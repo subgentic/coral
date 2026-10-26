@@ -29,14 +29,14 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'two agents waiting', 10000);
 
         console.log('1. Needs you: the agent with a goal has a quiet "Goal: <title>" link under its row, the other has none');
-        const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ name: tr.querySelector('.group-table-link').textContent, goal: (tr.querySelector('.group-table-cell-btn') || {}).textContent || '', aria: (tr.querySelector('.group-table-cell-btn') || {}).ariaLabel || '' }))`);
+        const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ name: tr.querySelector('.dt-primary').textContent, goal: (tr.querySelector('.dt-link') || {}).textContent || '', aria: (tr.querySelector('.dt-link') || {}).ariaLabel || '' }))`);
         assert.deepEqual(rows.map(r => [r.name, r.goal]).sort(), [['fe', 'Ship the new installer'], ['qa', '']]);
         assert.equal(rows.find(r => r.name === 'fe').aria, 'Goal: Ship the new installer', 'the cell button says which goal it is');
-        assert.equal(await ev(`document.querySelectorAll('#group-table-view .group-table-cell-btn').length`), 1);
+        assert.equal(await ev(`document.querySelectorAll('#group-table-view .dt-link').length`), 1);
 
         await shot('inbox-needs-goal');
         console.log('2. the link opens the goal on its board\'s Goals face');
-        await ev(`document.querySelector('#group-table-view .group-table-cell-btn').click(); true`);
+        await ev(`document.querySelector('#group-table-view .dt-link').click(); true`);
         await waitFor(`!!document.querySelector('#mb-goals .goals-detail-title') && document.querySelector('#mb-goals .goals-detail-title').textContent === 'Ship the new installer'`, 'the goal to open', 12000);
         assert.equal(await ev(`document.activeElement.id`), 'goals-detail', 'the focus is on the goal\'s detail');
 

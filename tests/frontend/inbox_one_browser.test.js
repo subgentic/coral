@@ -98,15 +98,15 @@ const AGENTS = (waiting) => waiting ? [
             }
 
             // the tab opens on the group last on screen: Needs you, as a table
-            await waitFor(`!!document.querySelector('#group-table-view table.group-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the first group as a table', 10000);
+            await waitFor(`!!document.querySelector('#group-table-view table.dt-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the first group as a table', 10000);
             assert.equal(await tableTitle(), 'Needs you', at + 'Needs you first');
             const needsBar = await ev(`(() => { const b = document.querySelector('#group-table-view .gt-toolbar'), s = b && b.querySelector('.gt-search'); return s ? { w: Math.round(s.getBoundingClientRect().width), left: Math.round(s.getBoundingClientRect().left), action: !!b.querySelector('.team-tb-action'), chips: b.querySelectorAll('.group-chip').length } : null; })()`);
             assert.ok(needsBar && needsBar.chips === 0 && !needsBar.action, at + 'the page has the toolbar line: the search field, no chips and no create action on Needs you (#7723): ' + JSON.stringify(needsBar));
             assert.equal(await ev(`(() => { const v = document.getElementById('group-table-view'), t = document.querySelector('#group-table-title').getBoundingClientRect(), h = document.querySelector('#group-table-view .group-table-head').getBoundingClientRect(); const m = innerWidth < 768 || matchMedia('(pointer: coarse)').matches ? 44 : 36;
                 return Math.round(h.height) === m && Math.abs(t.top - ((() => { const tb = v.querySelector('.gt-toolbar'); return tb ? tb.getBoundingClientRect().bottom + parseFloat(getComputedStyle(tb).marginBottom) : v.getBoundingClientRect().top + parseFloat(getComputedStyle(v).paddingTop); })() + (m - t.height) / 2)) < 1.5; })()`), true, at + 'the title row is one fixed height (no header button here, one on the tabs that have one)');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => [h.textContent, h.getAttribute('scope')])`), [['Item', 'col'], ['Team', 'col'], ['Folder', 'col'], ['When', 'col'], ['Goal', 'col']], at + 'Item, Team, Folder (the rows have one), When, and Goal because a row has one');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.children[0].textContent.trim() + '|' + r.children[1].textContent.trim())`), ['Agent One|team-a', 'Agent Two|team-b'], at + 'a row per waiting agent, with its team');
-            assert.equal(await ev(`document.querySelector('#group-table-view tbody tr .group-table-cell-btn').textContent`), 'Ship 169', at + "the goal's cell opens the goal");
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => [h.textContent.replace(/[↑↓↕]/g, '').trim(), h.getAttribute('scope')])`), [['Agent', 'col'], ['Waiting for', 'col'], ['CLI', 'col'], ['Folder', 'col'], ['Team', 'col'], ['Goal', 'col'], ['Waiting', 'col']], at + 'Agent, Waiting for, CLI, Folder (the rows have one), Team, Goal because a row has one, and how long it Waits');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.querySelector('.dt-primary').textContent.trim() + '|' + r.querySelector('td[data-key="team"]').textContent.trim())`), ['Agent One|team-a', 'Agent Two|team-b'], at + 'a row per waiting agent, with its team');
+            assert.equal(await ev(`document.querySelector('#group-table-view tbody tr .dt-link').textContent`), 'Ship 169', at + "the goal's cell opens the goal");
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#group-table-title')), c = getComputedStyle(document.querySelector('#group-table-view .group-table-head .session-group-count')); return [t.fontSize, t.fontWeight, c.fontSize, c.fontWeight]; })()`), ['20px', '700', '11px', '600'], at + 'the title is 20/700, its count 11/600');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the table is on the scale');
             await shot(`inbox-one-needs-${w}`);
@@ -150,7 +150,7 @@ const AGENTS = (waiting) => waiting ? [
             assert.deepEqual([savedBar.chipsOnLine, savedBar.chipsInHead, savedBar.label], [2, 0, 'Search saved messages'], at + 'Saved\'s Open and Done chips are on the toolbar line, not a row under the title (QA finding 3), and the page\'s field says what it searches');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent)`), ['Message', 'Saved', 'State', 'Action'], at + 'Message, Saved, State, Action');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .group-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim() + (c.getAttribute('aria-pressed') === 'true' ? '*' : ''))`), ['Open 2*', 'Done 1'], at + 'Open and Done chips with counts');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody .group-table-cell-btn')].map(b => b.textContent)`), ['Done', 'Done'], at + 'one quiet Done button per row');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-quiet')].map(b => b.textContent)`), ['Done', 'Done'], at + 'one quiet Done button per row');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the saved table is on the scale');
             await shot(`inbox-one-saved-${w}`);
             // Display options hold Filters and Sort, and no second search box
@@ -159,13 +159,13 @@ const AGENTS = (waiting) => waiting ? [
             assert.equal(await ev(`document.querySelector('#inbox-saved-bar .list-bar-search') === null`), true, at + 'and no second search box');
             await ev(`document.querySelector('${pane} [data-display-button]').click(); true`);
             // Done moves a row to the Done chip, and Reopen brings it back
-            await ev(`document.querySelector('#group-table-view tbody .group-table-cell-btn').click(); true`);
+            await ev(`document.querySelector('#group-table-view tbody .dt-quiet').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'Done moves the row out of Open', 8000);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .group-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`), ['Open 1', 'Done 2'], at + 'the counts follow');
             assert.equal(await ev(`document.getElementById('inbox-live').textContent`), 'Marked done', at + 'a polite line says so');
             await ev(`document.querySelectorAll('#group-table-view .group-chip')[1].click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2 && document.querySelector('#group-table-view tbody .group-table-cell-btn').textContent === 'Reopen'`, at + 'the Done chip lists them, with Reopen', 8000);
-            await ev(`document.querySelector('#group-table-view tbody .group-table-cell-btn').click(); true`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2 && document.querySelector('#group-table-view tbody .dt-quiet').textContent === 'Reopen'`, at + 'the Done chip lists them, with Reopen', 8000);
+            await ev(`document.querySelector('#group-table-view tbody .dt-quiet').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'Reopen takes it out of Done', 8000);
             await ev(`document.querySelectorAll('#group-table-view .group-chip')[0].click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'back on Open with both', 8000);
@@ -183,7 +183,7 @@ const AGENTS = (waiting) => waiting ? [
             await waitFor(`/Agent Three needs you/.test(document.getElementById('inbox-live').textContent)`, at + 'the announcement while Saved is shown', 5000);
             await setAgents(true);
             // a saved message's page: its link back, the message, and a bar with the primary last
-            await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+            await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#inbox-page .item-bar') && document.getElementById('inbox-page').checkVisibility()`, at + "the saved message's page", 8000);
             assert.equal(await ev(`document.querySelector('#inbox-page > .group-back').textContent`), '← Saved', at + 'back names Saved');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#inbox-page .wf-item-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + 'the title is 17/700');

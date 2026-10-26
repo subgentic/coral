@@ -5,7 +5,7 @@
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), line: 0|1|2, when(row), subtitle(row) }
- *   cell types: chip(word, cls), avatar(name), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
+ *   cell types: chip(word, cls), avatar(name), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
  * (the Analytics tables); the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
@@ -40,6 +40,14 @@ export function avatar(name, text) {
     if (!n) { w.textContent = text || ''; return w; }
     const a = el('span', 'dt-avatar', [...n][0].toUpperCase()); a.setAttribute('aria-hidden', 'true'); a.style.background = `var(--avatar-${(hash(n.toLowerCase()) % 8) + 1})`;
     w.append(a, el('span', 'dt-person-name', text || n)); // text: what is said beside the circle when it is more than the name ("Done by Dev")
+    return w;
+}
+/** A person who is also the row's button: the circle, then the name as the one real button (Needs you: the agent). */
+export function personButton(name, label) {
+    const w = avatar(name);
+    const b = primaryButton(name, label);
+    w.querySelector('.dt-person-name')?.replaceWith(b);
+    if (!w.querySelector('.dt-avatar')) w.append(b);
     return w;
 }
 /** A time as the app says it (relative), with the exact time on hover. */

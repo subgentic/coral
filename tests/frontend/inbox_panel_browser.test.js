@@ -224,7 +224,7 @@ const STUB = `(() => {
             // Saved for later: the component's own "Read the whole message" (the mount without a mode, which is what Coral Hub's pinned version calls), mounted on a host of its own; then Coral's page, which reads the whole text at once and has no button (#7660)
             const savedAt = async i => {
                 await ev(`(async () => { const m = await import(${S} + 'saved.js'); await m.openSavedAll(); return true; })()`);
-                await waitFor(`document.querySelectorAll('#group-table-view tbody .group-table-link').length === 4 && document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved'`, 'four saved items', 8000);
+                await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 4 && document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved'`, 'four saved items', 8000);
                 await ev(`(async () => { document.getElementById('qa-old-host')?.remove(); const h = document.createElement('div'); h.id = 'qa-old-host'; document.body.append(h);
                     const sv = await import(${S} + 'saved.js'), ic = await import(${S} + 'inbox_coral.js'), pm = await import(${S} + 'inbox_panel.js');
                     const inbox = pm.mountInbox(h, ic.coralInboxAdapter, { load: false, region: false }); const x = inbox.savedExpand(sv.savedView().shown[${i}]); h.append(x.root); return true; })()`);
@@ -257,7 +257,7 @@ const STUB = `(() => {
             await ev(`document.getElementById('qa-old-host')?.remove(); true`);
             // Coral's page (#7660): the whole text at once, no button, the snippet gives way, a long one is not cut
             const reads0 = await ev(`window.__reqs.filter(x => /\\/api\\/saved\\/11\\/message$/.test(x.p)).length`);
-            await ev(`document.querySelectorAll('#group-table-view tbody .group-table-link')[0].click(); true`);
+            await ev(`document.querySelectorAll('#group-table-view tbody .dt-primary')[0].click(); true`);
             await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-body .md')`, 'the whole message, shown at once', 6000);
             const pg = await ev(`(() => { const p = document.getElementById('inbox-page'); const r = p.querySelector('.ibx-saved-body'); const sn = p.querySelector('.inbox-saved-snippet'); return { button: !!p.querySelector('.ibx-saved-toggle'), hidden: r.hidden, snippetHidden: sn.hidden, capped: getComputedStyle(r).maxHeight, clipped: r.scrollHeight > r.clientHeight + 1, bar: [...p.querySelectorAll('.item-bar > .btn, .item-bar > .wf-more > .btn')].map(b => b.textContent.trim()) }; })()`);
             check(`${dev}: Coral's message page shows the whole text at once: no button, the region open, the snippet gone, nothing cut, More and Open in the bar`, !pg.button && !pg.hidden && pg.snippetHidden && pg.capped === 'none' && !pg.clipped && /^More,Open/.test(pg.bar.join()), JSON.stringify(pg));
