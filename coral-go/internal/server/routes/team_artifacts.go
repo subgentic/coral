@@ -209,18 +209,7 @@ func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFil
 	if err != nil {
 		return nil, false, err
 	}
-	// A task's own list (?task=<n>) reads that task's results alone, so a file several tasks reference is on each of them, the way the task row's artifact_count counts it (#8575);
-	// the team's list collapses it to the newest task.
-	collect := tasks
-	if onlyTask != 0 {
-		collect = make([]board.TeamArtifactTask, 0, 1)
-		for _, t := range tasks {
-			if t.TaskID == onlyTask {
-				collect = append(collect, t)
-			}
-		}
-	}
-	items := collectTeamArtifacts(project, collect, subscribers, sessionFilter)
+	items := collectTeamArtifacts(project, tasks, subscribers, sessionFilter)
 	if sessionFilter != "" {
 		// Only a session of this board: the filter used to list ANY session's uploads under
 		// this board's name (#3601, weak site W27).
