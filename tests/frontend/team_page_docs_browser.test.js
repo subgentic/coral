@@ -37,7 +37,10 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
                 assert.ok(await ev(`!!window.__tp.find('input', /^Search (team )?artifacts$/i)`), 'an input named Search team artifacts (the old tab\'s name stays)');
                 assert.ok(await ev(`/\\b\\d[\\d,]*\\s+artifacts\\b/i.test(window.__na.text(window.__tp.page()))`), 'the count as words ("<n> artifacts")');
                 const hd = await ev(`window.__tp.headers()`); assert.ok(hd, 'the Artifacts tab has a table');
-                if (!mobile) assert.deepEqual(hd.slice(0, 5), ['Name', 'Type', 'Size', 'Task', 'Created'], 'the columns');
+                if (!mobile) {
+                    assert.equal(await ev(`window.__tp.table().querySelector('thead th input[type="checkbox"]')?.getAttribute('aria-label')`), 'Select all rows on this page', 'the first column selects artifacts for bulk actions');
+                    assert.deepEqual(hd.slice(1, 6), ['Name', 'Type', 'Size', 'Task', 'Created'], 'the data columns after selection');
+                }
                 assert.equal((await ev(`window.__tp.rows()`)).length, 5, 'five rows (the first page)');
             });
             await S.run(`${label}: Load more adds the next page below the first and keeps the focus in the table`, async () => {
@@ -45,7 +48,7 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
                 await waitFor(`window.__tp.rows().length === 10`, 'ten rows after Load more', 6000);
                 assert.equal(await ev(`!!window.__tp.find('button', /^Load more$/i)`), false, 'Load more is gone when the server has no more');
             });
-            await S.run(`${label}: a row's name (a button, the first column) opens the pane; the row is marked selected; Escape closes it and the focus returns to the row`, async () => {
+            await S.run(`${label}: a row's name button opens the pane; Escape closes it and the focus returns to the row`, async () => {
                 assert.ok(await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button')].find(x => /^Report 1$/.test(window.__na.name(x))); if (!b) return false; b.focus(); b.click(); return true; })()`), 'no row button named Report 1'); await settle(400);
                 assert.ok(await ev(`!!window.__tp.pane() && /The report text\\./.test(window.__na.text(window.__tp.pane()))`), 'the pane shows the text');
                 await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`); await settle(300);

@@ -1,6 +1,6 @@
 // The team page's documents-only detail pane (#7453, stage 1; UI/UX's team page doc 7aa984fe): choosing an artifact row opens an aside named Details beside the table (460 px wide at 1500 px and over, a 56 px rail of the
-// table below 1500 px, a sheet over a phone), with a heading, Open, Download, Copy link and a Close details button; Escape and Close details close it and give the focus back to the row, and the row is marked selected
-// while it is open. Goals, tasks and agents never open a pane (they get a page, or none); the header and the tab strip do not move when the pane opens. Written failing-first by QA (#7466): controls by role and
+// table below 1500 px, a sheet over a phone), with a heading, Open, Download, Copy link and a Close details button; Escape and Close details close it and give the focus back to the row, and the row is marked current
+// while it is open. Bulk selection is a separate state. Goals, tasks and agents never open a pane (they get a page, or none); the header and the tab strip do not move when the pane opens. Written failing-first by QA (#7466): controls by role and
 // accessible name (helpers/team_page.js). Isolated dev server; the artifact list is stubbed.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -58,8 +58,8 @@ const HEX = 'a'.repeat(64);
                     assert.ok(tw !== null && tw > 300, `the table keeps the page's width beside the pane (got ${tw})`);
                 }
             });
-            await S.run(`${label}: the row is marked selected while the pane is open, and the header and the tab strip have not moved`, async () => {
-                assert.equal(await ev(`(() => { const e = ${row('/' + ART + '/')}; return e ? (e.getAttribute('aria-selected') || e.getAttribute('aria-current') || '') : 'no row'; })()`), 'true', 'the row has aria-selected or aria-current true');
+            await S.run(`${label}: the row is marked current while the pane is open, and the header and the tab strip have not moved`, async () => {
+                assert.deepEqual(await ev(`(() => { const e = ${row('/' + ART + '/')}; return e ? { current: e.getAttribute('aria-current'), selected: e.getAttribute('aria-selected') } : null; })()`), { current: 'true', selected: 'false' }, 'the preview row is current without being selected for a bulk action');
                 const open = await rect(ev); await closeRow(); const closed = await rect(ev);
                 // Below 1500 px the sidebar is the 56 px rail while the pane is open, so the page's left edge and width change with it; the header and the tab strip do not move up or down or change height.
                 const keys = w >= 1500 ? ['x', 'y', 'w', 'h'] : ['y', 'h'];
