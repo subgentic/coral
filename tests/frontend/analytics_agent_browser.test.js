@@ -9,7 +9,7 @@ const AGENTS = [{ session_id: 'a1', agent_name: 'Frontend Dev', board_name: 'cor
     { session_id: 'a2', agent_name: 'QA Engineer', board_name: 'coral-go-team', folder: 'coral', requests: 4, input_tokens: 900, output_tokens: 90, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.6, first_seen: '2026-10-21T05:00:00Z', last_seen: '2026-10-21T05:30:00Z' }];
 const hourIso = ago => new Date(Math.floor((Date.now() - ago * 3600000) / 3600000) * 3600000).toISOString().replace('.000Z', 'Z');
 const BUCKETS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), series: [{ key: 'Frontend Dev', label: 'Frontend Dev', cost_usd: h === 20 ? 9 : 0.6, input_tokens: 1700, output_tokens: 300, cache_read_tokens: h === 20 ? 1000 : 15000, cache_write_tokens: 40, num_requests: 5 }, { key: 'QA Engineer', label: 'QA Engineer', cost_usd: 0.02, input_tokens: 30, output_tokens: 3, cache_read_tokens: 0, cache_write_tokens: 0, num_requests: 1 }] }));
-const TURNS = Array.from({ length: 30 }, (_, i) => ({ turn: i + 1, cost_usd: i === 14 ? 6 : 0.6, cumulative_cost: 0, input_tokens: 1000, output_tokens: 100, cache_read_tokens: 9000, cache_write_tokens: 0, model: 'claude-opus-5-5', timestamp: new Date(Date.now() - (30 - i) * 600000).toISOString() })).map((t, i, a) => ({ ...t, cumulative_cost: a.slice(0, i + 1).reduce((s, x) => s + x.cost_usd, 0) }));
+const TURNS = Array.from({ length: 30 }, (_, i) => ({ turn: i + 1, cost_usd: i === 14 ? 6.6 : 0.6, cumulative_cost: 0, input_tokens: 1000, output_tokens: 100, cache_read_tokens: 9000, cache_write_tokens: 0, model: 'claude-opus-5-5', timestamp: new Date(Date.now() - (30 - i) * 600000).toISOString() })).map((t, i, a) => ({ ...t, cumulative_cost: a.slice(0, i + 1).reduce((s, x) => s + x.cost_usd, 0) }));
 const BIGGEST = [{ session_id: 'a1', agent_name: 'Frontend Dev', cost_usd: 6, input_tokens: 38000, output_tokens: 900, cache_read_tokens: 1000, cache_write_tokens: 0, model: 'claude-opus-5-5', timestamp: new Date(Date.now() - 16 * 600000).toISOString(), num_turns: 1 },
     { session_id: 'a1', agent_name: 'Frontend Dev', cost_usd: 1.2, input_tokens: 9000, output_tokens: 300, cache_read_tokens: 4000, cache_write_tokens: 0, model: 'claude-opus-5-5', timestamp: new Date(Date.now() - 5 * 600000).toISOString(), num_turns: 1 }];
 const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), calls: 20 + h, errors: h === 20 ? 9 : 1, avg_duration_ms: 40 }));
@@ -58,6 +58,8 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         assert.ok(d.svgs.every(s => s[0] === 'true'), 'every chart is hidden from a screen reader: ' + JSON.stringify(d.svgs));
         assert.equal(d.svgs.filter(s => s[1]).length, 2, 'two charts lead; the rest are under More charts: ' + JSON.stringify(d.svgs));
         assert.deepEqual(d.rows, ['$6.00', '$1.20'], 'the biggest turns, the dearest first');
+        const first = await ev(`({ title: document.querySelector('#cost-agent-detail .viz-title').textContent, sr: document.querySelector('#cost-agent-detail .viz-sr').textContent })`);
+        assert.match(first.title, /^Cost turn by turn, last 24 hours/); assert.match(first.sr, /\$24\.00 in all/, 'the running cost ends on the Cost tile: ' + first.sr);
         assert.match(d.tiles[0], /^Cost\$24\.00/); assert.match(d.tiles[2], /90% of the input/, JSON.stringify(d.tiles));
         console.log('   ✓');
 
