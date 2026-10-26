@@ -809,168 +809,6 @@ body.panel-dragging .agentic-state {
     container-type: inline-size;
 }
 
-/* The task id opens the task: a real button so the rows are reachable by keyboard. */
-.board-task-open {
-    background: none;
-    border: none;
-    padding: 0;
-    font: inherit;
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
-}
-.board-task-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
-
-/* A narrow panel (the sidebar) cannot fit every column, and the title used to be pushed
-   off-screen behind a sideways scroll. There each row wraps: status, id, priority and agent
-   on the first line, the full title on its own line below; Type, Cost and Created are hidden. */
-@container (max-width: 789px) {
-    .board-task-list .board-task-item { min-width: 0; flex-wrap: wrap; row-gap: 2px; }
-    .board-task-list .board-task-item .board-task-type,
-    .board-task-list .board-task-item .board-task-cost,
-    .board-task-list .board-task-item .board-task-time { display: none; }
-    .board-task-list .board-task-item .board-task-desc { order: 10; flex: 1 0 100%; min-width: 0; padding-left: 106px; box-sizing: border-box; }
-    /* Two lines of the title, not one cut at the edge: with hundreds of tasks the title is how a row is told apart. */
-    .board-task-list .board-task-item:not(.board-task-header) .board-task-desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; }
-    .board-task-list .board-task-header .board-task-desc { display: none; }
-    /* The agent column takes what the first line has left instead of a fixed 110px: with the fixed width the first line needed 360px, and in a dock
-       a little narrower than that Agent wrapped under Status, and under the Priority label in the header (#4716). */
-    .board-task-list .board-task-item .board-task-assignee { flex: 1 1 0; width: auto; min-width: 0; }
-}
-/* A dock of 560px and up has room for Cost on the first line (status, id, priority, agent, cost: about 300px), so it is not dropped with Type and Created (#4877: it was cut out of a 680px dock). Narrower than that (the sidebar) the row keeps what #4716 gave it. */
-@container (min-width: 560px) and (max-width: 789px) {
-    .board-task-list .board-task-item .board-task-cost { display: block; order: 5; }
-}
-
-.board-task-item {
-    display: flex;
-    align-items: center;
-    /* Fixed columns (676px: status 96, id 42, priority 58, type 50, agent 110, cost 60, created 100, and the 160px description) + 7 gaps (70px) + padding (24px).
-       The wrapped layout above takes over below 790px (a container is a few px wider than the list it scrolls in), so the list does not scroll sideways with Cost and Created cut off in a 680px dock (#4877). A fixed floor, not fit-content:
-       every row gets the same width, so backgrounds and borders line up and
-       long descriptions still truncate instead of stretching their row. */
-    min-width: 770px;
-    width: 100%;
-    box-sizing: border-box;
-    gap: 10px;
-    padding: 6px 12px;
-    font-size: var(--fs-md);
-    line-height: 1.4;
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-.board-task-header {
-    color: var(--text-secondary);
-    font-size: 0.75rem;
-    font-weight: 500; /* sentence case, 12/500, as the team page's Tasks table (#7639) */
-    cursor: default;
-    border-bottom: 1px solid var(--border);
-    padding: 6px 12px;
-    position: sticky;
-    top: 0;
-    background: var(--bg-secondary);
-    z-index: 1;
-}
-
-.board-task-sort {
-    cursor: pointer;
-    user-select: none;
-}
-
-.board-task-sort:hover {
-    color: var(--text-primary);
-}
-
-.board-task-time {
-    font-size: var(--fs-base);
-    color: var(--text-secondary);
-    white-space: nowrap;
-    min-width: 100px;
-    text-align: right;
-    margin-left: auto;
-}
-
-.board-task-status-col {
-    width: 96px;
-    flex-shrink: 0;
-}
-
-.board-task-status-wrap {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    width: 96px;
-    flex-shrink: 0;
-}
-
-/* Working and blocked details stay available on hover and keyboard focus
-   without adding noisy red labels to every task row. */
-.board-task-status-wrap[tabindex="0"] {
-    cursor: help;
-    border-radius: var(--radius-sm);
-}
-
-.board-task-status-wrap[tabindex="0"]:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-.board-task-status-label {
-    font-size: var(--fs-base);
-    color: var(--text-secondary);
-    white-space: nowrap;
-    /* The column is fixed width; never spill into the task id beside it. */
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.board-task-status-label b {
-    color: var(--error);
-    font-weight: 600;
-}
-
-.board-task-id {
-    width: 42px;
-    flex-shrink: 0;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-}
-
-.board-task-item:last-child {
-    border-bottom: none;
-}
-
-.board-task-item:hover {
-    background: var(--hover-bg);
-}
-
-.board-task-item.completed {
-    /* The row is dimmed cell by cell, not as a whole: its verification badge (#4564) is text that must reach 4.5:1, and a whole-row opacity of .55 cut it to about 2:1. */
-    opacity: 1;
-}
-.board-task-item.completed > :not(.board-task-desc) { opacity: 0.55; }
-.board-task-item.completed .board-task-desc { color: color-mix(in srgb, var(--text-primary) 55%, transparent); }
-
-.board-task-item.failed {
-    background: rgba(var(--fx-red-rgb), 0.06);
-}
-
-.board-task-item.cancelled {
-    opacity: 0.7;
-}
-
-.board-task-item.blocked {
-    opacity: 0.7;
-}
-
-.board-task-item.draft {
-    opacity: 0.65;
-}
-
-.board-task-item:not(.board-task-header) .board-task-desc { color: var(--link-text); } /* every title is the link it is (#7182); the working one is told by its status icon, not by being the only blue title */
-.board-task-item.completed:not(.board-task-header) .board-task-desc { text-decoration: line-through; text-decoration-thickness: 1px; } /* a finished title keeps the full link colour (4.5:1 in both themes; a 60% mix measured 3.3 and 2.9): the line and the check icon say it is done */
-
 .board-task-status-icon {
     font-size: var(--icon-inline-size);
     flex-shrink: 0;
@@ -1013,18 +851,6 @@ body.panel-dragging .agentic-state {
     white-space: nowrap;
 }
 
-/* ── Subagent rows ─────────────────────────────────────────
-   Work a main agent delegated, shown among its tasks. A violet rail, tint
-   and chip set them apart from board and agent tasks at a glance. */
-.board-task-item.board-task-subagent {
-    background: linear-gradient(90deg, rgba(var(--fx-violet-rgb), 0.10), rgba(var(--fx-violet-rgb), 0.02) 60%);
-    box-shadow: inset 3px 0 0 var(--subagent-accent);
-}
-
-.board-task-item.board-task-subagent.in-progress .board-task-desc {
-    color: var(--subagent-accent);
-}
-
 .board-task-type.board-task-type-subagent {
     display: inline-flex;
     align-items: center;
@@ -1037,40 +863,6 @@ body.panel-dragging .agentic-state {
     font-size: var(--icon-inline-size);
 }
 
-.board-task-subagent-badge {
-    display: inline-block;
-    margin-right: 6px;
-    padding: 0 6px;
-    border-radius: var(--radius-lg);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    line-height: 16px;
-    vertical-align: 1px;
-    color: var(--subagent-accent);
-    background: rgba(var(--fx-violet-rgb), 0.15);
-    border: 1px solid rgba(var(--fx-violet-rgb), 0.35);
-}
-
-/* How long an in-progress task has been claimed */
-.board-task-claimed {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    margin-right: 6px;
-    padding: 0 6px;
-    border-radius: var(--radius-lg);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    line-height: 16px;
-    vertical-align: 1px;
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    font-variant-numeric: tabular-nums;
-}
-.board-task-claimed .material-icons {
-    font-size: var(--icon-inline-size);
-}
 .task-detail-claimed-for {
     color: var(--text-muted);
 }
@@ -1191,27 +983,6 @@ body.panel-dragging .agentic-state {
     font-size: 0.75rem;
     font-style: italic;
     color: var(--text-muted);
-}
-
-.board-task-assignee {
-    font-size: var(--fs-base);
-    color: var(--text-secondary);
-    flex-shrink: 0;
-    width: 110px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.board-task-desc {
-    flex: 0 0 160px;
-    /* The only flexible column. .board-task-item's min-width guarantees it at
-       least 160px; without that it collapsed to zero at the default panel
-       width and every task lost its title. */
-    min-width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .board-task-hide-toggle {
@@ -1491,15 +1262,6 @@ body.panel-dragging .agentic-state {
 .task-detail-value {
     font-size: 0.8125rem;
     color: var(--text-primary);
-}
-
-.board-task-cost {
-    font-size: 0.6875rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-    width: 60px;
-    flex-shrink: 0;
-    text-align: right;
 }
 
 .board-task-cost-live {
@@ -2521,7 +2283,6 @@ body.panel-dragging .agentic-state {
 @media (pointer: coarse), (max-width: 767px) { .preview-unshare-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } }
 
 /* A task names its goal (#7253): a quiet chip on a Tasks row and the Goal line's button in a task's detail. */
-.board-task-goal { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--border-light); border-radius: 999px; color: var(--text-secondary); font-size: var(--fs-base); max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .task-goal-link { background: none; border: 0; padding: 0; font: inherit; color: var(--link-text); text-decoration: underline; cursor: pointer; text-align: left; overflow-wrap: anywhere; }
 @media (max-width: 767px) { .task-goal-link { min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } } /* the Goal line's button is a 44 px target on a phone (#7313) */
 

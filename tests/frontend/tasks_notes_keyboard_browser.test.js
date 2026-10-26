@@ -28,19 +28,21 @@ const { connect } = require('./agent_view_harness');
             t.renderBoardTaskList(); return true; })()`);
         await waitFor(`document.querySelectorAll('#board-task-list [data-on-click="task-open"]').length === 2`, 'two task rows', 5000);
 
+        await ev(`document.getElementById('agentic-state').style.width = '1000px'; true`);
+        await waitFor(`!document.querySelector('#board-task-list .dt-box').classList.contains('dt-folded')`, 'wide table headers');
         console.log('1. Tasks: rows and headings');
-        const kinds = await ev(`[...document.querySelectorAll('#board-task-list [data-on-click="task-sort"]')].map(e => ({ tab: e.tabIndex, role: e.getAttribute('role') }))`);
-        assert.ok(kinds.length >= 3 && kinds.every(k => k.tab === 0 && k.role === 'button'), 'the headings are focusable buttons: ' + JSON.stringify(kinds));
+        const kinds = await ev(`[...document.querySelectorAll('#board-task-list .dt-sort')].map(e => ({ tab: e.tabIndex, role: e.getAttribute('role') }))`);
+        assert.ok(kinds.length >= 3 && kinds.every(k => k.tab === 0 && k.role === null), 'the headings are focusable buttons: ' + JSON.stringify(kinds));
         // a task row is neither (#5813): its one keyboard control is the native Open button, named by the task and its status
         const rowKinds = await ev(`[...document.querySelectorAll('#board-task-list [data-on-click="task-open"]')].map(e => ({ tab: e.tabIndex, role: e.getAttribute('role'), open: e.querySelector('button.board-task-open')?.getAttribute('aria-label') || '' }))`);
-        assert.ok(rowKinds.length === 2 && rowKinds.every(k => k.tab === -1 && k.role === null && /^Open task #\d+: .+, .+$/.test(k.open)), 'rows are not buttons; each holds a named native Open button: ' + JSON.stringify(rowKinds));
-        const sortLabel = () => ev(`document.querySelector('#board-task-list [data-sort="priority"]').textContent`);
-        assert.equal((await sortLabel()).includes('▲') || (await sortLabel()).includes('▼'), false, 'not sorted by priority yet');
+        assert.ok(rowKinds.length === 2 && rowKinds.every(k => k.tab === -1 && k.role === 'row' && /^Open task #\d+: .+, .+$/.test(k.open)), 'rows are not buttons; each holds a named native Open button: ' + JSON.stringify(rowKinds));
+        const sortLabel = () => ev(`document.querySelector('#board-task-list .dt-sort[data-key="priority"]').textContent`);
+        assert.equal((await sortLabel()).includes('↑') || (await sortLabel()).includes('↓'), false, 'not sorted by priority yet');
         for (const [k, code, vk] of [['Enter', 'Enter', 13], [' ', 'Space', 32]]) {
-            await ev(`document.querySelector('#board-task-list [data-sort="priority"]').focus(); true`);
+            await ev(`document.querySelector('#board-task-list .dt-sort[data-key="priority"]').focus(); true`);
             const before = await sortLabel();
             await press(k, code, vk);
-            await waitFor(`document.querySelector('#board-task-list [data-sort="priority"]').textContent !== ${JSON.stringify(before)}`, `${JSON.stringify(k)} sorts by the heading`, 4000);
+            await waitFor(`document.querySelector('#board-task-list .dt-sort[data-key="priority"]').textContent !== ${JSON.stringify(before)}`, `${JSON.stringify(k)} sorts by the heading`, 4000);
         }
         // a board task's name opens the team page's task page (#7644): the page needs a real board, so the opener is recorded here (task_page_actions_browser opens it for real)
         await ev(`window.__opened = []; window.openTeamPage = (board, opts) => { window.__opened.push({ board, ...opts }); return Promise.resolve(true); }; document.querySelector('#board-task-list .board-task-open').focus(); true`);

@@ -1,7 +1,7 @@
 // #4706 (UX scale pass): what a long list does to three panels, against stubbed answers.
 //  - Team Artifacts names the board (its label, never its id) and says when the list is only the newest part: "500+ artifacts", "Showing 100 of 500+"
 //  - Servers: with more than five machines "Add server" and a count sit above the list, not screens below it; with a few it stays under the list
-//  - the task list in a narrow panel shows a long title on two lines, not cut at the first
+//  - the shared task list in a narrow panel keeps the full title accessible without overflowing
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -52,12 +52,21 @@ const { connect } = require('./agent_view_harness');
         const top = await ev(`document.querySelector('#servers-view [data-action="add"]').getBoundingClientRect().top < innerHeight`);
         assert.equal(top, true, 'the button is on the first screen');
 
-        console.log('3. A narrow task list shows a long title on two lines');
+        console.log('3. A narrow shared task row keeps the complete title accessible');
         await ev(`window.switchNavTab('agents'); true`);
-        const lines = await ev(`(() => { const host = document.createElement('div'); host.id = 'scale-probe'; host.style.cssText = 'position:fixed;left:0;top:0;width:360px;background:#000;z-index:9999';
-            host.innerHTML = '<div class="board-task-list" style="width:360px"><div class="board-task-item"><span class="board-task-status-col">Open</span><span class="board-task-id">#1</span><span class="board-task-desc">' + 'A long title that keeps going and going so that it needs more than one line to be read. '.repeat(3) + '</span></div></div>';
-            document.body.append(host); const d = host.querySelector('.board-task-desc'); const cs = getComputedStyle(d); const lh = parseFloat(cs.lineHeight) || 16; const r = { clamp: cs.webkitLineClamp, ws: cs.whiteSpace, lines: Math.round(d.getBoundingClientRect().height / lh) }; host.remove(); return r; })()`);
-        assert.equal(lines.clamp, '2'); assert.equal(lines.ws, 'normal'); assert.ok(lines.lines === 2, 'the title is two lines tall (' + lines.lines + ')');
+        await ev(`(async () => {
+            const base = window.__coralStatic || '/static/';
+            const { state } = await import(base + 'state.js'), tasks = await import(base + 'tasks.js');
+            tasks.stopBoardTaskPoll(); state.currentSession = { name: 'scale-probe', type: 'live' }; state.selectedTeam = null;
+            state.currentAgentTasks = []; state.currentSubagents = [];
+            state.currentBoardTasks = [{ id: 1, title: 'A long title that keeps going and going so that it needs more than one line to be read. '.repeat(3), status: 'pending' }];
+            const host = document.createElement('div'); host.id = 'scale-probe'; host.style.cssText = 'position:fixed;left:0;top:0;width:360px;background:var(--bg-primary);z-index:9999';
+            host.append(document.getElementById('board-task-list')); document.body.append(host); tasks.renderBoardTaskList();
+        })()`);
+        await waitFor(`document.querySelector('#scale-probe .dt-box.dt-folded')`, 'folded task table');
+        const row = await ev(`(() => { const host = document.getElementById('scale-probe'), b = host.querySelector('.dt-primary'); const r = { title: b.textContent, label: b.getAttribute('aria-label'), overflow: host.scrollWidth - host.clientWidth, height: b.getBoundingClientRect().height }; host.remove(); return r; })()`);
+        assert.ok(row.title.length > 200 && row.label.includes(row.title), 'the complete title names the keyboard button');
+        assert.ok(row.overflow <= 1 && row.height >= 44, 'the shared row fits the dock and keeps a touch target');
         console.log('PASS');
     } catch (e) {
         console.error(e && e.stack || e);

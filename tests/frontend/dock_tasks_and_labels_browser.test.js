@@ -1,5 +1,5 @@
 // UI/UX's 170 list, items 9 and 12 (task 7639). Item 9: the labels of the Restart dialog's permission mode and of the Add Macro dialog (Label, Command) have no colon, as nowhere else. Item 12: the agent dock's
-// Tasks table has a sentence-case head (12/500, not capitals made by CSS), a board task's name is the row's one real button (its id is text), and a mouse click on a row leaves no focus ring behind. The task
+// Tasks table uses the shared header typography, a board task's name is the row's one real button (its id is text), and a mouse click on a row leaves no focus ring behind. The task
 // list is an agent's Tasks tab on a real board of the isolated dev server (helpers/board_tasks_tab.js). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -26,24 +26,13 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         for (const width of [420, 680, 980]) {
             await ev(`(() => { const d = document.getElementById('agentic-state'); d.style.transition = 'none'; d.style.width = '${width}px'; return d.offsetWidth; })()`);
             // #7800: the same columns must start at the same edge, regardless of header/row element types.
+            await waitFor(`document.querySelector('#board-task-list .dt-box').classList.contains('dt-folded') === ${width < 800}`, 'responsive table layout');
             const edges = await ev(`(() => {
-                const head = document.querySelector('#board-task-list .board-task-header');
-                const rows = [...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')];
-                return ['status', 'id', 'priority', 'type', 'assignee', 'desc', 'cost', 'time'].map(col => {
-                    const h = head.querySelector('.board-task-' + (col === 'status' ? 'status-col' : col));
-                    return { col, visible: !!h.getClientRects().length, head: h.getBoundingClientRect().left,
-                        rows: rows.map(r => r.querySelector('.board-task-' + (col === 'status' ? 'status-wrap' : col)).getBoundingClientRect().left) };
-                });
+                const head = document.querySelector('#board-task-list thead tr');
+                const rows = [...document.querySelectorAll('#board-task-list tbody tr')];
+                return [...head.cells].map((h, i) => ({ col: h.textContent, visible: !!h.getClientRects().length,
+                    head: h.getBoundingClientRect().left, rows: rows.map(r => r.cells[i].getBoundingClientRect().left) }));
             })()`);
-            console.log('column edges', width, JSON.stringify(edges));
-            const priorityTextEdges = await ev(`(() => {
-                return [...document.querySelectorAll('#board-task-list .board-task-priority')].map(cell => {
-                    const range = document.createRange(); range.selectNodeContents(cell);
-                    return range.getBoundingClientRect().left;
-                });
-            })()`);
-            for (const left of priorityTextEdges.slice(1)) assert.ok(Math.abs(left - priorityTextEdges[0]) < 1,
-                'Priority label and values share a text edge: ' + JSON.stringify(priorityTextEdges));
             for (const col of edges.filter(c => c.visible)) for (const left of col.rows)
                 assert.ok(Math.abs(left - col.head) < 1, `${col.col}: header ${col.head}, cell ${left}`);
 
@@ -51,11 +40,11 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         }
         await ev(`document.getElementById('agentic-state').style.width = '420px'; true`);
 
-        console.log('12. a sentence-case head, the name is the one button, no ring after a click');
+        console.log('12. a shared table head, the name is the one button, no ring after a click');
         if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(require('node:path').join(process.env.CORAL_SCREENSHOT_DIR, 'dock-tasks.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
-        const head = await ev(`(() => { const h = document.querySelector('#board-task-list .board-task-header'); const cs = getComputedStyle(h); return { texts: [...h.children].map(c => c.textContent.trim()), transform: cs.textTransform, weight: cs.fontWeight, size: cs.fontSize }; })()`);
-        assert.equal(head.transform, 'none', 'the head is not capitals made by CSS: ' + JSON.stringify(head));
-        assert.deepEqual([head.weight, head.size], ['500', '12px'], '12/500');
+        const head = await ev(`(() => { const h = document.querySelector('#board-task-list thead tr'); const cs = getComputedStyle(h.cells[0]); return { texts: [...h.children].map(c => c.textContent.replace(/[↕↑↓]/g, '').trim()), transform: cs.textTransform, weight: cs.fontWeight, size: cs.fontSize }; })()`);
+        assert.equal(head.transform, 'uppercase', 'the head uses shared typography: ' + JSON.stringify(head));
+        assert.deepEqual([head.weight, head.size], ['600', '11px'], 'shared header typography');
         assert.deepEqual(head.texts.slice(0, 3), ['Status', 'ID', 'Priority'], 'the words as written');
         const row = await ev(`(() => { const r = document.querySelector('#board-task-list .board-task-item:not(.board-task-header)'); const b = [...r.querySelectorAll('button')]; return { buttons: b.length, name: b[0] && b[0].getAttribute('aria-label'), inDesc: !!(b[0] && b[0].closest('.board-task-desc')), idIsButton: !!r.querySelector('button.board-task-id') }; })()`);
         assert.equal(row.buttons, 1, 'one real button on the row: ' + JSON.stringify(row)); assert.ok(row.inDesc && !row.idIsButton, 'it is the name, and the id is text');

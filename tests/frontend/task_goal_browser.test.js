@@ -30,11 +30,10 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length >= 2 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'the tasks', 15000);
 
         console.log('1. a Tasks row names its goal in a quiet chip; a task with no goal has none');
-        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-goal').length === 1`, 'the goal chip', 8000);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].map(r => [r.querySelector('.board-task-desc').textContent.trim(), (r.querySelector('.board-task-goal') || {}).textContent || ''])`),
+        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .dt-subtitle').length === 1`, 'the goal chip', 8000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].map(r => [r.querySelector('.board-task-desc').textContent.trim(), (r.querySelector('.dt-subtitle') || {}).textContent || ''])`),
             await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].map(r => [r.querySelector('.board-task-desc').textContent.trim(), /installer/.test(r.querySelector('.board-task-desc').textContent) ? 'Goal: Ship the new installer' : ''])`));
-        assert.equal(await ev(`document.querySelector('#agentic-panel-tasks .board-task-goal').textContent`), 'Goal: Ship the new installer', 'the chip says Goal: to a screen reader (hidden words), then the title (#7313)');
-        assert.equal(await ev(`document.querySelector('#agentic-panel-tasks .board-task-goal .sr-only').textContent`), 'Goal: ');
+        assert.equal(await ev(`document.querySelector('#agentic-panel-tasks .dt-subtitle').textContent`), 'Goal: Ship the new installer', 'the chip says Goal: to a screen reader (hidden words), then the title (#7313)');
 
         console.log('2. Create Task: the Goal select lists the open goals; the task is made under the chosen one');
         await ev(`document.querySelector('.btn-create-task').click(); true`);

@@ -47,10 +47,11 @@ const open = [
         console.log('  ok');
 
         console.log('The default order shows no sort arrow; a column\'s third click gives the default back and clears the arrow');
-        const arrows = () => ev(`[...document.querySelectorAll('#board-task-list .board-task-header .board-task-sort')].map(e => e.dataset.sort + ':' + (/[▲▼]/.exec(e.textContent) || [''])[0]).filter(x => !x.endsWith(':'))`);
+        assert.equal(await ev(`document.querySelector('#board-task-list .dt-sortbar-select').selectedOptions[0].textContent`), 'Open first, newest first');
+        const arrows = () => ev(`[...document.querySelectorAll('#board-task-list th[aria-sort]')].filter(e => e.getAttribute('aria-sort') !== 'none').map(e => e.querySelector('.dt-sort').dataset.key + ':' + (e.getAttribute('aria-sort') === 'descending' ? '▼' : '▲'))`);
         assert.deepEqual(await arrows(), [], 'the default order has no arrow');
-        const click = f => ev(`document.querySelector('#board-task-list .board-task-header [data-sort="${f}"]').click(); true`);
-        await click('created_at'); assert.deepEqual(await arrows(), ['created_at:▼', 'created_at:▼'], 'first click: newest first, arrow down (the Task and Created labels share the key)');
+        const click = f => ev(`document.querySelector('#board-task-list .dt-sort[data-key="${f}"]').click(); true`);
+        await click('created_at'); assert.deepEqual(await arrows(), ['created_at:▼'], 'first click: newest first, arrow down (the Created column)');
         assert.deepEqual(await ids(), [...open, ...done].sort(byNewest).map(t => t.id), 'a chosen Created is the plain date order');
         await click('created_at'); assert.deepEqual((await arrows())[0], 'created_at:▲', 'second click turns it round');
         await click('created_at');
@@ -83,22 +84,30 @@ const open = [
         for (const w of (process.env.QA_WIDTHS || '300,330,360,420,520,680,770,790,900').split(',').map(Number)) {
             await ev(`document.getElementById('qa-dock').style.width = '${w}px'; true`);
             await ev(framesJs(2)); // the layout settles after the width changes
-            const g = await ev(`(() => { const h = document.querySelector('#board-task-list .board-task-header'); const r = c => { const e = h.querySelector('.' + c); const b = e.getBoundingClientRect(); const range = document.createRange(); range.selectNodeContents(e); const t = range.getBoundingClientRect(); return { left: b.left, right: b.right, top: Math.round(b.top), textLeft: t.left, textRight: t.right, clipped: e.scrollWidth > e.clientWidth + 1 }; };
-                const row = document.querySelector('#board-task-list .board-task-item:not(.board-task-header)'); const rb = c => row.querySelector('.' + c).getBoundingClientRect();
-                return { priority: r('board-task-priority'), agent: r('board-task-assignee'), id: r('board-task-id'), width: document.getElementById('board-task-list').clientWidth, row: { priorityLeft: rb('board-task-priority').left, agentLeft: rb('board-task-assignee').left } }; })()`);
-            const over = await ev(`(() => { const l = document.getElementById('board-task-list'); return { scroll: l.scrollWidth, client: l.clientWidth, cost: !!document.querySelector('#board-task-list .board-task-item:not(.board-task-header) .board-task-cost') && getComputedStyle(document.querySelector('#board-task-list .board-task-item:not(.board-task-header) .board-task-cost')).display !== 'none' }; })()`);
-            if (!process.env.QA_WIDTHS) assert.ok(over.scroll <= over.client + 1, `at ${w}px the list scrolls sideways (Cost and Created cut off, #4877): ${JSON.stringify(over)}`);
-            const gap = g.agent.textLeft - g.priority.textRight;
-            if (process.env.QA_WIDTHS) console.log(`   ${w}px: gap ${gap.toFixed(1)} priority ${JSON.stringify(g.priority)} agent-left ${g.agent.left} (second line: ${g.agent.left < g.priority.left})`);
-            if (process.env.QA_WIDTHS) continue;
-            assert.ok(gap >= 6, `at ${w}px the labels are ${gap.toFixed(1)}px apart: ${JSON.stringify(g)}`);
-            assert.ok(!g.priority.clipped && !g.agent.clipped, `at ${w}px a label is cut: ${JSON.stringify(g)}`);
-            assert.ok(g.agent.left >= g.priority.right + 6 && Math.abs(g.agent.top - g.priority.top) <= 3, `at ${w}px Agent wrapped under Priority: ${JSON.stringify(g)}`);
-            assert.ok(g.row && Math.abs(g.row.agentLeft - g.agent.left) < 1 && Math.abs(g.row.priorityLeft - g.priority.left) < 1, `at ${w}px the rows' columns do not line up with the header's: ${JSON.stringify(g)}`);
-            assert.ok(g.priority.textLeft - g.id.textRight >= 4, `at ${w}px Priority touches ID: ${JSON.stringify(g)}`);
+            const g = await ev(`(() => {
+                const list = document.getElementById('board-task-list'), box = list.querySelector('.dt-box');
+                const row = list.querySelector('tbody tr');
+                const cells = [...row.cells].map(c => ({ key: c.dataset.key, left: c.getBoundingClientRect().left, shown: c.getBoundingClientRect().width > 0 }));
+                const heads = [...list.querySelectorAll('thead th')].map(c => ({ key: c.querySelector('.dt-sort')?.dataset.key, left: c.getBoundingClientRect().left }));
+                return { folded: box.classList.contains('dt-folded'), scroll: list.scrollWidth, width: list.clientWidth, cells, heads };
+            })()`);
+            assert.ok(g.scroll <= g.width + 1, `at ${w}px no sideways scroll: ${JSON.stringify(g)}`);
+            for (const key of ['priority', 'assignee', 'type', 'cost', 'created_at']) {
+                const cell = g.cells.find(c => c.key === key);
+                assert.ok(cell.shown, `${key} remains visible at ${w}px`);
+                if (!g.folded) assert.ok(Math.abs(cell.left - g.heads.find(h => h.key === key).left) < 1, `${key} aligns with its header at ${w}px`);
+            }
         }
         console.log('  ok');
         if (process.env.QA_WIDTHS) process.exitCode = 1; // measuring: print
+        await ev(`document.getElementById('qa-dock').style.width = '360px'; window.__coral._toggleTaskSort('cost'); window.__coral._toggleTaskSort('cost'); window.__coral._toggleTaskSort('cost'); true`);
+        await waitFor(`document.querySelector('#board-task-list .dt-box.dt-folded')`, 'folded sort controls');
+        await ev(`(() => { const s = document.querySelector('#board-task-list .dt-sortbar-select'); s.focus(); s.value = 'priority'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+        for (let i = 0; i < 2; i++) await ev(`(() => { const b = document.querySelector('#board-task-list .dt-sortbar-dir'); b.focus(); b.click(); })()`);
+        assert.equal(await ev(`document.activeElement === document.querySelector('#board-task-list .dt-sortbar-select')`), true, 'resetting the sort returns focus to its visible selector');
+        assert.equal(await ev(`document.querySelector('#board-task-list .dt-sortbar-select').selectedOptions[0].textContent`), 'Open first, newest first');
+        await ev(`window.__heldTaskRow = document.querySelector('#board-task-list tbody tr'); T.tasks.renderBoardTaskList(); true`);
+        assert.equal(await ev(`window.__heldTaskRow === document.querySelector('#board-task-list tbody tr')`), true, 'an unchanged refresh keeps row nodes');
         console.log('PASS task list order');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

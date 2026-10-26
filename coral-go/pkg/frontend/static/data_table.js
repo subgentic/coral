@@ -1,7 +1,7 @@
 /* The one table (#7743): every list or table surface passes what to show, the component owns how it looks and behaves. The operator's rule: a styling change is one token or one rule, so every size and colour here
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
- *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, layout, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName, quiet, scroll }) -> { el, bar, selectButton, selection(), clear(), state }
+ *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, when(row), subtitle(row), title(row), filter: { label, active(), open(button) } }
@@ -148,10 +148,12 @@ export function dataTable(cfg) {
         const id = `dt-sort-${Math.random().toString(36).slice(2, 8)}`;
         const label = el('label', 'dt-sortbar-label', 'Sort by'); label.htmlFor = id;
         const select = el('select', 'dt-sortbar-select'); select.id = id;
+        if (!st.sort && cfg.defaultSortLabel) { const o = el('option', null, cfg.defaultSortLabel); o.value = ''; o.disabled = true; select.append(o); }
         for (const c of sortable) { const o = el('option', null, c.label); o.value = c.key; select.append(o); }
-        select.value = (st.sort && st.sort.key) || sortable[0].key;
+        select.value = (st.sort && st.sort.key) || (cfg.defaultSortLabel ? '' : sortable[0].key);
         select.addEventListener('change', () => { const c = columns.find(x => x.key === select.value); st.sort = null; sortBy(c, true); });
         const dir = button('btn dt-sortbar-dir', st.sort && st.sort.dir === 'desc' ? 'Descending' : 'Ascending', () => { const c = columns.find(x => x.key === select.value); sortBy(c); });
+        dir.hidden = !st.sort && !!cfg.defaultSortLabel;
         sortBar.append(label, select, dir);
     }
 
