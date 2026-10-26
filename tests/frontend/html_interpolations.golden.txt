@@ -587,13 +587,11 @@
 1	task_detail_html.js	clickable
 1	task_detail_html.js	completedAt
 1	task_detail_html.js	createdAt
-1	task_detail_html.js	dep.task_id
 1	task_detail_html.js	depStatusClass
 1	task_detail_html.js	depStatusLabel
 1	task_detail_html.js	depTitle
 1	task_detail_html.js	depsHtml
 1	task_detail_html.js	fields
-1	task_detail_html.js	lc.request_count
 1	task_detail_html.js	nameHtml
 1	task_detail_html.js	note
 1	task_detail_html.js	note ? `<br>${note}` : ''

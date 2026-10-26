@@ -189,7 +189,7 @@ function _taskBlockedByHtml(task) {
             const clickable = !isCrossBoard ? ` data-on-click="task-open" data-kind="${escapeAttr(task._source === 'agent' ? 'agent' : 'board')}" data-task-id="${Number(dep.task_id)}" style="cursor:pointer"` : '';
             return `<div class="task-dep-item">
                 <span class="task-dep-status ${depStatusClass}">${depStatusLabel}</span>
-                <a class="task-dep-link"${clickable}>${boardPrefix}#${dep.task_id}${depTitle}</a>
+                <a class="task-dep-link"${clickable}>${boardPrefix}#${Number(dep.task_id)}${depTitle}</a>
                 <span>${escapeHtml(dep.condition || 'success')}${dep.required_artifacts?.length ? ` · requires ${escapeHtml(dep.required_artifacts.join(', '))}` : ''}${dep.blocked_reason ? ` · ${escapeHtml(dep.blocked_reason)}` : ''}</span>
             </div>`;
         }).join('');
@@ -263,7 +263,7 @@ function _taskLiveCostHtml(liveCost) {
             </div>
             <div class="task-detail-token-item" style="margin-top:4px;opacity:0.6">
                 <span class="task-detail-token-label">Requests</span>
-                <span class="task-detail-token-value">${lc.request_count}</span>
+                <span class="task-detail-token-value">${Number(lc.request_count)}</span>
             </div>
         </div>`;
     }

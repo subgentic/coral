@@ -54,7 +54,7 @@ export const coralInboxAdapter = {
     },
     async listTaskMessages(project, taskId) { // the task's conversation (#7703): the person's replies and the agents' answers posted with --task, oldest first
         const d = await json(await fetch(`/api/board/${encodeURIComponent(project)}/messages/all?task_id=${pathId(taskId)}&limit=200`));
-        return (Array.isArray(d) ? d : []).map(m => ({ id: m.id, from: m.hub_user || m.subscriber_id || '', mine: m.subscriber_id === 'Operator', content: m.content, created_at: m.created_at }));
+        return (Array.isArray(d) ? d : []).map(m => ({ id: m.id, from: m.hub_user || m.subscriber_id || '', mine: m.subscriber_id === 'Operator' && !m.hub_user, content: m.content, created_at: m.created_at }));
     },
     canReply() { return { ok: true }; }, // the Operator of this computer; a Coral Hub viewer's adapter says why not
     async readSavedMessage(item) {

@@ -75,6 +75,12 @@ const STUB = `(() => { const real = window.fetch; const J = (b, s) => Promise.re
         assert.equal(await ev(`scrollY`), 0, 'the page did not move');
         await ev(`document.querySelector('#qa-thread-host .ibx-thread-new').click(); true`);
         await waitFor(`document.querySelector('#qa-thread-host .ibx-thread-new').hidden`, 'the line goes when followed', 3000);
+        console.log('a Coral Hub operator post is named by its hub user, and only the local Operator is You (Security #7724)');
+        await ev(`window.__msgs.push({ id: window.__nextId++, subscriber_id: 'Operator', hub_user: 'hub-user-1234abcd', content: 'from the hub', created_at: new Date().toISOString(), task_id: 11 }); true`);
+        await waitFor(`document.querySelector('#qa-thread-host .ibx-thread-head').textContent === 'Messages (10)'`, 'the hub post', 6000);
+        it = await items();
+        assert.match(it.at(-1).who, /^hub-user-1234abcd, /); assert.equal(it.at(-1).mine, false, 'not drawn as You');
+        assert.equal(it.filter(x => x.mine).length, 1, 'the one You is the person\'s own reply');
         console.log('PASS inbox_thread');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
