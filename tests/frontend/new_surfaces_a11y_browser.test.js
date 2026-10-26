@@ -151,6 +151,16 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             assert.equal(ths.filter(t => t.sort !== 'none').length, 1, 'exactly one column is the sort');
             const lvl = `#cost-by-thinking th[data-field="level"] button.cost-sort-btn`;
             const before = await ev(`document.querySelector('#cost-by-thinking th[data-field="level"]').getAttribute('aria-sort')`);
+            if (await ev(`getComputedStyle(document.querySelector('#cost-by-thinking thead')).display === 'none'`)) {
+                // the table is folded (a phone, #7738): its header row is not drawn, so the sort is the "Sort by" select above it, and the column filters are a desktop control
+                const sel = '.cost-fold-sort select';
+                assert.match(await ev(`document.querySelector(${JSON.stringify(sel)}).closest('label').textContent`), /^Sort by/, 'the select is named Sort by');
+                await focus(sel);
+                await ev(`(() => { const s = document.querySelector(${JSON.stringify(sel)}); s.value = 'level'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                await waitFor(`document.querySelector('#cost-by-thinking th[data-field="level"]').getAttribute('aria-sort') !== ${JSON.stringify(before)}`, 'the Sort by select sorts by the column', 4000);
+                assert.equal(await ev(`document.querySelectorAll('#cost-by-thinking th[aria-sort]:not([aria-sort="none"])').length`), 1);
+                continue;
+            }
             await focus(lvl); await key('Enter');
             await waitFor(`document.querySelector('#cost-by-thinking th[data-field="level"]').getAttribute('aria-sort') !== ${JSON.stringify(before)}`, 'Enter sorts by the column', 4000);
             const sb = await ax(lvl); assert.equal(sb.role, 'button'); assert.match(sb.name, /^thinking level/i, sb.name);
