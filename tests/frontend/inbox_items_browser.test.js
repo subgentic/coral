@@ -71,7 +71,7 @@ const BASE = require('./test_base').BASE;
                     await ev('history.forward(); true'); await checkInbox(url);
                     await load(url); await checkInbox(url);
                     await waitFor(`!!document.querySelector('#inbox-page .inbox-team-link')`, 'quiet team link');
-                    const teamURL=`/team/${board}/${isTask?'tasks/'+id:'messages'}`;
+                    const teamURL=`/team/${board}/${isTask?'tasks/'+id:'board'}`; // the Board tab's address word is board (#8652)
                     assert.equal(await ev(`document.querySelector('#inbox-page .inbox-team-link').getAttribute('href')`),teamURL);
                     await ev(`document.querySelector('#inbox-page .inbox-team-link').click(); true`);
                     await waitFor(`location.pathname===${JSON.stringify(teamURL)} && document.getElementById('team-page-view')?.getClientRects().length>0`, 'explicit team link');

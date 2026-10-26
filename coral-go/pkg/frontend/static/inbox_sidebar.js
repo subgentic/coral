@@ -9,7 +9,7 @@ import { needsInputAttention } from './display_activity_hint.js';
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 import { go, note, backIs, currentRoute } from './nav.js';
-import { build, keyRoute } from './routes.js';
+import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
 import { sessionServer, keyLabel, identityKey } from './server_base.js';
 import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -22,8 +22,6 @@ import { setHidden } from './dom_write.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
-import { note, currentRoute } from './nav.js';
-import { parse as parseRoute, inboxFolderPath } from './routes.js';
 const { coralInboxAdapter, savedExpandFor } = await importOnce('./inbox_coral.js');
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
@@ -274,6 +272,7 @@ function noteFolder(key) {
     const path = inboxFolderPath(key), route = path ? parseRoute(path) : null;
     if (!route) return;
     const cur = currentRoute();
+    if (cur && cur.view === route.view && cur.sub === route.sub && cur.folder === route.folder) return; // already on this folder's family (an item's page is under the folder's path: its own handler owns the address)
     if (cur && cur.view === 'chats' && (cur.id || cur.query)) return; // a chat's own address, or the Chats list with its search in the address (/chats?q=...): the filters are in it, so it stays
     note(route, { replace: !!cur && cur.view === 'chats' });
 }
