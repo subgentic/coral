@@ -12,7 +12,7 @@ const done = Array.from({ length: 40 }, (_, i) => ({ id: 100 + i, title: 'Done '
 const open = [
     { id: 1, title: 'Pending', status: 'pending', priority: 'low', created_at: '2026-09-01T10:00:00Z' },
     { id: 2, title: 'Running', status: 'in_progress', priority: 'high', assigned_to: 'Dev', claimed_at: '2026-09-02T10:00:00Z', created_at: '2026-09-02T10:00:00Z' },
-    { id: 3, title: 'In review', status: 'review_pending', priority: 'medium', assigned_to: 'Dev', created_at: '2026-09-03T10:00:00Z' },
+    { id: 3, title: 'In review', status: 'review_pending', priority: 'medium', assigned_to: 'Dev', reviewers: ['QA', 'UX', 'Sec'], created_at: '2026-09-03T10:00:00Z' },
     { id: 4, title: 'Blocked', status: 'blocked', priority: 'medium', created_at: '2026-09-04T10:00:00Z' },
     { id: 5, title: 'Draft', status: 'draft', priority: 'low', created_at: '2026-09-05T10:00:00Z' },
 ];
@@ -44,6 +44,12 @@ const open = [
             ['state', 'task', 'who']);
         assert.equal(await ev(`(() => { const row = document.querySelector('#board-task-list tbody tr'); const primary = row.cells[1].querySelector('.dt-primary'); return row.querySelectorAll('.dt-primary').length === 1 && row.cells[1].querySelector('.board-task-id')?.textContent === '#5' && row.cells[1].textContent.startsWith('#5 Draft') && primary?.textContent === 'Draft'; })()`), true,
             'the second cell has one primary action, with ID before the title');
+
+        console.log('Who is circles, as on the Tasks tab (#8507): the person solid, the reviewers outlined (two, then +N), the whole named and shown on hover, no name beside them');
+        const who = await ev(`(() => { const row = [...document.querySelectorAll('#board-task-list tbody tr')].find(r => r.querySelector('.board-task-id')?.textContent === '#3'); const c = row.querySelector('td[data-key="who"]'), i = c.querySelector('[role=img]'); return { label: i && i.getAttribute('aria-label'), title: i && i.title, solid: c.querySelectorAll('.dt-avatar:not(.dt-avatar-review)').length, outlined: c.querySelectorAll('.dt-avatar-review').length, more: (c.querySelector('.dt-avatars-more') || {}).textContent, words: !!c.querySelector('.dt-person-name, .board-task-assignee'), w: Math.round(c.getBoundingClientRect().width) }; })()`);
+        assert.deepEqual({ ...who, w: undefined }, { label: 'Dev, review by QA, UX, Sec', title: 'Dev, review by QA, UX, Sec', solid: 1, outlined: 2, more: '+1', words: false, w: undefined }, JSON.stringify(who));
+        assert.ok(who.w <= 110, `the column is as narrow as its circles (${who.w} px)`);
+        console.log('  ok');
 
         console.log('Default order: open and active first (newest first), then done (newest first)');
         const byNewest = (a, b) => b.created_at.localeCompare(a.created_at);
