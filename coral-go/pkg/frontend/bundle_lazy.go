@@ -138,8 +138,11 @@ func lazyPlugin(fsys fs.FS, startup map[string]bool, alias map[string]string, ex
 // lazyOutput is one lazy build's files: the module (named name) and its source map.
 type lazyOutput struct{ js, mapFile []byte }
 
-// buildLazy builds entry (source text) into the file name, with the options of the startup bundle's final build.
-func buildLazy(static fs.FS, entry, name string, plugin api.Plugin) (lazyOutput, error) {
+// buildLazy is how one lazy file is built: a variable so a test can make a build panic (TestALazyBuildThatPanicsIsSkipped).
+var buildLazy = buildLazyFile
+
+// buildLazyFile builds entry (source text) into the file name, with the options of the startup bundle's final build.
+func buildLazyFile(static fs.FS, entry, name string, plugin api.Plugin) (lazyOutput, error) {
 	res := api.Build(api.BuildOptions{
 		Stdin:             &api.StdinOptions{Contents: entry, Sourcefile: name, Loader: api.LoaderJS, ResolveDir: "/"},
 		Bundle:            true,

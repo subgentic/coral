@@ -12,6 +12,9 @@ import (
 	"sync"
 	"testing"
 	"testing/fstest"
+
+	"github.com/evanw/esbuild/pkg/api"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 var (
@@ -463,5 +466,68 @@ func TestLazyFamiliesBuildFromAMinifiedTree(t *testing.T) {
 				t.Errorf("minified tree: group %s does not register %s", g.Main, m)
 			}
 		}
+	}
+}
+
+// A lazy build that panics is not the server's end (#8705, Security's LOW): its goroutine recovers (safego), the module is listed in LazySkipped and is not in Files (so it is served as the
+// original), and when it is a group's main file the members are not stubbed to a file that is not there.
+func TestALazyBuildThatPanicsIsSkipped(t *testing.T) {
+	_, static := realBundle(t)
+	index, _ := fs.ReadFile(Templates, "templates/index.html")
+	real := buildLazy
+	t.Cleanup(func() { buildLazy = real })
+	const single, main = "docs.js", "workflows.js"
+	buildLazy = func(static fs.FS, entry, name string, plugin api.Plugin) (lazyOutput, error) {
+		if name == single || name == main {
+			panic("the build of " + name + " blew up")
+		}
+		return real(static, entry, name, plugin)
+	}
+	before := safego.Panics()
+	b, err := BuildBundle(static, index)
+	if err != nil {
+		t.Fatalf("a lazy build that panics took the bundle down: %v", err)
+	}
+	if got := safego.Panics() - before; got != 2 {
+		t.Errorf("%d panics recovered, want 2", got)
+	}
+	for _, m := range []string{single, main} {
+		if b.LazySkipped[m] == nil {
+			t.Errorf("%s panicked and is not in LazySkipped: %v", m, b.LazySkipped)
+		}
+		if _, ok := b.Files[m]; ok {
+			t.Errorf("%s has a file in the bundle although its build panicked", m)
+		}
+		for _, c := range b.Lazy {
+			if c == m {
+				t.Errorf("%s is listed as covered", m)
+			}
+		}
+	}
+	for _, g := range LazyGroups {
+		if g.Main != main {
+			continue
+		}
+		for _, m := range g.Members {
+			if _, ok := b.Files[m]; ok {
+				t.Errorf("member %s of the skipped group %s is a stub of a file that is not there", m, main)
+			}
+			if b.Files[m] != nil || b.LazySkipped[m] != nil {
+				t.Errorf("member %s is neither the original nor skipped cleanly", m)
+			}
+		}
+	}
+	if len(b.LazySkipped) != 2 {
+		t.Errorf("LazySkipped is %v, want only the two panicked", b.LazySkipped)
+	}
+	// Everything else is built as before, and the bundle itself is whole.
+	if len(b.Files["app.js"]) == 0 || len(b.Lazy) < 100 {
+		t.Errorf("the rest of the family is not built: app.js %d bytes, %d lazy", len(b.Files["app.js"]), len(b.Lazy))
+	}
+	// The overlay serves a skipped module as the original.
+	got, err := fs.ReadFile(b.FS(static), single)
+	orig, _ := fs.ReadFile(static, single)
+	if err != nil || !bytes.Equal(got, orig) {
+		t.Errorf("%s is not served as the original: %v", single, err)
 	}
 }
