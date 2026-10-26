@@ -62,6 +62,7 @@ func TestMainCommandLineIsGolden(t *testing.T) {
 		out := stdout.String()
 		serr := logLine.ReplaceAllString(stderr.String(), "") // coral.log lines carry the time
 		// the go test binary's own trailer and this platform's default address are not coral's words
+		out = withoutTestFlags(out)
 		for _, s := range []*string{&out, &serr} {
 			*s = strings.ReplaceAll(*s, "PASS\n", "")
 			*s = strings.ReplaceAll(*s, fmt.Sprintf("http://localhost:%d", config.DefaultPort), "http://localhost:DEFAULTPORT")
@@ -79,4 +80,23 @@ func TestMainCommandLineIsGolden(t *testing.T) {
 	want, err := os.ReadFile(path)
 	require.NoError(t, err, "run with UPDATE_MAIN_GOLDEN=1 once to write it")
 	require.Equal(t, string(want), got.String())
+}
+
+// withoutTestFlags drops the entries of Go's own -test.* flags from a flag.PrintDefaults listing. The child process is the test binary, so --help-all lists
+// them beside coral's flags; their set and defaults differ with the Go version and the machine (-test.parallel's default is the CPU count), and they are not coral's
+// words. An entry is its "  -test.name" line and the indented lines under it.
+func withoutTestFlags(out string) string {
+	var kept []string
+	skipping := false
+	for _, line := range strings.Split(out, "\n") {
+		switch {
+		case strings.HasPrefix(line, "  -test."):
+			skipping = true
+		case skipping && strings.HasPrefix(line, "    \t"):
+		default:
+			skipping = false
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
 }
