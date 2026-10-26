@@ -3751,12 +3751,9 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="jobs"], [data-nav
 /* A Settings checkbox is wrapped in its own label, which is the tap target: 44 px square on a phone or a touch screen (the box is 13 px; the label for= sits in the
    other column of the row), and unchanged on a mouse (#4252). */
 .check-hit { display: inline-flex; align-items: center; justify-content: flex-start; vertical-align: middle; } /* the box stays at the left of its column */
-/* (the hub switch's box was as wide as the generic input rule makes it; a checkbox is its own size) */
-.settings-hub-mode-toggle > input[type="checkbox"] { width: auto; flex: none; margin: 0; }
 @media (max-width: 767px), (pointer: coarse) {
     .check-hit { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
     /* A switch row whose label holds its own text is a target the height of a touch control. */
-    .settings-hub-mode-toggle { display: flex; align-items: center; gap: var(--space-sm, 8px); min-height: var(--control-touch-height, 44px); }
 }
 
 /* The Model picker of the launch and restart forms (#4066): a list with the free-text box behind "Other…". */
@@ -3948,15 +3945,12 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-row > dd:has(> .check-hit) .settings-hint { align-self: stretch; text-align: right; }
 /* Settings > Network and Hub (#6579 part 2): the groups are sections with an h3 title, so the headings list reads Remote access, Setup code, Coral Hub, Manage other computers; a section is a row like the others
    (a title where a term was, a body where a definition was). On a phone Coral Hub, the reason most people open the pane, comes first. */
-.settings-modal-body .net-groups { display: flex; flex-direction: column; }
 .settings-row > .net-group-head { display: flex; flex-wrap: wrap; align-items: center; gap: .1rem .4rem; align-self: start; padding-top: .35rem; min-width: 0; }
 .net-group-title { margin: 0; font-size: .875rem; font-weight: 600; color: var(--text-primary); }
 .settings-row > .net-body { min-width: 0; margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; color: var(--text-primary); word-break: normal; overflow-wrap: anywhere; font-size: .8125rem; }
 .net-group-head .check-hit > input[type="checkbox"] { width: auto; margin: 0; flex: none; }
-.net-group-head > .check-hit, .net-group-head > .settings-hub-mode-toggle { display: inline-flex; align-items: center; margin: 0 0 0 auto; } /* (the dialog's generic label leaves 12 px under itself: the switch is centred on the title and the (i)) */
+.net-group-head > .check-hit { display: inline-flex; align-items: center; margin: 0 0 0 auto; } /* (the dialog's generic label leaves 12 px under itself: the switch is centred on the title and the (i)) */
 .net-group[hidden] { display: none; }
-.settings-modal-body .net-groups { width: 100%; }
-.net-groups > .net-group { width: 100%; box-sizing: border-box; grid-template-columns: minmax(0, 1fr); } /* a group is its head (title, (i), the switch at the far end) and its body under it, at every width */
 #settings-cloud .settings-cloud-connect-row .btn { margin-left: 0; }
 .settings-row > .net-group-head { flex-wrap: nowrap; }
 .net-group-head > .settings-info-btn, .tb-head > .settings-info-btn { align-self: center; margin-top: 0; } /* the head is one centred row (title, (i), switch): the (i) centres with the title (a wrapped title: centred on it as a block), not at the top of the row with a margin worked out for a body label's line height (the icon census, #6879) */
@@ -3982,17 +3976,11 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-pane > .settings-theme-btn, .settings-pane > .settings-prompts-btn { margin-top: 1rem; }
 /* The on/off boxes are switches; they stay native checkboxes (the keyboard, the screen reader and the touch target are unchanged). */
 :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"],
-#settings-modal .settings-hub-mode-toggle > input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; width: var(--switch-w, 2.5rem); height: 1.4rem; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
 :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]::before,
-#settings-modal .settings-hub-mode-toggle > input[type="checkbox"]::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
 :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked,
-#settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
 :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked::before,
-#settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:checked::before { background: #fff; transform: translateX(var(--switch-travel, 1.1rem)); }
 :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:focus-visible,
-#settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:disabled,
-#settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]::before { transition: none; } }
 /* A touch screen: the switches are 44 px wide targets (they were 40 px: the phone census's red on the health switches): their width and knob travel are these two variables. */
 @media (pointer: coarse) { :root { --switch-w: 2.75rem; --switch-travel: 1.35rem; } }
@@ -4180,10 +4168,6 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 
 /* Network and Hub layout nits (#5985): a status line that is empty takes no room; "Run as a hub" is label left, switch right like every other row; Disconnect aligns with the row's left edge. */
 #settings-remote-access-status:empty, #settings-hub-mode-status:empty, #settings-debug-input-log-status:empty { display: none; }
-.settings-row-hub { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem 1.5rem; align-items: center; padding: .7rem 0; border-top: 1px solid var(--border); }
-.settings-row-hub > dt { grid-column: 1; grid-row: 1; }
-.settings-row-hub > dd { display: contents; }
-.settings-row-hub #settings-hub-mode-desc, .settings-row-hub #settings-hub-mode-status, .settings-row-hub #settings-hub-mode-restart { grid-column: 1 / -1; justify-self: start; }
 #settings-cloud .settings-cloud-actions { margin: 6px 0; padding: 0; justify-content: flex-start; }
 #settings-cloud .settings-cloud-actions .btn { margin-left: 0; }
 /* The Coral Hub card (#6579): the status line and Disconnect or Cancel are one row; the level question and, once linked, a closed "More Coral Hub permissions" follow; Connect sits under the question. */
@@ -4199,11 +4183,6 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .settings-cloud-warn .material-icons { font-size: 1rem; vertical-align: text-bottom; }
 #settings-cloud .settings-cloud-saved { margin: 4px 0 0; }
 @media (pointer: coarse), (max-width: 767px) { #settings-cloud-link { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); } } /* the link to approve the code is a 44 px target on a phone */
-.settings-row-hub .settings-info-text { grid-column: 1 / -1; }
-.info-grid.settings-grid .settings-row-hub > dt { align-self: center; padding-top: 0; }
-.settings-row-hub .settings-hub-mode-toggle { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); }
-#settings-modal .settings-row-hub .settings-hub-mode-toggle > input[type="checkbox"] { align-self: center; position: relative; top: 0; }
-.settings-row-hub .settings-hub-mode-toggle { justify-content: center; min-width: var(--control-touch-height, 44px); }
 /* Network and Hub on the settings row (#7626): every switch is at the far end of its head (the Manage switch had lost its auto margin to a rule written for the old grid), Status is a group with the machine's state at the right of its row, the level question is the label with its hint at the left and the select at the right, and the Hub command is a full-width box with Copy at its end. */
 #about-section { display: grid; padding: .7rem 0; border-top: 1px solid var(--border); } /* a group like the others, but not a .settings-row: the hub page hides it and the settings trace counts hidden rows */
 #about-section[hidden] { display: none; }

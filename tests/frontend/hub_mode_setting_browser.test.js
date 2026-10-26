@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
         const box = document.getElementById('settings-hub-mode-enabled');
         const st = document.getElementById('settings-hub-mode-status');
         const btn = document.getElementById('settings-hub-mode-restart');
-        const dd = document.getElementById('settings-hub-mode');
+        const dd = box && box.closest('.sv-row');
         return box && { checked: box.checked, disabled: box.disabled, label: (document.getElementById(box.getAttribute('aria-labelledby')) || {}).textContent,
             described: (box.getAttribute('aria-describedby') || '').split(' ').every(id => !!document.getElementById(id)),
             status: st.textContent, restart: !btn.hidden, shown: !!dd && !dd.hidden && box.offsetParent !== null };
