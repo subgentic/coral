@@ -15,7 +15,7 @@ import { buildListBar } from './list_bar.js';
 import { importOnce } from './import_once.js';
 import { selectInboxTab, rememberInboxGroup } from './inbox_tab.js';
 // This module is loaded lazily, so its own parts are loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
-const { KINDS, KIND_LABEL, SORTS, SORT_LABEL, EMPTY: SAVED_EMPTY, makeModel: savedModel, clean: cleanSaved, isFiltered: savedFiltered, toQuery: savedQuery } = await importOnce('./saved_filters.js');
+const { KINDS, KIND_LABEL, SORTS, SORT_LABEL, makeModel: savedModel, clean: cleanSaved, isFiltered: savedFiltered, toQuery: savedQuery, keeps: savedKeeps, loadFilters: loadSavedFilters, saveFilters: saveSavedFilters } = await importOnce('./saved_filters.js');
 
 const $ = id => document.getElementById(id);
 let tab = 'open';
@@ -24,7 +24,8 @@ let down = []; // the registered servers that did not answer the last read: {id,
 let multi = false; // more than one server answered: each item names its server
 const checks = new Map(); // item (uid) -> { state: 'live' | 'ended' | 'board' | 'gone' | 'noopen', why }
 // The search and filters (#4778): the server matches (q, kind, conv, order), so a search covers every saved message, not just the ones shown.
-let filters = { ...SAVED_EMPTY };
+let filters = loadSavedFilters();
+const setFilters = next => { filters = next; saveSavedFilters(filters); };
 let bar = null;
 let totals = { open: 0, done: 0 };
 let loadSeq = 0; // the read in flight that was asked for last: an answer that comes after a newer ask is dropped, so a slow read of an old filter never overwrites the list of the newer one (#7945)
@@ -79,7 +80,7 @@ async function load() {
     down = others.filter(o => o.failed).map(o => ({ id: o.server, label: o.label }));
     multi = scope.kind === 'all' && remotes.length > 0;
     // Only what a server sent in a usable shape is listed (an id goes into a URL: saved_marks.js validSavedItem).
-    items = answered.flatMap(a => (Array.isArray(a.d.items) ? a.d.items : []).filter(validSavedItem).map(i => ({ ...i, server: a.server })))
+    items = answered.flatMap(a => (Array.isArray(a.d.items) ? a.d.items : []).filter(validSavedItem).map(i => ({ ...i, server: a.server }))).filter(i => savedKeeps(i, filters))
         .sort((a, b) => (filters.sort === 'oldest' ? -1 : 1) * (b.saved_at || '').localeCompare(a.saved_at || ''));
     for (const i of items) if (i.ref && !convTitles.has(i.ref)) convTitles.set(i.ref, i.title || i.ref);
     const open = answered.reduce((n, a) => n + (a.d.open || 0), 0), done = answered.reduce((n, a) => n + (a.d.done || 0), 0);
@@ -147,7 +148,7 @@ const savedSpec = () => ({
 function syncBar(shownCount) {
     const host = $('saved-bar');
     if (host) {
-        if (!bar) { bar = buildListBar(savedSpec(), next => { filters = cleanSaved(next); refresh(); }); host.append(bar.node); }
+        if (!bar) { bar = buildListBar(savedSpec(), next => { setFilters(cleanSaved(next)); refresh(); }); host.append(bar.node); }
         syncOneBar(bar, shownCount);
     }
     if (inboxBar) syncOneBar(inboxBar, shownCount);
@@ -367,7 +368,7 @@ export function setSavedTab(t) { tab = t === 'done' ? 'done' : 'open'; render();
 export function setSavedQuery(q) {
     const next = cleanSaved({ ...filters, q });
     if (JSON.stringify(next) === JSON.stringify(filters)) return Promise.resolve();
-    filters = next;
+    setFilters(next);
     return refresh();
 }
 /** Read the list now (the Inbox's Saved group was opened), for the scope the Inbox is (everything). */
@@ -388,10 +389,29 @@ export async function savedRemove(it) {
     return true;
 }
 export function savedOpen(it) { return openSavedLink(it); }
+/** The Inbox's Saved page toolbar (#8602) works on the same filters as the sidebar's Display options: what they are now, a change (cleaned, and the list read again), the spec of the page's bar, and the options that follow the data. */
+export const savedFiltersNow = () => ({ ...filters });
+export function setSavedFilters(next) { setFilters(cleanSaved(next)); return refresh(); }
+export const savedPageSpec = () => ({
+    ...savedSpec(), idp: 'inbox-saved', placeholder: 'Search saved messages',
+    fields: [
+        { type: 'select', key: 'kind', id: 'inbox-saved-kind', label: 'Type', values: KINDS, labels: KIND_LABEL, any: 'Any type' },
+        { type: 'select', key: 'team', id: 'inbox-saved-team', label: 'Team', values: [], labels: {}, any: 'Any team' },
+        { type: 'select', key: 'conv', id: 'inbox-saved-conv', label: 'From', values: [], labels: {}, any: 'Any conversation' },
+        { type: 'date', key: 'from', id: 'inbox-saved-from', label: 'Saved since' },
+    ],
+});
+export function savedPageOptions() {
+    const refs = [...convTitles.keys()].sort((a, b) => convLabel(a).localeCompare(convLabel(b)));
+    if (filters.conv && !refs.includes(filters.conv)) refs.push(filters.conv);
+    const teams = [...new Set(items.map(i => i.team).filter(Boolean))].sort();
+    if (filters.team && !teams.includes(filters.team)) teams.push(filters.team);
+    return { conv: { values: refs, labels: Object.fromEntries(refs.map(r => [r, convLabel(r)])) }, team: { values: teams, labels: {} } };
+}
 /** The bar for the Inbox's Display options (Filters and Sort; no search), built once into `host`. */
 export function mountInboxSavedBar(host) {
     if (inboxBar || !host) return;
-    inboxBar = buildListBar({ ...savedSpec(), idp: 'svi', noSearch: true }, next => { filters = cleanSaved({ ...next, q: filters.q }); refresh(); });
+    inboxBar = buildListBar({ ...savedSpec(), idp: 'svi', noSearch: true }, next => { setFilters(cleanSaved({ ...next, q: filters.q })); refresh(); });
     host.append(inboxBar.node);
     syncOneBar(inboxBar, savedView().shown.length);
 }
