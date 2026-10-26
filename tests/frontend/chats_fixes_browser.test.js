@@ -34,7 +34,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await waitFor(`document.querySelectorAll('#history-sessions-list li[data-session-id]').length === 3`, 'three chats', 10000);
             // On a wide screen the tab opens on its first group's table (#7443): the empty pane is what shows with no chat and no group, so it is put on screen here to be measured
             if (!mobile) {
-                assert.ok(await ev(`document.getElementById('group-table-view').checkVisibility() && !!document.querySelector('#group-table-view table.group-table')`), `${tag}: the Chats tab opens on its first group's table`);
+                assert.ok(await ev(`document.getElementById('group-table-view').checkVisibility() && !!document.querySelector('#group-table-view table.dt-table')`), `${tag}: the Chats tab opens on its first group's table`);
                 await ev(`(async () => { const u = await import(${S} + 'utils.js'); u.showView('chats-empty-view'); return true; })()`);
             }
             // the empty pane

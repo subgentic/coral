@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { setTheme } = require('./helpers/contrast');
+const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
@@ -17,10 +18,21 @@ const SESSIONS = [
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // This is the Hub's history table; local history navigation redirects asynchronously to Inbox folders.
+        const { Fetch } = client;
+        await Fetch.enable({ patterns: [{ urlPattern: '*', resourceType: 'Document', requestStage: 'Response' }, { urlPattern: '*/auth/session', requestStage: 'Request' }] });
+        safePaused(client, async e => {
+            if (e.request.url.endsWith('/auth/session')) return Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify({ authenticated: true, email: 'qa@example.com', csrf: 'qa' })).toString('base64') });
+            if (e.responseStatusCode !== 200) return Fetch.continueRequest({ requestId: e.requestId });
+            const { body, base64Encoded } = await Fetch.getResponseBody({ requestId: e.requestId });
+            const html = (base64Encoded ? Buffer.from(body, 'base64').toString('utf8') : body).replace(/"mode":\s*"local"/, '"mode":"cloud"');
+            return Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: (e.responseHeaders || []).filter(h => !/^content-length$/i.test(h.name)), body: Buffer.from(html).toString('base64') });
+        });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         await ev(`(() => { const R = window.fetch.bind(window); window.__hits = ['aaaaaaaa-0001', 'aaaaaaaa-0002'];
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
+                if (url.pathname === '/api/sessions/history') return Promise.resolve(new Response(JSON.stringify({ sessions: ${JSON.stringify(SESSIONS)}, total: 3, page: 1, page_size: 50 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 if (url.pathname === '/api/sessions/history/search') return Promise.resolve(new Response(JSON.stringify({ status: 'complete', results: window.__hits.map(id => ({ session_id: id, type: 'chat', source: 'claude', hits: [{ role: 'user', excerpt: 'release', timestamp: '2026-10-01T10:00:00Z', locator: { session_id: id }, matches: [] }] })) }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 return R(u, o); }; return true; })()`);
         await ev(`window.switchNavTab('history'); Promise.all([import((window.__coralStatic||'/static/')+'sidebar.js'), import((window.__coralStatic||'/static/')+'view_switch.js')]).then(([sb, vs]) => { sb.showSidebarPane('history'); vs.showView('chats-empty-view'); document.body.setAttribute('data-nav-tab', 'history'); return true; })`);
