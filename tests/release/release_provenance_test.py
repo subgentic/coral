@@ -10,6 +10,9 @@ import release_provenance as p  # noqa: E402
 
 REPO = "subgentic/coral"
 CFG = g.load_config(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".github", "gate.json"))
+# The tests pin the release policy (the three heavy gates), not whatever a one-time gate.json carries: v2.0.0 shipped with cdp-gate out of "always"
+# (operator-approved) and this self-test, which resolve runs from the tagged tree, would otherwise fail on the edited file.
+CFG = dict(CFG, always=["go-tests", "go-race", "cdp-gate"])
 TAGGED = "b" * 40  # the notes commit that is tagged
 GATED = "a" * 40  # its parent: the code the gates ran on
 
