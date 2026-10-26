@@ -214,7 +214,7 @@ func (h *SpendHandler) readRoster(ctx context.Context, project string, fr spendF
 	if err != nil {
 		return nil, "could not read the board's agents"
 	}
-	summaries, err := h.ts.GetUsageSummaryByAgentBoard(ctx, spendStamp(fr.start), project)
+	summaries, err := h.ts.GetUsageSummaryByAgentBoardUntil(ctx, spendStamp(fr.start), spendDBStamp(fr.end), project) // to the window's end, as the totals are
 	if err != nil {
 		return nil, "could not read token usage"
 	}
