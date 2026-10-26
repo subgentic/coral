@@ -131,7 +131,6 @@ registerActions({
     'docs-phone-back': () => { importOnce('./docs.js').then(m => m.docsPhoneBack()).catch(() => {}); },
     'docs-copy-agent-line': () => { importOnce('./docs.js').then(m => m.copyDocsLine()).catch(() => {}); }, // the Docs page's button, in the page from the start; docs.js loads with the Docs tab
     'm-close-top-bar-settings-then-check-for-updates': () => { window.__coral.closeTopBarSettings(); window.checkForUpdates(true); },
-    'm-close-top-bar-settings-then-show-saved': () => { window.__coral.closeTopBarSettings(); importOnce('./saved.js').then(m => m.openSavedAll()).catch(() => {}); },
     'm-close-top-bar-settings-then-show-servers-modal': () => { window.__coral.closeTopBarSettings(); window.showServersModal(); },
     'm-close-top-bar-settings-then-show-settings-modal': () => { window.__coral.closeTopBarSettings(); window.showSettingsModal(); },
     'm-close-top-bar-settings-then-show-theme-configurator': () => { window.__coral.closeTopBarSettings(); window.showThemeConfigurator(); },

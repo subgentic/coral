@@ -6,7 +6,6 @@ import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { showToast, escapeAttr } from './utils.js';
 import { isCloud, sessionServer, normServer, splitKey, serverFetch, LOCAL_SERVER } from './server_base.js';
-import { onBuilt } from './lazy_dom.js';
 import { dockKind, onDockPage } from './dock_page.js';
 import { scopeOf, withScope, ALL } from './saved_scope.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Inbox's Saved tab
@@ -183,14 +182,12 @@ document.addEventListener('keydown', (e) => {
 let countTimer = 0;
 let savedCount = 0;
 function paintCount(badge) { badge.textContent = savedCount > 0 ? (savedCount > 99 ? '99+' : String(savedCount)) : ''; badge.hidden = !(savedCount > 0); }
-// The settings menu is built on its first open (#4500), after the count may have arrived: paint it then.
-onBuilt('top-bar-settings-menu', menu => menu.querySelectorAll('.saved-menu-item .saved-count').forEach(paintCount));
 export function setSavedCount(n) {
     const b = document.getElementById('saved-btn');
     if (!b) return;
     savedCount = n;
     setInboxCount('saved', n);
-    document.querySelectorAll('#saved-btn .saved-count, .saved-menu-item .saved-count').forEach(paintCount);
+    document.querySelectorAll('#saved-btn .saved-count').forEach(paintCount);
     b.setAttribute('aria-label', n > 0 ? `Saved for later, ${n} open` : 'Saved for later');
     b.classList.toggle('on', n > 0);
 }
@@ -285,14 +282,14 @@ document.addEventListener('click', async (e) => {
     }
 });
 
-// On a phone at large text the top bar has no room for the Saved button without cutting the view selector to "Age...": there it is an entry of the settings
-// menu (with its count) instead. Decided from the real layout, so both ways of making text large (the browser's setting and the page's) count.
-function fitSavedButton() {
+// Keep the bookmark in the top bar at large text sizes: the view selector gets
+// its own row, as it does on a very narrow viewport, so neither control is cut.
+function fitSavedBar() {
     const big = isPhoneLayout() && parseFloat(getComputedStyle(document.documentElement).fontSize) >= 24;
-    document.body.classList.toggle('saved-in-menu', big);
+    document.body.classList.toggle('saved-bar-wrap', big);
 }
 if (typeof ResizeObserver === 'function') {
-    const start = () => { fitSavedButton(); const bar = document.querySelector('.top-bar'); if (bar) new ResizeObserver(fitSavedButton).observe(bar); };
+    const start = () => { fitSavedBar(); const bar = document.querySelector('.top-bar'); if (bar) new ResizeObserver(fitSavedBar).observe(bar); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 }
-window.addEventListener('resize', fitSavedButton);
+window.addEventListener('resize', fitSavedBar);

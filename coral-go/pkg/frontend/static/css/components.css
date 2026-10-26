@@ -3747,12 +3747,9 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 @media (pointer: coarse) { .jumpbar .btn { min-height: 44px; min-width: 44px; } }
 .saved-jump { position: relative; }
 .saved-jump::before { content: "Saved"; position: absolute; left: 0; top: -22px; background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: 0.625rem; font-weight: 700; border-radius: var(--radius-lg); padding: 0 7px; line-height: 16px; pointer-events: none; }
-.saved-menu-item { display: none; }
-.saved-menu-item .saved-count { margin-left: 6px; min-width: 14px; padding: 0 5px; border-radius: var(--radius-lg); background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: 0.6875rem; font-weight: 700; line-height: 16px; text-align: center; }
-.saved-menu-item .saved-count[hidden] { display: none; }
-/* Large text on a phone: the settings menu has Saved, the top bar does not (see saved_marks.js). */
-.saved-in-menu #saved-btn { display: none; }
-.saved-in-menu .saved-menu-item { display: flex; }
+/* Keep the bookmark and the view selector at large text sizes on a phone. */
+.saved-bar-wrap .top-bar { flex-wrap: wrap; row-gap: 4px; }
+.saved-bar-wrap .nav-select { order: 3; flex: 1 1 100%; margin: 0; }
 
 /* The install help where an agent CLI is missing (#4569): the vendor's page as a link in the theme's link colour, and a quiet note. */
 .acf-cli-warning .cli-install-link, .acf-cli-warning .cli-install-note { margin: 6px 0 0; }
