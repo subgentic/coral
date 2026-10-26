@@ -306,7 +306,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // The unread count on agent rows was not useful to users, so no chip is rendered.
     void unreadCount;
     const unreadChip = '';
-    const skipped = s.sleeping ? null : skippedOf(s); // the last automated message Coral did not type (#7727)
+    const skipped = s.sleeping || !(Number(s.board_unread) > 0) ? null : skippedOf(s); // the last automated message Coral did not type (#7727)
     const heldLine = skipped ? `<div class="session-held-line" title="${escapeAttr(skipped.why)}">Not typed: ${escapeHtml(skipped.why)}</div>` : '';
     const kebabMenuContent = _rowMenuContent(s, sid);
     // The menu's items (about 50 elements a row) are drawn when it opens (#4611): the row holds an empty menu and this module the text for it.

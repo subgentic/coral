@@ -66,9 +66,10 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 	}
 	if v.leftover {
 		// Coral's own earlier text is still in the box (its Enter did not take): it is sent, and this one is not typed after it, which
-		// would join the two. The next send types into an empty box.
+		// would join the two. The next send types into an empty box. Nothing was withheld from the person's view: no skip is recorded
+		// (what was sent is Coral's text, and a skip left from before is over).
 		in.submitLeftover(ctx)
-		noteSkipped(in, "Coral's earlier text was still in the input box; it was sent")
+		clearSkipped(in.Name)
 		return Skipped, nil
 	}
 	if v.skip != "" {

@@ -24,11 +24,10 @@ export function skippedOf(row) {
 /** The line for the agent view and the row: '' when nothing waits and nothing was skipped. */
 export function waitingText(row) {
     if (!row || row.sleeping) return '';
-    const n = waitingCount(row), k = skippedOf(row);
+    const n = waitingCount(row), k = n > 0 ? skippedOf(row) : null; // a skip is shown only while an unread message waits
     const unread = n > 0 ? `${n} unread board message${n === 1 ? '' : 's'} for this agent` : '';
     if (unread && k) return `${unread}. Not typed: ${k.why}.`;
-    if (unread) return unread;
-    return k ? `Not typed: ${k.why}.` : '';
+    return unread;
 }
 
 /** What is said after a Send now, from the server's answer. */

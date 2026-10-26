@@ -516,7 +516,7 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"board_project":         boardProject(boardSubs, liveBoardNames, tmuxName, sid),
 			"board_job_title":       boardJobTitle(boardSubs, liveBoardNames, tmuxName, sid),
 			"board_unread":          boardUnread,
-			"skipped_send":          skippedSendField(tmuxName),
+			"skipped_send":          skippedSendField(tmuxName, boardUnread),
 			"board_is_orchestrator": boardSubscriberFlag(boardSub),
 			"log_path":              agent.LogPath,
 			"sleeping":              liveSleeping[sid],

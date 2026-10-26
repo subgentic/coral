@@ -6,7 +6,6 @@ package routes
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -46,6 +45,12 @@ func skippedWhy(name string) string {
 	return "the agent's screen showed a prompt, a draft or could not be read"
 }
 
+// waitingUnread is the unread count ListWaiting has put in out.
+func waitingUnread(out map[string]any) int {
+	n, _ := out["unread"].(int)
+	return n
+}
+
 // ListWaiting lists what waits for one live agent: its unread board messages (sender, time, text) and the last automated send that was not typed, with why.
 // GET /api/sessions/live/{name}/waiting?agent_type=..&session_id=..
 //
@@ -57,9 +62,6 @@ func (h *SessionsHandler) ListWaiting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]any{"board": nil, "unread": 0, "messages": []waitingMessage{}, "skipped": nil}
-	if s, ok := ptymanager.SkippedOf(name); ok {
-		out["skipped"] = skippedRow{Why: s.Why, What: s.What, At: s.At.UTC().Format(time.RFC3339), Since: s.Since.UTC().Format(time.RFC3339)}
-	}
 	if h.bs != nil {
 		if sub, err := h.bs.GetSubscriptionBySessionName(r.Context(), name); err == nil && sub != nil {
 			out["board"] = sub.Project
@@ -79,6 +81,7 @@ func (h *SessionsHandler) ListWaiting(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	out["skipped"] = skippedSendField(name, waitingUnread(out)) // none when no unread board message waits
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -132,6 +135,8 @@ func (h *SessionsHandler) SendWaitingNow(w http.ResponseWriter, r *http.Request)
 			out["why"] = s.Why
 			out["prompt_open"] = len(s.Why) >= len(ptymanager.SkipPrompt) && s.Why[:len(ptymanager.SkipPrompt)] == ptymanager.SkipPrompt
 			out["draft_in_box"] = s.Why == ptymanager.SkipDraft
+		} else {
+			out["sent"] = true // no skip was recorded: Coral's own earlier nudge was still in the box and got its Enter now
 		}
 	}
 	writeJSON(w, http.StatusOK, out)

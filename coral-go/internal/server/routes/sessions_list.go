@@ -496,7 +496,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"board_project":         boardProject(d.boardSubs, lv.boardNames, tmuxName, sid),
 		"board_job_title":       boardJobTitle(d.boardSubs, lv.boardNames, tmuxName, sid),
 		"board_unread":          boardUnread,
-		"skipped_send":          skippedSendField(tmuxName), // the last automated send Coral did not type and why ({why, what, at, since}), null at none (#7727)
+		"skipped_send":          skippedSendField(tmuxName, boardUnread), // the last automated send Coral did not type and why ({why, what, at, since}), null at none (#7727)
 		"board_is_orchestrator": boardSubscriberFlag(boardSub),
 		"log_path":              agent.LogPath,
 		"sleeping":              lv.sleeping[sid],
@@ -981,8 +981,11 @@ func (h *SessionsHandler) terminalOfAgent(launchPath string) string {
 }
 
 // skippedSendField is the live row's skipped_send: the last automated send Coral did not type into the agent and why, or nil when none is pending (#7727). The unread board messages that
-// wait for it are board_unread; the page lists them (GET .../waiting).
-func skippedSendField(name string) any {
+// wait for it are board_unread; the page lists them (GET .../waiting). With no unread board message nothing waits, so no skip is shown: a notice next to "no unread messages" contradicts itself.
+func skippedSendField(name string, unread int) any {
+	if unread <= 0 {
+		return nil
+	}
 	if s, ok := ptymanager.SkippedOf(name); ok {
 		return skippedRow{Why: s.Why, What: s.What, At: s.At.UTC().Format(time.RFC3339), Since: s.Since.UTC().Format(time.RFC3339)}
 	}

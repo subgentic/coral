@@ -171,12 +171,21 @@ func TestCoralsOwnLeftoverIsSentAndAnythingElseIsADraft(t *testing.T) {
 	a := &fakeAgent{screen: idleInputBox}
 	assert.Equal(t, Sent, deliver(t, a, n, "Read the board"))
 	assert.Equal(t, []string{"Read the board"}, a.sent())
+	var recorded bool
+
+	// an earlier skip (a prompt was open) is over once Coral's own text is sent
+	a.show(permissionMenu)
+	assert.Equal(t, Skipped, deliver(t, a, n, "You have 2 unread messages"))
+	_, recorded = SkippedOf(n)
+	require.True(t, recorded)
 
 	// its Enter did not take: the box still holds exactly that text
 	a.show(claudeMonitorWithText)
 	assert.Equal(t, Skipped, deliver(t, a, n, "You have 2 unread messages"), "the new text is not typed after the old one")
 	assert.Equal(t, []string{"Read the board"}, a.sent(), "nothing typed")
 	assert.Equal(t, 1, a.enters, "the old text's Enter is pressed")
+	_, recorded = SkippedOf(n)
+	assert.False(t, recorded, "Coral's own leftover that got its Enter is not a skip")
 	a.show(idleInputBox) // the Enter took: the box is empty
 	assert.Equal(t, Sent, deliver(t, a, n, "You have 2 unread messages"), "the next send types into the box (the leftover is forgotten once sent)")
 

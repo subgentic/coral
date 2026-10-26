@@ -43,7 +43,7 @@ const BASE = require('./test_base').BASE;
             check(`${tag}: the message box keeps its width beside the line`, boxW >= 0.5, String(boxW));
             await feed({ skipped_send: { why: 'the screen could not be read', what: 'board message' } });
             v = await view();
-            check(`${tag}: only a skipped send: it says so, and there is no Send now (nothing unread to send)`, /^Not typed: the screen could not be read\.$/.test(v.text) && !v.send && v.list, JSON.stringify(v));
+            check(`${tag}: a skipped send with no unread message says nothing (a notice beside "no unread messages" contradicts itself), on the line and on the row`, v.text === '' && !v.shown && !v.send && !v.list && v.row === null, JSON.stringify(v));
 
             // the list and Send now, for this exact session
             await feed({ board_unread: 2 });
