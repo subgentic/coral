@@ -1,7 +1,7 @@
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
-import { boardFetch, serverUrl, artifactPath, isCloud, splitKey, keyLabel, LOCAL_SERVER } from './server_base.js';
+import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, LOCAL_SERVER } from './server_base.js';
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
@@ -17,12 +17,11 @@ const { buildBar } = await importOnce('./team_artifact_bar.js');
 const { loadFilters, saveFilters, toParams, isFiltered, EMPTY } = await importOnce('./team_artifact_filters.js');
 const { loadPanelOpen, savePanelOpen, buildMoreMenu } = await importOnce('./list_bar.js');
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
-const { inlineArtifactPath } = await importOnce('./artifact_paths.js');
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js');
+const { HEX_RE, managedHex, itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem } = await importOnce('./artifact_item.js');
+const linkOf = (item) => linkOfItem(item, { server: server(), project: model.project }); // where the bytes are, for the list this page shows
 
 const PAGE = 100;
-const HEX_RE = /^[a-f0-9]{64}$/;
-const MANAGED_RE = /^(?:coral:\/\/artifacts\/|\/api\/artifacts\/)([a-f0-9]{64})(?:\?v=\d+)?$/i;
 const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...EMPTY }, kept: new Set(), gen: 0, controller: null };
 let root = null, hooks = {}, bar = null, barKey = '';
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
@@ -35,16 +34,7 @@ Local paths like /tmp/<file> are not reachable by the user, so always upload. Fu
 
 /** The computer the list is about: an agent's own (its session's), else the team's. */
 const server = () => (model.scope ? model.scope.server : splitKey(model.project).server);
-const managedHex = (item) => { const m = MANAGED_RE.exec(item.uri || ''); return m ? m[1].toLowerCase() : (HEX_RE.test(String(item.id || '')) ? String(item.id) : ''); };
-const itemKey = (item) => managedHex(item) || `${item.source || ''}|${item.uri || ''}|${item.name || ''}`;
-const isUnverified = (item) => item.provenance === 'unverified';
 
-function readableName(item) {
-    const name = String(item.name || '').trim();
-    if (name && !/^(?:coral:\/\/artifacts\/)?[a-f0-9]{64}(?:\.[a-z0-9]+)?$/i.test(name)) return name;
-    if (item.task_title) return `${item.task_title} — artifact`;
-    return item.task_id ? `Task #${item.task_id} artifact` : 'Uploaded artifact';
-}
 
 // What a row says about where it came from, and whether Coral checked the link (#4396); the words are the server's display text, never markup.
 function originBadge(item) {
@@ -55,35 +45,7 @@ function originBadge(item) {
     return '';
 }
 
-/** Where the bytes are: a stored artifact (previewable, downloadable) or an external https link (opens in a new tab); null for an unavailable or unverified one. */
-function linkOf(item) {
-    if (item.available === false || isUnverified(item)) return null;
-    const at = server();
-    const hex = managedHex(item);
-    if (hex) return { url: serverUrl(artifactPath(hex), at), preview: true, hex, server: at };
-    const inline = item.inline ? inlineArtifactPath(item.content_url, splitKey(model.project).name) : null; // a task's completion artifact: its text is read from the task, not stored under a digest
-    if (inline) return { url: serverUrl(inline, at), preview: true, inline: true, contentURL: item.content_url, server: at };
-    try { const u = new URL(item.uri); if (u.protocol === 'https:' || u.protocol === 'http:') return { url: u.href, preview: false, server: at }; } catch { /* unavailable or unsupported reference */ }
-    return null;
-}
 
-function sizeText(n) {
-    if (n == null || !Number.isFinite(Number(n))) return '';
-    const b = Number(n);
-    if (b < 1024) return `${b} B`;
-    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-    return `${(b / 1024 / 1024).toFixed(1)} MB`;
-}
-function typeText(item) {
-    const mime = String(item.media_type || '').split(';')[0].trim().toLowerCase();
-    const named = { 'text/markdown': 'Markdown', 'text/x-markdown': 'Markdown', 'text/html': 'HTML', 'application/xhtml+xml': 'HTML', 'application/json': 'JSON', 'application/pdf': 'PDF', 'text/plain': 'Text', 'text/csv': 'CSV' };
-    if (named[mime]) return named[mime];
-    for (const [prefix, label] of [['image/', 'Image'], ['audio/', 'Audio'], ['video/', 'Video']]) if (mime.startsWith(prefix)) return label;
-    if (/\.(md|markdown|mdown)$/i.test(item.name || '')) return 'Markdown';
-    return mime.startsWith('text/') ? 'Text' : 'File';
-}
-const createdText = (item) => { const d = item.created_at ? new Date(item.created_at) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleString() : ''; };
-const taskText = (item) => (item.task_id ? `#${item.task_id}${item.task_title ? ' ' + item.task_title : ''}` : 'No task');
 
 // ── what is kept and what is deleted ─────────────────────────────────────
 
