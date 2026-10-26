@@ -3987,7 +3987,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .settings-cloud-saved { margin: 4px 0 0; }
 @media (pointer: coarse), (max-width: 767px) { #settings-cloud-link { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); } } /* the link to approve the code is a 44 px target on a phone */
 /* Network and Hub on the settings row (#7626): every switch is at the far end of its head (the Manage switch had lost its auto margin to a rule written for the old grid), Status is a group with the machine's state at the right of its row, the level question is the label with its hint at the left and the select at the right, and the Hub command is a full-width box with Copy at its end. */
-#about-section { display: grid; padding: .7rem 0; border-top: 1px solid var(--border); } /* a group like the others, but not a .settings-row: the hub page hides it and the settings trace counts hidden rows */
+#about-section { display: grid; } /* a group like the others, but not a .settings-row: the hub page hides it and the settings trace counts hidden rows */
 #about-section[hidden] { display: none; }
 #about-section .net-body > :not(.settings-editions-btn) { align-self: stretch; }
 #about-section .machine-health-card { margin: 0; padding: 0; border: 0; background: none; }

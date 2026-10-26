@@ -79,7 +79,7 @@ function form(startProvider, index) {
     fields.push(
         { key: 'value', type: 'text', id: 'cm-id', label: 'Model id', required: true, requiredMessage: MODEL_ID_MISSING, messageAsIs: true, attrs: { maxlength: '128', autocomplete: 'off', spellcheck: 'false' }, setup: e => e.classList.add('settings-mono-input'),
             validate: (v, values) => idProblem(providerOf(values), String(v || '').trim(), index) },
-        { key: 'display_name', type: 'text', id: 'cm-name', label: 'Display name (optional)', attrs: { maxlength: String(MAX_NAME), autocomplete: 'off' } },
+        { key: 'display_name', type: 'text', id: 'cm-name', label: 'Display name', optional: true, attrs: { maxlength: String(MAX_NAME), autocomplete: 'off' } },
     );
     // the thinking levels a provider takes: the boxes (or the line that says there are none) of the chosen provider show
     for (const [p] of PROVIDERS) {

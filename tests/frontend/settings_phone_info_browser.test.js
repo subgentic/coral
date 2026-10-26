@@ -13,7 +13,7 @@ const { connect } = require('./agent_view_harness');
         const l = Page.loadEventFired(); await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await l; await install();
         await ev(`window.__coralReady.then(() => true)`);
         await ev(`window.showSettingsModal().then(() => true)`);
-        await waitFor(`(m => !!m && getComputedStyle(m).display !== 'none' && m.querySelectorAll('.settings-row').length > 3 && !!m.querySelector('.settings-group-pick select'))(document.getElementById('settings-modal'))`, 'Settings', 10000);
+        await waitFor(`(m => !!m && getComputedStyle(m).display !== 'none' && m.querySelectorAll('.settings-row, .sv-row').length > 3 && !!m.querySelector('.settings-group-pick select'))(document.getElementById('settings-modal'))`, 'Settings', 10000);
         const groups = await ev(`[...document.querySelector('#settings-modal .settings-group-pick select').options].map(o => o.value)`);
         assert.ok(groups.length >= 5, 'the sections: ' + JSON.stringify(groups));
 
