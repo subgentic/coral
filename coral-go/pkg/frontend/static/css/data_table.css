@@ -129,6 +129,7 @@
 .dt-box.dt-folded tr { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; padding: 8px var(--table-pad-x); min-height: var(--table-touch); box-sizing: border-box; border-bottom: 1px solid var(--table-border); }
 .dt-box.dt-folded tbody tr:last-child { border-bottom: 0; }
 .dt-box.dt-folded td { display: block; height: auto; padding: 0; border: 0; max-width: 100%; background: none; }
+.dt-box.dt-folded .dt-table td.dt-content, .dt-box.dt-folded.dt-has-content .dt-table td.dt-grow { width: auto; } /* the unfolded table's 1% and 100% widths are for its columns: a folded cell is as wide as its content (#8035) */
 .dt-box.dt-folded .dt-row:hover td, .dt-box.dt-folded .dt-row.dt-selected td, .dt-box.dt-folded .dt-row[aria-current="true"] td { background: none; }
 .dt-box.dt-folded .dt-row:hover, .dt-box.dt-folded .dt-row[aria-current="true"] { background: var(--table-hover); }
 .dt-box.dt-folded .dt-row.dt-selected { background: var(--table-selected); }

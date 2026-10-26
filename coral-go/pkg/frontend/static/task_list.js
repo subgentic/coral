@@ -592,7 +592,7 @@ function _taskTable(tasks, footer) {
             } },
             // The dock shows Status, Task and Agent only (#7962, the operator): priority, type, cost and the time are on the main Tasks tab and in the opened task
             { key: 'assignee', label: 'Agent', width: 'content', sort: true, firstDir: 'desc', line: 2, when: t => !!t.assigned_to, cell: t => (t.assigned_to ? span('board-task-assignee', t.assigned_to) : '') }, // an empty Agent is an empty cell, not a dash (#8003)
-        ],
+        ].filter(c => !(c.key === 'assignee' && agentTaskScope())), // an agent's own dock lists only that agent's tasks: an Agent column would say the same name on every row (#8035)
     });
     // Keep the existing action dispatcher and identifiers: opening a board task,
     // personal task or subagent still takes the same route as before.
