@@ -11,7 +11,7 @@ const DT = await importOnce('./data_table.js'); // the one table (#7743)
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view: a task list is drawn by tasksTable
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
-import { goalTitle, refreshGoalTitles, readGoalChoices, noGoalLabel } from './task_goals.js';
+import { goalTitle, refreshGoalTitles, readGoal, readGoalChoices, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
@@ -295,7 +295,15 @@ export async function readTask(project, id) {
     const have = model.project === project ? model.rows.find(t => t.id === Number(id)) : null;
     try {
         const r = await boardFetch(project, `/tasks/${pathId(id)}`);
-        if (r.ok) return r.json();
+        if (r.ok) {
+            const task = await r.json();
+            // A direct task mount has not loaded the team's list or its title cache.
+            if (task.goal_id && !task.goal_title) {
+                const goal = await readGoal(project, task.goal_id);
+                if (goal?.title) task.goal_title = goal.title;
+            }
+            return task;
+        }
     } catch { /* the list's item below */ }
     return have || null;
 }
@@ -435,7 +443,7 @@ function factsOf(task, ctx) {
     const doer = doerOf(task); // who did the work: for a done task the one who built it (the server's worked_by)
     fact(dl, isDoneTask(task) ? 'Done by' : 'Assigned to', who && !isDoneTask(task) && doer === task.assigned_to ? btn('team-link', doer, () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(who.name, who.agent_type, who.session_id, who.server); }) : (doer || (isDoneTask(task) ? 'Nobody recorded' : 'Nobody yet')));
     if (task.goal_id) {
-        const g = btn('team-link', (ctx.goalTitleOf && ctx.goalTitleOf(task.goal_id)) || goalTitle(ctx.project, task.goal_id) || `Goal ${task.goal_id}`, () => ctx.openGoal(task.goal_id)); // a goal's page already knows the titles
+        const g = btn('team-link', (ctx.goalTitleOf && ctx.goalTitleOf(task.goal_id)) || task.goal_title || goalTitle(ctx.project, task.goal_id) || `Goal ${task.goal_id}`, () => ctx.openGoal(task.goal_id)); // a goal's page already knows the titles
         fact(dl, 'Goal', g);
     } else fact(dl, 'Goal', noGoalLabel);
     const priority = el('span', null, priorityWord(task.priority)); priority.title = `Claim priority: ${task.priority || 'none'}`; // the dialog's name for it
