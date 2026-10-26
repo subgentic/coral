@@ -20,6 +20,7 @@
 
 /* ── The table ── */
 .mb-table { padding: 0 0 0.75rem; }
+#mb-messages.mb-table { max-width: none; } /* the table fills the pane like the other team tabs (#8504); the 840px cap of #mb-messages is the Chat view's line length */
 .mb-table .mb-message { display: block; margin: 0; padding: 0; border-radius: 0; border-bottom: 1px solid var(--border); }
 .mb-table .mb-queue-run { margin: 0; padding: 0.5rem 0.875rem; border-bottom: 1px solid var(--border); }
 
