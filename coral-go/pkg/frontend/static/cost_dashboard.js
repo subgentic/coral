@@ -8,8 +8,10 @@ import { pollEvery } from './overload.js';
 import { keyLabel } from './server_base.js';
 import { formatTokens, formatDuration, formatCost } from './format.js';
 import { importOnce } from './import_once.js';
+import { isPhoneLayout } from './phone_layout.js';
 const { dataTable, tableState, link: dtLink, chip, tag, avatar } = await importOnce('./data_table.js'); // the shared table (#7743)
 const { showViews, syncRangeLine } = await importOnce('./analytics_views.js'); // the sidebar's list of views and the page's title (#7473)
+const series = await importOnce('./analytics_series.js'); // the lines over time above By provider, By model, By team and By agent (#7857)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
@@ -314,6 +316,7 @@ export async function _refreshCostDashboard() {
 
     // Flash live indicator
     _flashLiveIndicator();
+    _refreshSeries(); // the chart above the open breakdown view (#7857)
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
     showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time')); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
@@ -455,12 +458,79 @@ const _shareBarCol = total => _numCol('cost_pct', 'Share', r => r.cost_usd || 0,
     wrap.append(bar, label); return wrap;
 } });
 const _textCol = (table, key, label, get, extra) => ({ key, label, sort: true, sortValue: get, cell: get, tone: 'primary', filter: { label: `Filter ${label}, ${TABLE_TITLES[table]}`, active: () => _hasActiveFilter(table, key), open: btn => _openFilter(table, key, btn) }, ...extra });
+// ── The breakdown views over time (#7857) ────────────────────────────────
+// By provider, By model, By team and By agent each have a line per table row above the table. The table is the legend: a swatch before the first column's name (a button: it brings the line forward), a click on the
+// row does the same, and under the table a line says whether the rows add up to where the chart ends. The chart reads /api/token-usage/timeseries?group_by=...
+const SERIES_VIEWS = {
+    provider: { group: 'provider', key: r => r.agent_type || 'unknown', name: r => r.agent_type || 'unknown' },
+    model: { group: 'model', key: r => r.model_id || 'unknown', name: r => r.model || 'unknown' },
+    team: { group: 'team', key: r => r.board_name || '(no team)', name: r => (r.board_name ? keyLabel(r.board_name) : '(no team)') },
+    agent: { group: 'agent', key: r => r.agent_name || '(unknown)', name: r => r.display_name || r.agent_name || 'Agent' },
+};
+const _currentView = () => document.getElementById('cost-dashboard-view')?.dataset.view || '';
+const _periodHours = () => ({ hour: 1, day: 24, week: 168, month: 720 })[document.getElementById('cost-time-range')?.value || 'day'] || 24;
+const _periodInterval = () => ({ hour: '5m', day: '1h', week: '1h', month: '1d' })[document.getElementById('cost-time-range')?.value || 'day'] || '1h';
+
+/** The sum of a figure over a view's rows (the unfiltered ones), or null when its rows do not have it (By team has no Requests). */
+function _rowsTotal(view, field) {
+    const rows = _rawData[view] || [];
+    if (!rows.length || rows.some(r => r[field] == null)) return null;
+    return rows.reduce((a, r) => a + (Number(r[field]) || 0), 0);
+}
+
+function _drawSeries(view) {
+    const host = document.getElementById(`cost-series-${view}`);
+    if (!host) return;
+    series.drawPanel(host, view, { tableTotal: f => _rowsTotal(view, f), redraw: () => _rerender(view), phone: isPhoneLayout() });
+}
+
+async function _refreshSeries(view = _currentView()) {
+    const v = SERIES_VIEWS[view];
+    if (!v) return;
+    const host = document.getElementById(`cost-series-${view}`);
+    if (!host) return;
+    const untilMs = Date.now(), sinceMs = untilMs - _periodHours() * 3600000, interval = _periodInterval();
+    try {
+        const resp = await fetch(`/api/token-usage/timeseries?since=${encodeURIComponent(new Date(sinceMs).toISOString())}&interval=${interval}&group_by=${v.group}`, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('unavailable');
+        const data = await resp.json();
+        series.setData(view, { buckets: data.buckets || [], interval, sinceMs, untilMs });
+    } catch { series.setData(view, null, 'The chart is unavailable. The table below is complete.'); }
+    _drawSeries(view);
+    _rerender(view); // the swatches
+}
+
+/** A row's key in the table's first column: a swatch (a button) in its line's colour, then what the cell says. */
+function _swatched(view, cell) {
+    const v = SERIES_VIEWS[view];
+    return r => {
+        const inner = cell(r), color = series.swatchColor(view, v.key(r));
+        if (!color) return inner;
+        const wrap = document.createElement('span'); wrap.className = 'cost-lead';
+        const line = series.lineKeyOf(view, v.key(r)), on = series.highlighted(view) === line;
+        // a pointer has a button (a small target); a finger has the row, which is 44 px and does the same, so the swatch is only its colour
+        const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+        const b = document.createElement(coarse ? 'span' : 'button'); b.className = 'cost-swatch'; b.style.background = color;
+        if (coarse) { b.setAttribute('aria-hidden', 'true'); if (on) b.setAttribute('aria-pressed', 'true'); }
+        else { b.type = 'button'; b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', `Bring ${v.name(r)}'s line forward`); b.addEventListener('click', () => { series.setHighlight(view, line); _drawSeries(view); _rerender(view); }); }
+        wrap.append(b, inner instanceof Node ? inner : document.createTextNode(String(inner == null ? '' : inner)));
+        return wrap;
+    };
+}
+const _pick = view => r => { series.setHighlight(view, series.lineKeyOf(view, SERIES_VIEWS[view].key(r))); _drawSeries(view); _rerender(view); };
+const _seriesOpts = view => ({ open: _pick(view), rowName: r => SERIES_VIEWS[view].name(r) });
+
+document.addEventListener('cost-view-change', e => { if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); });
+let _resizeTimer = null;
+window.addEventListener('resize', () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { const v = _currentView(); if (SERIES_VIEWS[v] && document.getElementById(`cost-series-${v}`)?.firstChild) _drawSeries(v); }, 150); });
+
 function _drawTable(container, table, columns, rows, empty, extra) {
     const st = _tables[table] || (_tables[table] = tableState());
     if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
     if (!rows.length) { emptyState(container, empty || NO_DATA, 'cost-empty'); return; }
     const t = dataTable({ label: TABLE_TITLES[table], columns, rows, rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...extra });
     container.replaceChildren(t.el);
+    if (SERIES_VIEWS[table]) _drawSeries(table); // the line under the chart compares its total with these rows
 }
 
 function _renderProviderTable(rows) {
@@ -471,11 +541,11 @@ function _renderProviderTable(rows) {
     if (!container) return;
     const filtered = _applyColFilters(rows, 'provider', { agent_type: r => r.agent_type || '' });
     _drawTable(container, 'provider', [
-        _textCol('provider', 'agent_type', 'Provider', r => r.agent_type || ''),
+        _textCol('provider', 'agent_type', 'Provider', r => r.agent_type || '', { cell: _swatched('provider', r => r.agent_type || '') }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _costCol(), _shareCol(),
-    ], filtered);
+    ], filtered, null, _seriesOpts('provider'));
 }
 
 function _renderModelTable(rows) {
@@ -486,12 +556,12 @@ function _renderModelTable(rows) {
     if (!container) return;
     const filtered = _applyColFilters(rows, 'model', { model: r => r.model || '', agent_type: r => r.agent_type || '' });
     _drawTable(container, 'model', [
-        _textCol('model', 'agent_type', 'Provider', r => r.agent_type || ''),
+        _textCol('model', 'agent_type', 'Provider', r => r.agent_type || '', { cell: _swatched('model', r => r.agent_type || '') }),
         _textCol('model', 'model', 'Model', r => r.model || '', { title: r => r.model_id || '' }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _costCol(), _shareCol(),
-    ], filtered);
+    ], filtered, null, _seriesOpts('model'));
 }
 
 const _THINKING_NAMES = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
@@ -537,7 +607,7 @@ function _renderAgentTable(rows) {
         return wrap;
     };
     _drawTable(container, 'agent', [
-        _textCol('agent', 'agent_name', 'Agent', nameOf, { cell: nameCell }),
+        _textCol('agent', 'agent_name', 'Agent', nameOf, { cell: _swatched('agent', nameCell) }),
         _costCol(), // right after the name: eleven columns do not all fit a desktop page, and Cost is the figure the page is opened for (#7719)
         _textCol('agent', 'board_name', 'Team', r => r.board_name || '', { cell: r => (r.board_name ? keyLabel(r.board_name) : '—'), tone: 'secondary' }), // the key's label (#3536)
         _textCol('agent', 'folder', 'Folder', r => r.folder || '', { cell: r => r.folder || '—', title: r => r.working_dir || r.folder || '', tone: 'secondary' }),
@@ -545,7 +615,7 @@ function _renderAgentTable(rows) {
         _numCol('duration', 'Duration', span, () => '', { cell: r => _formatDuration(start(r), end(r)) }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
-    ], filtered, NO_DATA, { rowKey: r => r.session_id || `${r.agent_name}:${start(r)}` });
+    ], filtered, NO_DATA, { ..._seriesOpts('agent'), rowKey: r => r.session_id || `${r.agent_name}:${start(r)}` });
     _attachAgentChartHovers(container, new Set(filtered.map(r => r.session_id).filter(Boolean)));
 }
 
@@ -835,11 +905,11 @@ function _renderTeamTable(teams) {
     const filtered = _applyColFilters(teams, 'team', { board_name: t => t.board_name || '(no team)' });
     const total = teams.reduce((n, t) => n + (t.cost_usd || 0), 0) || 1;
     _drawTable(container, 'team', [
-        _textCol('team', 'board_name', 'Team', t => t.board_name || '', { cell: t => (t.board_name ? keyLabel(t.board_name) : '(no team)') }),
+        _textCol('team', 'board_name', 'Team', t => t.board_name || '', { cell: _swatched('team', t => (t.board_name ? keyLabel(t.board_name) : '(no team)')) }),
         _numCol('num_agents', 'Agents', t => t.num_agents || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _costCol(), _shareBarCol(total),
-    ], filtered);
+    ], filtered, null, _seriesOpts('team'));
 }
 
 // ── Branch Table ────────────────────────────────────────────

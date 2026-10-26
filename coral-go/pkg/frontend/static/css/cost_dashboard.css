@@ -406,3 +406,45 @@
     #mobile-analytics-list .sidebar-header { padding: 12px; }
     .cost-page { padding: 12px; }
 }
+
+/* ── The breakdown views over time (#7857, analytics_series.js) ─────────────────────────────────────────────────────────────────────────────────────────────
+ * Seven line colours and Other, validated as a set (adjacent CVD separation 8+, normal-vision 15+); light and dark are each their own steps. Text never wears a series colour: a line is named by its swatch in
+ * the table, the tooltip, the end label and its dash pattern in forced colours. */
+:root { --viz-grid: var(--border-subtle, var(--border)); }
+.viz-panel { margin: 0 0 12px; }
+.viz-panel:empty { display: none; }
+.viz-tools { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 0 0 8px; }
+.viz-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.viz-ctl-label { font-size: 0.75rem; color: var(--text-muted); }
+.viz-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: var(--radius-md, 6px); overflow: hidden; }
+.viz-seg button { min-height: 32px; padding: 0 10px; background: transparent; border: 0; color: var(--text-secondary); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.viz-seg button[aria-pressed="true"] { background: var(--bg-hover); color: var(--text-primary); font-weight: 600; }
+.viz-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.viz-card { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg, 8px); padding: 10px 12px; }
+.viz-title { margin: 0 0 4px; font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
+.viz-host { position: relative; }
+.viz-svg { display: block; max-width: 100%; forced-color-adjust: none; }
+.viz-svg text { font: inherit; font-size: 0.6875rem; fill: var(--text-muted); }
+.viz-svg .viz-end { font-size: 0.75rem; fill: var(--text-secondary); }
+.viz-grid { stroke: var(--viz-grid); stroke-width: 1; }
+.viz-cross { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.viz-dot { stroke: var(--bg-primary); stroke-width: 2; }
+.viz-line { stroke-linejoin: round; stroke-linecap: round; }
+.viz-tip { position: absolute; pointer-events: none; z-index: 3; min-width: 160px; padding: 8px 10px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg, 8px); box-shadow: var(--shadow-md); font-size: 0.75rem; }
+.viz-tip-when { color: var(--text-muted); margin-bottom: 4px; }
+.viz-tip-row { display: flex; justify-content: space-between; gap: 12px; color: var(--text-secondary); }
+.viz-tip-row b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.viz-tip-row i { display: inline-block; width: 10px; height: 2px; margin-right: 6px; vertical-align: middle; }
+.viz-check { margin: 6px 0 0; font-size: 0.75rem; color: var(--text-secondary); }
+.viz-check b { color: var(--text-primary); }
+.viz-check-bad b { color: var(--danger); }
+.cost-lead { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
+.cost-swatch { flex: none; width: 14px; height: 14px; padding: 0; border: 2px solid transparent; border-radius: var(--radius-xs); cursor: pointer; background-clip: padding-box; box-sizing: border-box; }
+.cost-swatch[aria-pressed="true"] { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+.cost-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (pointer: coarse) { .cost-swatch { width: 18px; height: 18px; } .viz-seg button { min-height: var(--control-touch-height, 44px); padding: 0 12px; } }
+@media (forced-colors: active) {
+    .viz-line-0 { stroke-dasharray: none; } .viz-line-1 { stroke-dasharray: 8 4; } .viz-line-2 { stroke-dasharray: 2 4; } .viz-line-3 { stroke-dasharray: 12 4 2 4; }
+    .viz-line-4 { stroke-dasharray: 6 2; } .viz-line-5 { stroke-dasharray: 1 3; } .viz-line-6 { stroke-dasharray: 16 6; } .viz-line-o { stroke-dasharray: 3 3; }
+    .cost-swatch { forced-color-adjust: none; border-color: CanvasText; }
+}
