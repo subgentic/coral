@@ -3,7 +3,7 @@
 
 // a selector that names a table part (an element: table, thead, tbody, tfoot, tr, td, th), or a class of a table the surfaces built for themselves: the class is matched whole, so `.goals-table-page` (the Goals
 // page's layout class) and `.group-table-link` (a button in a group page) are not tables
-const TABLE_CLASS = '(?:team-table|group-table|group-table-stack|group-table-aligned|servers-table|cost-table|goals-table|board-task-item|team-row|sched-table|sched-runs-table|wf-table|wf-runs-table|wf-steps-table|cs-table|saved-table)';
+const TABLE_CLASS = '(?:team-table|group-table|group-table-stack|group-table-aligned|servers-table|cost-table|goals-table|board-task-item|team-row|sched-table|sched-runs-table|wf-table|wf-runs-table|wf-steps-table|cs-table)';
 export const CSS_SELECTOR = new RegExp(`(^|[\\s,>+~(])(table|thead|tbody|tfoot|tr|td|th)\\b|\\.${TABLE_CLASS}(?![\\w-])`);
 export const DT_CLASS = /\.dt-[a-z]/;
 

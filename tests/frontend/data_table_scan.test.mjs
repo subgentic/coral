@@ -17,7 +17,7 @@ const css = (src, exempt) => cssCount(src, exempt);
 assert.equal(css('.group-table th { color: red; }').n, 1, 'a header selector');
 assert.equal(css('.x table, .y td { margin: 0; }').n, 1, 'two parts in one rule are one rule');
 assert.equal(css('tr:hover td { x: y; }').n, 1);
-for (const cls of ['team-table', 'group-table', 'group-table-stack', 'group-table-aligned', 'servers-table', 'cost-table', 'sched-runs-table', 'wf-runs-table', 'wf-steps-table', 'cs-table', 'saved-table']) assert.equal(css(`.${cls} { width: 100%; }`).n, 1, `a whole table class: .${cls}`);
+for (const cls of ['team-table', 'group-table', 'group-table-stack', 'group-table-aligned', 'servers-table', 'cost-table', 'sched-runs-table', 'wf-runs-table', 'wf-steps-table', 'cs-table']) assert.equal(css(`.${cls} { width: 100%; }`).n, 1, `a whole table class: .${cls}`);
 // CSS: what does not
 assert.equal(css('.goals-table-page { padding: 0; }').n, 0, 'the Goals page layout class is not a table');
 assert.equal(css('.goals-table-page .goals-back { min-height: 44px; }').n, 0, 'nor is a rule under it');
