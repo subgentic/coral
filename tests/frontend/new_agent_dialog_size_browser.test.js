@@ -55,13 +55,16 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
                 const names = await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.provider}.test(window.__na.name(e))); return g ? window.__na.radios(g).map(r => window.__na.radioName(r)) : null; })()`);
                 assert.ok(names && names.length >= 3, `Provider is a radiogroup of the providers (found ${JSON.stringify(names)})`);
                 const probe = () => ev(`(() => { const f = (s, rx) => { const e = window.__na.find(s, rx); return e ? window.__na.box(e) : null; }; const m = f('select', ${N.model}); const t = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.thinking}.test(window.__na.name(e))); return { dialog: window.__na.box(window.__na.panel()), model: m, thinking: t ? window.__na.box(t) : null }; })()`);
+                let slotMin = Infinity;
                 const first = await probe(); assert.ok(first.model && first.thinking, 'Model and Thinking are on the Agent tab');
                 for (const n of names) {
                     await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.provider}.test(window.__na.name(e))); window.__na.radios(g).find(r => window.__na.radioName(r) === ${JSON.stringify(n)}).click(); return true; })()`);
                     await settle(300);
                     const p = await probe(); same(first.dialog, p.dialog, `provider ${n}: dialog`);
-                    for (const k of ['model', 'thinking']) { assert.ok(p[k], `provider ${n}: ${k} is shown`); for (const c of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(first[k][c] - p[k][c]) <= 0.5, `provider ${n}: ${k} ${c} moved from ${first[k][c]} to ${p[k][c]}`); }
+                    slotMin = Math.min(slotMin, await ev(`document.getElementById('launch-note-slot').offsetHeight`));
+                    for (const k of ['model', 'thinking']) { assert.ok(p[k], `provider ${n}: ${k} is shown`); for (const c of ['x', 'y', 'w', 'h']) { if (mobile && c === 'y') assert.ok(p[k].y >= first[k].y - 0.5, `provider ${n}: ${k} y moved up from ${first[k].y} to ${p[k].y}`); else assert.ok(Math.abs(first[k][c] - p[k][c]) <= 0.5, `provider ${n}: ${k} ${c} moved from ${first[k][c]} to ${p[k][c]}`); } } // on a phone an empty slot is collapsed, so a note pushes Model and Thinking down, never up (#7912)
                 }
+                if (mobile) assert.ok(slotMin <= 24, `on a phone an empty notes slot takes no room (the smallest slot seen was ${slotMin}px tall)`);
                 assert.ok(await ev(`(() => { const d = window.__na.dialog(); return [...d.querySelectorAll('[aria-live=polite]')].some(e => e.getClientRects().length > 0 || e.offsetHeight > 0); })()`), 'a polite live region holds the provider note');
             });
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`);
