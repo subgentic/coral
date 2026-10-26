@@ -163,7 +163,7 @@ export function mountSettingsView(host, spec) {
             if (help && help.more) {
                 const more = node('div', 'sv-more'); more.id = `${id}-m`; more.hidden = true; more.append(...paragraphs(help.more));
                 const btn = node('button', 'sv-learn', 'Learn more'); btn.type = 'button'; btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', more.id);
-                const named = () => { if (help.about) btn.setAttribute('aria-label', `${btn.textContent} about ${help.about}`); }; named(); // help.about: what it is about, for the screen reader ("Learn more about working modes")
+                const named = () => btn.setAttribute('aria-label', `${btn.textContent} about ${help.about || field.label}`); named(); // help.about, else the field's label: what it is about, for the screen reader ("Learn more about working modes"); a page of them is not seven "Learn more"
                 btn.addEventListener('click', () => { more.hidden = !more.hidden; btn.setAttribute('aria-expanded', String(!more.hidden)); btn.textContent = more.hidden ? 'Learn more' : 'Show less'; named(); });
                 helpEl.append(' ', btn); text.append(helpEl, more);
             } else text.append(helpEl);
