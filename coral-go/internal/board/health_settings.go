@@ -86,29 +86,19 @@ func DefaultHealthSettings() HealthSettings {
 	}
 }
 
-func clampInt(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
-
 // Clamp keeps every value in its range (#4176 rule 7): times at least 5 and at most 1440
 // minutes, nudge counts 1 to 5, at most 8 default reviewers.
 func (h HealthSettings) Clamp() HealthSettings {
-	h.IntervalMin = clampInt(h.IntervalMin, 5, 1440)
-	h.ClaimNudge.AfterMin = clampInt(h.ClaimNudge.AfterMin, 5, 1440)
-	h.ClaimNudge.Nudges = clampInt(h.ClaimNudge.Nudges, 1, 5)
-	h.StatusNudge.AfterMin = clampInt(h.StatusNudge.AfterMin, 5, 1440)
-	h.StatusNudge.EscalateAfterMin = clampInt(h.StatusNudge.EscalateAfterMin, 5, 1440)
-	h.MentionRenudge.AfterMin = clampInt(h.MentionRenudge.AfterMin, 5, 1440)
-	h.HeldNotice.AfterMin = clampInt(h.HeldNotice.AfterMin, 5, 1440)
-	h.BusyNoTask.AfterMin = clampInt(h.BusyNoTask.AfterMin, 5, 1440)
-	h.GoalSize.Limit = clampInt(h.GoalSize.Limit, 5, 500)
-	h.AskReminder.AfterMin = clampInt(h.AskReminder.AfterMin, 5, 1440)
+	h.IntervalMin = min(max(h.IntervalMin, 5), 1440)
+	h.ClaimNudge.AfterMin = min(max(h.ClaimNudge.AfterMin, 5), 1440)
+	h.ClaimNudge.Nudges = min(max(h.ClaimNudge.Nudges, 1), 5)
+	h.StatusNudge.AfterMin = min(max(h.StatusNudge.AfterMin, 5), 1440)
+	h.StatusNudge.EscalateAfterMin = min(max(h.StatusNudge.EscalateAfterMin, 5), 1440)
+	h.MentionRenudge.AfterMin = min(max(h.MentionRenudge.AfterMin, 5), 1440)
+	h.HeldNotice.AfterMin = min(max(h.HeldNotice.AfterMin, 5), 1440)
+	h.BusyNoTask.AfterMin = min(max(h.BusyNoTask.AfterMin, 5), 1440)
+	h.GoalSize.Limit = min(max(h.GoalSize.Limit, 5), 500)
+	h.AskReminder.AfterMin = min(max(h.AskReminder.AfterMin, 5), 1440)
 	h.Recipient = strings.TrimSpace(h.Recipient)
 	var revs []string
 	for _, r := range h.DefaultReviewers {

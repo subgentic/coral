@@ -249,8 +249,8 @@ func StartEnrollment(ctx context.Context, hc *http.Client, hubURL string, now ti
 	if len(r.DeviceCode) < 16 || len(r.DeviceCode) > 256 || !userCodeRe.MatchString(r.UserCode) {
 		return nil, ErrHubResponse
 	}
-	interval := time.Duration(clamp(r.Interval, 2, 30)) * time.Second
-	expires := time.Duration(clamp(r.ExpiresIn, 30, 900)) * time.Second
+	interval := time.Duration(min(max(r.Interval, 2), 30)) * time.Second
+	expires := time.Duration(min(max(r.ExpiresIn, 30), 900)) * time.Second
 	return &DeviceCode{
 		DeviceCode: r.DeviceCode, UserCode: r.UserCode, Interval: interval, ExpiresAt: now.Add(expires),
 		VerificationURL: safeVerificationURL(hubURL, r.VerificationURL),
@@ -349,16 +349,6 @@ func cleanLabel(s string) string {
 		s = string(r[:80])
 	}
 	return strings.TrimSpace(s)
-}
-
-func clamp(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
 }
 
 // TunnelURL turns the hub origin into its wss:// tunnel endpoint.

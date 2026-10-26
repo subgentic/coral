@@ -82,6 +82,14 @@ func TestStartEnrollmentValidatesHubAnswers(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2*time.Second, dc.Interval, "a hub cannot make the connector poll faster than every 2s")
 	require.Equal(t, time.Unix(900, 0), dc.ExpiresAt, "nor wait longer than 15 minutes")
+	dc, err = run(withInterval(999, -5), 200)
+	require.NoError(t, err)
+	require.Equal(t, 30*time.Second, dc.Interval, "nor poll slower than every 30s")
+	require.Equal(t, time.Unix(30, 0), dc.ExpiresAt, "a code is never kept for less than 30 seconds")
+	dc, err = run(withInterval(17, 300), 200)
+	require.NoError(t, err)
+	require.Equal(t, 17*time.Second, dc.Interval, "a value in range is kept")
+	require.Equal(t, time.Unix(300, 0), dc.ExpiresAt)
 
 	for name, body := range map[string]map[string]any{
 		"short device code": {"device_code": "short", "user_code": "ABCD-EFGH"},
