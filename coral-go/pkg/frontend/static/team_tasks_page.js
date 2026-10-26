@@ -16,7 +16,6 @@ import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
 import { foldWayBack } from './way_back.js';
-const { buildTaskBar } = await importOnce('./task_bar.js'); // the old tab's search, filters and sort on the shared list bar (lazy: its failure is retried)
 const TF = await importOnce('./task_filters.js');
 const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's renderer (DOM-built, no markup from text): a task reads the same on both pages
 const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
@@ -158,7 +157,7 @@ function setFilters(next) {
 function ensureBar() {
     if (bar && barKey === model.project) return;
     barKey = model.project;
-    bar = buildTaskBar(setFilters, { onPanel: open => { try { browserLocal.set(`coral-list-bar-open:team-tasks:${model.project}`, open ? '1' : ''); } catch { /* the panel is shut next time */ } } }, { team: true });
+    bar = TV.tasksToolbar('team', setFilters, { onPanel: open => { try { browserLocal.set(`coral-list-bar-open:team-tasks:${model.project}`, open ? '1' : ''); } catch { /* the panel is shut next time */ } } });
     applyChoices();
     bar.setOpen(browserLocal.get(`coral-list-bar-open:team-tasks:${model.project}`) === '1');
 }
@@ -211,8 +210,8 @@ function draw() {
     if (bar.node.parentElement !== body) body.prepend(bar.node);
     const query = TF.isQuery(model.filters), L = model.q, all = rowsNow(), failed = query ? L.error : model.failed;
     const c = counts();
-    newTask = newTask || btn('btn btn-primary goals-new', 'New task', () => { (window.showCreateTaskModal || (() => {}))(); });
-    // The one toolbar line (#7717): the list bar's own row holds the search, the state pills (one compact select when they do not fit), the Filters icon and New task at the right.
+    newTask = newTask || TV.newTaskButton();
+    // The one toolbar line (#7717): the list bar's own row holds the search, the state pills (one compact select when they do not fit), the Filters icon and + Task at the right.
     Toolbar.adopt(bar.node.querySelector('.list-bar-search-row'), {
         pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key] })),
             onPick: key => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },

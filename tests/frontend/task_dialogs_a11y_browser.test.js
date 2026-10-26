@@ -29,7 +29,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length >= 2 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'the tasks', 15000);
 
         console.log('1. Create task: focus, a spoken refusal, a keyboard-reachable dependency picker');
-        await ev(`document.querySelector('.btn-create-task').focus(); document.querySelector('.btn-create-task').click(); true`);
+        await ev(`document.querySelector('#board-task-bar .btn-create-task').focus(); document.querySelector('#board-task-bar .btn-create-task').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none'`, 'the dialog', 8000);
         assert.equal(await ev(`document.activeElement.id`), 'create-task-title', 'focus goes to the title on open');
         assert.equal(await ev(`document.getElementById('create-task-title').getAttribute('aria-required')`), 'true');
@@ -87,8 +87,8 @@ const BASE = require('./test_base').BASE;
         for (const theme of ['dark', 'light']) {
             await setTheme(ev, theme);
             await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); window.selectLiveSession('bt-agent', 'claude', 'bt-agent-id', 'local'); true`);
-            await waitFor(`!!document.querySelector('.btn-create-task') && document.querySelector('.btn-create-task').getClientRects().length > 0`, 'the Tasks tab again', 8000);
-            await ev(`document.querySelector('.btn-create-task').click(); true`);
+            await waitFor(`!!document.querySelector('#board-task-bar .btn-create-task') && document.querySelector('#board-task-bar .btn-create-task').getClientRects().length > 0`, 'the Tasks tab again', 8000);
+            await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
             await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none'`, 'create', 5000);
             const c = await auditRegion(ev, ['#create-task-modal']); await shot(`create-${theme}`);
             await ev(`document.querySelector('#create-task-modal .modal-close-btn').click(); true`);

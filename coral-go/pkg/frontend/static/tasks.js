@@ -21,7 +21,7 @@ import './task_format.js';
 import { showSubagentDetailModal } from './subagents.js';
 import './safe_storage.js';
 import './lazy_dom.js';
-import './task_bar.js';
+import './tasks_view.js';
 import './task_filters.js';
 import './task_board_context.js';
 import './task_verify_marks.js';

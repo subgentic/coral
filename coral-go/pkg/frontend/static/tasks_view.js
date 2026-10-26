@@ -4,8 +4,9 @@
  *   tasksTable('team', rows, { ctx: { openGoal(goalId), goalTitleOf(goalId), noGoal, teamOf(task) }, open, state, ...dataTable options }) -> { el, bar, selectButton, ... } (a data_table)
  *   taskColumns(ctx, ['state', 'task', 'who', 'goal', 'priority', 'updated']) -> Column[] (the columns alone, for a surface that adds its own) */
 import { taskStatusWord, statusClass } from './goal_words.js';
-import { importOnce } from './import_once.js';
-const DT = await importOnce('./data_table.js'); // lazy: its failure is retried
+import * as DT from './data_table.js'; // static: a top-level await on a lazy import here would hold up every module that imports this one (the shape that froze startup in #7844 and #7904)
+import { buildListBar } from './list_bar.js';
+import { EMPTY, STATUSES, PRIORITIES, SORTS, STATUS_LABEL, PRIORITY_LABEL, SORT_LABEL, clean, chips, isFiltered, without } from './task_filters.js';
 
 export const taskWord = (t) => taskStatusWord(t.status, t.review_requested);
 export const taskKey = (t) => `t${t.id}`;
@@ -51,4 +52,67 @@ export function tasksTable(scope, rows, { ctx = {}, tweak, ...table } = {}) {
     let columns = taskColumns(ctx, keys);
     if (tweak) columns = tweak(columns) || columns;
     return DT.dataTable({ label: `Tasks, ${rows.length}`, rowKey: taskKey, rowName: (t) => `#${t.id} ${t.title}`, ...table, columns, rows });
+}
+
+// ── the one toolbar (#8119): Search, Filters, + Task, on every scope that has a list bar ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+const SPEC = {
+    idp: 'tk',
+    noun: 'task',
+    hideCount: true,
+    label: 'Search and filter tasks',
+    searchLabel: 'Search tasks',
+    placeholder: 'Search tasks',
+    collapsible: true, // the agents tab's pattern (#5293): one icon opens Filters and Sort
+    sorts: { values: SORTS, labels: SORT_LABEL, aria: 'Sort tasks' },
+    fields: [
+        { type: 'select', key: 'status', id: 'tk-status', label: 'Status', values: STATUSES, labels: STATUS_LABEL, any: 'Any status' },
+        { type: 'select', key: 'priority', id: 'tk-priority', label: 'Priority', values: PRIORITIES, labels: PRIORITY_LABEL, any: 'Any priority' },
+        { type: 'text', key: 'assignee', id: 'tk-assignee', className: 'list-bar-by', label: 'Agent', max: 80, placeholder: 'Agent name', datalist: 'tk-assignee-list' },
+        { type: 'date', key: 'from', id: 'tk-from', label: 'Updated since' },
+    ],
+    model: { EMPTY, clean, chips, isFiltered, without },
+};
+
+// The team page's Tasks tab (#7782): no Status field (the state pills above the list are the status), the goal as a select (the page fills its options: No goal, then the team's goals with their task counts), the agent
+// as a select of the team's members, and the fields two to a line. The board's own Tasks panel (task_list.js) keeps the full set.
+const TEAM_SPEC = {
+    ...SPEC,
+    compactPanel: true,
+    sorts: null, // one sort on this tab: the table's own sortable heads (the order it opens in is Open first); the panel has none (#7883)
+    doneButton: true, // a phone's panel closes with Done (#7883)
+    chipsElsewhere: true, // the page puts every filter that is on as a chip on its toolbar line
+    fields: [
+        SPEC.fields[1],
+        { type: 'select', key: 'goal', id: 'tk-goal', label: 'Goal', values: [], labels: {}, any: 'Any goal' },
+        { type: 'select', key: 'assignee', id: 'tk-assignee', label: 'Agent', values: [], labels: {}, any: 'Any agent' },
+        SPEC.fields[3],
+    ],
+};
+
+// The dock's Tasks panel (#7924): the one top row (the search, the Filters icon, + Task), so the bar has a slot for the owner's button after the icon; Hide done is the owner's extra in the panel.
+const DOCK_SPEC = {
+    ...SPEC,
+    headerSlots: true,
+    // Agent is a select of the dock's agents, as on the main Tasks tab (#8003): the owner fills its options (the board's members and whoever has a task)
+    fields: [SPEC.fields[0], SPEC.fields[1], { type: 'select', key: 'assignee', id: 'tk-assignee', label: 'Agent', values: [], labels: {}, any: 'Any agent' }, SPEC.fields[3]],
+};
+
+
+const TOOLBAR_SPECS = { team: TEAM_SPEC, agent: DOCK_SPEC, 'agent-team': DOCK_SPEC };
+
+/** The Tasks list's search box, Filters panel and chips on the shared list bar, for a scope: onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). The team tab
+ *  adds its state pills and chips to the bar's row (team_toolbar.js adopt); the dock puts + Task in the bar's header slot; both end the row with newTaskButton. A scope with no toolbar (a goal's column, the Inbox's own list) throws. */
+export function tasksToolbar(scope, onChange, hooks = {}) {
+    const spec = TOOLBAR_SPECS[scope];
+    if (!spec) throw new Error(`tasksToolbar: scope "${scope}" has no toolbar`);
+    return buildListBar(spec, onChange, hooks);
+}
+
+/** The one + Task button: the same words, name, tooltip and action on every list of tasks. `small` is the dock's compact size. It opens the create-task dialog (the data-on-click action). */
+export function newTaskButton({ small = false } = {}) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = `btn btn-primary btn-create-task${small ? ' btn-small' : ' goals-new'}`; b.textContent = '+ Task';
+    b.title = 'Create task'; b.setAttribute('aria-label', 'New task'); b.setAttribute('data-on-click', 'task-create-show');
+    return b;
 }

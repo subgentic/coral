@@ -8,7 +8,6 @@ import { pathId, boardFetch, serverFetch, serverForSession, fetchValidated, drop
 import { EMPTY as TASK_EMPTY, SORT_LABEL as taskSortLabel, isQuery, loadFilters as loadTaskFilters, phases as taskPhases, toParams as taskParams, saveFilters as saveTaskFilters } from './task_filters.js';
 import { browserLocal } from './safe_storage.js';
 import { showToast, escapeHtml } from './utils.js';
-import { buildTaskBar } from './task_bar.js';
 import { loadPanelOpen, savePanelOpen } from './list_bar.js';
 import { _priorityOrder, _agentTaskStatus } from './task_format.js';
 import { morphHtml } from './dom_morph.js';
@@ -361,18 +360,16 @@ function _syncTaskBar(show, counts) {
     const solo = host.querySelector('.board-task-solo');
     if (!show) {
         if (_taskBar && _taskBar.node.parentElement === host) _taskBar.node.remove();
-        if (!solo) { const d = document.createElement('div'); d.className = 'board-task-solo'; d.innerHTML = '<button type="button" class="btn btn-primary btn-small btn-create-task" data-on-click="task-create-show" title="Create Task" aria-label="Create task">+ Task</button>'; host.append(d); }
+        if (!solo) { const d = document.createElement('div'); d.className = 'board-task-solo'; d.append(TV.newTaskButton({ small: true })); host.append(d); }
         return;
     }
     if (solo) solo.remove();
     if (!_taskBar) {
         const board = _taskFiltersBoard;
-        _taskBar = buildTaskBar(_setTaskFilters, { onPanel: open => savePanelOpen('tasks', board, open) }, { dock: true });
+        _taskBar = TV.tasksToolbar(agentTaskScope() ? 'agent' : 'agent-team', _setTaskFilters, { onPanel: open => savePanelOpen('tasks', board, open) });
         _taskBar.setOpen(loadPanelOpen('tasks', board)); // the panel is left as it was for this board (#5293)
         // The one top row (#7924): the search, the Filters icon, then + Task; Hide done is a control of the Filters panel, not a title row
-        const tools = document.createElement('div');
-        tools.innerHTML = '<button type="button" class="btn btn-primary btn-small btn-create-task" data-on-click="task-create-show" title="Create Task" aria-label="Create task">+ Task</button>';
-        _taskBar.setHeader(null, [tools.firstElementChild]);
+        _taskBar.setHeader(null, [TV.newTaskButton({ small: true })]);
         const hide = document.createElement('div');
         hide.innerHTML = '<label class="board-task-hide-toggle"><input type="checkbox" data-on-change="task-hide-done"> <span class="board-task-hide-text">Hide done</span></label>';
         _hideDoneEl = hide.firstElementChild;
