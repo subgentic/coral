@@ -7,6 +7,7 @@ export function agentIsStarting(row) {
 }
 
 const SEND_STARTING_TITLE = "This agent is still starting: your message is held until it is ready";
+const STARTING_HINT = "Messages you send now are held until it is ready.";
 const SEND_BUTTONS = '.btn-send, .mobile-send-btn[data-on-click="cmd-send"]';
 
 let sendStarting = false; // the last answer, kept because the toolbar's buttons are rebuilt (controls.js) after it is given
@@ -15,7 +16,12 @@ let sendStarting = false; // the last answer, kept because the toolbar's buttons
 export function syncSendStarting(starting = sendStarting) {
     sendStarting = !!starting;
     const hint = document.getElementById("composer-starting-hint"); // the same words as a quiet line above the box (#8242): a phone never shows Send's title
-    if (hint) hint.hidden = !starting;
+    if (hint) {
+        if (starting) { // shown first and worded a frame later: a polite live region that appears with its words says nothing (the live-region census)
+            hint.hidden = false;
+            requestAnimationFrame(() => { if (!hint.hidden) hint.textContent = STARTING_HINT; });
+        } else { hint.hidden = true; hint.textContent = ""; }
+    }
     document.querySelectorAll(SEND_BUTTONS).forEach(b => {
         if (starting) {
             if (b.dataset.startingWas === undefined) b.dataset.startingWas = JSON.stringify([b.getAttribute("title"), b.getAttribute("data-tooltip"), b.getAttribute("aria-label")]);
