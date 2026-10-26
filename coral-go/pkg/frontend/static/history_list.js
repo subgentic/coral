@@ -1,5 +1,4 @@
 /* The Chats list and a history transcript (moved out of render.js, #4996; no behaviour change). */
-import { importOnce } from './import_once.js';
 import { historyServer } from './history_source.js';
 import { identityKey } from './server_base.js';
 import { state } from './state.js';
@@ -13,10 +12,10 @@ import { renderTranscript } from './live_chat.js';
 import { historyLabel } from './history_label.js';
 import { browserLocal } from './safe_storage.js';
 import { setAttr } from './dom_write.js';
+import * as DT from './data_table.js'; // a static import: this file is in the startup graph, and a top-level await in it kept app.js from registering its DOMContentLoaded handler in time (#8538)
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable } from './sidebar_groups.js';
 
 
-const DT = await importOnce('./data_table.js');
 const chatTableStates = new Map();
 
 /** The usual branches say nothing: only another one is worth a word in a row. */
