@@ -265,8 +265,10 @@ const hex = i => i.toString(16).padStart(20, '0');
         const bl = await saved('?kind=board&conv=' + BOARD);
         assert.equal(bl.items.length, 2); assert.equal(bl.items.find(i => i.key === String(keep.id)).snippet, 'the one to save');
         assert.equal((await api('DELETE', `/api/board/${BOARD}/messages/${drop.id}`)).status, 200, 'the message is deleted from the board');
-        await select('sv-a'); // away from the board
-        await ev(`window.selectLiveSession('', '', '', 'local'); true`); // and home: the list is of the agent or team on screen (#4792), and this one reads all of them
+        // Leaving the team page awaits its settings guard. The mobile wrapper
+        // drops the exported selector's promise even on desktop; await the real
+        // selector so no late selection can navigate away after Saved opens.
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'sessions.js'); await m.selectLiveSession('sv-a', 'claude', 'sv-a-id', 'local'); await m.selectLiveSession('', '', '', 'local'); return true; })()`); // home: this list reads every conversation
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the page's own Saved tab; the top bar's bookmark is the Inbox's (#4905)
         const INBOX_ROWS = '#group-table-view tbody tr';
         await waitFor(`${INBOX_SAVED} && [...document.querySelectorAll('${INBOX_ROWS} .dt-primary')].filter(e => e.textContent.toLowerCase().includes('saved-4510-board')).length === 2`, 'the board items (home\'s list is the Inbox\'s, everything\'s)', 6000);
@@ -287,7 +289,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.equal(await ev(`document.querySelector('#saved-jumpbar .btn').textContent`), 'Back to Saved');
         await shot('saved-board-jump');
         for (const it of (await saved()).items) await api('DELETE', `/api/saved/${it.id}`);
-        await select('sv-a');
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'sessions.js'); await m.selectLiveSession('sv-a', 'claude', 'sv-a-id', 'local'); return true; })()`);
         // two items again for the phone
         await ev(`(async () => { for (const k of [${JSON.stringify(hex(3))}, ${JSON.stringify(hex(4))}]) await fetch('/api/saved', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'agent', ref: 'sv-a-id', key: k, agent_type: 'claude', title: 'sv-a', snippet: 'a saved message', said_at: '2026-10-17T08:00:00Z' }) }); })()`);
         console.log('   ✓');
@@ -313,7 +315,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         const e1 = await api('POST', '/api/saved', { kind: 'agent', ref: ENDED, key: hex(20), agent_type: 'claude', title: 'ended agent', snippet: 'ended message 20', said_at: '2026-10-16T10:00:20Z' });
         const e2 = await api('POST', '/api/saved', { kind: 'agent', ref: MISSING, key: hex(1), agent_type: 'claude', title: 'no transcript', snippet: 'a message of a transcript that is gone', said_at: '2026-10-16T10:00:01Z' });
         assert.equal(e1.status, 200); assert.equal(e2.status, 200);
-        await ev(`window.selectLiveSession('', '', '', 'local'); true`); // home: the list is of the agent or team on screen (#4792), and these are three agents'
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'sessions.js'); await m.selectLiveSession('', '', '', 'local'); return true; })()`); // home: the list is of the agent or team on screen (#4792), and these are three agents'
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the page's own Saved tab; the top bar's bookmark is the Inbox's (#4905)
         const IR = '#group-table-view tbody tr';
         await waitFor(`${INBOX_SAVED} && document.querySelectorAll('${IR}').length === 4 && document.getElementById('group-table-view').textContent.includes('transcript that is gone')`, 'the four items (home\'s list is the Inbox\'s)', 6000);
