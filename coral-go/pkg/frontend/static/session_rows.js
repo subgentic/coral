@@ -92,11 +92,22 @@ export function kebabId(kind, key) {
     return `kebab-${kind}-${k.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}-${h.toString(36)}`;
 }
 
-const LABEL_TAIL = 7, LABEL_SPLIT_OVER = 16;
-/** [head, tail] for a name longer than 16 characters (the tail is its last 7, never in the middle of a character), else [name, '']. */
+const LABEL_TAIL_FITS = 10, LABEL_TAIL_PARTS = 3, LABEL_SPLIT_OVER = 16;
+/** [head, tail] for a name longer than 16 characters, else [name, '']: the tail is the last whole word or two (a word ends at a space, a hyphen, an underscore or a dot), so the end that tells agents apart stays and a cut never lands inside it ("Frontend… Teams UI"); a space between them stays at the end of the head. A name with no word that fits has no tail: its end gets the plain ellipsis. */
 function splitLabel(name) {
-    const chars = Array.from(String(name));
-    return chars.length > LABEL_SPLIT_OVER ? [chars.slice(0, -LABEL_TAIL).join(''), chars.slice(-LABEL_TAIL).join('')] : [String(name), ''];
+    const full = String(name);
+    if (Array.from(full).length <= LABEL_SPLIT_OVER) return [full, ''];
+    const parts = full.match(/[^\s\-_.]*[\-_.]*\s*/gu).filter(Boolean);
+    let tail = '';
+    for (let i = parts.length - 1, n = 0; i > 0 && n < LABEL_TAIL_PARTS; i--, n++) {
+        const next = parts[i] + tail;
+        if (Array.from(next.trimEnd()).length > LABEL_TAIL_FITS) break;
+        tail = next;
+    }
+    tail = tail.replace(/^\s+/u, '');
+    while (tail && !/[\p{L}\p{N}]/u.test(tail.split(/\s/u)[0])) tail = tail.replace(/^\S*\s*/u, ''); // never begin on a bare "&" or "-"
+    if (!tail) return [full, ''];
+    return [full.slice(0, full.length - tail.length), tail];
 }
 
 /** What the phone's row shows besides the name (the sidebar hides these): the state chip, the unread count, and the banner for an agent that needs the person. */
@@ -278,7 +289,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // An agent called by its folder under that folder's own group would read the same twice: its CLI tells it from the group ("my-app · Claude", #6029).
     const sameAsGroup = !isTerminal && groupName && String(identity).toLowerCase() === String(keyLabel(groupName)).toLowerCase() && typeName(s.agent_type);
     const displayLabel = sameAsGroup ? `${identity} \u00b7 ${typeName(s.agent_type)}` : identity;
-    // A long name is cut with an ellipsis, and agents of one team share a prefix: its last characters never shrink, so the end that tells them apart stays ("release-engineering-coo...-4-9").
+    // A long name is cut with an ellipsis, and agents of one team share a prefix: its last word or two never shrink, so the end that tells them apart stays ("release-engineering-coo...-number-4-9").
     const [nameHead, nameTail] = splitLabel(displayLabel);
     const reminder = getCachedAgentAvailability(s);
     const reminderTag = reminder?.reminder

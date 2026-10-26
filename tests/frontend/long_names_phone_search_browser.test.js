@@ -1,5 +1,5 @@
-// Agent list at scale (#4624, UX #4612 items 1 and 3): (1) a long agent name keeps the end that tells agents of one team apart: its head shrinks with an ellipsis, its last 7 characters do
-// not, on the desktop sidebar; the full name stays in the text, the hover title and the row's accessible name; on the phone the name wraps, so its end is there. (3) The phone's Agents
+// Agent list at scale (#4624, UX #4612 items 1 and 3): (1) a long agent name keeps the end that tells agents of one team apart: its head shrinks with an ellipsis, its last whole word or two do
+// not (the cut never lands inside them: "Frontend… Teams UI", #7919), on the desktop sidebar; the full name stays in the text, the hover title and the row's accessible name; on the phone the name wraps, so its end is there. (3) The phone's Agents
 // page has a Search agents button (a 44 px box under the list header's controls, the same search): typing filters the rows, Escape clears it, and a widened screen's sidebar box takes the text over.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server; run_cdp_suites.mjs finds it by name.
 const assert = require('node:assert/strict');
@@ -11,7 +11,8 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: layout settles over frames after a viewport change; there is no completion event
-    const NAMES = ['release-engineering-coordinator-4-9', 'release-engineering-coordinator-4-7', 'backend-platform-reliability-engineer-4-1', 'backend-platform-reliability-engineer-4-2', 'qa', 'frontend-accessibility-reviewer-4-3'];
+    const NAMES = ['release-engineering-coordinator-4-9', 'release-engineering-coordinator-4-7', 'backend-platform-reliability-engineer-4-1', 'backend-platform-reliability-engineer-4-2', 'qa', 'frontend-accessibility-reviewer-4-3', 'Frontend Dev Teams UI', 'Security Reviewer Windows', 'Data Science & Dashboarding', 'Supercalifragilisticexpialidocious'];
+    const PLAIN = ['Supercalifragilisticexpialidocious', 'Data Science & Dashboarding']; // no word of 10 characters or fewer ends them: the plain end ellipsis
     const open = async (w, h, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -31,18 +32,27 @@ const BASE = require('./test_base').BASE;
         console.log('1. Desktop: the end of a long name stays visible');
         await open(1280, 800, false);
         const rows = await ev(`${ROWS}.map(r => { const l = r.querySelector('.session-label'), name = r.querySelector('.session-label-name'), tail = r.querySelector('.sln-tail'), head = r.querySelector('.sln-head'); const lr = l.getBoundingClientRect(), tr = tail ? tail.getBoundingClientRect() : null;
-            return { name: name.textContent, title: l.title, aria: r.getAttribute('aria-label'), split: l.classList.contains('session-label-split'), tail: tail ? tail.textContent : null, tailVisible: tr ? tr.width > 0 && tr.right <= lr.right + 1 && tr.left >= lr.left - 1 : null, headCut: head ? head.scrollWidth > head.clientWidth : null }; })`);
+            return { name: name.textContent, title: l.title, aria: r.getAttribute('aria-label'), split: l.classList.contains('session-label-split'), tail: tail ? tail.textContent : null, tailVisible: tr ? tr.width > 0 && tr.right <= lr.right + 1 && tr.left >= lr.left - 1 : null, headCut: head ? head.scrollWidth > head.clientWidth : null, lastW: head ? (() => { const t = head.firstChild, g = document.createRange(); g.setStart(t, t.length - 1); g.setEnd(t, t.length); return Math.round(g.getBoundingClientRect().width * 10) / 10; })() : null }; })`);
         assert.equal(rows.length, NAMES.length);
         for (const r of rows) {
             assert.ok(NAMES.includes(r.name), 'the text is the whole name: ' + r.name);
             assert.equal(r.title, r.name, 'the hover shows the full name'); assert.ok(r.aria.startsWith(r.name + ','), 'the accessible name carries the full name: ' + r.aria);
-            if (r.name.length > 16) assert.ok(r.split && r.tail === r.name.slice(-7) && r.tailVisible, 'its last 7 characters are in view: ' + JSON.stringify(r));
-            else assert.ok(!r.split, 'a short name is left as it is');
+            const cut = r.name.length - (r.tail || '').length;
+            if (r.name.length > 16 && !PLAIN.includes(r.name)) {
+                assert.ok(r.split && r.name.endsWith(r.tail) && r.tailVisible && r.tail.length <= 10, 'its end is in view: ' + JSON.stringify(r));
+                assert.ok(/[\s\-_.]/.test(r.name[cut - 1]), 'the tail starts at a word, never inside one: ' + JSON.stringify(r));
+                if (/\s/.test(r.name[cut - 1]) && !r.headCut) assert.ok(r.lastW >= 2, 'the space between the head and the tail is drawn: ' + JSON.stringify(r));
+            } else assert.ok(!r.split, 'a short name, or one without a word that fits, has no tail (a plain end ellipsis): ' + JSON.stringify(r));
         }
         assert.ok(rows.some(r => r.headCut), 'the sidebar is narrow enough that a head is cut with an ellipsis (the case under test): ' + JSON.stringify(rows.map(r => r.headCut)));
         const tails = rows.filter(r => r.split).map(r => r.tail); assert.equal(new Set(tails).size, tails.length, 'agents of one team with a shared prefix show different ends: ' + tails.join(','));
 
         await shot('long-names-desktop');
+        // A narrower sidebar (the person dragged it in): the space-separated names are cut too, and their last words stay whole.
+        await ev(`document.querySelector('.sidebar').style.width = '200px'; true`); await sleep(300); // sleep-ok: layout settles over frames after a width change; there is no completion event
+        const narrow = await ev(`${ROWS}.map(r => { const l = r.querySelector('.session-label'), t = r.querySelector('.sln-tail'), h = r.querySelector('.sln-head'); const lr = l.getBoundingClientRect(), tr = t && t.getBoundingClientRect(); return { name: r.querySelector('.session-label-name').textContent, tail: t && t.textContent, tailIn: tr ? tr.width > 0 && tr.right <= lr.right + 1 : null, cut: h ? h.scrollWidth > h.clientWidth : null }; })`);
+        for (const w of ['Frontend Dev Teams UI', 'Security Reviewer Windows']) { const r = narrow.find(x => x.name === w); assert.ok(r.tail && r.name.endsWith(r.tail) && r.tailIn && r.cut, 'at 200 px the head is cut and the last words are whole: ' + JSON.stringify(r)); }
+        await shot('long-names-narrow');
         console.log('2. Phone: the name wraps, so its end is there; the Agents page has a Search agents box');
         await open(390, 844, true);
         const ph = await ev(`${ROWS}.map(r => { const l = r.querySelector('.session-label'), t = r.querySelector('.sln-tail'); const lr = l.getBoundingClientRect(), tr = t ? t.getBoundingClientRect() : null; return { display: getComputedStyle(l).display, tailIn: tr ? tr.width > 0 && tr.right <= lr.right + 1 : null, sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })`);
