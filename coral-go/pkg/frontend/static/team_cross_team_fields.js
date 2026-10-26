@@ -66,7 +66,7 @@ export function createMessaging(team) {
         if (st.state === 'off') return '<button type="button" class="btn btn-primary xt-primary" data-act="turn-on">Turn on cross-team messaging</button>';
         if (st.state === 'stale') return '<button type="button" class="btn btn-primary xt-primary" data-act="check-hub">Check the Coral Hub connection</button>';
         if (st.state === 'old') return '<button type="button" class="btn btn-primary xt-primary" data-act="new-team">Create a new team</button>';
-        return `<a class="btn btn-primary xt-primary" href="${escapeAttr(HUB_LINKS_URL)}" target="_blank" rel="noopener noreferrer">Link a team on another Coral<span class="sr-only"> (opens Coral Hub in a new tab)</span></a>`;
+        return `<a class="btn xt-primary" href="${escapeAttr(HUB_LINKS_URL)}" target="_blank" rel="noopener noreferrer">Link a team on another Coral<span class="sr-only"> (opens Coral Hub in a new tab)</span></a>`;
     };
     // The two reaches of the messaging setting, told apart (#5916, #5962): the box is "Message teams on other computers (through Coral Hub links)": on unless it is turned off, and a team there also needs a
     // Coral Hub link. Teams on this computer are their own line: they need an explicit on (the button). An older Coral that does not say is not guessed about.

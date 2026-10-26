@@ -1680,6 +1680,10 @@
 .prompt-inspection-folded > summary::-webkit-details-marker { display: none; }
 .prompt-inspection-folded > summary::before { content: '▸' / ''; }
 .prompt-inspection-folded[open] > summary::before { content: '▾' / ''; }
+.xt-how > summary { display: flex; align-items: center; gap: 4px; list-style: none; cursor: pointer; font-weight: 600; } /* "How this works" (Messaging settings, #7884): the disclosure's arrow, so it reads as a control */
+.xt-how > summary::-webkit-details-marker { display: none; }
+.xt-how > summary::before { content: '▸' / ''; }
+.xt-how[open] > summary::before { content: '▾' / ''; }
 .prompt-inspection-bar { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 12px; }
 .prompt-inspection-bar label { margin: 0; }
 .prompt-inspection-card[hidden] { display: none; }
