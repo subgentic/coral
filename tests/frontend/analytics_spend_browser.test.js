@@ -134,6 +134,12 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
             await waitFor(`document.querySelectorAll('#cost-spend .spend-card').length >= 5`, 'the section again', 6000);
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), true);
+            // The missing-data headline is words, unlike the numeric tiles: it must remain inside its tile on a phone (#8609).
+            await ev(`window.__spend.tool_calls.measured_agents = 0; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await waitFor(`document.querySelectorAll('#cost-spend .spend-card .cost-card-value')[1]?.textContent === 'Not measured'`, 'the word headline', 6000);
+            const words = await ev(`(() => { const cards = [...document.querySelectorAll('#cost-spend .spend-card')], e = cards[1].querySelector('.cost-card-value'), box = cards[1].getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(e); const rects = [...range.getClientRects()]; return { text: e.textContent, fits: rects.length > 0 && rects.every(r => r.left >= box.left + 10 && r.right <= box.right - 10), overlaps: cards.some((c, i) => cards.slice(i + 1).some(d => { const a = c.getBoundingClientRect(), b = d.getBoundingClientRect(); return a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1; })) }; })()`);
+            assert.deepEqual(words, { text: 'Not measured', fits: true, overlaps: false }, 'the whole word headline fits without colliding with another tile');
         });
     } finally { await client.close(); }
     const bad = results.filter(r => r[1]); console.log(`${results.length - bad.length}/${results.length} scenarios pass`); if (bad.length) { console.error('FAIL: ' + bad.map(r => r[0]).join('; ')); process.exit(1); }
