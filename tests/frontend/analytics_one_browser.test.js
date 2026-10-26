@@ -31,6 +31,11 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
     window.fetch = (u, o) => { const url = String(u && u.url || u); window.__costReq = (window.__costReq || []).concat(url);
         if (new URL(url, location.origin).pathname === '/api/board/tasks') return json({ tasks: ${JSON.stringify(TASKS)} });
         if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: 10, output_tokens: 20, cost_usd: 4 }, by_model: ${JSON.stringify(MODEL)}, by_thinking: ${JSON.stringify(THINKING)}, by_agent_type: ${JSON.stringify(PROVIDER)}, by_agent: ${JSON.stringify(AGENT)} });
+        if (url.includes('/api/token-usage/timeseries')) {
+            const since = Date.parse(new URL(url, location.origin).searchParams.get('since'));
+            const long = Date.now() - since > 2 * 86400000, step = long ? 86400000 : 3600000;
+            return json({ buckets: Array.from({ length: long ? 7 : 25 }, (_, i) => ({ bucket: new Date(Date.UTC(2026, 9, 19, 12) + i * step).toISOString(), cost_usd: 1, cumulative_cost: i + 1 })) });
+        }
         if (url.includes('/api/token-usage/by-team')) return json({ teams: ${JSON.stringify(TEAMS)} });
         if (url.includes('/api/token-usage/by-branch')) return json({ branches: ${JSON.stringify(BRANCHES)} });
         if (url.includes('/api/token-usage/')) return json({});
@@ -111,6 +116,9 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); const h = [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]; return [rows.length, h]; })()`), [11, [mobile ? 44 : 36]], at + 'the views are the shared sidebar row: 36 px on a desktop, 44 on a phone, the button is the row');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-dashboard-view [data-cview]')].filter(e => e.getClientRects().length).map(e => e.dataset.cview)`).then(a => [...new Set(a)]), ['overview'], at + 'only the Overview parts are shown');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#cost-dashboard-view .cost-section[data-cview=overview] .cost-section-title')); return [t.fontSize, t.fontWeight]; })()`), ['14px', '600'], at + 'a section heading is 14/600');
+            await waitFor(`document.querySelectorAll('#cost-spend-chart .spend-label').length === 6`, at + 'the cumulative chart labels', 5000);
+            assert.equal(await ev(`document.querySelector('#cost-spend-chart .spend-line').getAttribute('points').trim().split(/\\s+/).length`), 25, at + '25 hourly buckets include both ends of the exact 24-hour window');
+            assert.ok((await ev(`[...document.querySelectorAll('#cost-spend-chart .spend-label')].slice(-3).map(e => e.textContent)`)).every(t => /\d[:.]\d/.test(t)), at + 'the exact 24-hour axis keeps time labels');
             await shot(`analytics-one-overview-${w}`);
 
             // choosing a view from the keyboard keeps the focus on its row (the list is drawn again, the button was a new one)
@@ -147,6 +155,10 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             await choose('Overview');
             await ev(`(() => { const s = document.getElementById('cost-time-range'); s.value = 'week'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.getElementById('cost-range-text').textContent === 'Last 7 days'`, at + 'the page says the range', 5000);
+            const expectedDays = await ev(`[0, 3, 6].map(i => new Date(Date.UTC(2026, 9, 19, 12) + i * 86400000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))`);
+            await waitFor(`document.querySelectorAll('#cost-spend-chart .spend-label').length === 6 && [...document.querySelectorAll('#cost-spend-chart .spend-label')].slice(-3).map(e => e.textContent).join('|') === ${JSON.stringify(expectedDays.join('|'))}`, at + 'the seven-day axis names its dates', 5000);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-spend-chart .spend-label')].slice(-3).map(e => e.textContent)`), expectedDays, at + 'multi-day endpoints and midpoint are dates, not three times of day');
+
             await choose('Task time');
             assert.equal(await ev(`document.getElementById('cost-time-range').value`), 'week', at + 'the one state follows to the other views');
             await shot(`analytics-one-range-${w}`);

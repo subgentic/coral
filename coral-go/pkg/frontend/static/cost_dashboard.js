@@ -702,11 +702,13 @@ function _renderSpendChart(buckets) {
     // Y-axis labels
     const midCost = maxCost / 2;
 
-    // X-axis labels (first, middle, last)
+    // X-axis labels (first, middle, last): a multi-day chart must distinguish dates, not repeat the same time.
+    const multiDay = Date.parse(buckets[n - 1].bucket) - Date.parse(buckets[0].bucket) > 86400000;
     const formatBucketLabel = (b) => {
         try {
             const d = new Date(b);
-            return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+            return multiDay ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
         } catch { return ''; }
     };
 
