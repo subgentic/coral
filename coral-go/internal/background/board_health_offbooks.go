@@ -62,7 +62,7 @@ func commitMention(content string) (what string, ok bool) {
 
 // offBooksKinds is what the board's settings leave on.
 func offBooksKinds(hs board.HealthSettings) map[string]bool {
-	return map[string]bool{board.OffBooksBusy: hs.BusyNoTask.On, board.OffBooksPost: hs.PostNoTask.On, board.OffBooksUpload: hs.UploadNoTask.On}
+	return map[string]bool{board.OffBooksBusy: hs.BusyNoTask.On, board.OffBooksPost: hs.PostNoTask.On, board.OffBooksUpload: hs.UploadNoTask.On, board.OffBooksGoalSize: hs.GoalSize.On}
 }
 
 // offBooksItems notes what happened off the books since the last check and returns the lines for the check: the occurrences not said yet, of the signals that are on. The ids it
@@ -79,6 +79,9 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 		m.noteBusyNoTask(ctx, project, orch, subs, bySession, inProgress, time.Duration(hs.BusyNoTask.AfterMin)*time.Minute, now)
 	}
 	m.scanOffBooksPosts(ctx, project, orch, subs, hs.PostNoTask.On, now)
+	if hs.GoalSize.On {
+		m.noteGoalSizes(ctx, project, hs.GoalSize.Limit, now)
+	}
 	pending, err := m.store.PendingOffBooks(ctx, project, now, offBooksKinds(hs))
 	if err != nil {
 		return nil
@@ -89,6 +92,11 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 	items := make([]teamhealth.Item, 0, len(pending))
 	var ids []offBooksShown
 	for _, p := range pending {
+		if p.Kind == board.OffBooksGoalSize { // a line about the board's own goal: no agent, and what to do is in it
+			items = append(items, teamhealth.Item{Rank: 3, Agent: "Board", Problem: p.Detail})
+			ids = append(ids, offBooksShown{id: p.ID, needle: "Board: " + p.Detail})
+			continue
+		}
 		at, _ := time.Parse("2006-01-02T15:04:05.000Z", p.At)
 		items = append(items, teamhealth.Item{Rank: 2, Agent: teamhealth.Name(p.Agent), Problem: p.Detail,
 			Evidence: "Seen " + teamhealth.Age(now.Sub(at)) + " ago, off the board's tasks", Suggest: "ask what it is for, or put it on a task"})
@@ -184,4 +192,21 @@ func (m *BoardHealthMonitor) scanOffBooksPosts(ctx context.Context, project, orc
 		_ = m.store.AddOffBooks(ctx, project, board.OffBooksPost, msg.SubscriberID, strconv.FormatInt(msg.ID, 10), "posted "+what+" with no task number and no task in progress", at)
 	}
 	_ = m.store.SetOffBooksPostCursor(ctx, project, last)
+}
+
+// noteGoalSizes (#7808, goal #21 part 6): a goal that is not closed and has more than limit tasks, open and done together (a goal that has grown that big is the thing to split, and what is
+// done is what to close), is a line of the check once per crossing and again at each further limit. Goals that are done or dropped are not counted. The line is numbers only: never the goal's title.
+func (m *BoardHealthMonitor) noteGoalSizes(ctx context.Context, project string, limit int, now time.Time) {
+	sizes, err := m.store.OpenGoalSizes(ctx, project)
+	if err != nil {
+		return
+	}
+	crossed, err := m.store.NoteGoalSizes(ctx, project, sizes, limit)
+	if err != nil {
+		return
+	}
+	for _, g := range crossed {
+		detail := fmt.Sprintf("Goal #%d has %d tasks (limit %d): consider splitting it or closing what is done", g.ID, g.Total, limit)
+		_ = m.store.AddOffBooks(ctx, project, board.OffBooksGoalSize, "Board", fmt.Sprintf("%d|%d|%d", g.ID, g.Total/limit, now.UnixNano()), detail, now)
+	}
 }

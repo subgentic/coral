@@ -278,3 +278,105 @@ func TestOnlyWhatTheDeliveredCheckSaysIsMarkedShown(t *testing.T) {
 	left, _ = h.s.PendingOffBooks(ctx, "team", h.now, all)
 	assert.Empty(t, left)
 }
+
+// goalTasks makes a goal of the team's board with n tasks linked to it (the board package's own helpers are not visible here).
+func (h *checkHarness) goalTasks(title string, n int) int64 {
+	h.t.Helper()
+	ctx := context.Background()
+	g, err := h.s.CreateGoal(ctx, "team", board.GoalInput{Title: title, Outcome: "o", DoneWhen: "d", CreatedBy: "Operator"})
+	require.NoError(h.t, err)
+	h.moreTasks(g.ID, n)
+	return g.ID
+}
+
+func (h *checkHarness) moreTasks(goal int64, n int) {
+	h.t.Helper()
+	for i := 0; i < n; i++ {
+		_, err := h.s.CreateTaskWithOpts(context.Background(), "team", "task", "", "medium", "Operator", &board.CreateTaskOpts{GoalID: &goal})
+		require.NoError(h.t, err)
+	}
+}
+
+func TestAGoalWithTooManyTasksIsOneLineOncePerCrossing(t *testing.T) {
+	h := newCheckHarness(t)
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	g := h.goalTasks("Secret goal title", 15)
+	line := func(id int64, n, limit int) string {
+		return fmt.Sprintf("Board: Goal #%d has %d tasks (limit %d): consider splitting it or closing what is done", id, n, limit)
+	}
+	out := h.checkTo("Orchestrator")
+	assert.NotContains(t, out, "has 15 tasks", "15 is the limit, not past it")
+
+	h.moreTasks(g, 1)
+	out = h.next()
+	assert.Contains(t, out, line(g, 16, 15))
+	assert.NotContains(t, out, "Secret goal title", "numbers only: never the goal's title")
+	assert.NotContains(t, h.next(), "has 16 tasks", "once per crossing")
+
+	h.moreTasks(g, 13)
+	assert.NotContains(t, h.next(), "Goal #", "29 tasks is not another step")
+	h.moreTasks(g, 1)
+	assert.Contains(t, h.next(), line(g, 30, 15), "30 is the next step")
+	assert.NotContains(t, h.next(), "Goal #")
+}
+
+func TestTheGoalSizeSignalFollowsItsSettings(t *testing.T) {
+	h := newCheckHarness(t)
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	g := h.goalTasks("g", 12)
+	h.settings(func(hs *board.HealthSettings) { hs.GoalSize.On = false })
+	assert.NotContains(t, h.checkTo("Orchestrator"), "Goal #", "12 is under the limit anyway")
+	h.moreTasks(g, 10) // 22 tasks
+	assert.NotContains(t, h.next(), "Goal #", "off in settings means silent")
+
+	h.settings(func(hs *board.HealthSettings) { hs.GoalSize = board.HealthGoalSize{On: true, Limit: 30} })
+	assert.NotContains(t, h.next(), "Goal #", "the limit is a setting: 22 is under 30")
+	h.settings(func(hs *board.HealthSettings) { hs.GoalSize.Limit = 20 })
+	assert.Contains(t, h.next(), fmt.Sprintf("Board: Goal #%d has 22 tasks (limit 20)", g), "turned on or lowered: a goal over the limit is said once")
+	assert.NotContains(t, h.next(), "Goal #")
+}
+
+func TestAClosedGoalIsNotCounted(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	done := h.goalTasks("done", 20)
+	dropped := h.goalTasks("dropped", 20)
+	open := h.goalTasks("open", 20)
+	_, _, err := h.s.CloseGoal(ctx, "team", done, "its done-when is met", board.GoalDone)
+	require.NoError(t, err)
+	_, _, err = h.s.CloseGoal(ctx, "team", dropped, "not wanted", board.GoalDropped)
+	require.NoError(t, err)
+	out := h.checkTo("Orchestrator")
+	assert.Contains(t, out, fmt.Sprintf("Goal #%d has 20 tasks", open))
+	assert.NotContains(t, out, fmt.Sprintf("Goal #%d ", done), "done: its done-when is met")
+	assert.NotContains(t, out, fmt.Sprintf("Goal #%d ", dropped))
+	assert.Equal(t, 1, strings.Count(out, "consider splitting it"), out)
+}
+
+func TestAGoalThatShrinksAndGrowsBackIsSaidAgain(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	g := h.goalTasks("g", 16)
+	assert.Contains(t, h.checkTo("Orchestrator"), fmt.Sprintf("Goal #%d has 16 tasks", g))
+	tasks, err := h.s.ListOpenTasks(ctx, "team")
+	require.NoError(t, err)
+	for _, tk := range tasks[:8] { // eight tasks move to no goal: 8 left
+		require.NoError(t, h.s.SetTaskGoal(ctx, "team", tk.ID, nil))
+	}
+	assert.NotContains(t, h.next(), "Goal #", "below the limit: nothing to say")
+	h.moreTasks(g, 9) // 17 again
+	assert.Contains(t, h.next(), fmt.Sprintf("Goal #%d has 17 tasks", g), "a new crossing is a new line")
+}
+
+func TestAGoalLineKeptWhileTheSwitchWasOffIsNotSaid(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	require.NoError(t, h.s.AddOffBooks(ctx, "team", board.OffBooksGoalSize, "Board", "7|1|1", "Goal #7 has 16 tasks (limit 15): consider splitting it or closing what is done", h.now))
+	h.settings(func(hs *board.HealthSettings) { hs.GoalSize.On = false })
+	assert.NotContains(t, h.checkTo("Orchestrator"), "Goal #7", "off in settings means silent, a line already kept included")
+	h.settings(func(hs *board.HealthSettings) { hs.GoalSize.On = true })
+	assert.Contains(t, h.next(), "Board: Goal #7 has 16 tasks (limit 15)", "and said once when it is turned on")
+}

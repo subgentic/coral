@@ -539,6 +539,7 @@ values are clamped: times are 5 to 1440 minutes, and nudges are 1 to 5.
 | `busy_no_task` | on, `after_min` 10 | a line of the orchestrator's check for an agent that has been in a turn that long with no task in progress (once per turn; the orchestrator itself is left out) |
 | `post_no_task` | on | a line of the check for a commit, SHA or patch an agent posted with no task number in the post and no task in progress when it posted (once per post) |
 | `upload_no_task` | on | a line of the check for an artifact an agent uploaded with no task in progress, unless it said `--no-task` (once per upload) |
+| `goal_size` | on, `limit` 15 | a line of the check when a goal that is not closed has more than `limit` tasks, open and done together: "Goal #N has M tasks (limit L): consider splitting it or closing what is done", once per crossing and again at each further `limit` (30, 45, ...); a done or dropped goal is not counted; numbers only, never the goal's title |
 
 The three off-the-books signals use the board's, the hooks' and the upload route's own records, never the screen. Each line names the agent and a fixed phrase (a short SHA or digest, never the agent's words), is said once, and goes out in the orchestrator's next check (five lines at most per check; the rest wait). A switch that is off keeps its signal silent.
 

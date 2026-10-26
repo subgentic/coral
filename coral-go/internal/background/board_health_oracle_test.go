@@ -142,6 +142,7 @@ func runCheckOracle(t *testing.T, seed int64) {
 	// The frozen walk has no off-the-books signals (#7793): they are off here so the two sides say the same, and have their own tests (board_health_offbooks_test.go).
 	hs := bs.GetHealthSettings(ctx, "team")
 	hs.BusyNoTask.On, hs.PostNoTask.On, hs.UploadNoTask.On = false, false, false
+	hs.GoalSize.On = false
 	require.NoError(t, bs.SetHealthSettings(ctx, "team", hs))
 	devs := []string{}
 	for i := 0; i < 2+rng.Intn(4); i++ {

@@ -135,3 +135,132 @@ func TestOffBooksPostCursorAndLatestMessage(t *testing.T) {
 	id, _ = s.OffBooksPostCursor(ctx, "team")
 	assert.Equal(t, latest, id)
 }
+
+func TestGoalSizeSettingDefaultsAndClamp(t *testing.T) {
+	d := DefaultHealthSettings()
+	assert.Equal(t, HealthGoalSize{On: true, Limit: 15}, d.GoalSize, "15 tasks, the goal-size guidance")
+	h := d
+	h.GoalSize.Limit = 1
+	assert.Equal(t, 5, h.Clamp().GoalSize.Limit)
+	h.GoalSize.Limit = 100000
+	assert.Equal(t, 500, h.Clamp().GoalSize.Limit)
+	raw, err := json.Marshal(d)
+	require.NoError(t, err)
+	var fields map[string]any
+	require.NoError(t, json.Unmarshal(raw, &fields))
+	assert.Equal(t, map[string]any{"on": true, "limit": float64(15)}, fields["goal_size"], "the JSON names the Hub notice lists")
+	s := testStore(t)
+	ctx := context.Background()
+	h.GoalSize = HealthGoalSize{On: false, Limit: 30}
+	require.NoError(t, s.SetHealthSettings(ctx, "team", h))
+	assert.Equal(t, HealthGoalSize{On: false, Limit: 30}, s.GetHealthSettings(ctx, "team").GoalSize)
+}
+
+func TestGoalLevelIsTheLimitsMultiplesPassed(t *testing.T) {
+	for _, c := range [][3]int{{0, 15, 0}, {15, 15, 0}, {16, 15, 1}, {29, 15, 1}, {30, 15, 2}, {44, 15, 2}, {45, 15, 3}, {6, 5, 1}, {10, 5, 2}, {20, 0, 0}} {
+		assert.Equal(t, c[2], goalLevel(c[0], c[1]), "%d tasks, limit %d", c[0], c[1])
+	}
+}
+
+// goalWith makes a goal of the board and n tasks linked to it, a third of them completed.
+func goalWith(t *testing.T, s *Store, project, title string, n int) *Goal {
+	t.Helper()
+	ctx := context.Background()
+	g, err := s.CreateGoal(ctx, project, GoalInput{Title: title, Outcome: "o", DoneWhen: "d", CreatedBy: "Operator"})
+	require.NoError(t, err)
+	addTasks(t, s, project, g.ID, n)
+	return g
+}
+
+func addTasks(t *testing.T, s *Store, project string, goal int64, n int) {
+	t.Helper()
+	ctx := context.Background()
+	for i := 0; i < n; i++ {
+		tk, err := s.CreateTaskWithOpts(ctx, project, "task", "", "medium", "Operator", &CreateTaskOpts{GoalID: &goal})
+		require.NoError(t, err)
+		if i%3 == 0 {
+			_, err = s.db.ExecContext(ctx, `UPDATE board_tasks SET status = 'completed', completed_at = ? WHERE id = ?`, "2026-10-19T00:00:00Z", tk.ID)
+			require.NoError(t, err)
+		}
+	}
+}
+
+func TestOpenGoalSizesCountOpenAndDoneTasksOfGoalsThatAreNotClosed(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	big := goalWith(t, s, "team", "big", 7)
+	empty, err := s.CreateGoal(ctx, "team", GoalInput{Title: "empty", Outcome: "o", DoneWhen: "d", CreatedBy: "Operator"})
+	require.NoError(t, err)
+	done := goalWith(t, s, "team", "done", 9)
+	dropped := goalWith(t, s, "team", "dropped", 9)
+	_, _, err = s.CloseGoal(ctx, "team", done.ID, "met", GoalDone)
+	require.NoError(t, err)
+	_, _, err = s.CloseGoal(ctx, "team", dropped.ID, "no", GoalDropped)
+	require.NoError(t, err)
+	other := goalWith(t, s, "other", "other board", 4)
+	got, err := s.OpenGoalSizes(ctx, "team")
+	require.NoError(t, err)
+	assert.Equal(t, []GoalSize{{ID: big.ID, Total: 7}}, got, "open and done tasks together; a closed goal, a goal with no task and another board's goal are not there (%d, %d)", empty.ID, other.ID)
+}
+
+func TestNoteGoalSizesSaysACrossingOnceAndAgainAtEachStepAndAfterAReopen(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	g := goalWith(t, s, "team", "growing", 15)
+	note := func() []int64 {
+		sizes, err := s.OpenGoalSizes(ctx, "team")
+		require.NoError(t, err)
+		crossed, err := s.NoteGoalSizes(ctx, "team", sizes, 15)
+		require.NoError(t, err)
+		var ids []int64
+		for _, c := range crossed {
+			ids = append(ids, c.ID)
+		}
+		return ids
+	}
+	assert.Empty(t, note(), "15 tasks is the limit, not past it")
+	addTasks(t, s, "team", g.ID, 1)
+	assert.Equal(t, []int64{g.ID}, note(), "16 passes it")
+	assert.Empty(t, note(), "once per crossing")
+	addTasks(t, s, "team", g.ID, 13)
+	assert.Empty(t, note(), "29 is not another step")
+	addTasks(t, s, "team", g.ID, 1)
+	assert.Equal(t, []int64{g.ID}, note(), "30 is the next step")
+	assert.Empty(t, note())
+
+	// it shrinks below the limit and grows back: a new crossing
+	_, err := s.db.ExecContext(ctx, `UPDATE board_tasks SET goal_id = NULL WHERE board_id = 'team' AND id IN (SELECT id FROM board_tasks WHERE board_id = 'team' AND goal_id = ? LIMIT 20)`, g.ID)
+	require.NoError(t, err)
+	assert.Empty(t, note(), "10 tasks: below")
+	addTasks(t, s, "team", g.ID, 6)
+	assert.Equal(t, []int64{g.ID}, note(), "16 again is a new crossing")
+
+	// closed, then reopened: counted afresh
+	_, _, err = s.CloseGoal(ctx, "team", g.ID, "done", GoalDone)
+	require.NoError(t, err)
+	assert.Empty(t, note(), "a closed goal is not counted")
+	state := GoalActive
+	_, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{State: &state})
+	require.NoError(t, err)
+	assert.Equal(t, []int64{g.ID}, note(), "reopened and still big: said again")
+}
+
+func TestAGoalThatShrinksToALowerStepIsSaidAtTheSecondAgain(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	g := goalWith(t, s, "team", "g", 30)
+	note := func() int {
+		sizes, err := s.OpenGoalSizes(ctx, "team")
+		require.NoError(t, err)
+		crossed, err := s.NoteGoalSizes(ctx, "team", sizes, 15)
+		require.NoError(t, err)
+		return len(crossed)
+	}
+	assert.Equal(t, 1, note(), "30 tasks: the second step, said")
+	assert.Equal(t, 0, note())
+	_, err := s.db.ExecContext(ctx, `UPDATE board_tasks SET goal_id = NULL WHERE board_id = 'team' AND id IN (SELECT id FROM board_tasks WHERE board_id = 'team' AND goal_id = ? LIMIT 10)`, g.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, note(), "20 tasks: the first step, already said")
+	addTasks(t, s, "team", g.ID, 10)
+	assert.Equal(t, 1, note(), "30 again: the second step is said again, the level having come down with the goal")
+}

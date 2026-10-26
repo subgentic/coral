@@ -66,6 +66,12 @@ CREATE TABLE IF NOT EXISTS health_offbooks (
 	at       TEXT NOT NULL,
 	shown_at TEXT,
 	UNIQUE (project, kind, ref)
+);
+CREATE TABLE IF NOT EXISTS health_goal_size (
+	project    TEXT NOT NULL,
+	goal_id    INTEGER NOT NULL,
+	said_level INTEGER NOT NULL,
+	PRIMARY KEY (project, goal_id)
 );`)
 	return err
 }

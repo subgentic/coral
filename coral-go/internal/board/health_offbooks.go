@@ -98,3 +98,82 @@ func (s *Store) HadTaskInProgress(ctx context.Context, project, member string, a
 		AND (completed_at IS NULL OR completed_at >= ?)`, project, member, at.UTC().Format(time.RFC3339), at.Add(-grace).UTC().Format(time.RFC3339))
 	return n > 0, err
 }
+
+// OffBooksGoalSize is the kind of a line the orchestrator's check says about a goal that has grown past the team's limit (#7808): it shares this queue (shown once, a few lines a check,
+// again if the check did not go out); its ref is the goal, the level and the moment of the crossing, so a goal that crossed, fell back and crossed again is a new line.
+const OffBooksGoalSize = "goalsize"
+
+// GoalSize is how many tasks one open goal has, its open and its done ones together.
+type GoalSize struct {
+	ID    int64 `db:"id"`
+	Total int   `db:"total"`
+}
+
+// OpenGoalSizes is the task count of each of the board's goals that are not closed (done or dropped: a goal whose done-when is met is not counted). A goal with no task is not listed.
+func (s *Store) OpenGoalSizes(ctx context.Context, project string) ([]GoalSize, error) {
+	var out []GoalSize
+	err := s.reader().SelectContext(ctx, &out, `SELECT g.id AS id, COUNT(t.id) AS total FROM board_goals g
+		JOIN board_tasks t ON t.board_id = g.board_id AND t.goal_id = g.id
+		WHERE g.board_id = ? AND g.state NOT IN ('done', 'dropped') GROUP BY g.id ORDER BY g.id`, project)
+	return out, err
+}
+
+// goalLevel is how many whole limits a goal's tasks have passed: 0 until it has more than limit tasks, then total/limit (the limit's multiples are the steps: 15, 30, 45).
+func goalLevel(total, limit int) int {
+	if limit <= 0 || total <= limit {
+		return 0
+	}
+	return total / limit
+}
+
+// NoteGoalSizes works out which goals have crossed a level since the last time: the ones whose level is above the one said (they are returned, and the level is kept), and keeps the level
+// down when a goal shrinks (so it is said again when it grows back) and forgets the goals that are closed, or gone, or small again (a goal that is reopened counts afresh).
+func (s *Store) NoteGoalSizes(ctx context.Context, project string, sizes []GoalSize, limit int) ([]GoalSize, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var rows []struct {
+		GoalID int64 `db:"goal_id"`
+		Level  int   `db:"said_level"`
+	}
+	if err := tx.SelectContext(ctx, &rows, `SELECT goal_id, said_level FROM health_goal_size WHERE project = ?`, project); err != nil {
+		return nil, err
+	}
+	said := make(map[int64]int, len(rows))
+	for _, r := range rows {
+		said[r.GoalID] = r.Level
+	}
+	var crossed []GoalSize
+	open := make(map[int64]bool, len(sizes))
+	for _, g := range sizes {
+		open[g.ID] = true
+		level := goalLevel(g.Total, limit)
+		prev, had := said[g.ID]
+		switch {
+		case level == 0:
+			if had {
+				if _, err := tx.ExecContext(ctx, `DELETE FROM health_goal_size WHERE project = ? AND goal_id = ?`, project, g.ID); err != nil {
+					return nil, err
+				}
+			}
+		case level > prev:
+			crossed = append(crossed, g)
+			fallthrough
+		case level < prev:
+			if _, err := tx.ExecContext(ctx, `INSERT INTO health_goal_size (project, goal_id, said_level) VALUES (?, ?, ?)
+				ON CONFLICT(project, goal_id) DO UPDATE SET said_level = excluded.said_level`, project, g.ID, level); err != nil {
+				return nil, err
+			}
+		}
+	}
+	for id := range said {
+		if !open[id] {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM health_goal_size WHERE project = ? AND goal_id = ?`, project, id); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return crossed, tx.Commit()
+}
