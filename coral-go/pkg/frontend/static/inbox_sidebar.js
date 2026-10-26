@@ -134,7 +134,7 @@ function inboxTaskToolbar() {
             if (input && group === 'tasks') input.value = next.q;
             renderInboxNav(true);
         });
-        taskBar.node.classList.add('inbox-tasks-toolbar');
+        taskBar.node.classList.add('inbox-tasks-toolbar', 'inbox-folder-toolbar');
         taskBar.node.querySelector('.list-bar-search-row').classList.add('gt-toolbar');
     }
     taskBar.set({ ...taskFilters, q: queries.tasks });
@@ -143,11 +143,9 @@ function inboxTaskToolbar() {
     const rows = tasks.filter(taskMatches);
     const active = document.activeElement;
     const held = taskBar.node.contains(active) ? (active.matches('.team-tb-select') ? 'select' : active.dataset.filter) : null;
-    Toolbar.adopt(taskBar.node.querySelector('.list-bar-search-row'), {
-        pills: { label: 'Show tasks that are', current: taskState,
+    IT.adoptPills(taskBar.node, { label: 'Show tasks that are', current: taskState,
             items: [{ key: 'all', label: 'All', count: rows.length }, ...states.map(key => ({ key, label: key, count: rows.filter(t => stateOf(t) === key).length }))],
-            onPick: key => { inboxTasksState.selected.clear(); taskState = key; renderInboxNav(true); } },
-    });
+            onPick: key => { inboxTasksState.selected.clear(); taskState = key; renderInboxNav(true); } });
     if (held) {
         const next = held === 'select' ? taskBar.node.querySelector('.team-tb-select') : [...taskBar.node.querySelectorAll('[data-filter]')].find(el => el.dataset.filter === held);
         next?.focus({ preventScroll: true });

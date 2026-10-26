@@ -9,6 +9,19 @@ import { importOnce } from './import_once.js';
 const { buildListBar } = await importOnce('./list_bar.js');
 const Toolbar = await importOnce('./team_toolbar.js');
 
+/** The state pills of a folder, in the row where the width permits, and the same choice as a select in the Filters panel for when it does not (css shows one or the other, #8700). Called on every draw; what an earlier draw put there goes first. */
+export function adoptPills(node, pills) {
+    const row = node.querySelector('.list-bar-search-row'), menu = node.querySelector('.list-bar-menu');
+    Toolbar.adopt(row, { pills });
+    menu?.querySelector(':scope > .inbox-pill-field')?.remove();
+    const select = row.querySelector('.team-tb-select');
+    if (!pills || !select || !menu) return;
+    const field = document.createElement('div'); field.className = 'list-bar-field inbox-pill-field';
+    const label = document.createElement('span'); label.className = 'list-bar-field-label'; label.textContent = pills.panelLabel || 'Show';
+    field.append(label, select);
+    menu.prepend(field);
+}
+
 /** A folder's toolbar: `spec` is a list bar spec without the shared parts (idp, noun, label, searchLabel, placeholder, fields, sorts, model); `onChange(filters)` is told the new, clean filters. */
 export function folderToolbar(spec, onChange) {
     const bar = buildListBar({ hideCount: true, collapsible: true, compactPanel: true, doneButton: true, sheet: true, label: `Search and filter ${spec.noun}s`, placeholder: spec.searchLabel, ...spec }, onChange, {});
@@ -23,7 +36,7 @@ export function folderToolbar(spec, onChange) {
             for (const [key, o] of Object.entries(options)) bar.setOptions(key, o.values, o.labels || {});
             const active = document.activeElement;
             const held = bar.node.contains(active) ? (active.matches('.team-tb-select') ? 'select' : active.dataset.filter) : null;
-            Toolbar.adopt(row, { pills });
+            adoptPills(bar.node, pills);
             if (held) {
                 const next = held === 'select' ? bar.node.querySelector('.team-tb-select') : [...bar.node.querySelectorAll('[data-filter]')].find(e => e.dataset.filter === held);
                 next?.focus({ preventScroll: true });

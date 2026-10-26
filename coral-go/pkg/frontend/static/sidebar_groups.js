@@ -124,12 +124,26 @@ export function tableMarkup(t) { return tableHtml(t); }
 function tableHtml(t, n = 0, lead = '', bar = false) {
     const tid = n ? `group-table-title-${n + 1}` : 'group-table-title'; // a page with several tables (the landing's groups, #7722): one title id each
     const count = t.count === undefined ? t.rows.length : t.count;
-    // An Inbox folder page (t.noun = [one, many]): a phone's folder select already names the folder, so below 768 px the title is only for screen readers and the count reads as one line, "12 goals" (#8681)
-    const countLine = t.noun && count != null ? `<span class="gt-count-line">${count} ${escapeHtml(t.noun[count === 1 ? 0 : 1])}</span>` : '';
-    const top = (t.headless ? lead : `<div class="group-table-head${t.noun ? ' group-table-head-folder' : ''}">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2>${count == null ? '' : `<span class="session-group-count">${count}</span>`}${countLine}${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
+    // An Inbox folder page (t.noun, with its component toolbar): the title and the count are the first thing of the toolbar's one row (folderHead), not a row of their own (#8700)
+    const inRow = !!(t.noun && bar && !n);
+    const top = (t.headless || inRow ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2>${count == null ? '' : `<span class="session-group-count">${count}</span>`}${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
     if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
     return top + '<div class="group-table-node"></div>' + (t.note ? `<p class="empty-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
+}
+
+/** An Inbox folder page's title and count, the first thing of its toolbar's one row (#8700): the h2 keeps the page's title id (the focus target when nothing else takes it). Drawn again only when its words change. */
+function folderHead(node, t) {
+    const row = node.querySelector('.list-bar-search-row');
+    if (!row) return;
+    const count = t.count === undefined ? t.rows.length : t.count, words = `${t.title}|${count}`;
+    let head = row.querySelector(':scope > .inbox-folder-head');
+    if (head && head.dataset.words === words) return;
+    if (!head) { head = document.createElement('span'); head.className = 'inbox-folder-head'; row.prepend(head); }
+    head.dataset.words = words;
+    const h = document.createElement('h2'); h.id = 'group-table-title'; h.tabIndex = -1; h.textContent = t.title;
+    head.replaceChildren(h);
+    if (count != null) { const c = document.createElement('span'); c.className = 'session-group-count'; c.textContent = String(count); head.append(c); }
 }
 
 function drawTable() {
@@ -149,12 +163,14 @@ function drawTable() {
     // A component toolbar keeps its own listeners, open panel, search, and focus across table redraws.
     const toolbarFocus = bar?.node?.contains(a) ? a : null;
     const toolbarCaret = toolbarFocus && typeof toolbarFocus.selectionStart === 'number' ? [toolbarFocus.selectionStart, toolbarFocus.selectionEnd] : null;
-    const drawn = html + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
+    const folderPage = bar?.node && tables[0] && tables[0].noun ? tables[0] : null;
+    const drawn = html + (folderPage ? `|head:${folderPage.title}:${folderPage.count === undefined ? folderPage.rows.length : folderPage.count}` : '') + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
     // A row the keyboard is on keeps it across a redraw (the Inbox's "waiting 4 min" moves on every 30 seconds while the table is the only list, #7004): it is found again by its class and data attributes
     const held = host.contains(a) && a.matches('.group-chip, .dt-primary, .dt-quiet') ? { cls: a.className, data: JSON.stringify(a.dataset) } : null;
     if (host.dataset.drawn !== drawn) {
         host.innerHTML = html; host.dataset.drawn = drawn; // a redraw of what is there would drop the focus from a row the keyboard is on
         if (bar?.node) host.prepend(bar.node);
+        if (folderPage) folderHead(bar.node, folderPage);
         if (lead) host.prepend(lead.node());
         const slots = host.querySelectorAll('.group-table-node'); // one per table that draws its own rows (and has some), in order
         let k = 0;
