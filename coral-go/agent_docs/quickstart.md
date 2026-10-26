@@ -2,7 +2,7 @@
 
 Get from a downloaded release to a committed, tested change.
 
-This page targets Coral v1.4.156. The example output and timings in steps 4-5 were
+The example output and timings in steps 4-5 were
 captured on an earlier (v1.0.8) build, so treat them as illustrative. Where something is unverified, it says so.
 
 > **Example result (v1.0.8 measurement):** about 90 seconds from starting the server to a

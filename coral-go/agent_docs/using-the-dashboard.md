@@ -2,7 +2,7 @@
 
 > Choose models, manage agents and teams, and find controls in the dashboard.
 
-Task-oriented notes on the dashboard controls added in v1.4.102 to v1.4.151. Every statement was checked against the source. Screenshots are in the dark theme; the light theme and a phone show the same controls.
+Task-oriented notes on the dashboard controls. Every statement was checked against the source. Screenshots are in the dark theme; the light theme and a phone show the same controls.
 
 ## Choose a model and thinking level
 

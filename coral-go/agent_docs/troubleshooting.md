@@ -3,7 +3,7 @@
 > Diagnose common startup, agent, workflow and connection problems.
 
 Symptoms with the cause for each. Statements about behavior were checked against the
-v1.4.3 source. Some entries were first observed on older builds; where the current source
+source. Some entries were first observed on older builds; where the current source
 no longer shows the problem, the entry says so. Items marked *unverified* were not
 re-tested on the current build.
 

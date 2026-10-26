@@ -5,7 +5,7 @@ description: "Choose a model and thinking level, see them in the agent list, rea
 
 # Using the dashboard
 
-Task-oriented notes on the dashboard controls added in v1.4.102 to v1.4.151: choosing a model and thinking level and seeing them in the agent list, the cost table by thinking level, the team health monitor, the agent list's Display panel, the sectioned dialogs, image thumbnails, and the Inbox's Tasks for you and Read the whole message. Screenshots are in the dark theme; the light theme and a phone show the same controls.
+Task-oriented notes on the dashboard controls: choosing a model and thinking level and seeing them in the agent list, the cost table by thinking level, the team health monitor, the agent list's Display panel, the sectioned dialogs, image thumbnails, and the Inbox's Tasks for you and Read the whole message. Screenshots are in the dark theme; the light theme and a phone show the same controls.
 
 ## Choose a model and thinking level
 
