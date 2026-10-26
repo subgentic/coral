@@ -141,8 +141,8 @@ func templatePath(v string, shell bool, quote byte) string {
 	return shellWord(v)
 }
 
-// shellQuoteAt is the POSIX quote open at byte i of cmd: a single quote, a double quote or 0.
-func shellQuoteAt(cmd string, i int) byte {
+// ShellQuoteAt is the POSIX quote open at byte i of cmd: a single quote, a double quote or 0.
+func ShellQuoteAt(cmd string, i int) byte {
 	var q byte
 	for j := 0; j < i && j < len(cmd); j++ {
 		c := cmd[j]
@@ -273,7 +273,7 @@ func expandTemplatesWith(text string, env []string, shell bool, tooBig func(name
 	last := 0
 	for _, loc := range templatePattern.FindAllStringIndex(text, -1) {
 		b.WriteString(text[last:loc[0]])
-		quote = shellQuoteAt(text, loc[0])
+		quote = ShellQuoteAt(text, loc[0])
 		b.WriteString(replace(text[loc[0]:loc[1]]))
 		last = loc[1]
 	}
