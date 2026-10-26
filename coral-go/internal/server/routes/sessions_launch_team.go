@@ -64,6 +64,7 @@ type launchTeamRequest struct {
 		Mode               string `json:"mode"`
 		DependencyGuidance bool   `json:"dependency_guidance"`
 		CustomInstructions string `json:"custom_instructions"`
+		AsksAreTasks       bool   `json:"asks_are_tasks"`
 	} `json:"working_mode"`
 	WorkflowPresets []struct {
 		ID           string `json:"id"`
@@ -413,6 +414,7 @@ func (h *SessionsHandler) restoreTeamTemplate(ctx context.Context, body *launchT
 			Mode:               body.WorkingMode.Mode,
 			DependencyGuidance: body.WorkingMode.DependencyGuidance,
 			CustomInstructions: body.WorkingMode.CustomInstructions,
+			AsksAreTasks:       body.WorkingMode.AsksAreTasks,
 		}
 		if _, err := h.bs.SetWorkingMode(ctx, body.BoardName, wm); err != nil {
 			log.Printf("[launch-team] failed to restore working mode for team %s: %v", body.BoardName, err)

@@ -14,8 +14,13 @@ type WorkingMode struct {
 	Mode               string `json:"mode"`
 	DependencyGuidance bool   `json:"dependency_guidance"`
 	CustomInstructions string `json:"custom_instructions"`
-	Instructions       string `json:"instructions"`
+	// AsksAreTasks adds the work-on-tasks rule to the instructions every task of the team is claimed with (goal #21): asks for work go through tasks, plain posts are for talk. Off when absent (a team keeps today's instructions until it turns it on).
+	AsksAreTasks bool   `json:"asks_are_tasks"`
+	Instructions string `json:"instructions"`
 }
+
+// AsksAreTasksRule is the sentence the setting adds.
+const AsksAreTasksRule = "Ask another agent for work with coral-board post --assign or task add --follow-up; plain posts are for questions, decisions, heads-ups and status."
 
 func (m *WorkingMode) normalize() error {
 	if m.Mode == "" {
@@ -27,6 +32,9 @@ func (m *WorkingMode) normalize() error {
 	}
 	if m.DependencyGuidance {
 		m.Instructions = joinModeInstruction(m.Instructions, "Connect stages as separate dependent tasks with explicit prerequisites and named required outputs.")
+	}
+	if m.AsksAreTasks {
+		m.Instructions = joinModeInstruction(m.Instructions, AsksAreTasksRule)
 	}
 	m.Instructions = joinModeInstruction(m.Instructions, m.CustomInstructions)
 	return nil

@@ -335,6 +335,7 @@ engine-enforced lifecycle and permissions.
 | `mode: worktrees` (Worktrees) | Off | Asks agents to use an isolated Git worktree/branch from an agreed base, reuse their task checkout, leave other checkouts untouched and publish the exact commit. Useful for parallel implementation; someone must still integrate and verify the combined result. |
 | `mode: merge_queue` (Merge queue) | Off | Asks agents to work in a worktree, attach their patch to the task with its base, and leave landing to whoever lands from `coral-board queue` (see [Merge queue](merge-queue.md)). Useful when several agents produce patches that one person or role lands. |
 | `dependency_guidance` (Include dependent-queue guidance) | `false` | Appends guidance to connect stages as separate dependent tasks with explicit prerequisites and named outputs. It does not create tasks or require every job to use Build/Test/Release. Operator/Orchestrator planning permissions still apply. |
+| `asks_are_tasks` (Requests for work are tasks) | `false` | Adds the rule "Ask another agent for work with `coral-board post --assign` or `task add --follow-up`; plain posts are for questions, decisions, heads-ups and status." to the instructions every task of the team is claimed with, after the dependent-queue guidance and before the custom text. The New team dialog turns it on for a new team; a team that never set it keeps today's instructions. Tasks already claimed keep what they were claimed with. CLI: `coral-board working-mode --asks-are-tasks[=false]`. |
 | `custom_instructions` | Empty string | Appends team conventions after the mode and dependency guidance. Leading/trailing whitespace is trimmed; maximum 4096 UTF-8 bytes, not characters. Example: “Run make check before publishing a commit.” |
 | `instructions` in the response | Generated | Read-only composed guidance: mode text, optional dependency guidance, then custom text, separated by newlines. A caller-provided value is ignored. |
 
@@ -368,6 +369,7 @@ PUT replaces the setting:
 {
   "mode": "worktrees",
   "dependency_guidance": true,
+  "asks_are_tasks": true,
   "custom_instructions": "Run make check before publishing a commit."
 }
 ```

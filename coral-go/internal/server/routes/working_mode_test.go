@@ -41,3 +41,29 @@ func TestWorkingModeAPI(t *testing.T) {
 	require.Equal(t, 200, w.Code)
 	require.Contains(t, w.Body.String(), `"instructions":""`)
 }
+
+// The "Requests for work are tasks" switch goes through the working-mode route: saved, read back, and the rule is in the instructions the route returns; a PUT that leaves it out turns it off (omitted fields reset).
+func TestWorkingModeAsksAreTasksSwitch(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	r := chi.NewRouter()
+	r.Get("/api/board/{project}/working-mode", h.GetWorkingMode)
+	r.Put("/api/board/{project}/working-mode", h.SetWorkingMode)
+	call := func(method, body string) map[string]any {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(method, "/api/board/team/working-mode", bytes.NewBufferString(body)))
+		require.Equal(t, 200, w.Code, w.Body.String())
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+		return out
+	}
+	require.Equal(t, false, call("GET", "")["asks_are_tasks"], "a team that never set it: off")
+	on := call("PUT", `{"mode":"none","asks_are_tasks":true}`)
+	require.Equal(t, true, on["asks_are_tasks"])
+	require.Contains(t, on["instructions"], "coral-board post --assign or task add --follow-up")
+	read := call("GET", "")
+	require.Equal(t, true, read["asks_are_tasks"], "read back")
+	require.Contains(t, read["instructions"], "plain posts are for questions, decisions, heads-ups and status")
+	off := call("PUT", `{"mode":"none"}`)
+	require.Equal(t, false, off["asks_are_tasks"])
+	require.NotContains(t, off["instructions"], "coral-board post --assign")
+}

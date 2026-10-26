@@ -14,7 +14,7 @@ const { HEALTH_DEFAULTS } = await importOnce('./team_health_settings.js');
 const { jsonError, presetNameText, presetInstructionsText, presetLabel, renderInspection } = await importOnce('./team_working_mode.js');
 
 let _lastSection = 'workflow'; // the group the tab shows, kept when the page is drawn again (Cancel)
-const MODE_KEYS = ['mode', 'dependency_guidance', 'custom_instructions'];
+const MODE_KEYS = ['mode', 'dependency_guidance', 'asks_are_tasks', 'custom_instructions'];
 const DEFAULT_MODES = [{ value: 'none', label: 'None' }, { value: 'shared_checkout', label: 'Shared checkout' }, { value: 'worktrees', label: 'Worktrees' }];
 
 const PRESET_EDITOR = `<details class="disclosure team-settings-section workflow-presets-section preset-editor">
@@ -84,6 +84,7 @@ export async function showTeamSettingsPage(team, options = {}) {
                     help: { text: 'Instructions are saved with each task when it is first claimed.', about: 'working modes', more: 'Tasks already claimed keep their instructions. This setting gives guidance; it does not create worktrees by itself.' },
                     options: async () => { await dataReady.catch(() => {}); return modeOptions(); } },
                 { key: 'dependency_guidance', type: 'toggle', label: 'Include dependent-queue guidance', help: 'Tells agents how to work when a task waits on another.' },
+                { key: 'asks_are_tasks', type: 'toggle', label: 'Requests for work are tasks', help: 'When an agent needs another agent to do something, it creates a task. Plain posts are for questions and status.' },
                 { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence },
                 { key: 'custom_instructions', type: 'textarea', label: 'Additional instructions', help: 'Team-specific conventions, given to agents with each task.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
                 { key: 'presets', type: 'custom', label: 'Presets', help: 'A preset saves with Save preset, not Save settings.', wide: true, render: slot => { slot.innerHTML = PRESET_EDITOR; } },
@@ -117,7 +118,7 @@ export async function showTeamSettingsPage(team, options = {}) {
                 await fillMessaging({ refusal: boardSettingsResponse ? await refusalOf(boardSettingsResponse, answeredLocally(team)) : '' });
             }
             q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), workingMode) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(team)))}</p>`;
-            return { mode: workingMode.mode || 'none', dependency_guidance: Boolean(workingMode.dependency_guidance), custom_instructions: workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), ...(healthBase ? healthToValues(healthBase) : {}) };
+            return { mode: workingMode.mode || 'none', dependency_guidance: Boolean(workingMode.dependency_guidance), asks_are_tasks: Boolean(workingMode.asks_are_tasks), custom_instructions: workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), ...(healthBase ? healthToValues(healthBase) : {}) };
         },
         // What changed since the page loaded (the working mode is saved whole: what the server has now, with only the fields changed here, #4423).
         save: async (changes, { before, values }) => {
@@ -129,7 +130,7 @@ export async function showTeamSettingsPage(team, options = {}) {
                     const current = await fetch(workingModeURL);
                     if (!current.ok) throw new Error(await jsonError(current, 'Could not read the working mode to save it.'));
                     const fresh = await current.json();
-                    const body = rebaseChanges(pick(before), pick(values), { mode: fresh.mode || 'none', dependency_guidance: Boolean(fresh.dependency_guidance), custom_instructions: fresh.custom_instructions || '' });
+                    const body = rebaseChanges(pick(before), pick(values), { mode: fresh.mode || 'none', dependency_guidance: Boolean(fresh.dependency_guidance), asks_are_tasks: Boolean(fresh.asks_are_tasks), custom_instructions: fresh.custom_instructions || '' });
                     const response = await fetch(workingModeURL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                     if (!response.ok) failures.push(await jsonError(response, 'Could not save working mode.'));
                     else { workingMode = await response.json(); saved.push(...MODE_KEYS); }

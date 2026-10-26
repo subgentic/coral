@@ -19,7 +19,7 @@ func cmdWorkingMode(args []string) {
 // workingModeFlags is a working-mode command line.
 type workingModeFlags struct {
 	board, custom, mode, create, edit, reset, name, instructions, file string
-	guidance, presets                                                  bool
+	guidance, asksAreTasks, presets                                    bool
 	seen                                                               map[string]bool // the flags given
 }
 
@@ -83,6 +83,7 @@ func parseWorkingModeFlags(args []string) (workingModeFlags, error) {
 	fs.StringVar(&f.custom, "custom-instructions", "", "Custom team rules; empty clears them")
 	fs.StringVar(&f.mode, "mode", "", "Select a built-in or custom workflow preset")
 	fs.BoolVar(&f.guidance, "dependency-guidance", false, "Include guidance about dependent tasks")
+	fs.BoolVar(&f.asksAreTasks, "asks-are-tasks", false, "Tell agents that asks for work are tasks (post --assign or task add --follow-up)")
 	fs.BoolVar(&f.presets, "presets", false, "List presets and effective team instructions")
 	fs.StringVar(&f.create, "create", "", "Create custom preset ID")
 	fs.StringVar(&f.edit, "edit", "", "Edit preset ID (built-ins become team-local overrides)")
@@ -110,7 +111,7 @@ func checkWorkingModeFlags(seen map[string]bool) error {
 			operations++
 		}
 	}
-	selection := seen["mode"] || seen["custom-instructions"] || seen["dependency-guidance"]
+	selection := seen["mode"] || seen["custom-instructions"] || seen["dependency-guidance"] || seen["asks-are-tasks"]
 	if operations > 1 || operations > 0 && selection {
 		return fmt.Errorf("use one preset operation or update the selected working mode")
 	}
@@ -156,7 +157,7 @@ func workingModeRequest(f workingModeFlags, project string) (method, path string
 	case f.seen["reset"]:
 		method = "POST"
 		path += "/presets/" + url.PathEscape(f.reset) + "/reset"
-	case f.seen["mode"] || f.seen["custom-instructions"] || f.seen["dependency-guidance"]:
+	case f.seen["mode"] || f.seen["custom-instructions"] || f.seen["dependency-guidance"] || f.seen["asks-are-tasks"]:
 		method = "PUT"
 	}
 	return method, path, body, nil
@@ -181,6 +182,9 @@ func updatedWorkingMode(f workingModeFlags, get func() ([]byte, error)) (map[str
 	}
 	if f.seen["dependency-guidance"] {
 		current["dependency_guidance"] = f.guidance
+	}
+	if f.seen["asks-are-tasks"] {
+		current["asks_are_tasks"] = f.asksAreTasks
 	}
 	delete(current, "instructions")
 	return current, nil

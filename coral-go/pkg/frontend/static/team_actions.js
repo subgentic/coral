@@ -134,6 +134,7 @@ async function _attachWorkingModeToTemplate(boardName, tmpl) {
                 tmpl.working_mode = {
                     mode: mode.mode,
                     dependency_guidance: mode.dependency_guidance || false,
+                    asks_are_tasks: mode.asks_are_tasks || false,
                     custom_instructions: mode.custom_instructions || '',
                 };
             }
