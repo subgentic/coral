@@ -4055,8 +4055,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-cli-slot:empty { display: none; }
 .launch-cli-slot { margin: 10px 26px 0; font-size: 0.8125rem; line-height: 1.5; color: var(--text-secondary); }
 .launch-cli-slot .acf-cli-warning { margin: 0 !important; } /* the form gave it a margin inline */
-.acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: var(--fs-md); font-weight: 500; } /* a row like any other: the status as its label (13/500), the button at the right, a link or note under it */
-.acf-cli-warning > span { flex: 1 1 12rem; }
+.acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px 12px; font-size: var(--fs-md); font-weight: 500; } /* a row like any other: the status as its label (13/500), the button at the right, a link or note under it */
+.acf-cli-warning > span { flex: 0 1 auto; }
 .acf-cli-warning > p { flex: 0 0 100%; margin: 0; font-weight: 400; }
 .launch-cli-slot .acf-cli-warning code { color: var(--text-primary); overflow-wrap: anywhere; }
 .launch-cli-slot .acf-cli-warning .cli-install-link a { color: var(--link-text); }
@@ -4258,6 +4258,10 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 
 .launch-wizard .acf-top-row { display: flex; flex-direction: column; gap: 14px; }
 .launch-wizard .acf-top-row .acf-model-wrap { margin: 0; }
+.launch-wizard .acf-top-row.acf-adopted { display: none; }
+.acf-agent-slot { display: flex; flex-direction: column; gap: 6px; }
+.sd-modal-content .settings-pane .acf-agent-rows label { display: inline-block; margin-bottom: 0; } /* the pane's block labels (and their bottom margin) would put the optional mark on a line of its own */
+.acf-agent-rows .seg-group { align-self: flex-start; max-width: 100%; margin: 0; }
 .launch-wizard .acf-thinking-wrap { display: block; margin: 0; }
 .launch-wizard .acf-thinking-wrap[hidden] { display: none; }
 .launch-wizard .acf-thinking-label, .launch-wizard .acf-model-wrap { display: block; margin-bottom: 4px; font-size: var(--fs-md); font-weight: 500; } /* Model and Thinking: the form label style, 13/500 (UI/UX on Restart) */

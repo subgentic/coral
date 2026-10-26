@@ -81,7 +81,7 @@
   },
   "launch-prompt-field": {
     "css": 3,
-    "js": 3,
+    "js": 0,
     "html": 2
   },
   "job-field": {
@@ -96,8 +96,8 @@
   },
   "launch-field-*": {
     "css": 3,
-    "js": 6,
-    "html": 7
+    "js": 3,
+    "html": 6
   },
   "__families": [
     "health-form",

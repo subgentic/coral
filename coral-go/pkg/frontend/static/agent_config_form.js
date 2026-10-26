@@ -226,7 +226,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
 /** The Behavior prompt: a field of settings_view (label above; the textarea keeps the class every read of the form uses). */
 function mountAcfPrompts(container, { promptVal }) {
     for (const host of container.querySelectorAll('.acf-prompt-host')) {
-        const view = mountSettingsView(host, { mode: 'form', fields: [{ key: 'prompt', type: 'textarea', label: 'Behavior prompt', rows: Number(host.dataset.rows) || 8, placeholder: "Describe the agent's role and behavior...", setup: e => e.classList.add('acf-prompt') }] });
+        const view = mountSettingsView(host, { mode: 'form', fields: [{ key: 'prompt', type: 'textarea', label: 'Behavior prompt', optional: true, rows: Number(host.dataset.rows) || 8, placeholder: "Describe the agent's role and behavior...", setup: e => e.classList.add('acf-prompt') }] });
         view.set('prompt', promptVal);
     }
 }
@@ -504,7 +504,39 @@ function finishAcfControls(container, opts) {
         if (mode && launchFlags.modeCards) segmentSelect(mode, { label: 'Permission mode', cards: true, className: 'seg-modes' });
         _syncEnforcement(container);
     }
+    if (opts.sections) mountAgentRows(container); // the Agent pane's rows (the provider of a member, Model, Thinking) are fields of settings_view
     if (opts.sections) { const shell = container.closest('.settings-shell'); if (shell) initSectionDialog(shell); } // the panes are in: build the section list
+}
+
+/** The Agent pane's rows as fields of settings_view (#8457): the controls the form built move into them (their listeners and classes come along, so every read of the form is unchanged), and the label, the optional mark and the spacing are the form's. A control the code hides (Model for a terminal, Thinking for a provider with no levels) hides its row. */
+function mountAgentRows(container) {
+    const pane = container.querySelector('.settings-pane[data-section="agent"]');
+    const top = pane && pane.querySelector('.acf-top-row');
+    if (!top) return;
+    const uid = container.dataset.acfUid || 'acf';
+    const provider = top.querySelector('.acf-provider-label:not([hidden])'); // Add/Edit member: the provider as segments (New agent adopts its own provider group; Restart says it in a line)
+    const modelWrap = top.querySelector('.acf-model-wrap'), thinkingWrap = top.querySelector('.acf-thinking-wrap');
+    const adopt = (from, keep) => (slot, labelId) => {
+        slot.classList.add('acf-agent-slot');
+        for (const n of [...from.children]) if (!keep.some(k => n.matches(k))) { slot.append(n); for (const c of [n, ...n.querySelectorAll('select, input:not([type=hidden])')]) if (c.matches && c.matches('select, input') && !c.hasAttribute('aria-label')) c.setAttribute('aria-labelledby', labelId); }
+        return {};
+    };
+    const fields = [];
+    if (provider) fields.push({ key: 'provider', type: 'custom', label: 'Provider', labelId: `${uid}-provider-l`, render: slot => adopt(provider, ['.acf-provider-head'])(slot, `${uid}-provider-l`) });
+    if (modelWrap) fields.push({ key: 'model', type: 'custom', label: 'Model', optional: true, labelId: `${uid}-model-l`, render: slot => adopt(modelWrap, ['.launch-optional'])(slot, `${uid}-model-l`) });
+    if (thinkingWrap) { thinkingWrap.querySelector('.acf-thinking-label')?.remove(); fields.push({ key: 'thinking', type: 'custom', label: 'Thinking', optional: true, labelId: 'acf-thinking-label', render: slot => adopt(thinkingWrap, [])(slot, 'acf-thinking-label') }); }
+    if (!fields.length) return;
+    const host = document.createElement('div'); host.className = 'acf-agent-rows';
+    top.before(host);
+    const view = mountSettingsView(host, { mode: 'form', fields });
+    const follow = (wrap, key) => { // the row is as shown as the control the code shows or hides
+        const row = host.querySelector(`.sv-row[data-key="${key}"]`); if (!wrap || !row) return;
+        const sync = () => { row.hidden = wrap.hidden || wrap.style.display === 'none'; };
+        sync(); new MutationObserver(sync).observe(wrap, { attributes: true, attributeFilter: ['hidden', 'style'] });
+    };
+    follow(modelWrap, 'model'); follow(thinkingWrap, 'thinking');
+    top.classList.add('acf-adopted'); // what is left of the old row (the hidden provider select of New agent, the emptied wrappers the code still finds and toggles) takes no room
+    return view;
 }
 
 
