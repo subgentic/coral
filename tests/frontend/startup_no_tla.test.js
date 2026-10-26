@@ -4,6 +4,7 @@
 //   node startup_no_tla.test.js
 const fs = require('node:fs');
 const path = require('node:path');
+const assert = require('node:assert/strict');
 const acorn = require('acorn');
 
 const STATIC = path.resolve(__dirname, '../../coral-go/pkg/frontend/static');
@@ -14,7 +15,7 @@ function topLevelAwait(src) {
     let found = null;
     (function walk(n, inFn) {
         if (!n || typeof n.type !== 'string' || found) return;
-        if (n.type === 'AwaitExpression' && !inFn) { found = n; return; }
+        if ((n.type === 'AwaitExpression' || (n.type === 'ForOfStatement' && n.await)) && !inFn) { found = n; return; } // await x, and for await (...)
         const fn = inFn || /Function/.test(n.type);
         for (const k of Object.keys(n)) {
             const v = n[k];
@@ -24,16 +25,22 @@ function topLevelAwait(src) {
     return found && src.slice(0, found.start).split('\n').length;
 }
 
+// the scan itself: a top-level await of either kind is found, an await inside a function is not
+assert.ok(topLevelAwait('const x = await y;'), 'await');
+assert.ok(topLevelAwait('for await (const x of y) {}'), 'for await');
+assert.ok(topLevelAwait('if (a) { await b; }'), 'await in a block');
+assert.equal(topLevelAwait('async function f() { await y; for await (const x of z) {} } const g = async () => { await y; };'), null, 'awaits inside functions');
+
 const seen = new Set();
 const problems = [];
 (function visit(file) {
     if (seen.has(file)) return;
     seen.add(file);
     let src;
-    try { src = fs.readFileSync(path.join(STATIC, file), 'utf8'); } catch { return; }
+    try { src = fs.readFileSync(path.join(STATIC, file), 'utf8'); } catch (e) { problems.push(`${file} is imported statically and cannot be read: ${e.code || e.message}`); return; }
     const line = topLevelAwait(src);
     if (line) problems.push(`${file}:${line} has a top-level await and is in the startup graph (import it statically, or load it lazily)`);
-    for (const m of src.matchAll(IMPORT)) visit(m[1]);
+    for (const m of src.matchAll(IMPORT)) visit(path.posix.normalize(path.posix.join(path.posix.dirname(file), m[1]))); // relative to the importing file (platform/native.js imports ./detect.js)
 })('app.js');
 
 if (seen.size < 100) problems.push(`only ${seen.size} modules found from app.js: the walk is not reading the graph`);
