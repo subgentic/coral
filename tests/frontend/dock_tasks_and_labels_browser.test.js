@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { setTheme } = require('./helpers/contrast');
 
 const B = 'dock-tasks-' + Date.now().toString(36);
 
@@ -36,7 +37,13 @@ const B = 'dock-tasks-' + Date.now().toString(36);
             for (const col of edges.filter(c => c.visible)) for (const left of col.rows)
                 assert.ok(Math.abs(left - col.head) < 1, `${col.col}: header ${col.head}, cell ${left}`);
 
-            if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(require('node:path').join(process.env.CORAL_SCREENSHOT_DIR, 'dock-tasks-' + width + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+            if (process.env.CORAL_SCREENSHOT_DIR) {
+                for (const theme of ['dark', 'light']) {
+                    await setTheme(ev, theme);
+                    require('node:fs').writeFileSync(require('node:path').join(process.env.CORAL_SCREENSHOT_DIR, 'dock-tasks-' + width + '-' + theme + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+                }
+                await setTheme(ev, 'dark');
+            }
         }
         await ev(`document.getElementById('agentic-state').style.width = '420px'; true`);
 
@@ -45,7 +52,7 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         const head = await ev(`(() => { const h = document.querySelector('#board-task-list thead tr'); const cs = getComputedStyle(h.cells[0]); return { texts: [...h.children].map(c => c.textContent.replace(/[↕↑↓]/g, '').trim()), transform: cs.textTransform, weight: cs.fontWeight, size: cs.fontSize }; })()`);
         assert.equal(head.transform, 'uppercase', 'the head uses shared typography: ' + JSON.stringify(head));
         assert.deepEqual([head.weight, head.size], ['600', '11px'], 'shared header typography');
-        assert.deepEqual(head.texts.slice(0, 3), ['Status', 'ID', 'Priority'], 'the words as written');
+        assert.deepEqual(head.texts.slice(0, 3), ['Status', 'Task', 'Priority'], 'the words as written');
         const row = await ev(`(() => { const r = document.querySelector('#board-task-list .board-task-item:not(.board-task-header)'); const b = [...r.querySelectorAll('button')]; return { buttons: b.length, name: b[0] && b[0].getAttribute('aria-label'), inDesc: !!(b[0] && b[0].closest('.board-task-desc')), idIsButton: !!r.querySelector('button.board-task-id') }; })()`);
         assert.equal(row.buttons, 1, 'one real button on the row: ' + JSON.stringify(row)); assert.ok(row.inDesc && !row.idIsButton, 'it is the name, and the id is text');
         assert.ok(/^Open task #\d+: [A-Z]/.test(row.name), 'its name says what it opens: ' + row.name);

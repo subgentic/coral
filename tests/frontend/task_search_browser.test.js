@@ -26,7 +26,7 @@ async function run() {
     await Promise.all([Page.enable(), Runtime.enable()]);
     const exceptions = [];
     Runtime.exceptionThrown(e => exceptions.push((((e.exceptionDetails || {}).exception || {}).description || 'exception').slice(0, 200)));
-    const ev = async (x) => { const r = await Runtime.evaluate({ expression: x, awaitPromise: true, returnByValue: true }); if (r.exceptionDetails) throw new Error('page eval: ' + JSON.stringify(r.exceptionDetails).slice(0, 400)); return r.result.value; };
+    const ev = async (x) => { const r = await Runtime.evaluate({ expression: x, awaitPromise: true, returnByValue: true }); if (r.exceptionDetails) throw new Error('page eval: ' + (r.exceptionDetails.exception?.description || JSON.stringify(r.exceptionDetails)) + '\nExpression: ' + x); return r.result.value; };
     const { waitFor } = require('./helpers/wait').bind(ev);
 const { removeBoards } = require('./helpers/board_cleanup');
     const MODS = `const tasks = await import((window.__coralStatic||'/static/')+'tasks.js'); const { state } = await import((window.__coralStatic||'/static/')+'state.js');`;
