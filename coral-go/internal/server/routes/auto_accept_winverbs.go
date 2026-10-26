@@ -361,49 +361,8 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 	if why, done := winExtractRisk(st, name, args, outside); done {
 		return why
 	}
-	switch name {
-	case "git":
-		// A setting that makes git run a program (core.hooksPath, an alias with !, git -c ...): the same rule as the POSIX words (auto_accept_gitcfg.go).
-		if why := gitCodeExecRisk(args); why != "" {
-			return why
-		}
-		// git clone <url> <dir>: the directory it creates.
-		for i, a := range args {
-			if strings.EqualFold(a, "clone") {
-				return gitCloneRisk(args[i+1:], outside)
-			}
-		}
-		return ""
-	case "attrib":
-		for _, p := range winPaths(args) {
-			if pathOutside(p, outside) {
-				return "it changes attributes outside the working directory (" + p + ")"
-			}
-		}
-		return ""
-	case "reg":
-		if len(args) > 0 {
-			switch strings.ToLower(args[0]) {
-			case "delete", "add", "import", "load", "unload", "restore", "copy":
-				return "it changes the registry"
-			}
-		}
-		return ""
-	case "icacls":
-		for _, a := range args {
-			l := strings.ToLower(a)
-			if strings.HasPrefix(l, "/grant") || strings.HasPrefix(l, "/reset") || strings.HasPrefix(l, "/setowner") || strings.HasPrefix(l, "/deny") || strings.HasPrefix(l, "/remove") {
-				return "it changes file permissions"
-			}
-		}
-		return ""
-	case "stop-process", "spps", "kill":
-		for _, a := range args {
-			if isForce(a) {
-				return "it force-stops processes"
-			}
-		}
-		return ""
+	if why, done := winToolRisk(st, name, args, outside); done {
+		return why
 	}
 	if winAsk[name] {
 		return "it runs " + words[0] + ", which can run anything"
@@ -533,6 +492,55 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		}
 	}
 	return ""
+}
+
+// winToolRisk judges git, attrib, reg, icacls and Stop-Process: the settings, paths and switches that make each change something.
+func winToolRisk(st winStage, name string, args []string, outside func(string) bool) (string, bool) {
+	switch name {
+	case "git":
+		// A setting that makes git run a program (core.hooksPath, an alias with !, git -c ...): the same rule as the POSIX words (auto_accept_gitcfg.go).
+		if why := gitCodeExecRisk(args); why != "" {
+			return why, true
+		}
+		// git clone <url> <dir>: the directory it creates.
+		for i, a := range args {
+			if strings.EqualFold(a, "clone") {
+				return gitCloneRisk(args[i+1:], outside), true
+			}
+		}
+		return "", true
+	case "attrib":
+		for _, p := range winPaths(args) {
+			if pathOutside(p, outside) {
+				return "it changes attributes outside the working directory (" + p + ")", true
+			}
+		}
+		return "", true
+	case "reg":
+		if len(args) > 0 {
+			switch strings.ToLower(args[0]) {
+			case "delete", "add", "import", "load", "unload", "restore", "copy":
+				return "it changes the registry", true
+			}
+		}
+		return "", true
+	case "icacls":
+		for _, a := range args {
+			l := strings.ToLower(a)
+			if strings.HasPrefix(l, "/grant") || strings.HasPrefix(l, "/reset") || strings.HasPrefix(l, "/setowner") || strings.HasPrefix(l, "/deny") || strings.HasPrefix(l, "/remove") {
+				return "it changes file permissions", true
+			}
+		}
+		return "", true
+	case "stop-process", "spps", "kill":
+		for _, a := range args {
+			if isForce(a) {
+				return "it force-stops processes", true
+			}
+		}
+		return "", true
+	}
+	return "", false
 }
 
 // winExtractRisk judges the archive tools (tar, 7z, unzip, expand, makecab): where they extract or write.
