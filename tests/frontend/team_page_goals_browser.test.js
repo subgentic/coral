@@ -35,9 +35,22 @@ const GOAL = 'Explore goals with two teams';
             await S.run(`${label}: Goals is a table with the columns Goal, State, Tasks, Updated, a row per goal, and a New goal button`, async () => {
                 assert.ok(await onGoals, 'the team page is open');
                 const hd = await headers(); assert.ok(hd, 'Goals has a table');
-                assert.deepEqual(hd.map(x => x.replace(/\s+/g, ' ').trim()).slice(0, 4), ['Goal', 'State', 'Tasks', 'Updated'], 'the columns');
+                assert.deepEqual(hd.map(x => x.replace(/[↕↑↓]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 4), ['Goal', 'State', 'Tasks', 'Updated'], 'the columns');
                 const rows = (await rowsOf()).filter(r => !/ no goal\b/.test(r)); assert.equal(rows.length, 2, `a row per goal (got ${rows.length}); the tasks with no goal are the last row (#7717)`);
                 assert.ok(rows.some(r => r.includes(GOAL)) && rows.some(r => r.includes('Plan the release notes')), 'the two goals are the rows');
+                assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-table')`), true, 'Goals uses the shared table');
+                const progress = await ev(`(() => { const p = window.__tp.page().querySelector('progress'); return p && { max: p.max, value: p.value, label: p.getAttribute('aria-label') }; })()`);
+                assert.ok(progress && progress.max > 0 && progress.label === `${progress.value} of ${progress.max} done`, 'progress exposes the task counts');
+                if (mobile) assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-box.dt-folded .dt-sortbar-select')`), true, 'phone has shared folded sorting');
+                else {
+                    await ev(`window.__tp.page().querySelector('.dt-sort[data-key="goal"]').click()`);
+                    assert.equal(await ev(`window.__tp.page().querySelector('th[data-key="goal"]').getAttribute('aria-sort')`), 'ascending');
+                    await ev(`window.__tp.page().querySelector('.dt-sort[data-key="goal"]').click()`);
+                    assert.equal(await ev(`window.__tp.page().querySelector('th[data-key="goal"]').getAttribute('aria-sort')`), 'descending');
+                    const names = await ev(`Array.from(window.__tp.page().querySelectorAll('tbody .dt-primary'), e => e.textContent)`);
+                    assert.deepEqual(names.slice(0, 2), ['Plan the release notes', GOAL], 'descending title sort');
+                    assert.match(names.at(-1), /no goal/, 'no-goal navigation stays last');
+                }
                 await click('button', /^New goal$/i, 'button');
                 await ev(`(() => { const e = document.activeElement; if (e && e.tagName === 'TEXTAREA' || e && e.tagName === 'INPUT') {} return true; })()`);
                 // A real key press: the New goal dialog is a native modal dialog, and only the browser's own Escape closes it (a script-made keydown does not, and the page stays inert behind it).

@@ -12,7 +12,6 @@ import { whenText } from './when_text.js';
 import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
 import { foldWayBack } from './way_back.js';
-const { teamTable, rowButton, stateChip: tableStateChip } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the goal's column is its folded form
@@ -281,11 +280,11 @@ function drawHead() {
 /** Redraw a column and give the keyboard its place back: the control that had focus (a chip by its filter, a card by its goal, anything else by its class and words) is found again in the new draw; when it is gone ("Show all" and "Try again" go when they work) focus goes to the pressed chip, never to the page. */
 function keepFocus(col, redraw) {
     const a = document.activeElement;
-    const held = a && col && col.contains(a) && a !== col ? { filter: a.dataset.filter, goal: a.dataset.goalId, id: a.id, cls: a.className, text: a.textContent } : null;
+    const held = a && col && col.contains(a) && a !== col ? { sortKey: a.classList.contains('dt-sort') ? a.dataset.key : '', sortSelect: a.classList.contains('dt-sortbar-select'), sortDir: a.classList.contains('dt-sortbar-dir'), filter: a.dataset.filter, goal: a.dataset.goalId, id: a.id, cls: a.className, text: a.textContent } : null;
     redraw();
     if (!held) return;
     const all = [...col.querySelectorAll('button, [tabindex]')];
-    const same = held.filter ? col.querySelector(`.goals-chip[data-filter="${CSS.escape(held.filter)}"]`) : held.goal ? col.querySelector(`[data-goal-id="${CSS.escape(held.goal)}"]`) : held.id ? col.querySelector(`#${CSS.escape(held.id)}`) : all.find(e => e.className === held.cls && e.textContent === held.text);
+    const same = held.sortKey ? col.querySelector(`.dt-sort[data-key="${CSS.escape(held.sortKey)}"]`) : held.sortSelect ? col.querySelector('.dt-sortbar-select') : held.sortDir ? col.querySelector('.dt-sortbar-dir') : held.filter ? col.querySelector(`.goals-chip[data-filter="${CSS.escape(held.filter)}"]`) : held.goal ? col.querySelector(`[data-goal-id="${CSS.escape(held.goal)}"]`) : held.id ? col.querySelector(`#${CSS.escape(held.id)}`) : all.find(e => e.className === held.cls && e.textContent === held.text);
     (same || col.querySelector('.goals-chip[aria-pressed="true"]') || (col.classList.contains('goals-detail-col') ? col : col.querySelector('#goals-detail-title')))?.focus({ preventScroll: true }); // gone because it worked: the pressed chip in the list, the goal's heading in the detail
 }
 
@@ -294,9 +293,9 @@ const drawDetail = () => (layout === 'page' ? drawPage() : keepFocus(root && roo
 
 // ── the team page's Goals tab (#7453): a table of the goals; a goal's own page with its tasks as a table ────────────────
 
-const goalRowBtn = (g) => { const b = rowButton(g.title || `Goal ${g.id}`); b.dataset.goalId = String(g.id); return b; };
+const goalRowBtn = (g) => { const b = DT.primaryButton(g.title || `Goal ${g.id}`); b.dataset.goalId = String(g.id); return b; };
 const doneOf = (rollup) => rollup.done, totalOf = (rollup) => W.allTasksOf(rollup);
-const tasksCell = (rollup) => (totalOf(rollup) ? `${doneOf(rollup)} of ${totalOf(rollup)} done` : 'No tasks');
+let goalsTableState = DT.tableState();
 
 function drawPage() {
     const body = root && root.querySelector('.goals-body'); if (!body) return;
@@ -330,17 +329,22 @@ function drawTableRaw(col) {
         col.append(e);
         return;
     }
-    col.append(teamTable({
-        label: `Goals, ${shown.length}`, columns: ['Goal', 'State', 'Tasks', 'Updated'],
-        rows: shown.map(g => ({
-            key: g.id, current: g.id === model.openId,
-            open: () => openGoal(g.id, true),
-            cells: [goalRowBtn(g), tableStateChip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`), tasksCell(g.rollup), whenText(g.updatedAt)],
-        })).concat(model.noGoalOpen > 0 && model.filter === 'all' ? [{ // the tasks that serve no goal are a last row of the table, not a line under the toolbar (#7717): it opens the team's Tasks with the no-goal filter on
-            key: 'no-goal', open: () => window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }),
-            cells: [(() => { const b = rowButton(W.noGoalRowText(model.noGoalOpen)); b.classList.add('goals-no-goal'); return b; })(), '', '', ''],
-        }] : []),
-    }));
+    const sort = goalsTableState.sort;
+    const sortValue = g => sort.key === 'goal' ? g.title : sort.key === 'state' ? W.stateWord(g) : sort.key === 'tasks' ? (totalOf(g.rollup) ? doneOf(g.rollup) / totalOf(g.rollup) : 0) : g.updatedAt;
+    if (sort) shown.sort((a, b) => { const x = sortValue(a), y = sortValue(b); return (sort.dir === 'desc' ? -1 : 1) * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true })); });
+    const rows = shown.concat(model.noGoalOpen > 0 && model.filter === 'all' ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : []);
+    col.append(DT.dataTable({
+        label: `Goals, ${shown.length}`, rows, rowKey: g => g.id, state: goalsTableState,
+        onSort: () => drawList(), // keep the no-goal navigation row last in either direction
+        open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
+        columns: [
+            { key: 'goal', label: 'Goal', primary: true, width: 'grow', sort: true, line: 1,
+                cell: g => { const b = goalRowBtn(g); if (g.noGoal) b.classList.add('goals-no-goal'); return b; }, subtitle: g => g.outcome },
+            { key: 'state', label: 'State', sort: true, line: 2, cell: g => g.noGoal ? '' : DT.chip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`) },
+            { key: 'tasks', label: 'Tasks', sort: true, line: 2, tone: 'tertiary', cell: g => g.noGoal ? '' : DT.progressCell(doneOf(g.rollup), totalOf(g.rollup)) },
+            { key: 'updated', label: 'Updated', sort: true, line: 0, tone: 'tertiary', align: 'end', cell: g => g.noGoal ? '' : DT.timeCell(g.updatedAt) },
+        ],
+    }).el);
 }
 
 function backButton(text, onClick) {
@@ -534,7 +538,7 @@ export function closeGoal() {
     model.openId = 0; model.taskId = 0; model.screen = 'goal';
     if (layout === 'page') hooks.onItem?.(0);
     draw();
-    (root.querySelector(`.goal-card[data-goal-id="${id}"]`) || root.querySelector(`.team-row-btn[data-goal-id="${id}"]`))?.focus();
+    (root.querySelector(`.goal-card[data-goal-id="${id}"]`) || root.querySelector(`.dt-primary[data-goal-id="${id}"]`))?.focus();
 }
 
 /** The goal page's own id (0 on the list): the team page asks it to put the address and the Back button right. */
@@ -666,7 +670,7 @@ function openClose(g, preset) {
 
 /** Show the board's goals in `host` (the page's #mb-goals) and read them. */
 export function showGoals(host, project, opts = {}) {
-    if (project !== model.project) { Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false, taskId: 0, taskSearch: '', screen: 'goal' }); }
+    if (project !== model.project) { goalsTableState = DT.tableState(); Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false, taskId: 0, taskSearch: '', screen: 'goal' }); }
     layout = opts.page ? 'page' : 'cards';
     hooks = opts.page ? (opts.hooks || {}) : {};
     const kind = opts.page ? 'page' : 'cards';

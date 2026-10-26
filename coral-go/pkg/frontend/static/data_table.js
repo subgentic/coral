@@ -50,6 +50,17 @@ export function timeCell(stamp) {
 }
 export function link(text, run) { return button('dt-link', text, run); }
 
+/** Task completion: visible counts remain meaningful without colour or a filled bar. */
+export function progressCell(done, total) {
+    const cell = el('span', 'dt-progress');
+    if (!total) { cell.textContent = 'No tasks'; return cell; }
+    const label = `${done} of ${total} done`;
+    const meter = el('progress', 'dt-progress-meter');
+    meter.max = total; meter.value = done; meter.setAttribute('aria-label', label);
+    cell.append(meter, el('span', 'dt-progress-text', label));
+    return cell;
+}
+
 // ── the table ─────────────────────────────────────────────────────────────
 const INTERACTIVE = 'a, input, select, textarea, summary, button:not(.dt-primary)';
 const compareBy = (col) => {
