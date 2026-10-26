@@ -104,11 +104,10 @@ func TestTurnEndHandoffAfterARealTypedNudge(t *testing.T) {
 	require.NoError(t, err)
 	typed := false
 	d, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: idleBox{}, Name: name, AgentType: "claude", SessionID: sid,
-		Key: "board-unread:" + board, Text: "You have 1 unread message", What: "test",
+		Text: "You have 1 unread message", What: "test",
 		Send: func(context.Context) error { typed = true; return nil }})
 	require.NoError(t, err)
 	require.True(t, typed, "the nudge was typed (%v)", d)
-	require.False(t, ptymanager.LastDelivered(name, "board-unread:"+board).IsZero())
 	// As Claude 2.1.300 does: a prompt_submit for the queued nudge, just after it was typed.
 	_, err = h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "hotel", SessionID: &sid, EventType: "prompt_submit", Summary: "queued",
 		CreatedAt: time.Now().UTC().Add(400 * time.Millisecond).Format(store.ISOFormat)})

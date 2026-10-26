@@ -34,9 +34,6 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 	if in.Send == nil {
 		return Sent, errors.New("automated input without a send function")
 	}
-	if in.Key == "" {
-		in.Key = in.Text
-	}
 	unlock := gate.lockSession(in.Name)
 	defer unlock()
 	if in.Ready != nil {
@@ -86,7 +83,6 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 		return Skipped, nil
 	}
 	if err == nil {
-		gate.noteDelivered(in.Name, in.Key)
 		noteDeliveredText(in.Name, in.Text)
 		clearSkipped(in.Name)
 	}

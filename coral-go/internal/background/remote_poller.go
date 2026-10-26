@@ -174,7 +174,7 @@ func (p *RemoteBoardPoller) RunOnce(ctx context.Context) error {
 		// One line (#3376), through the automated-input gate (#3431). Whether a remote board's
 		// unread messages tag the agent isn't known here (only their count is), so it goes as a
 		// mention: typed in mid-turn as before, never held for a turn (#3578).
-		skipped, err := deliverAutomated(ctx, p.runtime, p.logger, sessionName, agent.AgentType, agent.SessionID, "remote-board-unread:"+sub.Project, board.OneLine(nudge), "remote board nudge", false, true)
+		skipped, err := deliverAutomated(ctx, p.runtime, p.logger, sessionName, agent.AgentType, agent.SessionID, board.OneLine(nudge), "remote board nudge", false, true)
 		if skipped {
 			continue
 		}

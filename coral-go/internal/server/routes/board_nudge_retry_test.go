@@ -26,7 +26,7 @@ func TestBoardNudge8031TrustedStateChangeRetriesThroughTheGate(t *testing.T) {
 	term.show("Would you like to proceed?\n› 1. Yes\n  2. No\nPress enter to confirm or esc to cancel\n")
 	var typed, kicks atomic.Int64
 	deliver := func() {
-		_, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: term, Name: name, AgentType: "codex", SessionID: sid, Key: "board-unread:" + project, Text: "You have 1 unread message", What: "board nudge", Send: func(context.Context) error { typed.Add(1); return nil }})
+		_, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: term, Name: name, AgentType: "codex", SessionID: sid, Text: "You have 1 unread message", What: "board nudge", Send: func(context.Context) error { typed.Add(1); return nil }})
 		if err != nil {
 			t.Errorf("deliver: %v", err)
 		}
@@ -89,7 +89,7 @@ func TestBoardNudge8040TaskReminderMemoDoesNotWakeBoard(t *testing.T) {
 	h.SetBoardHandler(bh)
 	for _, what := range []string{"task reminder", "board nudge"} {
 		term.show("Would you like to proceed?\n› 1. Yes\n  2. No\nPress enter to confirm or esc to cancel\n")
-		delivery, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: term, Name: name, AgentType: "codex", SessionID: sid, Key: what, Text: "fixture notification", What: what, Send: func(context.Context) error { t.Error("nothing may be typed through the dialog"); return nil }})
+		delivery, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: term, Name: name, AgentType: "codex", SessionID: sid, Text: "fixture notification", What: what, Send: func(context.Context) error { t.Error("nothing may be typed through the dialog"); return nil }})
 		require.NoError(t, err)
 		require.Equal(t, ptymanager.Skipped, delivery)
 		memo, ok := ptymanager.SkippedOf(name)

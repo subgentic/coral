@@ -53,8 +53,8 @@ func (m *BoardHealthMonitor) SetAgents(ts *store.TaskStore, rt AgentRuntime, dis
 	m.discover = discover
 	m.signal = hookSignal(ts)
 	m.limit = screenLimit(rt)
-	m.deliver = func(ctx context.Context, a AgentInfo, key, text string) error {
-		_, err := deliverAutomated(ctx, rt, m.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, key, board.OneLine(text), "health check", false, false)
+	m.deliver = func(ctx context.Context, a AgentInfo, _ string, text string) error {
+		_, err := deliverAutomated(ctx, rt, m.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, board.OneLine(text), "health check", false, false)
 		return err
 	}
 }

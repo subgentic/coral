@@ -75,8 +75,8 @@ func (f *fakeAgent) sent() []string {
 	defer f.mu.Unlock()
 	return append([]string(nil), f.typed...)
 }
-func (f *fakeAgent) input(name, key, text string, requireBox bool) AutomatedInput {
-	return AutomatedInput{Term: f, Name: name, Key: key, Text: text, What: "test", RequireInputBox: requireBox,
+func (f *fakeAgent) input(name, text string, requireBox bool) AutomatedInput {
+	return AutomatedInput{Term: f, Name: name, Text: text, What: "test", RequireInputBox: requireBox,
 		Send: func(context.Context) error {
 			f.mu.Lock()
 			defer f.mu.Unlock()
@@ -94,7 +94,7 @@ func quickLaunchWaits(t *testing.T) {
 
 func deliver(t *testing.T, a *fakeAgent, name, text string) Delivery {
 	t.Helper()
-	d, err := DeliverAutomated(context.Background(), a.input(name, "", text, false))
+	d, err := DeliverAutomated(context.Background(), a.input(name, text, false))
 	require.NoError(t, err)
 	return d
 }
@@ -219,18 +219,18 @@ func TestAnUnreadableScreenGetsNothing(t *testing.T) {
 	assert.Equal(t, Skipped, deliver(t, b, n, "x"), "an empty screen")
 	assert.Empty(t, b.sent())
 
-	d, err := DeliverNow(context.Background(), a.input(n, "", "now", false))
+	d, err := DeliverNow(context.Background(), a.input(n, "now", false))
 	require.NoError(t, err)
 	assert.Equal(t, Sent, d, "a person's Send now types where the screen cannot be read")
 	assert.Equal(t, []string{"now"}, a.sent())
 
 	// ...but never into an open prompt or over a draft
 	p := &fakeAgent{screen: permissionMenu}
-	d, _ = DeliverNow(context.Background(), p.input(n, "", "now", false))
+	d, _ = DeliverNow(context.Background(), p.input(n, "now", false))
 	assert.Equal(t, Skipped, d)
 	assert.Empty(t, p.sent())
 	dr := &fakeAgent{screen: claudeMonitorWithText}
-	d, _ = DeliverNow(context.Background(), dr.input(n, "", "now", false))
+	d, _ = DeliverNow(context.Background(), dr.input(n, "now", false))
 	assert.Equal(t, Skipped, d)
 	assert.Empty(t, dr.sent())
 }
@@ -280,7 +280,7 @@ func TestAFirstPromptWaitsForTheInputBox(t *testing.T) {
 	n := "claude-t-launch"
 	done := make(chan Delivery, 1)
 	go func() {
-		d, _ := DeliverAutomated(context.Background(), a.input(n, "initial-prompt", "Build the feature", true))
+		d, _ := DeliverAutomated(context.Background(), a.input(n, "Build the feature", true))
 		done <- d
 	}()
 	time.Sleep(30 * time.Millisecond) // sleep-ok: a blank screen, then a trust dialog: the prompt never answers it
@@ -298,32 +298,47 @@ func TestAFirstPromptWaitsForTheInputBox(t *testing.T) {
 
 	// an agent whose box is not recognised: the fallback
 	u := &fakeAgent{screen: "Some new CLI v9 :: type here"}
-	d, err := DeliverAutomated(context.Background(), u.input("claude-t-launch2", "initial-prompt", "Build it", true))
+	d, err := DeliverAutomated(context.Background(), u.input("claude-t-launch2", "Build it", true))
 	require.NoError(t, err)
 	assert.Equal(t, Sent, d)
 	assert.Equal(t, []string{"Build it"}, u.sent())
 
 	// a prompt that stays open is never answered, and the send gives up after the wait
 	o := &fakeAgent{screen: trustDialog}
-	d, err = DeliverAutomated(context.Background(), o.input("claude-t-launch3", "initial-prompt", "Build it", true))
+	d, err = DeliverAutomated(context.Background(), o.input("claude-t-launch3", "Build it", true))
 	require.NoError(t, err)
 	assert.Equal(t, Skipped, d)
 	assert.Empty(t, o.sent())
 }
 
-// LastDelivered still says when a key was typed, and ForgetSession (the agent was killed or restarted) forgets it, the skip and the last text.
-func TestDeliveredKeysAndForgetSession(t *testing.T) {
+// ForgetSession clears the old process's typed text and skipped send and notifies subscribers.
+func TestForgetSessionClearsTypedTextAndSkip(t *testing.T) {
 	n := "claude-t-forget"
 	a := &fakeAgent{screen: idleInputBox}
-	before := time.Now()
-	_, err := DeliverAutomated(context.Background(), a.input(n, "board-unread:team", "nudge", false))
+	d, err := DeliverAutomated(context.Background(), a.input(n, "nudge", false))
 	require.NoError(t, err)
-	assert.False(t, LastDelivered(n, "board-unread:team").Before(before))
+	require.Equal(t, Sent, d)
+	require.Equal(t, []string{"nudge"}, a.sent())
+	gate.mu.Lock()
+	_, typed := gate.lastTyped[n]
+	gate.mu.Unlock()
+	require.True(t, typed)
+	a.show(permissionMenu)
+	d, err = DeliverAutomated(context.Background(), a.input(n, "held nudge", false))
+	require.NoError(t, err)
+	require.Equal(t, Skipped, d)
+	_, skipped := SkippedOf(n)
+	require.True(t, skipped)
 	forgotten := make(chan string, 1)
 	stop := OnSessionForgotten(func(name string) { forgotten <- name })
 	defer stop()
 	ForgetSession(n)
-	assert.True(t, LastDelivered(n, "board-unread:team").IsZero())
+	gate.mu.Lock()
+	_, typed = gate.lastTyped[n]
+	gate.mu.Unlock()
+	assert.False(t, typed)
+	_, skipped = SkippedOf(n)
+	assert.False(t, skipped)
 	assert.Equal(t, n, <-forgotten)
 }
 
@@ -361,7 +376,7 @@ func TestAPersonsOwnPastedDraftIsNotCoralsLeftover(t *testing.T) {
 	// a look at an empty box forgets Coral's text: it was taken, and a placeholder that comes later cannot be it
 	gate.noteTyped(n, strings.Repeat("a long first prompt. ", 30), true)
 	b := &fakeAgent{screen: idleInputBox}
-	b.input(n, "", "x", false).look(context.Background())
+	b.input(n, "x", false).look(context.Background())
 	_, kept := gate.typedFor(n)
 	assert.False(t, kept, "an empty box ends Coral's claim on what it typed")
 	b.show(person)

@@ -28,8 +28,8 @@ type TaskReminders struct {
 // NewTaskReminders checks for due reminders every 30 seconds.
 func NewTaskReminders(bs *board.Store, rt AgentRuntime, discover func(context.Context) ([]AgentInfo, error)) *TaskReminders {
 	t := &TaskReminders{store: bs, runtime: rt, logger: slog.Default(), discover: discover, now: time.Now, Interval: 30 * time.Second}
-	t.deliver = func(ctx context.Context, a AgentInfo, key, text string) error {
-		_, err := deliverAutomated(ctx, t.runtime, t.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, key, board.OneLine(text), "task reminder", false, false)
+	t.deliver = func(ctx context.Context, a AgentInfo, _ string, text string) error {
+		_, err := deliverAutomated(ctx, t.runtime, t.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, board.OneLine(text), "task reminder", false, false)
 		return err
 	}
 	return t

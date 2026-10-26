@@ -47,11 +47,10 @@ func TestTurnEndHandsOffUnreadAfterMidTurnDelivery8557(t *testing.T) {
 				require.NoError(t, err)
 				typed := 0
 				t.Cleanup(func() { ptymanager.ForgetSession(name) })
-				delivered, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: capturedHandoffScreen(screen), Name: name, AgentType: "claude", SessionID: sid, Key: "board-unread:" + board, Text: "You have 1 unread message", What: "board nudge", Send: func(context.Context) error { typed++; return nil }})
+				delivered, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: capturedHandoffScreen(screen), Name: name, AgentType: "claude", SessionID: sid, Text: "You have 1 unread message", What: "board nudge", Send: func(context.Context) error { typed++; return nil }})
 				require.NoError(t, err)
 				require.Equal(t, ptymanager.Sent, delivered)
 				require.Equal(t, 1, typed)
-				require.False(t, ptymanager.LastDelivered(name, "board-unread:"+board).IsZero())
 				ask := func(active bool) map[string]any {
 					body := `{"stop_hook_active":false}`
 					if active {

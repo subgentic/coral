@@ -52,24 +52,24 @@ func skipIfAgentExited(ctx context.Context, rt any, logger *slog.Logger, name, w
 // (skipIfAgentExited, which reports it as skipped), and only when the agent isn't
 // waiting on a prompt: ptymanager.DeliverAutomated skips it while the prompt is
 // open. The caller must retain its source-of-truth work and retry, not mark it
-// delivered. key groups sends that supersede each other ("" for the text itself);
+// delivered.
 // requireInputBox holds it until the agent's normal input box is on screen (a
 // launch's first prompt). mention: it is about a board message that tags the agent, which
 // the gate types in mid-turn when it follows the signals (#3578).
-func deliverAutomated(ctx context.Context, rt AgentRuntime, logger *slog.Logger, name, agentType, sessionID, key, text, what string, requireInputBox, mention bool) (skipped bool, err error) {
-	return deliverAutomatedIfWanted(ctx, rt, logger, name, agentType, sessionID, key, text, what, requireInputBox, mention, nil)
+func deliverAutomated(ctx context.Context, rt AgentRuntime, logger *slog.Logger, name, agentType, sessionID, text, what string, requireInputBox, mention bool) (skipped bool, err error) {
+	return deliverAutomatedIfWanted(ctx, rt, logger, name, agentType, sessionID, text, what, requireInputBox, mention, nil)
 }
 
 // deliverAutomatedIfWanted is deliverAutomated with wanted, when set, asked again just before the
 // text is typed, held or not: false skips it (#4362: a board nudge held while the agent worked was
 // typed after the turn in which it had read those messages).
-func deliverAutomatedIfWanted(ctx context.Context, rt AgentRuntime, logger *slog.Logger, name, agentType, sessionID, key, text, what string, requireInputBox, mention bool, wanted func(context.Context) bool) (skipped bool, err error) {
+func deliverAutomatedIfWanted(ctx context.Context, rt AgentRuntime, logger *slog.Logger, name, agentType, sessionID, text, what string, requireInputBox, mention bool, wanted func(context.Context) bool) (skipped bool, err error) {
 	if skipIfAgentExited(ctx, rt, logger, name, what) {
 		return true, nil
 	}
 	delivery, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{
 		Term: rt, Name: name, AgentType: agentType, SessionID: sessionID,
-		Key: key, Text: text, What: what, RequireInputBox: requireInputBox,
+		Text: text, What: what, RequireInputBox: requireInputBox,
 		// As a bracketed paste where the agent takes one: a menu ignores it (#3457).
 		Paste: true,
 		Ready: func(ctx context.Context) error {

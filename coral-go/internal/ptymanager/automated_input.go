@@ -52,8 +52,6 @@ type AutomatedInput struct {
 	Term any
 	// Name, AgentType and SessionID identify the agent's session.
 	Name, AgentType, SessionID string
-	// Key identifies what the send is about (LastDelivered); "" means the text itself.
-	Key string
 	// Text is what will be typed, for the input debug log.
 	Text string
 	// What names the sender in logs ("board message", "initial prompt", ...).
@@ -103,14 +101,12 @@ type inputGate struct {
 	mu sync.Mutex
 	// sending serialises the sends to one session, so two nudges are not interleaved in one box.
 	sending sync.Map // session name -> *sync.Mutex
-	// delivered: when each session's sends were last typed, by Key (LastDelivered).
-	delivered map[string]map[string]time.Time
 	// lastTyped: each session's last text Coral typed, until the agent's box is seen empty or the session ends.
 	lastTyped map[string]typedMemo
 	nowFn     atomic.Pointer[func() time.Time] // the clock; nil is time.Now. Tests replace it
 }
 
-var gate = &inputGate{delivered: map[string]map[string]time.Time{}, lastTyped: map[string]typedMemo{}}
+var gate = &inputGate{lastTyped: map[string]typedMemo{}}
 
 // now is the gate's clock.
 func (g *inputGate) now() time.Time {

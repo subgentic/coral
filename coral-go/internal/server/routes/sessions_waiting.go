@@ -125,7 +125,7 @@ func (h *SessionsHandler) SendWaitingNow(w http.ResponseWriter, r *http.Request)
 	text := board.NudgeText(unread)
 	delivery, err := ptymanager.DeliverNow(r.Context(), ptymanager.AutomatedInput{
 		Term: h.terminal, Name: name, AgentType: ls.AgentType, SessionID: ls.SessionID,
-		Key: "board-unread:" + sub.Project, Text: text, What: "Send now", Paste: true,
+		Text: text, What: "Send now", Paste: true,
 		Send: func(ctx context.Context) error {
 			return h.terminal.SendInput(ctx, terminalinput.Coral, name, text, ls.AgentType, ls.SessionID)
 		},

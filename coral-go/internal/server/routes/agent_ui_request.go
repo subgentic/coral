@@ -206,7 +206,7 @@ func (h *SessionsHandler) agentUIRequest(w http.ResponseWriter, r *http.Request)
 	var sendErr error
 	delivery, err := ptymanager.DeliverAutomated(r.Context(), ptymanager.AutomatedInput{
 		Term: h.terminal, Name: terminalName, AgentType: ls.AgentType, SessionID: ls.SessionID,
-		Key: "ui-request:" + body.RequestID, Text: notification, What: "agent UI request notification", Send: send,
+		Text: notification, What: "agent UI request notification", Send: send,
 	})
 	if delivery == ptymanager.Skipped {
 		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "delivered": false, "skipped": true, "recorded": true, "request_id": body.RequestID, "panel_id": panelID, "session_id": sid,
