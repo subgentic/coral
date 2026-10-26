@@ -353,12 +353,15 @@
 /* The same literal board name as its list row, including digit+x (#8682). */
 .goals-detail-title, .team-page-title { font-feature-settings: "calt" 0; }
 
-/* Review actions wrap within the folded Needs you row. */
-.inbox-review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.inbox-review-error { flex-basis: 100%; }
+/* Keep the review actions together; the full team name remains in the metadata tooltip. */
+.inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; }
+.inbox-review-error { grid-column: 1 / -1; white-space: normal; }
 .inbox-review-error:empty { display: none; }
+.inbox-review-meta-team { display: none; }
 .inbox-review-more { margin: 12px 0; }
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {
     .inbox-review-actions button { min-height: 44px; }
+    .inbox-review-meta { display: block; max-width: max(3rem, calc(100vw - 18rem)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .inbox-review-meta-team { display: inline; }
 }
