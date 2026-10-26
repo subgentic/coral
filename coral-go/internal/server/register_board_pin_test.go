@@ -47,7 +47,7 @@ func TestRegisterBoardPinsActualRouteBindings(t *testing.T) {
 }
 
 func boardSurfacePath(path string) bool {
-	return strings.HasPrefix(path, "/api/board/") || strings.HasPrefix(path, "/api/tasks/") || path == "/api/notifications" || path == "/api/session-artifacts" || path == "/api/cloud/cross-team-links" || path == "/api/goals" || path == "/api/goal-links"
+	return strings.HasPrefix(path, "/api/board/") || strings.HasPrefix(path, "/api/tasks/") || path == "/api/notifications" || path == "/api/session-artifacts" || path == "/api/team-artifacts" || path == "/api/cloud/cross-team-links" || path == "/api/goals" || path == "/api/goal-links"
 }
 
 // Every board-dependent method must retain its 503 guard after extraction, not

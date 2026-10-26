@@ -87,6 +87,7 @@ GET /api/system/hub-operator redact
 GET /api/system/update redact
 GET /api/tags redact
 GET /api/tasks/active redact
+GET /api/team-artifacts redact
 GET /api/teams/all redact
 GET /api/teams/detail/{name} redact
 GET /api/teams/detail/{name}/availability redact

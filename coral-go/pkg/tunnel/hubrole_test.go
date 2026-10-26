@@ -166,6 +166,7 @@ func TestIsOwnerRouteIsTheUpdateRoutesAndTheOwnersConfiguration(t *testing.T) {
 		{http.MethodGet, "/api/board/team/artifacts", true},
 		{http.MethodGet, "/api/board/team/tasks/12/artifact-content", true},
 		{http.MethodGet, "/api/session-artifacts", true},
+		{http.MethodGet, "/api/team-artifacts", true},
 		{http.MethodPost, "/api/artifacts/" + hexID, false},
 		{http.MethodPut, "/api/artifacts/" + hexID, false},
 		{http.MethodDelete, "/api/artifacts", false},

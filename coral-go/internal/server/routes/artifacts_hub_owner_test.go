@@ -116,7 +116,7 @@ func TestTeamArtifactListsThroughTheHubAreOwnerOnly(t *testing.T) {
 			continue // the team server here has no dashboard stand-in; an untunneled request is as before
 		}
 		withLabel(t, c.label, nil)
-		for _, route := range []string{"/api/session-artifacts?session_id=" + sid, "/api/board/alpha/artifacts", "/api/board/alpha/tasks/1/artifact-content?index=0"} {
+		for _, route := range []string{"/api/session-artifacts?session_id=" + sid, "/api/board/alpha/artifacts", "/api/team-artifacts", "/api/board/alpha/tasks/1/artifact-content?index=0"} {
 			status, body := hubGet(t, srv.URL+route, c.header)
 			if c.allow {
 				assert.NotEqual(t, http.StatusForbidden, status, "%s: %s", c.name, route)

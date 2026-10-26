@@ -111,6 +111,7 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 	// availability self-guards on a nil board store, and session artifacts come from the artifact store.
 	r.Get("/api/board/{project}/status", sessHandler.TeamAvailability)
 	r.Get("/api/session-artifacts", boardHandler.ListSessionArtifacts)
+	r.Get("/api/team-artifacts", boardHandler.ListAllTeamArtifacts) // every team's artifacts in one list (Goal #62), the owner's
 }
 
 func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.BoardHandler) {

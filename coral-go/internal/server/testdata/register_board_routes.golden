@@ -53,6 +53,7 @@ GET /api/session-artifacts | (*BoardHandler).ListSessionArtifacts-fm
 GET /api/tasks/active | (*TasksHandler).ListActiveRuns-fm
 GET /api/tasks/runs | (*TasksHandler).ListTasks-fm
 GET /api/tasks/runs/{runID} | (*TasksHandler).GetTaskStatus-fm
+GET /api/team-artifacts | (*BoardHandler).ListAllTeamArtifacts-fm
 PATCH /api/board/{project} | (*BoardHandler).RenameBoard-fm
 PATCH /api/board/{project}/goals/{goalID} | (*BoardHandler).UpdateGoal-fm
 PATCH /api/board/{project}/tasks/{taskID} | (*BoardHandler).UpdateTask-fm

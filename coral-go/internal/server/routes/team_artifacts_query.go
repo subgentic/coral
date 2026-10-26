@@ -252,6 +252,9 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
 	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.task, q.goal, q.tags, q.since, q.until, q.sortName, vals.Get("session_id"))
+	if teams := vals["team"]; len(teams) > 0 { // the cross-team list's teams are part of what a cursor is tied to
+		fmt.Fprintf(fp, "|%v", teams)
+	}
 	q.finger = hex.EncodeToString(fp.Sum(nil))[:16]
 	if v, ok, serr := taSingle("cursor", vals["cursor"]); serr != nil {
 		return nil, serr
@@ -518,7 +521,11 @@ func keyOf(it teamArtifact) artifactSortKey {
 		size = *it.Size
 	}
 	// The id is a tie-break only, and an external link's id is "uri:<the link>", which can hold a secret: the key (and so the cursor) holds its hash.
-	sum := sha256.Sum256([]byte(it.ID))
+	tie := it.ID
+	if it.BoardID != "" {
+		tie = it.BoardID + "\x00" + it.ID // the cross-team list: one digest in two teams is two rows, in a total order
+	}
+	sum := sha256.Sum256([]byte(tie))
 	return artifactSortKey{At: it.CreatedAt, Name: strings.ToLower(it.Name), Size: size, TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
 }
 
@@ -555,14 +562,23 @@ func artifactAfter(sortName string, a, b artifactSortKey) bool {
 	return newestAfter(a, b)
 }
 
-// queryTeamArtifacts answers a query over items (the collected, merged list). It writes the reply.
-func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request, project string, items []teamArtifact, truncated bool, limit, offset int, sessionFilter string, q *teamArtifactQuery) {
+// teamArtifactSelection is one page of a query over a collected list.
+type teamArtifactSelection struct {
+	page    []teamArtifact
+	total   int            // the rows the filters matched
+	start   int            // where the page starts in them
+	hasMore bool           // another page follows
+	next    string         // its cursor ("" when none)
+	tags    map[string]int // the tag words of the whole list, with their counts (the Tag filter's choices)
+}
+
+// selectTeamArtifacts filters, sorts and pages items (the collected, merged list) by q: the one rule behind a team's list and the cross-team list.
+func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact, limit, offset int, q *teamArtifactQuery) (*teamArtifactSelection, error) {
 	var kept map[string]bool
 	if q.kept != nil {
 		var err error
 		if kept, err = h.bs.KeptArtifactIDs(r.Context()); err != nil {
-			errInternalServer(w, "could not list artifacts")
-			return
+			return nil, err
 		}
 	}
 	dir := h.artifactObjectDir()
@@ -572,7 +588,7 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 			redactItemForTunnel(&items[i])
 		}
 	}
-	counts := teamTagCounts(items) // over the team's whole list, as the Tag filter offers its words (after redaction for a Hub viewer)
+	counts := teamTagCounts(items) // over the whole list, as the Tag filter offers its words (after redaction for a Hub viewer)
 	var set []teamArtifact
 	for _, it := range items {
 		if q.cheapMatch(it, kept) {
@@ -598,7 +614,7 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 		set = out
 	}
 	sort.SliceStable(set, func(i, j int) bool { return artifactAfter(q.sortName, keyOf(set[j]), keyOf(set[i])) })
-	total := len(set)
+	sel := &teamArtifactSelection{total: len(set), tags: counts}
 	start := offset
 	if q.cursor != nil {
 		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
@@ -611,33 +627,48 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 	if end > len(set) {
 		end = len(set)
 	}
-	hasMore := end < len(set)
-	page := set[start:end]
+	sel.start = start
+	sel.hasMore = end < len(set)
+	sel.page = set[start:end]
 	if !enriched {
-		for i := range page {
-			enrichTeamArtifact(&page[i], dir)
-			finishTeamArtifactName(&page[i])
+		for i := range sel.page {
+			enrichTeamArtifact(&sel.page[i], dir)
+			finishTeamArtifactName(&sel.page[i])
 			if tunneled {
-				redactItemForTunnel(&page[i])
+				redactItemForTunnel(&sel.page[i])
 			}
 		}
 	}
-	if page == nil {
-		page = []teamArtifact{}
+	if sel.page == nil {
+		sel.page = []teamArtifact{}
 	}
-	resp := map[string]any{
-		"project": project, "artifacts": page, "limit": limit, "offset": start,
-		"has_more": hasMore, "truncated": truncated, "total": total, "all": len(items),
-	}
-	if hasMore && len(page) > 0 {
-		k := keyOf(page[len(page)-1])
+	if sel.hasMore && len(sel.page) > 0 {
+		k := keyOf(sel.page[len(sel.page)-1])
 		if q.sortName != "name" {
 			k.Name = "" // only the name sort compares names: a cursor carries no text it does not need
 		}
-		resp["next_cursor"] = teamArtifactCursor{Sort: q.sortName, Finger: q.finger, At: k.At, Name: k.Name, Size: k.Size, TaskID: k.TaskID, Source: k.Source, Index: k.Index, ID: k.ID}.encode()
+		sel.next = teamArtifactCursor{Sort: q.sortName, Finger: q.finger, At: k.At, Name: k.Name, Size: k.Size, TaskID: k.TaskID, Source: k.Source, Index: k.Index, ID: k.ID}.encode()
 	}
-	if len(counts) > 0 {
-		resp["tag_counts"] = counts
+	return sel, nil
+}
+
+// queryTeamArtifacts answers a query over items (the collected, merged list). It writes the reply.
+func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request, project string, items []teamArtifact, truncated bool, limit, offset int, sessionFilter string, q *teamArtifactQuery) {
+	all := len(items)
+	sel, err := h.selectTeamArtifacts(r, items, limit, offset, q)
+	if err != nil {
+		errInternalServer(w, "could not list artifacts")
+		return
+	}
+	resp := map[string]any{
+		"project": project, "artifacts": sel.page, "limit": limit, "offset": sel.start,
+		"has_more": sel.hasMore, "truncated": truncated, "total": sel.total, "all": all,
+	}
+	if sel.next != "" {
+		resp["next_cursor"] = sel.next
+	}
+	if len(sel.tags) > 0 {
+		resp["tag_counts"] = sel.tags
 	}
 	if sessionFilter != "" {
 		resp["session_id"] = sessionFilter

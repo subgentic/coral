@@ -54,6 +54,7 @@ func setupBoardTestServer(t *testing.T) (*httptest.Server, *BoardHandler) {
 	r.Get("/api/board/{project}", handler.GetBoardInfo)
 	r.Post("/api/board/{project}/goals", handler.CreateGoal)
 	r.Get("/api/goals", handler.ListAllGoals)
+	r.Get("/api/team-artifacts", handler.ListAllTeamArtifacts)
 	r.Get("/api/board/{project}/goals", handler.ListGoals)
 	r.Get("/api/board/{project}/goals/{goalID}", handler.GetGoal)
 	r.Patch("/api/board/{project}/goals/{goalID}", handler.UpdateGoal)
