@@ -33,6 +33,7 @@ const TB = await importOnce('./task_bulk.js'); // what the selection bar does to
 const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar takes the page's toolbar line (mountSelection)
 const GC = await importOnce('./goal_columns.js');
 const { mountGoal } = await importOnce('./goal_view.js');
+const { quietFocus } = await importOnce('./quiet_focus.js');
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
@@ -297,6 +298,7 @@ registerGroupSource('hub-inbox', {
                 signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
                 node: () => DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     open: g => {
+                        quietFocus($('inbox-view')); // same pointer-only heading focus rule as the team page
                         goalOpener = { team: g.board_id, id: g.id };
                         goalScroll = $('group-table-view')?.scrollTop || 0;
                         note(folderRoute);
@@ -445,6 +447,7 @@ let _mounted = false;
 export async function showInbox({ folder = '', quiet = false } = {}) {
     if (!_mounted) {
         _mounted = true;
+        $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
         onInboxHooks({ needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
         saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
         saved.mountInboxSavedBar($('inbox-saved-bar'));
