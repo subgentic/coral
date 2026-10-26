@@ -173,29 +173,24 @@ func (h *BoardHandler) TaskChangesDiff(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "task changes artifact not found")
 		return
 	}
-	// The diff is kept by board and id; one written before that (by id alone) is still read, so no task loses the history it had. Either must have been written after the task was made: a file older than the task is an
-	// older task's under a repeated id (#6948).
+	// The diff is kept by board and id. It must have been written after the task was made: a file older than the task is an older task's under a repeated id (#6948). A diff kept by id alone, before the
+	// board key, is not read: such a task shows no changes.diff.
 	var data []byte
 	served := false
-	for _, path := range []string{h.taskArtifactPath(found.BoardID, taskID), h.legacyTaskArtifactPath(taskID)} {
-		if _, serr := os.Stat(path); serr != nil {
-			continue
-		}
+	path := h.taskArtifactPath(found.BoardID, taskID)
+	if _, serr := os.Stat(path); serr == nil {
 		// Judged by the task's own folder, not the file: identical diffs are stored once and every task's changes.diff is a hard link to that object (#3555), so a task whose diff repeats an older one's has a file with the
 		// older time. Putting this task's link in its folder is what sets the folder's time, and a folder is never shared.
-		if dir, derr := os.Stat(filepath.Dir(path)); derr != nil || writtenBefore(dir.ModTime(), found.CreatedAt) {
-			continue
-		}
-		b, rerr := os.ReadFile(path)
-		if rerr != nil {
-			if os.IsNotExist(rerr) {
-				continue
+		if dir, derr := os.Stat(filepath.Dir(path)); derr == nil && !writtenBefore(dir.ModTime(), found.CreatedAt) {
+			b, rerr := os.ReadFile(path)
+			if rerr != nil && !os.IsNotExist(rerr) {
+				errInternalServer(w, rerr.Error())
+				return
 			}
-			errInternalServer(w, rerr.Error())
-			return
+			if rerr == nil {
+				data, served = b, true
+			}
 		}
-		data, served = b, true
-		break
 	}
 	if !served {
 		errNotFound(w, "task changes artifact not found")
