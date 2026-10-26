@@ -34,7 +34,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const bar = document.getElementById('board-task-bar');
         return { shown: !!bar.firstChild && bar.getClientRects().length > 0, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent),
             titles: rows.map(r => (r.querySelector('.board-task-desc') || {}).textContent.trim()), statuses: rows.map(r => (r.querySelector('.board-task-status-wrap') || {}).textContent), ids: rows.map(r => Number((r.querySelector('.board-task-id') || {}).textContent.replace('#', ''))),
-            more: (l.querySelector('.board-task-load-more') || {}).textContent || null, empty: (l.querySelector('.board-task-empty') || {}).textContent || null, hide: !!document.querySelector('#board-task-hide-toggle-container input') }; })()`);
+            more: (l.querySelector('.dt-foot') || {}).textContent || null, empty: (l.querySelector('.board-task-empty') || {}).textContent || null, hide: !!document.querySelector('#board-task-hide-toggle-container input') }; })()`);
     const load = () => ev(`(async () => { ${MODS} await tasks.loadBoardTasks(${JSON.stringify(BOARD)}); return true; })()`);
     const type = async (text) => { await ev(`document.getElementById('tk-search').focus(); true`); await Input.insertText({ text }); };
     const pick = (id, value) => ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -66,8 +66,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // ── The default list, with the bar above it ──
         await load();
         let s = await snap();
-        check('the bar is above the table and counts the board (66 tasks)', s.shown && s.count === '66 tasks' && s.chips.length === 0, JSON.stringify([s.shown, s.count, s.chips]));
-        check('the default list is unchanged: open first, then the newest 50 done, Hide done offered', s.statuses.slice(0, 6).every(x => x !== 'Finished') && s.statuses.filter(x => x === 'Finished').length === 50 && s.hide && /Load more done tasks/.test(s.more || ''), JSON.stringify([s.statuses.length, s.hide, s.more]));
+        check('the toolbar omits the count line', await ev(`document.querySelector('#board-task-bar .list-bar-count').hidden && document.querySelector('#board-task-bar .list-bar-count').getClientRects().length === 0`));
+        check('the bar tracks the board count for search announcements (66 tasks)', s.shown && s.count === '66 tasks' && s.chips.length === 0, JSON.stringify([s.shown, s.count, s.chips]));
+        check('the default list is unchanged: open first, then the newest 50 done, Hide done offered', s.statuses.slice(0, 6).every(x => x !== 'Finished') && s.statuses.filter(x => x === 'Finished').length === 50 && s.hide && /Showing 56 of 66/.test(s.more || ''), JSON.stringify([s.statuses.length, s.hide, s.more]));
 
         // ── A search asks the whole board ──
         await type('alpha');
@@ -89,12 +90,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await type('gamma');
         await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '63 of 66'`, 'the count of gamma');
         s = await snap();
-        check('"gamma" (3 open, 60 done): the open ones come first and the done ones are still to load', s.titles.length === 3 && s.statuses.every(x => x !== 'Finished') && /Load more tasks \(60 not shown\)/.test(s.more || ''), JSON.stringify([s.count, s.titles.length, s.more]));
-        await ev(`document.querySelector('#board-task-list .board-task-load-more').click(); true`);
+        check('"gamma" (3 open, 60 done): the open ones come first and the done ones are still to load', s.titles.length === 3 && s.statuses.every(x => x !== 'Finished') && /Showing 3 of 63/.test(s.more || ''), JSON.stringify([s.count, s.titles.length, s.more]));
+        await ev(`document.querySelector('#board-task-list .dt-more').click(); true`);
         await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 53`, 'the first page of the done ones');
         s = await snap();
-        check('Load more then brings the first 50 done tasks after the open ones, and offers the last 10', s.statuses.slice(0, 3).every(x => x !== 'Finished') && s.statuses.slice(3).every(x => x === 'Finished') && /\(10 not shown\)/.test(s.more || ''), JSON.stringify([s.statuses.length, s.more]));
-        await ev(`document.querySelector('#board-task-list .board-task-load-more').click(); true`);
+        check('Load more then brings the first 50 done tasks after the open ones, and offers the last 10', s.statuses.slice(0, 3).every(x => x !== 'Finished') && s.statuses.slice(3).every(x => x === 'Finished') && /Showing 53 of 63/.test(s.more || ''), JSON.stringify([s.statuses.length, s.more]));
+        await ev(`document.querySelector('#board-task-list .dt-more').click(); true`);
         await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 63`, 'every match');
         s = await snap();
         check('and the last page: all 63, each once, no button', new Set(s.ids).size === 63 && s.more === null, JSON.stringify([s.ids.length, new Set(s.ids).size, s.more]));
@@ -105,8 +106,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await pick('tk-status', 'done');
         await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '60 of 66'`, 'the done filter');
         s = await snap();
-        check('Done: only the done tasks (60 of 66), the first page of 50, Load more offers the rest', s.statuses.length === 50 && s.statuses.every(x => x === 'Finished') && /10 not shown/.test(s.more || '') && s.chips.join() === 'Status: Done', JSON.stringify([s.count, s.statuses.length, s.more]));
-        await ev(`document.querySelector('#board-task-list .board-task-load-more').click(); true`);
+        check('Done: only the done tasks (60 of 66), the first page of 50, Load more offers the rest', s.statuses.length === 50 && s.statuses.every(x => x === 'Finished') && /Showing 50 of 60/.test(s.more || '') && s.chips.join() === 'Status: Done', JSON.stringify([s.count, s.statuses.length, s.more]));
+        await ev(`document.querySelector('#board-task-list .dt-more').click(); true`);
         await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 60`, 'the next page');
         s = await snap();
         check('Load more adds the rest, each once, and the button goes', new Set(s.ids).size === 60 && s.more === null, JSON.stringify([s.ids.length, new Set(s.ids).size, s.more]));
@@ -127,7 +128,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await pick('tk-sort', 'oldest');
         await settle(`document.querySelector('#board-task-list .board-task-item:not(.board-task-header) .board-task-desc')?.textContent.includes('gamma done 0')`, 'oldest first');
         s = await snap();
-        check('Oldest: the first task made is first, 50 of them, Load more for the rest', s.ids.length === 50 && s.ids[0] === Math.min(...s.ids) && /Load more tasks/.test(s.more || ''), JSON.stringify([s.ids.slice(0, 3), s.more]));
+        check('Oldest: the first task made is first, 50 of them, Load more for the rest', s.ids.length === 50 && s.ids[0] === Math.min(...s.ids) && /Load more/.test(s.more || ''), JSON.stringify([s.ids.slice(0, 3), s.more]));
         await pick('tk-sort', 'open');
         await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '66 tasks' && !!document.querySelector('#board-task-hide-toggle-container input')`, 'open first again');
 

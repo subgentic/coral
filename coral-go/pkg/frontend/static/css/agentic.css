@@ -1909,16 +1909,6 @@ body.panel-dragging .agentic-state {
     text-align: center;
 }
 
-/* "Load more done tasks": older done tasks come a page at a time (#3269). */
-.board-task-more {
-    display: flex;
-    justify-content: center;
-    padding: 8px 0 4px;
-}
-.board-task-load-more {
-    font-size: 0.75rem;
-}
-
 /* Create Task dialog: board-only fields and the solo-agent send option */
 #create-task-board-fields[hidden],
 #create-task-send-row[hidden] {

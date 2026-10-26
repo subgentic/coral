@@ -297,7 +297,7 @@ async function _loadFilteredTasks(boardName, { append = false, refresh = false }
     if (refresh && L.rows.length > BOARD_TASK_PAGE) return; // paged further than the first page: a poll leaves it
     const seq = ++_filteredSeq;
     L.busy = true; L.error = '';
-    if (!append && !refresh) renderBoardTaskList();
+    if (!refresh) renderBoardTaskList();
     try {
         let rows, cursor, total, doneTotal = L.doneTotal, truncated = false, phase = L.phase;
         if (append) {
@@ -370,19 +370,22 @@ function _syncTaskBar(show, counts) {
 }
 
 /** "Load more": the next page of done tasks (or of the filtered list). */
-export async function loadMoreBoardTasks() {
+async function loadMoreBoardTasks() {
     if (_queryActive()) { if (_filteredHasMore() && !_filteredList.busy) await _loadFilteredTasks(_boardList.board, { append: true }); return; }
     const board = _boardList.board;
     const cursor = _boardList.nextCursor;
-    if (!board || !cursor) return;
+    if (!board || !cursor || _boardList.busyMore) return;
+    const list = _boardList; list.busyMore = true; list.moreError = '';
+    renderBoardTaskList();
     const seq = _boardTasksLoadSeq;
     let data;
     try {
         data = await _boardTasksFetch(board, `/tasks?status=completed&limit=${BOARD_TASK_PAGE}&cursor=${encodeURIComponent(cursor)}`);
     } catch (e) {
-        showToast('Could not load more tasks. Try again.', true);
-        return;
-    }
+        list.moreError = 'Could not load more tasks. Try again.';
+        showToast(list.moreError, true);
+    } finally { list.busyMore = false; }
+    if (!data) { if (_boardList === list) renderBoardTaskList(); return; }
     // The user moved to another board meanwhile, or the list was reloaded from scratch.
     if (_boardList.board !== board || _boardList.nextCursor !== cursor || seq !== _boardTasksLoadSeq) return;
     _boardList.older = [..._boardList.older, ...(data.tasks || [])];
@@ -556,7 +559,7 @@ function _taskRowCost(t, isAgent, isSubagent) {
 }
 
 /** The dock keeps its own task fields; the shared component owns the table layout. */
-function _taskTable(tasks) {
+function _taskTable(tasks, footer) {
     const span = (cls, value) => DT.el('span', cls, value);
     const key = t => `${t._source}:${t.subagent_id || t.id}`;
     const details = t => [t._source === 'subagent' ? t.subagent_type : '',
@@ -564,30 +567,30 @@ function _taskTable(tasks) {
         t._source === 'board' && t.goal_id ? `Goal: ${goalTitle(_goalBoard, t.goal_id)}` : ''].filter(Boolean).join(' · ');
     dockTaskTableState.sort = _taskSortExplicit ? { key: _taskSortField, dir: _taskSortAsc ? 'asc' : 'desc' } : null;
     const table = DT.dataTable({ label: 'Agent tasks', rows: tasks, rowKey: key, rowName: t => t.title || t.description || '',
-        state: dockTaskTableState, onSort: field => _toggleTaskSort(field), bare: true, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first',
+        footer, state: dockTaskTableState, onSort: field => _toggleTaskSort(field), bare: true, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first',
         columns: [
             { key: 'status', label: 'Status', line: 2, cell: t => {
                 const st = _taskStatus(t), cls = st.className === 'completed' ? 'goal-state-task-done' : st.className === 'in-progress' ? 'goal-state-task-active' : st.className === 'blocked' ? 'goal-state-task-blocked' : '';
                 const chip = DT.chip(st.label, cls);
                 chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip;
             } },
-            { key: 'id', label: 'ID', sort: true, firstDir: 'desc', line: 2, tone: 'tertiary', cell: t => span('board-task-id', t.id != null ? `#${t.id}` : '—') },
+            { key: 'id', label: 'Task', sort: true, firstDir: 'desc', primary: true, width: 'grow', line: 1, subtitle: details, cell: t => {
+                const cell = DT.el('span'), description = span('board-task-desc');
+                const name = t.title || t.description || '';
+                const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${_taskStatus(t).detail}`);
+                b.classList.add('board-task-open', 'board-task-name');
+                cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
+                description.append(b);
+                cell.append(span('board-task-id', t.id != null ? `#${t.id}` : '—'), ' ', description);
+                if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
+                return cell;
+            } },
             { key: 'priority', label: 'Priority', sort: true, line: 2, tone: 'tertiary', cell: t => span('board-task-priority-value', t.priority ? (_priorityLabel[t.priority] || t.priority) : '—') },
             { key: 'type', label: 'Type', sort: true, firstDir: 'desc', line: 2, cell: t => {
                 const cell = DT.tag(t._source === 'subagent' ? 'sub' : t._source); cell.classList.add('board-task-source');
                 if (t._source === 'subagent') cell.title = `Subagent launched by ${t.assigned_to || '—'}`; return cell;
             } },
             { key: 'assignee', label: 'Agent', sort: true, firstDir: 'desc', line: 2, when: t => !!t.assigned_to, cell: t => span('board-task-assignee', t.assigned_to || '—') },
-            { key: 'task', label: 'Task', primary: true, width: 'grow', line: 1, subtitle: details, cell: t => {
-                const cell = span('board-task-desc');
-                const name = t.title || t.description || '';
-                const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${_taskStatus(t).detail}`);
-                b.classList.add('board-task-open', 'board-task-name');
-                cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
-                cell.append(b);
-                if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
-                return cell;
-            } },
             { key: 'cost', label: 'Cost', sort: true, firstDir: 'desc', numeric: true, line: 2, tone: 'tertiary', when: t => !!_taskRowCost(t, t._source === 'agent', t._source === 'subagent').costText, cell: t => { const cost = _taskRowCost(t, t._source === 'agent', t._source === 'subagent'); return span(cost.costClass, cost.costText || '—'); } },
             { key: 'created_at', label: 'Created', sort: true, firstDir: 'desc', align: 'end', line: 1, tone: 'tertiary', cell: t => { const cell = DT.timeCell(t.created_at); cell.classList.add('board-task-time'); return cell; } },
         ],
@@ -604,21 +607,14 @@ function _taskTable(tasks) {
     return table.el;
 }
 
-/** The "Load more" button of a filtered list: the next page of what matches. */
-function _filteredMoreHtml() {
-    if (!_filteredHasMore()) return '';
-    const left = _filteredList.total !== null ? Math.max(0, _filteredList.total - _filteredList.rows.length) : 0;
-    return `<div class="board-task-more"><button type="button" class="btn board-task-load-more" data-on-click="task-load-more"${_filteredList.busy ? ' aria-busy="true"' : ''}>Load more tasks${left ? ` (${left} not shown)` : ''}</button></div>`;
-}
-
-/** The "Load more done tasks" button while older done tasks are not loaded. */
-function _taskLoadMoreHtml(boardDoneTotal, boardDoneLoaded) {
-    // Older done tasks come a page at a time (#3269).
-    const notLoaded = Math.max(0, boardDoneTotal - boardDoneLoaded);
-    const more = _boardList.nextCursor && !_hideCompleted
-        ? `<div class="board-task-more"><button type="button" class="btn board-task-load-more" data-on-click="task-load-more">Load more done tasks${notLoaded ? ` (${notLoaded} not shown)` : ''}</button></div>`
-        : '';
-    return more;
+/** Shared quiet footer: the next page arrives when this row scrolls into view. */
+function _taskFooter(querying, scope, shown, total) {
+    const hasMore = querying ? _filteredHasMore() && !(scope && _hideCompleted && !isQuery(_taskFilters) && !_filteredList.cursor) : _boardList.nextCursor && !_hideCompleted;
+    if (!hasMore) return undefined;
+    const busy = querying ? _filteredList.busy : _boardList.busyMore;
+    const error = querying ? _filteredList.error : _boardList.moreError;
+    return { text: error || `Showing ${shown} of ${total}`, auto: !error,
+        more: { label: error ? 'Try again' : 'Load more', busy: !!busy, run: loadMoreBoardTasks } };
 }
 
 /** The badge: done / all, from the server's totals for the board. */
@@ -698,19 +694,19 @@ export function renderBoardTaskList() {
     _syncTaskBar(hasBoard, barCounts);
 
     // Older done tasks come a page at a time (#3269).
-    const more = querying ? (scope && _hideCompleted && !isQuery(_taskFilters) && !_filteredList.cursor ? '' : _filteredMoreHtml()) : _taskLoadMoreHtml(boardDoneTotal, boardDoneLoaded);
+    const more = _taskFooter(querying, scope, tasks.length, querying ? (_filteredList.total ?? boardTasks.length) + otherTasks.length : boardAll + otherTasks.length);
     const signature = JSON.stringify([tasks, _liveCosts, _taskFilters.sort, _taskSortField, _taskSortAsc, _taskSortExplicit, more,
         tasks.map(t => [whenText(t.created_at), t._source === 'board' ? _claimedFor(t) : '', t.goal_id ? goalTitle(_goalBoard, t.goal_id) : ''])]);
     if (container.dataset.drawn === signature && container.querySelector('.dt-table')) return;
     const active = container.contains(document.activeElement) ? document.activeElement : null;
-    const held = active && { row: active.closest('tr')?.dataset.key, sort: active.dataset.key, sortbar: active.closest('.dt-sortbar') ? active.tagName : '' };
-    const table = _taskTable(tasks), footer = document.createElement('template'); footer.innerHTML = more || '';
+    const held = active && { row: active.closest('tr')?.dataset.key, sort: active.dataset.key, more: active.classList.contains('dt-more'), sortbar: active.closest('.dt-sortbar') ? active.tagName : '' };
+    const table = _taskTable(tasks, more);
     // Keep the visible sort controls while the new table's ResizeObserver catches up.
     table.classList.toggle('dt-folded', !!container.querySelector('.dt-box.dt-folded'));
-    container.replaceChildren(table, footer.content); container.dataset.drawn = signature;
+    container.replaceChildren(table); container.dataset.drawn = signature;
     if (held) {
         const target = held.row ? [...container.querySelectorAll('tbody tr')].find(r => r.dataset.key === held.row)?.querySelector('.dt-primary')
-            : held.sortbar ? container.querySelector(`.dt-sortbar ${held.sortbar.toLowerCase()}`) : [...container.querySelectorAll('.dt-sort')].find(b => b.dataset.key === held.sort);
+            : held.more ? container.querySelector('.dt-more') || container.querySelector('tbody tr:last-child .dt-primary') : held.sortbar ? container.querySelector(`.dt-sortbar ${held.sortbar.toLowerCase()}`) : [...container.querySelectorAll('.dt-sort')].find(b => b.dataset.key === held.sort);
         (target?.hidden ? container.querySelector('.dt-sortbar-select') : target || container.querySelector('.dt-primary, button'))?.focus({ preventScroll: true });
     }
 

@@ -37,6 +37,14 @@ const open = [
         const ids = () => ev(`[...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')].map(r => Number(r.querySelector('.board-task-id').textContent.replace('#', '')))`);
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 45`, 'the 45 rows');
 
+        console.log('Columns put Status and the primary Task before the facts');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#board-task-list thead th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent.trim())`),
+            ['Status', 'Task', 'Priority', 'Type', 'Agent', 'Cost', 'Created']);
+        assert.deepEqual(await ev(`[...document.querySelector('#board-task-list tbody tr').cells].map(c => c.dataset.key)`),
+            ['status', 'id', 'priority', 'type', 'assignee', 'cost', 'created_at']);
+        assert.equal(await ev(`(() => { const row = document.querySelector('#board-task-list tbody tr'); const primary = row.cells[1].querySelector('.dt-primary'); return row.querySelectorAll('.dt-primary').length === 1 && row.cells[1].querySelector('.board-task-id')?.textContent === '#5' && row.cells[1].textContent.startsWith('#5 Draft') && primary?.textContent === 'Draft'; })()`), true,
+            'the second cell has one primary action, with ID before the title');
+
         console.log('Default order: open and active first (newest first), then done (newest first)');
         const byNewest = (a, b) => b.created_at.localeCompare(a.created_at);
         const want = [...open.slice().sort(byNewest), ...done.slice().sort(byNewest)].map(t => t.id);
