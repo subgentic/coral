@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,18 +41,56 @@ func waitingLookLeavesUnread(t *testing.T, mode string, texts []string) {
 	}
 	unread := func() int { n, _ := h.bs.CheckUnread(ctx, "alpha", "Worker"); return n }
 	require.Equal(t, 2, unread())
-	for i := 0; i < 2; i++ { // twice: the second look must show what the first did
-		resp, err := http.Get(server.URL + "/api/sessions/live/" + name + "/waiting?agent_type=claude&session_id=" + sid)
-		require.NoError(t, err)
-		var out struct {
-			Unread   int              `json:"unread"`
-			Messages []map[string]any `json:"messages"`
+	for _, routeName := range []string{name, "Worker"} {
+		for i := 0; i < 2; i++ { // both API and dashboard names, twice: looking never consumes the messages
+			resp, err := http.Get(server.URL + "/api/sessions/live/" + routeName + "/waiting?agent_type=claude&session_id=" + sid)
+			require.NoError(t, err)
+			var out struct {
+				Unread   int              `json:"unread"`
+				Messages []map[string]any `json:"messages"`
+			}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+			resp.Body.Close()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Equal(t, 2, out.Unread, "look %d", i)
+			assert.Len(t, out.Messages, 2, "look %d lists both messages", i)
+			assert.Equal(t, 2, unread(), "look %d: the agent still has both unread", i)
 		}
-		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-		resp.Body.Close()
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Equal(t, 2, out.Unread, "look %d", i)
-		assert.Len(t, out.Messages, 2, "look %d lists both messages", i)
-		assert.Equal(t, 2, unread(), "look %d: the agent still has both unread", i)
 	}
+}
+
+// The dashboard uses the folder name, which may be shared by sibling sessions.
+// Send now must resolve its board and terminal from the already validated ID.
+func TestSendWaitingFromDashboardUsesExactSession(t *testing.T) {
+	server, h, mock, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	name := naming.SessionName("claude", gateSID)
+	siblingID := "22222222-2222-3333-4444-555555555555"
+	sibling := naming.SessionName("claude", siblingID)
+	for _, sid := range []string{gateSID, siblingID} {
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "repo", WorkingDir: t.TempDir()}))
+	}
+	mock.addSession(name, "/tmp/test")
+	mock.addSession(sibling, "/tmp/sibling")
+	term := &screenTerminal{fgSessionTerminal: newFGTerminal(mock), screen: idleInputBox}
+	term.setFG(name, "node")
+	h.terminal = term
+	_, err := h.bs.Subscribe(ctx, "alpha", "Worker", "Backend", name, nil, "mentions")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, "alpha", "Lead", "Orchestrator", "claude-lead", nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.PostMessage(ctx, "alpha", "Lead", "@Worker dashboard send", nil)
+	require.NoError(t, err)
+	resp, err := http.Post(server.URL+"/api/sessions/live/repo/waiting/send", "application/json", strings.NewReader(`{"agent_type":"claude","session_id":"`+gateSID+`"}`))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var out map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	require.Equal(t, http.StatusOK, resp.StatusCode, out)
+	assert.Equal(t, true, out["sent"])
+	mock.mu.Lock()
+	defer mock.mu.Unlock()
+	assert.NotEmpty(t, mock.sent[name])
+	assert.Empty(t, mock.sent["repo"])
+	assert.Empty(t, mock.sent[sibling])
 }

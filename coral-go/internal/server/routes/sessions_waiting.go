@@ -11,6 +11,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
@@ -57,10 +58,13 @@ func waitingUnread(out map[string]any) int {
 //	{"board": "team", "unread": N, "messages": [{"id", "sender", "at", "text", "truncated"?}], "skipped": {"why", "what", "at", "since"} | null}
 func (h *SessionsHandler) ListWaiting(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
-	if _, status, message := h.validateExactLiveTarget(r.Context(), name, r.URL.Query().Get("agent_type"), r.URL.Query().Get("session_id"), false); status != 0 {
+	ls, status, message := h.validateExactLiveTarget(r.Context(), name, r.URL.Query().Get("agent_type"), r.URL.Query().Get("session_id"), false)
+	if status != 0 {
 		writeExactTargetError(w, status, message)
 		return
 	}
+	// The dashboard names the folder; board subscriptions and terminal state use the exact session name.
+	name = naming.SessionName(ls.AgentType, ls.SessionID)
 	out := map[string]any{"board": nil, "unread": 0, "messages": []waitingMessage{}, "skipped": nil}
 	if h.bs != nil {
 		if sub, err := h.bs.GetSubscriptionBySessionName(r.Context(), name); err == nil && sub != nil {
@@ -103,6 +107,7 @@ func (h *SessionsHandler) SendWaitingNow(w http.ResponseWriter, r *http.Request)
 		writeExactTargetError(w, status, message)
 		return
 	}
+	name = naming.SessionName(ls.AgentType, ls.SessionID)
 	if h.bs == nil {
 		errBadRequest(w, "no board")
 		return
