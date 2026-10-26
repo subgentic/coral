@@ -17,7 +17,7 @@ import { boardOfPage } from './dock_page.js';
 
 const OPEN_KEY = 'coral-artifact-comments-open'; // explicit choice shared by the viewer and docked preview, at every width
 
-/** The team the artifact is opened from, as the bare board name the comments routes take: the team's page, the board page, or the open agent's own team; none otherwise (#5182). The viewer and the docked preview pane (#5311) both ask. */
+/** The team the artifact is opened from, as the bare board name the comments routes take: the team's page (where a board opens, #8129), or the open agent's own team; none otherwise (#5182). The viewer and the docked preview pane (#5311) both ask. */
 export function commentBoard(opts) {
     if (opts && opts.board) return opts.board;
     const key = state.selectedTeam || boardOfPage() || sessionTeamKey(state.currentSession);
