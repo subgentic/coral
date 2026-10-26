@@ -10,22 +10,12 @@
       "listRoute": 1
     }
   },
-  "goals_view.js": {
-    "tasks": {
-      "columns": 2
-    }
-  },
   "inbox_coral.js": {
     "tasks": {
       "listRoute": 1
     },
     "board": {
       "listRoute": 1
-    }
-  },
-  "inbox_sidebar.js": {
-    "tasks": {
-      "columns": 1
     }
   },
   "message_board.js": {
@@ -51,7 +41,6 @@
   },
   "team_tasks_page.js": {
     "tasks": {
-      "columns": 2,
       "listRoute": 1
     }
   }
