@@ -23,7 +23,7 @@ console.log('cloud_words: ok');
 // The status sentences of the connect panel (moved here from cloud_connect.js, #8386).
 
 assert.equal(describe({ state: 'off' }), OFF_TEXT);
-assert.match(OFF_TEXT, /--cloud-url https:\/\/app\.coralhub\.dev.*coral cloud connect/);
+assert.ok(OFF_TEXT.includes('cloud-url https://app.coralhub.dev') && OFF_TEXT.endsWith('coral cloud connect'), 'the off sentence names the address to start with and the command to connect');
 assert.equal(describe({ state: 'idle', hub_url: 'https://h.example' }), 'Ready to connect to https://h.example. Nothing is sent until you connect.');
 assert.equal(describe({ state: 'idle', last_error_code: 'hub_unreachable' }), 'Coral could not reach Coral Hub. Check your connection and try again.');
 assert.equal(describe({ state: 'idle', last_error_code: 'rate_limited' }), 'Coral Hub is busy. Try again in a moment.');
@@ -58,7 +58,7 @@ assert.equal(autoAcceptChangedText(null), '');
 assert.equal(autoAcceptChangedText({ allow_hub_auto_accept_changed: { by: 'robot' } }), '', 'only the hub or this computer is named');
 assert.equal(autoAcceptChangedText({ allow_hub_auto_accept_changed: { by: 'local' }, allow_hub_auto_accept: false }), 'Turned off on this computer');
 assert.equal(autoAcceptChangedText({ allow_hub_auto_accept_changed: { by: 'hub', user: 'ann' } }), 'Turned on from Coral Hub by ann');
-assert.equal(autoAcceptChangedText({ allow_hub_auto_accept_changed: { by: 'hub', user: '‮evil​' } }), 'Turned on from Coral Hub by evil', 'control and bidi characters never reach the screen');
+assert.equal(autoAcceptChangedText({ allow_hub_auto_accept_changed: { by: 'hub', user: '\u202eevil\u200b' } }), 'Turned on from Coral Hub by evil', 'control and bidi characters never reach the screen');
 assert.equal(autoAcceptChangedText({ allow_hub_auto_accept_changed: { by: 'hub', user: ' ' } }), 'Turned on from Coral Hub by a Coral Hub user');
 assert.match(autoAcceptChangedText({ allow_hub_auto_accept_changed: { by: 'local', at: '2026-10-20T10:00:00Z' } }), /^Turned on on this computer, .+/);
 assert.equal(autoAcceptChangedText({ allow_hub_auto_accept_changed: { by: 'local', at: 'not a date' } }), 'Turned on on this computer');
