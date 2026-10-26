@@ -1,6 +1,6 @@
 // The Saved for later sidebar closes (#4742, the operator's report: on the home view the top bar's bookmark opened a right-hand sidebar with only the Saved list and
 // no way to close it). Real isolated server. On the home view (the full-screen Saved page, #4811) and from an agent's page (the scoped sidebar): the bookmark is a toggle (pressed while the sidebar shows Saved), Escape in the
-// sidebar closes it with the focus back on the bookmark, the X in its header closes it, and the top bar's panel icon says whether it is open. From an agent's page the
+// sidebar closes it with the focus back on the bookmark, the dock Saved button again closes it, and the top bar's panel icon says whether it is open. From an agent's page the
 // dock is left as it was: open on the tab it had, or shut. A phone's overlay opens and closes with the bookmark too.
 //
 // Expects CORAL_TEST_URL + CDP_PORT from the runner. Exit 0 / 1.
@@ -45,7 +45,7 @@ async function run() {
         await ev(`localStorage.removeItem('coral-agentic-collapsed'); true`);
 
         console.log('Home view: the Saved page (#4811), not a sidebar');
-        const page = () => ev(`(() => ({ view: (() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })(), nav: document.querySelector('.top-nav-tab.active').dataset.arg, pressed: document.getElementById('saved-btn').getAttribute('aria-pressed'), focus: document.activeElement && document.activeElement.id, dock: getComputedStyle(document.getElementById('agentic-state')).display, x: getComputedStyle(document.getElementById('saved-close')).display }))()`);
+        const page = () => ev(`(() => ({ view: (() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })(), nav: document.querySelector('.top-nav-tab.active').dataset.arg, pressed: document.getElementById('saved-btn').getAttribute('aria-pressed'), focus: document.activeElement && document.activeElement.id, dock: getComputedStyle(document.getElementById('agentic-state')).display }))()`);
         check('the Saved bookmark starts not pressed', (await state()).pressed === 'false', JSON.stringify(await state()));
         await clickSaved(); check('the bookmark opens the full-screen page, pressed, with no sidebar (its X is in the hidden dock)', await until(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.getElementById('saved-btn').getAttribute('aria-pressed') === 'true' && getComputedStyle(document.getElementById('agentic-state')).display === 'none'`, 'the page'), JSON.stringify(await page()));
         await clickSaved(); check('the bookmark again leaves it, with the focus on the bookmark', await until(`!(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.getElementById('saved-btn').getAttribute('aria-pressed') === 'false' && document.activeElement.id === 'saved-btn'`, 'left'), JSON.stringify(await page()));
@@ -83,7 +83,8 @@ async function run() {
         // The dock shut: Saved opens it, the X shuts it again.
         await ev(`window.toggleAgenticPanel(false); true`); await closed('the agent\'s dock shut');
         await clickDockSaved(); await opened('the bookmark opens it on Saved');
-        await ev(`document.getElementById('saved-close').click(); true`); await closed('the X shuts it again (it was shut before)');
+        check('the panel has no title and no X at the top (#7926): its bar starts with Search and the Filters icon', await ev(`!document.getElementById('saved-close') && !document.getElementById('saved-scope') && !document.querySelector('#saved-ui .saved-head') && !!document.querySelector('#saved-bar .list-bar-search') && !!document.querySelector('#saved-bar .list-bar-toggle') && !document.querySelector('#saved-bar .list-bar-sort')`));
+        await clickDockSaved(); await closed('the bookmark again shuts it (it was shut before)');
         await clickDockSaved(); await opened('opened'); await esc(); await closed('Escape shuts it again');
 
         console.log('A coarse pointer wider than a phone (a touch tablet)');
@@ -92,8 +93,7 @@ async function run() {
         await Page.navigate({ url: BASE + '/' }); await coralReady();
         await goAgent();
         await clickDockSaved(); await opened('opened on the tablet');
-        check('the X is a 44px target on a coarse pointer', await ev(`(() => { const r = document.getElementById('saved-close').getBoundingClientRect(); return getComputedStyle(document.getElementById('saved-close')).display !== 'none' && r.width >= 44 && r.height >= 44; })()`), JSON.stringify(await ev(`(() => { const r = document.getElementById('saved-close').getBoundingClientRect(); return [r.width, r.height]; })()`)));
-        await ev(`document.getElementById('saved-close').click(); true`); await closed('and it closes');
+        await clickDockSaved(); await closed('and the bookmark closes it');
         await Emulation.setTouchEmulationEnabled({ enabled: false });
 
         console.log('A phone');

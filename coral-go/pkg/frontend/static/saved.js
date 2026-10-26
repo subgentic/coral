@@ -60,7 +60,7 @@ async function load() {
         convTitles.clear();
         if (filters.conv) filters = { ...filters, conv: '' };
     }
-    $('saved-scope').textContent = scopeHeading(scope);
+    $('saved-ui').setAttribute('aria-label', scopeHeading(scope)); // the panel's name for a screen reader: no visible title, the tab says it (#7926)
     // A scope belongs to one server: only that one is asked (this computer when it is the hub's own).
     const remotes = scope.kind !== 'all' ? (normServer(scope.server) === LOCAL_SERVER ? [] : [{ id: scope.server, label: serverName(scope.server) }])
         : state.hub ? (state.servers || []).filter(s => s && s.id && s.id !== LOCAL_SERVER && s.status === 'online') : [];
@@ -132,6 +132,7 @@ const convLabel = ref => convTitles.get(ref) || ref;
 const savedSpec = () => ({
     idp: 'sv', noun: 'message', label: 'Search and filter saved messages', searchLabel: 'Search saved messages', placeholder: 'Search saved messages',
     sorts: { values: SORTS, labels: SORT_LABEL, aria: 'Sort saved messages' },
+    collapsible: true, // the dock's one top row: Search and the Filters icon, Sort inside its panel (#7926); the Inbox's own bar has noSearch and is unchanged
     fields: [
         { type: 'select', key: 'kind', id: 'sv-kind', label: 'Type', values: KINDS, labels: KIND_LABEL, any: 'Any type' },
         { type: 'select', key: 'conv', id: 'sv-conv', label: 'From', values: [], labels: {}, any: 'Any conversation' },
@@ -333,7 +334,7 @@ export async function openSaved({ toggle = false } = {}) {
     tab = 'open';
     wire();
     await showSaved();
-    ($('saved-table').querySelector('.group-chip, .dt-primary') || $('saved-close')).focus();
+    ($('saved-table').querySelector('.group-chip, .dt-primary') || $('saved-bar').querySelector('input, button'))?.focus();
 }
 
 // ── The Inbox's Saved group (#7472) ──────────────────────────────────

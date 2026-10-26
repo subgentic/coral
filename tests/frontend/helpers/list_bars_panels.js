@@ -83,7 +83,7 @@ PANELS.push({
         await ctx.ev(`window.selectLiveSession('QA Alpha', 'claude', 'qa-a-id', 'local'); true`);
         // the dock's own Saved tab (the top bar's bookmark is the Inbox's since #4905), the way the toast's link opens it
         await ctx.ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`);
-        await ctx.settle(`document.getElementById('saved-scope').textContent === 'Saved: QA Alpha' && document.querySelectorAll('#saved-table tbody tr').length > 0`, 'the scoped list');
+        await ctx.settle(`document.getElementById('saved-ui').getAttribute('aria-label') === 'Saved: QA Alpha' && document.querySelectorAll('#saved-table tbody tr').length > 0`, 'the scoped list');
         await pick(ctx, '#sv-kind', 'agent');
         await ctx.settle(`!!document.querySelector('#saved-bar .list-bar-chip')`, 'a chip');
         await openMenu(ctx, '#saved-bar');
