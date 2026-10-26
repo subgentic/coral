@@ -131,8 +131,17 @@ const BASE = require('./test_base').BASE;
         const ch = await ev(`({ view: document.getElementById('mb-messages').dataset.view, head: ${ROWS}.some(r => r.querySelector(':scope > .mb-row-toggle').getClientRects().length), body: ${ROWS}.every(r => r.querySelector('.mb-message-body').getClientRects().length), stored: localStorage.getItem('coral.board.view') })`);
         assert.deepEqual(ch, { view: 'chat', head: false, body: true, stored: 'chat' });
         await shot('board-chat-1280-dark');
-        await open(1280, 800, false, 'dark', 'chat');
+        await open(1400, 900, false, 'dark', 'chat');
         assert.equal(await ev(`document.getElementById('mb-messages').dataset.view`), 'chat', 'a reload keeps Chat');
+        // The Table fills the pane (#8504); Chat keeps its reading width (#8553).
+        // Require room beyond the cap so this cannot pass on a narrow column by accident.
+        const chatWidth = await ev(`(() => {
+            const feed = document.getElementById('mb-messages');
+            return { table: feed.classList.contains('mb-table'), feed: Math.round(feed.getBoundingClientRect().width), column: Math.round(document.getElementById('mb-board').getBoundingClientRect().width) };
+        })()`);
+        assert.equal(chatWidth.table, false, 'the width check measures Chat, not Table');
+        assert.ok(chatWidth.column > 840, 'at 1400 px the column leaves room to exercise the Chat cap: ' + JSON.stringify(chatWidth));
+        assert.equal(chatWidth.feed, 840, 'Chat caps its feed at 840 px even when its column is wider');
 
         console.log('9. Light theme');
         await open(1280, 800, false, 'light', 'table');
