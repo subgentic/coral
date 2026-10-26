@@ -5,12 +5,13 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const USAGE = { totals: { total_tokens: 99, cost_usd: 12.5, execution_time_sec: 0 }, by_agent: [
-    { session_id: 's1', agent_name: 'Frontend Dev', input_tokens: 15491800000, output_tokens: 2500000, cache_read_tokens: 1234, cache_write_tokens: 999949, cost_usd: 9.5 },
+    { session_id: 's1', agent_name: 'Frontend Dev', input_tokens: 15491800000, output_tokens: 2500000, cache_read_tokens: 1234, cache_write_tokens: 999950, cost_usd: 9.5 },
     { session_id: 's2', agent_name: 'Backend Dev', input_tokens: 5000, output_tokens: 700, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 3 },
     { session_id: 's3', agent_name: 'QA Engineer', input_tokens: 900, output_tokens: 90, cache_read_tokens: 10, cache_write_tokens: 0, cost_usd: 0.12 }] };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -28,7 +29,7 @@ const USAGE = { totals: { total_tokens: 99, cost_usd: 12.5, execution_time_sec: 
         const first = await ev(`[...document.querySelector('#task-detail-content .dt-table tbody tr').children].map(c => c.textContent.trim())`);
         assert.deepEqual(first, ['Frontend Dev', '$9.50', '15.5B', '2.5M', '1.2K', '1.0M'], 'a thousand million reads B, and a figure that rounds up moves into the next unit');
         assert.equal(await ev(`document.querySelectorAll('#task-detail-content table.cost-table').length`), 0, 'the old table is gone');
-        console.log('   ✓');
+        await shot('team-token-usage-1280'); console.log('   ✓');
 
         console.log('2. A head sorts, and again reverses');
         await ev(`document.querySelector('#task-detail-content .dt-table th[data-key="name"] .dt-sort').click(); true`);
@@ -44,7 +45,7 @@ const USAGE = { totals: { total_tokens: 99, cost_usd: 12.5, execution_time_sec: 
         const fold = await ev(`(() => { const box = document.querySelector('#task-detail-content .dt-box'); return { sideways: box.scrollWidth > box.clientWidth + 1, page: document.documentElement.scrollWidth > innerWidth + 1, head: getComputedStyle(box.querySelector('thead')).display, strong: [...box.querySelectorAll('tbody tr:first-child td.dt-fold-key')].map(c => c.dataset.label), select: !!box.querySelector('.dt-sortbar-select') }; })()`);
         assert.deepEqual([fold.sideways, fold.page, fold.head, fold.select], [false, false, 'none', true], JSON.stringify(fold));
         assert.equal(fold.strong.length, 1, JSON.stringify(fold));
-        console.log('   ✓');
+        await shot('team-token-usage-390'); console.log('   ✓');
         console.log('PASS team token usage: data_table, By agent\'s order, K/M/B, sort, fold');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

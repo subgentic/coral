@@ -1034,6 +1034,8 @@ button.subscriber-history-link {
     width: 100%;
 }
 
+.info-token-grid > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; } /* a figure is its label over its value, one grid cell each (the pairs used to run into each other) */
+
 .info-token-label {
     color: var(--text-secondary);
     font-size: var(--fs-base);
