@@ -181,15 +181,13 @@ export async function showUpdatesPane() {
     if (!isCloud() && hubOn !== null && !unmanaged && s.hubRelaunch) { // Coral Hub's relaunch exists in this build (#7343)
         fields.push({
             key: 'hub_relaunch', type: 'custom', label: 'Relaunch from Coral Hub',
+            // On Windows Coral Hub cannot install at all (the install asks the person here): the sentence says so and there is no switch to change (#7338)
+            help: windowsInstall(s) ? HUB_RELAUNCH_WINDOWS : hubOn ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF,
             render: slot => {
-                slot.classList.add('update-fact');
-                // On Windows Coral Hub cannot install at all (the install asks the person here): the sentence says so and there is no switch to change (#7338)
-                slot.append(mk('span', 'toggle-desc', `${windowsInstall(s) ? HUB_RELAUNCH_WINDOWS : hubOn ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF} `));
-                if (!windowsInstall(s)) {
-                    const go = mk('button', 'btn btn-small', 'Change in Network and Hub'); go.type = 'button';
-                    go.addEventListener('click', () => window.showSettingsModal && window.showSettingsModal('network'));
-                    slot.append(go);
-                }
+                if (windowsInstall(s)) return;
+                const go = mk('button', 'btn btn-small', 'Change in Network and Hub'); go.type = 'button';
+                go.addEventListener('click', () => window.showSettingsModal && window.showSettingsModal('network'));
+                slot.append(go);
             },
         });
     }
