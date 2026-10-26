@@ -27,6 +27,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
         let s = await state();
         assert.deepEqual([s.selecting, s.count, s.search], [true, '2 selected', true], 'the bar takes the line, the search field stays ' + JSON.stringify(s));
         assert.deepEqual(s.actions, ['Reassign', 'Set priority', 'Cancel tasks', 'Clear'], 'the actions');
+        const gaps = await ev(`(() => { const bs = [...document.querySelectorAll('#team-panel-tasks .dt-bar > *')].map(e => e.getBoundingClientRect()); return bs.slice(1).map((r, i) => Math.round(r.left - bs[i].right)); })()`);
+        assert.ok(gaps.slice(0, -1).every(g => g <= 12), 'the bar\'s actions are close together, 8 px apart ' + JSON.stringify(gaps)); // the last gap is to Clear, alone at the right
+        assert.ok(gaps[gaps.length - 1] >= 0, 'Clear follows the actions');
         await shot('tasks-selected');
         // Set priority: asks for the value in the bar, calls each task's route
         await ev(`[...document.querySelectorAll('#team-panel-tasks .dt-bar-action')].find(b => b.textContent === 'Set priority').click(); true`);

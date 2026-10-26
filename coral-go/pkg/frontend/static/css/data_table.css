@@ -66,7 +66,8 @@
 .dt-row.dt-selected td { background: var(--table-selected); }
 .dt-table .dt-check { width: var(--table-check-w); padding-right: 0; }
 .dt-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
-.dt-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+.dt-bar { flex: 1 1 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+.dt-bar > * { margin: 0; }
 .dt-bar-count { font-size: var(--table-secondary-size); font-weight: 600; color: var(--table-primary-color); }
 .dt-bar-clear { margin-left: auto; }
 .dt-bar-confirm { font-size: var(--table-secondary-size); color: var(--table-primary-color); }
