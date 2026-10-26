@@ -18,13 +18,6 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// menuOnScreen is a terminal showing an open permission menu: the gate holds for it.
-type menuOnScreen struct{}
-
-func (menuOnScreen) AgentScreen(context.Context, string, string, string) (string, error) {
-	return " Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel · Tab to amend\n", nil
-}
-
 // #3481 phase 1: the gate's state from the agent's own signals: none yet (ok=false),
 // in a turn, blocked on its own request (with the kind), idle after a stop, idle again
 // after a denial that only the transcript records, and gone after SessionEnd, which

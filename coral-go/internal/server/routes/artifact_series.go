@@ -256,15 +256,6 @@ func memberOf(digest, session string, rec agentUploadRecord) seriesMember {
 	return seriesMember{Digest: digest, N: rec.Version, Session: session, At: rec.CreatedAt, Uploader: rec.Uploader, Role: rec.Role, Board: rec.Board}
 }
 
-// seriesBoard is the board that owns series id: the board of its first member's record (the index only says the same).
-func seriesBoard(coralDir, id string) string {
-	ms := seriesMembers(coralDir, id)
-	if len(ms) == 0 {
-		return ""
-	}
-	return ms[0].Board
-}
-
 // seriesMemberSet is every artifact that belongs to a series: they count as kept for pruning (pick 4, keep all: only an explicit delete removes a version).
 func seriesMemberSet(coralDir string) map[string]bool {
 	out := map[string]bool{}
