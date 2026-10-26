@@ -32,6 +32,7 @@ const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar take
 const GC = await importOnce('./goal_columns.js');
 const GF = await importOnce('./goal_filters.js'); // the Goals folder's search, pills and Filters (#8596)
 const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar
+const NF = await importOnce('./needs_filters.js'); // the Needs you folder's search, pills and Filters (#8604)
 const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
@@ -56,7 +57,40 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 const waitingSessions = () => (state.liveSessions || []).filter(needsInputAttention);
 const teamOf = s => s.board_project ? keyLabel(identityKey(sessionServer(s), s.board_project)) : '';
 const needsText = s => [resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s)].join(' ').toLowerCase();
-const needsRows = () => waitingSessions().filter(s => !queries.needs || needsText(s).includes(queries.needs));
+let needsFilters = NF.loadFilters(), needsBar = null;
+const needsCtx = { text: needsText, teamOf, nameOf: s => resolveSessionIdentity(s) };
+const needsRows = () => NF.ordered(waitingSessions().filter(s => NF.matches(s, needsFilters, needsCtx)), needsFilters);
+/** The Needs you folder's toolbar (#8604): the search, the kind pills (All, Permission, Question, Needs input), the Filters icon (Team, Agent, Waiting longer than, Sort), the chips of what is on. */
+function inboxNeedsToolbar() {
+    if (!needsBar) {
+        needsBar = IT.folderToolbar({
+            idp: 'inbox-needs', noun: 'agent', searchLabel: 'Search needs you',
+            sorts: { values: NF.SORTS, labels: NF.SORT_LABEL, aria: 'Sort by how long they have waited' },
+            fields: [
+                { type: 'select', key: 'team', id: 'inbox-needs-team', label: 'Team', values: [], labels: {}, any: 'Any team' },
+                { type: 'select', key: 'agent', id: 'inbox-needs-agent', label: 'Agent', values: [], labels: {}, any: 'Any agent' },
+                { type: 'select', key: 'longer', id: 'inbox-needs-longer', label: 'Waiting longer than', values: NF.LONGER, labels: NF.LONGER_LABEL, any: 'Any time' },
+            ],
+            model: { EMPTY: NF.EMPTY, clean: NF.clean, chips: NF.chips, isFiltered: NF.isFiltered, without: NF.without },
+        }, next => {
+            needsFilters = next; NF.saveFilters(next); queries.needs = next.q.toLowerCase();
+            const input = $('inbox-search'); if (input && group === 'needs') input.value = next.q; // the sidebar's box shows the same words
+            renderInboxNav(true);
+        });
+    }
+    const all = waitingSessions();
+    const teams = [...new Set(all.map(teamOf).filter(Boolean))].sort(), names = [...new Set(all.map(s => resolveSessionIdentity(s)))].sort();
+    const rows = all.filter(s => NF.matches(s, { ...needsFilters, kind: '' }, needsCtx));
+    const counts = NF.KINDS.map(k => rows.filter(s => NF.kindOf(s) === k).length);
+    const node = needsBar.draw({
+        filters: needsFilters,
+        options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} } },
+        pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
+            items: [{ key: 'all', label: 'All', count: rows.length }, ...NF.KINDS.map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: counts[i] }))],
+            onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
+    });
+    return { node, signature: JSON.stringify([needsFilters, teams, names, counts, rows.length]) };
+}
 
 // ── Tasks ────────────────────────────────────────────────────────────────
 const RANK = { high: 0, medium: 1, low: 2 };
@@ -200,7 +234,7 @@ function inboxSavedToolbar() {
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
-const countOf = key => key === 'needs' ? needsRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'saved' ? savedCounts().open : undefined;
+const countOf = key => key === 'needs' ? waitingSessions().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'saved' ? savedCounts().open : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const folderSections = () => [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
@@ -319,7 +353,7 @@ async function openChat(c) {
 }
 
 registerGroupSource('hub-inbox', {
-    toolbar: key => key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
+    toolbar: key => key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
     table: key => {
@@ -328,7 +362,7 @@ registerGroupSource('hub-inbox', {
             const rows = needsRows(), dirOf = s => String(s.working_directory || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop();
             const goalOf = s => s.goal && s.goal.id && s.goal.title;
             const goal = rows.some(goalOf);
-            return { title: 'Needs you', rows, empty: { line: 'Nothing needs your input.' },
+            return { title: 'Needs you', rows, empty: { line: NF.isFiltered(needsFilters) ? 'No agent that needs you matches the search and filters.' : 'Nothing needs your input.' },
                 signature: JSON.stringify(rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, dirOf(s)])), // the words move on with the clock: they are part of what was drawn
                 node: () => DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => resolveSessionIdentity(s),
                     open: s => { window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
@@ -413,6 +447,7 @@ export function filterInbox(value) {
     queries[group] = CH.CHAT_KEY.test(group) || group === 'tasks' ? text : text.toLowerCase();
     if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; } // a chat search goes to the server as typed
     if (CH.CHAT_KEY.test(group)) chatFilters.set(group, { ...chatFiltersOf(group), q: text }); // the sidebar's box and the page's share the one search (#8603)
+    if (group === 'needs') { needsFilters = { ...needsFilters, q: text }; NF.saveFilters(needsFilters); } // the sidebar's box and the page's share the one search (#8604)
     if (group === 'goals') { goalFilters = { ...goalFilters, q: text }; GF.saveFilters(goalFilters); } // the sidebar's box and the page's share the one search (#8596)
     renderInboxNav(true);
 }
