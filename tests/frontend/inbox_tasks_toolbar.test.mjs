@@ -13,7 +13,9 @@ assert.equal(host.querySelector('[id$="assignee"]'), null, 'every task belongs t
 inbox.filterInbox('release');
 assert.equal(host.querySelector('input[type="search"]').value, 'release', 'mailbox search updates shared search');
 await inbox.openInboxGroup('needs');
-assert.equal(host.querySelector('.list-bar-toggle'), null, 'Tasks controls do not leak into Needs you');
+assert.equal(host.querySelector('[id^="inbox-tk-"]'), null, 'Tasks controls do not leak into Needs you');
+assert.ok(host.querySelector('.inbox-folder-toolbar .list-bar-toggle'), 'Needs you has its own toolbar with its own Filters (#8604)');
+assert.equal(host.querySelectorAll('input[type="search"]').length, 1, 'and one page search');
 await inbox.openInboxGroup('tasks');
 assert.equal(host.querySelector('input[type="search"]').value, 'release', 'folder retains its search');
 inbox.filterInbox('');
