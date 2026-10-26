@@ -114,6 +114,16 @@ func costAnswersFor(t *testing.T, s *TokenUsageStore, since string) costAnswers 
 }
 
 // oldSummary and oldSeries are the queries as they were before the aggregate, over token_usage_all with the dedup subquery over the same view.
+// oracleBound is the old SQL's bound with the one change of #8634, spelled out here: a since that is a whole second in UTC is the bare form, which sorts before every stamp of that second.
+func oracleBound(since string) string {
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05"} {
+		if at, err := time.Parse(layout, since); err == nil && at.Nanosecond() == 0 {
+			return at.UTC().Format("2006-01-02T15:04:05")
+		}
+	}
+	return since
+}
+
 func oldSummary(t *testing.T, db *DB, since string) []UsageSummary {
 	q := `SELECT agent_type, COALESCE(SUM(input_tokens), 0) as input_tokens, COALESCE(SUM(output_tokens), 0) as output_tokens,
 	      COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens, COALESCE(SUM(cache_write_tokens), 0) as cache_write_tokens,
@@ -123,7 +133,7 @@ func oldSummary(t *testing.T, db *DB, since string) []UsageSummary {
 	var args []any
 	if since != "" {
 		q += " AND recorded_at >= ?"
-		args = append(args, since)
+		args = append(args, oracleBound(since))
 	}
 	q += ` GROUP BY agent_type`
 	var out []UsageSummary
@@ -139,7 +149,7 @@ func oldSeries1h(t *testing.T, db *DB, since string) []TimeSeriesBucket {
 	var args []any
 	if since != "" {
 		q += " AND recorded_at >= ?"
-		args = append(args, since)
+		args = append(args, oracleBound(since))
 	}
 	q += ` GROUP BY bucket ORDER BY bucket ASC`
 	var out []TimeSeriesBucket
@@ -154,7 +164,7 @@ func aggSinces() []string {
 		"2026-10-16T14:37:12.5Z",           // inside an hour
 		"2026-10-16T14:37:12+00:00",        // the other canonical suffix
 		"2026-10-17T00:00:00.000000+00:00", // the stored layout, on a day
-		"2026-10-16T16:37:12+02:00",        // not UTC: compared as text, so the raw rows answer
+		"2026-10-16T16:37:12+02:00",        // not UTC: its UTC instant
 		"2026-10-16 14:00:00",              // a space for the T
 		"2026-10-11T03:20:00Z",             // inside the rolled-up (hourly) rows
 		"2020-01-01T00:00:00Z",             // before everything
