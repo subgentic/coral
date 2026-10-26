@@ -51,15 +51,15 @@ registerGroupSource('workflows', {
         if (!workflowTableStates.has(key)) workflowTableStates.set(key, DT.tableState());
         return { title: g.label, rows: g.items, signature: JSON.stringify(g.items),
             node: () => DT.dataTable({
-                label: `${g.label} workflows, ${g.items.length}`, rows: g.items,
+                label: `${g.label} workflows, ${g.items.length}`, rows: g.items, layout: 'fixed',
                 rowKey: w => w.id, rowName: w => w.name, state: workflowTableStates.get(key),
                 open: w => selectWorkflow(Number(w.id)),
                 columns: [
                     { key: 'workflow', label: 'Workflow', field: 'name', primary: true, width: 'grow', line: 1, sort: true, cell: w => DT.primaryButton(w.name) },
-                    { key: 'steps', label: 'Steps', numeric: true, width: 'content', line: 2, tone: 'tertiary', sort: 'number', sortValue: stepsOf, cell: w => String(stepsOf(w)) },
-                    { key: 'last-run', label: 'Last run', width: 'content', line: 1, tone: 'tertiary', sort: 'date', sortValue: w => w.last_run?.started_at, cell: w => w.last_run?.started_at ? whenWords(w.last_run.started_at) : 'Never' },
-                    { key: 'result', label: 'Result', width: 'content', line: 2, sort: true, sortValue: w => lastResult(w.last_run), cell: w => lastResult(w.last_run) || 'No runs' },
-                    { key: 'run', label: 'Run', width: 'content', line: 2, cell: w => {
+                    { key: 'steps', label: 'Steps', numeric: true, width: '4rem', line: 2, tone: 'tertiary', sort: 'number', sortValue: stepsOf, cell: w => String(stepsOf(w)) },
+                    { key: 'last-run', label: 'Last run', width: '8rem', line: 1, tone: 'tertiary', sort: 'date', sortValue: w => w.last_run?.started_at, cell: w => w.last_run?.started_at ? whenWords(w.last_run.started_at) : 'Never' },
+                    { key: 'result', label: 'Result', width: '12rem', line: 2, sort: true, sortValue: w => lastResult(w.last_run), cell: w => lastResult(w.last_run) || 'No runs' },
+                    { key: 'run', label: 'Run', width: '4rem', line: 2, cell: w => {
                         const b = DT.el('button', 'btn btn-small dt-action', 'Run'); b.type = 'button';
                         b.setAttribute('aria-label', `Run ${w.name}`);
                         b.addEventListener('click', () => triggerWorkflow(Number(w.id), b));

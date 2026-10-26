@@ -1,7 +1,7 @@
 /* The one table (#7743): every list or table surface passes what to show, the component owns how it looks and behaves. The operator's rule: a styling change is one token or one rule, so every size and colour here
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
- *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName }) -> { el, bar, selectButton, selection(), clear(), state }
+ *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, layout, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), line: 0|1|2, when(row), subtitle(row) }
@@ -100,6 +100,7 @@ export function dataTable(cfg) {
     const sortBar = el('div', 'dt-sortbar');
     if (cfg.sortBar === false) sortBar.hidden = true; // a narrow column of a few rows (a goal's tasks) needs no Sort by
     const table = el('table', 'dt-table'); table.setAttribute('aria-label', cfg.label); table.setAttribute('role', 'table');
+    if (cfg.layout === 'fixed') table.style.tableLayout = 'fixed'; // grouped lists share column widths even when their contents differ
     const thead = el('thead'); thead.setAttribute('role', 'rowgroup'); const tbody = el('tbody'); tbody.setAttribute('role', 'rowgroup');
     table.append(thead, tbody);
     box.append(sortBar, table);
