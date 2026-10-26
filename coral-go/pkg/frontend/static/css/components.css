@@ -4441,7 +4441,9 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 #launch-agent-pick .launch-agent-opt { display: grid !important; grid-template-columns: auto minmax(0, 1fr); column-gap: 6px; align-items: center; }
 #launch-agent-pick .launch-agent-opt::before { grid-row: 1 / span 2; }
 #launch-agent-pick .launch-agent-name { grid-column: 2; grid-row: 1; align-self: end; line-height: 1.25; }
-#launch-agent-pick .launch-agent-missing { grid-column: 2; grid-row: 2; align-self: start; min-height: 1.1em; line-height: 1.1; }
+#launch-agent-pick .launch-agent-missing { grid-column: 2; grid-row: 2; align-self: start; height: 1.1em; line-height: 1.1; }
+#launch-agent-pick label.launch-agent-opt { min-height: 52px; } /* the same height with or without the mark (the badge, the name and the mark fit in it), so the answer moves nothing */
+#launch-agent-pick .launch-agent-opt:not(.has-mark) .launch-agent-name { grid-row: 1 / span 2; align-self: center; } /* no mark: the name is centred against the badge; with one, the name and the mark are centred together */
 #launch-agent-pick .launch-agent-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 #launch-agent-pick .launch-agent-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 .launch-note-slot { display: flow-root; min-height: 2.2em; margin: 0; } /* one note, as tall as the longest at this width in em: it wraps to more lines as the box narrows or the text grows (container queries below) */ /* flow-root: a note's or an empty slot's margin stays inside it, so nothing moves when a note comes */

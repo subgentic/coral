@@ -55,7 +55,7 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
     const found = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r(null), PROBE_MS))])));
     if (group._pickToken !== token || !group.isConnected) return; // another New Agent opened meanwhile
     TYPES.forEach(([type], i) => {
-        if (found[i] === false) labels.get(type).querySelector('.launch-agent-missing').textContent = ' not installed';
+        if (found[i] === false) { labels.get(type).querySelector('.launch-agent-missing').textContent = ' not installed'; labels.get(type).classList.add('has-mark'); }
     });
     const order = TYPES.map((_, i) => i).sort((a, b) => (found[b] === true) - (found[a] === true) || a - b); // installed first, then the rest as they were
     if (!chosen && !group.contains(document.activeElement)) for (const i of order) group.append(labels.get(TYPES[i][0])); // moving a label would drop the keyboard from it: only when nobody is on the group

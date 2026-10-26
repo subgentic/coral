@@ -76,6 +76,8 @@ const BASE = require('./test_base').BASE;
             await shot(`agent-pick-after-probes-${w}`);
             const tiles1 = await tiles();
             check(`${tag}: the answer moves nothing: every tile keeps its place and height (the second line is reserved)`, JSON.stringify(tiles0) === JSON.stringify(tiles1), JSON.stringify([tiles0, tiles1]));
+            const centred = await ev(`[...document.querySelectorAll('#launch-agent-pick label')].map(l => { const t = l.getBoundingClientRect(), n = l.querySelector('.launch-agent-name').getBoundingClientRect(); return [l.classList.contains('has-mark'), Math.round((n.top + n.height / 2) - (t.top + t.height / 2))]; })`);
+            check(`${tag}: an unmarked name is centred in its tile (against the badge); a marked one sits above the centre with its mark under it`, centred.every(([marked, d]) => marked ? d < -3 : Math.abs(d) <= 1), JSON.stringify(centred));
             const mark = await ev(`(() => { const m = document.querySelector('#launch-agent-pick .launch-agent-missing'); const n = m.previousElementSibling; const a = m.getBoundingClientRect(), b = n.getBoundingClientRect(); return { below: a.top >= b.bottom - 1, size: getComputedStyle(m).fontSize, weight: getComputedStyle(m).fontWeight }; })()`);
             check(`${tag}: "not installed" is a second line under the name, 11/400`, mark.below && mark.size === '11px' && mark.weight === '400', JSON.stringify(mark));
             await waitFor(`!!document.querySelector('#launch-cli-slot .acf-cli-warning, .launch-cli-slot .acf-cli-warning')`, 'the install help', 6000);
