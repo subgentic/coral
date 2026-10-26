@@ -788,35 +788,9 @@
                     </section>
                     <section class="settings-pane" id="settings-pane-terminal" data-group="terminal" data-icon="terminal" data-title="Terminal" role="tabpanel" aria-labelledby="settings-tab-terminal" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Terminal</h4>
-                        <dl class="info-grid settings-grid">
-                <div class="settings-row">
-                <dt id="settings-terminal-font-size-label">Terminal font size</dt>
-                <dd>
-                    <select aria-labelledby="settings-terminal-font-size-label" id="settings-terminal-font-size" class="settings-select">
-                        <option value="10">10px</option>
-                        <option value="11">11px</option>
-                        <option value="12">12px</option>
-                        <option value="13" selected>13px</option>
-                        <option value="14">14px</option>
-                        <option value="16">16px</option>
-                        <option value="18">18px</option>
-                    </select>
-                </dd>
-                </div>
-                <div class="settings-row">
-                <dt id="settings-terminal-scrollback-label">Terminal scrollback</dt>
-                <dd>
-                    <select aria-labelledby="settings-terminal-scrollback-label" id="settings-terminal-scrollback" class="settings-select">
-                        <option value="1000">1,000 lines</option>
-                        <option value="5000">5,000 lines</option>
-                        <option value="10000">10,000 lines</option>
-                        <option value="20000" selected>20,000 lines</option>
-                        <option value="50000">50,000 lines</option>
-                        <option value="100000">Unlimited (100k)</option>
-                    </select>
-                </dd>
-                </div>
-                {{ template "includes/toggle_row" (toggle "settings-fit-pane-width" "Fit pane width" "With the tmux backend, the terminal takes the size of this browser window.") }}
+                        <div id="settings-terminal-rows"></div>
+                        <!-- the live parts of this group (filled by terminal_backend.js and settings_dialog.js) sit here until the group's rows are drawn, then settings_fields.js moves each into its place -->
+                        <div id="settings-terminal-live" hidden>
             <!-- Settings > Terminal backend (#3634): filled by terminal_backend.js; never shown through Coral Hub. -->
             <div class="tb-row" id="settings-terminal-backend" role="radiogroup" aria-labelledby="tb-label" hidden>
                 <div class="tb-head"><span class="tb-label" id="tb-label">Terminal backend</span><span class="tb-now" id="tb-now"></span></div>
@@ -840,6 +814,7 @@
                         <p class="tb-note">Agents that were running when Coral stopped. Coral wakes them one at a time when it starts, and they resume their conversation with the permissions they ran with, including an agent that bypassed permissions. More than this many: Coral asks first. Agents you put to sleep stay asleep.</p>
                     </div>
                 </div>
+                        <dl class="info-grid settings-grid" id="settings-tools-folder-dl">
                 <div class="settings-row" id="settings-tools-folder-row" hidden>
                 <dt class="toggle-dt">
                     <span>Agent tools folder</span>
@@ -850,8 +825,7 @@
                 </dd>
                 </div>
                         </dl>
-                    
-                        <details class="disclosure settings-engine-more">
+                        <details class="disclosure settings-engine-more" id="settings-engine-more">
                             <summary>Render engine</summary>
                             <dl class="info-grid settings-grid">
                                 <div class="settings-row">
@@ -862,6 +836,7 @@
                                 </div>
                             </dl>
                         </details>
+                        </div>
                     </section>
                     <section class="settings-pane" id="settings-pane-notifications" data-group="notifications" data-icon="notifications" data-title="Notifications" role="tabpanel" aria-labelledby="settings-tab-notifications" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Notifications</h4>

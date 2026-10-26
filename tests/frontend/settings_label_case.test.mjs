@@ -36,7 +36,11 @@ assert.ok(titleCased('Show Scrollbars') && titleCased('Default Working Directory
 assert.ok(!titleCased('Show scrollbars') && !titleCased('Coral Hub') && !titleCased('Default models') && !titleCased('Artifact store limit (GiB)') && !titleCased('CLI paths') && !titleCased('Run as a hub'));
 assert.deepEqual(labels('<dt>Theme</dt><label for="settings-x">Check Updates<span>Help Text Here</span></label><label for="other">Not Settings</label>'), ['Theme', 'Check Updates']);
 
-const found = labels(html);
+// the groups that are fields (settings_fields.js, #7838): each field's label, not its options' labels
+const fieldsSrc = fs.readFileSync(path.resolve(here, '../../coral-go/pkg/frontend/static/settings_fields.js'), 'utf8');
+const fieldLabels = [...fieldsSrc.matchAll(/key: '[a-z_]+', type: '(?:select|toggle|text|number)'[^{}]*?\blabel: '([^']*)'/g)].map(m => m[1]);
+assert.ok(fieldLabels.length >= 10, 'the field labels were found (' + fieldLabels.length + ')');
+const found = [...labels(html), ...fieldLabels];
 assert.ok(found.length > 30, 'the settings labels were found (' + found.length + ')');
 const bad = [...new Set(found.filter(titleCased))];
 assert.deepEqual(bad, [], 'Title Case settings labels (use sentence case): ' + bad.join(', '));

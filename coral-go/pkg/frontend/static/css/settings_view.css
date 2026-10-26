@@ -15,6 +15,7 @@
 .sv-row[hidden] { display: none; }
 .sv-heading { margin: 8px 0 0; font-size: var(--sv-label-size); font-weight: 600; color: var(--sv-label-color); }
 .sv-notice { min-width: 0; }
+.sv-row-notice:has(> .sv-notice > [hidden]:only-child), .sv-row-notice:has(> .sv-notice > dl > [hidden]:only-child) { display: none; } /* a live part its own module has hidden leaves no empty row */
 .sv-pane > .sv-row:first-of-type, .sv-body > .sv-row:first-of-type { border-top: 0; }
 .sv-settings .sv-row { grid-template-columns: minmax(0, 1fr) var(--sv-control-width); }
 .sv-settings .sv-row-wide, .sv-form .sv-row { grid-template-columns: minmax(0, 1fr); }
