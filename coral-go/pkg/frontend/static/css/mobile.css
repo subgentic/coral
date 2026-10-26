@@ -1341,8 +1341,8 @@
 .agent-ui-send,
 .sched-preset,
 .team-availability-dialog button,
-:is(.working-mode-form, .team-launch-health) select,
-:is(.working-mode-form, .team-launch-health) input[name="preset_name"],
+:is(.working-mode-form, .team-launch-health, .preset-editor) select,
+:is(.working-mode-form, .team-launch-health, .preset-editor) input[name="preset_name"],
 .modal-content select,
 .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]) {
         min-height: var(--control-touch-height);
