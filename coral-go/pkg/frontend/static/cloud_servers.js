@@ -29,6 +29,7 @@ import { healthDot, healthCard } from './machine_health.js';
 // This module is loaded lazily, so its search box is loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { syncRelaunchReads, resetRelaunchReads, relaunchBadge } = await importOnce('./relaunch_badge.js'); // the "Updating" badge of a hub relaunch (#5355, behind the update flag)
 const { syncServersBar, serverVisible, serversFiltered, resetServersBar } = await importOnce('./server_search.js');
+const DT = await importOnce('./data_table.js'); // the one table (#7903)
 
 // The Servers tab (#3070) hosts this list; there is no separate dialog.
 let host = null;
@@ -255,17 +256,9 @@ async function setAccess(s, value) {
     if (sel && document.activeElement === document.body) sel.focus();
 }
 
-// The list is a table (Name, Status, Coral, Agents, Hub access, and the row actions Rename and Revoke) with sortable headers; a row expands for the rest (health, what applies, the update notice).
-const COLUMNS = [
-    { key: 'name', label: 'Name' },
-    { key: 'status', label: 'Status' },
-    { key: 'version', label: 'Coral' },
-    { key: 'agents', label: 'Agents' },
-    { key: 'access', label: 'Hub access' },
-    { key: 'actions', label: 'Actions', plain: true }, // Rename and Revoke: not sortable
-];
-let sortKey = 'name';
-let sortDir = 'asc';
+// The list is the shared table (Name, Status, Coral, Agents, Hub access, and the row actions Rename and Revoke) with sortable heads; a row expands for the rest (health, what applies, the update notice) in the table's detail row.
+const dtState = DT.tableState();
+dtState.sort = { key: 'name', dir: 'asc' };
 const expanded = new Set(); // ids of the rows that are open
 
 /** Compare two dotted versions numerically ("1.4.10" after "1.4.9"); anything unreadable sorts as 0. */
@@ -287,32 +280,6 @@ function sortValue(s, key) {
     if (key === 'agents') return serverAgentCount(live);
     if (key === 'access') return rank(effectiveOf(s));
     return String(s.label || 'Unnamed server').toLowerCase();
-}
-
-function sorted(list) {
-    const dir = sortDir === 'asc' ? 1 : -1;
-    const by = (a, b) => {
-        const x = sortValue(a, sortKey), y = sortValue(b, sortKey);
-        const c = sortKey === 'version' ? cmpVersion(x, y) : (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: 'base' }));
-        return c || String(a.label || '').toLowerCase().localeCompare(String(b.label || '').toLowerCase()) || String(a.id).localeCompare(String(b.id));
-    };
-    return [...list].sort((a, b) => dir * by(a, b));
-}
-
-function setSort(key) {
-    if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc'; else { sortKey = key; sortDir = key === 'agents' || key === 'access' ? 'desc' : 'asc'; }
-    render();
-}
-
-function headerRow() {
-    return h('tr', { role: 'row' }, COLUMNS.map(c => {
-        if (c.plain) return h('th', { scope: 'col', role: 'columnheader', className: `cs-th cs-col-${c.key}` }, h('span', { className: 'sr-only', text: c.label }));
-        const on = sortKey === c.key;
-        const th = h('th', { scope: 'col', role: 'columnheader', className: `cs-th cs-col-${c.key}`, 'aria-sort': on ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none' },
-            h('button', { type: 'button', className: 'cs-sort', dataset: { key: c.key }, onclick: () => setSort(c.key) },
-                h('span', { text: c.label }), h('span', { className: 'cs-sort-mark', 'aria-hidden': 'true', text: on ? (sortDir === 'asc' ? '▲' : '▼') : '' })));
-        return th;
-    }));
 }
 
 /** Open one machine's details (a deep link to it). */
@@ -358,7 +325,7 @@ function focusRow(id, selector) { const el = document.getElementById(rowId(id))?
 
 /** Revoke asks first, in the row: the keyboard goes to Cancel (the safe answer), and Cancel or Escape leave the machine connected and put the keyboard back on that row's Revoke. */
 let moreOpen = null; // the row whose More menu is open: a redraw (the list refreshes on its own) keeps it open
-function askRevoke(s) { moreOpen = null; confirming = s.id; render(); focusRow(s.id, '.cs-col-actions .cs-revoke-cancel'); }
+function askRevoke(s) { moreOpen = null; confirming = s.id; render(); focusRow(s.id, '.cs-actions .cs-revoke-cancel'); }
 function cancelRevoke(s) { confirming = null; render(); focusRow(s.id, '.cs-more-btn'); }
 const revokeNoteId = s => `${rowId(s.id)}-revoke-note`;
 
@@ -405,7 +372,7 @@ function detailCell(s, live, online, isBusy, helpId) {
         : null;
     // The row shows the status and the version; the details add only what it does not: when an offline machine was last heard from.
     const meta = online ? null : h('div', { className: 'cs-meta cs-lastseen', text: `Last contact ${formatLastSeen(s.last_seen)}` });
-    return h('td', { colSpan: COLUMNS.length, role: 'cell', className: 'cs-detail-cell' },
+    return h('div', { className: 'cs-detail-cell' },
         s.needs_relink === true ? h('div', { className: 'cs-note cs-relink-note', id: relinkId(s), hidden: !relinkOpen.has(s.id), text: relinkHelp(s.label) }) : null,
         h('div', { className: 'cs-main' }, meta, belowMinimumText(live) ? h('div', { className: 'cs-meta server-below-minimum', text: belowMinimumText(live) }) : null,
             online ? healthCard(live.machine_health, { title: 'Health', online: true, waitingText: 'No health reading yet.' }) : null, effEl, helpEl, info),
@@ -413,28 +380,45 @@ function detailCell(s, live, online, isBusy, helpId) {
         updateNote);
 }
 
-/** One server: its table row and the details row under it (shown while the row is open). */
-function rows(s) {
-    const live = liveOf(s);
-    const isBusy = busy.has(s.id);
-    const online = s.online === true;
-    const id = rowId(s.id), detailId = `${id}-detail`, helpId = `${id}-access-help`;
-    const isOpen = expanded.has(s.id) || renaming === s.id || confirming === s.id || (s.needs_relink === true && relinkOpen.has(s.id));
-    const version = serverVersion(live);
-    const agents = serverAgentCount(live);
-    const upd = updateBadge(live);
-    const main = h('tr', { className: 'cs-row' + (isOpen ? ' cs-open' : ''), id, tabIndex: -1, role: 'row', dataset: { id: s.id } },
-        h('td', { role: 'cell', className: 'cs-col-name' }, nameCell(s, live, online, isOpen, detailId)),
-        h('td', { role: 'cell', className: 'cs-col-status', dataset: { label: 'Status' } }, online ? 'Online' : 'Offline'),
-        h('td', { role: 'cell', className: 'cs-col-version', dataset: { label: 'Coral' } }, h('span', { text: version ? version : '—' }), upd ? ' ' : null, upd),
-        h('td', { role: 'cell', className: 'cs-col-agents', dataset: { label: 'Agents' } }, String(agents)),
-        h('td', { role: 'cell', className: 'cs-col-access' }, accessPicker(s, isBusy, helpId)),
-        h('td', { role: 'cell', className: 'cs-col-actions' }, h('div', { className: 'cs-actions' }, rowActions(s, isBusy))));
-    const detail = h('tr', { className: 'cs-detail', id: detailId, role: 'row', hidden: !isOpen }, detailCell(s, live, online, isBusy, helpId));
-    const escape = e => { if (e.key === 'Escape' && confirming === s.id) { e.preventDefault(); e.stopPropagation(); cancelRevoke(s); } };
-    main.addEventListener('keydown', escape); detail.addEventListener('keydown', escape);
-    return [main, detail];
+/** Whether a machine's row is open: the person opened it, or something in it needs to be seen (a rename, the revoke question, the relink help). */
+const isOpenRow = s => expanded.has(s.id) || renaming === s.id || confirming === s.id || (s.needs_relink === true && relinkOpen.has(s.id));
+
+/** The machines as one dataTable: the columns and the detail row are the table's; a cell holds the controls it always did (the toggle, the access select, Rename and More). Every row has the id deep links and the redraw's focus keep use. */
+function serversTable(shown) {
+    const live = s => liveOf(s);
+    const cellOf = {
+        name: s => { const id = rowId(s.id); return nameCell(s, live(s), s.online === true, isOpenRow(s), `${id}-detail`); },
+        status: s => (s.online === true ? 'Online' : 'Offline'),
+        version: s => { const v = serverVersion(live(s)), upd = updateBadge(live(s)), f = document.createDocumentFragment(); f.append(h('span', { text: v ? v : '—' })); if (upd) f.append(' ', upd); return f; },
+        agents: s => String(serverAgentCount(live(s))),
+        access: s => accessPicker(s, busy.has(s.id), `${rowId(s.id)}-access-help`),
+        actions: s => h('div', { className: 'cs-actions' }, rowActions(s, busy.has(s.id))),
+    };
+    const t = DT.dataTable({
+        label: 'Your computers', state: dtState, rows: shown, rowKey: s => s.id, rowName: s => s.label || 'Unnamed server',
+        columns: [
+            { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: s => sortValue(s, 'name'), cell: cellOf.name },
+            { key: 'status', label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
+            { key: 'version', label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
+            { key: 'agents', label: 'Agents', line: 2, align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
+            { key: 'access', label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
+            { key: 'actions', label: 'Actions', line: 1, cell: cellOf.actions },
+        ],
+        detail: { id: s => `${rowId(s.id)}-detail`, open: isOpenRow, render: s => detailCell(s, live(s), s.online === true, busy.has(s.id), `${rowId(s.id)}-access-help`) },
+        // The names the deep links, the focus keep and the suites read: the table keeps its own classes, these are hooks only (no rule in any stylesheet); they are put back whenever a sort draws the rows again.
+        decorateHead: (th, c) => { th.classList.add('cs-th', `cs-col-${c.key}`); th.querySelector('.dt-sort')?.classList.add('cs-sort'); },
+        decorate: (s, tr, detail) => {
+            tr.id = rowId(s.id); tr.tabIndex = -1; tr.dataset.id = s.id; tr.classList.add('cs-row'); tr.classList.toggle('cs-open', isOpenRow(s));
+            for (const td of tr.querySelectorAll('td.dt-td')) td.classList.add(`cs-col-${td.dataset.key}`);
+            if (detail) detail.classList.add('cs-detail');
+            const escape = e => { if (e.key === 'Escape' && confirming === s.id) { e.preventDefault(); e.stopPropagation(); cancelRevoke(s); } };
+            tr.addEventListener('keydown', escape); if (detail) detail.addEventListener('keydown', escape);
+        },
+    });
+    t.el.querySelector('table').classList.add('cs-table');
+    return t.el;
 }
+
 
 /** The steps to add a machine, with the download link and what the person will see on that computer. */
 function enrollBlock() {
@@ -471,14 +455,13 @@ function render() {
     if (!host) return;
     // Re-rendering replaces every row: keep focus on the same control where we can.
     const active = document.activeElement && host.contains(document.activeElement) ? document.activeElement : null;
-    const keepRow = active && active.closest('.cs-row, .cs-detail');
+    const keepRow = active && active.closest('.dt-row, .dt-detail');
     const keep = keepRow ? { row: keepRow.id, text: active.textContent, cls: active.className, tag: active.tagName } : null;
     syncServersBar(servers, 'machine', render); // the search box, from six machines up
-    const shown = sorted(servers.filter(serverVisible));
+    // the order the table's sort keeps for equal values: the name, then the id
+    const shown = servers.filter(serverVisible).sort((a, b) => String(a.label || '').toLowerCase().localeCompare(String(b.label || '').toLowerCase()) || String(a.id).localeCompare(String(b.id)));
     const table = shown.length
-        ? h('table', { className: 'cs-table', role: 'table', 'aria-label': 'Your computers' },
-            h('thead', { role: 'rowgroup' }, headerRow()),
-            h('tbody', { role: 'rowgroup' }, shown.flatMap(rows)))
+        ? serversTable(shown)
         : h('p', { className: 'servers-empty', text: loadError ? '' : serversFiltered() ? 'No computers match this search.' : 'No computers connected yet.' });
     // replaceChildren() would render a null as the text "null": leave it out.
     const restoreFocus = rememberFocus(host); // a control the redraw replaced gets focus back (#4882)

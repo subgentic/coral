@@ -162,8 +162,8 @@ function serversTable(local, remotes) {
             { key: 'agents', label: 'Agents', line: 2, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => agentsText(serverAgentCount(live(s))) },
         ],
         open: s => { if (!isLocal(s)) { _open = s.id; _confirmDelete = null; _focusNext = 'back'; render(); } },
+        decorate: (s, tr) => { tr.id = `server-row-${isLocal(s) ? 'local' : s.id}`; tr.tabIndex = -1; }, // the id the page of a server and the redraw's focus keep use, put back after a sort
     });
-    for (const tr of t.el.querySelectorAll('tr.dt-row')) { tr.id = `server-row-${tr.dataset.key}`; tr.tabIndex = -1; } // the id the page of a server and the redraw's focus keep use
     return t.el;
 }
 

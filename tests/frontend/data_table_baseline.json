@@ -1,10 +1,8 @@
 {
   "css": {
-    "cloud.css": 10,
     "layout.css": 11
   },
   "js": {
-    "cloud_servers.js": 13,
     "sidebar_groups.js": 7
   }
 }
