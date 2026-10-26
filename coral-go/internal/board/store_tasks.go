@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/subgentic/coral/internal/naming"
 )
 
@@ -105,7 +106,71 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 
 	initialStatus := "draft"
 
-	// The goal is checked before anything is stored: a refusal leaves no task behind.
+	goalID, err := s.goalForNewTask(ctx, project, opts, w)
+	if err != nil {
+		return nil, err
+	}
+	remoteBoard, remoteGoal, requestID, requestServer, requestBoard, err := remoteColumns(opts, goalID)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.db.ExecContext(ctx,
+		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id, remote_board_uid, remote_goal_uid, request_id, request_server, request_board)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID, remoteBoard, remoteGoal, requestID, requestServer, requestBoard)
+	if err != nil {
+		return nil, err
+	}
+	taskID, _ := result.LastInsertId()
+	s.ensureBoardRow(ctx, project)
+	// Keep new tasks unclaimable until configuration and dependencies are stored.
+	if err := saveWorkflow(ctx, s.db, taskID, w); err != nil {
+		return nil, err
+	}
+
+	if err := s.addNewTaskDependencies(ctx, project, taskID, opts); err != nil {
+		return nil, err
+	}
+	if opts != nil && opts.Draft {
+		return s.getTaskByID(ctx, project, taskID)
+	}
+	return s.publishNewTask(ctx, project, taskID, w)
+}
+
+// addNewTaskDependencies stores the new task's blockers (a chain of three at most unless the caller allows more); a refused one takes the task and its workflow back out, so a refusal leaves no task behind.
+func (s *Store) addNewTaskDependencies(ctx context.Context, project string, taskID int64, opts *CreateTaskOpts) error {
+	if opts == nil || len(opts.BlockedBy) == 0 {
+		return nil
+	}
+	maxDepth := opts.MaxDepth
+	if maxDepth <= 0 {
+		maxDepth = 3
+	}
+	if err := s.AddTaskDependencies(ctx, project, taskID, opts.BlockedBy, maxDepth); err != nil {
+		s.db.ExecContext(ctx, "DELETE FROM task_workflows WHERE task_id = ?", taskID)
+		s.db.ExecContext(ctx, "DELETE FROM board_tasks WHERE id = ? AND board_id = ?", taskID, project)
+		return err
+	}
+	return nil
+}
+
+// publishNewTask makes a stored task claimable; a retry also takes over the dependents of the task it retries.
+func (s *Store) publishNewTask(ctx context.Context, project string, taskID int64, w TaskWorkflow) (*Task, error) {
+	task, err := s.PublishTask(ctx, project, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if w.RetryOf == 0 {
+		return task, nil
+	}
+	if err := s.RewireRetryDependents(ctx); err != nil {
+		return nil, err
+	}
+	return s.getTaskByID(ctx, project, taskID)
+}
+
+// goalForNewTask is the goal a new task is linked to: the one asked for, else the retried task's own; it refuses a goal that is not the board's or is closed, and a task with none on a board that requires one. It stores nothing: a refusal leaves no task behind.
+func (s *Store) goalForNewTask(ctx context.Context, project string, opts *CreateTaskOpts, w TaskWorkflow) (*int64, error) {
 	var goalID *int64
 	if opts != nil && opts.GoalID != nil {
 		if err := s.checkGoalForTask(ctx, s.db, project, *opts.GoalID); err != nil {
@@ -124,62 +189,23 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 			return nil, ErrGoalRequired
 		}
 	}
+	return goalID, nil
+}
 
-	var remoteBoard, remoteGoal, requestID, requestServer, requestBoard *string
-	if opts != nil && opts.remote != nil {
-		// A task made for another team's request has no goal of its own board's: a task has a local goal or a remote one, never both.
-		if goalID != nil {
-			return nil, ErrGoalRequestAnswered
-		}
-		r := opts.remote
-		remoteGoal, requestID, requestServer, requestBoard = &r.GoalUID, &r.RequestID, &r.Server, &r.Board
-		if r.BoardUID != "" {
-			remoteBoard = &r.BoardUID
-		}
+// remoteColumns are the columns of a task made for another team's request (all nil for any other task). A task has a local goal or a remote one, never both.
+func remoteColumns(opts *CreateTaskOpts, goalID *int64) (remoteBoard, remoteGoal, requestID, requestServer, requestBoard *string, err error) {
+	if opts == nil || opts.remote == nil {
+		return
 	}
-	result, err := s.db.ExecContext(ctx,
-		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id, remote_board_uid, remote_goal_uid, request_id, request_server, request_board)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID, remoteBoard, remoteGoal, requestID, requestServer, requestBoard)
-	if err != nil {
-		return nil, err
+	if goalID != nil {
+		return nil, nil, nil, nil, nil, ErrGoalRequestAnswered
 	}
-	taskID, _ := result.LastInsertId()
-	s.ensureBoardRow(ctx, project)
-	// Keep new tasks unclaimable until configuration and dependencies are stored.
-	if err := saveWorkflow(ctx, s.db, taskID, w); err != nil {
-		return nil, err
+	r := opts.remote
+	remoteGoal, requestID, requestServer, requestBoard = &r.GoalUID, &r.RequestID, &r.Server, &r.Board
+	if r.BoardUID != "" {
+		remoteBoard = &r.BoardUID
 	}
-
-	if opts != nil && len(opts.BlockedBy) > 0 {
-		maxDepth := opts.MaxDepth
-		if maxDepth <= 0 {
-			maxDepth = 3
-		}
-		if err := s.AddTaskDependencies(ctx, project, taskID, opts.BlockedBy, maxDepth); err != nil {
-			s.db.ExecContext(ctx, "DELETE FROM task_workflows WHERE task_id = ?", taskID)
-			s.db.ExecContext(ctx, "DELETE FROM board_tasks WHERE id = ? AND board_id = ?", taskID, project)
-			return nil, err
-		}
-	}
-
-	if opts == nil || !opts.Draft {
-		task, err := s.PublishTask(ctx, project, taskID)
-		if err != nil {
-			return nil, err
-		}
-		if w.RetryOf != 0 {
-			if err := s.RewireRetryDependents(ctx); err != nil {
-				return nil, err
-			}
-			task, err = s.getTaskByID(ctx, project, taskID)
-			if err != nil {
-				return nil, err
-			}
-		}
-		return task, nil
-	}
-	return s.getTaskByID(ctx, project, taskID)
+	return
 }
 
 // ListTasks returns all tasks for a project, ordered by priority then ID.
@@ -469,115 +495,146 @@ const holdsSlotSQL = `status = 'in_progress' AND NOT ` + parkedSQL
 // An agent cannot claim a new task while they have an in-progress task. A parked task is never offered or claimed until it is unparked (#5183).
 func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, requestedID ...int64) (*Task, error) {
 	now := nowUTC()
-	priorityOrder := `CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, id ASC`
+	if err := s.refuseWhileSlotHeld(ctx, project, subscriberID); err != nil {
+		return nil, err
+	}
+	candidateIDs, err := s.claimCandidates(ctx, project, subscriberID, requestedID)
+	if err != nil {
+		return nil, err
+	}
+	for _, taskID := range candidateIDs {
+		claimed, err := s.claimOne(ctx, project, subscriberID, taskID, now)
+		if err != nil {
+			return nil, err
+		}
+		if !claimed {
+			continue
+		}
+		s.recordClaimSession(ctx, project, subscriberID, taskID)
+		return s.getTaskByID(ctx, project, taskID)
+	}
+	return nil, nil
+}
 
+// errSlotHeld is the refusal of a claim by an agent that has a task in progress.
+var errSlotHeld = fmt.Errorf("complete your current task before claiming a new one")
+
+// refuseWhileSlotHeld is errSlotHeld when the subscriber has an active task.
+func (s *Store) refuseWhileSlotHeld(ctx context.Context, project, subscriberID string) error {
 	var activeCount int
 	if err := s.db.GetContext(ctx, &activeCount,
 		`SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL,
 		project, subscriberID); err == nil && activeCount > 0 {
-		return nil, fmt.Errorf("complete your current task before claiming a new one")
+		return errSlotHeld
 	}
+	return nil
+}
 
-	// Assigned pending work is always considered before the unassigned pool.
-	// Keep all candidates so a stale pending row with unmet dependencies cannot
-	// hide a later ready task.
-	var candidateIDs []int64
+// claimCandidates are the pending tasks a claim tries, in order: the one asked for (when it is this subscriber's or nobody's), else the subscriber's own by priority and then the unassigned pool. All of
+// them are kept so a stale pending row with unmet dependencies cannot hide a later ready task.
+func (s *Store) claimCandidates(ctx context.Context, project, subscriberID string, requestedID []int64) ([]int64, error) {
+	priorityOrder := `CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, id ASC`
 	if len(requestedID) > 0 && requestedID[0] > 0 {
+		var candidateIDs []int64
 		if err := s.db.SelectContext(ctx, &candidateIDs, `SELECT id FROM board_tasks WHERE id = ? AND board_id = ? AND status = 'pending' AND (assigned_to = ? OR assigned_to IS NULL OR assigned_to = '') AND NOT `+parkedSQL, requestedID[0], project, subscriberID); err != nil || len(candidateIDs) == 0 {
 			if t, gerr := s.GetTask(ctx, project, requestedID[0]); gerr == nil && t != nil && t.Status == "pending" && t.Parked(time.Now()) {
 				return nil, fmt.Errorf("task #%d is parked and cannot be claimed until it is unparked", requestedID[0])
 			}
 			return nil, fmt.Errorf("requested task is not available to this subscriber")
 		}
-	} else {
-		var assigned, unassigned []int64
-		if err := s.db.SelectContext(ctx, &assigned, `SELECT id FROM board_tasks WHERE board_id = ? AND status = 'pending' AND assigned_to = ? AND NOT `+parkedSQL+` ORDER BY `+priorityOrder, project, subscriberID); err != nil {
-			return nil, err
-		}
-		if err := s.db.SelectContext(ctx, &unassigned, `SELECT id FROM board_tasks WHERE board_id = ? AND status = 'pending' AND (assigned_to IS NULL OR assigned_to = '') AND NOT `+parkedSQL+` ORDER BY `+priorityOrder, project); err != nil {
-			return nil, err
-		}
-		candidateIDs = append(assigned, unassigned...)
+		return candidateIDs, nil
 	}
+	var assigned, unassigned []int64
+	if err := s.db.SelectContext(ctx, &assigned, `SELECT id FROM board_tasks WHERE board_id = ? AND status = 'pending' AND assigned_to = ? AND NOT `+parkedSQL+` ORDER BY `+priorityOrder, project, subscriberID); err != nil {
+		return nil, err
+	}
+	if err := s.db.SelectContext(ctx, &unassigned, `SELECT id FROM board_tasks WHERE board_id = ? AND status = 'pending' AND (assigned_to IS NULL OR assigned_to = '') AND NOT `+parkedSQL+` ORDER BY `+priorityOrder, project); err != nil {
+		return nil, err
+	}
+	return append(assigned, unassigned...), nil
+}
 
-	for _, taskID := range candidateIDs {
-		tx, err := s.db.BeginTxx(ctx, nil)
-		if err != nil {
-			return nil, err
-		}
-		inputs, ready, err := dependencyInputs(ctx, tx, taskID)
-		if err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-		if !ready {
-			// Reconcile stale queue metadata and continue searching this claim.
-			if _, err := tx.ExecContext(ctx, "UPDATE board_tasks SET status = 'blocked', edited_at = ? WHERE id = ? AND board_id = ? AND status = 'pending'", nowUTC(), taskID, project); err != nil {
-				tx.Rollback()
-				return nil, err
-			}
-			if err := tx.Commit(); err != nil {
-				return nil, err
-			}
-			continue
-		}
-		result, err := tx.ExecContext(ctx,
-			`UPDATE board_tasks SET status = 'in_progress', assigned_to = ?, claimed_at = ?, last_activity_at = ?
-			 WHERE id = ? AND board_id = ? AND status = 'pending'
-			   AND (assigned_to = ? OR assigned_to IS NULL OR assigned_to = '')
-			   AND NOT EXISTS (SELECT 1 FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL+`)`,
-			subscriberID, now, now, taskID, project, subscriberID, project, subscriberID)
-		if err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-		n, _ := result.RowsAffected()
-		if n == 0 {
-			var hasActive int
-			tx.GetContext(ctx, &hasActive, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL, project, subscriberID)
-			tx.Rollback()
-			if hasActive > 0 {
-				return nil, fmt.Errorf("complete your current task before claiming a new one")
-			}
-			continue
-		}
-		w, err := loadWorkflow(ctx, tx, taskID)
-		if err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-		if w.TeamMode == nil {
-			mode, err := loadWorkingMode(ctx, tx, project)
-			if err != nil {
-				tx.Rollback()
-				return nil, err
-			}
-			w.TeamMode = &mode
-			if mode.Instructions != "" {
-				w.Instructions += "\n\nTeam working instructions:\n" + mode.Instructions
-			}
-		}
-		w.Inputs = inputs
-		if err := saveWorkflow(ctx, tx, taskID, w); err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, err
-		}
-		if s.sessionsDB != nil {
-			var sessionName string
-			if err := s.db.GetContext(ctx, &sessionName, `SELECT session_name FROM board_subscribers WHERE subscriber_id = ? AND project = ? AND is_active = 1 LIMIT 1`, subscriberID, project); err == nil && sessionName != "" {
-				sessionUUID := naming.SessionIDFromName(sessionName)
-				var exists int
-				if err := s.sessionsDB.GetContext(ctx, &exists, `SELECT 1 FROM live_sessions WHERE session_id = ? AND status = 'active' LIMIT 1`, sessionUUID); err == nil {
-					s.db.ExecContext(ctx, `UPDATE board_tasks SET session_id = ? WHERE id = ? AND board_id = ?`, sessionUUID, taskID, project)
-				}
-			}
-		}
-		return s.getTaskByID(ctx, project, taskID)
+// claimOne tries to claim one candidate in a transaction. A candidate whose dependencies are not met is put back to blocked (stale queue metadata) and not claimed; one that was taken meanwhile is not
+// claimed either; both say false with no error, so the claim goes on to the next. When the subscriber took another task meanwhile the answer is errSlotHeld.
+func (s *Store) claimOne(ctx context.Context, project, subscriberID string, taskID int64, now string) (claimed bool, err error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return false, err
 	}
-	return nil, nil
+	inputs, ready, err := dependencyInputs(ctx, tx, taskID)
+	if err != nil {
+		tx.Rollback()
+		return false, err
+	}
+	if !ready {
+		// Reconcile stale queue metadata and continue searching this claim.
+		if _, err := tx.ExecContext(ctx, "UPDATE board_tasks SET status = 'blocked', edited_at = ? WHERE id = ? AND board_id = ? AND status = 'pending'", nowUTC(), taskID, project); err != nil {
+			tx.Rollback()
+			return false, err
+		}
+		return false, tx.Commit()
+	}
+	result, err := tx.ExecContext(ctx,
+		`UPDATE board_tasks SET status = 'in_progress', assigned_to = ?, claimed_at = ?, last_activity_at = ?
+		 WHERE id = ? AND board_id = ? AND status = 'pending'
+		   AND (assigned_to = ? OR assigned_to IS NULL OR assigned_to = '')
+		   AND NOT EXISTS (SELECT 1 FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL+`)`,
+		subscriberID, now, now, taskID, project, subscriberID, project, subscriberID)
+	if err != nil {
+		tx.Rollback()
+		return false, err
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		var hasActive int
+		tx.GetContext(ctx, &hasActive, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL, project, subscriberID)
+		tx.Rollback()
+		if hasActive > 0 {
+			return false, errSlotHeld
+		}
+		return false, nil
+	}
+	if err := snapshotClaimWorkflow(ctx, tx, project, taskID, inputs); err != nil {
+		tx.Rollback()
+		return false, err
+	}
+	return true, tx.Commit()
+}
+
+// snapshotClaimWorkflow stores, with the claim, what the claimer is told: the board's working mode (once) and its instructions, and the inputs the dependencies give.
+func snapshotClaimWorkflow(ctx context.Context, tx *sqlx.Tx, project string, taskID int64, inputs []TaskInput) error {
+	w, err := loadWorkflow(ctx, tx, taskID)
+	if err != nil {
+		return err
+	}
+	if w.TeamMode == nil {
+		mode, err := loadWorkingMode(ctx, tx, project)
+		if err != nil {
+			return err
+		}
+		w.TeamMode = &mode
+		if mode.Instructions != "" {
+			w.Instructions += "\n\nTeam working instructions:\n" + mode.Instructions
+		}
+	}
+	w.Inputs = inputs
+	return saveWorkflow(ctx, tx, taskID, w)
+}
+
+// recordClaimSession links a claimed task to its claimer's live session, when the claimer has one (best effort).
+func (s *Store) recordClaimSession(ctx context.Context, project, subscriberID string, taskID int64) {
+	if s.sessionsDB == nil {
+		return
+	}
+	var sessionName string
+	if err := s.db.GetContext(ctx, &sessionName, `SELECT session_name FROM board_subscribers WHERE subscriber_id = ? AND project = ? AND is_active = 1 LIMIT 1`, subscriberID, project); err != nil || sessionName == "" {
+		return
+	}
+	sessionUUID := naming.SessionIDFromName(sessionName)
+	var exists int
+	if err := s.sessionsDB.GetContext(ctx, &exists, `SELECT 1 FROM live_sessions WHERE session_id = ? AND status = 'active' LIMIT 1`, sessionUUID); err == nil {
+		s.db.ExecContext(ctx, `UPDATE board_tasks SET session_id = ? WHERE id = ? AND board_id = ?`, sessionUUID, taskID, project)
+	}
 }
 
 // TouchActiveTask records activity by an agent without changing task state.
