@@ -95,7 +95,11 @@ const BASE = require('./test_base').BASE;
         await waitFor(`location.pathname === '/team/${B}/tasks' && (document.activeElement?.dataset.taskId === '${second}' || document.activeElement?.id === 'team-tab-tasks')`, 'back at Tasks with row focus', 8000);
         await openGoal(goal);
         await waitFor(`document.querySelector('.goal-side-head').textContent.replace(/\\s+/g, ' ').includes('1 open, 2 done')`, 'goal reflects the completed task', 15000);
-        check('the goal column reflects completion on the shared page', JSON.stringify(await ev(`[...document.querySelectorAll('.goal-side-group')].map(h => h.textContent)`)) === JSON.stringify(['Open 1', 'Done 2']));
+        // The goal rollup arrives before its separate task-list request. Wait for the
+        // column's existing busy state to clear before checking its refreshed groups.
+        await waitFor(`!!document.querySelector('.goal-side-list') && document.querySelector('.goal-side-list').getAttribute('aria-busy') !== 'true'`, 'goal task rows refreshed after completion', 15000);
+        check('the goal column reflects completion on the shared page', JSON.stringify(await ev(`[...document.querySelectorAll('.goal-side-group')].map(h => h.textContent)`)) === JSON.stringify(['Open 1', 'Done 2']), JSON.stringify(await rows()));
+        check('the completed task row now says Done', (await rows()).some(r => r.title === '#' + second + ' Second open task' && r.chip === 'Done'));
 
         console.log('4. A phone: the goal, its task list and a task are three screens');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
