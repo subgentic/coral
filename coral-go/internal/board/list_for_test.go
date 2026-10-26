@@ -139,7 +139,8 @@ func TestTheDocksListDoesNotHoldTheBoardsText(t *testing.T) {
 		require.NoError(t, err)
 	}
 	filler := strings.Repeat("a long line of the board's text, ", 120) // about 4 KB
-	const n = 3000
+	// the tagged rule reads one batch of text at a time (about 5.6 MB whatever the board holds): the board must hold several times that
+	const n = 9000
 	for i := 0; i < n; i++ {
 		_, err := s.PostMessage(ctx, "big", "Poster", fmt.Sprintf("@Worker %d %s", i, filler), nil)
 		require.NoError(t, err)
@@ -176,7 +177,7 @@ func TestTheDocksListDoesNotHoldTheBoardsText(t *testing.T) {
 		require.Len(t, msgs, 50)
 		require.Equal(t, n, page.Scanned, who)
 		grown := peak.Load() - min(peak.Load(), base.HeapAlloc)
-		assert.Less(t, grown, textBytes/2, "%s: the peak heap while listing (%d bytes) stays well under the board's text (%d bytes)", who, grown, textBytes)
+		assert.Less(t, grown, textBytes/3, "%s: the peak heap while listing (%d bytes) stays under a third of the board's text (%d bytes)", who, grown, textBytes)
 	}
 }
 
