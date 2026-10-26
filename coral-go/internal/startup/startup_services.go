@@ -402,8 +402,8 @@ func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, 
 	})
 }
 
-// ResolveBackend picks this run's terminal backend without asking what is running (the pure rules are in backendchoice, #6064).
-func ResolveBackend(flagValue, saved, goos string) (backend string, forced bool) {
+// resolveBackend picks this run's terminal backend without asking what is running (the pure rules are in backendchoice, #6064).
+func resolveBackend(flagValue, saved, goos string) (backend string, forced bool) {
 	backend, forced, _ = backendchoice.Resolve(flagValue, saved, goos, nil)
 	return backend, forced
 }

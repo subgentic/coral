@@ -20,9 +20,9 @@ func TestResolveBackend(t *testing.T) {
 		{"tmux", "pty", "linux", "tmux", true},
 		{"tmux", "", "windows", "pty", false}, // not honoured on Windows (#304); the entry points refuse it first
 	} {
-		got, forced := ResolveBackend(c.flag, c.saved, c.goos)
+		got, forced := resolveBackend(c.flag, c.saved, c.goos)
 		if got != c.want || forced != c.forced {
-			t.Errorf("ResolveBackend(%q, %q, %q) = %q, %v; want %q, %v", c.flag, c.saved, c.goos, got, forced, c.want, c.forced)
+			t.Errorf("resolveBackend(%q, %q, %q) = %q, %v; want %q, %v", c.flag, c.saved, c.goos, got, forced, c.want, c.forced)
 		}
 	}
 }
