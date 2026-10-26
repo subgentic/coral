@@ -127,14 +127,14 @@
 2	cost_dashboard.js	PAD.top + plotH / 2
 1	cost_dashboard.js	PAD.top + plotH / 2 + 4
 4	cost_dashboard.js	W
-1	cost_dashboard.js	_formatCost(maxCost)
-1	cost_dashboard.js	_formatCost(midCost)
 1	cost_dashboard.js	areaPoints.join(' ')
 1	cost_dashboard.js	checked
 1	cost_dashboard.js	color
 1	cost_dashboard.js	formatBucketLabel(buckets[0].bucket)
 1	cost_dashboard.js	formatBucketLabel(buckets[Math.floor(n / 2)].bucket)
 1	cost_dashboard.js	formatBucketLabel(buckets[n - 1].bucket)
+1	cost_dashboard.js	formatCost(maxCost, { zeroAsTwo: true })
+1	cost_dashboard.js	formatCost(midCost, { zeroAsTwo: true })
 2	cost_dashboard.js	points.join(' ')
 1	cost_dashboard.js	points[points.length - 1].split(',')[0]
 1	cost_dashboard.js	points[points.length - 1].split(',')[1]
@@ -391,7 +391,6 @@
 1	sidebar_rail.js	icon
 1	sidebar_rail.js	style
 1	sidebar_rail.js	unread > 9 ? '9+' : unread
-1	subagents.js	_formatCost(sa.cost_usd || 0, true)
 1	subagents.js	_formatTokenCount(n || 0)
 1	subagents.js	extraClass
 1	subagents.js	field('API Calls', sa.api_calls ? String(sa.api_calls) : '')
@@ -401,6 +400,7 @@
 1	subagents.js	field('Subagent ID', escapeHtml(sa.subagent_id || ''), ' subagent-detail-mono')
 1	subagents.js	field(running ? 'Last Activity' : 'Finished', sa.last_activity_at ? formatTaskDate(sa.last_activity_at) : '')
 1	subagents.js	field(running ? 'Running For' : 'Duration', duration || '')
+1	subagents.js	formatCost(sa.cost_usd || 0, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })
 1	subagents.js	html
 1	subagents.js	inner
 3	subagents.js	label
@@ -432,8 +432,6 @@
 1	task_detail_html.js	(review.artifacts || []).map(artifactHtml).join('')
 1	task_detail_html.js	(workflow.gate_results || []).length ? `<div>Gate results: ${(workflow.gate_results || []).map(g => `<span cla
 1	task_detail_html.js	(workflow.gate_results || []).map(g => `<span class="task-gate-result ${g.passed ? 'passed' : 'failed'}">${esc
-1	task_detail_html.js	_formatCost(lc.cost_usd, true)
-1	task_detail_html.js	_formatCost(task.cost_usd, true)
 1	task_detail_html.js	_formatTokenCount(lc.cache_read_tokens)
 1	task_detail_html.js	_formatTokenCount(lc.cache_write_tokens)
 1	task_detail_html.js	_formatTokenCount(lc.input_tokens)
@@ -457,6 +455,8 @@
 1	task_detail_html.js	depTitle
 1	task_detail_html.js	depsHtml
 1	task_detail_html.js	fields
+1	task_detail_html.js	formatCost(lc.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })
+1	task_detail_html.js	formatCost(task.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })
 1	task_detail_html.js	nameHtml
 1	task_detail_html.js	note
 1	task_detail_html.js	note ? `<br>${note}` : ''
@@ -526,8 +526,8 @@
 1	theme_config.js	groups
 1	theme_config.js	rows
 1	theme_config.js	themeOptions
-1	token_usage_ui.js	_formatCost(totalCost)
 1	token_usage_ui.js	executionTimeRow
+1	token_usage_ui.js	formatCost(totalCost)
 1	token_usage_ui.js	formatDuration(usageData.totals.execution_time_sec)
 1	token_usage_ui.js	formatTokens(totalCacheR)
 1	token_usage_ui.js	formatTokens(totalCacheW)
@@ -563,9 +563,9 @@
 1	workflows.js	exitCodeHtml
 1	workflows.js	fileItems
 1	workflows.js	filesHtml
-1	workflows.js	formatDuration(dur)
-1	workflows.js	formatDuration(durSec)
-1	workflows.js	formatDuration(elapsed)
+1	workflows.js	formatDuration(dur, { unit: 's', dropZeroSeconds: true })
+1	workflows.js	formatDuration(durSec, { unit: 's', dropZeroSeconds: true })
+1	workflows.js	formatDuration(elapsed, { unit: 's', dropZeroSeconds: true })
 1	workflows.js	formatTime(run.finished_at)
 1	workflows.js	formatTime(run.started_at)
 1	workflows.js	i + 1
