@@ -255,7 +255,9 @@
  * pills when its own width permits, the select alone below 40rem. */
 .inbox-tasks-toolbar { container: inboxtasks / inline-size; }
 .inbox-tasks-toolbar .team-tb-select { display: none; }
+.inbox-tasks-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { min-width: 10rem; }
 @container inboxtasks (max-width: 40rem) {
+    .inbox-tasks-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 1 1 100%; }
     .inbox-tasks-toolbar .team-tb-pills { display: none; }
     .inbox-tasks-toolbar .team-tb-select { display: block; }
 }

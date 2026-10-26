@@ -38,6 +38,10 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(facts, { shared: true, searches: 1, create: false, assignee: false, overflow: false });
             const stateControl = await ev(`(() => { const h = document.getElementById('group-table-view'), visible = e => !!e && e.getClientRects().length > 0; return { pills: visible(h.querySelector('.team-tb-pills')), select: visible(h.querySelector('.team-tb-select')) }; })()`);
             assert.deepEqual(stateControl, { pills: width === 1280, select: width === 390 }, `${width}: exactly one state control is visible`);
+            if (width === 390) {
+                const searchLayout = await ev(`(() => { const h = document.getElementById('group-table-view'), search = h.querySelector('.list-bar-search').getBoundingClientRect(); return { width: search.width, minimum: 10 * parseFloat(getComputedStyle(document.documentElement).fontSize), bottom: search.bottom, controls: ['.team-tb-select', '.list-bar-toggle', '.dt-select-toggle'].map(s => h.querySelector(s).getBoundingClientRect().top) }; })()`);
+                assert.ok(searchLayout.width >= searchLayout.minimum && searchLayout.controls.every(top => top >= searchLayout.bottom), `phone search keeps 10rem with controls below: ${JSON.stringify(searchLayout)}`);
+            }
             await shot(`inbox-tasks-toolbar-${width}`);
             await ev(`document.querySelector('#group-table-view .list-bar-toggle').click(); true`);
             await waitFor(`document.getElementById('inbox-tk-priority').getBoundingClientRect().height > 0`, 'Filters open');
