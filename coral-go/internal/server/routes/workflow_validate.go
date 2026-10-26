@@ -264,18 +264,17 @@ func validateHooks(raw json.RawMessage) string {
 	return ""
 }
 
+// prevRefRe matches the templates that name the previous step's output: {{prev_dir}}, {{prev_stdout}}, {{prev_stderr}}, {{prev_artifact}} and the _content form of each (the runner's names, background/workflow_templates.go).
+var prevRefRe = regexp.MustCompile(`\{\{prev_(?:dir|stdout|stderr|artifact)(?:_content)?\}\}`)
+
 // stepRefRe matches {{step_N_...}} template patterns and captures N.
 var stepRefRe = regexp.MustCompile(`\{\{step_(\d+)_`)
 
 // validateTemplateRefs checks template variable references in step text.
 func validateTemplateRefs(text string, stepIndex, totalSteps int) string {
-	// Check {{prev_*}} references on step 0
-	if stepIndex == 0 {
-		for _, tmpl := range []string{"{{prev_dir}}", "{{prev_stdout}}", "{{prev_stderr}}"} {
-			if strings.Contains(text, tmpl) {
-				return "step 0 cannot reference previous step"
-			}
-		}
+	// Check {{prev_*}} references on step 0: the previous step's folder, stdout, stderr and artifact, as a path or as its content
+	if stepIndex == 0 && prevRefRe.MatchString(text) {
+		return "step 0 cannot reference previous step"
 	}
 
 	// Check {{step_N_*}} references — N must be < current step index and within bounds
