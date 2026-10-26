@@ -39,7 +39,12 @@ const TEAM_SPEC = {
 
 /** onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). team: the team page's Tasks tab's panel. */
 // The dock's Tasks panel (#7924): the one top row (the search, the Filters icon, + Task), so the bar has a slot for the owner's button after the icon; Hide done is the owner's extra in the panel.
-const DOCK_SPEC = { ...SPEC, headerSlots: true };
+const DOCK_SPEC = {
+    ...SPEC,
+    headerSlots: true,
+    // Agent is a select of the dock's agents, as on the main Tasks tab (#8003): the owner fills its options (the board's members and whoever has a task)
+    fields: [SPEC.fields[0], SPEC.fields[1], { type: 'select', key: 'assignee', id: 'tk-assignee', label: 'Agent', values: [], labels: {}, any: 'Any agent' }, SPEC.fields[3]],
+};
 
 export function buildTaskBar(onChange, hooks = {}, { team = false, dock = false } = {}) {
     return buildListBar(team ? TEAM_SPEC : dock ? DOCK_SPEC : SPEC, onChange, hooks);

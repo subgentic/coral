@@ -378,11 +378,29 @@ function _syncTaskBar(show, counts) {
         _syncHideDone(_hideDoneLast.count, _hideDoneLast.hidden);
     }
     if (_taskBar.node.parentElement !== host) host.append(_taskBar.node);
-    _taskBar.names([...new Set((state.currentBoardTasks || []).map(t => t.assigned_to).filter(n => typeof n === 'string' && n))].sort().slice(0, 50));
+    _applyAgentChoices();
     _taskBar.set(_taskFilters, counts);
     // The worker scope is fixed: a board-wide assignee control would promise a view this dock never shows.
     const assignee = host.querySelector('#tk-assignee');
     if (assignee) assignee.closest('label').hidden = !!agentTaskScope();
+}
+
+// The Agent select's options (#8003): the board's members (read once per board) and whoever has a task on screen, and the agent in the filter so it always shows.
+let _dockMembers = { board: '', names: [] };
+function _applyAgentChoices() {
+    if (!_taskBar) return;
+    const names = [...new Set([...(_dockMembers.board === _taskFiltersBoard ? _dockMembers.names : []), ...(state.currentBoardTasks || []).map(t => t.assigned_to), _taskFilters.assignee].filter(n => typeof n === 'string' && n))].sort();
+    _taskBar.setOptions('assignee', names, {});
+    const board = _taskFiltersBoard;
+    if (board && _dockMembers.board !== board) {
+        _dockMembers = { board, names: [] }; // asked once: a failed read leaves the names of the tasks
+        boardFetch(board, '/subscribers').then(r => (r.ok ? r.json() : [])).then(d => {
+            const list = Array.isArray(d) ? d : (d && Array.isArray(d.subscribers) ? d.subscribers : []);
+            if (_dockMembers.board !== board) return;
+            _dockMembers.names = list.map(s => s && s.subscriber_id).filter(n => typeof n === 'string' && n);
+            _applyAgentChoices();
+        }).catch(() => {});
+    }
 }
 
 /** "Load more": the next page of done tasks (or of the filtered list). */
@@ -574,7 +592,7 @@ function _taskTable(tasks, footer) {
                 return cell;
             } },
             // The dock shows Status, Task and Agent only (#7962, the operator): priority, type, cost and the time are on the main Tasks tab and in the opened task
-            { key: 'assignee', label: 'Agent', width: 'content', sort: true, firstDir: 'desc', line: 2, when: t => !!t.assigned_to, cell: t => span('board-task-assignee', t.assigned_to || '—') },
+            { key: 'assignee', label: 'Agent', width: 'content', sort: true, firstDir: 'desc', line: 2, when: t => !!t.assigned_to, cell: t => (t.assigned_to ? span('board-task-assignee', t.assigned_to) : '') }, // an empty Agent is an empty cell, not a dash (#8003)
         ],
     });
     // Keep the existing action dispatcher and identifiers: opening a board task,

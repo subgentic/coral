@@ -78,6 +78,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('with nothing on, the Filters icon carries no dot', !top.badge, JSON.stringify(top));
         await ev(`document.querySelector('.board-task-hide-toggle input').click(); true`);
         await settle(`!document.querySelector('#tk-toggle .display-badge').hidden`, 'the badge');
+        // Agent is a select of the dock's agents, as on the main Tasks tab (#8003)
+        const agent = await ev(`(() => { const e = document.getElementById('tk-assignee'); return { tag: e.tagName, options: [...e.options].map(o => o.textContent), any: e.options[0].value === '' }; })()`);
+        check('Agent is a select with Any agent first (not a text field with a datalist)', agent.tag === 'SELECT' && agent.options[0] === 'Any agent' && agent.any && (await ev(`!document.getElementById('tk-assignee-list')`)), JSON.stringify(agent));
         check('Hide done on is a dot on the Filters icon, and the icon says so', await ev(`document.getElementById('tk-toggle').getAttribute('aria-label') === 'Filters and sort, 1 on' && document.getElementById('tk-toggle').classList.contains('active')`), await ev(`document.getElementById('tk-toggle').getAttribute('aria-label')`));
         await ev(`document.querySelector('.board-task-hide-toggle input').click(); true`);
         await settle(`document.querySelector('#tk-toggle .display-badge').hidden`, 'the badge gone');
