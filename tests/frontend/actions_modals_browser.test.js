@@ -69,9 +69,9 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const browser = await ev(`(() => { const calls = []; const keep = window.toggleBrowser; window.toggleBrowser = (...a) => calls.push(a);
             document.querySelector('#launch-modal [data-on-click="m-toggle-browser"]').click(); window.toggleBrowser = keep; return calls; })()`);
         check('a folder browser button toggles its browser (its four ids)', browser.length === 1 && browser[0].length === 4 && browser[0].every(x => /^[a-z0-9-]+$/.test(x)), JSON.stringify(browser));
-        const wt = await ev(`(() => { const c = document.querySelector('[data-on-change="m-team-worktree"]'); const r = document.getElementById('team-worktree-branch-row'); if (!c || !r) return null;
-            c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); const on = r.style.display; c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); return { on, off: r.style.display }; })()`);
-        check('the team worktree checkbox shows and hides its branch row', wt && wt.on === '' && wt.off === 'none', JSON.stringify(wt));
+        const wt = await ev(`(() => { const c = document.getElementById('launch-team-worktree'); const r = document.getElementById('launch-team-base-branch')?.closest('.sv-row'); if (!c || !r) return null;
+            c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); const on = r.hidden; c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); return { on, off: r.hidden }; })()`);
+        check('the team worktree checkbox shows and hides its branch row', wt && wt.on === false && wt.off === true, JSON.stringify(wt));
         await ev(`document.querySelector('#launch-modal [data-on-click="m-hide-launch-modal"]').click(); true`);
         check('the launch dialog’s Cancel closes it', !(await ev(shown('launch-modal'))));
 
