@@ -364,34 +364,10 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 	if why, done := winToolRisk(st, name, args, outside); done {
 		return why
 	}
-	if winAsk[name] {
-		return "it runs " + words[0] + ", which can run anything"
+	if why, done := winSystemRisk(words, name, args); done {
+		return why
 	}
-	if name == "sc" && (len(args) == 0 || !winServiceVerbs[strings.ToLower(args[0])]) {
-		name = "set-content" // sc is PowerShell 5's alias of Set-Content: judged by the path it writes (#5690)
-	}
-	if winSystem[name] {
-		switch name {
-		case "sc", "net", "net1":
-			if len(args) == 0 || !winServiceVerbs[strings.ToLower(args[0])] || (strings.EqualFold(args[0], "use") && len(args) == 1) {
-				return "" // net use alone only lists the connections
-			}
-		case "cipher":
-			if !hasArgFold(args, "/w") {
-				return ""
-			}
-		case "assoc", "ftype":
-			if !strings.Contains(strings.Join(args, " "), "=") {
-				return "" // without = they only print
-			}
-		case "schtasks", "netsh", "wmic", "taskkill", "mklink":
-			// only the changing forms
-			if !winChangesState(name, args) {
-				return ""
-			}
-		}
-		return "it " + winSystemWhy(name)
-	}
+	name = winScAlias(name, args)
 
 	// PowerShell uses its own parameters for names a POSIX shell also has.
 	ambiguous := name == "rm" || name == "mv" || name == "cp"
@@ -492,6 +468,45 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		}
 	}
 	return ""
+}
+
+// winSystemRisk judges the commands that run anything or change the system (winAsk, winSystem): sc, net, cipher, assoc, schtasks, netsh and the rest, each in its changing forms only. done says the name was one of them.
+func winSystemRisk(words []string, name string, args []string) (string, bool) {
+	if winAsk[name] {
+		return "it runs " + words[0] + ", which can run anything", true
+	}
+	name = winScAlias(name, args)
+	if winSystem[name] {
+		switch name {
+		case "sc", "net", "net1":
+			if len(args) == 0 || !winServiceVerbs[strings.ToLower(args[0])] || (strings.EqualFold(args[0], "use") && len(args) == 1) {
+				return "", true // net use alone only lists the connections
+			}
+		case "cipher":
+			if !hasArgFold(args, "/w") {
+				return "", true
+			}
+		case "assoc", "ftype":
+			if !strings.Contains(strings.Join(args, " "), "=") {
+				return "", true // without = they only print
+			}
+		case "schtasks", "netsh", "wmic", "taskkill", "mklink":
+			// only the changing forms
+			if !winChangesState(name, args) {
+				return "", true
+			}
+		}
+		return "it " + winSystemWhy(name), true
+	}
+	return "", false
+}
+
+// winScAlias names the command a stage runs under its PowerShell meaning: sc without a service verb is PowerShell 5's alias of Set-Content, judged by the path it writes (#5690).
+func winScAlias(name string, args []string) string {
+	if name == "sc" && (len(args) == 0 || !winServiceVerbs[strings.ToLower(args[0])]) {
+		return "set-content"
+	}
+	return name
 }
 
 // winToolRisk judges git, attrib, reg, icacls and Stop-Process: the settings, paths and switches that make each change something.
