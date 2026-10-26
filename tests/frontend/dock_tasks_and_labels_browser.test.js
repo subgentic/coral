@@ -23,6 +23,34 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         await openBoardTasksTab({ ev, waitFor }, B);
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 3 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'three task rows', 15000);
 
+        for (const width of [420, 680, 980]) {
+            await ev(`(() => { const d = document.getElementById('agentic-state'); d.style.transition = 'none'; d.style.width = '${width}px'; return d.offsetWidth; })()`);
+            // #7800: the same columns must start at the same edge, regardless of header/row element types.
+            const edges = await ev(`(() => {
+                const head = document.querySelector('#board-task-list .board-task-header');
+                const rows = [...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')];
+                return ['status', 'id', 'priority', 'type', 'assignee', 'desc', 'cost', 'time'].map(col => {
+                    const h = head.querySelector('.board-task-' + (col === 'status' ? 'status-col' : col));
+                    return { col, visible: !!h.getClientRects().length, head: h.getBoundingClientRect().left,
+                        rows: rows.map(r => r.querySelector('.board-task-' + (col === 'status' ? 'status-wrap' : col)).getBoundingClientRect().left) };
+                });
+            })()`);
+            console.log('column edges', width, JSON.stringify(edges));
+            const priorityTextEdges = await ev(`(() => {
+                return [...document.querySelectorAll('#board-task-list .board-task-priority')].map(cell => {
+                    const range = document.createRange(); range.selectNodeContents(cell);
+                    return range.getBoundingClientRect().left;
+                });
+            })()`);
+            for (const left of priorityTextEdges.slice(1)) assert.ok(Math.abs(left - priorityTextEdges[0]) < 1,
+                'Priority label and values share a text edge: ' + JSON.stringify(priorityTextEdges));
+            for (const col of edges.filter(c => c.visible)) for (const left of col.rows)
+                assert.ok(Math.abs(left - col.head) < 1, `${col.col}: header ${col.head}, cell ${left}`);
+
+            if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(require('node:path').join(process.env.CORAL_SCREENSHOT_DIR, 'dock-tasks-' + width + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+        }
+        await ev(`document.getElementById('agentic-state').style.width = '420px'; true`);
+
         console.log('12. a sentence-case head, the name is the one button, no ring after a click');
         if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(require('node:path').join(process.env.CORAL_SCREENSHOT_DIR, 'dock-tasks.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
         const head = await ev(`(() => { const h = document.querySelector('#board-task-list .board-task-header'); const cs = getComputedStyle(h); return { texts: [...h.children].map(c => c.textContent.trim()), transform: cs.textTransform, weight: cs.fontWeight, size: cs.fontSize }; })()`);

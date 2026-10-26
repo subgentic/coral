@@ -993,7 +993,7 @@ body.panel-dragging .agentic-state {
     border-radius: var(--radius-sm);
     flex-shrink: 0;
     width: 58px;
-    text-align: center;
+    text-align: left; /* #7800: label and priority values share the same text edge. */
     letter-spacing: 0.3px;
 }
 
