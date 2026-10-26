@@ -117,7 +117,8 @@ func costAnswersFor(t *testing.T, s *TokenUsageStore, since string) costAnswers 
 func oldSummary(t *testing.T, db *DB, since string) []UsageSummary {
 	q := `SELECT agent_type, COALESCE(SUM(input_tokens), 0) as input_tokens, COALESCE(SUM(output_tokens), 0) as output_tokens,
 	      COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens, COALESCE(SUM(cache_write_tokens), 0) as cache_write_tokens,
-	      COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cost_usd), 0) as cost_usd, COUNT(DISTINCT session_id) as num_sessions
+	      COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cost_usd), 0) as cost_usd, COUNT(DISTINCT session_id) as num_sessions,
+	      COALESCE(SUM(n_rows), 0) as num_requests
 	      FROM token_usage_all WHERE ` + sourceDedup + ` AND 1=1`
 	var args []any
 	if since != "" {

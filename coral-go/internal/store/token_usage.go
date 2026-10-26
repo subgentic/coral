@@ -54,6 +54,7 @@ type UsageSummary struct {
 	TotalTokens      int64   `db:"total_tokens" json:"total_tokens"`
 	CostUSD          float64 `db:"cost_usd" json:"cost_usd"`
 	NumSessions      int     `db:"num_sessions" json:"num_sessions"`
+	NumRequests      int64   `db:"num_requests" json:"num_requests"` // the calls recorded (what By agent sums as Requests); num_sessions is the distinct sessions
 }
 
 // ModelUsageSummary is token usage for one model id of one agent type. Model is "" for usage
@@ -69,6 +70,7 @@ type ModelUsageSummary struct {
 	TotalTokens      int64   `db:"total_tokens" json:"total_tokens"`
 	CostUSD          float64 `db:"cost_usd" json:"cost_usd"`
 	NumSessions      int     `db:"num_sessions" json:"num_sessions"`
+	NumRequests      int64   `db:"num_requests" json:"num_requests"` // the calls recorded (what By agent sums as Requests); num_sessions is the distinct sessions
 }
 
 // AgentUsageSummary represents per-agent (session) token usage aggregates.
@@ -365,7 +367,8 @@ func (s *TokenUsageStore) GetUsageSummary(ctx context.Context, since string) ([]
 	          COALESCE(SUM(cache_write_tokens), 0) as cache_write_tokens,
 	          COALESCE(SUM(total_tokens), 0) as total_tokens,
 	          COALESCE(SUM(cost_usd), 0) as cost_usd,
-	          COUNT(DISTINCT session_id) as num_sessions
+	          COUNT(DISTINCT session_id) as num_sessions,
+	          COALESCE(SUM(n_rows), 0) as num_requests
 	   FROM ` + rel + ` u WHERE ` + usageDedup("u.")
 	query += ` GROUP BY agent_type`
 	err := s.db.Reader().SelectContext(ctx, &summaries, query, args...)
@@ -386,7 +389,8 @@ func (s *TokenUsageStore) GetUsageSummaryByModel(ctx context.Context, since stri
 	          COALESCE(SUM(cache_write_tokens), 0) as cache_write_tokens,
 	          COALESCE(SUM(total_tokens), 0) as total_tokens,
 	          COALESCE(SUM(cost_usd), 0) as cost_usd,
-	          COUNT(DISTINCT session_id) as num_sessions
+	          COUNT(DISTINCT session_id) as num_sessions,
+	          COALESCE(SUM(n_rows), 0) as num_requests
 	   FROM ` + rel + ` u WHERE ` + usageDedup("u.")
 	query += ` GROUP BY agent_type, COALESCE(model, '') ORDER BY cost_usd DESC, agent_type, model`
 	err := s.db.Reader().SelectContext(ctx, &summaries, query, args...)

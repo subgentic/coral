@@ -129,6 +129,7 @@ func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request)
 	var totalInput, totalOutput, totalCacheRead, totalCacheWrite, totalTokens int64
 	var totalCost float64
 	var totalSessions int
+	var totalRequests int64
 	for _, s := range summaries {
 		totalInput += s.InputTokens
 		totalOutput += s.OutputTokens
@@ -137,6 +138,7 @@ func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request)
 		totalTokens += s.TotalTokens
 		totalCost += s.CostUSD
 		totalSessions += s.NumSessions
+		totalRequests += s.NumRequests
 	}
 
 	out := map[string]any{
@@ -152,6 +154,7 @@ func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request)
 			"total_tokens":       totalTokens,
 			"cost_usd":           totalCost,
 			"num_sessions":       totalSessions,
+			"num_requests":       totalRequests,
 		},
 	}
 	// by_agent is one row per session of every board (id, name, board, working directory): an agent's token gets the totals, not that list (#5041).
@@ -360,7 +363,7 @@ func withNotReported(tracked []store.ThinkingUsageSummary, byModel []store.Model
 		rest := &store.ThinkingUsageSummary{AgentType: tot.AgentType, Model: tot.Model,
 			InputTokens: clamp(tot.InputTokens, have.InputTokens), OutputTokens: clamp(tot.OutputTokens, have.OutputTokens),
 			CacheReadTokens: clamp(tot.CacheReadTokens, have.CacheReadTokens), CacheWriteTokens: clamp(tot.CacheWriteTokens, have.CacheWriteTokens),
-			TotalTokens: clamp(tot.TotalTokens, have.TotalTokens)}
+			TotalTokens: clamp(tot.TotalTokens, have.TotalTokens), NumCalls: clamp(tot.NumRequests, have.NumCalls)}
 		if tot.CostUSD > have.CostUSD {
 			rest.CostUSD = tot.CostUSD - have.CostUSD
 		}
@@ -391,6 +394,7 @@ func withNotReported(tracked []store.ThinkingUsageSummary, byModel []store.Model
 				take(&r.CacheReadTokens, &left.CacheReadTokens)
 				take(&r.CacheWriteTokens, &left.CacheWriteTokens)
 				take(&r.TotalTokens, &left.TotalTokens)
+				take(&r.NumCalls, &left.NumCalls)
 				if n := min(r.CostUSD, left.CostUSD); n > 0 {
 					r.CostUSD -= n
 					left.CostUSD -= n
