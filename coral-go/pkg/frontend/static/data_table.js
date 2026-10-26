@@ -5,6 +5,7 @@
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, when(row), subtitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
+ *   column widths (#7949): every header has a resize handle on its right edge (drag, Left and Right keys, double-click or Enter to fit the content); the widths are kept per list in this browser (widthsKey, else the label without its row count), and "Reset column widths" appears while any are set. minWidth per column (64 px by default), resize: false for one that must not.
  *   cell types: chip(word, cls), avatar(name), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
@@ -14,7 +15,7 @@ import { whenText } from './when_text.js';
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
-export const tableState = () => ({ sort: null, selected: new Set(), rowCache: new Map(), anchor: null, ctx: undefined, select: false, confirming: -1 });
+export const tableState = () => ({ widths: null, sort: null, selected: new Set(), rowCache: new Map(), anchor: null, ctx: undefined, select: false, confirming: -1 });
 
 // ── cell types ────────────────────────────────────────────────────────────
 /** The row's one real button: its text names the row. */
@@ -103,8 +104,77 @@ export function dataTable(cfg) {
     const table = el('table', 'dt-table'); table.setAttribute('aria-label', cfg.label); table.setAttribute('role', 'table');
     if (cfg.layout === 'fixed') table.style.tableLayout = 'fixed'; // grouped lists share column widths even when their contents differ
     const thead = el('thead'); thead.setAttribute('role', 'rowgroup'); const tbody = el('tbody'); tbody.setAttribute('role', 'rowgroup');
-    table.append(thead, tbody);
-    box.append(sortBar, table);
+    const colgroup = el('colgroup');
+    table.append(colgroup, thead, tbody);
+    const widthBar = el('div', 'dt-widthbar'); widthBar.hidden = true;
+    const resetWidths = button('btn btn-small dt-reset-widths', 'Reset column widths', () => { st.widths = {}; saveWidths(); applyWidths(); drawHead(); });
+    widthBar.append(resetWidths);
+    box.append(sortBar, widthBar, table);
+
+    // ── column widths (#7949): a handle on each header's right edge; the widths are kept per list in this browser ──
+    const MIN_W = 64, MAX_W = 2000, STEP = 16;
+    const wkey = `coral-dt-widths:${cfg.widthsKey || String(cfg.label).replace(/,\s*\d.*$/, '')}`; // a label that counts its rows ("Tasks, 12") is the list "Tasks"
+    const minOf = (c) => c.minWidth || MIN_W;
+    function readWidths() {
+        try {
+            const o = JSON.parse(localStorage.getItem(wkey) || 'null') || {}, out = {};
+            for (const c of columns) { const v = Number(o[c.key]); if (Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); }
+            return out;
+        } catch { return {}; }
+    }
+    function saveWidths() {
+        try { if (Object.keys(st.widths).length) localStorage.setItem(wkey, JSON.stringify(st.widths)); else localStorage.removeItem(wkey); } catch { /* a convenience: the widths last until the page closes */ }
+    }
+    st.widths ||= readWidths();
+    function applyWidths() {
+        colgroup.replaceChildren();
+        const any = Object.keys(st.widths).length > 0;
+        box.classList.toggle('dt-sized', any); widthBar.hidden = !any;
+        if (cfg.layout !== 'fixed') table.style.tableLayout = any ? 'fixed' : '';
+        if (!any) return;
+        if (sel) { const k = el('col'); k.style.width = 'var(--table-check-w)'; colgroup.append(k); }
+        for (const c of columns) { const k = el('col'); if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; colgroup.append(k); }
+    }
+    /** The first resize freezes the other columns at the widths they have (the title column, 'grow', takes whatever is left) so nothing jumps. */
+    function freezeWidths() {
+        for (const th of thead.querySelectorAll('th.dt-th')) { const c = columns.find(x => x.key === th.dataset.key); if (c && c.width !== 'grow' && !st.widths[c.key]) st.widths[c.key] = Math.max(minOf(c), Math.round(th.getBoundingClientRect().width)); }
+    }
+    function setWidth(c, w, th) {
+        st.widths[c.key] = Math.min(MAX_W, Math.max(minOf(c), Math.round(w)));
+        applyWidths();
+        const h = th && th.querySelector('.dt-resize'); if (h) h.setAttribute('aria-valuenow', String(st.widths[c.key]));
+    }
+    /** The width the column needs for its widest cell and its head: the table is laid out at its natural width for a moment (auto layout, as wide as its content, none of the kept widths) and the column's own head is measured. */
+    function fitWidth(c, th) {
+        const was = { layout: table.style.tableLayout, width: table.style.width, cols: colgroup.cloneNode(true) };
+        colgroup.replaceChildren(); table.style.tableLayout = 'auto'; table.style.width = 'max-content'; box.classList.remove('dt-sized');
+        const natural = Math.ceil(th.getBoundingClientRect().width);
+        table.style.tableLayout = was.layout; table.style.width = was.width; colgroup.replaceChildren(...was.cols.childNodes); box.classList.toggle('dt-sized', Object.keys(st.widths).length > 0);
+        return Math.min(800, natural);
+    }
+    function resizeHandle(c, th) {
+        const h = el('span', 'dt-resize'); h.setAttribute('role', 'separator'); h.setAttribute('aria-orientation', 'vertical'); h.tabIndex = 0; h.dataset.key = c.key;
+        h.setAttribute('aria-label', `Resize ${c.label} column`); h.setAttribute('aria-valuemin', String(minOf(c))); h.setAttribute('aria-valuemax', String(MAX_W));
+        const now = () => st.widths[c.key] || Math.round(th.getBoundingClientRect().width);
+        h.setAttribute('aria-valuenow', String(now()));
+        h.addEventListener('click', (e) => e.stopPropagation()); // a drag, or a press on the handle, never sorts
+        h.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault(); e.stopPropagation();
+            h.setPointerCapture(e.pointerId); h.classList.add('dt-resizing');
+            freezeWidths(); const startX = e.clientX, start = now(); let moved = false;
+            const move = (ev) => { moved = true; setWidth(c, start + (ev.clientX - startX), th); };
+            const up = () => { h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); h.classList.remove('dt-resizing'); if (moved) saveWidths(); else applyWidths(); };
+            h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+        });
+        h.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); freezeWidths(); setWidth(c, fitWidth(c, th), th); saveWidths(); }); // fit the column to its content
+        h.addEventListener('keydown', (e) => {
+            const step = e.shiftKey ? STEP * 3 : STEP;
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); freezeWidths(); setWidth(c, now() + (e.key === 'ArrowRight' ? step : -step), th); saveWidths(); }
+            else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); freezeWidths(); setWidth(c, fitWidth(c, th), th); saveWidths(); }
+        });
+        return h;
+    }
 
     const sortable = columns.filter(c => c.sort);
     const sortedRows = () => {
@@ -136,6 +206,7 @@ export function dataTable(cfg) {
                 const icon = el('span', 'material-icons', 'filter_list'); icon.setAttribute('aria-hidden', 'true'); f.append(icon);
                 th.append(f);
             }
+            if (cfg.resize !== false && c.resize !== false) th.append(resizeHandle(c, th));
             tr.append(th);
         }
         thead.append(tr);
@@ -274,7 +345,7 @@ export function dataTable(cfg) {
     function clear() { st.selected.clear(); st.anchor = null; st.confirming = -1; st.choices = null; syncSelection(); }
     function syncSelectMode() { box.classList.toggle('dt-selecting', st.select); selectButton.textContent = st.select ? 'Done' : 'Select'; selectButton.setAttribute('aria-pressed', String(st.select)); }
 
-    drawHead(); drawBody(); syncSelectMode();
+    drawHead(); drawBody(); syncSelectMode(); applyWidths();
     if (!rows.length && cfg.empty) {
         const e = el('div', 'dt-empty'); e.append(el('p', 'dt-empty-line', cfg.empty.line));
         if (cfg.empty.hint) e.append(el('p', 'dt-empty-hint', cfg.empty.hint));
