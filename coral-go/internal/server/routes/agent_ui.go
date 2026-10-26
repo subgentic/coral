@@ -32,8 +32,15 @@ func (h *SessionsHandler) RegisterAgentUI(r chi.Router) {
 func (h *SessionsHandler) agentUI(w http.ResponseWriter, r *http.Request) {
 	sid := r.URL.Query().Get("session_id")
 	// The dashboard reads the panels, removes them and sends their events; only the
-	// agent's own CLI writes one (PUT) (#3495).
-	if _, ok := h.agentFromRequest(w, r, &sid, r.Method != http.MethodPut); !ok {
+	// agent's own CLI writes one (PUT) (#3495). A hub reaches a registered server with the server's API key
+	// and no browser: it may read the panels and remove one, as the Operator's dashboard does, but an event
+	// wakes the agent, so that stays a person's (#8692).
+	if (r.Method == http.MethodGet || r.Method == http.MethodDelete) && sid != "" && !humanInputCaller(r) && operatorOrKeyCaller(r) {
+		if _, ok := h.sessionAgentName(r.Context(), sid); !ok {
+			errNotFound(w, "Unknown session; run this from inside a Coral agent")
+			return
+		}
+	} else if _, ok := h.agentFromRequest(w, r, &sid, r.Method != http.MethodPut); !ok {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
