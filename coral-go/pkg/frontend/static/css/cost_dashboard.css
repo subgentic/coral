@@ -627,5 +627,6 @@
     .cost-table-container .cost-table td.cost-fold-name { order: -2; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
     .cost-table-container .cost-table td.cost-fold-name:first-child { flex: 1 1 100%; }
     .cost-table-container .cost-table td.cost-fold-first { order: -1; }
+    .cost-table-container .cost-table td.cost-fold-key { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); } /* the one stronger figure: the sort key's value, 13/600 primary (UI/UX #7738) */
     .cost-table-container .cost-table td[data-label]:not(.cost-fold-name)::before { content: attr(data-label) " "; color: var(--text-muted); font-weight: 400; }
 }

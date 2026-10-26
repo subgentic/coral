@@ -75,6 +75,9 @@ function foldCostTables(root) {
         const ths = [...head.children];
         const names = COST_NAME_COLUMNS[ths[0] && ths[0].dataset.table] ?? 1;
         const label = th => { const n = [...(th.querySelector('.cost-sort-btn') || th).childNodes].find(x => x.nodeType === 3); return (n ? n.textContent : th.textContent).trim(); };
+        // the one stronger figure of a row: the column the table is sorted by (Cost, or Calls, when the sort is on a name or on nothing)
+        const sorted = ths.findIndex((th, i) => i >= names && /ascending|descending/.test(th.getAttribute('aria-sort') || ''));
+        const key = sorted >= 0 ? sorted : ths.findIndex(th => FOLD_FIRST.has(th.dataset.field));
         table.setAttribute('role', 'table');
         for (const group of table.children) group.setAttribute('role', 'rowgroup');
         for (const tr of table.querySelectorAll('tr')) {
@@ -84,7 +87,7 @@ function foldCostTables(root) {
             cells.forEach((c, i) => {
                 if (c.tagName === 'TH') { c.setAttribute('role', 'columnheader'); return; }
                 c.setAttribute('role', 'cell'); c.dataset.label = label(ths[i]); c.classList.toggle('cost-fold-name', i < names);
-                c.classList.toggle('cost-fold-first', FOLD_FIRST.has(ths[i].dataset.field));
+                c.classList.toggle('cost-fold-first', FOLD_FIRST.has(ths[i].dataset.field)); c.classList.toggle('cost-fold-key', i === key);
             });
         }
         // the sort, for a table whose header is not drawn
