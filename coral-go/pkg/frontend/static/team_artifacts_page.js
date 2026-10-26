@@ -280,8 +280,8 @@ function openArtifact(item, opener) {
     const hex = link && link.hex;
     const received = item.source === 'received';
     const facts = [
-        ['Type', un ? '' : typeText(item)], ['MIME', un ? '' : item.media_type || 'Unknown'], ['Size', un ? '' : sizeText(item.size)],
-        ['Task', taskText(item)], ['Created', createdText(item)], ['Producer', item.produced_by],
+        ['MIME', un ? '' : item.media_type || 'Unknown'], // the header says the type, the size and when (#7775): nothing here repeats it
+        ['Task', taskText(item)], ['Producer', item.produced_by],
         ['Status', un ? 'Link not verified: this team has not uploaded this file, so Coral shows no size, type or preview' : ''],
         ['Sent to', item.source === 'shared' ? item.shared_to : ''], ['Sent by', item.source === 'shared' || received ? item.sent_by : ''],
         ['Received from', received ? item.received_from : ''], ['Board (claimed by the sender)', received ? item.from_board : ''],
@@ -303,10 +303,12 @@ function openArtifact(item, opener) {
     }
     openDetailPane({
         key, opener, title: name, host: hooks.detailHost || null,
-        sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '),
+        sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words
         facts: facts.filter(([, v]) => v != null && v !== ''),
-        body: link && link.preview ? (host, { signal, isStale }) => { // the Operator's "Who can read this" (#5577) sits above the document, for a stored artifact
-            if (hex) { const slot = el('div', 'detail-readers'); host.before(slot); readersAllowed(hex, link.server).then(ok => { if (ok && !isStale()) slot.append(readersDisclosure(hex, link.server)); }).catch(() => {}); }
+        details: link && link.preview && hex ? (h, { isStale }) => { // the Operator's "Who can read this" (#5577) is behind Details with the facts, for a stored artifact
+            readersAllowed(hex, link.server).then(ok => { if (ok && !isStale()) h.add(readersDisclosure(hex, link.server)); }).catch(() => {});
+        } : null,
+        body: link && link.preview ? (host, { signal, isStale }) => {
             return renderArtifact(host, hex ? `coral://artifacts/${hex}` : item.uri || '', { server: link.server, filename: name, mediaType: item.media_type, contentURL: link.contentURL }, { signal, isStale, renderContent: renderText, openEntry: () => {}, setMeta: () => {} }); } : null,
         actions,
         onClose: () => { root?.querySelectorAll('tr[aria-current="true"]').forEach(r => r.removeAttribute('aria-current')); },

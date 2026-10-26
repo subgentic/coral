@@ -49,6 +49,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
         });
         await S.run('the pane of a received file lists where it came from and that it was not scanned; Keep toggles and sends PUT then DELETE', async () => {
             await click('#team-panel-artifacts button', /build-log\.txt/); await settle(500);
+            await ev(`(() => { const t = window.__tp.pane().querySelector('.details-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`); await settle(150); // the facts are behind the Details button (#7775)
             const pane = await ev(`window.__na.text(window.__tp.pane())`);
             assert.ok(/Received from\s*build-server/.test(pane) && /Not scanned/.test(pane) && /Board \(claimed by the sender\)\s*ci/.test(pane), `the details are in the pane: ${pane.slice(0, 300)}`);
             assert.ok(await ev(`(() => { const b = [...window.__tp.pane().querySelectorAll('button')].find(x => /^Keep$/.test(x.textContent.trim())); if (!b) return false; b.click(); return true; })()`), 'a Keep button'); await settle(300);

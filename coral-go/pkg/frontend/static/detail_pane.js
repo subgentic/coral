@@ -3,7 +3,8 @@
  * a title (17/700) with one line under it, key facts as a label and a value, the document, and the actions pinned at the bottom, the primary first. Escape and the close button close it and give the focus back to the row that opened it
  * (found again by its key if the table was drawn again meanwhile); choosing another row replaces the content; opening a tab clears it.
  *
- *   openDetailPane({ key, title, sub, facts: [[label, value]], body(el, { signal, isStale }), actions: [{ label, primary, run(button) | href, download }], opener, onClose, resizable, backLabel, focus, subTitle })
+ *   openDetailPane({ key, title, sub, facts: [[label, value]], body(el, { signal, isStale }), actions: [{ label, primary, run(button) | href, download }], opener, onClose, resizable, backLabel, focus, subTitle, details })
+ *   Content first (#7775): facts: [[label, value]] and whatever `details(h, { isStale })` adds through h.add(node) / h.clear() are behind ONE closed "Details" button in the header row (details_disclosure.js); the document comes straight under the header.
  *   resizable: the pane is a right sidebar like a goal page's task column (#7702): a handle on its left edge, dragged or moved with the keys, the width remembered (dock_resize.js). backLabel: the phone's way back ("Knowledge" -> "<- Knowledge"), shown only where the pane is a sheet. focus: false leaves the focus where it is (the pane opened by itself).
  *   closeDetailPane({ restoreFocus: true })      isDetailOpen()      detailKey()
  * `body` fills the document into an element; it is passed an AbortSignal and a staleness check, and everything it draws is its own (text from an artifact is data: textContent or the sanitising renderers only). */
@@ -11,6 +12,7 @@ import { importOnce } from './import_once.js';
 const { el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js'); // the goal page column's resize
 const { foldWayBack } = await importOnce('./way_back.js');
+const { makeDetails } = await importOnce('./details_disclosure.js'); // the facts and more behind one Details button (#7775)
 import { trapTab } from './dialog_focus.js';
 
 let current = null; // { key, opener, onClose, abort, gen }
@@ -48,7 +50,7 @@ function addResizeHandle(aside) {
     attachDockResize(grip, { panel: aside, row, key: 'coral-detail-width', apply: (w) => { aside.style.setProperty('--detail-w', w ? `${w}px` : ''); value(); } }).restore();
 }
 
-export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true, subTitle = '' }) {
+export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true, subTitle = '', details = null }) {
     const aside = host || pane(); // host: a pane of its own, a sheet over a panel (the agent's Artifacts), not the team page's aside
     if (!aside) return false;
     if (current && current.aside !== aside) closeDetailPane(); // one document at a time: the other pane is put away
@@ -59,6 +61,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     // Replacing keeps the opener the pane was first opened from, so Escape returns to a row that still exists: the newest row is the one chosen.
     current = { key, opener: opener || (replacing ? current.opener : document.activeElement), onClose, abort, gen: mine, aside, hosted: !!host };
     aside.replaceChildren();
+    const more = makeDetails(); // the facts and the rest: one closed button in the header row, the document straight under the header
     const head = el('div', 'detail-head');
     const text = el('div', 'detail-head-text');
     if (backLabel && !host) { // the phone's way back: a text link named for where it goes, on the title's line (#7734); a pane that is not a sheet has the close button
@@ -70,7 +73,10 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     }
     const h = el('h2', 'detail-title', title); h.id = 'detail-pane-title'; h.tabIndex = -1;
     text.append(h);
-    if (sub) { const p = el('p', 'detail-sub', sub); if (subTitle) p.title = subTitle; text.append(p); } // subTitle: the exact time behind a time in words
+    const subRow = el('div', 'detail-sub-row'); // the one line under the title: its facts in words, and the Details button at its end (nothing taller than the line)
+    if (sub) { const p = el('p', 'detail-sub', sub); if (subTitle) p.title = subTitle; subRow.append(p); } // subTitle: the exact time behind a time in words
+    subRow.append(more.button);
+    text.append(subRow);
     if (backLabel && !host) foldWayBack(text, '.detail-back', '.detail-title');
     const close = el('button', 'detail-close');
     close.type = 'button'; close.setAttribute('aria-label', 'Close details');
@@ -81,7 +87,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     if (facts.length) {
         const dl = el('dl', 'detail-facts');
         for (const [k, v] of facts) { if (v == null || v === '') continue; dl.append(el('dt', null, k), el('dd', null, v)); }
-        if (dl.children.length) main.append(dl);
+        if (dl.children.length) more.add(dl);
     }
     const doc = el('div', 'detail-doc');
     main.append(doc);
@@ -99,7 +105,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
         if (a.danger) b.classList.add('btn-danger'); // a destructive button in a bar is a button with an edge, the delete confirmation's class (UI/UX), never bare text
         foot.append(b);
     }
-    aside.append(head, main);
+    aside.append(head, more.panel, main);
     if (actions.length) aside.append(foot);
     if (resizable && !host) addResizeHandle(aside); else aside.style.removeProperty('--detail-w'); // a pane that is not resizable has its own width, not the last one's
     aside.hidden = false;
@@ -109,6 +115,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
         document.body.classList.add('team-detail-open');
         rail(true);
     }
+    if (details) { try { details({ add: more.add, clear: more.clear }, { isStale: () => current === null || current.gen !== mine }); } catch { /* the pane is shown without them */ } }
     if (body) { try { body(doc, { signal: abort.signal, isStale: () => current === null || current.gen !== mine }); } catch (e) { doc.textContent = 'This document could not be shown.'; } }
     if (focus) h.focus({ preventScroll: true }); // keyboard and screen reader: the pane's title (the row's own button keeps the way back)
     live(`${title}, details`);

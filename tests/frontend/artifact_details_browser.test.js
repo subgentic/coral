@@ -1,0 +1,107 @@
+// Artifact previews put the content first (#7775, the operator: "in the artifacts view, we don't need to see all this detail every time ... reserve the space for the actual content"): under the header comes the content
+// itself, and the facts and "Who can read this" are behind ONE closed "Details" button that a person opens, by keyboard too, and that stays open once they did. The same rule in the documents pane (the team page's Artifacts
+// and Knowledge) and in the full artifact viewer, at 1280 and 390 px; nothing in Details repeats what the header says (type, size, when). The artifacts, the knowledge and the readers are stubbed in the page. Isolated dev server.
+const assert = require('node:assert/strict');
+const { connect } = require('./agent_view_harness');
+const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
+const BASE = require('./test_base').BASE;
+const { removeBoards } = require('./helpers/board_cleanup');
+
+const TEAM = `qa-det-${Date.now() % 100000}`;
+const HEX = 'c'.repeat(64);
+const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
+const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00Z', index: '---\ntype: Team Knowledge Bundle\ntitle: ' + TEAM + '\ntags: [a, b]\ntimestamp: 2026-10-22T04:22:31Z\n---\n\n# Index\n\nWhat the team knows.\n', agents: [{ name: 'Backend Dev', content: 'Backend knowledge text.' }] };
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { settle } = require('./helpers/wait').bind(ev);
+    const S = scenarios();
+    const stub = () => ev(`(() => { const R = window.fetch.bind(window); const j = (b) => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        const items = [{ id: ${JSON.stringify(HEX)}, name: 'Design review.txt', media_type: 'text/plain', size: 1800, task_id: 11, task_title: 'Review', created_at: new Date(Date.now() - 7 * 60000).toISOString(), uri: 'coral://artifacts/${HEX}', available: true, source: 'completion', provenance: 'uploaded', produced_by: 'Worker A' }];
+        window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = String((o && o.method) || 'GET').toUpperCase();
+            if (m === 'GET' && /^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname)) return j({ project: ${JSON.stringify(TEAM)}, artifacts: items, has_more: false, total: 1 });
+            if (m === 'GET' && /^\\/api\\/artifacts\\/[0-9a-f]{64}\\/readers$/.test(url.pathname)) return j({ machine_owner: 'op', owners: [{ kind: 'operator', id: 'x', records: 1, teams: [{ label: 't' }] }], note: 'A Coral control, not an operating-system boundary.' });
+            if (m === 'GET' && /^\\/api\\/artifacts\\/[0-9a-f]{64}$/.test(url.pathname)) return Promise.resolve(new Response('The design review text.', { headers: { 'Content-Type': 'text/plain' } }));
+            if (m === 'GET' && /\\/api\\/teams\\/detail\\/[^/]+\\/knowledge$/.test(url.pathname)) return j(${JSON.stringify(BUNDLE)});
+            return R(u, o); };
+        return true; })()`);
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true }); await settle(350); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const geometry = (headSel, docSel) => ev(`(() => { const h = document.querySelector(${JSON.stringify(headSel)}), d = document.querySelector(${JSON.stringify(docSel)}); if (!h || !d) return null; return { gap: Math.round(d.getBoundingClientRect().top - h.getBoundingClientRect().bottom) }; })()`);
+    const key = async (k, code, vk, text) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk, text }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); };
+    const toggle = (scope) => `document.querySelector(${JSON.stringify(scope + ' .details-toggle')})`;
+    const open = async (w, h, mobile) => {
+        await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await ev(`localStorage.removeItem('coral-details-open'); true`);
+        await seed(ev, TEAM); await stub();
+        if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
+        await openTeam(ev, waitFor, TEAM).catch(() => {});
+    };
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [label, w, h, mobile] of VIEWS) {
+            console.log(label);
+            await open(w, h, mobile);
+            await S.run(`${label}: an artifact's pane has the content straight under the header, and Details closed (no facts table, no "Who can read this" on show)`, async () => {
+                await goTab(ev, settle, 'Artifacts'); await waitFor(`!!window.__tp.rows() && window.__tp.rows().length >= 1`, 'the artifact row', 10000);
+                await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /Design review/.test(window.__na.name(x))).click(); true`);
+                await waitFor(`!!window.__tp.pane() && /The design review text\\./.test(window.__na.text(window.__tp.pane()))`, 'the content in the pane', 10000);
+                await waitFor(`!!document.querySelector('#detail-pane .details-toggle:not([hidden])')`, 'the Details button');
+                const g = await geometry('#detail-pane .detail-head', '#detail-pane .detail-doc'); assert.ok(g && g.gap >= 0 && g.gap <= 16, `the content's top is within 16 px of the header's bottom: ${JSON.stringify(g)}`);
+                const s = await ev(`(() => { const t = ${toggle('#detail-pane')}, p = document.querySelector('#detail-pane .detail-details'); return { expanded: t.getAttribute('aria-expanded'), controls: t.getAttribute('aria-controls') === p.id, hidden: p.hidden, facts: window.__na.text(window.__tp.pane()), sub: document.querySelector('#detail-pane .detail-sub').textContent, exact: document.querySelector('#detail-pane .detail-sub').title, name: window.__na.name(t) }; })()`);
+                assert.deepEqual([s.expanded, s.controls, s.hidden], ['false', true, true], 'closed to begin with, the button names its panel'); assert.match(s.name, /^Details/);
+                assert.ok(!/Who can read this|MIME|Producer|Worker A/.test(s.facts), 'no facts and no readers on show: ' + s.facts.slice(0, 200));
+                assert.ok(/^Text \u00b7 1\.8 KB \u00b7 \d+ min ago$/.test(s.sub), `the header says the type, the size and when: ${s.sub}`); assert.ok(s.exact, 'with the exact time on hover');
+                await shot(`artifact-details-closed-${w}`);
+            });
+            await S.run(`${label}: Details opens and closes by keyboard (Enter, Space), shows the facts and "Who can read this", repeats nothing the header says, and stays open for the next artifact`, async () => {
+                await ev(`${toggle('#detail-pane')}.focus(); true`);
+                await key('Enter', 'Enter', 13, '\r'); await settle(200);
+                let s = await ev(`(() => { const t = ${toggle('#detail-pane')}, p = document.querySelector('#detail-pane .detail-details'); return { expanded: t.getAttribute('aria-expanded'), hidden: p.hidden, text: window.__na.text(p), focus: document.activeElement === t }; })()`);
+                assert.deepEqual([s.expanded, s.hidden, s.focus], ['true', false, true], 'Enter opens it and the focus stays on the button');
+                assert.ok(/MIME\s*text\/plain/.test(s.text) && /Task/.test(s.text) && /Producer\s*Worker A/.test(s.text), 'the facts: ' + s.text.slice(0, 200));
+                assert.ok(!/(^|\s)(Type|Size|Created)\s/.test(s.text.replace(/MIME/, '')), 'nothing repeats the header (type, size, time): ' + s.text.slice(0, 200));
+                await waitFor(`!!document.querySelector('#detail-pane .detail-details .artifact-readers')`, 'Who can read this inside Details', 8000);
+                assert.equal(await ev(`window.__na.text(document.querySelector('#detail-pane .detail-details')).includes('Who can read this')`), true, 'Who can read this is in the same panel');
+                await shot(`artifact-details-open-${w}`);
+                await key(' ', 'Space', 32, ' '); await settle(200);
+                assert.equal(await ev(`document.querySelector('#detail-pane .detail-details').hidden`), true, 'Space closes it');
+                await key(' ', 'Space', 32, ' '); await settle(200);
+                assert.equal(await ev(`document.querySelector('#detail-pane .detail-details').hidden`), false, 'and opens it');
+                await ev(`document.querySelector('#detail-pane .detail-close').click(); true`); await settle(200);
+                await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /Design review/.test(window.__na.name(x))).click(); true`);
+                await waitFor(`!!document.querySelector('#detail-pane .details-toggle:not([hidden])')`, 'the Details button again');
+                assert.equal(await ev(`${toggle('#detail-pane')}.getAttribute('aria-expanded')`), 'true', 'it stays open for the next one: remembered for the viewer');
+                await ev(`${toggle('#detail-pane')}.click(); true`); await settle(100);
+                await ev(`document.querySelector('#detail-pane .detail-close').click(); true`);
+            });
+            await S.run(`${label}: the Knowledge pane has the entry straight under the header and its front matter behind Details`, async () => {
+                await ev(`localStorage.removeItem('coral-details-open'); true`);
+                await goTab(ev, settle, 'Knowledge'); await waitFor(`!!window.__tp.rows() && window.__tp.rows().length >= 2`, 'the knowledge table', 10000);
+                await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /^Index$/.test(window.__na.name(x))).click(); true`);
+                await waitFor(`!!document.querySelector('#detail-pane .knowledge-md')`, 'the entry', 8000);
+                const g = await geometry('#detail-pane .detail-head', '#detail-pane .detail-doc'); assert.ok(g && g.gap >= 0 && g.gap <= 16, `the entry's top is within 16 px of the header's bottom: ${JSON.stringify(g)}`);
+                assert.equal(await ev(`document.querySelector('#detail-pane .detail-details').hidden`), true, 'the front matter is closed');
+                await ev(`${toggle('#detail-pane')}.focus(); true`); await key('Enter', 'Enter', 13, '\r'); await settle(200);
+                const t = await ev(`window.__na.text(document.querySelector('#detail-pane .detail-details'))`); assert.ok(/Type\s*Team Knowledge Bundle/.test(t) && /Tags/.test(t), 'the front matter in Details: ' + t.slice(0, 160));
+                await ev(`${toggle('#detail-pane')}.click(); document.querySelector('#detail-pane .detail-close').click(); true`);
+                await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /Backend Dev/.test(window.__na.name(x))).click(); true`); await settle(300);
+                assert.equal(await ev(`document.querySelector('#detail-pane .details-toggle').hidden`), true, 'an entry without front matter has no Details button');
+                await ev(`document.querySelector('#detail-pane .detail-close').click(); true`);
+            });
+            await S.run(`${label}: the artifact viewer has the content straight under the header and "Who can read this" behind Details`, async () => {
+                await ev(`localStorage.removeItem('coral-details-open'); (async () => { const m = await import((window.__coralStatic || '/static/') + 'artifact_viewer.js'); m.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'Design review.txt' }); })(); true`);
+                await waitFor(`!!document.querySelector('#artifact-viewer .details-toggle:not([hidden])') && /The design review text\\./.test(document.querySelector('#artifact-viewer .artifact-viewer-body').textContent)`, 'the viewer with its content and Details', 10000);
+                const g = await geometry('#artifact-viewer .artifact-viewer-header', '#artifact-viewer .artifact-viewer-body'); assert.ok(g && g.gap >= 0 && g.gap <= 16, `the content's top is within 16 px of the header's bottom: ${JSON.stringify(g)}`);
+                assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), true, 'closed to begin with');
+                await ev(`${toggle('#artifact-viewer')}.focus(); true`); await key('Enter', 'Enter', 13, '\r'); await settle(200);
+                assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), false, 'Enter opens it');
+                assert.ok(await ev(`window.__na.text(document.querySelector('#artifact-viewer .artifact-viewer-readers')).includes('Who can read this')`), 'Who can read this is inside');
+                await key(' ', 'Space', 32, ' '); await settle(200);
+                assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), true, 'Space closes it');
+                await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
+            });
+        }
+        await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
+    } finally { await removeBoards(ev, [TEAM]); await client.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

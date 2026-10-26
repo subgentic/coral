@@ -13,6 +13,7 @@ import { trapTab } from './dialog_focus.js';
 import { importOnce } from './import_once.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
 const { readersAllowed, readersDisclosure } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
+const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can read this" behind the one Details button (#7775)
 // Asked for when used, not imported: this module loads lazily and may only import startup modules statically.
 const { attachComments, commentBoard } = await importOnce('./artifact_comments.js');
 const { attachVersions } = await importOnce('./artifact_versions.js');
@@ -27,6 +28,7 @@ let _comments = null;    // the comments panel of the viewer (#5182)
 let _versions = null;    // the version bar of the viewer (#6472)
 let _hex = '';           // the artifact on show and what it was opened with, for a version chosen from the bar
 let _lastOpts = {};
+let _details = null;     // the Details button and its panel (the readers' row)
 let _overlay = 0;        // its entry in overlay_history.js while it is open on a phone (#5219)
 
 /** Render an artifact's text: Markdown through the strict renderer, anything else as plain text. */
@@ -56,6 +58,8 @@ function _build() {
         <div class="artifact-viewer-readers" hidden></div>
         <div class="artifact-viewer-main"><div class="artifact-viewer-body"></div></div>
     </div>`;
+    _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers') });
+    d.querySelector('.artifact-viewer-title').after(_details.button); // between the name and Download: the content is straight under the header
     d.addEventListener('click', (e) => { if (e.target === d) closeArtifactViewer(); });
     d.querySelector('.artifact-viewer-close').addEventListener('click', closeArtifactViewer);
     // A Coral artifact linked inside the shown file opens here too (the strict renderer keeps
@@ -113,9 +117,8 @@ export function openArtifactViewer(hex, opts = {}) {
     _comments.open(hex, opts.server, commentBoard(opts), true); // true: the comments of earlier versions of a series too (the server answers the plain list for an artifact in none)
     _versions.open(hex, opts.server, { switched: !!opts.switched });
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
-    const readers = d.querySelector('.artifact-viewer-readers');
-    readers.hidden = true; readers.replaceChildren();
-    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { readers.replaceChildren(readersDisclosure(hex, opts.server)); readers.hidden = false; } }).catch(() => {});
+    _details.clear();
+    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) _details.add(readersDisclosure(hex, opts.server)); }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,

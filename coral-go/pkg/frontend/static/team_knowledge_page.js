@@ -55,14 +55,12 @@ function factsBlock(f) {
     return dl.children.length ? dl : null;
 }
 
-/** Draws the entry in `host`: the facts, then the Markdown. The text is on screen as plain text first, and the rendered DOM replaces it when the renderer is there (a failed load leaves the plain text, never markup).
+/** Draws the entry's Markdown in `host` (its front matter is the pane's Details, entryFacts). The text is on screen as plain text first, and the rendered DOM replaces it when the renderer is there (a failed load leaves the plain text, never markup).
  *  A link to another entry of the team opens it through `open`; any other relative link is plain text. */
 async function showEntry(host, entry, open) {
     host.replaceChildren();
     if (!entry.text) { host.append(Object.assign(el('pre', 'team-task-text knowledge-text'), { textContent: 'Nothing written yet.' })); return; }
-    const { facts, body } = splitFrontMatter(entry.text);
-    const block = facts && factsBlock(facts);
-    if (block) host.append(block);
+    const { body } = splitFrontMatter(entry.text); // the front matter is behind the pane's Details button (#7775), not above the text
     const plain = Object.assign(el('pre', 'team-task-text knowledge-text'), { textContent: body });
     host.append(plain);
     try {
@@ -88,14 +86,19 @@ async function showEntry(host, entry, open) {
     } catch { /* the plain text stays */ }
 }
 
+/** The entry's front matter as the block the pane's Details button holds, or null when it has none. */
+const entryFacts = (entry) => { const { facts } = splitFrontMatter(entry.text || ''); return facts ? factsBlock(facts) : null; };
+
 function openEntry(entry, opener, { focus = true } = {}) {
+    let more = null;
+    const showFacts = () => { if (!more) return; more.clear(); const b = entryFacts(entry); if (b) more.add(b); };
     const when = model.data && model.data.created_at;
     const editable = entry.key !== 'index'; // the team's index is written by the distillation; an agent's notes can be changed by hand
     let bodyHost = null, editButton = null, status = null;
     const foot = () => document.querySelector('#detail-pane .detail-foot');
     const say = (t) => { if (status) { status.textContent = ''; status.textContent = t; } };
     const showText = () => showEntry(bodyHost, entry, (e) => openEntry(e, opener));
-    const toView = (focus = true) => { showText(); foot()?.replaceChildren(status, editButton); if (focus) editButton.focus({ preventScroll: true }); };
+    const toView = (focus = true) => { showFacts(); showText(); foot()?.replaceChildren(status, editButton); if (focus) editButton.focus({ preventScroll: true }); };
     // Edit: the text becomes a box and the pane's bar reads Cancel at the left and Save at the right with a status line; Escape and Cancel ask once, in the bar, when the text was changed.
     function startEdit() {
         const box = el('textarea', 'knowledge-editor'); box.value = entry.text || ''; box.setAttribute('aria-label', `Notes of ${entry.name}`); box.rows = 16;
@@ -127,7 +130,7 @@ function openEntry(entry, opener, { focus = true } = {}) {
         box.focus();
     }
     openDetailPane({
-        key: entry.key, opener, title: entry.name, sub: [whenText(when), entry.from].filter(Boolean).join(' · '), subTitle: exactTime(when), resizable: true, backLabel: 'Knowledge', focus,
+        key: entry.key, opener, title: entry.name, sub: [whenText(when), entry.from].filter(Boolean).join(' · '), subTitle: exactTime(when), resizable: true, backLabel: 'Knowledge', focus, details: (h) => { more = h; showFacts(); },
         body: (host) => { bodyHost = host; showText(); },
         actions: editable ? [{ label: 'Edit', run: (b) => { editButton = b; startEdit(); } }] : [],
         onClose: () => { root?.querySelectorAll('tr[aria-current="true"]').forEach(r => r.removeAttribute('aria-current')); },

@@ -145,7 +145,7 @@
 .detail-back:hover { text-decoration: underline; }
 .team-page.detail-sheet .detail-back { display: inline-flex; min-height: 44px; min-width: 44px; }
 .detail-head-text > .phone-title-row > .detail-back { flex: 0 0 auto; margin: 0; }
-.knowledge-facts { padding: 0 0 12px; border-bottom: 1px solid var(--border); font-size: 0.75rem; } /* the entry's front matter: a quiet block of facts above the text */
+.knowledge-facts { font-size: 0.75rem; } /* the entry's front matter: a quiet block of facts, behind the pane's Details button */
 .knowledge-facts dt, .knowledge-facts dd { font-size: 0.75rem; }
 .knowledge-facts dd { color: var(--text-primary); }
 .knowledge-tags { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -265,7 +265,6 @@
     #agentic-panel-artifacts-view td:last-child { vertical-align: middle; } /* Created on the line of the name, whose button is 44 px tall */
     #agentic-panel-artifacts-view .team-table th:nth-child(5), #agentic-panel-artifacts-view .team-table td:nth-child(5) { display: table-cell; } /* the page's phone table is Name and State; here Created stays beside the name, as in any narrow panel */
 }
-.detail-readers:not(:empty) { margin-bottom: 12px; }
 .team-row-cell .team-artifact-badge { white-space: normal; overflow-wrap: anywhere; } /* the origin words wrap in the name cell (a 390 px phone at 200% text) instead of widening the table */
 .team-artifacts-error { color: var(--error-text); } /* a failed load is red, not the grey of the other lines (UX #4469) */
 

@@ -28,16 +28,18 @@ const BASE = require('./test_base').BASE;
                     return real(u, o); }; })(); true`);
         };
 
-        console.log('1. Tab reaches "Who can read this" in the artifact viewer, and wraps around it');
+        console.log('1. Tab reaches the Details button and, once it is open, "Who can read this" in the artifact viewer, and wraps around them');
         await start(1280, 900, false);
-        await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${'a'.repeat(64)}', {})); true`);
-        await waitFor(`!!document.querySelector('.artifact-readers > summary')`, 'the disclosure');
+        await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${'a'.repeat(64)}', {})); localStorage.removeItem('coral-details-open'); true`);
+        await waitFor(`!!document.querySelector('.artifact-viewer .details-toggle:not([hidden])')`, 'the Details button (#7775: the readers are behind it)');
+        await ev(`document.querySelector('.artifact-viewer .details-toggle').click(); true`);
+        await waitFor(`!!document.querySelector('.artifact-readers > summary') && document.querySelector('.artifact-readers > summary').getClientRects().length > 0`, 'the disclosure, shown by Details');
         await ev(`document.querySelector('.artifact-viewer-close').focus(); true`);
         await key('Tab', 'Tab', 9);
         assert.equal(await active(), 'summary.', 'Tab from Close goes to Who can read this (it went back to Download)');
         await key('Tab', 'Tab', 9);
-        assert.match(await active(), /^a\.btn$|^a\./, 'from the last control Tab wraps to the first (Download)');
-        await key('Tab', 'Tab', 9, 8); // Shift+Tab from Download goes to the last control
+        assert.equal(await active(), 'button.details-toggle', 'from the last control Tab wraps to the first (Details)');
+        await key('Tab', 'Tab', 9, 8); // Shift+Tab from Details goes to the last control
         assert.equal(await active(), 'summary.', 'Shift+Tab from the first control goes to the last, the disclosure');
         await ev(`document.querySelector('.artifact-viewer-close')?.click(); true`);
 
