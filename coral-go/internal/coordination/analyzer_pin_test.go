@@ -827,8 +827,8 @@ func TestPinKeyFindingsAndRecommendations(t *testing.T) {
 	assert.Equal(t, "Coordination lag candidate: 3 ready task(s) assigned to currently idle subscribers remain unclaimed.", got[4])
 	assert.Equal(t, "Notification churn observed in 4 incident(s): reminders dispatched for tasks already claimed or in rapid (<2m) succession.", got[5])
 	assert.Equal(t, "Active duration observation: 5 task(s) in progress exceed threshold (candidate status, not proof of inactivity).", got[6])
-	// the wording says ">70%" while the detector's own thresholds are a half (jaccard) or 70% overlap with 3 shared words
-	assert.Equal(t, "Duplicate scope candidates: 6 pair(s) of concurrently created tasks share >70% title token similarity.", got[7])
+	// the wording states the detector's own rule (#8292): a half the words in common (jaccard), or 70% of the shorter title with 3 shared words, within 6 hours
+	assert.Equal(t, "Duplicate scope candidates: 6 pair(s) of tasks created within 6 hours of each other have overlapping titles (at least half their words in common, or 70% of the shorter title's words with 3 or more shared).", got[7])
 
 	// each finding appears on its own condition
 	for _, c := range []struct {

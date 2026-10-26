@@ -175,7 +175,7 @@ func generateKeyFindings(f ObservableFacts, h HeuristicSignals) []string {
 			len(h.ActiveWithoutProgress)))
 	}
 	if len(h.DuplicateScopeCandidates) > 0 {
-		findings = append(findings, fmt.Sprintf("Duplicate scope candidates: %d pair(s) of concurrently created tasks share >70%% title token similarity.",
+		findings = append(findings, fmt.Sprintf("Duplicate scope candidates: %d pair(s) of tasks created within 6 hours of each other have overlapping titles (at least half their words in common, or 70%% of the shorter title's words with 3 or more shared).",
 			len(h.DuplicateScopeCandidates)))
 	}
 
