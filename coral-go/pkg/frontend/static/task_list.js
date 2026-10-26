@@ -375,17 +375,17 @@ async function loadMoreBoardTasks() {
     const board = _boardList.board;
     const cursor = _boardList.nextCursor;
     if (!board || !cursor || _boardList.busyMore) return;
-    const list = _boardList; list.busyMore = true; list.moreError = '';
+    const boardPage = _boardList; boardPage.busyMore = true; boardPage.moreError = '';
     renderBoardTaskList();
     const seq = _boardTasksLoadSeq;
     let data;
     try {
         data = await _boardTasksFetch(board, `/tasks?status=completed&limit=${BOARD_TASK_PAGE}&cursor=${encodeURIComponent(cursor)}`);
     } catch (e) {
-        list.moreError = 'Could not load more tasks. Try again.';
-        showToast(list.moreError, true);
-    } finally { list.busyMore = false; }
-    if (!data) { if (_boardList === list) renderBoardTaskList(); return; }
+        boardPage.moreError = 'Could not load more tasks. Try again.';
+        showToast(boardPage.moreError, true);
+    } finally { boardPage.busyMore = false; }
+    if (!data) { if (_boardList === boardPage) renderBoardTaskList(); return; }
     // The user moved to another board meanwhile, or the list was reloaded from scratch.
     if (_boardList.board !== board || _boardList.nextCursor !== cursor || seq !== _boardTasksLoadSeq) return;
     _boardList.older = [..._boardList.older, ...(data.tasks || [])];
