@@ -101,7 +101,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     q.setAttribute('aria-label', spec.searchLabel);
     const clearQ = make('button', 'list-bar-clear-q', '×'); clearQ.type = 'button'; clearQ.setAttribute('aria-label', 'Clear search'); clearQ.hidden = true;
     wrap.append(q, clearQ);
-    const count = make('span', 'list-bar-count');
+    const count = make('span', 'list-bar-count'); count.hidden = !!spec.hideCount; // keep settled search announcements without a visible toolbar count
     // The count is not a live region itself: a list that changes under the person (agents coming and going, a poll) would have a screen reader announce it again and again. A hidden status region says it
     // only after the person changed the search or a filter (apply), which is when they want to hear how many are left.
     const live = make('span', 'list-bar-live'); live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite');

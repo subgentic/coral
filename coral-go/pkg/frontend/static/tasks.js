@@ -28,7 +28,7 @@ import { _updateDepTags } from './task_dep_picker.js';
 import './task_reminders.js';
 import { _boardTaskPollTick, _boardTaskPollTimer, _toggleHideCompleted, _toggleTaskSort, renderBoardTaskList } from './task_list.js';
 import { lazyFns, loadTaskDetail } from './lazy_panels.js';
-export { boardTaskFetchHooks, boardTaskPollHooks, loadAgentTasks, loadBoardTasks, loadMoreBoardTasks, renderBoardTaskList, renderTaskList, startBoardTaskPoll, stopBoardTaskPoll } from './task_list.js';
+export { boardTaskFetchHooks, boardTaskPollHooks, loadAgentTasks, loadBoardTasks, renderBoardTaskList, renderTaskList, startBoardTaskPoll, stopBoardTaskPoll } from './task_list.js';
 export { hideCreateTaskModal, showCreateTaskModal, submitCreateTask } from './task_create.js';
 // The task detail dialog is loaded the first time a task is opened (#5364: 43 KB the page does not need to start). Its functions are stubs until then (lazy_panels.js); closing one that was never opened has nothing to do.
 const detail = lazyFns(loadTaskDetail, ['_doCompleteAgentTask', 'completeAgentTask', 'showAgentTaskDetailModal']);
@@ -143,7 +143,6 @@ registerActions({
     'task-hide-done': () => _toggleHideCompleted(),
     'task-open': el => withId(el.dataset.taskId, id => (el.dataset.kind === 'agent' ? window.showAgentTaskDetailModal(id) : openTaskPage(id))), // an agent's own task is the dialog's; a board's is the team page's task page (#7644)
     'task-subagent-open': el => { const sid = textOf(el.dataset.subagentId); if (sid) showSubagentDetailModal(sid); },
-    'task-load-more': () => window.loadMoreBoardTasks(),
     'dep-picker-toggle': el => {
         const list = depContainer(el) && document.getElementById(el.dataset.container + '-list');
         if (list) { list.style.display = list.style.display === 'none' ? '' : 'none'; el.setAttribute('aria-expanded', String(list.style.display !== 'none')); }
