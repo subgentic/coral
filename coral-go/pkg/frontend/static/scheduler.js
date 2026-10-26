@@ -100,7 +100,7 @@ registerGroupSource('jobs', {
                     { key: 'last-run', label: 'Last run', width: '9rem', line: 2, tone: 'tertiary', sort: 'date', sortValue: job => job.last_run?.started_at, cell: job => {
                         const run = job.last_run;
                         if (!run) return lastWords(run);
-                        const cls = run.status === 'failed' ? 'goal-state-task-blocked' : run.status === 'running' ? 'goal-state-task-active' : run.status === 'completed' && run.exit_reason !== 'ended_while_coral_was_down' ? 'goal-state-task-done' : '';
+                        const cls = run.status === 'failed' ? 'team-state-bad' : run.status === 'running' ? 'goal-state-task-active' : run.status === 'completed' && run.exit_reason !== 'ended_while_coral_was_down' ? 'goal-state-task-done' : '';
                         return DT.chip(lastWords(run), cls);
                     } },
                     { key: 'next', label: 'Next', width: '7rem', line: 1, tone: 'tertiary', sort: 'date', sortValue: job => job.enabled ? job.next_fire_at : '', cell: job => {
@@ -295,7 +295,7 @@ const AGENT_NAMES = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', anti
 
 function resultCell(r) {
     const unseen = r.status === 'completed' && r.exit_reason === 'ended_while_coral_was_down';
-    const cls = unseen ? '' : r.status === 'completed' ? 'goal-state-task-done' : r.status === 'failed' || r.status === 'killed' ? 'goal-state-task-blocked' : r.status === 'running' ? 'goal-state-task-active' : '';
+    const cls = unseen ? '' : r.status === 'completed' ? 'goal-state-task-done' : r.status === 'failed' || r.status === 'killed' ? 'team-state-bad' : r.status === 'running' ? 'goal-state-task-active' : '';
     const cell = DT.el('span'), chip = DT.chip(resultWords(r), cls); chip.classList.add('sched-status'); cell.append(chip);
     const failure = runFailure(r); if (failure) cell.append(' ', DT.tag(`(${failure.short})`));
     return cell;
