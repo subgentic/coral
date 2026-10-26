@@ -16,11 +16,11 @@ const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); /
 const DT = await importOnce('./data_table.js');
 let agentsTableState = DT.tableState();
 
-const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Offline', unknown: 'No signal yet', unavailable: 'Unavailable' };
+const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Ended', unknown: 'No signal yet', unavailable: 'Unavailable' };
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
 const FIRST = ['available', 'busy', 'queued', 'sleeping', 'offline'];
 const CHIP_WORD = { available: 'Free', unknown: 'Unknown' };
-const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', queued: 'goal-state-blocked', needs_input: 'goal-state-blocked', offline: 'team-state-bad', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
+const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', queued: 'goal-state-blocked', needs_input: 'goal-state-blocked', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
 const PROVIDER = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', terminal: 'Terminal' };
 
 const model = { team: '', data: null, filter: 'all', search: '', failed: '', loading: false };
@@ -98,7 +98,7 @@ function remindButton(agent) {
 }
 
 // The Orchestrator first, then the agents that need a person (the header's "N need attention" opens this tab): a waiting agent, then a queued one, then an offline one; the rest in the sidebar's order.
-const NEEDS = ['waiting', 'needs_input', 'queued', 'offline'];
+const NEEDS = ['waiting', 'needs_input', 'queued']; // an ended agent needs no one: it sorts with the rest (#8271)
 const rank = (a) => { const i = NEEDS.indexOf(a.availability); return i < 0 ? NEEDS.length : i; };
 const isOrchestrator = (a) => /orchestrator/i.test(`${a.role || ''} ${a.name || ''}`);
 function sidebarIndex(a) {
@@ -138,6 +138,8 @@ function draw() {
     if (!data) return;
     if (!data.agents.length) { body.append(el('div', 'goals-empty', 'No agents on this board yet.')); return; }
     drawChips(body);
+    const ended = data.agents.filter(a => a.availability === 'offline').length; // the tab lists every member, the sidebar only the live ones: this says why they differ (#8271)
+    body.append(el('p', 'goals-note team-agents-count', `${data.agents.length} agent${data.agents.length === 1 ? '' : 's'}${ended ? `, ${ended} ended` : ''}`));
     const rows = visibleAgents();
     body.append(DT.dataTable({
         label: `Agents, ${rows.length}`, rows, rowKey: ag => ag.subscriber_id || ag.session_id || ag.name, state: agentsTableState,

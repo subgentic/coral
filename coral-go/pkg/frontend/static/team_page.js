@@ -105,7 +105,7 @@ function drawHeader() {
     document.title = `${keyLabel(S.team)} · Coral`;
 }
 
-const ATTENTION = ['queued', 'offline', 'needs_input', 'waiting']; // a waiting agent (a trust prompt, a question, an approval) needs a person (UI/UX, #7513)
+const ATTENTION = ['queued', 'needs_input', 'waiting']; // an ended agent (availability offline: no live terminal) is not one that needs a person, #8271; // a waiting agent (a trust prompt, a question, an approval) needs a person (UI/UX, #7513)
 function drawStatus(data) {
     const s = $('team-page-status'); if (!s) return;
     if (!data || !Array.isArray(data.agents)) { s.textContent = ''; s.className = 'team-page-status'; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
