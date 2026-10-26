@@ -5,6 +5,7 @@ import { plural } from './format.js';
 import { importOnce } from './import_once.js';
 import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
+import { mountSettingsView } from './settings_view.js'; // the pane's rows (a startup module: the Settings rows draw from it)
 const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, serverHas } = await importOnce('./update_api.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
@@ -91,14 +92,6 @@ function managed(s) {
     return m;
 }
 
-function row(id, label, desc, checked, disabled) {
-    const r = mk('div', 'settings-row'); const dt = mk('dt', 'toggle-dt'); const dd = mk('dd');
-    const l = mk('label', null, label); l.htmlFor = id; const d = mk('span', 'toggle-desc', desc); d.id = `${id}-desc`; dt.append(l, d);
-    const wrap = mk('label', 'check-hit'); const input = document.createElement('input'); input.type = 'checkbox'; input.id = id; input.checked = !!checked; input.disabled = !!disabled; input.setAttribute('aria-describedby', d.id);
-    wrap.append(input); dd.append(wrap); r.append(dt, dd);
-    return r;
-}
-
 // The page that runs the approval (Run workflow with the tag). A constant: no field the server or the release feed sent is ever put into this link.
 let _hubForTests = null; // a test says it is the Hub without booting the Hub page
 export function _setHubForTests(v) { _hubForTests = v; }
@@ -149,7 +142,7 @@ function waitingBlock(s) {
     return d;
 }
 
-/** Draw the pane from the last status (and ask for a fresh one). */
+/** Draw the pane from the last status (and ask for a fresh one): the card, the channel and the facts are parts this module draws; the switch, the hub line and the facts are rows of a settings_view (the pane is Settings like the rest). */
 export async function showUpdatesPane() {
     const host = body();
     if (!host) return;
@@ -158,42 +151,54 @@ export async function showUpdatesPane() {
     host.replaceChildren();
     if (!s || !s.enabled) { host.append(mk('p', 'update-calm', 'Updates are not available in this Coral.')); return; }
     const unmanaged = isManaged(s);
-    host.append(unmanaged ? managed(s) : card(s));
+    const fields = [{ key: 'card', type: 'notice', render: slot => slot.append(unmanaged ? managed(s) : card(s)) }];
     if (s.hasChannel) {
-        host.append(channelBlock(s));
-        // The waiting list is the operator's, and the client reads the release list only on Agentic: it shows while Agentic is the choice and the server sent releases (never through the Hub)
-        const sync = () => {
-            host.querySelector('.update-waiting')?.remove();
-            const agentic = !inHub() && !!(host.querySelector('#uc-agentic') || {}).checked;
-            const auto = host.querySelector('.update-channel-auto'); if (auto) auto.hidden = !agentic;
-            if (agentic && s.waiting.length) host.querySelector('.update-channel').after(waitingBlock(s));
-        };
-        host.querySelector('.update-channel').addEventListener('change', sync); sync();
+        fields.push({
+            key: 'channel', type: 'notice',
+            render: slot => {
+                slot.append(channelBlock(s));
+                // The waiting list is the operator's, and the client reads the release list only on Agentic: it shows while Agentic is the choice and the server sent releases (never through the Hub)
+                const sync = () => {
+                    slot.querySelector('.update-waiting')?.remove();
+                    const agentic = !inHub() && !!(slot.querySelector('#uc-agentic') || {}).checked;
+                    const auto = slot.querySelector('.update-channel-auto'); if (auto) auto.hidden = !agentic;
+                    if (agentic && s.waiting.length) slot.querySelector('.update-channel').after(waitingBlock(s));
+                };
+                slot.querySelector('.update-channel').addEventListener('change', sync); sync();
+            },
+        });
     }
     // Through Coral Hub the switch is not the hub's to change (the machine's owner sets it on that computer), so it is not drawn there
-    const grid = mk('dl', 'info-grid settings-grid');
     const reason = unmanaged ? (s.installKind === 'homebrew' ? 'Homebrew manages updates.' : 'This install cannot update itself.') : '';
-    if (serverHas.autoPref) grid.append(row('settings-update-auto', 'Check for updates automatically', unmanaged ? reason : `Downloads in the background and checks the release is genuine. ${windowsInstall(s) ? 'Windows asks for your permission, and you choose when to install it.' : 'The update installs when you relaunch Coral, never while you work.'} Only the latest releases of Coral\'s own GitHub repository are used.`, unmanaged ? false : s.auto !== false, unmanaged));
-    // The Coral Hub relaunch switch lives in Settings > Network and Hub (with the rest of what the hub may do here); this pane only says where it is
-    if (hubOn !== null && !unmanaged && s.hubRelaunch) { // Coral Hub's relaunch exists in this build (#7343)
-        const r = mk('div', 'settings-row'); const dt = mk('dt', null, 'Relaunch from Coral Hub'); const dd = mk('dd');
-        // On Windows Coral Hub cannot install at all (the install asks the person here): the sentence says so and there is no switch to change (#7338)
-        dd.append(mk('span', 'toggle-desc', `${windowsInstall(s) ? HUB_RELAUNCH_WINDOWS : hubOn ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF} `));
-        if (!windowsInstall(s)) {
-            const go = mk('button', 'btn btn-small', 'Change in Network and Hub'); go.type = 'button';
-            go.addEventListener('click', () => window.showSettingsModal && window.showSettingsModal('network'));
-            dd.append(go);
-        }
-        r.append(dt, dd); grid.append(r);
+    if (!isCloud() && serverHas.autoPref) {
+        const how = windowsInstall(s) ? 'Windows asks for your permission, and you choose when to install it.' : 'The update installs when you relaunch Coral, never while you work.';
+        fields.push({
+            key: 'auto', type: 'toggle', id: 'settings-update-auto', label: 'Check for updates automatically', default: unmanaged ? false : s.auto !== false, disabledWhen: () => unmanaged,
+            help: unmanaged ? reason : { text: 'Downloads in the background and checks the release is genuine.', more: `${how} Only the latest releases of Coral's own GitHub repository are used.` },
+        });
     }
-    if (!isCloud() && grid.children.length) host.append(grid);
-    const facts = mk('dl', 'info-grid settings-grid update-facts');
-    const fact = (k, v) => { const r = mk('div', 'settings-row'); r.append(mk('dt', null, k), mk('dd', null, v)); facts.append(r); };
-    if (s.checkedAt) fact('Last checked', stamp(s.checkedAt));
-    fact('Version', s.installed || 'unknown');
-    if (s.last && s.last.result === 'relaunched' && /^hub:/.test(s.last.by) && stamp(s.last.at)) fact('Last update', `Relaunched from Coral Hub at ${stamp(s.last.at)}`); // the time, never the hub user's name
-    host.append(facts);
-    host.append(mk('p', 'update-calm update-privacy', 'Coral contacts GitHub only, to read the release list and download the package.'));
+    // The Coral Hub relaunch switch lives in Settings > Network and Hub (with the rest of what the hub may do here); this pane only says where it is
+    if (!isCloud() && hubOn !== null && !unmanaged && s.hubRelaunch) { // Coral Hub's relaunch exists in this build (#7343)
+        fields.push({
+            key: 'hub_relaunch', type: 'custom', label: 'Relaunch from Coral Hub',
+            render: slot => {
+                slot.classList.add('update-fact');
+                // On Windows Coral Hub cannot install at all (the install asks the person here): the sentence says so and there is no switch to change (#7338)
+                slot.append(mk('span', 'toggle-desc', `${windowsInstall(s) ? HUB_RELAUNCH_WINDOWS : hubOn ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF} `));
+                if (!windowsInstall(s)) {
+                    const go = mk('button', 'btn btn-small', 'Change in Network and Hub'); go.type = 'button';
+                    go.addEventListener('click', () => window.showSettingsModal && window.showSettingsModal('network'));
+                    slot.append(go);
+                }
+            },
+        });
+    }
+    const fact = (key, label, value) => fields.push({ key, type: 'custom', label, render: slot => { slot.classList.add('update-fact'); slot.textContent = value; } });
+    if (s.checkedAt) fact('checked', 'Last checked', stamp(s.checkedAt));
+    fact('version', 'Version', s.installed || 'unknown');
+    if (s.last && s.last.result === 'relaunched' && /^hub:/.test(s.last.by) && stamp(s.last.at)) fact('last', 'Last update', `Relaunched from Coral Hub at ${stamp(s.last.at)}`); // the time, never the hub user's name
+    fields.push({ key: 'privacy', type: 'notice', render: slot => slot.append(mk('p', 'update-calm update-privacy', 'Coral contacts GitHub only, to read the release list and download the package.')) });
+    mountSettingsView(host, { mode: 'settings', saveBar: false, fields });
 }
 
 /** Save what the pane changed, with Apply: "Check for updates automatically" and the update channel (each only when it changed; a no-op when the pane was not drawn). Returns true when something was saved. */
