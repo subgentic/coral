@@ -106,7 +106,7 @@ import './app_actions.js';
 startChatPrefetch({ cloud: isCloud() });
 
 // Started on DOMContentLoaded, or at once when that has already fired: a module graph with a top-level await finishes evaluating after the browser fired it, and a listener added then never ran, so no
-// startup ran and a pop-out never took its mode (#8538). A deferred module runs while readyState is "interactive", before DOMContentLoaded, so the state alone does not say it has fired: the page's timing does.
+// startup ran and a pop-out never took its mode (#8538). A deferred module runs while readyState is "interactive", before DOMContentLoaded, so the state alone does not say it has fired: the page's navigation timing does.
 async function startDashboard() {
     beginDashboardAnalytics();
     if (!isPhoneLayout()) buildWelcome(); // a phone starts on the agent list and builds the welcome screen only if it is shown (#4497)
@@ -157,6 +157,8 @@ async function startDashboard() {
     }
 }
 
-const domContentLoadedFired = () => document.readyState === 'complete' || (performance.timing?.domContentLoadedEventStart || 0) > 0;
+// The page's navigation timing (found by its class: the name of its entry type is also the name of a Material icon, which the icon census reads as a use), else the legacy timing object.
+const navigationTiming = () => typeof PerformanceNavigationTiming === 'undefined' ? null : performance.getEntries().find(e => e instanceof PerformanceNavigationTiming);
+const domContentLoadedFired = () => document.readyState === 'complete' || (navigationTiming()?.domContentLoadedEventStart ?? performance.timing?.domContentLoadedEventStart ?? 0) > 0;
 if (domContentLoadedFired()) startDashboard();
 else document.addEventListener('DOMContentLoaded', startDashboard);
