@@ -40,7 +40,7 @@ func TestRosterCheckLooksLikeTheExample(t *testing.T) {
 	assert.NotContains(t, out, "\n", "typed as one paste")
 	assert.NotContains(t, strings.ToLower(out), "progressing")
 	assert.True(t, strings.HasPrefix(out, lines[0]+" • "+lines[1]), out)
-	assert.Equal(t, lines[0]+"\n- "+lines[1], strings.SplitN(FormatList(lines), "\n- "+lines[2], 2)[0])
+	assert.Equal(t, lines[0]+"\n- "+lines[1], strings.SplitN(formatList(lines), "\n- "+lines[2], 2)[0])
 }
 
 // Rule 1: "progressing" is never said from post volume; with everyone awake working the check says so, and nothing else.

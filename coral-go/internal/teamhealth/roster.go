@@ -332,9 +332,9 @@ func composeRoster(in CheckInput) string {
 	return strings.Join(ComposeLines(in), " • ")
 }
 
-// FormatList writes the lines as the check reads when shown: the header, then one "- " line each (what Compose types is the same
+// formatList writes the lines as the check reads when shown: the header, then one "- " line each (what Compose types is the same
 // text on one line).
-func FormatList(lines []string) string {
+func formatList(lines []string) string {
 	if len(lines) == 0 {
 		return ""
 	}
