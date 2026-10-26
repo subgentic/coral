@@ -122,7 +122,7 @@ const BASE = require('./test_base').BASE;
             : window.__realFetch(u, o); true`);
         await ev(`showSettingsModal()`);
         await waitFor(`(() => { const i = document.getElementById('settings-api-key'); return i && i.value && i.value !== 'Loading...'; })()`, 'the API key', { timeout: 8000 });
-        const key = await ev(`(() => { const i = document.getElementById('settings-api-key'); const row = i.closest('.settings-api-key-row'); const show = document.getElementById('settings-api-key-show'); const copy = document.getElementById('settings-api-key-copy');
+        const key = await ev(`(() => { const i = document.getElementById('settings-api-key'); const row = i.closest('.sv-ctl-line'); const show = document.getElementById('settings-api-key-show'); const copy = document.getElementById('settings-api-key-copy');
             return { type: i.type, readOnly: i.readOnly, w: i.getBoundingClientRect().width, rowW: row.getBoundingClientRect().width, showHidden: show.hidden, copyDisabled: copy.disabled }; })()`);
         assert.equal(key.type, 'password', 'masked');
         assert.ok(key.readOnly);
