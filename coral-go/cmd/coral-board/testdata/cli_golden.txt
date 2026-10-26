@@ -103,7 +103,7 @@ Output:
 
 Environment:
   CORAL_URL   Coral's address (default: the one the running Coral recorded,
-              else http://localhost:8420, this platform's port)
+              else http://localhost:DEFAULTPORT, this platform's port)
   CORAL_PORT  Server port (overrides CORAL_URL)
 
 Windows:
@@ -222,7 +222,7 @@ Output:
 
 Environment:
   CORAL_URL   Coral's address (default: the one the running Coral recorded,
-              else http://localhost:8420, this platform's port)
+              else http://localhost:DEFAULTPORT, this platform's port)
   CORAL_PORT  Server port (overrides CORAL_URL)
 
 Windows:
@@ -342,7 +342,7 @@ Output:
 
 Environment:
   CORAL_URL   Coral's address (default: the one the running Coral recorded,
-              else http://localhost:8420, this platform's port)
+              else http://localhost:DEFAULTPORT, this platform's port)
   CORAL_PORT  Server port (overrides CORAL_URL)
 
 Windows:

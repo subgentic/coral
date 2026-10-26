@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/config"
 )
 
 // The help pages and the flag errors of coral-board, byte for byte (testdata/cli_golden.txt): the helpers they share with coral-agent
@@ -25,7 +27,7 @@ func TestCLIHelpAndFlagErrorsAreGolden(t *testing.T) {
 	for _, args := range cases {
 		r := runBoard(t, rs.URL, t.TempDir(), args...)
 		fmt.Fprintf(&got, "=== coral-board %s\nexit %d\n--- stdout\n%s--- stderr\n%s", strings.Join(args, " "), r.code,
-			strings.ReplaceAll(r.stdout, rs.URL, "SERVER"), strings.ReplaceAll(r.stderr, rs.URL, "SERVER"))
+			normalize(r.stdout, rs.URL), normalize(r.stderr, rs.URL))
 		if !strings.HasSuffix(r.stdout, "\n") && r.stdout != "" {
 			got.WriteString("\n")
 		}
@@ -37,4 +39,11 @@ func TestCLIHelpAndFlagErrorsAreGolden(t *testing.T) {
 	want, err := os.ReadFile(path)
 	require.NoError(t, err, "run with UPDATE_CLI_GOLDEN=1 once to write it")
 	require.Equal(t, string(want), got.String())
+}
+
+// normalize turns the two values that differ by run or platform into words: the test server's URL, and this platform's default port (8420, but
+// 8450 on Windows, config.DefaultPort), which the help text names. Everything else stays byte for byte.
+func normalize(out, serverURL string) string {
+	out = strings.ReplaceAll(out, serverURL, "SERVER")
+	return strings.ReplaceAll(out, fmt.Sprintf("http://localhost:%d", config.DefaultPort), "http://localhost:DEFAULTPORT")
 }
