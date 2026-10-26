@@ -91,12 +91,25 @@ func TestRosterClassifiesEveryAgent(t *testing.T) {
 		require.NoError(t, err)
 	}
 	out := h.check()
-	assert.Contains(t, out, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · 1 working · 1 WAITING · 1 at a prompt · 1 idle · 1 of unknown state · 1 asleep · 1 offline · 0 claimable tasks")
+	assert.Contains(t, out, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · 1 working · 1 WAITING · 1 need input · 1 idle · 1 of unknown state · 1 asleep · 1 offline · 0 claimable tasks")
 	assert.NotContains(t, strings.ToLower(out), "progressing")
 	assert.NotContains(t, out, "awake agents are working")
 	assert.NotContains(t, out, "\n")
 	assert.Contains(t, out, "Waiting on YOU (Orchestrator), 1: Waiter ")
 	assert.Contains(t, out, "posts.", "volume is only counted")
+	// One word per meaning (#8294): WAITING is a wait on a task or a person, "need input" is an agent at a permission prompt (the dashboard's Needs input); the check no longer says "at a prompt".
+	assert.NotContains(t, out, "1 at a prompt", "the header counts them as need input")
+	// The agent at a prompt is named under "Needs you", before the idle one (most urgent first), and the one with no signal is named too, each with its ack id to clear it.
+	prompted, idler, blind := strings.Index(out, "Prompted: needs input"), strings.Index(out, "Idler: idle"), strings.Index(out, "Blind: no signal")
+	require.Greater(t, prompted, 0, "the agent at a prompt is named: "+out)
+	require.Greater(t, idler, 0, "the idle agent is named: "+out)
+	require.Greater(t, blind, 0, "the agent with no signal is named: "+out)
+	assert.Less(t, prompted, idler, "needs input comes before idle")
+	assert.Less(t, idler, blind, "no signal comes after idle")
+	for _, name := range []string{"Prompted", "Idler", "Blind"} {
+		i := strings.Index(out, name+": ")
+		assert.Contains(t, out[i:i+strings.Index(out[i:], "[ack ")+len("[ack ")+9], "[ack ", name+" keeps its ack id")
+	}
 }
 
 // Waits are grouped by who they wait on, the recipient's first; a task wait is on the task's owner, a role names its member, an

@@ -58,7 +58,7 @@ func TestRosterNeverSaysProgressingFromPosts(t *testing.T) {
 	assert.Contains(t, text, "1 idle")
 	// a prompt too, and an offline agent is counted
 	in.Roster.Counts = counts(2, 0, 1, 0, 0, 2)
-	assert.Contains(t, ComposeLines(in)[0], "1 at a prompt")
+	assert.Contains(t, ComposeLines(in)[0], "1 need input")
 	assert.Contains(t, ComposeLines(in)[0], "2 offline")
 }
 

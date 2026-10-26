@@ -86,7 +86,7 @@ func (r *Roster) headerCounts() string {
 		fmt.Sprintf("%d WAITING", r.Counts[StateWaiting]),
 	}
 	if n := r.Counts[StatePrompt]; n > 0 {
-		parts = append(parts, fmt.Sprintf("%d at a prompt", n))
+		parts = append(parts, fmt.Sprintf("%d need input", n))
 	}
 	if n := r.Counts[StateBlocked]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d BLOCKED by a usage limit", n))

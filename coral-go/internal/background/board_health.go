@@ -281,7 +281,24 @@ func (m *BoardHealthMonitor) idleItems(ctx context.Context, subs []board.Subscri
 			continue
 		}
 		sig, known := m.signal(ctx, a.SessionID)
-		if !known || sig.InTurn || sig.NeedsInput || sig.Since.IsZero() || now.Sub(sig.Since) < m.idleAfter {
+		// An agent at a permission prompt needs a person: named first (rank 1, the dashboard's "Needs input"), and an agent Coral has no signal from is named too, after the idle ones (rank 3), so the
+		// counts in the check's header are never anonymous (#8294).
+		if !known {
+			items = append(items, teamhealth.Item{Rank: 3, Agent: teamhealth.Name(sub.SubscriberID),
+				Problem: "no signal from it yet, so its state is unknown",
+				Suggest: "read its terminal to see what it is doing", Key: "unknown|" + sub.SubscriberID, State: "unknown"})
+			continue
+		}
+		if sig.NeedsInput && !sig.InTurn {
+			problem := "needs input, stopped at a prompt"
+			if !sig.Since.IsZero() {
+				problem = fmt.Sprintf("needs input, stopped at a prompt for %s", teamhealth.Age(now.Sub(sig.Since)))
+			}
+			items = append(items, teamhealth.Item{Rank: 1, Agent: teamhealth.Name(sub.SubscriberID), Problem: problem,
+				Suggest: "read its terminal to see what it asks, then tell the Operator", Key: "input|" + sub.SubscriberID, State: sig.Since.UTC().Format(time.RFC3339)})
+			continue
+		}
+		if sig.InTurn || sig.NeedsInput || sig.Since.IsZero() || now.Sub(sig.Since) < m.idleAfter {
 			continue
 		}
 		if _, blocked := m.blockedByLimit(ctx, a); blocked {
