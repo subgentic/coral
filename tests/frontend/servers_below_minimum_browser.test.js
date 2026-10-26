@@ -112,10 +112,10 @@ const CLOUD_PRELOAD = `(() => {
         await install();
         await ev(`(() => { window.__arrayShape = true; T.state.hub = true; T.state.servers = ${JSON.stringify(LIVE)}; return true; })()`);
         await ev(`window.switchNavTab('servers'); true`);
-        await waitFor(`document.querySelectorAll('#servers-view .servers-row').length >= ${SERVERS.length}`, 'the self-hosted hub server rows', 8000);
+        await waitFor(`document.querySelectorAll('#servers-view .dt-row').length >= ${SERVERS.length}`, 'the self-hosted hub server rows', 8000);
         // the hint is on a server's page (#7638): open each in turn
         const own = await ev(`(async () => { const until = async f => { for (let i = 0; i < 100 && !f(); i++) await new Promise(r => setTimeout(r, 20)); }; const out = {};
-            for (const id of [...document.querySelectorAll('#servers-view .servers-row[data-id]')].map(r => r.dataset.id)) { document.querySelector('#server-row-' + id + ' [data-action=open]').click(); await until(() => document.querySelector('.servers-page'));
+            for (const id of [...document.querySelectorAll('#servers-view .dt-row[data-key]:not([data-key="local"])')].map(r => r.dataset.key)) { document.querySelector('#server-row-' + id + ' [data-action=open]').click(); await until(() => document.querySelector('.servers-page'));
                 out[id] = [...document.querySelectorAll('.servers-page .server-below-minimum')].map(n => ({ text: n.textContent, kids: n.children.length })); document.getElementById('servers-back').click(); await until(() => document.querySelector('table.servers-table')); }
             return out; })()`);
         assert.deepEqual(own.m1, [{ text: 'Update Coral to 1.4.61', kids: 0 }], 'm1 in the self-hosted list');
