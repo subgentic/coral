@@ -27,12 +27,13 @@ function make(tag, className, text) {
 export function buildMoreMenu(id, items) {
     const wrap = make('span', 'list-bar-more');
     const btn = make('button', 'sidebar-collapse-btn list-bar-more-btn'); btn.type = 'button'; btn.id = `${id}-more`;
-    btn.title = 'More'; btn.setAttribute('aria-label', 'More'); btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', `${id}-more-menu`);
+    // named "More actions", not "More": a page's header has a More button too, and the board page shows both at 390 px (#7713)
+    btn.title = 'More actions'; btn.setAttribute('aria-label', 'More actions'); btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', `${id}-more-menu`);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     for (const [k, v] of [['width', '18'], ['height', '18'], ['viewBox', '0 0 24 24'], ['fill', 'currentColor'], ['aria-hidden', 'true']]) svg.setAttribute(k, v);
     for (const x of [5, 12, 19]) { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('cx', String(x)); c.setAttribute('cy', '12'); c.setAttribute('r', '1.8'); svg.append(c); }
     btn.append(svg);
-    const menu = make('div', 'team-more-menu list-bar-more-menu'); menu.id = `${id}-more-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More');
+    const menu = make('div', 'team-more-menu list-bar-more-menu'); menu.id = `${id}-more-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More actions');
     for (const it of items) {
         const b = make('button', null, it.label); b.type = 'button'; b.setAttribute('role', 'menuitem');
         b.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); it.run(); });
