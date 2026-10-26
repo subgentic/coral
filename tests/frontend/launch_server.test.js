@@ -112,7 +112,7 @@ const { pathToFileURL } = require('url');
 
     // Access refusals (#3068 C5) read as the one refusalMessage wording, naming
     // the server, never as the raw code; other 403s are unchanged.
-    const { refusalMessage } = await import(pathToFileURL(path.join(dir, 'cloud_servers.js')).href);
+    const { refusalMessage } = await import(pathToFileURL(path.join(dir, 'server_access.js')).href);
     for (const body of [
         { error: 'access_mode', required: 'launch', hub_mode: 'view', local_mode: 'launch' },
         { error: 'access_mode', required: 'launch', hub_mode: 'launch', local_mode: 'interact' },

@@ -193,7 +193,7 @@ const contrast = (a, b) => {
         assert.deepEqual(v.options, ['View', 'Interact', 'Launch (disabled)']);
         assert.equal(v.value, 'interact'); assert.equal(v.help, 'View until this computer connects.');
         // A choice is immediate: one PATCH with the word, no dialog, focus stays on the select.
-        const accessOf = id => ev(`import((window.__coralStatic || '/static/') + 'cloud_servers.js').then(cs => cs.serverAccess(${JSON.stringify(id)})).then(a => a && { effective: a.effective, mayInteract: a.mayInteract })`);
+        const accessOf = id => ev(`import((window.__coralStatic || '/static/') + 'server_access.js').then(cs => cs.serverAccess(${JSON.stringify(id)})).then(a => a && { effective: a.effective, mayInteract: a.mayInteract })`);
         const pick = (id, mode) => ev(`(() => { const s = document.querySelector('#server-row-${id} select'); s.focus(); s.value = ${JSON.stringify(mode)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await ev(`window.__patches = []; true`);
         await pick('m1', 'launch');

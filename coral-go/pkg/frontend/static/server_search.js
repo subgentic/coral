@@ -1,5 +1,5 @@
 /* The Servers list's search box (#4778): the shared list bar with only a search and a count, above the list, shown from six machines up (below that the whole list is on one screen).
- * The two lists (servers.js on a self-hosted hub, cloud_servers.js on the hosted one) call syncServersBar(all, noun) as they draw and keep what serverVisible says. The list is the one the
+ * The two source components of the Servers controller call syncServersBar(all, noun) as they draw and keep what serverVisible says. The list is the one the
  * tab holds: nothing is asked of the server. */
 import { buildListBar } from './list_bar.js';
 import { EMPTY, clean, chips, isFiltered, without, matches, countText } from './server_filters.js';

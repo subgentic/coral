@@ -1,6 +1,6 @@
 /* Servers tab (#3070): the top-level place to see and manage the machines this
  * dashboard reaches. On the Cloud Hub it lists the enrolled machines
- * (cloud_servers.js); on a self-hosted hub, the registered remotes (servers.js).
+ * and registered remotes through the same servers.js controller.
  * The tab shows when there is something to manage: always on the Cloud Hub,
  * and on a local Coral once a remote server is configured. Deep links go to a
  * row: /servers/<id>, the server chips in the agent list, and the "Open
@@ -35,14 +35,8 @@ export async function showServersTabContent(focusId) {
     const body = document.getElementById('servers-tab-body');
     if (!body) return;
     _active = true;
-    if (isCloud()) {
-        importOnce('./hub_nav.js').then(n => n.loadHubNav()).catch(() => {});
-        const m = await importOnce('./cloud_servers.js', 'the server list');
-        await m.renderCloudServersInto(body);
-    } else {
-        const m = await importOnce('./servers.js');
-        await m.renderServersInto(body);
-    }
+    if (isCloud()) importOnce('./hub_nav.js').then(n => n.loadHubNav()).catch(() => {});
+    await (await importOnce('./servers.js')).renderServersInto(body);
     if (!_active) return;
     focusRow(focusId);
 }
@@ -51,15 +45,14 @@ export async function showServersTabContent(focusId) {
 export async function leaveServersTab() {
     if (!_active) return;
     _active = false;
-    if (isCloud()) (await importOnce('./cloud_servers.js')).hideCloudServers();
-    else (await importOnce('./servers.js')).hideServersModal();
+    (await importOnce('./servers.js')).hideServersModal();
 }
 
 async function focusRow(focusId) {
     const heading = document.getElementById('servers-tab-title');
     if (!focusId) { if (heading) heading.focus(); return; }
     const id = 'server-row-' + String(focusId).replace(/[^A-Za-z0-9_-]/g, '_');
-    if (isCloud()) (await importOnce('./cloud_servers.js')).expandServer(focusId); // a deep link opens the machine's details
+    if (isCloud()) (await importOnce('./servers.js')).expandServer(focusId); // a deep link opens the machine's details
     const row = document.getElementById(id) || document.getElementById('server-row-' + focusId);
     if (!row) { if (heading) heading.focus(); return; }
     row.scrollIntoView({ block: 'center' });

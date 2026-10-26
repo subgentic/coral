@@ -70,7 +70,7 @@ const BASE = require('./test_base').BASE;
 
         console.log('2b. While the access answer is asked again the dialog keeps the last answer (dimmed, note up), and changes only when the new one arrives (#5004)');
         let release; hold = new Promise(r => { release = r; });
-        await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'cloud_servers.js')).invalidateServerAccess(); document.dispatchEvent(new CustomEvent('coral:server-access-loaded')); return true; })()`);
+        await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'server_access.js')).invalidateServerAccess(); document.dispatchEvent(new CustomEvent('coral:server-access-loaded')); return true; })()`);
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the stale answer must still be showing after the held request has had time to go out; there is nothing to wait on for a change that must not happen
         assert.equal(await ev(`document.getElementById('launch-access-note').textContent !== ''`), true, 'the note is still up while the answer is asked again');
         assert.equal(await ev(`document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').classList.contains('hub-blocked')`), true, 'the launch button is still dimmed');

@@ -45,7 +45,7 @@ let _warming = null;
 function _warmAccess(server) {
     if (_warming || (_cloudServers && _cloudServers.serverListSettled())) return;
     const before = _cloudServers ? JSON.stringify(_cloudServers.cachedServerAccess(server)) : 'null';
-    _warming = importOnce('./cloud_servers.js')
+    _warming = importOnce('./server_access.js')
         .then(m => { _cloudServers = m; return m.serverAccess(server); })
         .then(a => { if (JSON.stringify(a) !== before) document.dispatchEvent(new CustomEvent('coral:server-access-loaded')); })
         .catch(() => {})
@@ -147,7 +147,7 @@ export async function refreshHubAccess(session) {
     if (!session || session.type !== 'live' || !isCloud()) { setHubReadOnly(session, null); return; }
     const server = sessionServer(session);
     if (!server || server === 'local') { setHubReadOnly(session, null); return; }
-    const { serverAccess } = await importOnce('./cloud_servers.js');
+    const { serverAccess } = await importOnce('./server_access.js');
     const a = await serverAccess(server);
     // A hub_read_only frame on the terminal socket is authoritative until the agent
     // is reselected: a lookup that resolves after it (a slow or cached Servers list)

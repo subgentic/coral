@@ -83,7 +83,7 @@ const BASE = require('./test_base').BASE;
             window.__setServers = (r, c) => { remote = r; cloud = c; };
             window.fetch = (url, opts) => { const u = String(url); if (u === '/api/servers' && (!opts || !opts.method || opts.method === 'GET')) return Promise.resolve(new Response(JSON.stringify(window.__cloudShape ? { servers: cloud } : remote), { status: 200, headers: { 'Content-Type': 'application/json' } })); return realFetch(url, opts); };
             const out = {};
-            const hub = await import(${S}+'servers.js'), cl = await import(${S}+'cloud_servers.js');
+            const hub = await import(${S}+'servers.js'), cl = await import(${S}+'servers.js');
             const host = document.createElement('div'); host.id = 'fs-servers'; document.body.appendChild(host);
             await hub.renderServersInto(host);
             const add = host.querySelector('[data-action="add"]'); out.hasAdd = !!add; if (add) add.focus();
@@ -93,14 +93,14 @@ const BASE = require('./test_base').BASE;
             hub.hideServersModal(); host.remove();
             window.__cloudShape = true;
             const host2 = document.createElement('div'); host2.id = 'fs-cloud'; document.body.appendChild(host2);
-            await cl.renderCloudServersInto(host2);
+            await cl.renderServersInto(host2, { source: 'cloud' });
             host2.querySelector('#cs-enroll-toggle')?.click(); // "Add a machine" is folded while the account has machines (#5992): open it first
             const code = host2.querySelector('input.cloud-code'); out.hasCode = !!code;
             if (code) { code.focus(); code.value = 'AB12'; code.setSelectionRange(2, 3); }
             window.__setServers(remote, cloud.concat([{ id: 'c2', label: 'desktop', online: false, allow_launch: false, last_seen: new Date().toISOString() }]));
-            await cl.renderCloudServersInto(host2);
+            await cl.renderServersInto(host2, { source: 'cloud' });
             const again = document.activeElement; out.cloudKept = !!again && again.classList.contains('cloud-code') && host2.contains(again); out.typed = again && again.value; out.caret = again && [again.selectionStart, again.selectionEnd];
-            cl.hideCloudServers(); host2.remove(); window.fetch = realFetch;
+            cl.hideServersModal(); host2.remove(); window.fetch = realFetch;
             return out; })()`);
         assert.ok(real.hasAdd && real.hubKept, `Servers: focus stays on Add server after the list is redrawn: ${JSON.stringify(real)}`);
         assert.ok(real.hasCode && real.cloudKept, `Cloud servers: focus stays on the enrollment code box: ${JSON.stringify(real)}`);

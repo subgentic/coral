@@ -123,7 +123,7 @@ const FX = {
         await ev(`(() => { const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname; if (p === '/api/servers') return json({ servers: [{ id: 'm1', label: 'Alpha', online: true, access_mode: 'launch', local_mode: 'launch', created_at: '2026-10-01T00:00:00Z', last_seen: '2026-10-20T08:00:00Z' }] }); if (/\\/api\\/system\\/update$/.test(p)) return json({ relaunching: true }); return R(u, o); };
             const h = document.createElement('div'); h.id = 'rb-host'; document.body.appendChild(h); return true; })()`);
-        await ev(`import(${S} + 'cloud_servers.js').then(m => m.renderCloudServersInto(document.getElementById('rb-host')))`);
+        await ev(`import(${S} + 'servers.js').then(m => m.renderServersInto(document.getElementById('rb-host'), { source: 'cloud' }))`);
         await waitFor(`!!document.querySelector('.server-relaunch-badge')`, 'the badge', 5000);
         const bd = await ev(`(() => { const b = document.querySelector('.server-relaunch-badge'); return { role: b.getAttribute('role'), text: b.textContent.trim(), name: b.getAttribute('aria-label'), tab: b.tabIndex }; })()`);
         check(`the badge is an image named from its visible word and not a tab stop (${JSON.stringify(bd)})`, bd.role === 'img' && bd.name.startsWith(bd.text) && bd.tab === -1);

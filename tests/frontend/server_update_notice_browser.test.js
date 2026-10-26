@@ -113,9 +113,9 @@ const NONE = ['srv-current', 'srv-unknown', 'srv-odd'];
             window.fetch = (u, o) => String(u).startsWith('/api/servers')
                 ? Promise.resolve(new Response(JSON.stringify({ servers: ${JSON.stringify(SERVERS.map(({ id, label, status }) => ({ id, label, online: status === 'online', last_seen: '2026-10-13T00:00:00Z', access_mode: 'view' })))} }), { status: 200, headers: { 'content-type': 'application/json' } }))
                 : real(u, o);
-            const cs = await import((window.__coralStatic||'/static/')+'cloud_servers.js');
+            const cs = await import((window.__coralStatic||'/static/')+'servers.js');
             // The Cloud Hub's server list, as the Servers tab renders it (#3070).
-            await cs.renderCloudServersInto(document.getElementById('servers-tab-body'));
+            await cs.renderServersInto(document.getElementById('servers-tab-body'), { source: 'cloud' });
             await new Promise(r => setTimeout(r, 200));
             const out = {};
             for (const main of document.querySelectorAll('#servers-tab-body .cs-row')) {
@@ -129,7 +129,7 @@ const NONE = ['srv-current', 'srv-unknown', 'srv-odd'];
                 } : null;
                 out[li.dataset.id + ':disabled'] = [...main.querySelectorAll('button, select'), ...li.querySelectorAll('button, select')].filter(b => b.disabled).length;
             }
-            cs.hideCloudServers();
+            cs.hideServersModal();
             window.fetch = real;
             return out;
         })()`);

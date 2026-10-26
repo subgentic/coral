@@ -85,9 +85,9 @@ const BASE = require('./test_base').BASE;
                         : new Response('{}', { status: 503 }))
                     : real(u, o);
                 const host = document.getElementById('servers-tab-body') || document.body.appendChild(document.createElement('div'));
-                const cs = await import((window.__coralStatic || '/static/') + 'cloud_servers.js');
-                await cs.renderCloudServersInto(host);
-                cs.hideCloudServers();
+                const cs = await import((window.__coralStatic || '/static/') + 'servers.js');
+                await cs.renderServersInto(host, { source: 'cloud' });
+                cs.hideServersModal();
                 window.fetch = real;
                 const w = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
                 const bad = []; for (let n = w.nextNode(); n; n = w.nextNode()) if (n.nodeValue.trim() === 'null' || /\bnull\b/.test(n.nodeValue)) bad.push(n.nodeValue.trim().slice(0, 40));

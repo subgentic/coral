@@ -91,7 +91,7 @@ function explainRefusal(resp) {
     if (/\/api\/sessions\/launch(-team)?$/.test(settingsPath(resp.url || ''))) return;
     if (!/json/i.test(resp.headers.get('Content-Type') || '')) return;
     resp.clone().json().then(async body => {
-        const { refusalMessage } = await importOnce('./cloud_servers.js');
+        const { refusalMessage } = await importOnce('./server_access.js');
         const msg = refusalMessage(resp.status, body);
         if (!msg) return;
         _lastExplained = Date.now();
@@ -182,7 +182,7 @@ const signOut = signOutThisBrowser; // drafts, pending messages, recent folders,
 function buildAccountMenu(email) {
     const menu = h('div', { className: 'cloud-account-menu', id: 'cloud-account-menu', hidden: true, role: 'menu' },
         h('div', { className: 'cloud-account-email', text: email, title: email }),
-        h('button', { type: 'button', className: 'overflow-menu-item', role: 'menuitem', text: 'Servers', onclick: () => { setOpen(false); importOnce('./cloud_servers.js', 'the server list').then(m => m.showCloudServers(), () => {}); } }),
+        h('button', { type: 'button', className: 'overflow-menu-item', role: 'menuitem', text: 'Servers', onclick: () => { setOpen(false); importOnce('./servers.js', 'the server list').then(m => m.showServersModal(), () => {}); } }),
         // The hub's own pages, on this origin (the dashboard is served by the hub): plain links, same tab. Account is coral-go#1, Saved for later the hub's roll-up of every machine's saved messages (#4596).
         h('a', { className: 'overflow-menu-item', role: 'menuitem', href: '/account', text: 'Account' }),
         h('a', { className: 'overflow-menu-item', role: 'menuitem', href: '/saved', text: 'Saved for later' }),

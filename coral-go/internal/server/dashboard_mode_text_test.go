@@ -12,7 +12,7 @@ import (
 
 // What the dashboard says each Coral Hub access mode allows, and which mode its dimmed controls name, follow the route table
 // (testdata/cloud_routes.golden, what the connector enforces), as TestHubDocModesMatchTheRouteTable does for hub.md (#4526:
-// cloud_servers.js MODE_INFO said Interact could kill an agent long after #4274 made it Launch, and the dashboard dimmed Kill
+// server_access.js MODE_INFO said Interact could kill an agent long after #4274 made it Launch, and the dashboard dimmed Kill
 // and Sleep only below Interact).
 func TestDashboardModeTextMatchesTheRouteTable(t *testing.T) {
 	g, err := os.ReadFile(cloudGolden)
@@ -67,9 +67,9 @@ func TestDashboardModeTextMatchesTheRouteTable(t *testing.T) {
 	// Each mode's text, from the three places the dashboard says it.
 	texts := map[string]map[string]string{} // source -> mode -> text
 	modeText := regexp.MustCompile(`(?m)^\s*(view|interact|launch): \{ label: '[A-Za-z]+', text: '((?:[^'\\]|\\.)*)' \}`)
-	texts["cloud_servers.js MODE_INFO"] = map[string]string{}
-	for _, m := range modeText.FindAllStringSubmatch(read("static/cloud_servers.js"), -1) {
-		texts["cloud_servers.js MODE_INFO"][m[1]] = m[2]
+	texts["server_access.js MODE_INFO"] = map[string]string{}
+	for _, m := range modeText.FindAllStringSubmatch(read("static/server_access.js"), -1) {
+		texts["server_access.js MODE_INFO"][m[1]] = m[2]
 	}
 	helpText := regexp.MustCompile(`(?m)^\s*(view|interact|launch): '((?:[^'\\]|\\.)*)',`)
 	help := read("static/cloud_connect.js")

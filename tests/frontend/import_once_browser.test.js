@@ -1,8 +1,8 @@
 // Retry-safe dynamic imports (#3116):  run via run_cdp_suites.mjs
 // Chrome caches a failed module fetch for the life of the page. On the Cloud Hub
-// the Servers tab loads cloud_servers.js on first use; when that request fails
+// the Servers tab loads cloud_server_view.js on first use; when that request fails
 // once, the user gets a toast and opening the tab again loads it (as
-// cloud_servers.js?retry=1), and every later importer shares that one instance.
+// cloud_server_view.js?retry=1), and every later importer shares that one instance.
 // A background importer that fails gets no toast.
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
@@ -24,8 +24,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         throw new Error('timed out waiting for ' + what);
     };
     const json = body => ({ responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify(body)).toString('base64') });
-    const seen = [];      // cloud_servers.js requests, by file name + query
-    let failNext = true;  // fail the first cloud_servers.js request
+    const seen = [];      // cloud_server_view.js requests, by file name + query
+    let failNext = true;  // fail the first cloud_server_view.js request
     safePaused(client, async e => {
         const u = new URL(e.request.url);
         if (e.resourceType === 'Document') {
@@ -37,8 +37,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         }
         if (u.pathname === '/auth/session') return Fetch.fulfillRequest({ requestId: e.requestId, ...json({ authenticated: true, email: 'tester@example.com', csrf: 'test-csrf' }) });
         if (u.pathname === '/api/servers') return Fetch.fulfillRequest({ requestId: e.requestId, ...json({ servers: [{ id: 's1', label: 'Work Mac', online: true, last_seen: '2026-10-13T00:00:00Z', access_mode: 'view', local_mode: 'launch' }] }) });
-        if (u.pathname.endsWith('/cloud_servers.js')) {
-            seen.push('cloud_servers.js' + u.search);
+        if (u.pathname.endsWith('/cloud_server_view.js')) {
+            seen.push('cloud_server_view.js' + u.search);
             if (failNext) { failNext = false; return Fetch.failRequest({ requestId: e.requestId, errorReason: 'Failed' }); }
         }
         return Fetch.continueRequest({ requestId: e.requestId });
@@ -58,7 +58,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
             { urlPattern: `${BASE}/`, resourceType: 'Document', requestStage: 'Response' },
             { urlPattern: '*/auth/session*', requestStage: 'Request' },
             { urlPattern: '*/api/servers*', requestStage: 'Request' },
-            { urlPattern: '*/cloud_servers.js*', requestStage: 'Request' },
+            { urlPattern: '*/cloud_server_view.js*', requestStage: 'Request' },
         ] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab === 'function'`, 'the dashboard');
@@ -68,7 +68,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         await require('./helpers/wait').bind(ev).coralReady('startup', 'liveList', 'liveListLoaded');
         assert.equal(await ev(`JSON.parse(document.getElementById('coral-boot').textContent).mode`), 'cloud', 'the page runs in cloud mode');
         // Nothing has loaded the server list yet (it is not part of the startup graph).
-        assert.deepEqual(seen, [], 'cloud_servers.js is not loaded at startup');
+        assert.deepEqual(seen, [], 'cloud_server_view.js is not loaded at startup');
 
         // 1. The first load fails: a toast says so and the tab shows no list. 'No list' is read at the moment the
         // toast appears (a MutationObserver runs right after the toast is inserted): later, a background caller's
@@ -81,7 +81,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Could not load the server list/.test(t.textContent))`, 'the failure toast');
         // The plain URL was requested once and failed. A background caller (the access lookup) may already have
         // retried by now under load; a retry is always a new ?retry=N URL, never the cached failed one (#3118).
-        assert.equal(seen[0], 'cloud_servers.js', 'the first request is the plain URL, and it failed');
+        assert.equal(seen[0], 'cloud_server_view.js', 'the first request is the plain URL, and it failed');
         assert.ok(seen.slice(1).every(u => /\?retry=\d+$/.test(u)), 'nothing re-requests the failed URL: ' + JSON.stringify(seen));
         await waitFor(`window.__qaAtToast !== null`, 'the toast snapshot');
         assert.equal((await ev(`window.__qaAtToast`)).list, false, 'no list when the failure is reported');
@@ -91,21 +91,21 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         await openServers();
         await waitFor(`!!document.querySelector('#servers-tab-body .cs-row')`, 'the server list after the retry');
         assert.match(await ev(`document.querySelector('#servers-tab-body').textContent`), /Work Mac/);
-        assert.deepEqual(seen, ['cloud_servers.js', 'cloud_servers.js?retry=1'], 'the retry fetched cloud_servers.js?retry=1');
+        assert.deepEqual(seen, ['cloud_server_view.js', 'cloud_server_view.js?retry=1'], 'the retry fetched cloud_server_view.js?retry=1');
         console.log('PASS opening the tab again loads it (?retry=1)');
 
         // 3. One instance: later importers (here a background lookup and another
         // tab visit) share the retried module; nothing is fetched again.
         const same = await ev(`(async () => {
             const { importOnce } = await import((window.__coralStatic || '/static/') + 'import_once.js');
-            const a = await importOnce('./cloud_servers.js');
-            const b = await import(new URL('cloud_servers.js?retry=1', new URL((window.__coralStatic || '/static/'), location.href)).href);
-            return a === b && typeof a.serverAccess === 'function';
+            const a = await importOnce('./cloud_server_view.js');
+            const b = await import(new URL('cloud_server_view.js?retry=1', new URL((window.__coralStatic || '/static/'), location.href)).href);
+            return a === b && typeof a.serverView?.render === 'function';
         })()`);
         assert.ok(same, 'importOnce returns the retried instance');
         await openServers();
         await waitFor(`!!document.querySelector('#servers-tab-body .cs-row')`, 'the server list again');
-        assert.deepEqual(seen, ['cloud_servers.js', 'cloud_servers.js?retry=1'], 'no further module request');
+        assert.deepEqual(seen, ['cloud_server_view.js', 'cloud_server_view.js?retry=1'], 'no further module request');
         console.log('PASS later importers share the one instance; no refetch');
 
         // 4. Without a label (a background caller) a failure is quiet; with one it toasts.

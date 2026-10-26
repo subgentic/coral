@@ -63,7 +63,7 @@ const HUB_PRELOAD = `(() => {
     })()`);
     const access = mode => ev(`(async () => {
         window.__mode = ${JSON.stringify(mode)};
-        (await import((window.__coralStatic || '/static/') + 'cloud_servers.js')).invalidateServerAccess();
+        (await import((window.__coralStatic || '/static/') + 'server_access.js')).invalidateServerAccess();
         T.render.renderLiveSessions(T.state.liveSessions); // asks again, redraws when the list is in
         return true; })()`);
 

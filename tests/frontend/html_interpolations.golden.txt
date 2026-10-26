@@ -266,6 +266,23 @@
 1	preview_pane.js	safe
 1	preview_pane.js	unshare
 1	prompt_modals.js	bg
+1	registered_server_view.js	adding ? '' : warningHtml((_servers.find(x => x.id === _editing) || {}).warning)
+1	registered_server_view.js	attention
+1	registered_server_view.js	back
+1	registered_server_view.js	bar
+1	registered_server_view.js	cls
+1	registered_server_view.js	factHtml('Agents', escHtml(agentsText(agents)))
+1	registered_server_view.js	factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${badge ? ' ' + badge : ''}`)
+1	registered_server_view.js	factHtml('Last contact', escHtml(contact))
+1	registered_server_view.js	factHtml('URL', escHtml(s.url || ''))
+1	registered_server_view.js	formHtml()
+1	registered_server_view.js	m.cls
+1	registered_server_view.js	online
+1	registered_server_view.js	statusPill(status)
+1	registered_server_view.js	switchRow({ label: 'Allow private network address', name: 'allow_private', checked: cur.allow_private, labelCl
+1	registered_server_view.js	title
+1	registered_server_view.js	value
+1	registered_server_view.js	warningHtml(s.warning)
 1	render.js	unfilteredCount ? '' : PHONE_WELCOME
 1	sandbox_frame.js	DOC_CSP
 1	sandbox_frame.js	content
@@ -292,23 +309,6 @@
 1	server_status.js	serverDetailsHtml(e)
 1	server_status.js	serverLaunchActionsHtml(e)
 1	server_status.js	updateBadgeHtml(e)
-1	servers.js	adding ? '' : warningHtml((_servers.find(x => x.id === _editing) || {}).warning)
-1	servers.js	attention
-1	servers.js	back
-1	servers.js	bar
-1	servers.js	cls
-1	servers.js	factHtml('Agents', escHtml(agentsText(agents)))
-1	servers.js	factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${badge ? ' ' + badge : ''}`)
-1	servers.js	factHtml('Last contact', escHtml(contact))
-1	servers.js	factHtml('URL', escHtml(s.url || ''))
-1	servers.js	formHtml()
-1	servers.js	m.cls
-1	servers.js	online
-1	servers.js	statusPill(status)
-1	servers.js	switchRow({ label: 'Allow private network address', name: 'allow_private', checked: cur.allow_private, labelCl
-1	servers.js	title
-1	servers.js	value
-1	servers.js	warningHtml(s.warning)
 1	session_rows.js	(goalLine || unreadChip) ? `<div class="session-line2">${goalLine}${unreadChip}</div>` : ''
 1	session_rows.js	_WORKTREE_ICON
 2	session_rows.js	_archiveItem
