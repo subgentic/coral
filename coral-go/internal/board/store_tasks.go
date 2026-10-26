@@ -656,13 +656,6 @@ func (s *Store) TouchTask(ctx context.Context, project string, taskID int64) err
 	return err
 }
 
-// SnoozeTaskReminder suppresses inactivity reminders until the supplied time.
-func (s *Store) SnoozeTaskReminder(ctx context.Context, project string, taskID int64, until time.Time) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE board_tasks SET idle_snoozed_until = ?
-		WHERE board_id = ? AND id = ? AND status = 'in_progress'`, until.UTC().Format(time.RFC3339), project, taskID)
-	return err
-}
-
 // idleTasks returns active tasks that have had no recorded activity since the
 // supplied time. Older databases use claimed_at until activity is recorded.
 func (s *Store) idleTasks(ctx context.Context, project string, before time.Time) ([]Task, error) {

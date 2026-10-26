@@ -13,7 +13,7 @@ import (
 )
 
 // The task verbs read the actor (#4255 commit 3): create, claim, current, complete, cancel, update,
-// amend, reassign, publish, submit-review, release-review, delegate, approve, reject, nudge, snooze and
+// amend, reassign, publish, submit-review, release-review, delegate, approve, reject, nudge and
 // reminders. Under enforce a request with no verified actor (no credential) is refused 403
 // identity_unverified, a member's token or the Operator's cookie is attributed with no claim at all
 // (the claim is optional), and in log mode nothing changes: the claim is required as before and a
@@ -41,7 +41,6 @@ func TestTaskVerbsReadTheActor(t *testing.T) {
 			{"reassign", "POST", t + "/reassign", `{"assigned_to":"Dev"}`, false},
 			{"release-review", "POST", t + "/release-review", `{"reason":"slot released"}`, false},
 			{"nudge", "POST", t + "/nudge", `{}`, false},
-			{"snooze", "POST", t + "/snooze", `{"seconds":600}`, false},
 			{"start reminders", "POST", t + "/reminder", `{"interval_seconds":600}`, false},
 			{"stop reminders", "DELETE", t + "/reminder", ``, false},
 		}

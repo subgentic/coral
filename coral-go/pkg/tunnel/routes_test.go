@@ -706,7 +706,6 @@ func TestHubTierChanges4274(t *testing.T) {
 		{"POST", "/api/sessions/live/agent-1/archive", TierInteract},
 
 		{"POST", "/api/board/team/tasks/9/reassign", TierNever},
-		{"POST", "/api/board/team/tasks/9/snooze", TierNever},
 		{"PUT", "/api/board/team/working-mode/presets/p", TierNever},
 		{"POST", "/api/board/team/working-mode/presets/p/reset", TierNever},
 		{"POST", "/api/sessions/live/agent-1/tasks/reorder", TierNever},

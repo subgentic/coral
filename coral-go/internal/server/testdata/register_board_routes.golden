@@ -97,7 +97,6 @@ POST /api/board/{project}/tasks/{taskID}/reminder | (*BoardHandler).RemindTask-f
 POST /api/board/{project}/tasks/{taskID}/reply | (*BoardHandler).ReplyToTask-fm
 POST /api/board/{project}/tasks/{taskID}/review | (*BoardHandler).DelegateReview-fm
 POST /api/board/{project}/tasks/{taskID}/send-back | (*BoardHandler).SendBack-fm
-POST /api/board/{project}/tasks/{taskID}/snooze | (*BoardHandler).SnoozeTaskReminder-fm
 POST /api/board/{project}/tasks/{taskID}/submit-review | (*BoardHandler).SubmitCompletionReview-fm
 POST /api/board/{project}/waits | (*BoardHandler).RegisterWait-fm
 POST /api/board/{project}/working-mode/presets | (*BoardHandler).SaveWorkflowPreset-fm

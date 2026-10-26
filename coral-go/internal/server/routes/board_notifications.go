@@ -230,44 +230,6 @@ func (h *BoardHandler) NudgeTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "assignee": assignee})
 }
 
-// SnoozeTaskReminder suppresses inactivity reminders for an active task.
-// POST body: {"seconds": 1800}
-func (h *BoardHandler) SnoozeTaskReminder(w http.ResponseWriter, r *http.Request) {
-	project := urlParam(r, "project")
-	taskID, err := parseID(chi.URLParam(r, "taskID"))
-	if err != nil {
-		errBadRequest(w, "invalid task ID")
-		return
-	}
-	var body struct {
-		Seconds      int    `json:"seconds"`
-		SubscriberID string `json:"subscriber_id"`
-	}
-	if err := decodeJSON(r, &body); err != nil || body.Seconds <= 0 || body.Seconds > 7*24*60*60 {
-		errBadRequest(w, "seconds must be between 1 and 604800")
-		return
-	}
-	snoozeActor, attrOK := attributedTo(w, r, taskActor(r, body.SubscriberID))
-	if !attrOK {
-		return
-	}
-	if task, err := h.bs.GetTask(r.Context(), project, taskID); err != nil || task == nil {
-		errNotFound(w, "Task not found")
-		return
-	} else if !h.requirePlannerOrAssignee(w, r.Context(), project, task, snoozeActor, "snooze its reminders") {
-		return
-	} else if task.Status != "in_progress" {
-		errBadRequest(w, "only in-progress tasks can be snoozed")
-		return
-	}
-	until := time.Now().Add(time.Duration(body.Seconds) * time.Second)
-	if err := h.bs.SnoozeTaskReminder(r.Context(), project, taskID, until); err != nil {
-		errInternalServer(w, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "snoozed_until": until.UTC().Format(time.RFC3339)})
-}
-
 // RemindTask starts or stops a server-side periodic reminder for a task.
 // POST body: {"interval_seconds": 300}; DELETE stops the reminder.
 func (h *BoardHandler) RemindTask(w http.ResponseWriter, r *http.Request) {

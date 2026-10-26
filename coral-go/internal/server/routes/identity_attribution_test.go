@@ -88,7 +88,6 @@ func newAttributionHarness(t *testing.T) *attributionHarness {
 	r.Post("/api/board/{project}/tasks/{taskID}/reassign", bh.ReassignTask)
 	r.Post("/api/board/{project}/tasks/{taskID}/publish", bh.PublishTask)
 	r.Post("/api/board/{project}/tasks/{taskID}/nudge", bh.NudgeTask)
-	r.Post("/api/board/{project}/tasks/{taskID}/snooze", bh.SnoozeTaskReminder)
 	r.Post("/api/board/{project}/tasks/{taskID}/reminder", bh.RemindTask)
 	r.Delete("/api/board/{project}/tasks/{taskID}/reminder", bh.RemindTask)
 	// The Operator-only routes and the cross-team relay (#4255 commit 4).

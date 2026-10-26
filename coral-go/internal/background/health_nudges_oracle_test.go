@@ -216,7 +216,7 @@ func runHealthOracle(t *testing.T, seed int64) {
 				open, _ := bs.ListOpenTasks(ctx, "team")
 				for _, ot := range open {
 					if ot.Status == "in_progress" && rng.Intn(2) == 0 {
-						bs.SnoozeTaskReminder(ctx, "team", ot.ID, now.Add(time.Duration([]int{5, 30}[rng.Intn(2)])*time.Minute))
+						snoozeTaskForTest(t, pathA, ot.ID, now.Add(time.Duration([]int{5, 30}[rng.Intn(2)])*time.Minute))
 						break
 					}
 				}
@@ -504,4 +504,15 @@ func (h *HealthNudges) runProjectBefore4599(ctx context.Context, project string,
 				"[Coral health actions paused] this board's budget of %d automatic actions an hour is used up; Coral acts again next hour", h.TeamBudget), nil)
 		}
 	}
+}
+
+// snoozeTaskForTest puts a reminder snooze on a task of board "team" in the database at path, as one set before the route that set it was removed (#8598): the rules still honor an existing snooze, and
+// the oracle keeps drawing them.
+func snoozeTaskForTest(t *testing.T, path string, taskID int64, until time.Time) {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	require.NoError(t, err)
+	defer db.Close()
+	_, err = db.Exec(`UPDATE board_tasks SET idle_snoozed_until = ? WHERE board_id = 'team' AND id = ? AND status = 'in_progress'`, until.UTC().Format(time.RFC3339), taskID)
+	require.NoError(t, err)
 }

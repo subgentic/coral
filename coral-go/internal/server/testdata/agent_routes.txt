@@ -311,7 +311,6 @@ a POST /api/board/{project}/tasks/{taskID}/release-review
 a POST /api/board/{project}/tasks/{taskID}/reminder
 a POST /api/board/{project}/tasks/{taskID}/review
 a POST /api/board/{project}/tasks/{taskID}/send-back
-a POST /api/board/{project}/tasks/{taskID}/snooze
 a POST /api/board/{project}/tasks/{taskID}/submit-review
 a POST /api/board/{project}/waits
 b POST /api/board/{project}/working-mode/presets

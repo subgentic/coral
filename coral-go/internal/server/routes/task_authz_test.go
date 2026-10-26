@@ -13,7 +13,7 @@ import (
 )
 
 // #3668 (the task handlers' follow-up to the board authorization audit): cancel, title and
-// priority edits, nudges, reminders and snoozes need a planner (the Operator or an active
+// priority edits, nudges and reminders need a planner (the Operator or an active
 // registered orchestrator) or the task's assignee; publishing needs a planner. A second worker
 // on the board, neither planner nor assignee, is refused on every one.
 func TestTaskRoutesNeedAPlannerOrTheAssignee(t *testing.T) {
@@ -60,7 +60,7 @@ func TestTaskRoutesNeedAPlannerOrTheAssignee(t *testing.T) {
 	assert.Equal(t, http.StatusOK, req("PATCH", p(""), map[string]any{"subscriber_id": "Dev1", "priority": "high"}), "the assignee")
 	assert.Equal(t, http.StatusOK, req("PATCH", p(""), map[string]any{"subscriber_id": "Orch", "title": "work, sharpened"}), "a planner")
 
-	// Nudge and reminders (start, stop). Snooze uses the same check (requirePlannerOrAssignee).
+	// Nudge and reminders (start, stop).
 	assert.Equal(t, http.StatusForbidden, req("POST", p("/nudge?subscriber_id=Dev2"), nil))
 	assert.Equal(t, http.StatusBadRequest, req("POST", p("/nudge"), nil), "no actor")
 	assert.NotEqual(t, http.StatusForbidden, req("POST", p("/nudge?subscriber_id=Operator"), nil), "the Operator may nudge (this test assignee has no terminal to type into)")

@@ -547,8 +547,7 @@ values are clamped: times are 5 to 1440 minutes, and nudges are 1 to 5.
 The three off-the-books signals use the board's, the hooks' and the upload route's own records, never the screen. Each line names the agent and a fixed phrase (a short SHA or digest, never the agent's words), is said once, and goes out in the orchestrator's next check (five lines at most per check; the rest wait). A switch that is off keeps its signal silent.
 
 The claim nudge names the agent's highest-priority assigned task. Once that escalates, the
-next one waits until the first is resolved. A task whose reminder is snoozed gets no status
-nudge.
+next one waits until the first is resolved. A snooze already on a task is honored until it ends; there is no longer a way to set one.
 
 Activation for `death-or-trade-ai-auto` is deliberately explicit: save the
 existing global `board_health_monitor=true` setting, restart the server so

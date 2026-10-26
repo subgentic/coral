@@ -209,7 +209,6 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Post("/api/board/{project}/tasks/{taskID}/reassign", boardHandler.ReassignTask)
 	r.Post("/api/board/{project}/tasks/{taskID}/nudge", boardHandler.NudgeTask)
 	r.Post("/api/board/{project}/tasks/{taskID}/reply", boardHandler.ReplyToTask) // a message linked to the task, the creator mentioned (#5463)
-	r.Post("/api/board/{project}/tasks/{taskID}/snooze", boardHandler.SnoozeTaskReminder)
 	r.Post("/api/board/{project}/tasks/{taskID}/park", boardHandler.ParkTask)
 	r.Delete("/api/board/{project}/tasks/{taskID}/park", boardHandler.ParkTask)
 	r.Post("/api/board/{project}/health/ack", boardHandler.AckHealthItem)

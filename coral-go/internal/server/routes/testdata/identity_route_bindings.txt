@@ -176,7 +176,6 @@ POST /api/board/{project}/tasks/{taskID}/reminder | board-claims
 POST /api/board/{project}/tasks/{taskID}/reply | board-claims +token-session
 POST /api/board/{project}/tasks/{taskID}/review | board-claims
 POST /api/board/{project}/tasks/{taskID}/send-back | board-claims
-POST /api/board/{project}/tasks/{taskID}/snooze | board-claims
 POST /api/board/{project}/tasks/{taskID}/submit-review | board-claims
 POST /api/board/{project}/waits | board-claims
 POST /api/board/{project}/working-mode/presets | board-claims | operator-only
