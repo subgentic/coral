@@ -138,7 +138,8 @@ const hex = i => i.toString(16).padStart(20, '0');
         list = await saved();
         assert.equal(list.items.length, 2); assert.equal(list.items[0].key, hex(OLD), 'newest saved first');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the page's own Saved tab; the top bar's bookmark is the Inbox's (#4905)
-        await waitFor(`${TAB_OPEN} && document.querySelectorAll('${ROWS}').length === 2`, 'the Saved tab with two items', 6000);
+        await waitFor(`${TAB_OPEN} && document.querySelectorAll('${ROWS}').length === 2`, 'the Saved tab with two items', 6000)
+            .catch(async e => { throw new Error(`${e.message} | ${JSON.stringify(await ev(`({ open: ${TAB_OPEN}, rows: document.querySelectorAll('${ROWS}').length, text: (document.getElementById('saved-table') || {}).textContent?.slice(0, 160) })`))}`); }); // what the tab showed when it gave up (#7955)
         await waitFor(`document.getElementById('agentic-panel-saved').contains(document.activeElement)`, 'the focus to move into the Saved tab', 6000);
         assert.equal(await ev(`document.querySelector('#saved-table .dt-sortbar').hidden`), true, 'the existing Saved sort control is the only sort bar');
         const dlg = await ev(`(() => { const rows = [...document.querySelectorAll('${ROWS}')]; return { first: rows[0].querySelector('.dt-primary').textContent, saved: rows[0].cells[1].textContent.trim(), state: rows[0].cells[2].textContent.trim(), pressed: [...document.querySelectorAll('#saved-table .group-chip')].map(c => c.getAttribute('aria-pressed')), counts: [...document.querySelectorAll('#saved-table .group-chip-count')].map(c => c.textContent), inside: !!document.activeElement.closest('#agentic-panel-saved') }; })()`);

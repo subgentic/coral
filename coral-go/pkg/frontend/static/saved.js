@@ -221,6 +221,7 @@ async function probe(it) {
 let _drawn = false; // the list has been drawn once: a later read keeps what is on screen until the answer comes
 let _readError = ''; // why the last read failed, for the Inbox's Saved table (the dock says it in #saved-status)
 async function refresh() {
+    changedSince = false; // this read starts after every change so far
     if (!_drawn) { // the first read: the bar is already there and the table says it is loading, so nothing moves when the list arrives (#7431)
         syncBar(0);
         drawDock();
@@ -242,14 +243,16 @@ function wire() {
 }
 
 /** The Saved tab was shown (by a click on it, a key, or the top bar's button): read the list again. */
-let showing = null;
+let showing = null, showAgain = false;
+let changedSince = false; // a message was saved or taken off after the read in flight began (coral:saved-changed): that read's answer is already out of date (#7955)
+document.addEventListener('coral:saved-changed', () => { changedSince = true; });
 export function showSaved() {
-    if (showing) return showing; // the tab's switch and the top bar's button can both ask at once
+    if (showing) { if (changedSince) showAgain = true; return showing; } // the tab's switch and the top bar's button can both ask at once: they share one read, unless the list changed since it began, then one more follows it
     placeUi(); // the right sidebar's Saved tab: the one list is there
     wire();
     checks.clear();
     status('');
-    showing = refresh().finally(() => { showing = null; });
+    showing = (async () => { try { do { showAgain = false; await refresh(); } while (showAgain); } finally { showing = null; } })();
     return showing;
 }
 
@@ -267,14 +270,14 @@ let _prevTab = 'agents'; // the nav tab the full-screen page was opened from: Es
 const activeNavTab = () => document.querySelector('.top-nav-tab.active')?.dataset.arg || 'agents';
 
 /** The dashboard's own Inbox was shown (switchNavTab('hub-inbox')): the Saved list is moved into it and read. */
-let viewLoad = null;
+let viewLoad = null, viewAgain = false;
 export function showSavedView() {
-    if (viewLoad) return viewLoad; // the nav tab's switch and the top bar's button can both ask at once
+    if (viewLoad) { if (changedSince) viewAgain = true; return viewLoad; } // the nav tab's switch and the top bar's button can both ask at once: one read, and one more after it when the list changed since it began (#7955)
     placeUi();
     wire();
     checks.clear();
     status('');
-    viewLoad = refresh().finally(() => { viewLoad = null; });
+    viewLoad = (async () => { try { do { viewAgain = false; await refresh(); } while (viewAgain); } finally { viewLoad = null; } })();
     return viewLoad;
 }
 
