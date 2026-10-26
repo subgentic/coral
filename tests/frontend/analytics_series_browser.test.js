@@ -36,7 +36,12 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         await Emulation.setEmulatedMedia({ features: mobile ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub();
-        await ev(`window.switchNavTab('tokens'); true`); await view('team');
+        await ev(`window.switchNavTab('tokens'); true`);
+        // Tab entry owns the phone's list/view state. Choose after that entry has drawn,
+        // rather than inspecting a chart left in the hidden page by an early selectView.
+        await waitFor(`document.querySelector('#cost-nav-list .row-btn[data-view="team"]')?.getClientRects().length > 0`, 'the Analytics view list', 10000);
+        await ev(`document.querySelector('#cost-nav-list .row-btn[data-view="team"]').click(); true`);
+        await waitFor(`document.getElementById('cost-dashboard-view').dataset.view === 'team' && document.querySelector('#cost-series-team')?.getBoundingClientRect().width > 0`, 'By team is visible', 10000);
         await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length > 0 && document.querySelectorAll('#cost-by-team tbody tr').length === ${NAMES.length}`, 'the chart and the table', 15000);
     };
     const lines = () => ev(`[...document.querySelectorAll('#cost-series-team .viz-svg path.viz-line')].map(p => ({ stroke: p.getAttribute('stroke'), w: p.getAttribute('stroke-width'), o: p.getAttribute('opacity') }))`);
@@ -180,7 +185,7 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         await waitFor(`document.querySelector('#cost-by-team .dt-box').classList.contains('dt-folded')`, 'the table folds', 6000);
         const p = await ev(`(() => { const box = document.querySelector('#cost-series-team .viz-chart'), s = box.querySelector('svg'); const sw = document.querySelector('#cost-by-team .cost-toggle').getBoundingClientRect();
             return { page: document.documentElement.scrollWidth > innerWidth + 1, svgW: Math.round(s.getBoundingClientRect().width), boxW: Math.round(box.clientWidth), ends: s.querySelectorAll('.viz-end').length, sw: Math.round(Math.min(sw.width, sw.height)), swTag: document.querySelector('#cost-by-team .cost-toggle').tagName, metricRows: new Set([...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().top))).size, seg: Math.round(document.querySelector('#cost-series-team .viz-seg button').getBoundingClientRect().height), folded: document.querySelector('#cost-by-team .dt-box').classList.contains('dt-folded') }; })()`);
-        assert.equal(p.metricRows, 1, 'the Metric segments are one row at 390: ' + JSON.stringify(p)); assert.equal(p.page, false, JSON.stringify(p)); assert.ok(p.svgW <= p.boxW + 1, JSON.stringify(p)); assert.equal(p.ends, 0, 'no end labels on a phone'); assert.ok(p.sw >= 44 && p.swTag === 'BUTTON', 'the switch is a 44 px button on a touch screen: ' + JSON.stringify(p)); assert.ok(p.seg >= 44, 'the pickers are 44 px: ' + JSON.stringify(p)); assert.equal(p.folded, true);
+        assert.equal(p.metricRows, 1, 'the Metric segments are one row at 390: ' + JSON.stringify(p)); assert.equal(p.page, false, JSON.stringify(p)); assert.ok(p.svgW > 0 && p.boxW > 0 && p.svgW <= p.boxW + 1, JSON.stringify(p)); assert.equal(p.ends, 0, 'no end labels on a phone'); assert.ok(p.sw >= 44 && p.swTag === 'BUTTON', 'the switch is a 44 px button on a touch screen: ' + JSON.stringify(p)); assert.ok(p.seg >= 44, 'the pickers are 44 px: ' + JSON.stringify(p)); assert.equal(p.folded, true);
         console.log('   ✓'); await shot('series-team-phone');
         await view('overview'); await waitFor(`document.querySelectorAll('#cost-series-overview .viz-fill').length === 8`, 'the Overview on a phone', 12000); await ev(`window.scrollTo(0, 0); true`); await shot('series-overview-phone'); await setTheme(ev, 'light'); await shot('series-overview-phone-light'); await setTheme(ev, 'dark');
         console.log('PASS analytics over time: lines, legend table, picker, highlight, tooltip, totals, phone');
