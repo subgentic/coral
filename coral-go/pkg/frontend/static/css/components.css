@@ -3881,6 +3881,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-tab .sd-dot[hidden] { display: none; }
 .sd-modal-content .settings-pane label { display: block; margin-bottom: .9rem; }
 .sd-modal-content .settings-pane :is(input[type="text"], select, textarea) { max-width: 38rem; width: 100%; box-sizing: border-box; }
+.sd-modal-content .settings-pane .sv-row-wide :is(input[type="text"], textarea) { max-width: none; } /* a wide settings_view field (a long text) spans its row under its label, not the 38rem of the legacy panes (#8479) */
 .sd-modal-content .settings-pane textarea.acf-prompt { max-width: none; min-height: 16rem; resize: vertical; font-family: var(--font-mono, monospace); font-size: .8125rem; }
 @container sd (max-width: 40rem) {
     .sd-modal-content .settings-nav { width: auto; flex: none; border-right: 0; border-bottom: 1px solid var(--border); padding: .6rem 1rem; overflow: visible; }
