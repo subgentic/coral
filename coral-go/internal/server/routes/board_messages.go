@@ -453,6 +453,11 @@ func (h *BoardHandler) ListAllMessages(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, emptyIfNil(replies))
 		return
 	}
+	// ?for_subscriber=NAME: the messages that member's read would deliver (#8484), taken from the whole board and paged as below (the dock's Board tab of an agent). One rule, the store's selectRead.
+	if r.URL.Query().Has("for_subscriber") {
+		h.listMessagesFor(w, r, project, limit)
+		return
+	}
 	offset := clampOffset(queryInt(r, "offset", 0))
 	beforeID := int64(queryInt(r, "before_id", 0))
 	format := r.URL.Query().Get("format")
@@ -521,6 +526,40 @@ func (h *BoardHandler) ListAllMessages(w http.ResponseWriter, r *http.Request) {
 		// Default: bare array for CLI consumers
 		writeJSON(w, http.StatusOK, emptyIfNil(messages))
 	}
+}
+
+// listMessagesFor answers ListAllMessages for ?for_subscriber=: the same replies as the board's own list (a bare array, or the dashboard's page with its counts), holding only what that
+// subscriber's read would deliver.
+func (h *BoardHandler) listMessagesFor(w http.ResponseWriter, r *http.Request, project string, limit int) {
+	query := r.URL.Query()
+	who := strings.TrimSpace(query.Get("for_subscriber"))
+	if who == "" || len(who) > 200 {
+		errBadRequest(w, "invalid for_subscriber")
+		return
+	}
+	page := board.ForPage{Limit: limit, BeforeID: int64(queryInt(r, "before_id", 0)), HasAfter: query.Has("after_id")}
+	if page.HasAfter {
+		page.AfterID = int64(queryInt(r, "after_id", 0))
+	}
+	messages, page, err := h.bs.ListMessagesFor(r.Context(), project, who, page)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	if query.Get("format") != "dashboard" {
+		writeJSON(w, http.StatusOK, emptyIfNil(messages))
+		return
+	}
+	boardTotal, _ := h.bs.CountMessages(r.Context(), project) // "12 of 184 messages": the whole board's count beside this reader's
+	resp := map[string]any{"messages": emptyIfNil(messages), "total": page.Scanned, "board_total": boardTotal, "limit": limit, "offset": 0, "paging": "keyset", "before_count": page.Remaining}
+	if page.HasAfter && len(messages) > 0 {
+		if updates, uerr := h.bs.AskUpdates(r.Context(), project, page.AfterID, messages); uerr != nil {
+			slog.Warn("could not read the answers to the board's questions", "board", project, "error", uerr)
+		} else if len(updates) > 0 {
+			resp["ask_updates"] = updates
+		}
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // CheckUnread returns the unread message count.

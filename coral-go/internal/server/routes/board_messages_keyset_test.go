@@ -19,6 +19,7 @@ type dashboardPage struct {
 	Offset      int    `json:"offset"`
 	Paging      string `json:"paging"`
 	BeforeCount *int   `json:"before_count"`
+	BoardTotal  int    `json:"board_total"`
 }
 
 func getDashboardPage(t *testing.T, url string) dashboardPage {
