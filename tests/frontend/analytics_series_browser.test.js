@@ -71,15 +71,61 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         await view('team'); await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length === 8`, 'the team chart again', 8000);
         console.log('   ✓');
 
-        console.log('2. The rows add up to where the chart ends, said once; a figure the table does not have says nothing');
+        console.log('2. Metrics: any of them together, one chart each; the rows add up to every chart; the last one cannot be switched off');
+        const metric = name => ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].find(b => b.textContent === ${JSON.stringify(name)}).click(); true`);
+        const titles = () => ev(`[...document.querySelectorAll('#cost-series-team .viz-title')].map(h => h.textContent)`);
+        const pressed = () => ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button[aria-pressed="true"]')].map(b => b.textContent)`);
         assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/);
-        await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].find(b => b.textContent === 'Input').click(); true`);
-        assert.match(await ev(`document.querySelector('#cost-series-team .viz-title').textContent`), /^Input, running total/);
-        assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/);
-        await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].find(b => b.textContent === 'Requests').click(); true`);
-        assert.equal(await ev(`!!document.querySelector('#cost-series-team .viz-check')`), false, 'By team has no Requests column: no claim');
+        await metric('Input');
+        assert.deepEqual(await pressed(), ['Cost', 'Input']); assert.deepEqual(await titles(), ['Cost, running total', 'Input, running total'], 'several metrics, several rows: a chart for each');
+        assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree The table's rows add up to what each chart ends on \(Cost and Input\)/);
+        await metric('Cost');
+        assert.deepEqual(await pressed(), ['Input']); assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/);
+        await metric('Input'); assert.deepEqual(await pressed(), ['Input'], 'the last metric stays on');
+        await metric('Requests'); await metric('Input');
+        assert.deepEqual(await titles(), ['Requests, running total']); assert.equal(await ev(`!!document.querySelector('#cost-series-team .viz-check')`), false, 'By team has no Requests column: no claim');
         await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[1].querySelectorAll('button')].find(b => /^Each/.test(b.textContent)).click(); true`);
-        assert.match(await ev(`document.querySelector('#cost-series-team .viz-title').textContent`), /^Requests, each hour/);
+        assert.deepEqual(await titles(), ['Requests, each hour']);
+        await metric('Cost'); await metric('Requests');
+        console.log('   ✓');
+
+        console.log('2b. Rows checked in the table choose the lines; the others\' swatches are empty rings; the colours do not move; clearing brings the top 7 back');
+        const check = i => ev(`document.querySelectorAll('#cost-by-team tbody tr')[${i}].querySelector('.dt-check input').click(); true`);
+        await check(0); await check(1); await check(4);
+        let l2 = await lines();
+        assert.deepEqual(l2.map(x => x.stroke).sort(), ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-5)'], 'three checked rows, three lines, with the colours they had: ' + JSON.stringify(l2));
+        assert.equal(await ev(`document.querySelectorAll('#cost-by-team .cost-swatch-off').length`), NAMES.length - 3);
+        assert.match(await ev(`document.querySelector('#cost-series-team .viz-hint').textContent`), /^Showing the 3 checked rows/);
+        assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/, 'the rows checked add up to the chart');
+        await check(7); // a row that was in Other takes a colour no checked row has
+        l2 = await lines(); assert.deepEqual(l2.map(x => x.stroke).sort(), ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-5)'], JSON.stringify(l2));
+        assert.equal(await ev(`document.querySelectorAll('#cost-by-team .cost-swatch')[7].style.background`), 'var(--viz-3)');
+        // the period changes: the checks stay
+        await ev(`(() => { const s = document.getElementById('cost-time-range'); s.value = 'week'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length === 4 && document.querySelectorAll('#cost-by-team tbody tr .dt-check input:checked').length === 4`, 'the checks kept through the period change', 12000);
+        // one row checked, several metrics: the metrics are the lines (tokens together, in their own colours), titled with the row
+        await ev(`document.querySelector('#cost-by-team .dt-bar-clear').click(); true`);
+        await waitFor(`document.querySelectorAll('#cost-by-team tbody tr .dt-check input:checked').length === 0`, 'cleared', 5000);
+        assert.equal((await lines()).length, 8, 'nothing checked: the top 7 and Other again');
+        await check(0);
+        for (const m of ['Input', 'Output', 'Cache read', 'Cache write']) await metric(m);
+        await metric('Cost'); // Cost off: the four token metrics are left
+        const one = await ev(`({ titles: [...document.querySelectorAll('#cost-series-team .viz-title')].map(h => h.textContent), strokes: [...document.querySelectorAll('#cost-series-team .viz-svg path.viz-line')].map(p => p.getAttribute('stroke')) })`);
+        assert.deepEqual(one.titles, ['coral-go-team: Input, Output, Cache read and Cache write, each hour'], JSON.stringify(one));
+        assert.deepEqual(one.strokes, ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)'], 'a line per metric in the metric\'s own colour');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-series-team .viz-legend-item .viz-legend-name')].map(e => e.textContent)`), ['Input', 'Output', 'Cache read', 'Cache write'], 'a key names each metric line');
+        assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/);
+        await shot('series-metrics-one-row');
+        assert.equal(await ev(`document.querySelectorAll('#cost-series-team .viz-seg').length`), 3, 'Metrics, Show and, for one row with several metrics, Scale');
+        await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[2].querySelectorAll('button')].find(b => b.textContent === 'Log').click(); true`);
+        const lg = await ev(`({ scale: document.querySelector('#cost-series-team .viz-svg').getAttribute('data-scale'), ticks: [...document.querySelectorAll('#cost-series-team .viz-svg text.viz-axis')].map(t => t.textContent).slice(0, 5) })`);
+        assert.equal(lg.scale, 'log'); assert.deepEqual(lg.ticks, ['0', '10', '100', '1.0K', '10.0K'], 'a log axis steps by powers of ten: ' + JSON.stringify(lg));
+        await shot('series-metrics-one-row-log');
+        await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[2].querySelectorAll('button')].find(b => b.textContent === 'Linear').click(); true`);
+        await ev(`document.querySelector('#cost-by-team .dt-bar-clear').click(); true`);
+        await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[1].querySelectorAll('button')].find(b => /^Running/.test(b.textContent)).click(); true`);
+        await metric('Cost'); for (const m of ['Input', 'Output', 'Cache read', 'Cache write']) await metric(m); // back to Cost alone
+        assert.deepEqual(await pressed(), ['Cost']);
         console.log('   ✓');
 
         console.log('3. A swatch, or a click on the row, brings a line forward and dims the rest; again puts it back');

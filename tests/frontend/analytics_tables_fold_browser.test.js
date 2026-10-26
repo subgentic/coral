@@ -21,7 +21,7 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
     };
     const view = async key => { await ev(`(() => { const b = document.querySelector('#cost-nav-list .row-btn[data-view="${key}"]'); if (b) b.click(); return !!b; })()`); await settle(900); };
     const probe = () => ev(`(() => { const box = [...document.querySelectorAll('#cost-dashboard-view .dt-box')].find(b => b.getClientRects().length && b.querySelector('table')); if (!box) return null; const t = box.querySelector('table');
-        const row = t.querySelector('tbody tr'); const cells = row ? [...row.children] : []; const top = e => Math.round(e.getBoundingClientRect().top); const bar = box.querySelector('.dt-sortbar');
+        const row = t.querySelector('tbody tr'); const cells = row ? [...row.querySelectorAll('td:not(.dt-check)')] : []; const top = e => Math.round(e.getBoundingClientRect().top); const bar = box.querySelector('.dt-sortbar');
         return { sideways: box.scrollWidth > box.clientWidth + 1, pageSw: document.documentElement.scrollWidth > innerWidth + 1, display: getComputedStyle(t).display, head: getComputedStyle(t.querySelector('thead')).display, roles: [t.getAttribute('role'), row && row.getAttribute('role'), cells[0] && cells[0].getAttribute('role')],
             labels: cells.map(c => c.dataset.label || ''), firstFull: cells[0] ? Math.round(cells[0].getBoundingClientRect().width) : 0, rowW: row ? Math.round(row.getBoundingClientRect().width) : 0, tops: cells.map(top),
             first: cells.filter(c => c.classList.contains('dt-fold-first')).map(c => c.dataset.label), before: [...new Set(cells.filter(c => !c.classList.contains('dt-tone-primary')).map(c => getComputedStyle(c, '::before').content))],
@@ -45,7 +45,7 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
             });
             await S.run(`${label}: Sort by changes the order, and the reverse button reverses it`, async () => {
                 await view('provider');
-                const names = () => ev(`[...document.querySelectorAll('#cost-by-provider tbody tr')].map(r => r.children[0].textContent.trim())`);
+                const names = () => ev(`[...document.querySelectorAll('#cost-by-provider tbody tr')].map(r => r.querySelector('td:not(.dt-check)').textContent.trim())`);
                 const before = await names();
                 await ev(`(() => { const s = document.querySelector('#cost-by-provider .dt-sortbar select'); s.value = 'agent_type'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(600);
                 const byName = await names();
