@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,11 +16,25 @@ import (
 // Regenerate only before an intentional schema change, never during a refactor:
 // UPDATE_BOARD_SCHEMA_GOLDENS=1 go test -run '^TestBoardSchemaGolden$' ./internal/board
 func TestBoardSchemaGolden(t *testing.T) {
-	for _, version := range []string{"fresh", "v1.4.80", "v1.4.110"} {
+	for _, version := range []string{"fresh", "v1.4.80", "v1.4.110", "v1.4.80-pre-review"} {
 		t.Run(version, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "messageboard.db")
 			if version != "fresh" {
-				loadDump(t, path, filepath.Join("testdata", "migration", version, "messageboard.sql"))
+				fixtureVersion := version
+				if version == "v1.4.80-pre-review" {
+					fixtureVersion = "v1.4.80"
+				}
+				dump := filepath.Join("testdata", "migration", fixtureVersion, "messageboard.sql")
+				if version == "v1.4.80-pre-review" {
+					// The release dumps already allow review_pending. Remove that one
+					// status to exercise the older constraint-rebuild path as well.
+					script, err := os.ReadFile(dump)
+					require.NoError(t, err)
+					require.Equal(t, 1, strings.Count(string(script), ", 'review_pending'"))
+					dump = filepath.Join(t.TempDir(), "pre-review.sql")
+					require.NoError(t, os.WriteFile(dump, []byte(strings.Replace(string(script), ", 'review_pending'", "", 1)), 0600))
+				}
+				loadDump(t, path, dump)
 				require.Equal(t, "0", scalar(t, path, "SELECT count(*) FROM pragma_table_info('board_messages') WHERE name='task_id'"), "the fixture needs an upgrade")
 			}
 			s, err := NewStoreWithKey(path, "")
