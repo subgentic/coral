@@ -79,6 +79,7 @@ func (m *BoardHealthMonitor) scan(ctx context.Context) {
 	if err != nil {
 		return
 	}
+	tick := m.now() // the scan's own time: what a check is scheduled against (not when its delivery ended)
 	agents, err := m.discover(ctx)
 	if err != nil {
 		return
@@ -88,13 +89,16 @@ func (m *BoardHealthMonitor) scan(ctx context.Context) {
 		bySession[naming.SessionName(a.AgentType, a.SessionID)] = a
 	}
 	for _, p := range projects {
-		m.checkProject(ctx, p.Project, bySession)
+		m.checkProject(ctx, p.Project, bySession, tick)
 	}
 }
 
 // checkProject composes one board's check and types it to its recipient, as the team's health
 // settings say (on, interval, recipient, all-clear line).
-func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, bySession map[string]AgentInfo) {
+// tickSlack is how early a scan may be for the check it is due for: the ticker's own jitter. Without it a team's 5-minute interval was delivered every 10 (#7901).
+const tickSlack = 15 * time.Second
+
+func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, bySession map[string]AgentInfo, tick time.Time) {
 	hs := m.store.GetHealthSettings(ctx, project)
 	if !hs.On {
 		return
@@ -104,7 +108,9 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	m.mu.Lock()
 	last, checked := m.lastCheck[project]
 	m.mu.Unlock()
-	if checked && m.now().Sub(last) < time.Duration(hs.IntervalMin)*time.Minute {
+	// The last check is the tick it went out on, not the moment its delivery ended: a delivery that ends a few seconds after its tick left the next tick, one interval later, a few seconds
+	// short, and it was skipped, so a 5-minute interval delivered every 10 (Codex Test's finding in #7879).
+	if checked && tick.Sub(last)+tickSlack < time.Duration(hs.IntervalMin)*time.Minute {
 		return
 	}
 	orch, err := m.store.TeamOrchestrator(ctx, project)
@@ -138,7 +144,7 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 		return
 	}
 	m.mu.Lock()
-	m.lastCheck[project] = m.now()
+	m.lastCheck[project] = tick
 	m.mu.Unlock()
 	m.markOffBooksShown(ctx, project, text, m.now())
 }

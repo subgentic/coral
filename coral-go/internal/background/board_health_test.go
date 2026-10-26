@@ -281,3 +281,38 @@ func TestCheckListsOpenAsksOlderThanTheReminderTime(t *testing.T) {
 	h.now = h.now.Add(10 * time.Minute)
 	assert.NotContains(t, h.checkTo("Orchestrator"), "Asked by", "an answered question is off the list")
 }
+
+// #7901 (Codex Test's finding in #7879): a 5-minute interval delivered every 10 minutes. The monitor ticks every 5 minutes and compared the tick with the time the last delivery ENDED, a few seconds after its tick, so the
+// next tick fell a few seconds short and was skipped. The check is scheduled against the tick it went out on: a delivery that ends seconds after its tick does not make the next one late.
+func TestCheckIsDeliveredAtItsIntervalWhenADeliveryEndsAfterItsTick(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 0)
+	hs := healthOn()
+	hs.IntervalMin = 5
+	_, err := h.s.UpdateBoardSettings(ctx, "team", board.BoardSettingsUpdate{Health: &hs})
+	require.NoError(t, err)
+	delivered := func() int { h.mu.Lock(); defer h.mu.Unlock(); return len(h.sent["Orchestrator"]) }
+	inner := h.m.deliver
+	h.m.deliver = func(ctx context.Context, a AgentInfo, key, text string) error { // typing the check takes a few seconds
+		err := inner(ctx, a, key, text)
+		h.now = h.now.Add(7 * time.Second)
+		return err
+	}
+
+	tick := h.now
+	h.m.scan(ctx)
+	assert.Equal(t, 1, delivered())
+	h.now = tick.Add(3 * time.Minute)
+	h.m.scan(ctx)
+	assert.Equal(t, 1, delivered(), "a tick well short of the interval delivers nothing")
+	for i := 1; i <= 4; i++ {
+		h.now = tick.Add(time.Duration(i) * 5 * time.Minute) // the monitor's next ticks, five minutes apart
+		h.m.scan(ctx)
+		assert.Equal(t, 1+i, delivered(), "tick %d: a 5-minute interval delivers every 5 minutes, not every other tick", i)
+	}
+	h.now = tick.Add(20*time.Minute + 3*time.Minute) // and a tick three minutes after the last (the one at 20) still waits
+	h.m.scan(ctx)
+	assert.Equal(t, 5, delivered())
+}
