@@ -19,8 +19,8 @@ const FOLDERS = [
     { key: 'chats-group', label: 'Group chats', params: { type: 'group' }, count: 'group' },
     { key: 'chats-notes', label: 'With notes', params: { type: 'agent', with_notes: '1' }, count: 'notes' },
     { key: 'chats-starred', label: 'Starred', params: { starred: '1' }, count: 'starred' },
-    { key: 'chats-active', label: 'Active now', params: { active: '1' }, count: 'active' },
-    { key: 'chats-archived', label: 'Archived', params: { archived: '1' }, count: 'archived' },
+    { key: 'chats-active', label: 'Active now', params: { type: 'agent', active: '1' }, count: 'active' },
+    { key: 'chats-archived', label: 'Archived', params: { type: 'agent', archived: '1' }, count: 'archived' },
 ];
 let counts = null; // the last answer of the counts route
 
@@ -33,12 +33,21 @@ export function chatFolder(key, c = counts) {
     return null;
 }
 
+/** A folder's total from the last counts read (undefined until it is known): the number beside the folder and the one in the table's heading, so the two never differ. */
+export function folderCount(key, c = counts) {
+    const n = (v) => (c && Number.isFinite(c[v]) ? c[v] : undefined);
+    const f = FOLDERS.find(x => x.key === key);
+    if (f) return f.minus && n(f.count) !== undefined && n(f.minus) !== undefined ? Math.max(0, n(f.count) - n(f.minus)) : n(f.count);
+    const cli = /^chats-cli-(.+)$/.exec(key), tag = /^chats-tag-(\d+)$/.exec(key);
+    if (cli) { const t = cli[1], by = c && c.by_agent_type; return by ? (t === 'agy' ? (by.agy || 0) + (by.antigravity || 0) + (by.gemini || 0) : by[t]) : undefined; }
+    if (tag) { const t = ((c && c.tags) || []).find(x => String(x.id) === tag[1]); return t ? t.count : undefined; }
+    return undefined;
+}
+
 /** The view list's sections for the chat folders, with the counts the last read gave (a folder with none yet shows no number). */
 export function chatSections(c = counts) {
-    const n = (v) => (c && Number.isFinite(c[v]) ? c[v] : undefined);
-    const by = (t) => (c && c.by_agent_type ? (t === 'agy' ? (c.by_agent_type.agy || 0) + (c.by_agent_type.antigravity || 0) + (c.by_agent_type.gemini || 0) : c.by_agent_type[t]) : undefined);
-    const out = [{ title: 'Chats', items: FOLDERS.map(f => ({ key: f.key, label: f.label, count: f.minus && n(f.count) !== undefined && n(f.minus) !== undefined ? Math.max(0, n(f.count) - n(f.minus)) : n(f.count) })) },
-        { title: 'By CLI', items: CLIS.map(([t, label]) => ({ key: `chats-cli-${t}`, label, count: by(t) })) }];
+    const out = [{ title: 'Chats', items: FOLDERS.map(f => ({ key: f.key, label: f.label, count: folderCount(f.key, c) })) },
+        { title: 'By CLI', items: CLIS.map(([t, label]) => ({ key: `chats-cli-${t}`, label, count: folderCount(`chats-cli-${t}`, c) })) }];
     const tags = (c && c.tags) || [];
     if (tags.length) out.push({ title: 'Tags', items: tags.map(t => ({ key: `chats-tag-${t.id}`, label: t.name, count: t.count, dot: /^#[0-9a-f]{3,8}$/i.test(t.color || '') ? t.color : undefined })) });
     return out;
@@ -121,15 +130,15 @@ export function chatsSpec(key, ctx) {
     const L = listOf(key, q);
     if (!L.page && !L.busy && !L.done) readMore(key, folder, q, ctx.redraw);
     const rows = L.rows;
-    return { title: folder.title, rows, empty: { line: L.busy || !L.page ? 'Loading chats…' : (q ? 'No chat matches the search.' : 'No chats here.') },
-        signature: JSON.stringify([key, q, L.busy, L.done, L.error, rows.map(s => [s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec])]),
-        node: () => DT.dataTable({ label: `${folder.title}, ${rows.length}`, rows, rowKey: s => s.session_id, state: DT.tableState(), rowName: s => name(s) || historyLabel(s),
+    return { title: folder.title, rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (q ? 'No chat matches the search.' : 'No chats here.') },
+        signature: JSON.stringify([key, q, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec])]),
+        node: () => DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => s.session_id, state: DT.tableState(), rowName: s => name(s) || historyLabel(s),
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, ctx.redraw) } },
             columns: [
                 { key: 'agent', label: 'Agent', primary: true, line: 1, cell: s => { const n = name(s); const w = isGroup(s) ? DT.primaryButton(n || 'Group chat') : DT.personButton(n || 'Agent', `Open the chat of ${n || 'the agent'}`); const b = w.matches('button') ? w : w.querySelector('.dt-primary'); b.dataset.sessionId = s.session_id; if (isGroup(s)) { const wrap = DT.el('span', 'dt-person'); wrap.append(b, DT.tag('Group')); return wrap; } return w; } },
-                { key: 'chat', label: 'Chat', width: 'grow', line: 2, cell: s => { /* a board's name is the agent column's: its line says only what happened in it */ const c = DT.el('span', 'dt-chat-line'); const sn = snippetOf(s); if (isGroup(s)) { if (sn) c.append(DT.el('span', 'dt-chat-snippet', sn)); } else { c.append(DT.el('span', 'dt-chat-title', historyLabel(s))); if (sn) c.append(DT.el('span', 'dt-chat-snippet', ` \u2013 ${sn}`)); } if (s.active) { const live = DT.el('span', 'dt-chat-live', ' · active now'); c.append(live); } return c; } },
+                { key: 'chat', label: 'Chat', width: 'grow', line: 2, cell: s => { /* a board's name is the agent column's: its line says only what happened in it */ const c = DT.el('span', 'dt-chat-line'); const sn = snippetOf(s); if (isGroup(s)) { if (sn) c.append(DT.el('span', 'dt-chat-snippet', sn)); } else { c.append(DT.el('span', 'dt-chat-title', historyLabel(s))); if (sn) c.append(DT.el('span', 'dt-chat-snippet', ` \u2013 ${sn}`)); } if (s.active) { const live = DT.el('span', 'dt-chat-live', ' · active now'); c.append(live); } /* an archived board stays in Group chats, marked */ if (s.archived && key !== 'chats-archived') c.append(DT.tag('Archived')); return c; } },
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', line: 1, cell: s => DT.timeCell(stampOf(s)) },
                 { key: 'ran', label: 'Ran', tone: 'tertiary', align: 'end', line: 0, cell: s => ran(s.duration_sec) },
                 { key: 'flags', label: 'Star and archive', hideLabel: true, line: 0, cell: s => {
