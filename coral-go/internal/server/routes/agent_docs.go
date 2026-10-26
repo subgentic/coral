@@ -22,6 +22,7 @@ type AgentDocsHandler struct {
 }
 
 // AgentDocsFS is what the handler reads: a plain fs.FS of <name>.md files (the server's unzips the embedded .md.gz ones, #6814).
+// AgentDocsFS has no production user: it is exported for the agent-docs tests in internal/server.
 type AgentDocsFS = fs.FS
 
 // NewAgentDocsHandler creates a handler that serves docs from the given filesystem.

@@ -158,7 +158,7 @@ func (h *BoardHandler) subscriberReminderKey(project, subscriber string) string 
 	return "agent:" + project + ":" + subscriber
 }
 
-func (h *BoardHandler) HasSubscriberReminder(project, subscriber string) bool {
+func (h *BoardHandler) hasSubscriberReminder(project, subscriber string) bool {
 	h.reminderMu.Lock()
 	defer h.reminderMu.Unlock()
 	return h.reminders[h.subscriberReminderKey(project, subscriber)] != nil

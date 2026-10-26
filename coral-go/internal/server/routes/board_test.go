@@ -1619,7 +1619,7 @@ func TestBoardRemindSubscriber_DeletePersistsAndRequiresIdentity(t *testing.T) {
 		t.Fatal("the replaced reminder's goroutine did not end")
 	}
 	handler.reminderExited.Store(nil)
-	assert.True(t, handler.HasSubscriberReminder("myproject", "Orchestrator"), "the replacement is still active")
+	assert.True(t, handler.hasSubscriberReminder("myproject", "Orchestrator"), "the replacement is still active")
 
 	badReq, err := http.NewRequest(http.MethodDelete, base+"/reminder", strings.NewReader(`{"subscriber_id":""}`))
 	require.NoError(t, err)
@@ -1639,7 +1639,7 @@ func TestBoardRemindSubscriber_DeletePersistsAndRequiresIdentity(t *testing.T) {
 	rows, err = handler.bs.ListSubscriberReminders(context.Background())
 	require.NoError(t, err)
 	assert.Empty(t, rows, "deleting the reminder must remove its durable row")
-	assert.False(t, handler.HasSubscriberReminder("myproject", "Orchestrator"))
+	assert.False(t, handler.hasSubscriberReminder("myproject", "Orchestrator"))
 }
 
 func TestUnescapeLineBreaks(t *testing.T) {

@@ -29,6 +29,7 @@ var bodyLimits = map[string]int64{
 }
 
 // BodyLimitKeys lists the routes with a raised limit (tests).
+// BodyLimitKeys has no production caller: it is exported for the body-limit test in internal/server.
 func BodyLimitKeys() []string {
 	keys := make([]string, 0, len(bodyLimits))
 	for k := range bodyLimits {

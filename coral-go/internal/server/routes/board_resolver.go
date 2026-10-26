@@ -19,6 +19,7 @@ var boardStaticRoutes = map[string]bool{"projects": true, "tasks": true, "remote
 var boardResolveCalls atomic.Int64
 
 // BoardResolveCount is how many database resolves resolveBoard has made (tests).
+// BoardResolveCount has no production caller: it is exported for the token-cache end-to-end test in internal/server.
 func BoardResolveCount() int64 { return boardResolveCalls.Load() }
 
 // boardMemoKey carries a request's resolved boards in its context.

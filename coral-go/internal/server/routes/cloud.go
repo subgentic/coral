@@ -260,6 +260,7 @@ func (h *CloudHandler) RotateCLIToken() {
 }
 
 // SetPeerCheck replaces the same-user check (tests).
+// SetPeerCheck has no production caller: it is exported for the cloud-gate, hook and hub end-to-end tests in internal/server.
 func (h *CloudHandler) SetPeerCheck(f func(*http.Request) (same, supported bool)) { h.sameUser = f }
 
 // SetManager attaches the connector manager.
@@ -801,6 +802,7 @@ const cliSignedBodyMax = 32 << 20
 
 // SetLinkedCheck replaces how the handler tells whether a Hub link exists (tests that
 // run a tunnel without enrolling with a hub).
+// SetLinkedCheck has no production caller: it is exported for the hub end-to-end tests in internal/server.
 func (h *CloudHandler) SetLinkedCheck(fn func() bool) { h.linked = fn }
 
 // SetBoardStore gives the handler the board store, for the recent Operator actions
@@ -815,6 +817,7 @@ func (h *CloudHandler) SetLoginMinter(fn func() (string, error)) {
 }
 
 // SetConnectedCheck replaces the answer to "is the connector up to the hub this computer was linked to" (tests, #6108).
+// SetConnectedCheck has no production caller: it is exported for the hub owner-label test in internal/server.
 func (h *CloudHandler) SetConnectedCheck(f func() bool) { h.connected = f }
 
 // LoginToken: POST /api/system/login-token: a fresh single-use dashboard sign-in

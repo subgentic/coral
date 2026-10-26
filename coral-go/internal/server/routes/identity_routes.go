@@ -409,6 +409,7 @@ func ValidateGuardedRoutes(routes chi.Routes, hubMode bool) error {
 }
 
 // OperatorOnlyRouteKeys lists operatorOnlyRoutes ("METHOD pattern"), sorted, for tests.
+// OperatorOnlyRouteKeys has no production caller: it is exported for the route-census tests in internal/server.
 func OperatorOnlyRouteKeys() []string {
 	keys := make([]string, 0, len(operatorOnlyRoutes))
 	for k := range operatorOnlyRoutes {

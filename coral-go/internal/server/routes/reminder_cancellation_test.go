@@ -102,7 +102,7 @@ func TestReminderDeleteFailurePreservesActiveReminderAndRow(t *testing.T) {
 		return r.StatusCode
 	}
 	require.Equal(t, http.StatusInternalServerError, del())
-	require.True(t, h.HasSubscriberReminder("myproject", "Orchestrator"), "failed delete must keep the active timer")
+	require.True(t, h.hasSubscriberReminder("myproject", "Orchestrator"), "failed delete must keep the active timer")
 	seconds, active := h.SubscriberReminderInterval("myproject", "Orchestrator")
 	require.True(t, active)
 	require.Equal(t, 30, seconds)
@@ -113,7 +113,7 @@ func TestReminderDeleteFailurePreservesActiveReminderAndRow(t *testing.T) {
 	// Once persistence recovers, the same request removes both.
 	h.deleteSubscriberReminder = realDelete
 	require.Equal(t, http.StatusOK, del())
-	require.False(t, h.HasSubscriberReminder("myproject", "Orchestrator"))
+	require.False(t, h.hasSubscriberReminder("myproject", "Orchestrator"))
 	rows, err = h.bs.ListSubscriberReminders(context.Background())
 	require.NoError(t, err)
 	require.Empty(t, rows)
@@ -136,7 +136,7 @@ func TestReminderStopWaitsForInFlightNudgeThenNothingFollows(t *testing.T) {
 
 	time.Sleep(60 * time.Millisecond) // many tick intervals
 	require.Len(t, term.messages(), 1, "no nudge may be emitted after stop returned")
-	require.False(t, h.HasSubscriberReminder("p", "agent"))
+	require.False(t, h.hasSubscriberReminder("p", "agent"))
 }
 
 func TestReminderReplacementWaitsForOldNudgeAndSurvivesOldCleanup(t *testing.T) {
@@ -163,7 +163,7 @@ func TestReminderReplacementWaitsForOldNudgeAndSurvivesOldCleanup(t *testing.T) 
 		}
 		return false
 	}, 2*time.Second, 5*time.Millisecond, "replacement keeps firing after the old goroutine's cleanup")
-	require.True(t, h.HasSubscriberReminder("p", "agent"), "old cleanup must not erase the replacement")
+	require.True(t, h.hasSubscriberReminder("p", "agent"), "old cleanup must not erase the replacement")
 	seen := term.messages()
 	require.Equal(t, "[Coral reminder] old", seen[0], "only the one in-flight old nudge was emitted")
 	for _, m := range seen[1:] {
@@ -177,8 +177,8 @@ func TestReminderStopIsScopedToTeamAndSubscriber(t *testing.T) {
 	h.startSubscriberReminder("team-one", "agent", "one", 5*time.Millisecond)
 	h.startSubscriberReminder("team-two", "agent", "two", 5*time.Millisecond)
 	h.stopSubscriberReminder("team-one", "agent")
-	require.False(t, h.HasSubscriberReminder("team-one", "agent"))
-	require.True(t, h.HasSubscriberReminder("team-two", "agent"), "same subscriber id on another team is untouched")
+	require.False(t, h.hasSubscriberReminder("team-one", "agent"))
+	require.True(t, h.hasSubscriberReminder("team-two", "agent"), "same subscriber id on another team is untouched")
 	require.Eventually(t, func() bool {
 		for _, m := range term.messages() {
 			if m == "[Coral reminder] two" {
