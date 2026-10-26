@@ -145,7 +145,7 @@ function _selectAgentPreset(name) {
 
 // The line under Name says where the name came from: one line either way, so nothing on the page moves (#7391).
 function _nameHelp(filled) {
-    const el = document.getElementById('launch-name-help');
+    const el = document.querySelector('.launch-name-help');
     if (el) el.textContent = filled ? 'Filled from the persona. Change it if you want a different name.' : 'Choose a persona above and its name goes here, or type your own.';
 }
 

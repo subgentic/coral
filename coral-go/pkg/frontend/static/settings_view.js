@@ -21,7 +21,8 @@
  *             live?: [element ids or { id, wide?, describes?: false }] (page elements a module fills, moved under the help, or under the whole row; the control is described by them),
  *             visibleWhen?(values), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, compact?, render?(slot, ctl) => { get, invalid?(on) (mark the control's own input), focus?, set, onChange? } }
  *
- * The controller: values() set(key, v) dirty() isDirty() changes() error(key, message) clearErrors() validate({ focus }) save() cancel() showGroup(id) reload() destroy().
+ * The controller: values() set(key, v) dirty() isDirty() changes() error(key, message) clearErrors() validate({ focus }) save() cancel() showGroup(id) reload() destroy(), and retext(key, { label?, help?, required?, requiredMessage? })
+ * (a field that is worded for the mode its dialog is in: the label, the sentence under it, Required).
  * Events on the host: 'sv-dirty' { dirty }, 'sv-group' { id }, 'sv-saved' { changes }. */
 import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
@@ -390,6 +391,20 @@ export function mountSettingsView(host, spec) {
         say(text, isError = false) { status = text || null; statusError = !!isError && !!text; paintBar(); }, // a line of the caller's own in the bar (a part saved elsewhere, a load that failed)
         changes() { const o = {}; for (const k of dirtyKeys()) if (!(readOnlyOf(k) || fields.get(k).field.readOnly || fields.get(k).row.hidden)) o[k] = fields.get(k).ctl.get(); return o; },
         error: showError,
+        retext(key, { label, help: sentence, required, requiredMessage } = {}) {
+            const r = fields.get(key); if (!r) return;
+            r.field = { ...r.field };
+            if (label !== undefined) { r.field.label = label; if (r.label) r.label.textContent = label; }
+            if (sentence !== undefined) { const el = r.descId && document.getElementById(r.descId); if (el) el.textContent = sentence; } // the sentence under the label
+            if (required !== undefined) {
+                r.field.required = !!required; if (requiredMessage !== undefined) r.field.requiredMessage = requiredMessage;
+                let badge = r.row.querySelector('.sv-required');
+                if (required && !badge && r.label) { badge = node('span', 'sv-required', 'Required'); r.label.after(badge); }
+                if (badge) badge.hidden = !required;
+                const t = r.ctl.input; if (t) { if (required) t.setAttribute('aria-required', 'true'); else t.removeAttribute('aria-required'); }
+            }
+            if (errors.has(key)) showError(key, '');
+        },
         clearErrors() { for (const k of [...errors.keys()]) showError(k, ''); },
         validate({ focus = false } = {}) {
             let first = null;

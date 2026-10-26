@@ -4324,6 +4324,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-recap.launch-recap-error { color: var(--sv-error-color); }
 #team-recap:empty { display: none; }
 #launch-folder-status:empty { display: none; }
+#launch-folder-status { border-top: 0; } /* the buttons' own rule is the one divider above the red line */
 .team-template-row { display: flex; align-items: flex-end; gap: 8px; margin: 0 0 14px; }
 .team-template-pick { flex: 1; min-width: 0; }
 .team-template-pick select { width: 100%; }

@@ -14,7 +14,7 @@ const { defaultPermissionMode, syncDefaultPermissionMode, _normalizePermFlagsFor
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 import { checkTmuxForLaunch } from './prerequisites.js';
 import { showTeamAddress } from './team_form.js';
-import { agentForm as folderForm } from './agent_form.js';
+import { agentForm as folderForm, setAgentNameMode } from './agent_form.js';
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
 const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
@@ -60,13 +60,11 @@ function _selectLaunchType(type) {
     if (type === "agent") {
         if (!launch.addTo && !launch.member) { // New Agent: its own title and no team (Add agent and a member set both below, #7778, #7861)
             document.getElementById('launch-modal')?.removeAttribute('data-add-to');
-            const nameLabel = document.getElementById('launch-agent-name-label'); if (nameLabel) nameLabel.textContent = 'Name'; // a member's field is its Role, and a role is required
-            const nameOptional = document.getElementById('launch-agent-name-optional'); if (nameOptional) nameOptional.hidden = false;
+            setAgentNameMode(false); // a member's field is its Role, and a role is required
             const t = document.getElementById('launch-agent-title-text'); if (t) t.textContent = 'New agent';
         }
         _loadAgentBoardProjects();
         document.getElementById('agent-preset-selector')?.replaceChildren(); // a new dialog starts from Blank again (#7391)
-        const help = document.getElementById('launch-name-help'); if (help) help.textContent = 'Choose a persona above and its name goes here, or type your own.';
         _initAgentPresets();
         // Render agent config form
         renderAgentConfigForm('launch-agent-acf', {
@@ -365,9 +363,7 @@ function _applyMember() {
     if (title) title.textContent = m.row ? 'Edit member' : 'Add member';
     const name = document.getElementById('launch-agent-name-input');
     if (name) name.value = m.value.name || '';
-    const help = document.getElementById('launch-name-help'); if (help) help.textContent = 'The role this member has on the team.';
-    const nameLabel = document.getElementById('launch-agent-name-label'); if (nameLabel) nameLabel.textContent = 'Role';
-    const nameOptional = document.getElementById('launch-agent-name-optional'); if (nameOptional) nameOptional.hidden = true; // Save member needs a role
+    setAgentNameMode(true); // the role: Required, Save member needs it
     _syncLaunchBlock();
     _launchStage(m.row ? 'agent' : 'persona'); // an existing member opens on its settings, a new one on its role
     if (!m.row) name?.focus(); // the role is the first thing a new member needs

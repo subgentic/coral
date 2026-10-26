@@ -5,11 +5,26 @@ import { mountSettingsView } from './settings_view.js';
 import { onBuilt } from './lazy_dom.js';
 
 let _view = null;
+let _nameView = null;
 
 /** The form of step 1, once the dialog is built. */
 export function agentForm() { return _view; }
 
+/** Word the name field for what the dialog is doing: a new agent's optional name, or a team member's role (Add member and Edit member save a role, so it is Required). */
+export function setAgentNameMode(member) {
+    _nameView?.clearErrors();
+    _nameView?.retext('name', member
+        ? { label: 'Role', help: 'The role this member has on the team.', required: true, requiredMessage: 'A member needs a role' }
+        : { label: 'Name', help: 'Choose a persona above and its name goes here, or type your own.', required: false });
+}
+
 function mount(modal) {
+    const nameHost = modal.querySelector('#agent-name-host');
+    if (nameHost && !_nameView) {
+        _nameView = mountSettingsView(nameHost, { mode: 'form', fields: [
+            { key: 'name', type: 'text', id: 'launch-agent-name-input', label: 'Name', placeholder: 'e.g. QA Engineer, Frontend Dev', messageAsIs: true, help: 'Choose a persona above and its name goes here, or type your own.', helpTextClass: 'launch-name-help' },
+        ] });
+    }
     const host = modal.querySelector('#agent-form-host');
     if (!host || _view) return;
     const root = host.dataset.coralRoot || '';
