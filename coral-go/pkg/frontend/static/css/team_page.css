@@ -78,7 +78,10 @@
 .task-id { flex: none; font-size: 0.75rem; font-weight: 400; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .task-table td[data-col="1"] { width: 40%; max-width: 0; }
 .task-table .team-row-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-when { font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.task-when, .task-priority { font-size: 0.75rem; font-weight: 400; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; } /* tertiary 12/400: Priority and Updated */
+.task-cell-2, .task-goal { display: block; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; font-weight: 400; color: var(--text-secondary); } /* secondary 13/400, one line: Assigned to, Goal, Team */
+.task-goal.team-link { color: var(--link-text, var(--accent)); }
+.team-table.task-table td { vertical-align: middle; padding-top: 6px; padding-bottom: 6px; } /* the dense row: one line, about 36 px */
 .task-table th:last-child, .task-table td:last-child { text-align: right; }
 .task-col-list { list-style: none; margin: 0; padding: 0; }
 .task-col-btn { display: flex; flex-direction: column; gap: 4px; width: 100%; min-height: 44px; box-sizing: border-box; padding: 8px 12px; background: none; border: 0; border-bottom: 1px solid var(--border); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }

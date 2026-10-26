@@ -5,7 +5,7 @@
  * A task is the board's own record (status, review_requested, assigned_to, worked_by, completed_by, goal_id, priority, created_at, updated_at, board). Everything is built with the DOM and textContent: titles and names are
  * written by agents.
  *   taskList(tasks, { label, columns, phone, ctx })  -> a table, or on a phone the column
- *   ctx: { openTask(task), openGoal(goalId), goalTitleOf(goalId), current: key, noGoal: 'No goal', teamOf(task) }
+ *   ctx: { openTask(task), openGoal(goalId), goalTitleOf(goalId), current: key, keyOf(task), noGoal: 'No goal', teamOf(task) }
  */
 import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
@@ -14,7 +14,7 @@ const { teamTable, rowButton, stateChip, el } = await importOnce('./team_table.j
 
 export const COLUMN_HEADS = { state: 'State', task: 'Task', who: 'Assigned to', goal: 'Goal', team: 'Team', priority: 'Priority', when: 'Updated' };
 
-export const taskKey = (t) => `t${t.id}`;
+export const taskKey = (t, ctx) => (ctx && ctx.keyOf ? ctx.keyOf(t) : `t${t.id}`); // the Inbox lists the tasks of every team: its key has the team in it
 export const taskWord = (t) => taskStatusWord(t.status, t.review_requested);
 /** The one chip: the same word and the same dot wherever a task is drawn. */
 export const taskChip = (t) => { const w = taskWord(t); return stateChip(w, statusClass(w)); };
@@ -36,26 +36,26 @@ function titleCell(t, ctx) {
 }
 
 function goalCell(t, ctx) {
-    if (!t.goal_id) return el('span', 'team-muted', ctx.noGoal || 'No goal');
+    if (!t.goal_id) return el('span', 'task-cell-2 task-goal', ctx.noGoal || 'No goal');
     const link = button('team-link', ctx.goalTitleOf ? ctx.goalTitleOf(t.goal_id) : `Goal ${t.goal_id}`, () => ctx.openGoal?.(t.goal_id));
-    link.dataset.goalLink = String(t.goal_id);
+    link.dataset.goalLink = String(t.goal_id); link.classList.add('task-goal');
     return link;
 }
 
 const CELLS = {
     state: (t) => taskChip(t),
     task: (t, ctx) => titleCell(t, ctx),
-    who: (t) => whoText(t),
+    who: (t) => el('span', 'task-cell-2 task-who', whoText(t)),
     goal: (t, ctx) => goalCell(t, ctx),
-    team: (t, ctx) => (ctx.teamOf ? ctx.teamOf(t) : t.board || ''),
-    priority: (t) => priorityWord(t.priority),
+    team: (t, ctx) => el('span', 'task-cell-2 task-team', ctx.teamOf ? ctx.teamOf(t) : t.board || ''),
+    priority: (t) => el('span', 'task-priority', priorityWord(t.priority)),
     when: (t) => { const s = el('span', 'task-when', updatedText(t)); const at = t.updated_at || t.created_at; if (at) s.title = String(at); return s; },
 };
 
 export function taskTable(tasks, { label, columns, ctx = {} }) {
     return teamTable({
         label, columns: columns.map(c => COLUMN_HEADS[c]), className: 'task-table',
-        rows: tasks.map(t => ({ key: taskKey(t), current: ctx.current === taskKey(t), open: () => ctx.openTask?.(t), cells: columns.map(c => CELLS[c](t, ctx)) })),
+        rows: tasks.map(t => ({ key: taskKey(t, ctx), current: ctx.current === taskKey(t, ctx), open: () => ctx.openTask?.(t), cells: columns.map(c => CELLS[c](t, ctx)) })),
     });
 }
 
@@ -64,7 +64,7 @@ export function taskColumnRow(t, ctx = {}) {
     const li = el('li', 'task-col-row');
     const b = el('button', 'task-col-btn'); b.type = 'button'; b.dataset.taskId = String(t.id);
     b.setAttribute('aria-label', `Open task #${t.id}: ${t.title}, ${taskWord(t)}`);
-    if (ctx.current === taskKey(t)) b.setAttribute('aria-current', 'true');
+    if (ctx.current === taskKey(t, ctx)) b.setAttribute('aria-current', 'true');
     const line1 = el('span', 'task-col-line1'); line1.append(el('span', 'task-id', `#${t.id}`), el('span', 'task-col-title', t.title));
     const line2 = el('span', 'task-col-line2'); line2.append(taskChip(t), el('span', 'task-col-who', whoText(t)));
     if (String(t.priority || '').toLowerCase() === 'high') line2.append(el('span', 'task-col-priority', 'High'));
