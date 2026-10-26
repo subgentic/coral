@@ -49,7 +49,9 @@ const needsRows = () => waitingSessions().filter(s => !queries.needs || needsTex
 const PRIORITY_WORDS = { high: 'High', medium: 'Medium', low: 'Low' };
 const RANK = { high: 0, medium: 1, low: 2 };
 const stateOf = t => TC.taskWord(t);
-const inboxTasksState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
+const inboxTasksState = DT.tableState();
+const needsState = DT.tableState();
+const savedState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
 const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
 const taskRows = () => tasks.filter(t => !queries.tasks || taskText(t).includes(queries.tasks)).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
 async function refreshTasks() {
@@ -111,6 +113,29 @@ function savedTableSpec(where = '') {
 
 }
 
+/** The Saved folder's page: the chips (Open, Done) above, the one table under them. The dock's Saved tab keeps savedTableSpec (its own small table) until the dock's lists move. */
+function savedListSpec() {
+    const v = saved.savedView();
+    const rows = v.shown.map(saved.savedItemFacts);
+    const spec = savedTableSpec();
+    const multi = rows.some(f => f.serverName);
+    return { title: spec.title, chipsLabel: spec.chipsLabel, chips: spec.chips, empty: spec.empty, note: spec.note, rows,
+        signature: JSON.stringify([multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
+        node: () => DT.dataTable({ label: `Saved, ${rows.length}`, rows, rowKey: f => f.id, state: savedState, rowName: f => f.which,
+            open: f => openSavedPage(f.id),
+            columns: [
+                { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; return b; } },
+                ...(multi ? [{ key: 'machine', label: 'Computer', line: 0, cell: f => f.serverName || '' }] : []),
+                { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, cell: f => f.saved },
+                { key: 'state', label: 'State', line: 2, cell: f => (f.state ? DT.tag(f.state) : '') },
+                { key: 'action', label: 'Action', line: 2, cell: f => {
+                    if (f.gone) return '';
+                    const b = DT.el('button', 'btn btn-small dt-quiet', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`);
+                    b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
+                    return b; } },
+            ] }).el };
+}
+
 /** A message of the agent's Saved tab, as a sheet over the dock panel (the pane the Artifacts tab uses, detail_pane.js): what the Inbox's page holds (the text, why it cannot be opened, Read the whole message) with Open (the chat) and Remove from saved in its bar. Back, the close button and Escape return to the Saved table, the focus on the row. */
 let dockSheetId = '';
 async function openDockSavedSheet(id, opener) {
@@ -161,14 +186,23 @@ registerGroupSource('hub-inbox', {
     redraw: () => renderInboxNav(true),
     table: key => {
         if (key === 'needs') {
-            // The folder and the agent's own request (#7122) and the goal its task serves (#7302) are columns when any row has one; the goal's cell opens it on its board
+            // the goal its task serves (#7302) is a column when any row has one; the goal's cell opens it on its board
             const rows = needsRows(), dirOf = s => String(s.working_directory || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop();
             const goalOf = s => s.goal && s.goal.id && s.goal.title;
-            const opt = [['Folder', rows.some(dirOf), s => dirOf(s) || ''], ['Asks', rows.some(askOf), s => askOf(s)]];
             const goal = rows.some(goalOf);
-            return { title: 'Needs you', stack: true, columns: ['Item', 'Team', ...opt.filter(o => o[1]).map(o => o[0]), 'When', ...(goal ? ['Goal'] : [])], empty: { line: 'Nothing needs your input.' },
-                rows: rows.map(s => ({ title: resolveSessionIdentity(s), action: 'inbox-agent-open', data: { name: s.name, 'agent-type': s.agent_type, 'session-id': s.session_id, server: sessionServer(s) },
-                    cells: [teamOf(s), ...opt.filter(o => o[1]).map(o => o[2](s)), waitingText(s.waiting_since) || '', ...(goal ? [goalOf(s) ? { link: true, action: 'inbox-goal-open', data: { board: s.goal.board || s.board_project || '', 'goal-id': s.goal.id }, label: s.goal.title, aria: `Goal: ${s.goal.title}` } : ''] : [])] })) };
+            return { title: 'Needs you', rows, empty: { line: 'Nothing needs your input.' },
+                signature: JSON.stringify(rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, dirOf(s)])), // the words move on with the clock: they are part of what was drawn
+                node: () => DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => resolveSessionIdentity(s),
+                    open: s => { window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
+                    columns: [
+                        { key: 'agent', label: 'Agent', primary: true, sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                        { key: 'asks', label: 'Waiting for', width: 'grow', line: 2, cell: s => askOf(s) || '' },
+                        { key: 'cli', label: 'CLI', sort: true, sortValue: s => s.agent_type || '', line: 2, cell: s => (s.agent_type ? DT.tag(s.agent_type) : '') },
+                        ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
+                        { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
+                        ...(goal ? [{ key: 'goal', label: 'Goal', line: 0, cell: s => { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnBoard(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; } }] : []),
+                        { key: 'waiting', label: 'Waiting', tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: 1, cell: s => waitingText(s.waiting_since) || '' },
+                    ] }).el };
         }
         if (key === 'tasks') {
             const rows = taskRows(), openKey = page && page.kind === 'task' ? `${page.project}#${page.id}` : '';
@@ -177,7 +211,7 @@ registerGroupSource('hub-inbox', {
                 node: () => DT.dataTable({ label: `Tasks, ${rows.length}`, columns: TC.taskColumns({ teamOf: t => t.board || '' }, ['state', 'task', 'priority', 'team', 'updated']), rows, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
                     open: t => openTaskPage(t.project, t.id), current: openKey, rowName: t => `#${t.id} ${t.title}`, state: inboxTasksState }).el };
         }
-        if (key === 'saved') return savedTableSpec();
+        if (key === 'saved') return savedListSpec();
         return null;
     },
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
@@ -307,7 +341,7 @@ function focusCameFrom(was, inList) {
     if (!was) return;
     const root = inList ? document.querySelector('.sidebar-pane[data-pane="hub-inbox"]') : $('group-table-view');
     const id = CSS.escape(String(was.id));
-    const sel = inList ? (was.kind === 'task' ? `.row-btn[data-row-key="${CSS.escape('t:' + was.project + '#' + was.id)}"]` : `.row-btn[data-id="${id}"]`) : (was.kind === 'task' ? `.dt-primary[data-task-id="${id}"]` : `.group-table-link[data-id="${id}"]`);
+    const sel = inList ? (was.kind === 'task' ? `.row-btn[data-row-key="${CSS.escape('t:' + was.project + '#' + was.id)}"]` : `.row-btn[data-id="${id}"]`) : (was.kind === 'task' ? `.dt-primary[data-task-id="${id}"]` : `.dt-primary[data-id="${id}"]`);
     const row = root && root.querySelector(sel);
     if (row) row.focus({ preventScroll: true }); else if (!inList) $('group-table-title')?.focus({ preventScroll: true });
 }

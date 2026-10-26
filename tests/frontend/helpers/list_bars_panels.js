@@ -69,7 +69,7 @@ PANELS.push({
         if (phone) { await ctx.ev(`window.switchNavTab('hub-inbox'); true`); } else await ctx.ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         await ctx.ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await ctx.settle(`document.querySelectorAll('#group-table-view tbody tr').length === 1 && document.getElementById('group-table-view').getClientRects().length > 0`, 'Needs you');
-        return { roots: ['#group-table-view'], focus: ['#group-table-view .group-table-link'] };
+        return { roots: ['#group-table-view'], focus: ['#group-table-view .dt-primary'] };
     },
 });
 

@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
             };
             check(await names(), 'closed');
             // a message's page: More and Open name the message too (the whole text is on the page, #7660)
-            await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+            await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-body .md, #inbox-page .ibx-saved-body .ibx-why')`, `${tag}: the message page with its text`, 8000);
             const page = async () => [await btnNames('#inbox-page .item-bar button, #inbox-page .item-bar .btn')];
             check(await page(), 'a message page');
@@ -42,7 +42,7 @@ const BASE = require('./test_base').BASE;
             await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.loadSaved()).then(() => true)`); // the list is read again
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, `${tag}: the three items`, 10000);
             check(await names(), 'two that start alike');
-            const lone = await ev(`[...document.querySelectorAll('#group-table-view .group-table-cell-btn')].map(b => b.getAttribute('aria-label'))`);
+            const lone = await ev(`[...document.querySelectorAll('#group-table-view .dt-quiet')].map(b => b.getAttribute('aria-label'))`);
             // told apart by what the names say, not by where the list put them
             const pair = lone.filter(n => /The same first words/.test(n)), single = lone.filter(n => !/The same first words/.test(n));
             assert.deepEqual(pair.map(n => n.slice(-8)).sort(), ['(1 of 2)', '(2 of 2)'], `${tag}: the pair is told apart (${JSON.stringify(lone)})`);

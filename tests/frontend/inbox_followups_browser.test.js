@@ -84,8 +84,8 @@ const AGENTS = (waiting) => waiting ? [
             });
             if (!mobile) await step('a saved message page starts at its title; Escape goes back to the Saved table with the focus on that message, not to another tab', async () => {
                 await click('Saved', `${pane} .sgroup-header[data-group-name="hub-inbox:saved"]`); await settle(400);
-                const id = await ev(`document.querySelectorAll('#group-table-view .group-table-link')[1].dataset.id`);
-                await click('the message', `#group-table-view .group-table-link[data-id="${id}"]`); await settle(500);
+                const id = await ev(`document.querySelectorAll('#group-table-view .dt-primary')[1].dataset.id`);
+                await click('the message', `#group-table-view .dt-primary[data-id="${id}"]`); await settle(500);
                 assert.equal((await active()).cls.includes('wf-item-title'), true, 'a message page starts at its title');
                 await escape(); await settle(500);
                 assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Saved', 'back at the Saved table');
@@ -100,9 +100,9 @@ const AGENTS = (waiting) => waiting ? [
             });
             if (mobile) await step('the Saved table stacks: the message has the row, its state and action are under it, nothing is behind a sideways scroll', async () => {
                 await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .sgroup-header[data-group-name="hub-inbox:saved"]').click(); true`); await settle(500);
-                const r = await ev(`(() => { const tb = document.querySelector('#group-table-view .group-table'); const row = tb.querySelector('tbody tr'); const tds = [...row.children]; const rb = row.getBoundingClientRect(); const first = tds[0].getBoundingClientRect(); const rest = tds.slice(1).map(t => t.getBoundingClientRect()); const sc = document.querySelector('#group-table-view .group-table-scroll'); const act = row.querySelector('button.group-table-cell-btn'); const ab = act && act.getBoundingClientRect();
+                const r = await ev(`(() => { const tb = document.querySelector('#group-table-view .dt-table'); const row = tb.querySelector('tbody tr'); const tds = [...row.children]; const rb = row.getBoundingClientRect(); const first = tds[0].getBoundingClientRect(); const rest = tds.filter(t => t.classList.contains('dt-line-2')).map(t => t.getBoundingClientRect()); const sc = document.querySelector('#group-table-view .dt-box'); const act = row.querySelector('button.dt-quiet'); const ab = act && act.getBoundingClientRect();
                     return { firstW: Math.round(first.width), rowW: Math.round(rb.width), under: rest.every(b => b.top >= first.bottom - 1), over: sc.scrollWidth - sc.clientWidth, actionIn: !!ab && ab.left >= -1 && ab.right <= innerWidth + 1, role: tb.getAttribute('role'), cells: tds.map(t => t.getAttribute('role')) }; })()`);
-                assert.ok(r.firstW >= r.rowW * 0.9, 'the message takes the row: ' + JSON.stringify(r)); assert.ok(r.under, 'its date, state and action are under it: ' + JSON.stringify(r)); assert.ok(r.over <= 1, 'no sideways scroll: ' + JSON.stringify(r));
+                assert.ok(r.firstW >= r.rowW * 0.45, 'the message takes the first line (its date at the right): ' + JSON.stringify(r)); assert.ok(r.under, 'its state and action are under it: ' + JSON.stringify(r)); assert.ok(r.over <= 1, 'no sideways scroll: ' + JSON.stringify(r));
                 assert.ok(r.actionIn, 'the action is on screen: ' + JSON.stringify(r)); assert.equal(r.role, 'table'); assert.ok(r.cells.every(c => c === 'cell'), 'cells keep their role');
             });
         }

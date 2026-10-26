@@ -103,7 +103,7 @@ async function run() {
             await ev(`document.querySelector('#inbox-saved-bar .list-bar-filter-btn').click(); document.querySelector('#inbox-saved-bar .list-bar-clear-all').click(); true`);
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '4 messages'`, 'Clear all');
 
-            const order = () => ev(`[...document.querySelectorAll('#group-table-view tbody .group-table-link')].map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 40))`); // the snippets: a row's Gone sentence is said once for the list (#7122), so the whole text differs by row
+            const order = () => ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 40))`); // the snippets: a row's Gone sentence is said once for the list (#7122), so the whole text differs by row
             const newest = await order();
             await pick('svi-sort', 'oldest');
             await settle(`(() => { const r = document.querySelector('#group-table-view tbody tr'); return !!r && !/rollout checklist|unrelated/.test(r.textContent); })()`, 'oldest first');

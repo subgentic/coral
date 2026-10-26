@@ -16,9 +16,9 @@ const BASE = require('./test_base').BASE;
         const set = since => ev(`(async () => { const w = ${JSON.stringify(since)};
             window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, waiting_for_input: true, waiting_kind: 'permission', waiting_since: w[s.session_id] === undefined ? null : w[s.session_id] }));
             (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
-        const WHEN = `[...document.querySelectorAll('#group-table-view thead th')].findIndex(h => h.textContent.trim() === 'When')`; // the column moves when a row has a folder or a question
+        const WHEN = `[...document.querySelectorAll('#group-table-view thead th')].findIndex(h => h.textContent.replace(/[↑↓↕]/g, '').trim() === 'Waiting')`; // the column moves when a row has a folder or a question
         // an empty cell is a dash for the eye and "none" for a screen reader
-        const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ id: tr.querySelector('.group-table-link').dataset.sessionId, waited: tr.cells[${WHEN}].textContent.trim().replace(/^\u2014none$/, ''), title: tr.cells[${WHEN}].title || '', text: tr.textContent }))`);
+        const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ id: tr.querySelector('.dt-primary').dataset.sessionId, waited: tr.cells[${WHEN}].textContent.trim().replace(/^\u2014none$/, ''), title: tr.cells[${WHEN}].title || '', text: tr.textContent }))`);
         const ago = m => new Date(Date.now() - m * 60000).toISOString();
         await set({ 'qa-a-id': ago(4) });
         await ev(`window.switchNavTab('hub-inbox'); true`);

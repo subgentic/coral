@@ -28,13 +28,13 @@ const hex = i => i.toString(16).padStart(20, '0');
         const ui = document.getElementById('saved-ui'); const dock = document.getElementById('agentic-state'); const tabs = [...document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]')].filter(t => !t.hidden && t.style.display !== 'none').map(t => t.dataset.arg);
         const gt = vis('group-table-view') && /^hub-inbox:/.test(document.getElementById('group-table-view').dataset.group); // a group's table or an item's page, both the Inbox's own
         return { dockHeading: (document.getElementById('saved-scope') || {}).textContent, dockRows: [...document.querySelectorAll('#saved-table tbody .group-table-link')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort(), inbox: vis('inbox-view') || gt, local: vis('inbox-local') || gt, frame: !!document.getElementById('inbox-frame'), saved: vis('group-table-view') && document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved', uiIn: ui && (ui.parentElement.id), heading: (document.getElementById('group-table-title') || {}).textContent,
-            rows: document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved' ? [...document.querySelectorAll('#group-table-view tbody .group-table-link')].map(r => r.textContent).sort() : [],
+            rows: document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved' ? [...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(r => r.textContent).sort() : [],
             needs: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' ? [...document.querySelectorAll('#group-table-view tbody tr')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()) : [], needsEmpty: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && /Nothing needs your input/.test(document.getElementById('group-table-view').textContent),
             navActive: document.querySelector('.top-nav-tab.active') && document.querySelector('.top-nav-tab.active').dataset.arg, tabs, navBadge: (document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || '', navLabel: document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label'),
             dockShown: !!dock && getComputedStyle(dock).display !== 'none' && dock.getClientRects().length > 0 && !dock.classList.contains('collapsed') || (!!dock && dock.classList.contains('mobile-panel-overlay')), dockHasSavedTab: vis('agentic-tab-saved'),
             savedBtn: document.getElementById('saved-btn').getAttribute('aria-pressed'), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
     let BOARD = ''; // the board this suite makes, taken away again in the finally (#4959)
-    const LINK = `[...document.querySelectorAll('#group-table-view .group-table-link')].find(l => l.textContent.includes('the real board message'))`; // the saved message's row
+    const LINK = `[...document.querySelectorAll('#group-table-view .dt-primary')].find(l => l.textContent.includes('the real board message'))`; // the saved message's row
     const ALL_ROWS = ['fe-a chat', 'qa-a chat', 'qa-b chat', 'team-a board, by the Orchestrator', 'team-a board, by the QA Engineer', 'team-b board, by the QA Engineer'];
 
     try {
@@ -68,7 +68,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             await settle(`(window.__qaState && window.__qaState.liveSessions || []).length === 3`, 'three agents in the live list');
             await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
         };
-        const rowsShown = (heading, label) => settle(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved' && document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .group-table-link').length > 0`, label); // on screen, not only drawn
+        const rowsShown = (heading, label) => settle(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved' && document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .dt-primary').length > 0`, label); // on screen, not only drawn
 
         for (const [dev, w, mobile] of [['desktop', 1280, false], ['phone', 390, true]]) {
             console.log(dev);
@@ -105,7 +105,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             s = await state();
             check(`${dev}: Needs you lists the waiting agent, and the sidebar row says what it waits for`, s.needs.length === 1 && /QA Beta/.test(s.needs[0]) && /Needs input/.test(await ev(`document.querySelector('#inbox-nav-list .sb-row-meta').textContent`)), JSON.stringify(s.needs));
             await shot(`inbox-local-needs-${dev}`);
-            await ev(`document.querySelector('#group-table-view tbody .group-table-link').click(); true`);
+            await ev(`document.querySelector('#group-table-view tbody .dt-primary').click(); true`);
             await settle(`window.T && T.state.currentSession && T.state.currentSession.session_id === 'qa-b-id' && document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'the waiting agent opened');
             check(`${dev}: a Needs you row opens that agent (the Agents tab, the agent selected)`, true);
             await ev(`window.selectLiveSession('', '', '', 'local'); true`);
@@ -177,7 +177,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`document.querySelector('#inbox-page .wf-more > .btn').click(); true`);
         await ev(`document.querySelector('#inbox-page .wf-more-menu .btn').click(); true`);
 
-        await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .group-table-link').length === 6`, 'a removal in the Inbox');
+        await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .dt-primary').length === 6`, 'a removal in the Inbox');
         s = await state();
         check('Remove in the Inbox removes the item and stays on it', s.inbox, JSON.stringify([s.inbox]));
 
@@ -199,7 +199,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await settle(`document.getElementById('saved-btn').getAttribute('aria-label') === 'Saved for later, 6 open'`, 'the top bar count of everything');
         check('on an agent\'s page the top bar badge is the count of everything (6), not the agent\'s (2)', (await badge()) === '6', await badge());
         await ev(`document.getElementById('saved-btn').click(); true`);
-        await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .group-table-link').length === 6`, 'the Inbox at everything');
+        await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .dt-primary').length === 6`, 'the Inbox at everything');
         s = await state();
         check('an agent\'s page: the bookmark opens the Inbox at Saved for later, all of it', s.inbox && s.saved && s.uiIn === 'agentic-panel-saved' && s.navActive === 'hub-inbox' && s.savedBtn === 'true' && s.heading === 'Saved' && s.rows.length === ALL_ROWS.length && ALL_ROWS.every(r => s.rows.some(x => x.includes(r))), JSON.stringify([s.inbox, s.uiIn, s.navActive, s.savedBtn, s.heading, s.rows]));
         check('and the badge is still everything', (await badge()) === '6', await badge());
@@ -217,7 +217,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await settle(`document.getElementById('saved-btn').getAttribute('aria-label') === 'Saved for later, 6 open'`, 'the count on the team page');
         check('on a team\'s page the top bar badge is the count of everything (6)', (await badge()) === '6', await badge());
         await ev(`document.getElementById('saved-btn').click(); true`);
-        await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .group-table-link').length === 6`, 'the Inbox at everything, from a team');
+        await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .dt-primary').length === 6`, 'the Inbox at everything, from a team');
         s = await state();
         check('a team\'s page: the bookmark opens the Inbox at everything too', s.inbox && s.uiIn === 'agentic-panel-saved' && s.heading === 'Saved' && s.rows.length === 6, JSON.stringify([s.inbox, s.uiIn, s.heading, s.rows.length]));
         await ev(`document.getElementById('saved-btn').click(); true`);

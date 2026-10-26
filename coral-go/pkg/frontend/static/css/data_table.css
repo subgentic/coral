@@ -76,6 +76,7 @@
 .dt-person { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
 .dt-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--table-avatar); height: var(--table-avatar); border-radius: 50%; color: var(--on-avatar); font-size: 0.6875rem; font-weight: 700; }
 .dt-person-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-quiet { font-size: var(--table-tertiary-size); font-weight: var(--table-secondary-weight); color: var(--table-secondary-color); } /* a row's own small action (Done, Reopen): quiet, not a call to action */
 .dt-row-open { cursor: pointer; }
 .dt-row:hover td { background: var(--table-hover); }
 .dt-row[aria-current="true"] td { background: var(--table-hover); }
@@ -107,6 +108,7 @@
 .dt-box.dt-folded .dt-row:hover, .dt-box.dt-folded .dt-row[aria-current="true"] { background: var(--table-hover); }
 .dt-box.dt-folded .dt-row.dt-selected { background: var(--table-selected); }
 .dt-box.dt-folded .dt-check { display: none; }
+.dt-box.dt-folded .dt-primary, .dt-box.dt-folded .dt-link, .dt-box.dt-folded .dt-quiet { min-height: var(--table-touch); display: inline-flex; align-items: center; } /* a 44 px target when the table is the phone's two-line row */
 .dt-box.dt-folded.dt-selecting .dt-check { display: block; flex: none; width: var(--table-touch); }
 .dt-box.dt-folded.dt-selecting .dt-check input { width: 24px; height: 24px; }
 .dt-box.dt-fold-column.dt-folded td.dt-line-0, .dt-box.dt-fold-column.dt-folded td.dt-when-off { display: none; }
