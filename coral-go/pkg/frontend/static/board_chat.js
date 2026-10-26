@@ -11,6 +11,9 @@ import { initGrowingTextarea } from './growing_textarea.js';
 import { announceNotice } from './notifications.js';
 import { outcomeUnknownLine } from './outcome_unknown.js';
 import { paintPauseButton as _paintPauseButton } from './board_pause_button.js';
+import { onRowActions, boardView, saveBoardView, rowParts, applyView, mountTableTools, forgetOpenRows, refreshReplies, watchFold, dayLineBefore } from './board_table.js'; // the Board as a table (#7922): the team page's module at dock width
+import { messageTimeHtml } from './message_time.js';
+import { keyRoute, build } from './routes.js';
 
 // ── Board (right-panel tab) ──────────────────────────────────────
 let _boardChatTimer = null;
@@ -108,6 +111,7 @@ export function showBoardChatTab(boardName) {
         if (carried) document.getElementById('board-panel-msgs').replaceWith(carried);
 
         initGrowingTextarea(document.getElementById('board-panel-input'));
+        mountDockTableSwitch(panel);
 
     panel.dataset.board = boardName;
     }
@@ -116,6 +120,8 @@ export function showBoardChatTab(boardName) {
     // only what came since.
     if (_boardChatBoard !== boardName) {
         _boardChatBoard = boardName;
+        forgetOpenRows(); // no row stays open across teams
+        _boardChatReplyTo = null;
         _boardChatLoaded = false;
         _boardChatMessages = [];
         _boardChatTotal = 0;
@@ -315,8 +321,12 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
     const items = groupTaskQueueRuns(messages, !_boardChatSelectMode);
     // Unchanged messages keep their nodes (and the artifact images and links already resolved in them); only new or changed ones
     // are built (#3881: the whole page was rebuilt on every agent switch, 170 to 200 ms over five switches).
+    const lastWhen = (it) => it.kind === 'queue' ? it.msgs[it.msgs.length - 1].created_at : it.m.created_at;
+    applyView(msgsEl, boardView());
+    watchFold(msgsEl, { always: true }); // the dock is narrow: its rows are always the folded two lines
     morphHtml(msgsEl, loadEarlierHtml + items.map((item, i) => {
-        if (item.kind === 'queue') return renderTaskQueueRun(item, _formatTime);
+        const day = dayLineBefore(item.kind === 'queue' ? item.msgs[0].created_at : item.m.created_at, i > 0 ? lastWhen(items[i - 1]) : null);
+        if (item.kind === 'queue') return day + renderTaskQueueRun(item, _formatTime);
         const m = item.m;
         const agent = m.job_title || m.sender_name || 'Unknown';
         const color = getAgentColor(agent);
@@ -329,17 +339,23 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
 
         const selectedClass = _boardChatSelectMode && _boardChatSelectedIds.has(m.id) ? ' mb-message-selected' : '';
         const checkbox = _boardChatSelectMode ? `<input type="checkbox" class="mb-select-checkbox" data-msg-id="${Number(m.id)}" ${_boardChatSelectedIds.has(m.id) ? 'checked' : ''} data-on-click="board-chat-msg-select">` : '';
-        return `<div class="mb-message ${spacing}${alignClass}${selectedClass}"${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
+        const parent = m.reply_to ? messages.find(x => x.id === m.reply_to) : null;
+        const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel: '', replyName: m.reply_to ? (parent ? (parent.job_title || parent.sender_name || 'Unknown') : 'an earlier message') : '', more: false, idp: 'dbd' });
+        return day + `<div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}" data-message-id="${Number(m.id)}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
+            ${parts.toggle}
             <div class="mb-message-header">
                 ${checkbox}
                 <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(agent)}</span>
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
                 <span class="mb-message-time">${_formatTime(m.created_at)}</span>
             </div>
-            <div class="mb-message-body">${renderBoardMessageBody(m)}</div>
+            ${parts.tagsOpen}
+            <div class="mb-message-body" id="${escapeAttr(parts.bodyId)}">${renderBoardMessageBody(m)}</div>
             ${messageAttachmentsHtml(m)}
+            ${parts.actions}
         </div>`;
     }).join(''));
+    refreshReplies(msgsEl);
     resolveBoardArtifacts(msgsEl, _activeBoardChat ? splitKey(_activeBoardChat).server : undefined);
     if (wasAtBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
     msgsEl.dataset.rendered = '1';
@@ -458,6 +474,41 @@ export async function _exportBoardChatSelected() {
     _cancelBoardChatSelect();
 }
 
+let _boardChatReplyTo = null; // { id, name }: the message the box's text answers (Reply), sent as reply_to while the text still starts with the name
+
+/** The Table | Chat switch in the tab's head line (the choice is the team page's: one remembered setting). */
+function mountDockTableSwitch(panel) {
+    const head = panel.querySelector('.board-chat-header');
+    if (!head || head.querySelector(':scope > .mb-table-tools')) return;
+    mountTableTools(head, { view: boardView(), pills: false, onView: v => {
+        saveBoardView(v);
+        const box = document.getElementById('board-panel-msgs');
+        const bottom = box && box.scrollTop >= box.scrollHeight - box.clientHeight - 20;
+        if (box) { applyView(box, v); if (bottom) box.scrollTop = box.scrollHeight; }
+    } });
+    head.insertBefore(head.querySelector(':scope > .mb-table-tools'), head.querySelector('#board-chat-pause-btn'));
+}
+
+/** Reply in the dock: "@Sender " at the start of the box's text and the focus in it. */
+function _boardChatReply(id, name) {
+    const input = document.getElementById('board-panel-input');
+    if (!input) return;
+    const prefix = `@${name} `;
+    if (!input.value.toLowerCase().startsWith(prefix.toLowerCase())) input.value = prefix + input.value;
+    _boardChatReplyTo = { id: Number(id), name };
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+}
+
+/** Copy link in the dock: the message's own address (the team page's Board tab with the message's number). */
+async function _boardChatCopyLink(id) {
+    if (!_activeBoardChat) return;
+    try { await navigator.clipboard.writeText(`${location.origin}${build(keyRoute('team', _activeBoardChat, 'messages', Number(id)))}`); showToast('Link copied'); } catch { showToast('Could not copy the link', true); }
+}
+
+onRowActions('.board-chat-messages', { reply: _boardChatReply, link: _boardChatCopyLink });
+
 async function _sendBoardChat(boardName) {
     const inputEl = document.getElementById('board-panel-input');
     if (!inputEl) return;
@@ -469,7 +520,7 @@ async function _sendBoardChat(boardName) {
         const resp = await boardFetch(boardName, `/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content }),
+            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(_boardChatReplyTo && content.toLowerCase().startsWith(`@${_boardChatReplyTo.name.toLowerCase()}`) ? { reply_to: _boardChatReplyTo.id } : {}) }),
         });
         sent = resp.ok;
         if (!sent) unknown = await outcomeUnknownLine(resp); // the hub lost the answer: it may have reached the computer
@@ -481,6 +532,7 @@ async function _sendBoardChat(boardName) {
         showToast(unknown || 'Could not send to the team. Your message is back in the box.', true); // the words are back in the box either way; nothing is sent again by itself
         return;
     }
+    _boardChatReplyTo = null;
     announceNotice('Message sent'); // heard once, not drawn: the message itself appears in the list
     _loadBoardPanelChat(boardName);
 }

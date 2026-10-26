@@ -5,6 +5,7 @@
 import { escapeHtml, escapeAttr } from './html_escape.js';
 import { askBadge, mentionedNames } from './board_message_text.js';
 import { browserLocal } from './safe_storage.js';
+import { registerActions, withId, textOf } from './actions.js';
 
 const VIEW_KEY = 'coral.board.view';
 const SNIPPET_CHARS = 300;
@@ -84,14 +85,14 @@ export function sameDay(a, b) {
 }
 
 /** The divider above a day's first row: sticky while that day's rows scroll under it. A list item, since the messages box is a list. */
-export function dayDividerHtml(iso) {
+export function dayDividerHtml(iso, { listItem = true } = {}) {
     const label = dayLabel(iso);
-    return label ? `<div class="mb-day" role="listitem" data-day="${escapeAttr(String(new Date(iso).toDateString()))}">${escapeHtml(label)}</div>` : '';
+    return label ? `<div class="mb-day"${listItem ? ' role="listitem"' : ''} data-day="${escapeAttr(String(new Date(iso).toDateString()))}">${escapeHtml(label)}</div>` : '';
 }
 
 /** What a message's row adds to the board's own markup, as strings: `toggle` (the one-button head), `tagsOpen` (the tags again at the top of the open message, for the phone's folded row), `actions` (Reply,
  * Copy link, More) and the row's classes. agent is the sender's name, timeHtml the message's <time>, moreLabel the name of its More button. */
-export function rowParts(m, { agent, timeHtml, moreLabel, replyName = '', self = 'operator' }) {
+export function rowParts(m, { agent, timeHtml, moreLabel, replyName = '', self = 'operator', more = true, idp = 'mbd' }) {
     const replyText = `Reply to ${agent}`;
     const tags = tagsOf(m, { replyName, self });
     const open = isRowOpen(m.id);
@@ -99,10 +100,11 @@ export function rowParts(m, { agent, timeHtml, moreLabel, replyName = '', self =
     const tagHtml = tagsHtml(m, tags);
     const initial = Array.from(String(agent || '?'))[0] || '?';
     return {
+        bodyId: `${idp}-${Number(m.id)}`, // each surface its own ids: the team page and the dock can show the same message at once
         classes: `${open ? ' mb-open' : ''}${tags.ask ? ' mb-q' : ''}${tags.mine ? ' mb-mine' : ''}${replyName ? ' mb-is-reply' : ''}`,
-        toggle: `<button type="button" class="mb-row-toggle" data-on-click="mb-row-toggle" aria-expanded="${escapeAttr(String(open))}" aria-controls="mbd-${Number(m.id)}"><span class="mb-row-chev" aria-hidden="true"></span><span class="mb-row-avatar" aria-hidden="true">${escapeHtml(initial.toUpperCase())}</span><span class="mb-row-who" title="${escapeAttr(agent)}">${escapeHtml(agent)}</span><span class="mb-row-snippet">${escapeHtml(snippet)}</span><span class="mb-row-tags">${tagHtml}</span>${timeHtml}</button>`,
+        toggle: `<button type="button" class="mb-row-toggle" data-on-click="mb-row-toggle" aria-expanded="${escapeAttr(String(open))}" aria-controls="${escapeAttr(idp)}-${Number(m.id)}"><span class="mb-row-chev" aria-hidden="true"></span><span class="mb-row-avatar" aria-hidden="true">${escapeHtml(initial.toUpperCase())}</span><span class="mb-row-who" title="${escapeAttr(agent)}">${escapeHtml(agent)}</span><span class="mb-row-snippet">${escapeHtml(snippet)}</span><span class="mb-row-tags">${tagHtml}</span>${timeHtml}</button>`,
         tagsOpen: tagHtml ? `<div class="mb-row-tags-open">${tagHtml}</div>` : '',
-        actions: `<div class="mb-row-replies" hidden></div><div class="mb-row-actions"><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-reply" data-msg-id="${Number(m.id)}" data-sender="${escapeAttr(agent)}" aria-label="${escapeAttr(replyText)}">Reply</button><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-copy-link" data-msg-id="${Number(m.id)}">Copy link</button><button type="button" class="btn mb-row-btn mb-row-more" data-on-click="mb-msg-more" aria-haspopup="dialog" aria-label="${escapeAttr(moreLabel)}">More</button></div>`,
+        actions: `<div class="mb-row-replies" hidden></div><div class="mb-row-actions"><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-reply" data-msg-id="${Number(m.id)}" data-sender="${escapeAttr(agent)}" aria-label="${escapeAttr(replyText)}">Reply</button><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-copy-link" data-msg-id="${Number(m.id)}">Copy link</button>${more ? `<button type="button" class="btn mb-row-btn mb-row-more" data-on-click="mb-msg-more" aria-haspopup="dialog" aria-label="${escapeAttr(moreLabel)}">More</button>` : ''}</div>`,
     };
 }
 
@@ -165,11 +167,10 @@ export function applyView(container, view) {
 const PILLS = [['all', 'All'], ['questions', 'Questions'], ['mentions', 'Mentions me']];
 
 /** The toolbar's line under the search: the pills (All, Questions, Mentions me) at the left, the Table | Chat switch at the right. Built once per host; onView(view) and onPill(pill) are called on a choice. */
-export function mountTableTools(host, { view, pill = 'all', onView, onPill }) {
-    let bar = host.querySelector(':scope > #mb-table-tools');
+export function mountTableTools(host, { view, pill = 'all', onView, onPill, pills: withPills = true }) {
+    let bar = host.querySelector(':scope > .mb-table-tools');
     if (bar) return bar;
     bar = document.createElement('div');
-    bar.id = 'mb-table-tools';
     bar.className = 'mb-table-tools';
     const pills = document.createElement('div');
     pills.className = 'goals-chips mb-pills'; // the chips of the Goals and Tasks tabs: one chosen style
@@ -193,7 +194,52 @@ export function mountTableTools(host, { view, pill = 'all', onView, onPill }) {
         b.addEventListener('click', () => { for (const x of sw.children) x.setAttribute('aria-pressed', String(x === b)); onView(key); });
         sw.append(b);
     }
-    bar.append(pills, sw);
+    bar.append(...(withPills ? [pills] : []), sw);
     host.append(bar);
     return bar;
+}
+
+const FOLD_BELOW_REM = 40;
+const watched = new WeakSet();
+/** The box folds its rows (two lines, the tags with the open message) when it is narrower than 40 rem; always when `always` (the agent dock). The class is on the box itself: mb-fold. */
+export function watchFold(container, { always = false } = {}) {
+    if (!container || watched.has(container)) return;
+    watched.add(container);
+    const set = () => {
+        const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+        container.classList.toggle('mb-fold', always || container.clientWidth < FOLD_BELOW_REM * rem);
+    };
+    set();
+    if (typeof ResizeObserver === 'function') new ResizeObserver(set).observe(container);
+}
+
+/** The row of a message in the box that holds `from` (a row's own button, or any element inside the box). */
+function rowIn(from, id) {
+    const box = from.closest('.mb-messages-scroll, .board-chat-messages');
+    return box ? box.querySelector(`:scope > .mb-message[data-message-id="${CSS.escape(String(id))}"]`) : null;
+}
+
+const surfaces = [];
+/** A surface that draws the table says what Reply and Copy link do in it: box is the selector of its messages box, hooks { reply(id, name), link(id) }. */
+export function onRowActions(box, hooks) { surfaces.push({ box, ...hooks }); }
+const surfaceOf = (el) => surfaces.find(s => el.closest(s.box));
+
+// The head's press and a reply's jump: the same on every surface that draws the table (the team page's Board tab, the agent dock's).
+registerActions({
+    'mb-row-toggle': el => { const row = el.closest('.mb-message'); if (row) toggleRow(row); },
+    'mb-msg-reply': el => withId(el.dataset.msgId, id => { const n = textOf(el.dataset.sender), s = surfaceOf(el); if (n && s) s.reply(id, n); }),
+    'mb-msg-copy-link': el => withId(el.dataset.msgId, id => surfaceOf(el)?.link(id)),
+    'mb-jump-msg': el => withId(el.dataset.msgId, id => {
+        const row = rowIn(el, id);
+        if (!row) return;
+        toggleRow(row, true);
+        row.scrollIntoView({ block: 'center' });
+        row.setAttribute('tabindex', '-1');
+        row.focus({ preventScroll: true });
+    }),
+});
+
+/** The day lines of a list drawn from a string (the dock's): the line to put before an item when its day is not the one before it. whenOf(item) is the item's first time, lastOf(prev) the previous item's last. */
+export function dayLineBefore(when, prevWhen) {
+    return !prevWhen || !sameDay(prevWhen, when) ? dayDividerHtml(when, { listItem: false }) : '';
 }
