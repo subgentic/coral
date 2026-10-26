@@ -64,7 +64,7 @@ result in the completion JSON. The local runner is bounded and secret-minimal;
 production deployments still need an OS sandbox for stronger network/process
 isolation.
 
-### Orchestrator capability map
+## Orchestrator capability map
 
 The compact default orchestrator guidance points to the queue operations that
 are easy to miss:

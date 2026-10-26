@@ -955,7 +955,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .phone-title-row { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 0; }
     .phone-title-row > .group-back, .phone-title-row > .sched-back, .phone-title-row > .goals-back { flex: 0 0 auto; margin: 0; }
-    .phone-title-row > h2, .phone-title-row > .sched-header { flex: 1 1 10rem; min-width: 10rem; margin: 0; }
+    .phone-title-row > h1, .phone-title-row > h2, .phone-title-row > .sched-header { flex: 1 1 10rem; min-width: 10rem; margin: 0; }
 }
 .group-back:hover { text-decoration: underline; }
 /* A group header of a tab's list: the name opens the table, so it reads as a link on hover */

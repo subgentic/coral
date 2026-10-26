@@ -8,6 +8,7 @@ import { note, currentRoute } from './nav.js';
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, setBackLink } from './sidebar_groups.js';
 import { onViewShown } from './view_switch.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { foldWayBack } from './way_back.js';
 
 /** The line the "Copy docs line for agents" button copies: what a user pastes to an agent so it can read
  *  these docs. The agent prompt says the same (internal/agent DocsPromptLine; a Go test keeps them equal). */
@@ -54,6 +55,21 @@ export async function showDocsTab() {
     if (!docsList.length) { await loadDocsList(); return; }
     if (!selectedDoc && !isPhoneLayout()) openFirstGroupTable('docs'); // the tab opens on its first group's table; a phone shows the list
     syncPhonePage();
+}
+
+/** A phone's way back is on the title's line (#7751, the way every page has it, #7734): the button moves in front of the document's own heading, which is its title, and the pair share a row (way_back.js).
+ *  The page redraws the document by replacing everything in it, which takes the button with it: it goes back to the toolbar then (a wide screen's, where css hides it). */
+let phoneBack = null;
+function keepPhoneBack(content) {
+    if (phoneBack) return;
+    phoneBack = document.getElementById('docs-phone-back');
+    new MutationObserver(() => { if (phoneBack && !phoneBack.isConnected) document.getElementById('docs-back')?.after(phoneBack); }).observe(content, { childList: true });
+}
+function titleRow(content) {
+    keepPhoneBack(content);
+    const title = content.querySelector('h1');
+    if (!phoneBack || !isPhoneLayout() || !title || title.parentElement !== content) return;
+    title.before(phoneBack); foldWayBack(content, '#docs-phone-back', 'h1');
 }
 
 /** On a phone the list is the page and an open document is the screen after it (data-phone-item, docs.css). */
@@ -193,6 +209,8 @@ export async function selectDoc(name, { noteRoute = true, focusHeading = false }
     if (html !== null) {
         content.innerHTML = html;
         wrapTables(content);
+        focusableCode(content);
+        titleRow(content);
     } else {
         // Fallback: pre-formatted text
         content.innerHTML = '<pre style="white-space:pre-wrap">' + esc(doc.content) + '</pre>';
@@ -214,6 +232,18 @@ export async function copyDocsLine() {
     else showToast('Could not copy: select the text in the hint and copy it', true);
 }
 
+// ── Code blocks that scroll (#7751) ─────────────────────────────────────
+/** A code block wider than the page scrolls inside its own box: a keyboard has to reach it to read the rest, so it is a labelled, focusable region while it scrolls (and plain while it does not: no tab stop for a short line). */
+let codeWatched = false;
+function focusableCode(content) {
+    const sync = () => (document.getElementById('docs-content') || content).querySelectorAll('pre').forEach(pre => {
+        const scrolls = pre.scrollWidth > pre.clientWidth + 1;
+        if (scrolls) { pre.tabIndex = 0; pre.setAttribute('role', 'region'); pre.setAttribute('aria-label', 'Code, scrolls sideways'); }
+        else { pre.removeAttribute('tabindex'); pre.removeAttribute('role'); pre.removeAttribute('aria-label'); }
+    });
+    sync(); requestAnimationFrame(sync);
+    if (!codeWatched) { codeWatched = true; window.addEventListener('resize', sync); }
+}
 // ── Tables on a phone (#7162) ──────────────────────────────────────────
 
 /** Each table sits in a labelled, focusable scroll region (a keyboard reaches what overflows) with a visible line that says it scrolls sideways, drawn only while it does. */

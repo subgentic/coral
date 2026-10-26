@@ -47,7 +47,7 @@ const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back
         await scene('Team: a task page', 'Tasks', 'body', async () => { await team('Tasks'); await ev(`document.querySelector('#team-panel-tasks .team-row-btn, #team-panel-tasks tbody button').click(); true`); await waitFor(`!!document.querySelector('#team-panel-item #team-task-title')`, 'the task page', 10000); });
         await scene('Team: a goal page', 'Goals', 'body', async () => { await team('Goals'); await ev(`document.querySelector('#team-panel-goals .team-row-btn, #team-panel-goals tbody button').click(); true`); await waitFor(`!!document.querySelector('.goals-page .goals-back, #team-panel-item .goals-back, .goal-page .goals-back')`, 'the goal page', 10000); });
         const want = r => `\u2190 ${r.to}`;
-        const bad = results.filter(r => r.err || (r.backs && r.backs.length !== 1) || r.text !== want(r) || r.font !== '13px 500' || r.border !== 'none' || r.bg !== 'rgba(0, 0, 0, 0)' || (!r.beside && !r.name.startsWith('Docs')));
+        const bad = results.filter(r => r.err || (r.backs && r.backs.length !== 1) || r.text !== want(r) || r.font !== '13px 500' || r.border !== 'none' || r.bg !== 'rgba(0, 0, 0, 0)' || !r.beside);
         const colours = new Set(results.filter(r => !r.err).map(r => r.color));
         assert.ok(bad.length === 0 && colours.size === 1, `every phone way back is one text link named for where it goes, beside the title: ${bad.length} of ${results.length} differ (colours: ${[...colours].join(' | ')}):\n` + results.map(r => JSON.stringify(r)).join('\n'));
         console.log('PASS every phone way back is the same');

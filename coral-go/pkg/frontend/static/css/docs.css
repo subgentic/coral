@@ -174,7 +174,7 @@
 
 /* Docs on a phone (#7443): the pane is the page's list, and an open document is the screen after it, with a way back to the list */
 #mobile-docs-list { display: none; }
-.docs-toolbar .docs-phone-back { display: none; }
+.docs-toolbar .docs-phone-back, #docs-content .docs-phone-back { display: none; } /* a wide screen has no phone's way back, in the toolbar or moved in front of the title (#7751) */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     #mobile-docs-list { display: block; }
     #docs-view:not([data-phone-item]) .docs-page { display: none; }
@@ -184,3 +184,5 @@
     #mobile-docs-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
     #mobile-docs-list .sidebar-header { padding: 12px; }
 }
+
+.docs-content pre:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; } /* a code block that scrolls is a focusable region (#7751) */

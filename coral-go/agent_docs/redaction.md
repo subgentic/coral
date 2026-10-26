@@ -15,7 +15,7 @@ never passed on as it is.
    cost redaction speed (about three times the time on text dense in names such as key and token), so every local caller (`coral.log` lines, events, saved
    views, the board) keeps rules 1 and 2 only (`secrets.Redactor`).
 
-### Where the hub's rules (the keyword rules too) apply
+## Where the hub's rules (the keyword rules too) apply
 
 - Everything the cloud tunnel sends (replies, streams, terminal frames): `secrets.HubRedactor`.
 - A request that came through the tunnel, for the text it cuts or keeps before the reply is redacted: a chat page's trimmed tool fields (`?trim=N`) and a saved
@@ -26,7 +26,7 @@ never passed on as it is.
 
 The local callers (`coral.log`, events, the board, saved views of local requests) keep `secrets.Redactor`: they cannot reach a hub viewer without the reply's own redaction.
 
-### What the keyword rules cost
+## What the keyword rules cost
 
 They are regular expressions, so they only run where a name could be: `internal/secrets/keyword_gate.go` finds each `=`, `:`, `%3D` or full-width separator
 whose word before it ends like a name (key, token, secret, password, ...), and each `--flag` of that kind, and gives the rules that name and its value
@@ -35,7 +35,7 @@ and `TestKeywordPlacesAreTight` holds the places to a few percent of ordinary te
 source-code-heavy terminal text and on transcript JSON (Mac, `Redactor` against `HubRedactor`), and about 8 percent on a 2 MiB reply; text that is nothing but names
 costs more (about a third of the base speed).
 
-### Turning the keyword rules off
+## Turning the keyword rules off
 
 They are on whenever Coral is connected to Coral Hub. Two switches, both local: the setting `hub_redact_keywords` (Settings > Coral Hub, or `PUT /api/settings`
 with `{"hub_redact_keywords": false}`; read on every reply) and the environment variable `CORAL_REDACT_KEYWORDS=off` (also `0`, `no`, `false`; read at every

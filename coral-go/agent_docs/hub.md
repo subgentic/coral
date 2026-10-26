@@ -2,7 +2,7 @@
 
 A Coral server started with `--hub` (or `CORAL_HUB=1`) can register other standalone Coral servers (remotes), show their agents in its dashboard and proxy calls to them. Without hub mode none of these routes exist (404). `GET /api/health` reports `"hub": true|false`.
 
-### Turning hub mode on from Settings
+## Turning hub mode on from Settings
 
 **Settings > Run as a hub** (#3460) does the same as `--hub` for people who start Coral from the macOS or Windows app. It saves `hub_mode` and applies at the next start: `--hub` or `CORAL_HUB=1` turn hub mode on, and so does the saved setting; nothing else does. With `--hub` or `CORAL_HUB=1` the toggle shows as on and locked: to turn hub mode off, start Coral without them (and clear the setting). The desktop apps show a **Restart Coral** button, which starts a new instance and stops this one (agents keep running in tmux and are found again); a server started from a terminal says to quit and start it again.
 
