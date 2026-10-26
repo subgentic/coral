@@ -29,15 +29,15 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
     const geometry = (headSel, docSel) => ev(`(() => { const h = document.querySelector(${JSON.stringify(headSel)}), d = document.querySelector(${JSON.stringify(docSel)}); if (!h || !d) return null; return { gap: Math.round(d.getBoundingClientRect().top - h.getBoundingClientRect().bottom) }; })()`);
     const key = async (k, code, vk, text) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk, text }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); };
     // What "Who can read this" shows is the server's real text (its length and wording, artifact_readers.go), so a clipped line would show here: every line wraps (white-space normal, no overflow hidden),
-    // nothing is wider than its box, and at a phone's width the long lines take more than one line.
-    const wrapOf = (scope) => ev(`(() => { const r = document.querySelector(${JSON.stringify(scope + ' .artifact-readers')}), panel = r.parentElement; const ps = [...r.querySelectorAll('.artifact-readers-body p')]; const lh = parseFloat(getComputedStyle(ps[0]).lineHeight) || 20; const rb = r.getBoundingClientRect(); return { texts: ps.map(p => p.textContent), clipped: ps.filter(p => p.scrollWidth > p.clientWidth + 1).length, panelSide: panel.scrollWidth - panel.clientWidth, blockSide: r.scrollWidth - r.clientWidth, ws: [...new Set(ps.map(p => getComputedStyle(p).whiteSpace))], overflow: [getComputedStyle(r).overflowX, getComputedStyle(r.querySelector('.artifact-readers-body')).overflowX], lines: ps.map(p => Math.round(p.getBoundingClientRect().height / lh)), inside: ps.every(p => p.getBoundingClientRect().right <= rb.right + 1 && p.getBoundingClientRect().left >= rb.left - 1) }; })()`);
-    const assertWraps = (w, label, mobile) => {
+    // nothing is wider than its box and no ellipsis cuts a line (how many lines a long text takes depends on the font and the width, so that is not asserted).
+    const wrapOf = (scope) => ev(`(() => { const r = document.querySelector(${JSON.stringify(scope + ' .artifact-readers')}), panel = r.parentElement; const ps = [...r.querySelectorAll('.artifact-readers-body p')]; const rb = r.getBoundingClientRect(); return { texts: ps.map(p => p.textContent), clipped: ps.filter(p => p.scrollWidth > p.clientWidth + 1).length, panelSide: panel.scrollWidth - panel.clientWidth, blockSide: r.scrollWidth - r.clientWidth, ws: [...new Set(ps.map(p => getComputedStyle(p).whiteSpace))], overflow: [getComputedStyle(r).overflowX, getComputedStyle(r.querySelector('.artifact-readers-body')).overflowX], ellipsis: [r, r.querySelector('.artifact-readers-body'), ...ps].some(e => getComputedStyle(e).textOverflow === 'ellipsis'), inside: ps.every(p => p.getBoundingClientRect().right <= rb.right + 1 && p.getBoundingClientRect().left >= rb.left - 1) }; })()`);
+    const assertWraps = (w, label) => {
         assert.match(w.texts[0], /^On this computer, the Operator reads, manages and deletes every artifact on this computer\.$/, `${label}: the whole first line is there: ${JSON.stringify(w.texts)}`);
         assert.ok(w.texts.some(t => /^Held by the Operator on this computer \(1 record\), on qa-det-\d+\. The agents of every team this owner owns read it\.$/.test(t)), `${label}: the whole second line is there: ${JSON.stringify(w.texts)}`);
         assert.ok(/boundary: every agent on this computer runs as the same user and can read Coral's data folder with its own shell\.$/.test(w.texts[w.texts.length - 1]), `${label}: the note is whole`);
         assert.deepEqual([w.clipped, w.panelSide <= 1, w.blockSide <= 1, w.inside], [0, true, true, true], `${label}: nothing is wider than its box: ${JSON.stringify(w)}`);
         assert.deepEqual(w.ws, ['normal'], `${label}: lines wrap (no nowrap)`); assert.deepEqual(w.overflow, ['visible', 'visible'], `${label}: nothing is cut off by an overflow`);
-        if (mobile) assert.ok(w.lines.every(n => n >= 2), `${label}: at a phone's width every line is more than one line, wrapped whole: ${JSON.stringify(w.lines)}`);
+        assert.ok(!w.ellipsis, `${label}: no line is cut with an ellipsis`);
     };
     const toggle = (scope) => `document.querySelector(${JSON.stringify(scope + ' .details-toggle')})`;
     const open = async (w, h, mobile) => {
@@ -86,7 +86,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
                 assert.deepEqual(await ev(`(() => { const r = document.querySelector('#detail-pane .detail-details .artifact-readers'); return { tag: r.tagName, nested: r.querySelectorAll('details, summary').length, body: r.querySelector('.artifact-readers-body').textContent.length > 0 }; })()`), { tag: 'SECTION', nested: 0, body: true }, 'Who can read this is shown directly: its answer is there, no second disclosure inside the first (#7796)');
                 await shot(`artifact-details-open-${w}`);
                 await waitFor(`document.querySelectorAll('#detail-pane .artifact-readers-body p').length >= 3`, 'the readers answer', 8000);
-                assertWraps(await wrapOf('#detail-pane'), `${label} pane`, mobile);
+                assertWraps(await wrapOf('#detail-pane'), `${label} pane`);
                 await shot(`artifact-details-readers-${w}`);
                 await key(' ', 'Space', 32, ' '); await settle(200);
                 assert.equal(await ev(`document.querySelector('#detail-pane .detail-details').hidden`), true, 'Space closes it');
@@ -130,7 +130,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
                 assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), false, 'Enter opens it');
                 assert.ok(await ev(`window.__na.text(document.querySelector('#artifact-viewer .artifact-viewer-readers')).includes('Who can read this')`), 'Who can read this is inside');
                 await waitFor(`document.querySelectorAll('#artifact-viewer .artifact-readers-body p').length >= 3`, 'the readers answer in the viewer', 8000);
-                assertWraps(await wrapOf('#artifact-viewer'), `${label} viewer`, mobile);
+                assertWraps(await wrapOf('#artifact-viewer'), `${label} viewer`);
                 await key(' ', 'Space', 32, ' '); await settle(200);
                 assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), true, 'Space closes it');
                 await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
