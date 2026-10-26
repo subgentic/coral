@@ -28,17 +28,44 @@ const (
 	maxArtifactMetaBytes     = 64 << 10
 )
 
+// linkGoals says of every item with a task which goal that task belongs to (#8575), for the goal filter and the Goal column; the tasks' goals are read in one query.
+func (h *BoardHandler) linkGoals(ctx context.Context, project string, items []teamArtifact) {
+	var ids []int64
+	seen := map[int64]bool{}
+	for _, it := range items {
+		if it.TaskID > 0 && !seen[it.TaskID] {
+			seen[it.TaskID] = true
+			ids = append(ids, it.TaskID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	goals, err := h.bs.TaskGoals(ctx, project, ids)
+	if err != nil {
+		return
+	}
+	for i := range items {
+		if g, ok := goals[items[i].TaskID]; ok {
+			items[i].GoalID, items[i].GoalTitle = g.ID, g.Title
+		}
+	}
+}
+
 var digestLikeName = regexp.MustCompile(`^(?:sha256:)?[a-fA-F0-9]{32,64}$`)
 
 // teamArtifact is one deduplicated artifact reference in a team's task results.
 type teamArtifact struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	MediaType      string `json:"media_type,omitempty"`
-	Size           *int64 `json:"size"`
-	CreatedAt      string `json:"created_at"`
-	TaskID         int64  `json:"task_id"`
-	TaskTitle      string `json:"task_title"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	MediaType string `json:"media_type,omitempty"`
+	Size      *int64 `json:"size"`
+	CreatedAt string `json:"created_at"`
+	TaskID    int64  `json:"task_id"`
+	TaskTitle string `json:"task_title"`
+	// GoalID and GoalTitle: the goal the artifact's task belongs to (#8575); omitted when it has no task or its task no goal.
+	GoalID         int64  `json:"goal_id,omitempty"`
+	GoalTitle      string `json:"goal_title,omitempty"`
 	Source         string `json:"source"`
 	URI            string `json:"uri,omitempty"`
 	Digest         string `json:"digest,omitempty"`
@@ -166,6 +193,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		items = h.mergeCrossTeamRows(items, project)
 	}
 	h.linkUploadTasks(r.Context(), project, items)
+	h.linkGoals(r.Context(), project, items)
 	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
 	if tq != nil {
 		h.queryTeamArtifacts(w, r, project, items, scanTruncated, limit, offset, sessionFilter, tq)

@@ -77,6 +77,8 @@ type TaskListItem struct {
 	Reviewers []string `db:"-" json:"reviewers,omitempty"`
 	// ReviewersJSON is the reviewers as the query reads them (a JSON array of names); fillListReviewers turns it into Reviewers.
 	ReviewersJSON string `db:"reviewers_json" json:"-"`
+	// ArtifactCount: how many distinct artifacts the task's results reference (its completion's and its review's, each link once), for the task row's count (#8575). Absent (0) for a task with none.
+	ArtifactCount int `db:"artifact_count" json:"artifact_count,omitempty"`
 }
 
 // TaskListPage is one page of the task list.
@@ -96,6 +98,13 @@ type TaskListQuery struct {
 	Cursor string
 }
 
+// artifactCountSQL counts the distinct artifacts a task's results reference (#8575): the entries of its completion's artifacts and of its review's with a link or inline content, a link that both name once.
+// It reads the workflow JSON the list query already joins, so a row's count costs no query of its own.
+const artifactCountSQL = `COALESCE((SELECT COUNT(DISTINCT CASE WHEN COALESCE(json_extract(a.value, '$.uri'), '') != '' THEN a.u ELSE a.src || a.k END)
+		FROM (SELECT 'c' AS src, ac.key AS k, ac.value AS value, COALESCE(json_extract(ac.value, '$.uri'), '') AS u FROM json_each(w.data, '$.artifacts') ac
+		      UNION ALL SELECT 'r', ar.key, ar.value, COALESCE(json_extract(ar.value, '$.uri'), '') FROM json_each(w.data, '$.completion_review.artifacts') ar) a
+		WHERE a.u != '' OR COALESCE(json_extract(a.value, '$.content'), '') != ''), 0)`
+
 // taskListColumns selects a TaskListItem. body_preview is the first 200 characters (the
 // row tooltip); the workflow JSON is read for its outcome and whether a review is pending.
 const taskListColumns = `t.id, t.revision, t.board_id, t.title,
@@ -108,7 +117,8 @@ const taskListColumns = `t.id, t.revision, t.board_id, t.title,
 	     WHEN t.status = 'completed' AND COALESCE(t.completed_by, '') != '' THEN t.completed_by
 	     ELSE COALESCE(t.assigned_to, '') END AS worked_by,
 	` + prefixedUpdatedAtSQL + ` AS updated_at,
-	COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(w.data, '$.review_rounds[#-1].reviewers') v), '[]') AS reviewers_json
+	COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(w.data, '$.review_rounds[#-1].reviewers') v), '[]') AS reviewers_json,
+	` + artifactCountSQL + ` AS artifact_count
 	FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id`
 
 // ListTaskPage returns a page of the board's task list. Each page costs O(limit) rows:

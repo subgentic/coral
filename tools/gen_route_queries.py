@@ -33,7 +33,7 @@ EXTRA = {
     'GET /api/goals': {'state', 'board'},
     # The Team Artifacts list's query (#4572): parseTeamArtifactQuery reads these from a url.Values it is handed, not from the request,
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
-    'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'task', 'since', 'until', 'sort', 'cursor'},
+    'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'task', 'goal', 'since', 'until', 'sort', 'cursor'},
     # The board message search (#4745): SearchMessages reads these from a url.Values it parsed itself (a mistyped query string is refused,
     # not dropped), which the scan above does not follow.
     'GET /api/board/{}/messages/search': {'q', 'from', 'mentions', 'since', 'until', 'sort', 'limit', 'cursor', 'for_subscriber'},

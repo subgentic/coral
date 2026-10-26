@@ -251,7 +251,8 @@ func TestListTaskPage_DonePageUsesTheIndex(t *testing.T) {
 	}
 	joined := strings.Join(plan, "\n")
 	assert.Contains(t, joined, "idx_board_tasks_done", joined)
-	assert.NotContains(t, joined, "TEMP B-TREE", "no sort of the whole history:\n"+joined)
+	// no sort of the whole history (the artifact count's own count(DISTINCT) is a per-row structure over one task's at most 32 artifacts, #8575)
+	assert.NotContains(t, joined, "TEMP B-TREE FOR ORDER BY", "no sort of the whole history:\n"+joined)
 }
 
 // #3342: a cursor is bound to the board that issued it. A cursor from board A is refused on

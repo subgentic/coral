@@ -26,10 +26,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "task": true, "since": true, "until": true, "sort": true, "cursor": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "task": true, "goal": true, "since": true, "until": true, "sort": true, "cursor": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "task", "since", "until", "sort", "cursor"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "task", "goal", "since", "until", "sort", "cursor"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -50,6 +50,7 @@ type teamArtifactQuery struct {
 	boards   []string // lower-cased
 	kept     *bool
 	task     int64 // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
+	goal     int64 // 0: any; a goal's number: only what belongs to a task of that goal (#8575, the goal view's Artifacts)
 	since    *time.Time
 	until    *time.Time
 	sortName string
@@ -206,6 +207,15 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 		}
 		q.task = n
 	}
+	if v, ok, serr := taSingle("goal", vals["goal"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		n, perr := strconv.ParseInt(v, 10, 64)
+		if perr != nil || n <= 0 {
+			return nil, taErr("goal must be a goal number")
+		}
+		q.goal = n
+	}
 	if q.since, err = taTime("since", vals["since"]); err != nil {
 		return nil, err
 	}
@@ -226,7 +236,7 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	}
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
-	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.task, q.since, q.until, q.sortName, vals.Get("session_id"))
+	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s|%v", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.task, q.since, q.until, q.sortName, vals.Get("session_id"), q.goal)
 	q.finger = hex.EncodeToString(fp.Sum(nil))[:16]
 	if v, ok, serr := taSingle("cursor", vals["cursor"]); serr != nil {
 		return nil, serr
@@ -352,6 +362,9 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool) bo
 	if q.task != 0 && it.TaskID != q.task {
 		return false
 	}
+	if q.goal != 0 && it.GoalID != q.goal {
+		return false
+	}
 	if q.kept != nil {
 		isKept := it.managed != "" && kept[it.managed]
 		if isKept != *q.kept {
@@ -449,6 +462,7 @@ func shownText(s string) string {
 // viewer what the redaction hides (a prefix at a time); matching on the shown text tells them nothing more than the reply does.
 func redactItemForTunnel(it *teamArtifact) {
 	it.Name, it.TaskTitle, it.MediaType = shownText(it.Name), shownText(it.TaskTitle), shownText(it.MediaType)
+	it.GoalTitle = shownText(it.GoalTitle)
 	it.SentBy, it.SharedTo, it.ReceivedFrom, it.FromBoard = shownText(it.SentBy), shownText(it.SharedTo), shownText(it.ReceivedFrom), shownText(it.FromBoard)
 	if it.ProducedBy != nil {
 		p := shownText(*it.ProducedBy)
