@@ -355,37 +355,10 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 	if why, done := winStartRisk(st, name, args, outside); done {
 		return why
 	}
+	if why, done := winDownloadRisk(st, name, args, outside); done {
+		return why
+	}
 	switch name {
-	case "invoke-webrequest", "iwr", "invoke-restmethod", "irm", "curl", "wget":
-		for _, a := range args {
-			// curl -K file and --config file read more options (an output among them) from a file Coral does not read.
-			if name == "curl" && (strings.HasPrefix(a, "-K") || strings.EqualFold(a, "--config") || strings.HasPrefix(strings.ToLower(a), "--config=")) {
-				return "it reads curl options from a file Coral can't judge"
-			}
-			// curl -oPATH and wget -OPATH / -PPATH: the short option with its value glued on.
-			if len(a) > 2 && ((name == "curl" && strings.HasPrefix(a, "-o")) || (name == "wget" && (strings.HasPrefix(a, "-O") || strings.HasPrefix(a, "-P")))) && pathOutside(a[2:], outside) {
-				return "it writes outside the working directory (" + a[2:] + ")"
-			}
-			// --output=path, --output-document=path, --directory-prefix=path: the path is glued on.
-			if k := strings.IndexByte(a, '='); k > 0 && strings.HasPrefix(a, "--") {
-				switch strings.ToLower(a[:k]) {
-				case "--output", "--output-document", "--directory-prefix", "--output-dir":
-					if pathOutside(a[k+1:], outside) {
-						return "it writes outside the working directory (" + a[k+1:] + ")"
-					}
-				}
-			}
-		}
-		for i, a := range args {
-			if i+1 >= len(args) {
-				break
-			}
-			// -OutFile (PowerShell), curl's -o / --output and wget's -O / --output-document / -P: where the download is written.
-			if (isParam(a, "outfile", 3) || a == "-o" || strings.EqualFold(a, "--output") || strings.EqualFold(a, "--output-dir") || (name == "wget" && (a == "-O" || strings.EqualFold(a, "--output-document") || a == "-P" || strings.EqualFold(a, "--directory-prefix")))) && pathOutside(args[i+1], outside) {
-				return "it writes outside the working directory (" + args[i+1] + ")"
-			}
-		}
-		return "" // piped into iex, the sink is judged
 	case "tar", "bsdtar":
 		for i, a := range args {
 			v := ""
@@ -592,6 +565,43 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		}
 	}
 	return ""
+}
+
+// winDownloadRisk judges the download tools (Invoke-WebRequest, Invoke-RestMethod, curl, wget): where the download is written, and the options that read more from a file.
+func winDownloadRisk(st winStage, name string, args []string, outside func(string) bool) (string, bool) {
+	switch name {
+	case "invoke-webrequest", "iwr", "invoke-restmethod", "irm", "curl", "wget":
+		for _, a := range args {
+			// curl -K file and --config file read more options (an output among them) from a file Coral does not read.
+			if name == "curl" && (strings.HasPrefix(a, "-K") || strings.EqualFold(a, "--config") || strings.HasPrefix(strings.ToLower(a), "--config=")) {
+				return "it reads curl options from a file Coral can't judge", true
+			}
+			// curl -oPATH and wget -OPATH / -PPATH: the short option with its value glued on.
+			if len(a) > 2 && ((name == "curl" && strings.HasPrefix(a, "-o")) || (name == "wget" && (strings.HasPrefix(a, "-O") || strings.HasPrefix(a, "-P")))) && pathOutside(a[2:], outside) {
+				return "it writes outside the working directory (" + a[2:] + ")", true
+			}
+			// --output=path, --output-document=path, --directory-prefix=path: the path is glued on.
+			if k := strings.IndexByte(a, '='); k > 0 && strings.HasPrefix(a, "--") {
+				switch strings.ToLower(a[:k]) {
+				case "--output", "--output-document", "--directory-prefix", "--output-dir":
+					if pathOutside(a[k+1:], outside) {
+						return "it writes outside the working directory (" + a[k+1:] + ")", true
+					}
+				}
+			}
+		}
+		for i, a := range args {
+			if i+1 >= len(args) {
+				break
+			}
+			// -OutFile (PowerShell), curl's -o / --output and wget's -O / --output-document / -P: where the download is written.
+			if (isParam(a, "outfile", 3) || a == "-o" || strings.EqualFold(a, "--output") || strings.EqualFold(a, "--output-dir") || (name == "wget" && (a == "-O" || strings.EqualFold(a, "--output-document") || a == "-P" || strings.EqualFold(a, "--directory-prefix")))) && pathOutside(args[i+1], outside) {
+				return "it writes outside the working directory (" + args[i+1] + ")", true
+			}
+		}
+		return "", true // piped into iex, the sink is judged
+	}
+	return "", false
 }
 
 // winStartRisk judges start and Start-Process: the program they start, the folder it starts in, and its arguments.
