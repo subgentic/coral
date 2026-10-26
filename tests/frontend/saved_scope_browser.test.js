@@ -29,7 +29,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         heading: inbox ? 'All saved' : (document.getElementById('saved-ui')?.getAttribute('aria-label') || ''),
         rows: inbox ? [...t.querySelectorAll('tbody .dt-primary')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort() : [...document.querySelectorAll('#saved-table tbody .dt-primary')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort(),
         empty: (document.querySelector(inbox ? '#group-table-view .empty-line' : '#saved-table .empty-line') || {}).textContent || null,
-        tabs: inbox ? [...t.querySelectorAll('.group-chip .group-chip-count')].map(c => n(c)) : [...document.querySelectorAll('#saved-table .group-chip .group-chip-count')].map(c => n(c)),
+        tabs: inbox ? [...t.querySelectorAll('.team-tb-pills .goals-chip')].map(b => { const m = b.textContent.match(/\\d+/); return m && m[0] !== '0' ? '(' + m[0] + ')' : ''; }) : [...document.querySelectorAll('#saved-table .group-chip .group-chip-count')].map(c => n(c)),
         badge: (document.getElementById('saved-tab-count') || {}).textContent || '',
         over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         headingFits: (() => { const h = document.getElementById('saved-ui'); return h ? h.scrollWidth <= h.clientWidth + 1 : false; })(),

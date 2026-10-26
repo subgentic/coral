@@ -90,8 +90,8 @@ const MD = '# Migration plan\n\n## Steps\n\n1. Add the new columns behind a flag
 
             console.log(`9. ${mode}: the pressed Open or Done chip of the Inbox's Saved table is marked and none moves (#5770, #7472)`);
             await ev(`localStorage.setItem('coral.inbox.tab', 'saved'); document.getElementById('nav-tab-hub-inbox').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view .group-chip').length === 2 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the Saved chips', 8000);
-            const itabs = await ev(`(() => [...document.querySelectorAll('#group-table-view .group-chip')].map(b => { const c = getComputedStyle(b); return { sel: b.getAttribute('aria-pressed') === 'true', w: c.borderTopWidth, col: c.borderTopColor }; }))()`);
+            await waitFor(`document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip').length === 2 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the Saved chips', 8000);
+            const itabs = await ev(`(() => [...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => { const c = getComputedStyle(b); return { sel: b.getAttribute('aria-pressed') === 'true', w: c.borderTopWidth, col: c.borderTopColor }; }))()`);
             const isel = itabs.find(x => x.sel), iothers = itabs.filter(x => !x.sel);
             assert.ok(isel && iothers.length === 1, 'two chips, one pressed: ' + JSON.stringify(itabs));
             assert.ok(iothers.every(o => o.col !== isel.col), "the pressed chip's border is a colour of its own: " + JSON.stringify(itabs));
