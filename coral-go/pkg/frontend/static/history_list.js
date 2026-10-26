@@ -166,6 +166,7 @@ export function setChatSearchMatches(ids) { searchMatches = ids ? new Set(ids) :
 const matched = g => searchMatches ? g.sessions.filter(s => searchMatches.has(s.session_id)) : g.sessions;
 
 registerGroupSource('history', {
+    toolbar: () => ({ search: { id: 'history-search', label: 'Search chats' } }), // the page's toolbar line (#7723)
     keys: () => drawn.filter(g => matched(g).length || !searchMatches).map(g => g.key),
     redraw: redrawHistoryGroups,
     table: key => {

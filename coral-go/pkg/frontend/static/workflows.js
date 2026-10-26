@@ -49,6 +49,7 @@ registerGroupSource('workflows', {
                 cells: [String(stepsOf(w)), w.last_run && w.last_run.started_at ? whenWords(w.last_run.started_at) : '', lastResult(w.last_run), { action: 'wf-trigger', data: { 'workflow-id': Number(w.id) }, label: 'Run', aria: `Run ${w.name}` }] })),
             extra: { action: 'wf-build-agent', label: 'Build with Agent', icon: 'smart_toy', title: 'Starts an agent that builds the workflow with you' } };
     },
+    toolbar: () => ({ search: { id: 'workflows-search', label: 'Search workflows' }, action: { name: 'wf-create', label: 'New workflow' }, menu: { noun: 'workflow', items: [{ name: 'wf-build-agent', label: 'Build with Agent' }] } }), // the create action on the page's toolbar line, Build with Agent its second way (#7723)
     isEmpty: () => false, // the tab opens its first table itself (fetchWorkflows)
     showList: () => workflowsBackToList(),
     empty: () => workflowsBackToList(),

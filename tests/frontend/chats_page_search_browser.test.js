@@ -37,6 +37,11 @@ const SESSIONS = [
         assert.deepEqual(t.rows, ['Release notes chat', 'Build fix chat'], 'the page lists the same 2 chats as the sidebar ' + JSON.stringify(t));
         assert.equal(t.count, '2', 'and its count says 2 ' + JSON.stringify(t));
 
+        // the page's own search field is the sidebar's: typing in it fills the sidebar's and the list follows (#7723)
+        await ev(`(() => { const p = document.getElementById('gt-search'); p.value = 'build'; p.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+        assert.equal(await ev(`document.getElementById('history-search').value`), 'build', 'the sidebar\'s search field has what was typed in the page\'s');
+        await ev(`(() => { const p = document.getElementById('gt-search'); p.value = ''; p.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+
         // a search that finds nothing
         await ev(`window.__hits = []; import((window.__coralStatic||'/static/')+'chat_search.js').then(m => m.searchChats('zzz')).then(() => true)`);
         await waitFor(`/No matching chats/.test(document.getElementById('chat-search-results').textContent)`, 'the empty search', 10000);

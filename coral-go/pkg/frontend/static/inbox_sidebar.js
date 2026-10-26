@@ -154,6 +154,7 @@ export function drawDockSaved(host) {
 }
 
 registerGroupSource('hub-inbox', {
+    toolbar: () => ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
     table: key => {

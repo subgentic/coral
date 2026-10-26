@@ -13,6 +13,7 @@ import { onViewShown } from './view_switch.js';
 import { registerActions, textOf } from './actions.js';
 import { setHidden, setTitle, setAttr, setData } from './dom_write.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { importOnce } from './import_once.js';
 
 const sources = new Map();
 const TAB_NAME = { 'hub-inbox': 'Inbox', history: 'Chats', workflows: 'Workflows', jobs: 'Jobs', docs: 'Docs' }; // what a phone's way back from a table is named for (#7734)
@@ -105,6 +106,30 @@ function cellHtml(c) {
     return `<td>${c ? escapeHtml(c) : dash}</td>`;
 }
 
+/** The page toolbar's create actions (#7723), as the literal attribute: a source names one of these. */
+const TOOLBAR_ACTION_ATTR = { 'wf-create': 'data-on-click="wf-create"', 'job-new': 'data-on-click="job-new"', 'wf-build-agent': 'data-on-click="wf-build-agent"' };
+const MORE_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
+
+/** The page's one toolbar line (#7723, the team tabs' toolbar): the search field (the sidebar's own search, shown here and kept the same: typing in it types in the sidebar's), the chips of the first table
+ *  (the Inbox's Saved: Open and Done), a More icon when the tab has a second way to create, and the tab's create action at the right. `bar` is the source's toolbar(): { search: { id, label },
+ *  action: { name, label }, menu: { noun, items: [{ name, label }] } }. */
+function toolbarHtml(bar, first) {
+    const input = document.getElementById(bar.search.id);
+    const value = input ? input.value : '';
+    const label = (input && input.getAttribute('aria-label')) || bar.search.label; // the sidebar's field says what it searches in the open group (the Inbox: "Search saved messages"): the page's says the same
+    const hint = (input && input.placeholder) || label;
+    let html = `<div class="list-bar-search-wrap"><input type="search" class="list-bar-search gt-search" id="gt-search" data-on-input="sgroup-search" data-search="${escapeAttr(bar.search.id)}" placeholder="${escapeAttr(hint)}" aria-label="${escapeAttr(label)}" value="${escapeAttr(value)}" maxlength="200" autocomplete="off" spellcheck="false"></div>`;
+    html += chipsHtml(first);
+    const items = bar.menu ? bar.menu.items.filter(i => TOOLBAR_ACTION_ATTR[i.name]) : [];
+    if (items.length) {
+        const label = `More ${bar.menu.noun} actions`;
+        html += `<span class="list-bar-more gt-menu"><button type="button" class="sidebar-collapse-btn list-bar-more-btn" id="gt-more" data-on-click="gt-menu-toggle" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}" aria-haspopup="menu" aria-expanded="false" aria-controls="gt-more-menu">${MORE_SVG}</button>`
+            + `<div class="team-more-menu list-bar-more-menu" id="gt-more-menu" role="menu" aria-label="${escapeAttr(label)}" hidden>${items.map(i => `<button type="button" role="menuitem" ${TOOLBAR_ACTION_ATTR[i.name]}>${escapeHtml(i.label)}</button>`).join('')}</div></span>`;
+    }
+    if (bar.action && TOOLBAR_ACTION_ATTR[bar.action.name]) html += `<button type="button" class="btn btn-primary team-tb-action" ${TOOLBAR_ACTION_ATTR[bar.action.name]}>${escapeHtml(bar.action.label)}</button>`;
+    return `<div class="list-bar-search-row team-toolbar-row gt-toolbar">${html}</div>`;
+}
+
 function chipsHtml(t) {
     if (!t.chips || !t.chips.length) return '';
     return `<div class="group-table-chips" role="group" aria-label="${escapeAttr(t.chipsLabel || 'Show')}">${t.chips.filter(c => CHIP_ACTION_ATTR[c.action]).map(c => `<button type="button" class="group-chip" ${CHIP_ACTION_ATTR[c.action]} ${dataAttrs(c.data)} aria-pressed="${escapeAttr(c.pressed ? 'true' : 'false')}">${escapeHtml(c.label)} <span class="group-chip-count">${Number(c.count)}</span></button>`).join('')}</div>`;
@@ -113,14 +138,14 @@ function chipsHtml(t) {
 /** A table drawn somewhere other than the centre (the dock's Saved tab): `headless` leaves out its title row, the chips and the rows are the same. */
 export function tableMarkup(t) { return tableHtml(t, '', ''); }
 
-function tableHtml(t, kind, key, n = 0, lead = '', several = false) {
+function tableHtml(t, kind, key, n = 0, lead = '', several = false, bar = false) {
     const tid = n ? `group-table-title-${n + 1}` : 'group-table-title'; // a page with several tables (the landing's groups, #7722): one title id each
     // A table that stacks its rows on a phone (the Inbox's Saved: the message over its state and action) says it is a table in its roles, since a display other than table-* loses the native ones.
     const st = !!t.stack;
     const head = t.columns.map(c => `<th scope="col"${st ? ' role="columnheader"' : ''}>${escapeHtml(c)}</th>`).join('');
     const rows = t.rows.map(r => `<tr${st ? ' role="row"' : ''}><td${st ? ' role="cell"' : ''}><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)}>${escapeHtml(r.title)}</button></td>`
         + r.cells.map(c => (st ? cellHtml(c).replace('<td>', '<td role="cell">') : cellHtml(c))).join('') + '</tr>').join('');
-    const top = (t.headless ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${extraHtml(t.extra)}</div>`) + chipsHtml(t);
+    const top = (t.headless ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
     if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
     return top + `<div class="group-table-scroll"><table class="group-table${st ? ' group-table-stack' : ''}${several ? ' group-table-aligned' : ''}"${st ? ' role="table"' : ''} ${t.headless ? 'aria-label="' + escapeAttr(t.title) + '"' : 'aria-labelledby="${escapeAttr(tid)}"'}><thead${st ? ' role="rowgroup"' : ''}><tr${st ? ' role="row"' : ''}>${head}</tr></thead><tbody${st ? ' role="rowgroup"' : ''}>${rows}</tbody></table></div>`
@@ -135,9 +160,12 @@ function drawTable() {
     if (!host || !tables.length) return false;
     // a phone's way back to the list is in the table's own title row, not a row of its own above it (#7722)
     const back = isPhoneLayout() ? `<button type="button" class="group-back group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
-    const html = tables.map((x, i) => tableHtml(x, open.kind, open.key, i, i ? '' : back, tables.length > 1)).join('');
+    const bar = src.toolbar ? src.toolbar() : null;
+    const html = (bar ? toolbarHtml(bar, tables[0]) : '') + tables.map((x, i) => tableHtml(x, open.kind, open.key, i, i ? '' : back, tables.length > 1, !!bar)).join('');
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
+    const a = document.activeElement, typing = a && host.contains(a) && a.id === 'gt-search' ? { start: a.selectionStart, end: a.selectionEnd } : null;
     if (host.dataset.drawn !== html) { host.innerHTML = html; host.dataset.drawn = html; } // a redraw of what is there would drop the focus from a row the keyboard is on
+    if (typing) { const again = document.getElementById('gt-search'); if (again && again !== a) { again.focus({ preventScroll: true }); try { again.setSelectionRange(typing.start, typing.end); } catch { /* a search field has a caret */ } } } // the person is typing in the page's search: the redraw keeps their caret
     return true;
 }
 
@@ -201,5 +229,11 @@ registerActions({
         const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group);
         if (kind && key) openGroupTable(kind, key, { focus: true });
     },
+    // The page's search is the sidebar's: its text goes into the sidebar's field and that field's own handler runs (the list and the table follow).
+    'sgroup-search': el => { const target = document.getElementById(textOf(el.dataset.search)); if (!target || target.value === el.value) return; target.value = el.value; target.dispatchEvent(new Event('input', { bubbles: true })); },
+    'gt-menu-toggle': async el => { (await importOnce('./menu_button.js')).toggleMenu(el); },
     'sgroup-list': el => { const kind = textOf(el.dataset.kind); open = null; sources.get(kind)?.showList?.(); },
 });
+
+// A choice in the page toolbar's More menu closes the menu (the action itself runs from its own attribute).
+document.addEventListener('click', e => { if (e.target instanceof Element && e.target.closest('.gt-menu [role="menuitem"]')) importOnce('./menu_button.js').then(m => m.closeMenus(), () => {}); });

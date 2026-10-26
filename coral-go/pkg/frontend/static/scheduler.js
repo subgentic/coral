@@ -81,6 +81,7 @@ registerGroupSource('jobs', {
     landing: true, // the page it opens on lists every group the sidebar has (#7722)
     keys: () => jobGroups().map(g => g.key),
     redraw: () => renderJobsSidebar(),
+    toolbar: () => ({ search: { id: 'jobs-search', label: 'Search jobs' }, action: { name: 'job-new', label: 'New job' } }), // the create action on the page's toolbar line (#7723)
     table: key => { const g = jobGroups().find(x => x.key === key); return g ? { title: g.label, columns: ['Job', 'Schedule', 'Last run', 'Next'], rows: g.jobs.map(jobTableRow) } : null; },
     isEmpty: () => document.getElementById('scheduler-view')?.style.display === 'block' && !!document.querySelector('#scheduler-detail > .sched-empty-hint') && document.body.getAttribute('data-nav-tab') === 'jobs',
     showList: () => window.switchNavTab?.('jobs'),

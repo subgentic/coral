@@ -507,14 +507,19 @@
 1	sidebar_groups.js	CHEVRON
 1	sidebar_groups.js	CHIP_ACTION_ATTR[c.action]
 1	sidebar_groups.js	EXTRA_ACTION_ATTR[x.action]
+1	sidebar_groups.js	MORE_SVG
 1	sidebar_groups.js	ROW_ACTION_ATTR[r.action] || ''
+1	sidebar_groups.js	TOOLBAR_ACTION_ATTR[bar.action.name]
+1	sidebar_groups.js	TOOLBAR_ACTION_ATTR[i.name]
 2	sidebar_groups.js	attrs
+1	sidebar_groups.js	bar ? '' : extraHtml(t.extra)
 1	sidebar_groups.js	c ? escapeHtml(c) : dash
 1	sidebar_groups.js	dash
 2	sidebar_groups.js	dataAttrs(c.data)
 1	sidebar_groups.js	dataAttrs(r.data)
-1	sidebar_groups.js	extraHtml(t.extra)
 1	sidebar_groups.js	head
+1	sidebar_groups.js	html
+1	sidebar_groups.js	items.map(i => `<button type="button" role="menuitem" ${TOOLBAR_ACTION_ATTR[i.name]}>${escapeHtml(i.label)}</b
 1	sidebar_groups.js	lead
 1	sidebar_groups.js	rows
 1	sidebar_groups.js	t.chips.filter(c => CHIP_ACTION_ATTR[c.action]).map(c => `<button type="button" class="group-chip" ${CHIP_ACTI
