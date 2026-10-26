@@ -101,3 +101,27 @@ func TestFormatMarkdownEveryBranchGolden(t *testing.T) {
 	assertGolden(t, "testdata/format_scored.md", FormatMarkdown(fmtReportScored()))
 	assertGolden(t, "testdata/format_suppressed_bare.md", FormatMarkdown(fmtReportSuppressedBare()))
 }
+
+// #8442: truncate keeps a text of max runes whole and cuts one of max+1 to max-1 runes and an ellipsis; it counts runes, not bytes, and a newline is a space.
+func TestTruncateAtTheLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name, in string
+		max      int
+		want     string
+	}{
+		{"shorter", "abc", 5, "abc"},
+		{"exactly max runes", "abcde", 5, "abcde"},
+		{"max+1 runes", "abcdef", 5, "abcd…"},
+		{"exactly max multi-byte runes", "héllo", 5, "héllo"},
+		{"max+1 multi-byte runes", "héllo!", 5, "héll…"},
+		{"newlines are spaces, counted after", "a\nb\nc", 5, "a b c"},
+		{"newlines then over", "a\nb\nc\nd", 5, "a b …"},
+		{"empty", "", 5, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := truncate(tc.in, tc.max); got != tc.want {
+				t.Errorf("truncate(%q, %d) = %q, want %q", tc.in, tc.max, got, tc.want)
+			}
+		})
+	}
+}
