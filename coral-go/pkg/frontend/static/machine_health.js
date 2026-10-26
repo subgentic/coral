@@ -13,6 +13,7 @@
 
 import { state } from './state.js';
 import { onBuilt } from './lazy_dom.js';
+import { importOnce } from './import_once.js';
 
 // Maps, not plain objects: a value such as "constructor" or "__proto__" must not count as known
 // (QA, #3446 review).
@@ -99,7 +100,7 @@ export function healthDot(h, label = 'Machine') {
 }
 
 /** The card (`online`: the machine is connected, so no reading yet is "waiting", not "not connected"): the status with its reason, then Coral, agents, load, memory, disk and responsiveness. */
-export function healthCard(h, { title = 'Machine health', online = false, waitingText = 'Waiting for a health reading from this computer.' } = {}) {
+export function healthCard(h, { title = 'Machine health', online = false, waitingText = 'Waiting for a health reading from this computer.', chip = null } = {}) {
     const card = document.createElement('section');
     card.className = 'machine-health-card';
     const head = document.createElement('div');
@@ -110,7 +111,12 @@ export function healthCard(h, { title = 'Machine health', online = false, waitin
     const status = document.createElement('span');
     status.className = 'machine-health-status';
     status.textContent = healthStatusText(h);
-    head.append(healthDot(h), t, status);
+    if (chip) { // the status as the shared chip, the dot and the word as the Servers table shows them (#8276)
+        const tones = { ok: 'goal-state-done', busy: 'goal-state-blocked', stalled: 'goal-state-failed' };
+        const c = chip(healthStatusText(h), tones[healthStatus(h)] || '');
+        c.setAttribute('role', 'img'); c.setAttribute('aria-label', `${title} health: ${healthStatusText(h)}`);
+        head.append(t, c);
+    } else head.append(healthDot(h), t, status);
     card.appendChild(head);
     if (healthStatus(h) === 'unknown') {
         const note = document.createElement('p');
@@ -143,10 +149,11 @@ export function healthCard(h, { title = 'Machine health', online = false, waitin
 }
 
 // The Settings card for this machine (local dashboard only), redrawn as the feed changes.
-function renderLocalCard() {
+async function renderLocalCard() {
     const slot = document.getElementById('machine-health-local');
     if (!slot) return;
-    slot.replaceChildren(healthCard(localMachineHealth(), { title: 'This computer' }));
+    const { chip } = await importOnce('./data_table.js'); // the shared chip (the Servers table's), loaded when the card first draws
+    slot.replaceChildren(healthCard(localMachineHealth(), { title: 'This computer', chip }));
 }
 onBuilt('settings-modal', renderLocalCard); // the card's slot is in Settings, built on first open (#4500)
 if (typeof document !== 'undefined') { // a page (pure-node tests import this module too)

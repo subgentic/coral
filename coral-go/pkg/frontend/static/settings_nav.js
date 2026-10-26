@@ -110,7 +110,9 @@ function buildInfoButtons(root) {
         btn.setAttribute('aria-controls', long.map((t, i) => t.id || (t.id = `${long[0].id}-${i}`)).join(' '));
         btn.setAttribute('aria-label', `Learn more about ${name}`);
         btn.addEventListener('click', () => { const open = btn.getAttribute('aria-expanded') !== 'true'; for (const t of long) t.classList.toggle('settings-hint-clamp', !open); btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? 'Show less' : 'Learn more'; });
-        holder.append(btn);
+        const lead = row.dataset.learnAfter && row.querySelector(row.dataset.learnAfter);
+        if (lead && holder !== dt && lead.parentElement && lead.parentElement.matches('.net-body > *')) lead.after(' ', btn); // the sentence's own line: Learn more follows it on that line (#8276), the long text stays under it
+        else holder.append(btn);
     }
 }
 
