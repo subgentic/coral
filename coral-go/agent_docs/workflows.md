@@ -200,6 +200,8 @@ The run folder is private (0700, files 0600). Coral makes each step's folder and
 | `{{run_dir}}` | `$CORAL_WORKFLOW_RUN_DIR` |
 | `{{run_id}}` | `$CORAL_WORKFLOW_RUN_ID` |
 
+The first step has no previous step, so a save that uses `{{prev_dir}}`, `{{prev_stdout}}`, `{{prev_stderr}}`, `{{prev_artifact}}` or the `_content` form of one of them in step 0 is refused with `step 0 cannot reference previous step`. A `{{step_N_...}}` reference must name an earlier step.
+
 **Path templates in a shell `command`** (`{{prev_stdout}}`, `{{run_dir}}`, `{{step_N_dir}}` and the rest) are inserted quoted for where they sit, so a data folder with a space, an apostrophe or a shell character still names exactly that file (#3930): bare, a path is one quoted word (`cat {{prev_stdout}}`, `{{run_dir}}/out.txt`); inside double or single quotes, it is escaped for them. Write them bare.
 
 **Content templates in a shell `command`** (`{{…_content}}`): the content is inserted as **one single-quoted shell word**, so whatever a previous step printed can never change your command (no `;`, `$(…)` or quotes in it are run). Trailing newlines are dropped, as `$(…)` does (`git rev-parse --verify {{prev_stdout_content}}` works). A missing or refused artifact is an empty word. Content over 64 KiB fails the step with a message: use the file (`{{prev_stdout}}`, `"$CORAL_PREV_STDOUT"`) for big output. Don't put quotes around them: `printf %s {{prev_stdout_content}}`, not `"{{prev_stdout_content}}"`; saving a workflow with a quoted one returns a `warnings` list. The preferred forms are the variables and files: `"$CORAL_PREV_ARTIFACT_CONTENT"`, `cat "$CORAL_PREV_STDOUT"`. In an agent `prompt` the content is inserted as plain text.
