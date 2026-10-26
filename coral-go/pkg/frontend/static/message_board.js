@@ -13,7 +13,7 @@ import { platform } from './platform/detect.js';
 import { BOARD_SAVE_BUTTON, aboutRow, nameSaveButton } from './saved_marks.js';
 import { messageTimeHtml } from './message_time.js';
 import { paintPauseButton } from './board_pause_button.js';
-import { pathId, keyLabel, noteBoardLabel, hasBoardLabel, onBoardLabelsChanged, splitKey, boardFetch, teamFetch, isCloud, inTeam } from './server_base.js';
+import { pathId, keyLabel, noteBoardLabel, hasBoardLabel, splitKey, boardFetch, teamFetch, isCloud, inTeam } from './server_base.js';
 import { importOnce } from './import_once.js';
 import './goals_adapter.js'; // the Goals view (goals_view.js) is lazy and imports only what loads at startup (import_hygiene): its two small helpers load here (#7113)
 import './goal_words.js';
@@ -21,10 +21,8 @@ import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
 import { launchBlockedReason, blockedReason } from './hub_access.js';
 import { pollEvery, afterPause, isBusyStatus, busyRetryingText, machineOf } from './overload.js';
 import { keyRoute, build } from './routes.js';
-import { attachDialogFocus } from './dialog_focus.js';
 import { mountBoardSearch, highlightBoard, setBoardMembers, resetBoardSearch } from './board_search.js';
 import { PAGE_SIZE, fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchMessages, fetchProjects, fetchSubscribers, mergeMessages } from './board_fetch.js';
-import { navigateToAgentSession } from './board_agent_links.js';
 import { initGrowingTextarea } from './growing_textarea.js';
 import { onRowActions, boardView, saveBoardView, rowParts, toggleRow, setAllRows, refreshReplies, retagMentions, revealRow, applyAskUpdates, refreshAsk, applyView, mountTableTools, forgetOpenRows, sameDay, dayDividerHtml, watchFold } from './board_table.js'; // the board as a table (#7921)
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
@@ -83,13 +81,6 @@ function renderBoardSidebar(projects) {
     }).join('');
 }
 
-// The open board's header and the board list show labels; when one arrives or changes, they
-// follow (a board opened at /board/<id> before the lists loaded, a rename).
-onBoardLabelsChanged(() => {
-    const badge = document.getElementById('messageboard-project-badge');
-    if (badge && currentProject) badge.textContent = keyLabel(currentProject);
-});
-
 // ── View switching ───────────────────────────────────────────────────────
 
 /** A board's page is its team page's Messages tab (#8061): every link to a board (a chat, a message, a saved message, a list's row) opens it there, at /team/<team>/messages, and a message anchors where it is. */
@@ -110,7 +101,6 @@ export function showBoardInPage(project, host, messageId = null) {
     state.boardPageProject = project;
     state.currentBoardServer = splitKey(project).server;
     board.style.display = 'flex'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
-    hideBoardSubscribers();
     initGrowingTextarea(document.getElementById('mb-post-input'));
     attachMentionList();
     if (!hasBoardLabel(project)) {
@@ -168,19 +158,11 @@ export function showMessageBoardProjects() {
 
     document.getElementById('mb-project-list').style.display = '';
     document.getElementById('mb-board').style.display = 'none';
-    hideBoardSubscribers();
-    for (const list of ['mb-subscribers-list', 'mb-subscribers-sheet-list']) { const el = document.getElementById(list); if (el) el.innerHTML = '<li class="mb-project-meta">Open a board to see who is subscribed.</li>'; }
-    setMembersCount(0);
-    document.getElementById('messageboard-view').classList.remove('mb-has-board');
-    const backBtn2 = document.getElementById('mb-back-btn');
-    if (backBtn2) backBtn2.style.display = 'none';
     document.getElementById('mb-pause-btn').style.display = 'none';
     const sleepBtn2 = document.getElementById('mb-sleep-btn');
     if (sleepBtn2) sleepBtn2.style.display = 'none';
     document.getElementById('mb-delete-btn').style.display = 'none';
     document.getElementById('mb-select-btn').style.display = 'none';
-    document.getElementById('messageboard-project-badge').style.display = 'none';
-    document.querySelector('#messageboard-view .mb-view-header')?.classList.remove('mb-has-board');
 
     loadBoardProjectList();
     loadBoardProjects();
@@ -752,8 +734,6 @@ function formatTime(iso) {
 
 
 
-/** One word for the right panel, with how many are in it: the header's Members button (the desktop's, which brings the panel back on the Goals face, and the phone's, which opens its sheet). */
-function setMembersCount(n) { for (const id of ['mb-members-btn', 'mb-subscribers-btn']) { const b = document.getElementById(id); if (b) b.textContent = n ? `Members ${n}` : 'Members'; } }
 
 // The team's names for the composer's @ picker (the job title, else the id): refreshed with the members list.
 let mentionNames = [];
@@ -767,52 +747,12 @@ async function loadBoardSubscribers(project) {
         setBoardMembers([...new Set(subs.map(s => s.job_title || s.subscriber_id).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the From field's names
         // @mentions of these members are highlighted; the bodies on screen are marked in place
         if (setBoardMentionNames(subs.flatMap(s => [s.job_title, s.subscriber_id]))) { highlightMentionsIn(document.getElementById('mb-messages')); retagMentions(document.getElementById('mb-messages'), OPERATOR_ID.toLowerCase()); } // in place: no message is redrawn, so a jump's outline and focus stay
-        // The column and the phone sheet (#3610) show the same list.
-        const lists = ['mb-subscribers-list', 'mb-subscribers-sheet-list'].map(id => document.getElementById(id)).filter(Boolean);
-        if (!subs.length) {
-            for (const list of lists) list.innerHTML = '<li class="mb-project-meta">No members</li>';
-            setMembersCount(0);
-            return;
-        }
-        const html = subs.map(s => {
-            const displayName = escapeAttr(s.job_title || s.subscriber_id);
-            const sessionName = escapeAttr(s.session_name || '');
-            const icon = s.icon ? `<span class="agent-icon">${escapeHtml(s.icon)}</span> ` : '';
-            return `<li class="mb-subscriber">
-                <div class="mb-subscriber-name">${icon}<button type="button" class="subscriber-history-link" data-on-click="mb-subscriber-history" data-session="${escapeAttr(sessionName)}" data-name="${escapeAttr(displayName)}" title="View chat history">${escapeHtml(s.job_title)}</button></div>
-                <div class="mb-subscriber-id">${escapeHtml(s.subscriber_id)}</div>
-            </li>`;
-        }).join('');
-        for (const list of lists) list.innerHTML = html;
-        setMembersCount(subs.length);
     } catch (e) {
         console.error('Failed to load subscribers:', e);
     }
 }
 
 // ── Subscribers sheet (phone width, #3610) ───────────────────────────────
-
-export function openBoardSubscribers() {
-    const sheet = document.getElementById('mb-subscribers-sheet');
-    if (!sheet || !currentProject) return;
-    if (!sheet._wired) {
-        sheet._wired = true;
-        // Opening a subscriber's history leaves the board: the sheet closes first.
-        sheet.addEventListener('click', e => { if (e.target.closest('.subscriber-history-link')) hideBoardSubscribers(); });
-        // Escape (modal_chrome.js) and the other closes all hide it: the button follows.
-        new MutationObserver(() => {
-            const btn = document.getElementById('mb-subscribers-btn');
-            if (btn) btn.setAttribute('aria-expanded', String(sheet.style.display !== 'none'));
-        }).observe(sheet, { attributes: true, attributeFilter: ['style'] });
-    }
-    attachDialogFocus(sheet);
-    sheet.style.display = 'flex';
-}
-
-export function hideBoardSubscribers() {
-    const sheet = document.getElementById('mb-subscribers-sheet');
-    if (sheet && sheet.style.display !== 'none') sheet.style.display = 'none';
-}
 
 // ── Dashboard subscription ───────────────────────────────────────────────
 
@@ -1123,10 +1063,6 @@ registerActions({
     'mb-msg-select': el => withId(el.dataset.msgId, id => toggleMessageSelect(id, el.checked)),
     'mb-msg-delete': el => withId(el.dataset.msgId, confirmDeleteBoardMessage),
     'mb-msg-more': el => openMessageActions(el),
-    'mb-subscriber-history': el => {
-        const s = textOf(el.dataset.session);
-        if (s) navigateToAgentSession(s, textOf(el.dataset.name) || '');
-    },
     'mb-export-agents': el => document.querySelectorAll('.export-agent-cb').forEach(c => { c.checked = el.dataset.checked === '1'; }),
     'mb-export-do': () => doExportBoard(),
     'mb-export-close': () => hideExportBoardModal(),

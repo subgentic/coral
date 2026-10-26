@@ -159,7 +159,6 @@ module.exports = part => (async () => {
             const keyEsc = async () => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: the close transition
             await sc('board: more actions menu', async () => { await tap('#team-page-more'); }, { expect: `document.getElementById('team-page-more').getAttribute('aria-expanded') === 'true'` });
             await keyEsc();
-            await sc('board: subscribers sheet', async () => { await tap('#mb-subscribers-btn'); }, { expect: `getComputedStyle(document.getElementById('mb-subscribers-sheet')).display !== 'none'` });
             await keyEsc();
             await sc('board: tasks', async () => { // the board's tasks are the Tasks tab of an agent on that board (the board's page has no side panel, #7457)
                 await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const b = state.boardPageProject; window.__m.add('census-agent', 'C', 1, { sleeping: false, board_project: b }); return b; })()`);

@@ -56,7 +56,7 @@ import './preview_pane.js';
 import { initScheduler } from './scheduler.js';
 import { showJobModal, hideJobModal } from './job_form.js';
 import { initLiveJobs, selectLiveJobRun } from './live_jobs.js';
-import { initMessageBoard, showMessageBoardProjects, selectBoardProject, postBoardMessage, deleteMessageBoardProject, toggleBoardPause, showExportBoardModal, toggleSelectMode, openBoardSubscribers, hideBoardSubscribers } from './message_board.js';
+import { initMessageBoard, showMessageBoardProjects, selectBoardProject, postBoardMessage, deleteMessageBoardProject, toggleBoardPause, showExportBoardModal, toggleSelectMode } from './message_board.js';
 import { loadAllFolderTags, showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolderTag } from './folder_tags.js';
 import { loadPinnedFolders, pinFolder, unpinFolder, showOpenFolderModal, hideOpenFolderModal, submitOpenFolder } from './pinned_folders.js';
 import { initMobile, syncMobileAgentList } from './mobile.js';
@@ -93,9 +93,6 @@ const { showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged } =
 // The board view's header, composer and subscribers sheet (#3645). Pause and deleting the board
 // behave as before: the board's delete still asks first (deleteMessageBoardProject).
 registerActions({
-    'mb-subscribers': () => openBoardSubscribers(),
-    'mb-subscribers-close': () => hideBoardSubscribers(),
-    'mb-subscribers-backdrop': (el, event) => { if (event.target === el) hideBoardSubscribers(); },
     'mb-select-mode': () => toggleSelectMode(),
     'mb-export': () => showExportBoardModal(),
     'mb-pause': () => toggleBoardPause(),
