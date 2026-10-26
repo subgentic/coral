@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -303,6 +305,12 @@ func TestTheBoundOfTwoTakesTwoMessagesHoweverFastTheyCome(t *testing.T) {
 // #6615: a Codex whose hooks include PermissionRequest raises its row's Needs input at its approval dialog, and the tool's own PostToolUse clears it: so a person's chat message is held behind
 // the dialog for Codex too.
 func TestCodexApprovalDialogRaisesNeedsInputAndHoldsAPersonsMessage(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	dir := filepath.Join(home, "sessions", "2026", "10", "26")
+	require.NoError(t, os.MkdirAll(dir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "rollout-cccccccc-6615-4000-8000-000000000001.jsonl"), []byte(`{"type":"turn_context","payload":{"approval_policy":"on-request","approvals_reviewer":"user"}}`+"\n"), 0600))
+
 	server, h, mock, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
 	sid := "cccccccc-6615-4000-8000-000000000001"

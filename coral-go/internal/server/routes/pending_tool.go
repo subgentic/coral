@@ -254,13 +254,14 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 // notePendingToolEvent clears the pending tool when the event log shows it
 // finished, or that the turn moved on.
 func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID string) {
+	defer h.wakeCodexPermissionWatches(sessionID)
 	if sessionID == "" {
 		return
 	}
 	switch eventType { // the calls in flight, whichever the single slot below holds (#6687)
 	case "tool_use":
 		h.pending.callDone(sessionID, toolUseID)
-	case "stop", "prompt_submit", "session_reset":
+	case "stop", "prompt_submit", "session_reset", "session_end":
 		h.pending.callDone(sessionID, "")
 	}
 	// A PostToolUse for another tool than the pending one is a late one of an earlier call: the pending tool still runs, and whatever it waits on is
@@ -276,7 +277,7 @@ func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID s
 		if toolUseID != "" {
 			h.pending.clear(sessionID, toolUseID)
 		}
-	case "stop", "prompt_submit", "session_reset":
+	case "stop", "prompt_submit", "session_reset", "session_end":
 		h.pending.clear(sessionID, "")
 	}
 }

@@ -470,9 +470,11 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	// sessions DB. This is more reliable than the URL path name, which comes
 	// from the hook's cwd and can be wrong when multiple agents share a directory.
 	agentName := name
+	agentType, workingDir := "", ""
 	if body.SessionID != "" {
 		if ls, err := h.ss.GetLiveSession(r.Context(), body.SessionID); err == nil && ls != nil {
 			agentName = ls.AgentName
+			agentType, workingDir = ls.AgentType, ls.WorkingDir
 			if hasToken {
 				h.noteLiveMode(body.SessionID, ls.AgentType, body.PermissionMode) // from the agent's own hooks only
 			}
@@ -527,6 +529,20 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if hasToken && agentType == "codex" && body.EventType == "permission_request" {
+		if policy, reviewer := h.jsonl.ReadCodexApprovalSettings(body.SessionID, workingDir); policy == "never" || reviewer != "user" {
+			// PermissionRequest also fires before Codex's automatic review (#8471).
+			// The hook must return before a TUI can draw a later human escalation.
+			h.watchCodexPermission(owner.SessionName, workingDir, event)
+			writeJSON(w, http.StatusOK, map[string]bool{"pending_confirmation": true})
+			return
+		}
+	}
+
+	if agentType == "codex" {
+		h.codexPermissionMu.Lock()
+		defer h.codexPermissionMu.Unlock()
+	}
 	created, err := h.ts.InsertAgentEvent(r.Context(), event)
 	if err != nil {
 		errInternalServer(w, err.Error())
