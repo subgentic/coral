@@ -105,7 +105,7 @@ export function dataTable(cfg) {
     const foldKind = cfg.fold || 'column', foldAt = cfg.foldAt || 40;
     if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.rowCache?.clear(); st.confirming = -1; st.choices = null; st.anchor = null; st.ctx = String(sel.contextKey); }
     const hasContent = cfg.columns.some(c => c.width === 'content');
-    const box = el('div', `dt-box${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
+    const box = el('div', `dt-box${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     const bar = el('div', 'dt-bar'); bar.hidden = true;
     const selectButton = button('btn btn-small dt-select-toggle', 'Select', () => { st.select = !st.select; syncSelectMode(); });
     selectButton.setAttribute('aria-pressed', 'false'); selectButton.hidden = !sel;
