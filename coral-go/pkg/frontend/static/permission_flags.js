@@ -38,12 +38,12 @@ const WORKERS_REFUSED_ANY = 'Agents cannot start workers in this mode.';
 
 // `unset`: nothing is saved, so nothing is refused, though the select reads Auto (Security's #7587 point: only a saved mode, or a pick that will be saved, refuses)
 export function _updatePermModeDescription(selectEl, unset = false) {
-    const warn = selectEl.closest('.settings-row')?.querySelector('.perm-mode-warn'); // only the Settings row has it
+    const warn = selectEl.closest('.settings-row, .sv-row')?.querySelector('.perm-mode-warn'); // only the Settings row has it
     if (warn) {
         warn.textContent = WORKERS_REFUSED[selectEl.value] || WORKERS_REFUSED_ANY;
         warn.hidden = unset || selectEl.value === 'default' || selectEl.value === ''; // nothing saved refuses nothing
     }
-    const hint = selectEl.parentElement?.querySelector('.perm-mode-desc') || selectEl.closest('.settings-row')?.querySelector('.perm-mode-desc'); // Settings' line is in the label, not beside the select
+    const hint = selectEl.parentElement?.querySelector('.perm-mode-desc') || selectEl.closest('.settings-row, .sv-row')?.querySelector('.perm-mode-desc'); // Settings' line is in the label, not beside the select
     if (!hint) return;
     const codex = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value === 'codex';
     hint.textContent = codex && CODEX_NETWORK_MODES.includes(selectEl.value) ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[selectEl.value] || '';

@@ -21,13 +21,13 @@ const BASE = require('./test_base').BASE;
   const openDialog = async () => { await ev(`import(${MOD}+'state.js').then(async s => { const d = await fetch('/api/settings').then(r => r.json()); s.state.settings = d.settings; return true; }).then(() => import(${MOD}+'modals.js')).then(m => m.showSettingsModal('agents')).then(() => true)`); await ev(`new Promise((res, rej) => { const t0 = Date.now(), t = setInterval(() => { const p = document.querySelector('#settings-modal .settings-pane:not([hidden])'); if (p && p.dataset.group === 'agents' && document.getElementById('settings-permission-mode')) { clearInterval(t); res(true); } else if (Date.now() - t0 > 5000) { clearInterval(t); rej(new Error('the Agents pane did not open')); } }, 50); })`); };
   const save = () => ev(`import(${MOD}+'modals.js').then(m=>m.applySettings()).then(()=>true)`);
   const pick = mode => ev(`(()=>{const s=document.getElementById('settings-permission-mode');s.value=${JSON.stringify(mode)};s.dispatchEvent(new Event('change',{bubbles:true}));return s.value;})()`);
-  const line = () => ev(`(()=>{const w=document.querySelector('#settings-permission-mode').closest('.settings-row').querySelector('.perm-mode-warn');return {shown:!w.hidden&&w.getBoundingClientRect().height>0,select:document.getElementById('settings-permission-mode').value};})()`);
+  const line = () => ev(`(()=>{const w=document.querySelector('#settings-permission-mode').closest('.settings-row, .sv-row').querySelector('.perm-mode-warn');return {shown:!w.hidden&&w.getBoundingClientRect().height>0,select:document.getElementById('settings-permission-mode').value};})()`);
   const guard = await require('./helpers/settings_guard').guardSettings();
   try {
     await Page.enable(); await Page.navigate({ url: BASE }); await Page.loadEventFired();
     await ev(`new Promise(r=>{const t=setInterval(()=>{if(window.__coralStatic||document.readyState==='complete'){clearInterval(t);r(true)}},50)})`);
 
-    const state = () => ev(`(()=>{const s=document.getElementById('settings-permission-mode');const row=s.closest('.settings-row');const w=row.querySelector('.perm-mode-warn');return {value:s.value,notSet:[...s.options].some(o=>o.value===''),first:s.options[0].textContent,mode:row.querySelector('.perm-mode-desc').textContent,warn:!w.hidden&&w.getBoundingClientRect().height>0};})()`);
+    const state = () => ev(`(()=>{const s=document.getElementById('settings-permission-mode');const row=s.closest('.settings-row, .sv-row');const w=row.querySelector('.perm-mode-warn');return {value:s.value,notSet:[...s.options].some(o=>o.value===''),first:s.options[0].textContent,mode:row.querySelector('.perm-mode-desc').textContent,warn:!w.hidden&&w.getBoundingClientRect().height>0};})()`);
     assert.equal(await put({ default_permission_mode: '' }), 200, 'nothing saved to start with');
     assert.equal(await saved(), '');
     await openDialog();

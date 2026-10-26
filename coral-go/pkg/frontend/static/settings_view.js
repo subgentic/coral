@@ -136,7 +136,7 @@ export function mountSettingsView(host, spec) {
         row.dataset.key = field.key;
         if (t === 'heading' || t === 'notice') { // a row that holds no value: a sub-heading with its line, or text the caller draws (a note with a link)
             const help = typeof field.help === 'string' ? field.help : '';
-            if (t === 'heading') { row.append(node('h5', 'sv-heading', field.label)); if (help) row.append(node('p', 'sv-help', help)); }
+            if (t === 'heading') { const h = node('h5', 'sv-heading', field.label); if (field.id) h.id = field.id; row.append(h); if (help) row.append(node('p', 'sv-help', help)); }
             else { const slot = node('div', 'sv-notice'); if (field.render) field.render(slot, { field, host: root }); row.append(slot); }
             return { field, group, row, ctl: { node: row, get: () => undefined, set: () => {}, disable: () => {}, focus: () => {} }, errorEl: node('p', 'sv-error'), helpEl: null, actionEl: null, id, label: null };
         }
@@ -155,7 +155,7 @@ export function mountSettingsView(host, spec) {
         if (field.apply === 'now') helpBits.push('Applies immediately.');
         if (helpBits.length || (help && help.more)) {
             helpEl = node(helpBits.length ? 'p' : 'span', helpBits.length ? 'sv-help' : 'sv-help sv-help-inline'); helpEl.id = `${id}-h`; // no sentence: the Learn more follows the label on its line
-            helpEl.append(node('span', 'sv-help-text', helpBits.join(' ')));
+            helpEl.append(node('span', `sv-help-text${field.helpTextClass ? ' ' + field.helpTextClass : ''}`, helpBits.join(' '))); // helpTextClass: a class the caller's own code finds the sentence by
             if (help && help.more) {
                 const more = node('div', 'sv-more'); more.id = `${id}-m`; more.hidden = true; more.append(...paragraphs(help.more));
                 const btn = node('button', 'sv-learn', 'Learn more'); btn.type = 'button'; btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', more.id);
@@ -166,7 +166,6 @@ export function mountSettingsView(host, spec) {
         }
         const target = ctl.input || ctl.node;
         if (target && target.setAttribute) for (const [k, v] of Object.entries(field.attrs || {})) target.setAttribute(k, v); // attributes of the caller's: an aria attribute
-        if (field.setup && target) field.setup(target); // the caller's own touch on the control (a data-on-* action it names with setAttribute, which the action census reads)
         if (helpEl && target && target.setAttribute) target.setAttribute('aria-describedby', helpEl.id);
         const control = node('div', 'sv-control');
         control.append(ctl.node);
@@ -198,6 +197,7 @@ export function mountSettingsView(host, spec) {
         }
         const errorEl = node('p', 'sv-error'); errorEl.id = `${id}-e`; errorEl.hidden = true; errorEl.setAttribute('role', 'alert');
         row.append(text, control, errorEl);
+        if (field.setup && target) field.setup(target); // the caller's own touch on the control, once the row is whole (a data-on-* action it names with setAttribute, which the action census reads)
         const rec = { field, group, row, ctl, errorEl, helpEl, actionEl, id, label };
         const onEdit = () => touched(field.key);
         for (const ev of ['input', 'change']) (ctl.node).addEventListener(ev, onEdit);

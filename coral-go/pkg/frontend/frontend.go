@@ -78,16 +78,8 @@ func ParseIndex() (*template.Template, error) {
 	return template.New(path.Base(IndexTemplateFiles[0])).Funcs(templateFuncs).ParseFS(Templates, IndexTemplateFiles...)
 }
 
-// ToggleRow is the argument of the includes/toggle_row template. The label and description are trusted literals from the template files;
+// CloudSwitchRow is the argument of the includes/cloud_switch_row template. The label and description are trusted literals from the template files;
 // the funcs below are not reachable from page data.
-type ToggleRow struct {
-	ID    string
-	Label template.HTML
-	Desc  template.HTML
-	Attrs template.HTMLAttr
-}
-
-// CloudSwitchRow is the argument of the includes/cloud_switch_row template; same trust as ToggleRow.
 type CloudSwitchRow struct {
 	RowID, InputID, DescID string
 	RowAttrs, InputAttrs   template.HTMLAttr
@@ -104,13 +96,5 @@ var templateFuncs = template.FuncMap{
 			return template.HTMLAttr(" " + a)
 		}
 		return CloudSwitchRow{RowID: rowID, RowAttrs: sp(rowAttrs), InputID: inputID, Label: template.HTML(label), DescID: descID, Desc: template.HTML(desc), InputAttrs: sp(inputAttrs)}
-	},
-	// toggle builds a ToggleRow: toggle "settings-x" "Label" "Description" `data-on-change="m-x"` `checked`.
-	"toggle": func(id, label, desc string, attrs ...string) ToggleRow {
-		a := ""
-		for _, x := range attrs {
-			a += " " + x
-		}
-		return ToggleRow{ID: id, Label: template.HTML(label), Desc: template.HTML(desc), Attrs: template.HTMLAttr(a)}
 	},
 }

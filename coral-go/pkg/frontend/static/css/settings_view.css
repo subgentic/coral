@@ -14,6 +14,7 @@
 .sv-row { display: grid; gap: 4px var(--sv-row-gap); align-items: start; padding: var(--sv-row-pad-y) 0; border-top: 1px solid var(--sv-row-divider); }
 .sv-row[hidden] { display: none; }
 .sv-heading { margin: 8px 0 0; font-size: var(--sv-label-size); font-weight: 600; color: var(--sv-label-color); }
+#settings-modal .sv .sv-heading { font: var(--dlg-section); } /* inside the dialog a heading is the dialog's section type (settings_dialog_stable: one scale) */
 .sv-notice { min-width: 0; }
 /* the live parts of a Settings group (the terminal backend card, wake after a restart) sit on the page's row spacing: the row's own padding, not their own margins; the Learn more follows the sentence */
 .sv .sv-notice > #settings-terminal-backend { margin: 0; }

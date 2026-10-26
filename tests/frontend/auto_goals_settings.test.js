@@ -69,7 +69,7 @@ const BASE = require('./test_base').BASE;
       await m.loadSettings();
       await m.showSettingsModal();
       const box = document.getElementById('settings-auto-goals');
-      const label = document.querySelector('label[for="settings-auto-goals"]');
+      const label = box && document.getElementById(box.getAttribute('aria-labelledby'));
       return box ? { checked: box.checked, label: label && label.textContent.trim() } : 'missing';
     })()`);
     assert.deepEqual(row, { checked: true, label: "Name each agent's goal" }, 'the Settings dialog');

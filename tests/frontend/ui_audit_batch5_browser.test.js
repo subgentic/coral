@@ -21,8 +21,8 @@ const BASE = require('./test_base').BASE;
 
             console.log(`1. (${w}) Agents: defaults, models, switches, then the CLI paths`);
             await open('agents');
-            const names = await ev(`[...document.querySelectorAll('#settings-pane-agents .settings-row')].map(r => { const c = (r.querySelector('dt label, dt') || document.createElement('i')).cloneNode(true); c.querySelectorAll('.settings-info-btn, .settings-hint, .settings-hint-line, .toggle-desc, .settings-learn').forEach(b => b.remove()); /* the label alone: the hint lines (#7405) are under it */ return c.textContent.trim().replace(/\\s+/g, ' ').slice(0, 40); })`);
-            assert.deepEqual(names.slice(0, 5), ['Default permission mode', 'Default working directory', 'Default thinking', 'Default models', 'Custom models'], JSON.stringify(names));
+            const names = await ev(`[...document.querySelectorAll('#settings-pane-agents .sv-row')].map(r => { const c = (r.querySelector('.sv-label, .sv-heading, dt label, dt') || document.createElement('i')).cloneNode(true); return c.textContent.trim().replace(/\\s+/g, ' ').slice(0, 40); })`).then(l => l.filter(Boolean)); // fields, headings and the live parts (Custom models, CLI paths) in page order
+            assert.deepEqual(names.slice(0, 5), ['Defaults', 'Default permission mode', 'Default working directory', 'Default thinking', 'Default models'], JSON.stringify(names));
             assert.equal(names[names.length - 1], 'CLI paths', 'the CLI paths come last: ' + JSON.stringify(names));
             assert.ok(names.slice(5, -1).length >= 4 && names.slice(5, -1).every(n => n !== 'CLI paths'), 'the switches are between: ' + JSON.stringify(names));
             await ev(`(() => { for (const id of ['settings-working-dir', 'settings-cli-path-claude', 'settings-cli-path-codex', 'settings-cli-path-agy', 'settings-cli-path-pi']) { const e = document.getElementById(id); if (e) e.value = id === 'settings-working-dir' ? '/work/project' : ''; } return true; })()`); // for the picture only (the dialog is closed unsaved): the test server's own folders are not shown
