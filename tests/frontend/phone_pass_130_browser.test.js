@@ -98,7 +98,7 @@ const LONG_WAIT = "⏳ This agent hasn't done anything yet — check the termina
             await scene('the comments sheet with its composer', '#preview-pane');
             // 4. the owner-only refusal messages (team settings note, Prompt inspection, the Health check's refused save), stood in for
             const R = (status, code) => ({ status, code, error: 'x' });
-            for (const [label, ans, expect] of [['team settings note', { settings: R(403, 'mode_too_low') }, '#team-settings-messaging .ct-unavailable'], ['Prompt inspection', { inspection: R(404, 'not_found') }, '.prompt-inspection-content'], ['Health check save', { put: R(403, 'owner_unverified') }, '#team-settings-health .health-state']]) {
+            for (const [label, ans, expect] of [['team settings note', { settings: R(403, 'mode_too_low') }, '#team-settings-messaging .ct-unavailable'], ['Prompt inspection', { inspection: R(404, 'not_found') }, '.prompt-inspection-content'], ['Health check save', { put: R(403, 'owner_unverified') }, '.sv-status']]) {
                 await load(w, theme);
                 await ev(`(() => { const R0 = window.fetch; window.__ans = ${JSON.stringify(ans)}; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
                     const refuse = a => json({ code: a.code, error: 'x' }, a.status);
@@ -117,10 +117,10 @@ const LONG_WAIT = "⏳ This agent hasn't done anything yet — check the termina
                 await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, `${tag} the team settings`, 10000); await settle(500);
                 if (label === 'Health check save') {
                     await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
-                    await waitFor(`!!document.querySelector('#team-settings-health form')`, `${tag} the Health check form`, 8000);
-                    await ev(`(() => { const f = document.querySelector('#team-settings-health form'); const on = f.elements.on; on.checked = !on.checked; on.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-                    await ev(`document.querySelector('#team-settings-health form [type=submit]').click(); true`);
-                    await waitFor(`document.querySelector('#team-settings-health .health-state').classList.contains('health-error')`, `${tag} the refusal`, 6000);
+                    await waitFor(`!!document.querySelector('#team-settings-health [name=on]')`, `${tag} the Health check form`, 8000);
+                    await ev(`(() => { const on = document.querySelector('#team-settings-health [name=on]'); on.checked = !on.checked; on.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                    await ev(`document.querySelector('#team-settings-workspace .sv-save').click(); true`);
+                    await waitFor(`document.querySelector('#team-settings-workspace .sv-status').classList.contains('is-error')`, `${tag} the refusal`, 6000);
                 }
                 const said = await ev(`(() => { const e = document.querySelector(${JSON.stringify('#team-settings-workspace ' + expect.replace('#team-settings-health', '#team-settings-health'))}) || document.querySelector(${JSON.stringify(expect)}); return e ? e.textContent.trim() : ''; })()`);
                 if (!said || /undefined|\[object/.test(said)) problems.push(`${tag} ${label}: no refusal sentence shown (${JSON.stringify(said)})`);

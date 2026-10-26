@@ -3,6 +3,7 @@
  * shared sectioned shell's (components.css), the same as the dialogs that use section_dialog.js. */
 
 .sv { container: sv / inline-size; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.sv-scroll { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .sv-lead { margin: 0 0 .8rem; font-size: var(--sv-help-size); color: var(--sv-value-color); }
 .sv-shell { flex: 1; min-height: 0; }
 .sv .settings-panes > .settings-pane { max-width: 860px; }
@@ -12,10 +13,13 @@
 /* a row: the label and its help at the left, the control at the right (settings mode); label above, control full width (form mode) */
 .sv-row { display: grid; gap: 4px var(--sv-row-gap); align-items: start; padding: var(--sv-row-pad-y) 0; border-top: 1px solid var(--sv-row-divider); }
 .sv-row[hidden] { display: none; }
+.sv-heading { margin: 8px 0 0; font-size: var(--sv-label-size); font-weight: 600; color: var(--sv-label-color); }
+.sv-notice { min-width: 0; }
 .sv-pane > .sv-row:first-of-type, .sv-body > .sv-row:first-of-type { border-top: 0; }
 .sv-settings .sv-row { grid-template-columns: minmax(0, 1fr) var(--sv-control-width); }
 .sv-settings .sv-row-wide, .sv-form .sv-row { grid-template-columns: minmax(0, 1fr); }
 .sv-settings .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.sv-settings .sv-row-heading, .sv-settings .sv-row-notice { grid-template-columns: minmax(0, 1fr); }
 .sv-text { min-width: 0; }
 .sv-label { display: inline; font-size: var(--sv-label-size); font-weight: var(--sv-label-weight); color: var(--sv-label-color); }
 .sv-required { margin-left: .5rem; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-required-color); }
@@ -24,7 +28,7 @@
 .sv-learn::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: var(--sv-control-height-touch); transform: translateY(-50%); } /* its 44 px touch target is invisible, so a hint line keeps its height (UI/UX #7663) */
 .sv-more { margin-top: 6px; font-size: var(--sv-help-size); line-height: 1.5; color: var(--sv-help-color); }
 .sv-more[hidden] { display: none; }
-.sv-row > .sv-row-note { grid-column: -2 / -1; margin: 0; } /* a line of the caller's under the control (the open column; the only one when folded) */
+.sv-row > .sv-row-notice { grid-column: -2 / -1; margin: 0; } /* a line of the caller's under the control (the open column; the only one when folded) */
 .sv-more > p { margin: 0 0 6px; }
 .sv-control { display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end; }
 .sv-form .sv-control { justify-content: flex-start; }
@@ -73,7 +77,7 @@
     .sv-shell { flex-direction: column; }
     .sv .settings-tabs { display: none; }
     .sv .settings-nav .settings-group-pick { display: block; }
-    .sv .settings-group-pick select { width: 100%; min-height: var(--sv-control-height-touch); font-size: 0.875rem; }
+    .sv .settings-group-pick select { width: 100%; min-height: var(--sv-control-height-touch); font-size: 0.875rem; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); }
     .sv .settings-panes { padding: 12px 16px 20px; } /* px: the margins do not grow with the text size, the words get the room */
     .sv-settings .sv-row { grid-template-columns: minmax(0, 1fr); }
     .sv-settings .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; }
@@ -89,4 +93,12 @@
     .sv-switch:checked::before { background: HighlightText; }
     .sv-switch:disabled { opacity: 1; border-color: GrayText; }
     .sv-switch:disabled::before { background: GrayText; }
+}
+
+/* a narrow view for its text (a phone at a large text size, a 320 px phone): the view scrolls as a whole, the bar at its end, so the pane keeps room to read. In rem, so the text size counts. */
+@container sv (max-width: 24rem) {
+    .sv-scroll { overflow-y: auto; }
+    .sv-shell { flex: none; }
+    .sv .settings-panes { overflow: visible; flex: none; }
+    .sv-bar { position: static; }
 }

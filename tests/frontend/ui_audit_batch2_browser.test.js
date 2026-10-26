@@ -1,6 +1,6 @@
 // UI audit #5589, the second batch (findings 5, 6, 11, 14, 15):
 //   - Agent Team: the team name is above the sections (every tab has it), and the template tools are one "More template options" disclosure;
-//   - Team settings > Health check: the check is shown, Reviews and the automatic rules sit behind one disclosure that a problem in them opens;
+//   - Team settings > Health check: the check is shown, then its reviews and automatic rules as rows; a problem is named under its field and takes the focus;
 //   - the Customize tabs button has its own icon (it shared "tune" with Team Settings);
 //   - Team view: a card does not repeat the agent's name or "No open assigned tasks".
 // Drives Chrome over CDP against the isolated dev server.
@@ -36,21 +36,17 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('team-agents-list').getAttribute('aria-label')`), 'Team members', 'the members list is named');
         await ev(`window.hideLaunchModal(); true`);
 
-        console.log('2. Health check: the check first, the rest behind one disclosure that a problem opens');
+        console.log('2. Health check: the check first, then its rules; a problem is named under its field and takes the focus');
         const sub = await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' }) }).then(r => r.status)`);
         assert.ok(sub < 300, 'a team: ' + sub);
         await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
-        await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('.health-form')`, 'the Health check form', 15000);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('#team-settings-health [name=on]')`, 'the Health check fields', 15000);
         await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
-        await waitFor(`!!document.querySelector('.health-form')`, 'the health form', 15000);
-        assert.equal(await ev(`document.querySelector('.health-advanced').open`), false, 'Reviews and the automatic rules start closed');
-        for (const sel of ['.health-form input[name=on]', '.health-form input[name=interval_min]', '.health-form select[name=recipient]', '.health-form input[name=all_clear]']) assert.ok(await ev(vis(sel)), sel + ' is shown');
-        assert.equal(await ev(vis('.health-form input[name=claim_nudge_after_min]')), false, 'the numbers of a rule are behind the disclosure');
-        assert.ok(await ev(`document.querySelector('.health-form').scrollHeight < 700`), 'the tab is a short page now: ' + await ev(`document.querySelector('.health-form').scrollHeight`));
-        await ev(`{ const i = document.querySelector('.health-form input[name=claim_nudge_after_min]'); i.value = '0'; i.dispatchEvent(new Event('input', { bubbles: true })); } document.querySelector('.health-form [type=submit]').disabled = false; document.querySelector('.health-form').requestSubmit(); true`);
-        await waitFor(`document.querySelector('.health-advanced').open === true`, 'the disclosure opened on the problem');
+        for (const sel of ['#team-settings-health input[name=on]', '#team-settings-health input[name=interval_min]', '#team-settings-health select[name=recipient]', '#team-settings-health input[name=all_clear]', '#team-settings-health input[name=claim_nudge_after_min]']) assert.ok(await ev(vis(sel)), sel + ' is shown');
+        await ev(`{ const i = document.querySelector('#team-settings-health input[name=claim_nudge_after_min]'); i.value = '0'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#team-settings-workspace .sv-save').click(); } true`);
+        await waitFor(`!!document.querySelector('#team-settings-health .sv-row[data-key=claim_nudge_after_min] .sv-error:not([hidden])')`, 'the problem named under its field');
         assert.equal(await ev(`document.activeElement.name`), 'claim_nudge_after_min', 'and the field with the problem has the focus');
-        await ev(`document.querySelector('.team-availability-dialog, #team-settings-workspace')?.close?.(); true`);
+        await ev(`document.getElementById('qa-ts-host')?.remove(); true`);
 
         console.log('3. Customize tabs has its own icon');
         const icons = await ev(`(() => { const t = id => document.querySelector('#' + id + ' .material-icons')?.textContent; return [t('agentic-tab-customize'), ...['files', 'browse', 'artifacts', 'tasks', 'notes', 'activity', 'agent-ui'].map(n => t('agentic-tab-' + n))]; })()`);

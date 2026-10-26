@@ -66,11 +66,13 @@ export function mountSettingsView(host, spec) {
     const root = node('div', mode === 'form' ? 'sv sv-form' : 'sv sv-settings');
     root.dataset.mode = mode;
     root.id = `${uid}-root`;
+    const inner = node('div', 'sv-scroll'); // what the view holds: the lead, the shell and the bar (the part that scrolls on a narrow view)
+    root.append(inner);
     const readOnlyOf = key => (typeof spec.readOnly === 'function' ? spec.readOnly(key) : spec.readOnly) || false;
     const reasonOf = r => (typeof r === 'string' ? r : '');
     const globalReadOnly = typeof spec.readOnly === 'string' || spec.readOnly === true ? spec.readOnly : false;
-    if (typeof globalReadOnly === 'string' && globalReadOnly) root.append(node('p', 'sv-lead', globalReadOnly));
-    else if (spec.lead) root.append(node('p', 'sv-lead', spec.lead));
+    if (typeof globalReadOnly === 'string' && globalReadOnly) inner.append(node('p', 'sv-lead', globalReadOnly));
+    else if (spec.lead) inner.append(node('p', 'sv-lead', spec.lead));
     const partsDirty = () => (spec.parts ? spec.parts() : []).filter(p => p && p.dirty());  // parts: pieces the caller draws and saves itself (a group's own form); they count in the bar
 
     // -- the controls, one builder per type: each returns { get, set, node, focus, disable(on) } ----------
@@ -122,7 +124,7 @@ export function mountSettingsView(host, spec) {
         input.type = t === 'secret' ? 'password' : t === 'number' ? 'number' : 'text';
         if (t === 'secret') input.autocomplete = 'off';
         if (t === 'path') { input.spellcheck = false; input.autocapitalize = 'none'; }
-        if (t === 'number') { if (field.min !== undefined) input.min = field.min; if (field.max !== undefined) input.max = field.max; if (field.step !== undefined) input.step = field.step; }
+        if (t === 'number') { if (field.min !== undefined) input.min = field.min; if (field.max !== undefined) input.max = field.max; if (field.step !== undefined) input.step = field.step; if (field.min !== undefined && field.max !== undefined) input.title = `${field.min} to ${field.max}`; }
         if (field.placeholder) input.placeholder = field.placeholder;
         const get = () => (t === 'number' ? (input.value.trim() === '' ? null : Number(input.value)) : input.value);
         return { node: input, input, get, set: v => { input.value = v === undefined || v === null ? '' : String(v); }, focus: () => input.focus(), disable: on => { input.disabled = on; } };
@@ -133,6 +135,12 @@ export function mountSettingsView(host, spec) {
         const t = field.type || 'text';
         const row = node('div', `sv-row sv-row-${t}${field.wide ? ' sv-row-wide' : ''}`);
         row.dataset.key = field.key;
+        if (t === 'heading' || t === 'notice') { // a row that holds no value: a sub-heading with its line, or text the caller draws (a note with a link)
+            const help = typeof field.help === 'string' ? field.help : '';
+            if (t === 'heading') { row.append(node('h5', 'sv-heading', field.label)); if (help) row.append(node('p', 'sv-help', help)); }
+            else { const slot = node('div', 'sv-notice'); if (field.render) field.render(slot, { field, host: root }); row.append(slot); }
+            return { field, group, row, ctl: { node: row, get: () => undefined, set: () => {}, disable: () => {}, focus: () => {} }, errorEl: node('p', 'sv-error'), helpEl: null, actionEl: null, id, label: null };
+        }
         const text = node('div', 'sv-text');
         const label = node('label', 'sv-label', field.label); label.id = `${id}-l`;
         const ctl = buildControl(field, id);
@@ -161,7 +169,10 @@ export function mountSettingsView(host, spec) {
         if (helpEl && target && target.setAttribute) target.setAttribute('aria-describedby', helpEl.id);
         const control = node('div', 'sv-control');
         control.append(ctl.node);
-        if (field.unit) control.append(node('span', 'sv-unit', field.unit));
+        if (field.unit) {
+            const unit = node('span', 'sv-unit', field.unit); unit.id = `${id}-u`; control.append(unit);
+            if (ctl.input && !ctl.group && !ctl.custom && ctl.input.tagName === 'INPUT') ctl.input.setAttribute('aria-labelledby', `${id}-l ${unit.id}`); // the name is the label and the unit ("After minutes idle")
+        }
         let actionEl = null;
         if (field.action) {
             const a = field.action;
@@ -207,7 +218,7 @@ export function mountSettingsView(host, spec) {
     if (flat) {
         const body = node('div', 'sv-body');
         for (const g of groups) for (const field of g.fields || []) { if (!field.key) continue; const rec = buildRow(field, g); fields.set(field.key, rec); body.append(rec.row); }
-        root.append(body);
+        inner.append(body);
     } else {
         shell = node('div', 'settings-shell sv-shell');
         const label = spec.label || 'Settings sections';
@@ -218,7 +229,7 @@ export function mountSettingsView(host, spec) {
         const panes = node('div', 'settings-panes');
         for (const g of groups) panes.append(pane(g));
         shell.append(nav, panes);
-        root.append(shell);
+        inner.append(shell);
     }
     // the bar: status at the left, Cancel and Save at the right (settings mode; a form's dialog has its own footer)
     const barSpec = mode === 'settings' && spec.saveBar !== false ? { save: 'Save settings', cancel: 'Cancel', ...(spec.saveBar || {}) } : null;
@@ -228,7 +239,7 @@ export function mountSettingsView(host, spec) {
         const buttons = node('div', 'sv-bar-buttons');
         cancelBtn = node('button', 'btn sv-cancel', barSpec.cancel); cancelBtn.type = 'button'; cancelBtn.disabled = true;
         saveBtn = node('button', 'btn btn-primary sv-save', barSpec.save); saveBtn.type = 'button'; saveBtn.disabled = true;
-        buttons.append(cancelBtn, saveBtn); bar.append(statusEl, buttons); root.append(bar);
+        buttons.append(cancelBtn, saveBtn); bar.append(statusEl, buttons); inner.append(bar);
         cancelBtn.addEventListener('click', () => view.cancel());
         saveBtn.addEventListener('click', () => { view.save(); });
         root.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !saveBtn.disabled) { e.preventDefault(); view.save(); } });
@@ -237,6 +248,10 @@ export function mountSettingsView(host, spec) {
     if (spec.parts) for (const ev of ['input', 'change']) root.addEventListener(ev, () => setTimeout(() => { if (!destroyed) afterChange(); }, 0)); // a part's own controls: the bar follows them after the part's handlers have run
     if (shell) {
         initSectionDialog(shell);
+        for (const g of groups) if (g.domId) { // the shell numbers its panes; a group that asks for a stable id gets it (the tab follows)
+            const pane = shell.querySelector(`.settings-pane[data-section="${g.id}"]`), tab = shell.querySelector(`.settings-tab[data-section="${g.id}"]`);
+            if (pane) { pane.id = g.domId; if (tab) tab.setAttribute('aria-controls', g.domId); }
+        }
         const remember = spec.remember ? storeKey(`sv-group-${spec.remember}`) : null;
         const first = spec.group || (remember && browserLocal.get(remember)) || groups[0].id;
         showSection(shell, first);
@@ -312,7 +327,8 @@ export function mountSettingsView(host, spec) {
         const v = r.ctl.get();
         let msg = '';
         if (r.field.required && (v === '' || v === null || v === undefined || (Array.isArray(v) && !v.length))) msg = 'is required.';
-        if (!msg && r.field.validate) msg = r.field.validate(v, valuesNow()) || '';
+        if (!msg && r.field.integer && !r.row.hasAttribute('data-disabled')) { const lo = r.field.min, hi = r.field.max; if (v === null || !Number.isInteger(v) || (lo !== undefined && v < lo) || (hi !== undefined && v > hi)) msg = `use a whole number from ${lo} to ${hi}.`; } // field.integer: a whole number in its limits (a disabled row is not checked)
+        if (!msg && r.field.validate && !r.row.hasAttribute('data-disabled')) msg = r.field.validate(v, valuesNow()) || '';
         showError(key, msg);
         return !msg;
     }
@@ -348,7 +364,7 @@ export function mountSettingsView(host, spec) {
                 try {
                     const before = { ...baseline };
                     result = (await spec.save(changes, { before, values: valuesNow() })) || {};
-                    for (const k of Object.keys(changes)) baseline[k] = fields.get(k).ctl.get();
+                    for (const k of [...Object.keys(changes), ...(result.rebase || [])]) if (fields.has(k)) baseline[k] = fields.get(k).ctl.get(); // result.rebase: fields the save redrew from what the server kept
                 } catch (e) {
                     for (const k of (e && e.saved) || []) if (fields.has(k)) baseline[k] = fields.get(k).ctl.get(); // what was saved before the failure is no longer a change
                     named = e && e.fields ? Object.entries(e.fields) : [];
@@ -380,6 +396,8 @@ export function mountSettingsView(host, spec) {
             if (!shell) return;
             const open = view.group() === id;
             for (const e of shell.querySelectorAll(`[data-section="${id}"], .settings-group-pick option[value="${id}"]`)) e.remove();
+            for (const [k, r] of [...fields]) if (r.group.id === id) { fields.delete(k); errors.delete(k); } // its fields no longer count (a value, a change, a check)
+            afterChange();
             if (open) { const next = shell.querySelector('.settings-pane')?.dataset.section; if (next) showSection(shell, next); }
         },
         group() { return shell?.querySelector('.settings-pane:not([hidden])')?.dataset.section || null; },

@@ -1724,7 +1724,6 @@
 .health-wide-select select { margin-top: 4px; }
 .health-rule.off .health-why, .health-rule.off .health-knobs { opacity: .55; }
 .health-form input:focus-visible, .health-form select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.health-state.health-error { color: var(--error, var(--fx-red)); }
 
 /* Team settings, Messaging tab (#5572): one status line and one button, two switches, the linked teams, "How this works". */
 .xt-panel { display: grid; gap: 14px; }

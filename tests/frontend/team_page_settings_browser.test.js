@@ -77,6 +77,15 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 for (const m of [n, big]) { assert.ok(m.learnH <= m.lh * 1.6, `Learn more is a line high, not a 44 px button (${m.learnH}px for a ${m.lh}px line)`); assert.equal(m.target, true, 'its 44 px touch target is the invisible ::after'); }
                 await ev(`document.documentElement.style.fontSize = ''; true`);
             });
+            if (mobile) await S.run(`${label}: at 200% text the page scrolls as a whole and the pane keeps its room; the group select is on the input look (UI/UX on 1b)`, async () => {
+                await group('Workflow'); await settle(150);
+                await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(300);
+                const m = await ev(`(() => { const sv = document.querySelector('#team-settings-workspace .sv-scroll'), panes = sv.querySelector('.settings-panes'), sel = sv.querySelector('.settings-group-pick select'); const cs = getComputedStyle(sel); return { svScroll: getComputedStyle(sv).overflowY, panes: getComputedStyle(panes).overflowY, paneH: panes.getBoundingClientRect().height, vh: innerHeight, selBg: cs.backgroundColor, bg: getComputedStyle(document.body).getPropertyValue('--bg-primary') ? true : false, selBorder: cs.borderTopWidth }; })()`);
+                assert.equal(m.svScroll, 'auto', 'the view scrolls as a whole on a short screen'); assert.equal(m.panes, 'visible', 'the pane is not a small scroll box under the bar');
+                assert.ok(m.paneH >= m.vh * 0.4, `the pane has at least 40% of the screen (${Math.round(m.paneH)} of ${m.vh} px)`);
+                assert.equal(m.selBorder, '1px', 'the group select has the input border, not the browser\'s');
+                await ev(`document.documentElement.style.fontSize = ''; true`);
+            });
             await S.run(`${label}: the bar is pinned at the bottom: status "No changes to save.", Cancel at the left, Save settings at the right, Save off`, async () => {
                 const b = await bar(); assert.ok(b.save && b.cancel, 'Cancel and Save settings are there');
                 assert.match(b.status, /No changes to save/, `the status says there is nothing to save (got ${JSON.stringify(b.status)})`);

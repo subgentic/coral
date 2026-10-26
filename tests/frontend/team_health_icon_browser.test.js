@@ -113,20 +113,21 @@ const { setTheme } = require('./helpers/contrast');
         await render(false);
         assert.equal(await icon(), null, 'a new team has the check off: no icon, the settings are reached from the info button');
         await ev(`window.showTeamWorkingModeWorkspace(${JSON.stringify(TEAM)}); true`);
-        await waitFor(`document.getElementById('team-tab-settings')?.getAttribute('aria-selected') === 'true' && !!document.querySelector('#team-settings-health form')`, 'the Settings tab with the Health check section', 15000);
-        const panel = await ev(`(() => { const f = document.querySelector('#team-settings-health form'); return { on: f.elements.on.checked, text: document.getElementById('tsr-on-h').textContent, shown: !document.getElementById('team-settings-health').hidden, interval: f.elements.interval_min.value }; })()`);
+        await waitFor(`document.getElementById('team-tab-settings')?.getAttribute('aria-selected') === 'true' && !!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('#team-settings-health [name=on]')`, 'the Settings tab with the Health check section', 15000);
+        await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
+        const panel = await ev(`(() => { const h = n => document.querySelector('#team-settings-health [name="' + n + '"]'); return { on: h('on').checked, text: document.querySelector('#team-settings-health .sv-row[data-key=on] .sv-help').textContent, shown: !document.getElementById('team-settings-health').hidden, interval: h('interval_min').value }; })()`);
         assert.equal(panel.on, false, 'a new team has the check off');
         assert.ok(panel.shown && /tokens/.test(panel.text) && /stuck or idle/.test(panel.text), `the setting says what it does and costs: ${panel.text}`);
         assert.equal(panel.interval, '10', 'and shows its interval');
         // while the check is off, how often / to whom / the all-clear line are dimmed and off; turning it on enables them
-        const dep = () => ev(`(() => { const f = document.querySelector('#team-settings-health form'); const names = ['interval_min', 'recipient', 'all_clear']; return { on: f.elements.on.checked, disabled: names.map(n => f.elements[n].disabled), dim: [...f.querySelectorAll('.health-row, [data-check-dep]')].map(e => e.classList.contains('off')) }; })()`);
-        assert.deepEqual(await dep(), { on: false, disabled: [true, true, true], dim: [true] }, 'check off: the dependent controls are disabled and dimmed');
-        await ev(`document.querySelector('#team-settings-health form [name=on]').click(); true`);
-        assert.deepEqual(await dep(), { on: true, disabled: [false, false, false], dim: [false] }, 'check on: they are live');
-        await ev(`document.querySelector('#team-settings-health form [name=on]').click(); true`);
+        const dep = () => ev(`(() => { const h = n => document.querySelector('#team-settings-health [name="' + n + '"]'); const names = ['interval_min', 'recipient', 'all_clear']; return { on: h('on').checked, disabled: names.map(n => h(n).disabled), dim: names.map(n => h(n).closest('.sv-row').hasAttribute('data-disabled')) }; })()`);
+        assert.deepEqual(await dep(), { on: false, disabled: [true, true, true], dim: [true, true, true] }, 'check off: the dependent controls are disabled and dimmed');
+        await ev(`document.querySelector('#team-settings-health [name=on]').click(); true`);
+        assert.deepEqual(await dep(), { on: true, disabled: [false, false, false], dim: [false, false, false] }, 'check on: they are live');
+        await ev(`document.querySelector('#team-settings-health [name=on]').click(); true`);
         assert.deepEqual((await dep()).disabled, [true, true, true], 'off again: off again');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#team-settings-health fieldset')].map(f => [(f.querySelector('legend') || { textContent: f.getAttribute('aria-label') }).textContent, !!f.querySelector('[name=auto_delegate_on]')])`), [['Health check', false], ['Reviews', true], ['Automatic rules', false]], 'handing reviews to the default reviewers is its own section, apart from the check and its rules');
-        assert.ok(/whether or not the health check/.test(await ev(`document.getElementById('hr-auto_delegate-w').textContent`)), 'and says (behind its (i)) that it works with the check off');
+        assert.deepEqual(await ev(`(() => { const keys = [...document.querySelectorAll('#team-settings-health .sv-row')].map(r => r.dataset.key); const at = k => keys.indexOf(k); return [at('health_reviews') < at('auto_delegate_on'), at('auto_delegate_on') < at('health_rules'), at('on') < at('health_reviews'), at('claim_nudge_on') > at('health_rules')]; })()`), [true, true, true, true], 'handing reviews to the default reviewers is its own section (Reviews), apart from the check and its rules');
+        assert.ok(/whether or not the health check/.test(await ev(`document.querySelector('#team-settings-health .sv-row[data-key=auto_delegate_on] .sv-help').textContent`)), 'and says that it works with the check off');
         await shot('settings-health');
 
         // The Agent Team dialog's step 3 has the Health check tab (#7407, the design): the switch is off, and a launch sends health_monitor only when it is on.

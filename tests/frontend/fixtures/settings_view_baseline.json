@@ -45,8 +45,8 @@
     "html": 5
   },
   "ts-row": {
-    "css": 17,
-    "js": 1,
+    "css": 0,
+    "js": 0,
     "html": 0
   },
   "working-mode-form": {
@@ -56,7 +56,7 @@
   },
   "health-row": {
     "css": 3,
-    "js": 4,
+    "js": 3,
     "html": 0
   },
   "health-line": {
@@ -128,7 +128,6 @@
     "tb-head",
     "tb-line",
     "tb-row",
-    "ts-inline",
     "working-mode-form"
   ]
 }

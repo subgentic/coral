@@ -134,17 +134,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(on.name, 'Send health check'); assert.match(on.desc, /Uses tokens each time\./); // the hint (the page has no (i) explanation behind it)
         const every = await ax(`${P} input[name=interval_min]`);
         assert.equal(every.name, 'Every minutes'); assert.equal(every.desc, '5 to 1440');
-        await ev(`document.querySelector('${P} .health-advanced').open = true; true`); // Reviews and the automatic rules are behind one disclosure (#5589 finding 11)
         const rev = await ax(`${P} input[name=default_reviewers]`);
         assert.equal(rev.name, 'Default reviewers'); assert.match(rev.desc, /^Names of agents on this team/);
         const claim = await ax(`${P} input[name=claim_nudge_on]`);
         assert.equal(claim.name, 'Nudge an idle agent to claim its work'); assert.match(claim.desc, /^An agent that is idle/);
         const after = await ax(`${P} input[name=claim_nudge_after_min]`);
         assert.equal(after.name, 'After minutes idle'); assert.equal(after.desc, '5 to 1440');
-        const groups = await ev(`[...document.querySelectorAll('${P} .health-rule')].map(g => [g.getAttribute('role'), document.getElementById(g.getAttribute('aria-labelledby')).textContent, g.querySelectorAll('input[type=number]').length])`);
-        assert.deepEqual(groups.map(g => g[0]), groups.map(() => 'group'));
-        assert.ok(groups.some(g => g[1] === 'Nudge an idle agent to claim its work' && g[2] === 2), JSON.stringify(groups));
-        ok('Health check controls are named by their title, explained by their description, and each rule\'s numbers sit in a group named for the rule');
+        ok('Health check controls are named by their title (a number by its label and unit) and explained by their description');
     } catch (e) {
         console.error(e);
         process.exitCode = 1;

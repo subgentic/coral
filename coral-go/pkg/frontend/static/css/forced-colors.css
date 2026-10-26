@@ -4,17 +4,17 @@
    tab, and the dot that says what an agent is doing. Loaded after the other sheets so these win at equal specificity. */
 @media (forced-colors: active) {
     /* The Settings switches: off is an empty track with the knob at the left, on is a Highlight track with the knob at the right. */
-    :is(#settings-modal .settings-row .check-hit, .team-settings-page .ts-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"],
+    :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"],
     #settings-modal .settings-hub-mode-toggle > input[type="checkbox"] { background: Canvas; border: 2px solid ButtonText; }
-    :is(#settings-modal .settings-row .check-hit, .team-settings-page .ts-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]::before,
+    :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]::before,
     #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]::before { background: ButtonText; }
-    :is(#settings-modal .settings-row .check-hit, .team-settings-page .ts-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked,
+    :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked,
     #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:checked { background: Highlight; border-color: Highlight; }
-    :is(#settings-modal .settings-row .check-hit, .team-settings-page .ts-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked::before,
+    :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked::before,
     #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:checked::before { background: HighlightText; }
-    :is(#settings-modal .settings-row .check-hit, .team-settings-page .ts-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:disabled,
+    :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:disabled,
     #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:disabled { opacity: 1; border-color: GrayText; }
-    :is(#settings-modal .settings-row .check-hit, .team-settings-page .ts-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:disabled::before,
+    :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:disabled::before,
     #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:disabled::before { background: GrayText; }
 
     /* The selected tab (Settings and the dialogs' section lists, Team settings): a thick Highlight border, since the heavier weight alone is easy to miss and a

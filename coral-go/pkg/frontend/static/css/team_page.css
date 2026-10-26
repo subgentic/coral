@@ -164,25 +164,8 @@
 .team-agent-tasks { margin: 0; padding-left: 18px; }
 /* The Settings tab (stage 3): one page of four sections, rows with the label and hint at the left and the control at the right, and a bar pinned under it (the status line, Cancel at the left, Save settings at the right). */
 .team-settings-page { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
-.ts-label { overflow-wrap: break-word; }
-.ts-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem); gap: 4px 24px; align-items: start; padding: 10px 0; border-top: 1px solid var(--border-subtle, var(--border)); }
-.ts-row-wide { grid-template-columns: minmax(0, 1fr); }
-.ts-row-wide .ts-control textarea { width: 100%; box-sizing: border-box; }
-.ts-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ts-label { font-size: 0.8125rem; font-weight: 500; color: var(--text-primary); }
-.ts-hint { margin: 0; font-size: 0.75rem; color: var(--text-secondary); overflow-wrap: break-word; }
-.ts-hint:empty { display: none; }
-.ts-control { min-width: 0; display: flex; justify-content: flex-end; align-items: center; }
-.ts-control select { max-width: 100%; min-width: min(12rem, 100%); }
-.ts-control .check-hit { justify-content: flex-end; }
-.ts-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--text-secondary); }
-.ts-inline input { width: 5em; }
-.health-embedded .health-actions [type="submit"], .health-embedded .health-state, .xt-embedded .xt-save { display: none; }
-.health-embedded .health-actions { margin-top: 8px; }
+.xt-embedded .xt-save { display: none; }
 @media (max-width: 760px) {
-    .ts-row { grid-template-columns: minmax(0, 1fr); }
-    .ts-row-switch { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } /* a switch stays at the right of its words on a phone, as on a desktop */
-    .ts-control { justify-content: flex-start; }
     .team-settings-page select, .team-settings-page input:not([type="checkbox"]), .team-settings-page .btn { min-height: var(--control-touch-height, 44px); } /* every control of the page is a touch target (the prompt role list too) */
 }
 
@@ -201,7 +184,6 @@
 .team-page.detail-sheet .goals-facts dd, .team-page.detail-sheet .detail-facts dd { margin-bottom: 8px; }
 
 /* narrow (the open group's pane is what is measured, #7663), in rem so a larger text size stacks sooner: the label and its hint above the control, the control at the left; no word is broken */
-@container (max-width: 40rem) { .ts-row { grid-template-columns: minmax(0, 1fr); } .ts-row:not(.ts-row-switch) .ts-control { justify-content: flex-start; } }
 
 /* the agent's Artifacts tab (the dock panel): the team's table in a narrow panel, and the document as a sheet over the panel itself (the chat beside it stays) */
 #agentic-panel-artifacts, #agentic-panel-saved { position: relative; } /* the document is a sheet over the panel (the Saved tab's message as well) */

@@ -85,7 +85,7 @@ assert.deepEqual([...defined].filter(t => !used.has(t)), [], 'a --sv- token vari
 
 // (d) the one fold breakpoint
 const folds = [...svCss.matchAll(/@container\s+sv\s*\(max-width:\s*([0-9.]+rem)\)/g)];
-assert.equal(folds.length, 1, 'the fold breakpoint is written once in settings_view.css (found ' + folds.length + ')');
+assert.deepEqual(folds.map(f => f[1]), ['50rem', '24rem'], 'two container breakpoints in settings_view.css: the fold (50rem) and the narrow view that scrolls whole (24rem); found ' + folds.map(f => f[1]).join(', '));
 for (const f of cssFiles) if (f !== SV_CSS) assert.ok(!/@container\s+sv\b/.test(strip(read(f))), `${path.basename(f)} writes a second fold for the component`);
 
 console.log(`settings_view_census: ok (a .sv block only in settings_view.css, ${Object.keys(nowCounts).length} legacy row classes only falling${down.length ? ', ' + down.length + ' fell: run --update to lower the baseline' : ''}, ${defined.size} tokens used, one fold at ${folds[0][1]})`);

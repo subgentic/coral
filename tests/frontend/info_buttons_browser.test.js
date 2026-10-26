@@ -74,7 +74,7 @@ const MEASURE = `(() => {
                     for (const x of await ev(MEASURE)) seen.push({ g: t, ...x });
                     if (t === 'workflow' || t === 'health') await shot(`info-team-${t}-${w}`);
                 }
-                check(`${tag}: found the (i) buttons of ${tabs.join(', ')}`, seen.length >= 3, `${seen.length} buttons in ${[...new Set(seen.map(x => x.g))].join(', ')}`); // the Health check's rows and the prompt preview's cards keep theirs; the component's rows have a Learn more
+                check(`${tag}: the (i) buttons of ${tabs.join(', ')} are the prompt preview's only (its metadata); the rows have a Learn more instead`, seen.length >= 1 && seen.every(x => x.g === 'prompts'), `${seen.length} buttons in ${[...new Set(seen.map(x => x.g))].join(', ')}`);
                 const big = seen.filter(x => x.w > 24.5 || x.h > 24.5);
                 check(`${tag}: every (i) is a circle of at most 24 px`, big.length === 0, JSON.stringify(big.slice(0, 4)));
                 const off = seen.filter(x => x.first && Math.abs(x.cy - x.first.cy) > 5);
