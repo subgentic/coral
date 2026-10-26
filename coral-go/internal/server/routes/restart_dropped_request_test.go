@@ -114,7 +114,7 @@ func TestWakeRunsToItsEndWhenTheRequestIsDropped(t *testing.T) {
 
 // Every handler that ends a terminal or makes one and then starts an agent runs the rest on lifecycleCtx; a new one added without it fails here.
 func TestLifecycleHandlersRunOnLifecycleCtx(t *testing.T) {
-	for file, funcs := range map[string][]string{"sessions_lifecycle.go": {"Restart", "Resume"}, "sessions_sleep.go": {"Wake", "WakeSession", "WakeAll"}} {
+	for file, funcs := range map[string][]string{"sessions_restart.go": {"Restart"}, "sessions_lifecycle.go": {"Resume"}, "sessions_sleep.go": {"Wake", "WakeSession", "WakeAll"}} {
 		b, err := os.ReadFile(file)
 		require.NoError(t, err)
 		src := string(b)

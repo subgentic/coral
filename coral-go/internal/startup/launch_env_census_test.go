@@ -22,7 +22,7 @@ var launchSites = map[string]struct {
 	fields []string
 }{
 	"server/routes/sessions_launch_session.go.launchSession": {"a dashboard launch, and a team launch's members", launchEnvFields},
-	"server/routes/sessions_lifecycle.go.restartCommand":     {"a restart", launchEnvFields},
+	"server/routes/sessions_restart.go.restartCommand":       {"a restart", launchEnvFields},
 	"server/routes/sessions_lifecycle.go.resumeCommand":      {"a resume", launchEnvFields},
 	"server/routes/sessions_sleep.go.wakeExistingSession":    {"a wake after sleep", launchEnvFields},
 	"background/launcher.go.LaunchAgent":                     {"a scheduled or one-shot run", launchEnvFields},
