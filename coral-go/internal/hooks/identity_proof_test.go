@@ -86,7 +86,7 @@ func TestASessionTokenGoesOnlyAfterTheServerProvedItself(t *testing.T) {
 
 func TestAProgramThatCannotProveItselfNeverGetsTheSessionToken(t *testing.T) {
 	enableProof(t)
-	serve := func(h http.HandlerFunc) (string, *[]string) {
+	serve := func(h http.HandlerFunc) (string, func() []string) {
 		var mu sync.Mutex
 		var seen []string
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +96,11 @@ func TestAProgramThatCannotProveItselfNeverGetsTheSessionToken(t *testing.T) {
 			h(w, r)
 		}))
 		t.Cleanup(s.Close)
-		return s.URL, &seen
+		return s.URL, func() []string { // the handler appends on the server's goroutine: read a copy under the same lock
+			mu.Lock()
+			defer mu.Unlock()
+			return append([]string(nil), seen...)
+		}
 	}
 	for name, h := range map[string]http.HandlerFunc{
 		"answers 404":    func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) },
@@ -113,7 +117,7 @@ func TestAProgramThatCannotProveItselfNeverGetsTheSessionToken(t *testing.T) {
 			var re *serverproof.RefusedError
 			require.ErrorAs(t, err, &re)
 			assert.True(t, re.TokenWithheld())
-			for _, s := range *seen {
+			for _, s := range seen() {
 				assert.NotContains(t, s, v2Token, "the token was never sent")
 			}
 		})
