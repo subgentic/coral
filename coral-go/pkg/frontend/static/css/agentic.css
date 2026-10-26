@@ -2175,6 +2175,9 @@ body.panel-dragging .agentic-state {
 .list-bar-done { display: none; } /* a phone only (#7883) */
 .list-bar-menu-grid .list-bar-field > :last-child:not(.list-bar-field-label) { flex: 1 1 6rem; }
 .list-bar-menu-grid .list-bar-field > .list-bar-field-label { flex: 0 0 5.75rem; }
+.list-bar-menu-inline .list-bar-kept > .list-bar-field-label, .list-bar-menu-grid .list-bar-kept > .list-bar-field-label { flex: 0 1 auto; } /* Kept only: the words sit next to their box, not in a label column of their own (#8617) */
+.list-bar-kept, .list-bar-menu-inline .list-bar-kept, .list-bar-menu-grid .list-bar-kept { gap: 0.5rem; justify-content: flex-start; }
+.list-bar-kept > input[type="checkbox"] { flex: none; }
 @media (max-width: 767px) { .list-bar-menu-grid { grid-template-columns: minmax(0, 1fr); } .list-bar-done { display: block; width: 100%; min-height: var(--control-touch-height, 44px); margin: 0; } }
 /* The activity bars' panel (#7653): the tool-group boxes go two to a line in it as they did in the dropdown; the other fields, the count and Clear filters are a line each. */
 .list-bar-menu-groups { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 8px; }
