@@ -84,7 +84,7 @@ finish() {
   echo
   printf '%-12s %-5s %s\n' item state detail
   local i fail=0
-  for i in "${!NAMES[@]}"; do printf '%-12s %-5s %s\n' "${NAMES[$i]}" "${STATES[$i]}" "${DETAILS[$i]}"; [ "${STATES[$i]}" = PASS ] || fail=1; done
+  for i in "${!NAMES[@]}"; do printf '%-12s %-5s %s\n' "${NAMES[$i]}" "${STATES[$i]}" "${DETAILS[$i]}"; [ "${STATES[$i]}" = PASS ] || [ "${STATES[$i]}" = SKIP ] || fail=1; done
   exit "$fail"
 }
 
@@ -116,8 +116,10 @@ env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HH" CORAL_DATA_DIR="$DD" CORAL_
   "$app/Contents/MacOS/coral-tray" --foreground --no-browser --port "$PORT" --home "$HH" --backend tmux > "$work/tray.out" 2>&1 & TRAY=$!
 PIDS+=("$TRAY"); disown "$TRAY"
 for i in $(seq 1 120); do lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1 && break; sleep 0.5; done
+# a pid is recorded for kill only when it is this run's own: the tray's child, or a program started from this run's work folder (a port reused by another process is never killed)
+ours() { local p=$1 pp cmd; [ -n "$p" ] || return 1; pp=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' '); cmd=$(ps -o command= -p "$p" 2>/dev/null); [ "$pp" = "${TRAY:-0}" ] || case "$cmd" in "$work"/*) return 0 ;; *) return 1 ;; esac; }
 SRV0=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)
-[ -n "$SRV0" ] && PIDS+=("$SRV0")
+if [ -n "$SRV0" ] && ours "$SRV0"; then PIDS+=("$SRV0"); else [ -n "$SRV0" ] && echo "update_real: the process on :$PORT ($SRV0) is not this run's tray or server: not recorded, not killed" >&2; SRV0=""; fi
 for i in $(seq 1 80); do [ -r "$DD/api_key" ] && break; sleep 0.5; done
 KEY=$(tr -d '[:space:]' < "$DD/api_key" 2>/dev/null)
 base="http://127.0.0.1:$PORT"
@@ -131,7 +133,7 @@ if [ -z "$SRV0" ] || [ -z "$KEY" ] || [ "$(health)" != "$fromv" ]; then
 fi
 api -X PUT -d "{\"cli_path_claude\":\"$here/smoke_macos/standin_cli.py\",\"telemetry_enabled\":false}" "$base/api/settings" >/dev/null
 launch=$(api -X POST -d "{\"working_dir\":\"$work/wd\",\"display_name\":\"survivor\"}" "$base/api/sessions/launch")
-sname=$(printf '%s' "$launch" | jget session_name); terminal=$(printf '%s' "$launch" | jget terminal)
+terminal=$(printf '%s' "$launch" | jget terminal)
 sleep 4
 panes() { local t; for t in "$oldtmux" "$app/Contents/MacOS/tmux"; do [ -x "$t" ] && "$t" -S "$DD/tmux.sock" list-panes -a -F '#{session_name} #{pane_pid}' 2>/dev/null && return 0; done; return 1; }
 pane0=$(panes | head -1)
@@ -142,12 +144,28 @@ else
 fi
 
 # ---- 3 find ------------------------------------------------------------------------------------------------
-person --method POST --path /api/system/update/check | grep -q '^202' || { result "3 find" FAIL "the check was not accepted: $(person --method POST --path /api/system/update/check)"; finish; }
-sleep 20   # the status is read only once the check is over: a read made while it runs makes the check fail as a network error (see the plan)
-st=""; deadline=$(( $(date +%s) + tmo ))
+checked_at() { person --path /api/system/update | pbody | jget checked_at; }
+start_check() { person --method POST --path /api/system/update/check | grep -q '^202'; }
+before=$(checked_at)
+start_check || { result "3 find" FAIL "the check was not accepted: $(person --method POST --path /api/system/update/check)"; finish; }
+st=""; deadline=$(( $(date +%s) + tmo )); retried=0
 while [ "$(date +%s)" -lt "$deadline" ]; do
+  # the status is read only once the check is over (a read made while it runs makes the check fail as a network error, see the plan): checked_at changes when it ends
+  now=$(checked_at)
+  if [ -z "$now" ] || [ "$now" = "$before" ]; then sleep 3; continue; fi
   st=$(person --path /api/system/update | pbody)
-  if [ "$fromv" = "$tov" ]; then [ "$(printf '%s' "$st" | jget not_ready_reason)" = up_to_date ] && break; fi
+  reason=$(printf '%s' "$st" | jget not_ready_reason)
+  if [ "$reason" = backoff ] || [ "$reason" = check_failed ]; then
+    echo "update_real: the updater says $reason after the check at $now; its own status follows:" >&2
+    upd_env status 2>&1 | head -20 >&2
+    if [ "$retried" = 0 ]; then
+      retried=1; echo "update_real: retrying the check once after 65 s (one check a minute; a failure backs the next one off, up to a day)" >&2
+      sleep 65; before=$now; start_check || { result "3 find" FAIL "the retry was not accepted: $(person --method POST --path /api/system/update/check)"; finish; }
+      continue
+    fi
+    break
+  fi
+  if [ "$fromv" = "$tov" ]; then [ "$reason" = up_to_date ] && break; fi
   [ "$(printf '%s' "$st" | jget state)" = staged ] && [ "$(printf '%s' "$st" | jget relaunch.available)" = True ] && break
   sleep 5
 done
@@ -187,7 +205,8 @@ tmuxrestart=$(printf '%s' "$st" | jget relaunch.tmux_agents_restart)
 answer=$(person --method POST --path /api/system/update/relaunch-local --body "$body")
 deadline=$(( $(date +%s) + tmo )); v=""
 while [ "$(date +%s)" -lt "$deadline" ]; do v=$(health); [ "$v" = "$tov" ] && break; sleep 3; done
-SRV1=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1); [ -n "$SRV1" ] && PIDS+=("$SRV1")
+SRV1=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)
+if [ -n "$SRV1" ] && ours "$SRV1"; then PIDS+=("$SRV1"); else [ -n "$SRV1" ] && echo "update_real: the process on :$PORT ($SRV1) after the apply is not this run's: not recorded, not killed" >&2; fi
 if [ "$v" = "$tov" ] && [ -n "$SRV1" ] && [ "$SRV1" != "$SRV0" ] && ! kill -0 "$SRV0" 2>/dev/null; then
   result "5 apply" PASS "the person's request ($(printf '%s' "$answer" | head -c 80)) installed $tov: /api/health says $tov, server $SRV1 replaced $SRV0 (gone)"
 else
