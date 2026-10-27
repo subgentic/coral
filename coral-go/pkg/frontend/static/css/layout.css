@@ -77,7 +77,7 @@
 
 @media (max-width: 639px) {
     .nav-select, .top-bar-actions > .top-bar-btn:not(.hub-indicator), .top-bar-actions .top-bar-settings-wrapper, .top-bar-actions .cloud-account-wrapper { display: none !important; }
-    .top-menu-btn { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; min-height: 44px; margin: 0 8px; padding: 0 12px; background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-ml); color: var(--text-primary); font: inherit; font-weight: var(--fw-strong); cursor: pointer; text-align: left; }
+    .top-menu-btn { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; margin: 0 8px; justify-content: flex-start; text-align: left; } /* the menu button is a .btn that names the view; here only where it sits */
     .top-menu-btn .material-icons { font-size: var(--glyph-sm); flex-shrink: 0; }
     .top-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
@@ -137,22 +137,7 @@
     gap: 4px;
 }
 
-.top-bar-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 6px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    transition: color 0.15s, background 0.15s;
-}
 
-.top-bar-btn:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-}
 
 /* ── Layout Grid ───────────────────────────────────────────── */
 
@@ -243,20 +228,12 @@ body.panel-dragging .sidebar {
 }
 
 .sidebar-rail-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    border-radius: var(--radius-lg);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
 }
 
-.sidebar-rail-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
 /* The sidebar's toolbar buttons are quiet .btn-icons (#9332): the height of the header's controls is the family's (36, 44 on touch), as --ctl-h is. */
 
 /* Collapsed icon rail (desktop only) */
@@ -342,7 +319,6 @@ body.panel-dragging .sidebar {
     /* The rail's agent tiles are the Agents tab's; the other tabs' rail is the three buttons */
     .layout:not([data-sidebar-pane="agents"]) .sidebar-rail-list { display: none; }
     .layout:not([data-sidebar-pane="agents"]) #sidebar-rail-new { margin-top: auto; }
-    .sidebar-rail-btn:last-child { border: 1px dashed var(--border); border-radius: var(--radius-lg); width: 40px; height: 32px; }
     .sidebar-rail-group {
         display: flex;
         align-items: center;

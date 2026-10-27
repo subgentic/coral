@@ -94,7 +94,7 @@ function button() {
     const b = document.createElement('button');
     b.type = 'button';
     b.id = 'hub-indicator';
-    b.className = 'top-bar-btn hub-indicator';
+    b.className = 'btn btn-quiet btn-icon btn-small top-bar-btn hub-indicator';
     b.hidden = true;
     // A hub: one node joined to three.
     b.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2"/><circle cx="8" cy="2.5" r="1.3"/><circle cx="2.8" cy="12" r="1.3"/><circle cx="13.2" cy="12" r="1.3"/><path d="M8 6V3.8M6.3 9.1 3.9 11.2M9.7 9.1l2.4 2.1"/></svg>';
