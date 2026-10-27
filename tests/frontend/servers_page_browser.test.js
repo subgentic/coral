@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { oneLinePerRow } = require('./helpers/row_lines');
+const { setTheme } = require('./helpers/contrast');
 
 const SERVERS = [
     { id: 'local', label: 'studio-mac', local: true, status: 'online' },
@@ -16,6 +17,7 @@ const SERVERS = [
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const ok = name => console.log(`   ✓ ${name}`);
+    const sceneShot = require('./helpers/scene_shots')(Page, 'automations-servers');
     const shot = async n => { if (process.env.SHOT_DIR) fs.writeFileSync(`${process.env.SHOT_DIR}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable();
@@ -45,6 +47,7 @@ const SERVERS = [
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), true, at + 'the table keeps the Servers title');
             assert.deepEqual(t.scopes, ['col', 'col', 'col', 'col', 'col']);
             await oneLinePerRow(ev, 'table.dt-table tbody tr[data-key]', `${at}the servers`, assert, { min: 2 }); // Goal #79: a server is one line at both widths; a narrow list drops Tags, Version and Agents
+            for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await sceneShot(`servers-list-${theme}-${w}`); } await setTheme(ev, 'dark'); // the scenes UI/UX looks at (written when the gate asks for shots)
             assert.equal(t.rows, 3, at + 'this hub and two servers');
             assert.deepEqual(t.links, ['epoch', 'LAN box'], at + 'each remote server\'s name opens its page; this hub has none');
             assert.equal(t.rowButtons, 0, at + 'no Test, Edit or Remove buttons in the table');
