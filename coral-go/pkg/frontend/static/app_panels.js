@@ -1,6 +1,6 @@
 /* Lazy dashboard panel adapters shared by navigation, routes, and actions. */
 
-import { lazyFns, loadTeamPage, loadTeamSettings, loadWorkflows, loadCostDashboard, loadDocs, loadThemeConfig, loadModals, loadResumeDialog, loadDefaultPromptsDialog } from './lazy_panels.js';
+import { lazyFns, loadTeamPage, loadTeamSettings, loadWorkflows, loadCostDashboard, loadDocs, loadThemeConfig, loadModals, loadSettingsDialog, loadResumeDialog, loadDefaultPromptsDialog } from './lazy_panels.js';
 
 export const {
     selectWorkflow, selectWorkflowRun, killWorkflowRun, deleteWorkflow,
@@ -23,11 +23,12 @@ export const { showThemeConfigurator, hideThemeConfigurator } = lazyFns(loadThem
 
 export const {
     showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand,
-    showSettingsModal, hideSettingsModal, applySettings,
     toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent,
     showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates,
 } = lazyFns(loadModals, [
-    'showLaunchModal', 'hideLaunchModal', 'launchSession', 'hideInfoModal', 'copyInfoCommand', 'showSettingsModal', 'hideSettingsModal', 'applySettings', 'toggleFlag', 'showAddAgentToBoard', 'launchTerminalToBoard', 'launchDefaultAgent', 'showAddStandaloneAgent', 'launchStandaloneTerminal', 'exportPersonas', 'importPersonas', 'importTeamTemplates']);
+    'showLaunchModal', 'hideLaunchModal', 'launchSession', 'hideInfoModal', 'copyInfoCommand', 'toggleFlag', 'showAddAgentToBoard', 'launchTerminalToBoard', 'launchDefaultAgent', 'showAddStandaloneAgent', 'launchStandaloneTerminal', 'exportPersonas', 'importPersonas', 'importTeamTemplates']);
+
+export const { showSettingsModal, hideSettingsModal, applySettings } = lazyFns(loadSettingsDialog, ['showSettingsModal', 'hideSettingsModal', 'applySettings']);
 
 export const { showResumeModal, hideResumeModal, resumeLaunchNew } = lazyFns(loadResumeDialog, ['showResumeModal', 'hideResumeModal', 'resumeLaunchNew']);
 
