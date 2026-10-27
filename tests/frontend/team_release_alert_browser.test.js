@@ -39,6 +39,9 @@ const BASE = require('./test_base').BASE;
             assert.equal(form.on, false, at + 'off by default'); assert.deepEqual([form.branch, form.tag, form.wait], ['main', 'v*', '1440']); assert.deepEqual(form.range, ['60', '43200']);
             assert.deepEqual(form.dis, [true, true, true, true], at + 'the fields are live only while the switch is on'); assert.deepEqual(form.opts, ['', 'Boss', 'Dev One']);
             assert.deepEqual(form.hints, ['v* also matches prereleases, such as v2.0.1-beta.', '1 hour to 30 days'], at + 'the hints say what the pattern matches and the wait\'s range in words'); assert.deepEqual(form.unlabelled, []);
+            // the fields that repeat Branch, Wait and Also tell under each rule are named with their rule, so tabbing from field to field is not "Branch" twice (#9117)
+            const fieldNames = await ev(`['landing_branch', 'landing_wait_min', 'landing_nudge', 'release_branch', 'release_tag_pattern', 'release_wait_min', 'release_nudge', 'goals_ready_wait_min', 'unowned_tasks_wait_min'].map(n => (document.querySelector('${P} [name=' + n + ']') || {getAttribute: () => null}).getAttribute('aria-label'))`);
+            assert.deepEqual(fieldNames, ['Landing: Branch', 'Landing: Wait', 'Landing: Also tell', 'Release: Branch', 'Release: Tag pattern', 'Release: Wait', 'Release: Also tell', 'Goals ready to close: Wait', 'Open tasks with no goal or assignee: Wait'], at + 'each field is named with its rule: ' + JSON.stringify(fieldNames));
 
             console.log(`${at}a value the server would not read is refused at its field, before any request`);
             await ev(`window.__puts = 0; if (!window.__wrapped) { window.__wrapped = true; const w = window.fetch; window.fetch = (u, o = {}) => { if ((o.method || 'GET') === 'PUT' && /board\\/[^/]+\\/settings$/.test(String(u))) window.__puts++; return w(u, o); }; } true`);

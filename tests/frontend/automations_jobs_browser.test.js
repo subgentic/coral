@@ -46,6 +46,8 @@ const BASE = require('./test_base').BASE;
             await ev(`document.getElementById('nav-tab-automations').click(); true`); // the tab's own click (its action must know the tab), not the page function
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 3`, `${at}the three jobs in the folder's table`, 10000);
             assert.equal(await pathname(), '/automations/jobs', `${at}the address is the folder's`);
+            // the next run's exact time is text too, not only a tooltip (#9117): the two jobs with a next run say it for a screen reader; the paused one has none
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => (r.querySelector('td[data-key=next] .sr-only') || {}).textContent || '')`).then(a => a.map(t => /^, next run .+ your time$/.test(t))), [true, true, false], `${at}the next run is also text for assistive technology`);
             const folderWords = mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`;
             assert.deepEqual(await ev(folderWords), mobile ? ['Running now (0)', 'Failed (1)', 'Jobs (3)', 'Workflows (1)'] : ['Running now0', 'Failed1', 'Jobs3', 'Workflows1'], `${at}the folders with their counts, not job rows`);
             assert.equal(await ev(`document.querySelectorAll('#automations-nav-list .sched-row').length`), 0, `${at}no job rows in the sidebar`);
