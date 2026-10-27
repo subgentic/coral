@@ -4,10 +4,24 @@
  * A colour dot (a tag's colour) is a hex colour only. Text is set with textContent only.
  *
  *   build({ id, label, sections, current, onPick })  -> the element (the column and the select)
- *   sections: [{ title?, items: [{ key, label, count?, alert?, dot?, soon? }] }]      onPick(key) is not called for a disabled item; a section's title is also the select's group label
+ *   sections: [{ title?, items: [{ key, label, count?, alert?, dot?, icon?, soon? }] }]      onPick(key) is not called for a disabled item; a section's title is also the select's group label
  *   update(root, { sections, current })               -> draws the same element again with new counts or another current view; the keyboard stays on the item it was on */
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 const HEX = /^#[0-9a-f]{3,8}$/i;
+
+/** Existing folder glyphs and the shared provider mark; decoration never contributes to the button's accessible name. */
+function folderIcon(name) {
+    if (!name) return null;
+    const icon = el('span', 'view-list-icon top-bar-icon'); icon.dataset.icon = name; icon.setAttribute('aria-hidden', 'true');
+    if (name.startsWith('cli:')) {
+        icon.classList.add('agent-type-mark'); icon.dataset.agentType = name.slice(4);
+    } else if (name === 'saved-bookmark') {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        for (const [key, value] of Object.entries({ viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(key, value);
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'M4 2.5h8v11L8 10.5l-4 3z'); svg.append(path); icon.append(svg); // the top bar's Saved bookmark
+    } else { icon.classList.add('material-icons'); icon.textContent = name; }
+    return icon;
+}
 
 function draw(root, { sections, current }) {
     const nav = root.querySelector('.view-list-nav'), select = root.querySelector('.view-list-select');
@@ -20,6 +34,8 @@ function draw(root, { sections, current }) {
         for (const it of sec.items) {
             const b = el('button', 'view-list-item'); b.type = 'button'; b.dataset.key = it.key;
             const lab = el('span', 'view-list-label');
+            const icon = folderIcon(it.icon);
+            if (icon) { b.classList.add('view-list-with-icon'); lab.append(icon); }
             if (it.dot && HEX.test(it.dot)) { const d = el('i', 'view-list-dot'); d.style.setProperty('--view-list-dot', it.dot); d.setAttribute('aria-hidden', 'true'); lab.append(d); }
             lab.append(el('span', 'view-list-name', it.label));
             b.append(lab);
