@@ -159,12 +159,13 @@ let _boardTasksLoadSeq = 0;
 // "Load more" pages older done tasks with the cursor; a poll refreshes the first page
 // and keeps the older pages already loaded.
  const BOARD_TASK_PAGE = 50;
+const _fetchTaskPage = (board, cursor) => _boardTasksFetch(board, `/tasks?limit=${BOARD_TASK_PAGE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`); // one page of the default list: the open tasks, then the done ones (#9121)
 
 // A fetch that never answers (a hung server, a dead hub link) must not stop the poll for
 // good, since the poll never starts a tick while one runs (#3262).
 export const boardTaskFetchHooks = { timeoutMs: 20000 };
 
-const _emptyBoardList = board => ({ board, first: [], older: [], nextCursor: '', totalOpen: null, totalCompleted: null });
+const _emptyBoardList = board => ({ board, first: [], older: [], pages: 0, nextCursor: '', totalOpen: null, totalCompleted: null });
 
 let _boardList = _emptyBoardList(null);
 
@@ -216,7 +217,7 @@ async function _loadBoardTasksDefault(boardName) {
                 const [open, done] = await Promise.all(phases.map(statuses => _taskQueryFetch(boardName, taskParams(f, boardName, { statuses, limit: 1 }))));
                 data = { tasks: [], total_open: open.total ?? 0, total_completed: done.total ?? 0 };
             }
-        } else data = await _boardTasksFetch(boardName, `/tasks?limit=${BOARD_TASK_PAGE}`);
+        } else data = await _fetchTaskPage(boardName, '');
     } catch (e) {
         data = null;
         if (e && e.resp && isBusyStatus(e.resp.status)) refused = e.resp;
@@ -242,18 +243,27 @@ async function _loadBoardTasksDefault(boardName) {
         renderBoardTaskList();
         return;
     }
-    // Once "Load more" was used, the done tasks the old first page had are kept too: a task
-    // finished since pushes the oldest of them off page one, and the cursor continues after
-    // the older pages, so nothing else would bring it back.
-    const older = sameBoard && _boardList.older.length
-        ? [..._boardList.first.filter(t => t.status === 'completed' || t.status === 'skipped'), ..._boardList.older]
-        : [];
+    // Once "Load more" was used, the pages the person loaded are read again with the first (#9121): the default list pages the open tasks too, so an older page can hold an open task that has finished
+    // since, and a task finished since pushes the oldest done ones off page one; the cursor of the last page read continues from there.
+    const depth = sameBoard ? _boardList.pages : 0;
+    let older = [], nextCursor = data.next_cursor || '';
+    if (depth > 0 && nextCursor) {
+        try {
+            for (let i = 0; i < depth && nextCursor; i++) {
+                const more = await _fetchTaskPage(boardName, nextCursor);
+                older = older.concat(more.tasks || []);
+                nextCursor = more.next_cursor || '';
+            }
+        } catch { older = sameBoard ? _boardList.older : []; nextCursor = sameBoard ? _boardList.nextCursor : nextCursor; } // a failed re-read keeps what the person had
+        if (seq !== _boardTasksLoadSeq) return;
+    }
     _boardList = {
         board: boardName,
         first: data.tasks || [],
         older,
+        pages: depth,
         // Once older pages are loaded, "Load more" continues after the last of them.
-        nextCursor: older.length ? _boardList.nextCursor : (data.next_cursor || ''),
+        nextCursor,
         // A server from before pagination sends every task and no totals.
         scopeKey: agentTaskScope()?.key || '',
         totalOpen: data.total_open ?? null,
@@ -434,7 +444,7 @@ async function loadMoreBoardTasks() {
     const seq = _boardTasksLoadSeq;
     let data;
     try {
-        data = await _boardTasksFetch(board, `/tasks?status=completed&limit=${BOARD_TASK_PAGE}&cursor=${encodeURIComponent(cursor)}`);
+        data = await _fetchTaskPage(board, cursor);
     } catch (e) {
         boardPage.moreError = 'Could not load more tasks. Try again.';
         showToast(boardPage.moreError, true);
@@ -443,6 +453,7 @@ async function loadMoreBoardTasks() {
     // The user moved to another board meanwhile, or the list was reloaded from scratch.
     if (_boardList.board !== board || _boardList.nextCursor !== cursor || seq !== _boardTasksLoadSeq) return;
     _boardList.older = [..._boardList.older, ...(data.tasks || [])];
+    _boardList.pages++;
     _boardList.nextCursor = data.next_cursor || '';
     _setBoardTasks();
     renderBoardTaskList();

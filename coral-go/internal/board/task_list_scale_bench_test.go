@@ -38,7 +38,7 @@ func BenchmarkTaskListScale(b *testing.B) {
 	b.Run("default_list", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if p, err := s.ListTaskPage(ctx, "team", TaskListQuery{}); err != nil || len(p.Tasks) < 1500 {
+			if p, err := s.ListTaskPage(ctx, "team", TaskListQuery{}); err != nil || len(p.Tasks) != 50 || p.NextCursor == "" || p.TotalOpen != 1500 { // the open set is paged (#9121): one page, not 1,500 rows
 				b.Fatal(err)
 			}
 		}
