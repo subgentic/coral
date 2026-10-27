@@ -7,7 +7,7 @@ import { selectLiveSession } from './sessions.js';
 import { pollEvery } from './overload.js';
 import { note } from './nav.js';
 import { KILL_LOG_NOTE } from './render.js';
-import { formatDuration } from './format.js';
+import { compactDuration } from './format.js';
 import { runFailureHtml, runFailure } from './run_failure.js';
 import { resultWords, limitWords, lastWords } from './job_words.js'; // the Jobs pages' words: one set for both
 import { foldWayBack } from './sidebar_groups.js';
@@ -177,7 +177,7 @@ function workflowRunsTable(page) {
         columns: [
             { key: 'started', label: 'Started', primary: true, width: '12rem', cell: r => { const time = DT.timeCell(r.started_at); const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b; } },
             { key: 'result', label: 'Result', width: 'grow', cell: runResult },
-            { key: 'duration', label: 'Duration', width: '7rem', dropAt: 36, tone: 'tertiary', cell: r => r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1s' : formatDuration(Math.round(r.duration_seconds), { unit: 's', dropZeroSeconds: true })) : '—' },
+            { key: 'duration', label: 'Duration', width: '7rem', dropAt: 36, tone: 'tertiary', cell: r => r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1 s' : compactDuration(r.duration_seconds)) : '—' },
             { key: 'trigger', label: 'Trigger', width: '8rem', dropAt: 28, tone: 'tertiary', when: r => !!r.trigger_type, cell: r => r.trigger_type || '—' },
         ],
     }); table.el.classList.add('wf-runs-table'); return table.el;

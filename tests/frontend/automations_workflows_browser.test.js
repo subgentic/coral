@@ -109,7 +109,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.equal(await ev(`document.querySelector('#wf-run-detail .wf-run-title').textContent`), 'nightly-build, run #2', at + "the run's title names the workflow and the run (#9294)");
             assert.equal(await ev(`!!document.querySelector('#wf-run-detail .wf-started-line')`), false, at + "no 'Started <name>' line under the title: the title says it");
             { const meta = await ev(`[...document.querySelectorAll('#wf-run-detail .wf-run-meta > span')].map(s => s.textContent.replace(/\\s+/g, ' ').trim())`);
-              assert.equal(meta[0], 'failed', at + 'the state'); assert.equal(meta[1], 'On schedule', at + 'how it started, in words, not the code'); assert.match(meta[2], /^Started .+, took 1m 40s$/, at + 'one line: when it started and how long it took: ' + meta[2]);
+              assert.equal(meta[0], 'failed', at + 'the state'); assert.equal(meta[1], 'On schedule', at + 'how it started, in words, not the code'); assert.match(meta[2], /^Started .+, took 2 min$/, at + 'one line: when it started and how long it took: ' + meta[2]);
               assert.match(meta[3].replace(/^error /, ''), /^Step 2 \(Test\) exited with 3/, at + 'the failure line is in the Jobs pages\' words: ' + meta[3]); assert.doesNotMatch(meta[3], / :/, at + 'no stray space before the colon'); }
             assert.equal(await pathname(), '/automations/workflows/1/runs/2', at + "the address is the run's");
             await ev(`window.workflowsBackToList(); true`);
