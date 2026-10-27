@@ -708,7 +708,7 @@ body.panel-dragging .xterm-container {
     background: var(--bg-tertiary);
 }
 
-.image-uploading { align-self: center; font-size: 0.85rem; color: var(--text-secondary); }
+.image-uploading { align-self: center; font-size: var(--fs-md); color: var(--text-secondary); }
 
 .image-attachment {
     display: flex;
