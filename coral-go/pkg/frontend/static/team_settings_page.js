@@ -16,7 +16,7 @@ const { jsonError, presetNameText, presetInstructionsText, presetLabel, renderIn
 
 let _lastSection = 'workflow'; // the group the tab shows, kept when the page is drawn again (Cancel)
 const MODE_KEYS = ['mode', 'dependency_guidance', 'asks_are_tasks', 'custom_instructions'];
-const DEFAULT_MODES = [{ value: 'none', label: 'None' }, { value: 'shared_checkout', label: 'Shared checkout' }, { value: 'worktrees', label: 'Worktrees' }];
+const DEFAULT_MODES = [{ value: 'none', label: 'None' }, { value: 'shared_checkout', label: 'Shared checkout' }, { value: 'worktrees', label: 'Worktrees' }, { value: 'task_queue', label: 'Task queue' }];
 
 const PRESET_EDITOR = `<details class="disclosure team-settings-section workflow-presets-section preset-editor">
   <summary>Edit presets</summary>

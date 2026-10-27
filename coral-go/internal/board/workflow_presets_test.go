@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -41,8 +42,8 @@ func TestWorkflowPresetPersistenceAndSnapshots(t *testing.T) {
 	require.NoError(t, err)
 	presets, err := s.ListWorkflowPresets(ctx, "team")
 	require.NoError(t, err)
-	require.Len(t, presets, 5)
-	require.Equal(t, "Renamed", presets[4].Name)
+	require.Len(t, presets, 6)
+	require.Equal(t, "Renamed", presets[5].Name)
 	next, err := s.CreateTask(ctx, "team", "Next", "", "medium", "lead")
 	require.NoError(t, err)
 	next, err = s.ClaimTask(ctx, "team", "newdev", next.ID)
@@ -51,7 +52,7 @@ func TestWorkflowPresetPersistenceAndSnapshots(t *testing.T) {
 	require.NotContains(t, next.Workflow.Instructions, "Review changes carefully.")
 	other, err := s.ListWorkflowPresets(ctx, "other-team")
 	require.NoError(t, err)
-	require.Len(t, other, 4)
+	require.Len(t, other, 5)
 	_, err = s.SetWorkingMode(ctx, "other-team", WorkingMode{Mode: "review"})
 	require.Error(t, err)
 }
@@ -99,9 +100,9 @@ func TestWorkflowPresetResetAndCompatibility(t *testing.T) {
 	require.Error(t, err)
 	presets, err := s.ListWorkflowPresets(ctx, "team")
 	require.NoError(t, err)
-	require.Len(t, presets, 5)
-	require.Equal(t, "Keep me", presets[4].Instructions)
-	for _, id := range []string{"none", "shared_checkout", "worktrees", "merge_queue"} {
+	require.Len(t, presets, 6)
+	require.Equal(t, "Keep me", presets[5].Instructions)
+	for _, id := range []string{"none", "shared_checkout", "worktrees", "merge_queue", "task_queue"} {
 		_, err = s.SetWorkingMode(ctx, "team", WorkingMode{Mode: id})
 		require.NoError(t, err)
 	}
@@ -164,7 +165,7 @@ func TestWorkflowPresetBoardDeletion(t *testing.T) {
 	require.NoError(t, s.DeleteProject(ctx, "remove"))
 	presets, err := s.ListWorkflowPresets(ctx, "remove")
 	require.NoError(t, err)
-	require.Len(t, presets, 4)
+	require.Len(t, presets, 5)
 	mode, err := s.GetWorkingMode(ctx, "remove")
 	require.NoError(t, err)
 	require.Equal(t, "none", mode.Mode)
@@ -198,4 +199,47 @@ func TestWorkflowPresetDescriptionsForThePicker(t *testing.T) {
 	require.True(t, byID["worktrees"].Overridden)
 	require.NotEmpty(t, byID["worktrees"].Description, "an override of the instructions keeps the built-in's description")
 	require.Empty(t, byID["mine"].Description, "a team's own preset has none")
+}
+
+// #8919: the Task queue mode is built in, and its guidance is generic: no date, no repository path, no name of anyone's team or agents, and only commands the CLI has.
+func TestTaskQueueIsABuiltInModeWithGenericGuidance(t *testing.T) {
+	s, err := NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	defer s.Close()
+	ctx := context.Background()
+	list, err := s.ListWorkflowPresets(ctx, "team")
+	require.NoError(t, err)
+	ids := []string{}
+	byID := map[string]WorkflowPreset{}
+	for _, p := range list {
+		ids = append(ids, p.ID)
+		byID[p.ID] = p
+	}
+	require.Equal(t, []string{"none", "shared_checkout", "worktrees", "merge_queue", "task_queue"}, ids, "Task queue sits beside the other built-in modes")
+	p := byID["task_queue"]
+	require.Equal(t, "Task queue", p.Name)
+	require.True(t, p.Builtin)
+	require.NotEmpty(t, p.Description)
+	require.Equal(t, p.Instructions, p.DefaultInstructions)
+	require.NotEmpty(t, p.Instructions)
+	require.LessOrEqual(t, len(p.Instructions), 4096, "a preset's guidance fits the limit a team's own presets have")
+
+	text := p.Instructions
+	require.False(t, regexp.MustCompile(`\b(19|20)\d\d-\d\d-\d\d\b|\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2}\b`).MatchString(text), "no date")
+	for _, bad := range []string{"tests/", "coral-go", "internal/", ".github", "npm ", "/Users/", "~/", "C:\\", "go test", "make ", "DevOps", "Frontend", "Backend", "QA Engineer", "Security Reviewer", "Lead Developer", "Codex", "Operator"} {
+		require.NotContains(t, text, bad, "the guidance must read the same on any team")
+	}
+	// it says how work moves through the queue, with the real commands
+	for _, want := range []string{"coral-board task claim <id>", "coral-board task submit-review <id> --reason", "coral-board task approve <id>", "coral-board task reject <id> --note", "coral-agent artifact upload"} {
+		require.Contains(t, text, want)
+	}
+
+	// a team can use it, and a task claimed under it carries it
+	_, err = s.SetWorkingMode(ctx, "team", WorkingMode{Mode: "task_queue"})
+	require.NoError(t, err)
+	task, err := s.CreateTask(ctx, "team", "First", "", "medium", "lead")
+	require.NoError(t, err)
+	task, err = s.ClaimTask(ctx, "team", "dev", task.ID)
+	require.NoError(t, err)
+	require.Contains(t, task.Workflow.Instructions, "Work from the task queue.")
 }
