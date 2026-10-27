@@ -165,7 +165,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 
 .btn-add-macro {
     font-size: var(--fs-xl);
-    font-weight: 400;
+    font-weight: var(--fw-regular);
     color: var(--text-muted);
     border-style: dashed;
     min-width: 28px;
@@ -280,7 +280,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 
 .command-mention-item strong {
     color: inherit;
-    font-weight: 700;
+    font-weight: var(--fw-strong);
 }
 
 /* ── File @mention Dropdown ───────────────────────────────── */
@@ -319,7 +319,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 
 .file-mention-item strong {
     color: inherit;
-    font-weight: 700;
+    font-weight: var(--fw-strong);
 }
 
 .file-mention-breadcrumb {
@@ -400,7 +400,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
         border: 1px solid transparent;
         border-radius: 15px;
         color: var(--text-secondary);
-        font-weight: 500;
+        font-weight: var(--fw-medium);
     }
     :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .btn-nav:not(.btn-send):hover {
         background: var(--bg-hover);
@@ -467,7 +467,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
         overflow-y: auto;
     }
     #board-chat-input-pane .command-pane-toolbar { order: 1; gap: 4px; border-bottom: none; padding: 6px 8px 8px; }
-    #board-chat-input-pane .command-pane-toolbar .btn-nav:not(.btn-send) { height: var(--control-compact-height); background: transparent; border: 1px solid transparent; border-radius: 15px; color: var(--text-secondary); font-weight: 500; }
+    #board-chat-input-pane .command-pane-toolbar .btn-nav:not(.btn-send) { height: var(--control-compact-height); background: transparent; border: 1px solid transparent; border-radius: 15px; color: var(--text-secondary); font-weight: var(--fw-medium); }
     #board-chat-input-pane .btn-send { width: 32px; min-width: 32px; height: 32px; padding: 0; border-radius: 50%; box-shadow: none; }
     #board-chat-input-pane .btn-send:hover { transform: none; }
 }
@@ -596,7 +596,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     background: transparent; color: var(--text-primary); font: inherit; font-size: var(--fs-md); text-align: left; cursor: pointer; }
 .model-chip-item:hover, .model-chip-item:focus-visible { background: var(--bg-tertiary); }
 .model-chip-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; } /* a tint alone is not a focus indicator (#5042) */
-.model-chip-item.checked { font-weight: 600; }
+.model-chip-item.checked { font-weight: var(--fw-strong); }
 .model-chip-item .material-icons { font-size: var(--fs-xl); }
 .model-chip-empty { padding: 10px; font-size: var(--fs-md); color: var(--text-muted); }
 /* "Add a model…" at the end of the model menu (#5938): a separated item, and its small form (the id, an optional name) in the same panel */

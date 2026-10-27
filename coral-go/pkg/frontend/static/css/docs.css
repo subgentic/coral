@@ -49,7 +49,7 @@
 
 .docs-content h2 {
     font-size: 1.0625rem; /* the document keeps its reading scale: headings 20/700 and 17/700 (#7443) */
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     margin: 24px 0 8px;
     padding-bottom: 4px;
     border-bottom: 1px solid var(--border);
@@ -107,7 +107,7 @@
 
 
 
-.docs-content strong, .docs-content b { font-size: var(--fs-lg); font-weight: 600; } /* bold labels 14/600 */
+.docs-content strong, .docs-content b { font-size: var(--fs-lg); font-weight: var(--fw-strong); } /* bold labels 14/600 */
 
 .docs-content ul,
 .docs-content ol {

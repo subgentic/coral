@@ -128,7 +128,7 @@ body.panel-dragging .agentic-state {
     min-width: 2em; /* em: grows with the text, so the row wraps before a tab is squeezed to nothing */
     padding: 8px 4px;
     font-size: var(--fs-md);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-secondary);
     background: none;
     border: none;
@@ -157,7 +157,7 @@ body.panel-dragging .agentic-state {
 
 /* The panel's name (#6029): a tab the keyboard reaches says it in a small label under it (the hover title and the accessible name, aria-label, are the same words). */
 .agentic-tab { position: relative; }
-.agentic-tab[aria-label]:focus-visible::after { content: attr(aria-label) / ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 20; white-space: nowrap; padding: 4px 8px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-md); pointer-events: none; }
+.agentic-tab[aria-label]:focus-visible::after { content: attr(aria-label) / ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 20; white-space: nowrap; padding: 4px 8px; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-md); pointer-events: none; }
 .agentic-tab[aria-label]:nth-last-child(-n+3):focus-visible::after { left: auto; right: 0; transform: none; }
 
 .agentic-tab-count:empty {
@@ -166,7 +166,7 @@ body.panel-dragging .agentic-state {
 
 .agentic-tab-count {
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     background: var(--bg-hover);
     color: var(--text-primary); /* not the tab's own colour: the muted tab text on this chip was 4.4:1 (the Files one 3.7:1) in the light theme */
     border-radius: var(--radius-lg);
@@ -200,7 +200,7 @@ body.panel-dragging .agentic-state {
 .agentic-more-item { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); text-align: left; cursor: pointer; }
 .agentic-more-item:hover, .agentic-more-item:focus-visible { background: var(--bg-hover); }
 .agentic-more-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.agentic-more-item.active { color: var(--accent); font-weight: 600; }
+.agentic-more-item.active { color: var(--accent); font-weight: var(--fw-strong); }
 .agentic-more-item .material-icons { font-size: var(--icon-size); }
 .agentic-more-count { margin-left: auto; color: var(--text-secondary); font-size: var(--fs-base); }
 .agentic-more-count:empty { display: none; }
@@ -426,7 +426,7 @@ body.panel-dragging .agentic-state {
     justify-content: center;
     font-family: 'Material Icons';
     font-size: var(--icon-inline-size);
-    font-weight: 400;
+    font-weight: var(--fw-regular);
     font-style: normal;
     line-height: 1;
     letter-spacing: normal;
@@ -631,7 +631,7 @@ body.panel-dragging .agentic-state {
 .task-bar-count {
     font-size: var(--fs-sm);
     color: var(--text-muted);
-    font-weight: 400;
+    font-weight: var(--fw-regular);
     margin-left: 6px;
 }
 
@@ -752,7 +752,7 @@ body.panel-dragging .agentic-state {
 .task-completion-required ul { margin: 6px 0; padding-left: 18px; }
 .task-completion-required p { margin: 6px 0 0; }
 .task-completion-evidence { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; }
-.task-completion-evidence summary { cursor: pointer; color: var(--text-secondary); font-size: var(--fs-base); font-weight: 600; }
+.task-completion-evidence summary { cursor: pointer; color: var(--text-secondary); font-size: var(--fs-base); font-weight: var(--fw-strong); }
 .task-completion-evidence[open] summary { margin-bottom: 10px; color: var(--text-primary); }
 .task-completion-evidence label { margin-top: 10px; }
 .task-completion-evidence label:first-of-type { margin-top: 0; }
@@ -783,7 +783,7 @@ body.panel-dragging .agentic-state {
 
 .board-task-priority {
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     padding: 2px 6px;
     border-radius: var(--radius-sm);
     flex-shrink: 0;
@@ -813,7 +813,7 @@ body.panel-dragging .agentic-state {
     align-items: center;
     gap: 2px;
     color: var(--subagent-accent);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .board-task-type-subagent .material-icons {
@@ -928,7 +928,7 @@ body.panel-dragging .agentic-state {
     gap: 6px;
     min-height: 24px;
     font-size: var(--fs-md);
-    font-weight: 400;
+    font-weight: var(--fw-regular);
     text-transform: none;
     letter-spacing: 0;
     color: var(--text-secondary);
@@ -950,7 +950,7 @@ body.panel-dragging .agentic-state {
 
 .task-detail-title {
     font-size: var(--fs-xl);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     line-height: 1.4;
     margin-bottom: 12px;
 }
@@ -977,7 +977,7 @@ body.panel-dragging .agentic-state {
 
 .task-detail-status {
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     padding: 2px 8px;
     border-radius: var(--radius-sm);
     text-transform: uppercase;
@@ -1009,7 +1009,7 @@ body.panel-dragging .agentic-state {
 
 .task-dep-status {
     font-size: var(--fs-xs);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     padding: 1px 6px;
     border-radius: var(--radius-xs);
     text-transform: uppercase;
@@ -1161,7 +1161,7 @@ body.panel-dragging .agentic-state {
 
 .task-detail-label {
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     text-transform: uppercase;
     letter-spacing: 0.4px;
     color: var(--text-secondary);
@@ -1179,12 +1179,12 @@ body.panel-dragging .agentic-state {
 
 .board-task-cost-warning {
     color: var(--error-color) !important;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .task-detail-cost-summary {
     font-size: var(--fs-2xl);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-primary);
     margin: 4px 0 10px;
 }
@@ -1252,7 +1252,7 @@ body.panel-dragging .agentic-state {
     font-size: var(--fs-sm);
     color: var(--text-muted);
     padding: 6px 12px 2px;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -1282,7 +1282,7 @@ body.panel-dragging .agentic-state {
 
 .changed-files-title {
     font-size: var(--fs-base);
-    font-weight: 500; /* sentence case at 12/500, as the tab labels (UI/UX #7621): "0 files changed", not capitals */
+    font-weight: var(--fw-medium); /* sentence case at 12/500, as the tab labels (UI/UX #7621): "0 files changed", not capitals */
     color: var(--text-secondary);
 }
 
@@ -1352,7 +1352,7 @@ body.panel-dragging .agentic-state {
 .inline-preview-save {
     padding: 2px 6px;
     font-size: var(--fs-md);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     border: 1px solid var(--control-border);
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -1414,7 +1414,7 @@ body.panel-dragging .agentic-state {
 .image-pane-label {
     margin-bottom: 4px;
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--text-muted);
@@ -1650,7 +1650,7 @@ body.panel-dragging .agentic-state {
 }
 
 .file-name {
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
@@ -1670,7 +1670,7 @@ body.panel-dragging .agentic-state {
     gap: 4px;
     flex-shrink: 0;
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     font-variant-numeric: tabular-nums;
 }
 
@@ -1699,7 +1699,7 @@ body.panel-dragging .agentic-state {
     gap: var(--space-lg);
 }
 .note-card { flex: none; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
-.note-card-time { padding: var(--space-md) var(--space-lg) 0; font-size: var(--fs-base); font-weight: 500; color: var(--text-secondary); }
+.note-card-time { padding: var(--space-md) var(--space-lg) 0; font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-secondary); }
 .note-md-rendered { padding: var(--space-md) var(--space-lg) var(--space-lg); cursor: pointer; border-radius: var(--radius-lg); overflow-wrap: anywhere; }
 .note-md-rendered:hover { background: var(--bg-hover); }
 .note-md-rendered:focus-visible, .note-add:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -1786,7 +1786,7 @@ body.panel-dragging .agentic-state {
 
 .custom-view-help summary {
     cursor: pointer;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-secondary);
 }
 
@@ -1871,8 +1871,8 @@ body.panel-dragging .agentic-state {
 .agent-ui-card:not([hidden]) iframe { flex:1; min-height:260px; }
 .agent-ui-card header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
 .agent-ui-card strong { overflow-wrap:anywhere; min-width:0; }
-.agent-ui-event-count { display:inline-block; margin-left:6px; padding:2px 6px; color:var(--text-secondary); background:var(--bg-secondary); border:1px solid var(--border); border-radius:999px; font-size:var(--fs-sm); font-weight:400; white-space:nowrap; }
-.agent-ui-authored { display:inline-block; margin-left:6px; padding:2px 6px; color:var(--warning, #b45309); border:1px solid currentColor; border-radius:999px; font-size:var(--fs-sm); font-weight:400; white-space:nowrap; }
+.agent-ui-event-count { display:inline-block; margin-left:6px; padding:2px 6px; color:var(--text-secondary); background:var(--bg-secondary); border:1px solid var(--border); border-radius:999px; font-size:var(--fs-sm); font-weight:var(--fw-regular); white-space:nowrap; }
+.agent-ui-authored { display:inline-block; margin-left:6px; padding:2px 6px; color:var(--warning, #b45309); border:1px solid currentColor; border-radius:999px; font-size:var(--fs-sm); font-weight:var(--fw-regular); white-space:nowrap; }
 .agent-ui-card button, #agent-ui-expanded > button { padding:6px 10px; cursor:pointer; font:inherit; font-size: var(--fs-md); color:var(--text-primary); background:var(--bg-secondary); border:1px solid var(--control-border); border-radius: var(--radius-md); flex-shrink:0;
     min-height: var(--control-compact-height);
 }
@@ -1885,7 +1885,7 @@ body.panel-dragging .agentic-state {
 #agent-ui-expanded iframe { flex:1; min-height:0; width:100%; border:0; }
 #agent-ui-expanded::backdrop { background:#0009; }
 #agent-ui-expanded .agent-ui-expanded-bar { display:flex; align-items:center; gap:8px; }
-#agent-ui-expanded .agent-ui-expanded-bar h2 { flex:1; min-width:0; margin:0; font-size: var(--fs-md); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#agent-ui-expanded .agent-ui-expanded-bar h2 { flex:1; min-width:0; margin:0; font-size: var(--fs-md); font-weight:var(--fw-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #agent-ui-expanded .agent-ui-expanded-close { width:44px; height:44px; padding:0; display:inline-flex; align-items:center; justify-content:center; flex:none; cursor:pointer; color:var(--text-primary); background:var(--bg-secondary); border:1px solid var(--control-border); border-radius: var(--radius-md); }
 #agent-ui-expanded .agent-ui-expanded-close:hover { background:var(--bg-hover); }
 #agent-ui-expanded .agent-ui-expanded-close:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
@@ -1919,7 +1919,7 @@ body.panel-dragging .agentic-state {
 }
 .agent-ui-home-row:hover { border-color:var(--accent); }
 .agent-ui-home-row { font: 400 var(--fs-md)/1.4 var(--font-sans); } /* a button: the page font and rem sizes, so a panel's title grows with the text size like its "Revision 1 · 0 events" (UI Accessibility, #7653 item 5) */
-.agent-ui-home-row strong { font-size: var(--fs-md); font-weight: 600; }
+.agent-ui-home-row strong { font-size: var(--fs-md); font-weight: var(--fw-strong); }
 .inline-preview-artifact-fallback { display:flex; flex-direction:column; gap:8px; max-width:560px; margin:32px auto; padding:18px; color:var(--text-primary); background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-lg); overflow-wrap:anywhere; }
 .inline-preview-artifact-fallback span { color:var(--text-secondary); font-size:var(--fs-base); }
 .inline-preview-artifact-fallback p { margin:0; color:var(--text-secondary); }
@@ -1990,7 +1990,7 @@ body.panel-dragging .agentic-state {
 .list-bar-chips-inrow > li:not(:first-child):not(.list-bar-chips-more-item) { display: none; } /* the others are in the Filters panel; "+N" stands for them */
 .list-bar-chips-inrow .list-bar-chip { min-height: 32px; }
 .list-bar-chips-inrow > li:first-child .list-bar-chip { width: 100%; }
-.list-bar-chips-inrow .list-bar-chip-more { flex: none; font-weight: 600; }
+.list-bar-chips-inrow .list-bar-chip-more { flex: none; font-weight: var(--fw-strong); }
 .list-bar-chips-inrow .list-bar-chip-all { display: none; }
 @media (max-width: 760px) { .list-bar-chips-inrow .list-bar-chip { min-height: var(--control-touch-height, 44px); } }
 /* a row too narrow for the chips beside the pills and the search (a phone, a docked panel) shows none: the Filters icon carries the number and its panel lists them (#9078) */
@@ -1998,7 +1998,7 @@ body.panel-dragging .agentic-state {
 /* "+N" only where it shows whole beside five pills, the search box and the icon (#9144); on a narrower row the chip stands alone and the number badge on the Filters icon says how many are on */
 @container (max-width: 62rem) { .list-bar-chips-inrow > .list-bar-chips-more-item, .team-panel .team-tb-chips .team-tb-chip-more { display: none; } }
 @container (min-width: 62.01rem) { .list-bar-chips-inrow:has(.list-bar-chips-more-item), .team-panel .team-tb-chips:has(.team-tb-chip-more) { min-width: 12rem; } } /* the chip's 8 rem and the "+N" (#9144) */
-.display-badge.display-badge-count { width: auto; min-width: 1rem; height: 1rem; padding: 0 0.25rem; box-sizing: border-box; overflow: visible; top: -0.375rem; right: -0.375rem; font-size: var(--fs-sm); font-weight: 600; line-height: 1rem; text-align: center; color: var(--text-on-accent); }
+.display-badge.display-badge-count { width: auto; min-width: 1rem; height: 1rem; padding: 0 0.25rem; box-sizing: border-box; overflow: visible; top: -0.375rem; right: -0.375rem; font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 1rem; text-align: center; color: var(--text-on-accent); }
 .list-bar-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 8px; font-size: var(--fs-base); color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--control-border); border-radius: 999px; cursor: pointer; }
 .list-bar-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-bar-chip-x { color: var(--text-primary); } /* 4.4:1 in the light theme with the secondary text colour on the chip's fill (#4851) */
@@ -2035,7 +2035,7 @@ body.panel-dragging .agentic-state {
 .artifact-report-list { margin: 4px 0; padding-left: 20px; }
 .artifact-report-list > li { margin: 7px 0; }
 .artifact-report-fields { margin: 4px 0; padding-left: 12px; border-left: 2px solid var(--border); }
-.artifact-report-fields dt { font-weight: 600; margin-top: 8px; }
+.artifact-report-fields dt { font-weight: var(--fw-strong); margin-top: 8px; }
 .artifact-report-fields dd { margin: 2px 0 8px; }
 .artifact-report-raw { margin: 8px 0; white-space: pre-wrap; font-size: var(--fs-base); line-height: 1.5; }
 .artifact-report :is(h1, h2, p, span, li, dt, dd, pre) { overflow-wrap: anywhere; word-break: break-word; }
@@ -2049,7 +2049,7 @@ body.panel-dragging .agentic-state {
 .file-explorer-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; }
 .file-explorer-view[hidden] { display: none; }
 .explorer-heading { flex-wrap: wrap; } /* the folder's name on its own line when the two buttons do not fit beside it (#7652) */
-.explorer-root { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); }
+.explorer-root { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); }
 .explorer-item { display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; padding: 5px 10px; color: var(--text-primary); background: transparent; border: 0; text-align: left; font: inherit; font-size: var(--fs-md); cursor: pointer; }
 .explorer-item:hover, .explorer-item:focus { background: var(--bg-tertiary); }
 .explorer-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -2062,7 +2062,7 @@ body.panel-dragging .agentic-state {
 .explorer-action-btn:hover { color: var(--accent); }
 .explorer-status { padding: 6px 12px; color: var(--text-secondary); font-size: var(--fs-base); }
 .explorer-more { margin: 6px 12px; }
-.agent-ui-request label { display:block; font-size: var(--fs-xl); font-weight:600; margin-bottom:8px; }
+.agent-ui-request label { display:block; font-size: var(--fs-xl); font-weight:var(--fw-strong); margin-bottom:8px; }
 .agent-ui-request .agent-ui-prompt { font:inherit; font-size:var(--fs-lg); line-height:1.5; min-height:110px; }
 .agent-ui-request-status { font-size:var(--fs-md); line-height:1.5; overflow-wrap:anywhere; margin:10px 0 0; }
 .agent-ui-request-status:empty { display:none; }
@@ -2120,7 +2120,7 @@ body.panel-dragging .agentic-state {
 .board-choice-text { margin: 8px 0 12px; font-size: var(--fs-md); color: var(--text-secondary); }
 .board-choice-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .board-choice-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-md); }
-.board-choice-label { font-weight: 600; overflow-wrap: anywhere; }
+.board-choice-label { font-weight: var(--fw-strong); overflow-wrap: anywhere; }
 .board-choice-detail { flex: 1; font-size: var(--fs-base); color: var(--text-secondary); }
 
 /* #4344: the Files tab's title row (count, +/- stats, the diff select) wraps beside the refresh button at large text instead of pushing it off the screen. */

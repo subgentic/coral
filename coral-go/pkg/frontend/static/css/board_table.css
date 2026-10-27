@@ -10,7 +10,7 @@
 .mb-view-switch { display: inline-flex; margin-inline-start: auto; border: 1px solid var(--control-border); border-radius: var(--radius-md, 6px); overflow: hidden; }
 .mb-view-btn { min-height: 2rem; padding: 0 0.875rem; border: 0; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: var(--fs-md); cursor: pointer; }
 .mb-view-btn + .mb-view-btn { border-inline-start: 1px solid var(--control-border); }
-.mb-view-btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
+.mb-view-btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: var(--fw-strong); }
 @media (max-width: 767px), (pointer: coarse) { .mb-view-btn { min-height: var(--control-touch-height, 44px); } }
 
 /* In the agent dock's head line the switch sits between the title and the buttons. */
@@ -35,15 +35,15 @@
 .mb-row-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .mb-row-chev { width: 0; height: 0; border-style: solid; border-width: 0.3125rem 0 0.3125rem 0.4375rem; border-color: transparent transparent transparent var(--text-secondary); justify-self: center; }
 .mb-open > .mb-row-toggle .mb-row-chev { transform: rotate(90deg); }
-.mb-row-avatar { width: 1.25rem; height: 1.25rem; border-radius: 50%; display: grid; place-items: center; background: var(--mb-avatar); color: var(--on-avatar); font-size: var(--fs-sm); font-weight: 700; line-height: 1; }
-.mb-row-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-lg); font-weight: 600; }
+.mb-row-avatar { width: 1.25rem; height: 1.25rem; border-radius: 50%; display: grid; place-items: center; background: var(--mb-avatar); color: var(--on-avatar); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 1; }
+.mb-row-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .mb-row-snippet { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--text-secondary); }
 .mb-open > .mb-row-toggle .mb-row-snippet { visibility: hidden; } /* the whole message is under it */
 .mb-row-tags { display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; min-width: 0; max-width: 22rem; overflow: hidden; } /* a message with many marks does not leave its words 100 px (the open message shows every tag) */
 .mb-row-toggle .message-time { margin: 0; opacity: 1; font-size: var(--fs-base); color: var(--text-secondary); text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* The tags: quiet marks, never louder text. */
-.mb-row-tag, .mb-row-tags .mb-external-badge, .mb-row-tags-open .mb-external-badge { display: inline-flex; align-items: center; min-height: 1.25rem; padding: 0 0.4375rem; border: 1px solid var(--control-border); border-radius: 0.375rem; font-size: var(--fs-sm); font-weight: 600; color: var(--text-secondary); white-space: nowrap; background: none; }
+.mb-row-tag, .mb-row-tags .mb-external-badge, .mb-row-tags-open .mb-external-badge { display: inline-flex; align-items: center; min-height: 1.25rem; padding: 0 0.4375rem; border: 1px solid var(--control-border); border-radius: 0.375rem; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--text-secondary); white-space: nowrap; background: none; }
 .mb-row-mention { border-radius: 999px; color: var(--link-text, var(--accent)); }
 .mb-row-mention.is-self { border-color: var(--accent); }
 .mb-row-task { font-variant-numeric: tabular-nums; }
@@ -59,13 +59,13 @@
 .mb-row-replies { margin-block: 0.75rem 0; padding-inline-start: 0.75rem; border-inline-start: 2px solid var(--border); }
 .mb-row-replies-title { font-size: var(--fs-base); color: var(--text-secondary); padding-bottom: 0.25rem; }
 .mb-row-reply { display: flex; gap: 0.5rem; align-items: baseline; width: 100%; min-height: 2rem; padding: 0.25rem 0; border: 0; background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); text-align: start; cursor: pointer; }
-.mb-row-reply b { font-weight: 600; white-space: nowrap; }
+.mb-row-reply b { font-weight: var(--fw-strong); white-space: nowrap; }
 .mb-row-reply-time { color: var(--text-secondary); font-size: var(--fs-base); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .mb-row-reply-words { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
 .mb-table .mb-message.mb-is-reply > .mb-row-toggle { padding-inline-start: 2.25rem; }
 
 /* The day lines stay at the top while their day's rows pass under them. */
-.mb-day { position: sticky; top: 0; z-index: 2; padding: 0.375rem 0.875rem; font-size: var(--fs-sm); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); background: var(--bg-primary); border-bottom: 1px solid var(--border); }
+.mb-day { position: sticky; top: 0; z-index: 2; padding: 0.375rem 0.875rem; font-size: var(--fs-sm); font-weight: var(--fw-strong); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); background: var(--bg-primary); border-bottom: 1px solid var(--border); }
 
 /* The pills. */
 .mb-table[data-pill="questions"] > :is(.mb-message:not(.mb-q), .mb-queue-run, .mb-day),
@@ -90,5 +90,5 @@
 
 /* The dock's scope row (#8484): one quiet line under the head saying what the list holds. */
 .board-chat-scope { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; padding: 0.375rem 10px 0.5rem; } /* the head's own side padding */
-.board-chat-scope-note { margin: 0; font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); }
+.board-chat-scope-note { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-regular); color: var(--text-secondary); }
 .board-chat-search { padding: 0 10px; }

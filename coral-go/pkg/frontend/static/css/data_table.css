@@ -101,7 +101,7 @@
 .dt-id { flex: none; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
 .dt-tag { display: inline-block; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 1px 6px; font-size: var(--table-head-size); font-weight: var(--table-head-weight); color: var(--table-secondary-color); } /* a tag is one line: a server called build-west was build- / west at 390 (#8220) */
 .dt-person { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
-.dt-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--table-avatar); height: var(--table-avatar); border-radius: 50%; color: var(--on-avatar); font-size: var(--fs-sm); font-weight: 700; }
+.dt-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--table-avatar); height: var(--table-avatar); border-radius: 50%; color: var(--on-avatar); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
 .dt-avatars { gap: 4px; }
 .dt-avatars > .dt-avatar { background: var(--dt-avatar-bg); }
 /* a reviewer: smaller, outlined in its colour, the letter in the text colour (#8492) */
@@ -133,7 +133,7 @@
 .dt-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
 .dt-bar { flex: 1 1 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
 .dt-bar > * { margin: 0; }
-.dt-bar-count { font-size: var(--table-secondary-size); font-weight: 600; color: var(--table-primary-color); }
+.dt-bar-count { font-size: var(--table-secondary-size); font-weight: var(--fw-strong); color: var(--table-primary-color); }
 .dt-bar-clear { margin-left: auto; }
 .dt-bar-confirm { font-size: var(--table-secondary-size); color: var(--table-primary-color); }
 .dt-danger { color: var(--table-danger); border-color: var(--table-danger); background: none; }
@@ -172,7 +172,7 @@
 .dt-box.dt-fold-labeled.dt-folded td.dt-tone-primary { order: -2; }
 .dt-box.dt-fold-labeled.dt-folded td.dt-fold-first { order: -1; }
 .dt-box.dt-fold-labeled.dt-folded td:not(.dt-tone-primary) { font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-secondary-color); } /* the lines: 12/400 */
-.dt-box.dt-fold-labeled.dt-folded td.dt-fold-key { font-size: var(--table-secondary-size); font-weight: 600; color: var(--table-primary-color); } /* the sort key's figure: the one stronger line, 13/600 (#7738) */
+.dt-box.dt-fold-labeled.dt-folded td.dt-fold-key { font-size: var(--table-secondary-size); font-weight: var(--fw-strong); color: var(--table-primary-color); } /* the sort key's figure: the one stronger line, 13/600 (#7738) */
 .dt-box.dt-fold-labeled.dt-folded td:not(.dt-tone-primary)::before { content: attr(data-label); color: var(--table-tertiary-color); font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); flex: none; }
 @media (forced-colors: active) { .dt-row.dt-selected { outline: 2px solid Highlight; } .dt-table th { border-bottom-color: CanvasText; } }
 
@@ -289,7 +289,7 @@
 .dt-box.dt-fit:not(.dt-folded) td.dt-grow { min-width: var(--table-fit-name-min); }
 
 /* The Details link on an agent's artifact row (#8539): 12/400 in the link colour on the meta line, never hover-only; its 44 px target on a phone or a coarse pointer is a pseudo-element around it, not a taller row. */
-.dt-box .artifact-details, .dt-box.dt-folded .artifact-details { position: relative; display: inline; min-height: 0; min-width: 0; font-size: var(--fs-base); font-weight: 400; }
+.dt-box .artifact-details, .dt-box.dt-folded .artifact-details { position: relative; display: inline; min-height: 0; min-width: 0; font-size: var(--fs-base); font-weight: var(--fw-regular); }
 @media (max-width: 767px), (pointer: coarse) { .dt-box .artifact-details::after { content: ""; position: absolute; inset: -16px -10px; } }
 /* The "3 files" button of a task row (#8575): the page icon and the count, 12/400 tertiary, always shown; its 44 px target on a phone or a coarse pointer is a pseudo-element, so a row keeps its height. */
 .dt-box .dt-files, .dt-box.dt-folded .dt-files { position: relative; display: inline-flex; align-items: center; gap: 2px; min-height: 0; min-width: 0; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); }
@@ -299,7 +299,7 @@
 
 /* Artifact tags (#8594): small outlined chips (11/600, the quiet tone), two on a row then +N; in the sheet each has an x, and "+ Tag" opens the starter set and a box */
 .artifact-tags-row { display: inline-flex; gap: 4px; margin-top: 2px; max-width: 100%; flex-wrap: wrap; }
-.artifact-tag { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 0 6px; font-size: var(--fs-sm); font-weight: 600; line-height: 1.5; color: var(--table-secondary-color); }
+.artifact-tag { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 0 6px; font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 1.5; color: var(--table-secondary-color); }
 .artifact-tag-more { border-style: dashed; }
 .artifact-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .artifact-tag-list { display: contents; list-style: none; margin: 0; padding: 0; }
