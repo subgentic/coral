@@ -131,7 +131,7 @@ export function showBoardChatTab(boardName, agent = null) {
                 <div class="toolbar toolbar-pad command-pane-toolbar board-chat-toolbar">
                     <button type="button" class="btn btn-quiet btn-small btn-nav board-mention-chip" data-on-click="board-chat-all" title="Notify all agents">@all</button>
                     <span class="toolbar-spacer"></span>
-                    <button type="button" class="btn btn-primary btn-small btn-nav btn-send" data-on-click="board-chat-send" data-board="${escapeAttr(boardName)}" aria-label="Send message" title="Send message (Enter)">
+                    <button type="button" class="btn btn-primary btn-icon btn-small btn-nav btn-send" data-on-click="board-chat-send" data-board="${escapeAttr(boardName)}" aria-label="Send message" title="Send message (Enter)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     </button>
                 </div>

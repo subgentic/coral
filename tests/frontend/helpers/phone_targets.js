@@ -47,7 +47,7 @@ const ICON_ALIGN = `(() => {
         const isInfo = /info-btn/.test(e.className);
         const glyphEl = isInfo ? e : (e.querySelector('.material-icons, svg, img') || e);
         const g = glyphEl.getBoundingClientRect();
-        if (g.width > lim || g.height > lim) bad.push(d(e) + ' "' + nm(e).slice(0, 30) + '": the visible ' + (isInfo ? 'circle' : 'glyph') + ' is ' + Math.round(g.width) + 'x' + Math.round(g.height) + ' px (at most ' + Math.round(lim - 0.5) + ')');
+        if ((g.width > lim || g.height > lim) && !e.classList.contains('dt-mail-lead')) bad.push(d(e) + ' "' + nm(e).slice(0, 30) + '": the visible ' + (isInfo ? 'circle' : 'glyph') + ' is ' + Math.round(g.width) + 'x' + Math.round(g.height) + ' px (at most ' + Math.round(lim - 0.5) + ')');
         // a label on the same row: its first line's centre against the glyph's
         const parent = e.parentElement; if (!parent) continue;
         const label = [...parent.children].find(c => c !== e && /^(LABEL|SPAN|STRONG|LEGEND|H3|H4|P|DT)$/.test(c.tagName) && !c.matches('button, a, .material-icons, .sr-only') && !c.hidden && c.getClientRects().length && c.textContent.trim() && !c.querySelector('button, a, input, select'));

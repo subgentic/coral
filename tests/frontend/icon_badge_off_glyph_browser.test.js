@@ -32,7 +32,7 @@ const BASE = require('./test_base').BASE;
             for (const k of ['saved', 'filters']) {
                 assert.equal(m[k].overlap, false, `${at}the ${k} count does not cover its glyph: ${JSON.stringify(m[k])}`);
                 assert.ok(m[k].up && m[k].right, `${at}the ${k} count is above and to the right of its glyph: ${JSON.stringify(m[k])}`);
-                assert.ok(m[k].inside, `${at}the ${k} count stays in the window`);
+                assert.ok(m[k].inside, `${at}the ${k} count stays in the window: ${JSON.stringify(m[k])}`);
             }
             if (text === '2') await shot(`icon-badge-${zoom * 100}`);
         }

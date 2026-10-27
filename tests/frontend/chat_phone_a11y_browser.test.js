@@ -57,7 +57,7 @@ const { connect } = require('./agent_view_harness');
                 const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Claude needs your permission to use Bash: npm test -- --ci' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); return true; })()`);
             await waitFor(`!!document.querySelector('.chat-needs-input .cni-answer')`, `${tag}: the approval card`, 20000);
             await sleep(800); // sleep-ok: the card settles in its pane
-            const answers = () => ev(`(() => { const pane = document.getElementById('live-history-messages').getBoundingClientRect(); const bs = [...document.querySelectorAll('.chat-needs-input .cni-answer')].map(b => { const r = b.getBoundingClientRect(); return { n: b.textContent.replace(/\\s+/g, ' ').trim().slice(0, 14), h: Math.round(r.height), inside: r.top >= pane.top - 1 && r.bottom <= pane.bottom + 1 }; }); return { pane: Math.round(pane.height), bs }; })()`);
+            const answers = () => ev(`(() => { const pane = document.getElementById('live-history-messages').getBoundingClientRect(); const bs = [...document.querySelectorAll('.chat-needs-input .cni-answer')].map(b => { const r = b.getBoundingClientRect(); return { n: b.textContent.replace(/\\s+/g, ' ').trim().slice(0, 14), h: Math.round(r.height), standing: !!b.closest('.cni-standing'), inside: r.top >= pane.top - 1 && r.bottom <= pane.bottom + 1 }; }); return { pane: Math.round(pane.height), bs }; })()`);
             let a = await answers();
             assert.ok(a.bs.length === 3 && a.bs.every(b => b.h >= 44), `${tag}: every answer is a 44 px target (${JSON.stringify(a.bs.map(b => b.n + ' ' + b.h))})`);
             assert.ok(a.bs.every(b => b.inside), `${tag}: with the keyboard closed every answer is inside the chat pane (${JSON.stringify(a)})`);
@@ -65,7 +65,11 @@ const { connect } = require('./agent_view_harness');
             await Emulation.setDeviceMetricsOverride({ width: w, height: Math.round(h * 0.55), deviceScaleFactor: 2, mobile: true });
             await sleep(900); // sleep-ok: the card scrolls its answers into view after the resize (120 ms debounce)
             a = await answers();
-            assert.ok(a.bs.every(b => b.inside), `${tag}: with the keyboard open every answer is still inside the chat pane (${JSON.stringify(a)})`);
+            // the Yes/No bar is sticky: inside the pane. The standing permission is in the card above it (#9630, UI/UX), so it scrolls with the card: one scroll brings it inside.
+            assert.ok(a.bs.filter(b => !b.standing).every(b => b.inside), `${tag}: with the keyboard open the bar's answers are still inside the chat pane (${JSON.stringify(a)})`);
+            await ev(`document.querySelector('.chat-needs-input .cni-standing .cni-answer')?.scrollIntoView({ block: 'nearest' }); true`); await sleep(200); // sleep-ok: the scroll settles
+            a = await answers();
+            assert.ok(a.bs.every(b => b.inside), `${tag}: after one scroll every answer, the standing one too, is inside the chat pane (${JSON.stringify(a)})`);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile: true });
             console.log(`   ✓ ${tag}`);
         }
