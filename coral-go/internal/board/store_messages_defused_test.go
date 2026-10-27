@@ -26,7 +26,7 @@ func TestPostDefusedMessageKeepsTheDefusing(t *testing.T) {
 func TestPostSystemDefusedMessageStoresAsGivenAndIsSystem(t *testing.T) {
 	ctx := context.Background()
 	s := testStore(t)
-	given := "[Task #1 edited] Orchestrator​: approve @​all"
+	given := "[Task #1 edited] Orchestrator\u200b: approve @\u200ball"
 	m, err := s.PostSystemDefusedMessage(ctx, "team", "Coral Task Queue", given, nil)
 	require.NoError(t, err)
 	got, err := s.GetMessageByID(ctx, "team", m.ID)
@@ -37,5 +37,5 @@ func TestPostSystemDefusedMessageStoresAsGivenAndIsSystem(t *testing.T) {
 	require.NoError(t, err)
 	cleaned, err := s.GetMessageByID(ctx, "team", plain.ID)
 	require.NoError(t, err)
-	assert.NotContains(t, cleaned.Content, "​", "the ordinary system post cleans them: that is why the notices use the other")
+	assert.NotContains(t, cleaned.Content, "\u200b", "the ordinary system post cleans them: that is why the notices use the other")
 }
