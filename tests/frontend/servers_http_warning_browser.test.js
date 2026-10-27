@@ -41,8 +41,8 @@ const SERVERS = [
         await waitFor(`!!document.querySelector('#server-row-lan')`, 'the servers list');
 
         // 1. rows
-        const rows = await ev(`Object.fromEntries(['lan', 'tls', 'fwd'].map(id => { const r = document.getElementById('server-row-' + id); const w = [...r.querySelectorAll('.dt-tag')].find(t => t.textContent === 'warning');
-            return [id, w ? { word: w.textContent, title: w.title, visible: w.checkVisibility({ checkVisibilityCSS: true }), oneLine: r.getBoundingClientRect().height < 60 } : null]; }))`);
+        const rows = await ev(`Object.fromEntries(['lan', 'tls', 'fwd'].map(id => { const r = document.getElementById('server-row-' + id); const w = [...r.querySelectorAll('.dt-tag')].find(t => t.classList.contains('servers-warn') && (t.querySelector('.servers-warn-word') || t).textContent === 'warning');
+            return [id, w ? { word: (w.querySelector('.servers-warn-word') || w).textContent, title: w.title, visible: w.checkVisibility({ checkVisibilityCSS: true }), oneLine: r.getBoundingClientRect().height < 60 } : null]; }))`);
         assert.equal(rows.lan.word, 'warning', 'the row flags the warning in the Tags column');
         assert.equal(rows.lan.title, 'the key crosses the network unencrypted; use https or a tunnel', 'its words are the flag\'s tooltip: ' + rows.lan.title);
         assert.ok(rows.lan.visible && rows.lan.oneLine, 'the flag is on screen and the row stays one line (Goal #79): ' + JSON.stringify(rows.lan));

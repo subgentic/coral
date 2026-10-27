@@ -34,7 +34,7 @@ const SHOWS = ['lan', 'unreach', 'unauth', 'offline', 'xss', 'legacy', 'long'];
                 if (p === '/api/servers' && m === 'GET') return json(200, window.__list);
                 return R(u, o); }; })();` });
         const flags = () => ev(`(() => Object.fromEntries([...document.querySelectorAll('tr[data-key]')].map(tr => { const w = tr.querySelector('.servers-warn'); const r = w && w.getBoundingClientRect(), row = tr.getBoundingClientRect();
-            return [tr.getAttribute('data-key'), w ? { count: tr.querySelectorAll('.servers-warn').length, text: w.textContent.trim(), title: w.title, visible: w.getClientRects().length > 0 && r.right <= innerWidth + 0.5 && r.left >= 0, aria: (tr.querySelector('[data-action=open]') || {}).getAttribute && tr.querySelector('[data-action=open]').getAttribute('aria-label'), inButton: !!w.closest('[data-action=open]') } : null]; })))()`);
+            return [tr.getAttribute('data-key'), w ? { count: tr.querySelectorAll('.servers-warn').length, text: (w.querySelector('.servers-warn-word') || w).textContent.trim(), title: w.title, visible: w.getClientRects().length > 0 && r.right <= innerWidth + 0.5 && r.left >= 0, aria: (tr.querySelector('[data-action=open]') || {}).getAttribute && tr.querySelector('[data-action=open]').getAttribute('aria-label'), inButton: !!w.closest('[data-action=open]') } : null]; })))()`);
         const open = async (w, h, mobile) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
