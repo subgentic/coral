@@ -939,6 +939,13 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 500; padding-top: 1px; }
 .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .facts-row { display: contents; } /* each pair is a div in the dl (facts.js) */
+/* The one list row (#9242, Goal #88 slice 4): a row of a list in a sidebar, one line, 36 px (44 on a touch screen, touch.css), the hover surface, the focus ring drawn inside, and the current row the hover surface with an accent bar. A page's own class says only its padding and its columns;
+ * list_row_census.test.mjs fails a row class outside the family that sets its own height, radius, hover or focus. */
+.list-row { box-sizing: border-box; min-height: 36px; border-radius: var(--radius-md); background: none; cursor: pointer; }
+.list-row:hover:not(:disabled) { background: var(--bg-hover); }
+.list-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.list-row-current { background: var(--bg-hover); box-shadow: inset 3px 0 0 var(--accent); }
+@media (forced-colors: active) { .list-row-current { outline: 2px solid Highlight; outline-offset: -2px; box-shadow: none; } }
 /* The group head (#9245, Goal #88 slice 5): the heading of a group of rows or of a section of a page. 12/600 in capitals with a little tracking in the muted colour (a sidebar's "Needs attention", "Starred");
  * -lg is a section title of a page (Analytics' "Tokens per commit"): 14/600 in the secondary colour, in the case it is written. A count beside it is a count chip. A table's own group row (dt-group) and column heads are the table's. */
 .group-head { margin: 0; font-size: var(--fs-base); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }

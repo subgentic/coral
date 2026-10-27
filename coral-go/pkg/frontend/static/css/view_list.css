@@ -8,20 +8,14 @@
     align-items: center;
     gap: 8px;
     width: 100%;
-    min-height: 36px;
     padding: 0 10px;
     border: 0;
-    border-radius: var(--radius-md);
-    background: none;
     color: var(--text-secondary);
     font-family: var(--font-sans);
     font-size: var(--fs-lg);
     text-align: left;
-    cursor: pointer;
 }
-.view-list-item:hover:not(:disabled) { background: var(--bg-hover); }
-.view-list-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.view-list-current { background: var(--bg-hover); color: var(--text-primary); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.view-list-current { color: var(--text-primary); font-weight: 600; }
 .view-list-current .view-list-count { color: var(--text-primary); } /* on the hover-coloured current row the secondary colour is under 4.5:1 in the light theme */
 /* the red count pill: the same make as the tab strip's unread badge (layout.css .nav-tab-badge) */
 .view-list-count.view-list-alert {
@@ -47,9 +41,6 @@
 @media (max-width: 767px) {
     .view-list-nav { display: none; }
     .view-list-select { display: block; margin-bottom: 8px; } /* the field under it (the page's search) does not touch it */
-}
-@media (forced-colors: active) {
-    .view-list-current { outline: 2px solid Highlight; outline-offset: -2px; box-shadow: none; }
 }
 
 /* In the sidebar the generic section heading rule (layout.css .sidebar-section h2: 16 px of side padding) must not move the title: it starts where the rows' text does */

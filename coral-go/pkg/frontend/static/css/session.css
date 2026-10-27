@@ -693,10 +693,7 @@
     padding: 5px 4px 5px 36px !important; /* a folder header's chevron (#5989) moved its label 22px right: 14px + 22px */
     margin-left: 6px;
     margin-right: 6px;
-    border-radius: var(--radius-md);
     cursor: grab;
-    box-sizing: border-box;
-    min-height: 36px;
     border-left: 0;
 }
 
