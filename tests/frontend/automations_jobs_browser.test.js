@@ -4,10 +4,13 @@
 // Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 
 (async () => {
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = require('./helpers/scene_shots')(Page, 'automations-jobs'); // the scenes UI/UX looks at: the folder and a job's page, at both widths in both themes (written when the gate asks for shots)
+    const themed = async (name, w) => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await settle(150); await shot(`${name}-${theme}-${w}`); } await setTheme(ev, 'dark'); };
     const { settle } = require('./helpers/wait').bind(ev);
     const STUB = `(() => {
         const real = window.fetch; const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
@@ -73,11 +76,13 @@ const BASE = require('./test_base').BASE;
                 await pick(/^All/); await settle(300);
             }
 
+            await themed('folder', w);
             // a row opens the job in place; the way back returns to the folder and to the row
             await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].find(b => b.textContent.trim() === 'summarize-the-day').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-detail .sched-header')`, `${at}the job's page`, 8000);
             assert.equal(await pathname(), '/automations/jobs/2', `${at}the address is the job's`);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-header h2').textContent`), 'summarize-the-day');
+            await themed('job-page', w);
             assert.equal(await ev(`!!document.querySelector('#scheduler-detail [data-on-click="automations-back"]')`), true, `${at}the page has its way back to the folder`);
             await ev(`[...document.querySelectorAll('#scheduler-detail [data-on-click="automations-back"]')].find(b => b.getClientRects().length).click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 3 && document.getElementById('group-table-view').getClientRects().length > 0`, `${at}back at the folder's table`, 8000);
