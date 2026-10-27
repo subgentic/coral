@@ -28,6 +28,16 @@ const STYLE_FAMILY = /\.style\.fontFamily\s*=\s*['"`]([^'"`]+)['"`]/g;
 // a line height that is a length (a control's fixed height), 1 or 0 (an icon's), or inherited is not one of the three ratios
 const okLine = (v) => ok(v) || /^(1|0)$/.test(v.trim()) || /^[0-9.]+(px|rem|em)$/.test(v.trim()) || /^normal$/i.test(v.trim());
 const okWeight = (v) => ok(v);
+// a size in em follows the text it sits in (rendered prose, an inline code span, a placeholder scale): it is a ratio, not a step of the scale
+const relEm = (v) => /^[0-9.]*em$/.test(v.trim()) || /^calc\(\s*1em\b/.test(v.trim());
+// the icon font is the one face that is not a --font-* token
+const iconFont = (v) => /^['"]?Material Icons['"]?$/.test(v.trim());
+// files that are not the dashboard's styles, each for its reason
+export const EXEMPT_FILES = {
+    'coral-go/pkg/frontend/static/css/fonts.css': 'the @font-face declarations (family, weight range) and the icon font\'s own base size: they define the faces, they do not use them',
+    'coral-go/pkg/frontend/static/board_export_render.js': 'a standalone export document that leaves the dashboard as its own page and carries its own styles',
+    'coral-go/pkg/frontend/static/platform/native.js': 'the native shell\'s splash, drawn before the dashboard\'s stylesheets load',
+};
 const ok = (v) => /^(var\(|inherit$|initial$|unset$|revert)/i.test(v.trim()) || /\$\{/.test(v);
 
 export function scan() {
@@ -36,13 +46,14 @@ export function scan() {
     const files = [...walk(path.join(fe, 'static')), ...walk(path.join(fe, 'templates'))].filter(f => /\.(css|js|html)$/.test(f));
     for (const f of files) {
         const rel = path.relative(root, f).split(path.sep).join('/');
+        if (rel in EXEMPT_FILES) continue;
         let text = fs.readFileSync(f, 'utf8');
         if (f.endsWith('.css')) text = blank(text);
         const lines = text.split('\n');
         lines.forEach((line) => {
             if (/^\s*--[\w-]+\s*:/.test(line)) return; // a token definition
-            for (const m of line.matchAll(SIZE)) if (!ok(m[1])) add(rel, 'font-size', m[1]);
-            for (const m of line.matchAll(FAMILY)) if (!ok(m[1])) add(rel, 'font-family', m[1]);
+            for (const m of line.matchAll(SIZE)) if (!ok(m[1]) && !relEm(m[1])) add(rel, 'font-size', m[1]);
+            for (const m of line.matchAll(FAMILY)) if (!ok(m[1]) && !iconFont(m[1])) add(rel, 'font-family', m[1]);
             for (const m of line.matchAll(WEIGHT)) if (!okWeight(m[1])) add(rel, 'font-weight', m[1]);
             for (const m of line.matchAll(LINE)) if (!okLine(m[1])) add(rel, 'line-height', m[1]);
             for (const m of line.matchAll(STYLE_SIZE)) if (!ok(m[1])) add(rel, 'style.fontSize', m[1]);
