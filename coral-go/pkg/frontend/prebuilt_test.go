@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/fs"
+	"reflect"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -133,31 +134,39 @@ func TestNoPrebuiltBuilds(t *testing.T) {
 	}
 }
 
-// A damaged file is never served as the dashboard (#8785): one flipped bit, at many offsets of the real bundle's file, is refused every time; the intact file still decodes. gzip's CRC and
-// the file's own checksum are each enough for most flips; together none gets through.
+// A damaged file is never served as a different dashboard (#8785): one flipped bit, at many offsets of the real bundle's file, is either refused or decodes to exactly the intact files; the intact
+// file still decodes. gzip's CRC and the file's own checksum are each enough for most flips; together no flip yields different content. A flip in the header's time, extra-flags or OS byte (bytes
+// 4 to 9: nothing covers them, and they carry no content) decodes to the intact files and is accepted harmlessly: where the seeded offsets land depends on the file's length, which moves with
+// every change to the bundle, so the property is the content's, not "every flip is refused" (run 138, Security Reviewer's note).
 func TestAFlippedBitInThePrebuiltFileIsAlwaysRefused(t *testing.T) {
 	_, static := realBundle(t)
 	index, _ := fs.ReadFile(Templates, "templates/index.html")
-	data, built, _ := prebuiltOf(t, static, index)
-	if _, _, err := DecodePrebuilt(bytes.NewReader(data)); err != nil {
+	data, _, _ := prebuiltOf(t, static, index)
+	ref, refHash, err := DecodePrebuilt(bytes.NewReader(data))
+	if err != nil {
 		t.Fatalf("the intact file is refused: %v", err)
+	}
+	same := func(b *Bundle, hash string) bool {
+		return hash == refHash && filesSum(b.Files) == filesSum(ref.Files) && reflect.DeepEqual(b.Modules, ref.Modules) && reflect.DeepEqual(b.Lazy, ref.Lazy) && len(b.LazySkipped) == len(ref.LazySkipped)
 	}
 	seed := uint64(8785)
 	next := func() uint64 { seed = seed*6364136223846793005 + 1442695040888963407; return seed >> 33 }
-	accepted := 0
 	for i := 0; i < 100; i++ {
 		damaged := append([]byte{}, data...)
-		damaged[int(next())%len(damaged)] ^= 1 << (next() % 8)
-		b, _, err := DecodePrebuilt(bytes.NewReader(damaged))
-		if err == nil {
-			accepted++
-			if len(b.Files) == len(built.Files) {
-				t.Errorf("flip %d: a damaged file was accepted", i)
-			}
+		at := int(next()) % len(damaged)
+		damaged[at] ^= 1 << (next() % 8)
+		b, hash, err := DecodePrebuilt(bytes.NewReader(damaged))
+		if err == nil && !same(b, hash) {
+			t.Errorf("flip %d (byte %d): a damaged file was accepted and its content differs from the intact one", i, at)
 		}
 	}
-	if accepted > 0 {
-		t.Errorf("%d of 100 damaged files were accepted", accepted)
+	// the header's unchecked bytes: a flip there is accepted and changes nothing (the claim above is about content)
+	for at := 4; at < 10; at++ {
+		damaged := append([]byte{}, data...)
+		damaged[at] ^= 1
+		if b, hash, err := DecodePrebuilt(bytes.NewReader(damaged)); err == nil && !same(b, hash) {
+			t.Errorf("header byte %d: accepted with different content", at)
+		}
 	}
 	// a file cut short, or with a trailing byte changed, is refused too
 	if _, _, err := DecodePrebuilt(bytes.NewReader(data[:len(data)-4])); err == nil {
