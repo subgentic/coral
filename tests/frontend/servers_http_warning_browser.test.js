@@ -41,11 +41,13 @@ const SERVERS = [
         await waitFor(`!!document.querySelector('#server-row-lan')`, 'the servers list');
 
         // 1. rows
-        const rows = await ev(`Object.fromEntries(['lan', 'tls', 'fwd'].map(id => { const r = document.getElementById('server-row-' + id); const w = r.querySelector('.servers-row-warn');
-            return [id, w ? { text: w.lastElementChild.textContent.replace(/\\s+/g, ' ').trim(), icon: !!w.querySelector('.material-icons[aria-hidden="true"]'), word: w.querySelector('b') && w.querySelector('b').textContent, visible: w.checkVisibility({ checkVisibilityCSS: true }) } : null]; }))`);
-        assert.deepEqual(rows.lan, { text: 'Warning: The key crosses the network unencrypted; use https or a tunnel.', icon: true, word: 'Warning:', visible: true });
+        const rows = await ev(`Object.fromEntries(['lan', 'tls', 'fwd'].map(id => { const r = document.getElementById('server-row-' + id); const w = [...r.querySelectorAll('.dt-tag')].find(t => t.textContent === 'warning');
+            return [id, w ? { word: w.textContent, title: w.title, visible: w.checkVisibility({ checkVisibilityCSS: true }), oneLine: r.getBoundingClientRect().height < 60 } : null]; }))`);
+        assert.equal(rows.lan.word, 'warning', 'the row flags the warning in the Tags column');
+        assert.equal(rows.lan.title, 'the key crosses the network unencrypted; use https or a tunnel', 'its words are the flag\'s tooltip: ' + rows.lan.title);
+        assert.ok(rows.lan.visible && rows.lan.oneLine, 'the flag is on screen and the row stays one line (Goal #79): ' + JSON.stringify(rows.lan));
         assert.equal(rows.tls, null, 'an https row shows nothing'); assert.equal(rows.fwd, null, 'a row with no warning field shows nothing');
-        ok('a row with a warning shows an icon and "Warning: ..." in words; rows without one show nothing');
+        ok('a row with a warning is flagged in its Tags column (the words are the tooltip and the server\'s page\'s); rows without one show nothing');
         await shot('rows-desktop');
 
         // 2. the edit form repeats it; an https row's does not
@@ -96,9 +98,9 @@ const SERVERS = [
         // 4. phone, 200% text
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await ev(`document.documentElement.style.fontSize = '32px'; true`); await sleep(400); // sleep-ok: layout settles after a font-size or scroll change; there is no completion event
-        const fit = await ev(`(() => { const r = document.getElementById('server-row-lan'); const w = r.querySelector('.servers-row-warn'); const wr = w.getBoundingClientRect();
-            return { docOver: document.documentElement.scrollWidth - innerWidth, right: Math.round(wr.right), vw: innerWidth, sw: w.scrollWidth, cw: w.clientWidth, rowOver: r.scrollWidth - r.clientWidth }; })()`);
-        assert.ok(fit.docOver <= 0 && fit.right <= fit.vw && fit.sw <= fit.cw + 1 && fit.rowOver <= 1, JSON.stringify(fit));
+        const fit = await ev(`(() => { const r = document.getElementById('server-row-lan'); const wr = r.getBoundingClientRect();
+            return { docOver: document.documentElement.scrollWidth - innerWidth, right: Math.round(wr.right), vw: innerWidth, rowOver: r.scrollWidth - r.clientWidth }; })()`);
+        assert.ok(fit.docOver <= 0 && fit.right <= fit.vw && fit.rowOver <= 1, JSON.stringify(fit));
         await ev(`document.getElementById('server-row-lan').scrollIntoView({ block: 'center' }); true`); await sleep(200); // sleep-ok: layout settles after a font-size or scroll change; there is no completion event
         await shot('rows-phone-200');
         await ev(`document.querySelector('[data-action=add]').click(); true`);
