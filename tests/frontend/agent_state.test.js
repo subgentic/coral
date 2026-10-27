@@ -135,7 +135,7 @@ async function run() {
         const chip = q('.session-unread-chip'); const mchip = q('.session-status-chip');
         return [li.dataset.sessionId, { state: li.getAttribute('data-state'), aria: li.getAttribute('aria-label'), dotCls: dot ? dot.className : null, dotHidden: dcs ? dcs.visibility === 'hidden' : null, dotBg: dcs ? dcs.backgroundColor : null, dotAnim: dcs ? dcs.animationName : null, dotGlyph: dot ? getComputedStyle(dot, '::before').content : null, dotTitle: dot ? dot.getAttribute('title') : null, dotRing: dcs ? dcs.boxShadow : null, rowBg: getComputedStyle(li).backgroundColor,
             pills, ctxPill: q('.session-ctx-pill') ? q('.session-ctx-pill').textContent.trim() : null, attention: li.classList.contains('needs-attention'), isStuck: li.classList.contains('is-stuck'), done: li.classList.contains('session-done'),
-            unread: chip ? { text: chip.textContent.trim(), title: chip.getAttribute('title'), shown: getComputedStyle(chip).display !== 'none' } : null, mobileChip: mchip ? mchip.textContent.trim() : null,
+            unread: chip ? { text: chip.textContent.trim(), title: chip.getAttribute('title'), shown: getComputedStyle(chip).display !== 'none' } : null, mobileChip: mchip ? mchip.textContent.trim() : null, banner: q('.session-mobile-banner') ? q('.session-mobile-banner').textContent.trim() : null,
             nameX: nx, h: li.getBoundingClientRect().height, labelDecoration: getComputedStyle(name).textDecorationLine }]; })))()`;
     const TOASTS = `document.querySelectorAll('.notification-toast').length`;
 
@@ -271,8 +271,10 @@ async function run() {
         // ── mobile clone ──
         await boot(390, 844, true, false);
         const m = await ev(ROWS('mobile-session-list'));
-        const words = { [ID.working]: 'Working', [ID.idle]: 'Idle', [ID.needs]: 'Needs input', [ID.check]: 'Check terminal', [ID.stuck]: 'Stuck', [ID.sleeping]: 'Sleeping' };
+        const words = { [ID.working]: 'Working', [ID.idle]: 'Idle', [ID.needs]: 'Needs input', [ID.sleeping]: 'Sleeping' };
+        const banners = { [ID.check]: 'Nothing yet — open the terminal', [ID.stuck]: 'Session needs attention' }; // one chip per state (#9464): these two keep their banner, which says what to do, and have no state chip
         check('mobile status chip uses the same sentence-case words', Object.entries(words).every(([sid, w]) => m[sid] && m[sid].mobileChip === w), JSON.stringify(Object.fromEntries(Object.entries(words).map(([sid, w]) => [w, m[sid] && m[sid].mobileChip]))));
+        check('a mobile Check terminal or Stuck card has its banner and no state chip (one chip per state)', Object.entries(banners).every(([sid, w]) => m[sid] && m[sid].mobileChip === null && m[sid].banner === w), JSON.stringify(Object.fromEntries(Object.entries(banners).map(([sid, w]) => [w, m[sid] && { chip: m[sid].mobileChip, banner: m[sid].banner }]))));
         check('mobile Ready for input rows render no status chip; the dot and aria-label still say Ready for input', [ID.turnSolo, ID.turnMember, ID.turnOrch].every(id => m[id] && m[id].mobileChip === null && m[id].pills.length === 0 && /your-turn/.test(m[id].dotCls || '') && m[id].dotHidden === false && /, Ready for input(,|$)/.test(m[id].aria || '')), JSON.stringify([ID.turnSolo, ID.turnMember, ID.turnOrch].map(id => m[id] && { chip: m[id].mobileChip, dot: m[id].dotCls, dotHidden: m[id].dotHidden, aria: m[id].aria })));
         check('mobile clone: same data-state per row, idle dot hidden, unread chip hidden in favour of the meta pill', Object.entries(EXPECT).every(([sid, e]) => m[sid] && m[sid].state === e.state) && m[ID.idle].dotHidden === true && (!m[ID.turnMember].unread || !m[ID.turnMember].unread.shown), JSON.stringify({ idle: m[ID.idle] && m[ID.idle].dotHidden, unread: m[ID.turnMember] && m[ID.turnMember].unread }));
     } finally {

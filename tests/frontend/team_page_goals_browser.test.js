@@ -41,7 +41,7 @@ const GOAL = 'Explore goals with two teams';
                 assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-table')`), true, 'Goals uses the shared table');
                 const progress = await ev(`(() => { const p = window.__tp.page().querySelector('progress'); return p && { max: p.max, value: p.value, label: p.getAttribute('aria-label') }; })()`);
                 assert.ok(progress && progress.max > 0 && progress.label === `${progress.value} of ${progress.max} done`, 'progress exposes the task counts');
-                if (mobile) assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-box.dt-folded .dt-sortbar-select')`), true, 'phone has shared folded sorting');
+                if (mobile) assert.equal(await ev(`[...window.__tp.page().querySelectorAll('.dt-box.dt-one-line .dt-sort')].some(b => b.getClientRects().length > 0)`), true, 'phone sorts by the column heads of a one-line table (#8960: no fold, no sort bar)');
                 else {
                     await ev(`window.__tp.page().querySelector('.dt-sort[data-key="goal"]').click()`);
                     assert.equal(await ev(`window.__tp.page().querySelector('th[data-key="goal"]').getAttribute('aria-sort')`), 'ascending');
