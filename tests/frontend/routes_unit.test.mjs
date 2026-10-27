@@ -3,7 +3,7 @@
 // coral-hub Security's condition): a crafted path never becomes a route, so no /api path is
 // built from it.
 import assert from 'node:assert/strict';
-import { parse, build, fromLegacyHash, valid, normalize, chatsQuery, inboxFolderPath } from '../../coral-go/pkg/frontend/static/routes.js';
+import { parse, build, fromLegacyHash, valid, normalize, chatsQuery, inboxFolderPath, inboxRouteFor } from '../../coral-go/pkg/frontend/static/routes.js';
 
 const S = '6f9a3c1e-0000-4000-8000-000000000001';
 const rt = (path, route) => {
@@ -46,7 +46,24 @@ rt('/inbox/chats/all', { view: 'inbox-folder', folder: 'chats' });
 for (const f of ['active', 'starred', 'notes', 'archived', 'cli-claude', 'cli-agy', 'tag-7']) rt(`/inbox/chats/${f}`, { view: 'inbox-folder', folder: `chats-${f}` });
 assert.deepEqual(parse('/inbox/chats'), { view: 'inbox-folder', folder: 'chats' }, 'a bare /inbox/chats is All chats');
 assert.equal(build(parse('/inbox/chats')), '/inbox/chats/all', 'and is written in full');
-for (const bad of ['/inbox', '/inbox/', '/inbox/other', '/inbox/needs/x', '/inbox/saved/1', '/inbox/artifacts/x', '/inbox/chats/nonsense', '/inbox/chats/tag-0', '/inbox/chats/cli-', '/inbox/chats/cli-Claude', '/inbox/chats/all/x', '/inbox/chats-group']) assert.equal(parse(bad), null, bad);
+for (const bad of ['/inbox', '/inbox/', '/inbox/other', '/inbox/needs/x', '/inbox/saved/1', '/inbox/artifacts/x', '/inbox/chats/nonsense', '/inbox/chats/tag-0', '/inbox/chats/cli-', '/inbox/chats/cli-Claude', '/inbox/chats/all/x/y', '/inbox/chats/nonsense/x', '/inbox/chats/all/..x', '/inbox/chats/all/@/x', '/inbox/chats-group']) assert.equal(parse(bad), null, bad);
+// a chat on screen in the Inbox (Goal #100, #9549): /inbox/chats/<folder>/[@<server>/]<id>
+rt('/inbox/chats/all/abc-123', { view: 'inbox-folder', folder: 'chats', id: 'abc-123' });
+rt('/inbox/chats/starred/@m2/abc-123', { view: 'inbox-folder', folder: 'chats-starred', server: 'm2', id: 'abc-123' });
+// the old Chats addresses, when the Inbox is the native one: never a not-found page
+assert.deepEqual(inboxRouteFor(parse('/chats')), { view: 'inbox-folder', folder: 'chats' }, '/chats is All chats');
+assert.deepEqual(inboxRouteFor(parse('/chats/@m2')), { view: 'inbox-folder', folder: 'chats' }, 'a list drops its computer');
+assert.deepEqual(inboxRouteFor(parse('/chats', '?type=group')), { view: 'inbox-boards', sub: 'boards' }, 'type=group is the Boards folder');
+assert.deepEqual(inboxRouteFor(parse('/chats', '?q=build&page=3&type=agent')), { view: 'inbox-folder', folder: 'chats' }, 'any other filter is dropped and the address still lands on All chats');
+assert.deepEqual(inboxRouteFor({ view: 'chats', query: 'starred=1' }), { view: 'inbox-folder', folder: 'chats-starred' });
+assert.deepEqual(inboxRouteFor({ view: 'chats', query: 'archived=1' }), { view: 'inbox-folder', folder: 'chats-archived' });
+assert.deepEqual(inboxRouteFor({ view: 'chats', query: 'active=1' }), { view: 'inbox-folder', folder: 'chats-active' });
+assert.deepEqual(inboxRouteFor({ view: 'chats', query: 'with_notes=1' }), { view: 'inbox-folder', folder: 'chats-notes' });
+assert.deepEqual(inboxRouteFor(parse('/chats/abc-123')), { view: 'inbox-folder', folder: 'chats', id: 'abc-123' }, 'a chat is the chat on screen in the Inbox, under All chats');
+assert.deepEqual(inboxRouteFor(parse('/chats/@m2/abc-123')), { view: 'inbox-folder', folder: 'chats', server: 'm2', id: 'abc-123' }, 'and keeps its computer');
+for (const p of ['/chats', '/chats/@m2', '/chats/abc-123', '/chats/@m2/abc-123']) assert.ok(valid(inboxRouteFor(parse(p))) !== false && build(inboxRouteFor(parse(p))).startsWith('/inbox/'), `${p} lands on a written Inbox address`);
+assert.deepEqual(inboxRouteFor(parse('/board/team-a')), parse('/board/team-a'), '/board/<team> is unchanged');
+assert.equal(inboxRouteFor(null), null);
 assert.equal(inboxFolderPath('needs'), '/inbox/needs'); assert.equal(inboxFolderPath('artifacts'), '/inbox/artifacts'); assert.equal(inboxFolderPath('chats-cli-codex'), '/inbox/chats/cli-codex'); assert.equal(inboxFolderPath('chats-group'), '/inbox/boards'); assert.equal(inboxFolderPath('nope'), '', 'a folder with no path');
 assert.equal(valid({ view: 'inbox-folder', folder: 'saved' }), true); assert.equal(valid({ view: 'inbox-folder', folder: 'goals' }), false, 'goals is not this family');
 rt('/board/@m2/qa', { view: 'board', server: 'm2', id: 'qa' });
