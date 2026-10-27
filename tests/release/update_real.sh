@@ -144,6 +144,19 @@ else
 fi
 
 # ---- 3 find ------------------------------------------------------------------------------------------------
+# Evidence for a check that failed (#9075): what the updater logged for it, and the GitHub rate limit it ran under. The updater asks GitHub without a token (60 requests an hour per address,
+# shared by every run on the same runner address); a 403 with x-ratelimit-remaining 0 is that limit, not a Coral fault.
+diag_failure() {
+  echo "update_real: ---- evidence for the failed check ----" >&2
+  echo "update_real: the updater's own status (coral-update status):" >&2
+  upd_env status 2>&1 | head -30 | sed 's/^/    /' >&2
+  echo "update_real: the server's [update] log lines (stage and HTTP status are in them):" >&2
+  { grep -h '\[update\]' "$work/tray.out" 2>/dev/null; grep -hr '\[update\]' "$DD"/*.log "$HH"/.coral/*.log 2>/dev/null; } | tail -20 | sed 's/^/    /' >&2
+  echo "update_real: GitHub's rate limit as the updater sees it (unauthenticated) and as gh does:" >&2
+  curl -s -m 15 -D - -o /dev/null https://api.github.com/rate_limit 2>/dev/null | tr -d '\r' | grep -iE '^(HTTP/|x-ratelimit-(limit|remaining|reset|resource)|retry-after)' | sed 's/^/    /' >&2
+  gh api rate_limit --jq '"    gh (authenticated): core remaining \(.resources.core.remaining) of \(.resources.core.limit), resets \(.resources.core.reset)"' 2>&1 | head -2 >&2
+  echo "update_real: ---- end of the evidence ----" >&2
+}
 checked_at() { person --path /api/system/update | pbody | jget checked_at; }
 start_check() { person --method POST --path /api/system/update/check | grep -q '^202'; }
 before=$(checked_at)
@@ -156,8 +169,8 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   st=$(person --path /api/system/update | pbody)
   reason=$(printf '%s' "$st" | jget not_ready_reason)
   if [ "$reason" = backoff ] || [ "$reason" = check_failed ]; then
-    echo "update_real: the updater says $reason after the check at $now; its own status follows:" >&2
-    upd_env status 2>&1 | head -20 >&2
+    echo "update_real: the updater says $reason after the check at $now" >&2
+    diag_failure
     if [ "$retried" = 0 ]; then
       retried=1; echo "update_real: retrying the check once after 65 s (one check a minute; a failure backs the next one off, up to a day)" >&2
       sleep 65; before=$now; start_check || { result "3 find" FAIL "the retry was not accepted: $(person --method POST --path /api/system/update/check)"; finish; }
