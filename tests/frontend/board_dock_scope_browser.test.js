@@ -13,6 +13,8 @@ const BASE = require('./test_base').BASE;
     const S = `(window.__coralStatic || '/static/')`;
     const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const theme = t => ev(`(async () => { const m = await import(${S} + 'settings_core.js'); m.clearCustomThemeVars(); m.applyTheme('${t}'); return true; })()`);
+    const lightShot = async n => { await theme('light'); await new Promise(r => setTimeout(r, 500)); await shot(n + '-light'); await theme('dark'); await new Promise(r => setTimeout(r, 500)); }; // sleep-ok: the theme's colour transition settles
     const post = async (who, content) => { const r = await api('POST', `/api/board/${B}/messages`, { subscriber_id: who, content }); assert.equal(r.status, 200, JSON.stringify(r)); };
     const AGENT = { subscriber: 'Backend Dev', orchestrator: false, name: 'Backend Dev' };
     const show = agent => ev(`import(${S} + 'render.js').then(m => { m.showBoardChatTab(${JSON.stringify(B)}, ${JSON.stringify(agent)}); return true; })`);
@@ -55,6 +57,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(st.note, 'Showing what Backend Dev reads: its mentions, @all, its replies and its own posts. 3 of 6 messages', at + 'the line says what is shown and how many');
             assert.match((await rows()).join('|'), /dock task.*standup.*On it/s);
             await shot(`dock-scope-agent-${w}`);
+            await lightShot(`dock-scope-agent-${w}`);
 
             console.log(`${at}2. A new message that tags it arrives through the poll's after_id`);
             await post('Orchestrator', '@Backend Dev one more for you'); await post('QA Engineer', 'Untagged chatter three');
@@ -70,6 +73,7 @@ const BASE = require('./test_base').BASE;
             await typeSearch('chatter'); // said only by messages outside its list
             await waitFor(`/No match in what Backend Dev reads/.test((document.querySelector('#agentic-panel-board .board-chat-search .mb-search-status') || {}).textContent || '')`, 'the no-match line', 15000);
             await shot(`dock-scope-nomatch-${w}`);
+            await lightShot(`dock-scope-nomatch-${w}`);
             assert.equal((await state()).switches, 0, at + 'the no-match line has no way to the whole board');
             await typeSearch('');
 
@@ -83,6 +87,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`/Nothing for Newcomer yet/.test((document.querySelector('#board-panel-msgs .board-chat-empty') || {}).textContent || '')`, 'the empty state', 15000);
             st = await state(); assert.equal(st.empty, 'Nothing for Newcomer yet.'); assert.equal(st.rows, 0); assert.equal(st.switches, 0, at + 'no link to the whole board');
             await shot(`dock-scope-empty-${w}`);
+            await lightShot(`dock-scope-empty-${w}`);
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, at + 'no sideways scroll');
             console.log('   ✓');
         }
