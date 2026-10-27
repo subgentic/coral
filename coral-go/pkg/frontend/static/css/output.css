@@ -165,6 +165,10 @@ body.panel-dragging .preview-pane {
     }
     .preview-pane.preview-phone-full .preview-full-back { display: flex; min-height: 44px; min-width: 44px; justify-content: center; border-left: 0; border-right: 1px solid var(--border); color: var(--text-primary); }
     .preview-pane.preview-phone-full .preview-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    /* Fit one whole tab in the scrolling strip: truncate its title before clipping Close (#8913). */
+    .preview-pane.preview-phone-full .preview-tab { max-width: 100%; box-sizing: border-box; }
+    .preview-pane.preview-phone-full .preview-tab-name { min-width: 0; }
+    .preview-pane.preview-phone-full .preview-tab-close { min-width: 44px; min-height: 44px; }
     body:has(.preview-pane.preview-phone-full) .agentic-state.mobile-panel-overlay { z-index: 90; }
 }
 
