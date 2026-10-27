@@ -54,8 +54,8 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         await ev(`document.querySelector('#cost-by-agent tbody tr .dt-link[aria-label="Charts for Frontend Dev"]').click(); true`);
         await waitFor(`document.querySelectorAll('#cost-agent-detail .viz-svg').length >= 3 && document.querySelectorAll('#cost-agent-detail .dt-table tbody tr').length === 2`, 'the drill-down', 12000);
         let d = await detail();
-        assert.deepEqual([d.view, d.title, d.current], ['agent-detail', 'Frontend Dev', 'By agent'], JSON.stringify(d));
-        assert.equal(await ev(`(() => { const b = document.querySelector('.viz-back'); return [b.querySelector('span').getAttribute('aria-hidden'), b.textContent]; })()`).then(x => x.join('|')), 'true|\u2190 By agent', 'the back link: its arrow is drawn, not read (#8022)');
+        assert.deepEqual([d.view, d.title, d.current], ['agent-detail', 'Frontend Dev', 'Overview'], JSON.stringify(d));
+        assert.equal(await ev(`(() => { const b = document.querySelector('.viz-back'); return [b.querySelector('span').getAttribute('aria-hidden'), b.textContent]; })()`).then(x => x.join('|')), 'true|\u2190 Overview', 'the back link: its arrow is drawn, not read (#8022)');
         assert.ok(d.svgs.every(s => s[0] === 'true'), 'every chart is hidden from a screen reader: ' + JSON.stringify(d.svgs));
         assert.equal(d.svgs.filter(s => s[1]).length, 2, 'two charts lead; the rest are under More charts: ' + JSON.stringify(d.svgs));
         assert.deepEqual(d.rows, ['$6.00', '$1.20'], 'the biggest turns, the dearest first');
@@ -84,7 +84,7 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         assert.ok(await ev(`[...document.querySelectorAll('#cost-agent-detail .viz-more .viz-bar')].some(p => p.getAttribute('fill') === 'var(--danger)')`), 'failed calls are drawn in the error colour');
         console.log('   ✓');
 
-        assert.equal(await ev(`document.querySelector('#cost-agent-detail .viz-back').textContent`), '\u2190 By agent'); assert.ok(await ev(`document.querySelector('#cost-agent-detail .viz-back').classList.contains('back-link')`), 'the back link of the page, not a button');
+        assert.equal(await ev(`document.querySelector('#cost-agent-detail .viz-back').textContent`), '\u2190 Overview'); assert.ok(await ev(`document.querySelector('#cost-agent-detail .viz-back').classList.contains('back-link')`), 'the back link of the page, not a button');
         console.log('4. Back to By agent; a failing read leaves the rest');
         await ev(`document.querySelector('#cost-agent-detail .viz-back').click(); true`);
         await waitFor(`document.getElementById('cost-dashboard-view').dataset.view === 'agent'`, 'back on By agent', 6000);

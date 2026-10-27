@@ -21,6 +21,7 @@ try {
             { key: 'high', label: 'High', value: 1440, n: 64, sent_back_share: 0.12, cost_usd_per_unit: 5.3 },
             { key: 'max', label: 'Max', value: 2460, n: 5, sent_back_share: 0.1, cost_usd_per_unit: 9 }] };
     globalThis.fetch = window.fetch = async url => { const u = new URL(url, 'https://x.example'); reads.push(u.search); return Response.json(answer(u.searchParams.get('metric'), u.searchParams.get('group_by'))); };
+    window.localStorage.setItem('coral-eff-group-commit', 'all'); window.localStorage.setItem('coral-eff-group-time', 'all'); // the flow below starts at All (the default is Model, analytics_overview_group.test.mjs)
     const eff = await importUi('analytics_efficiency');
     const settle = () => new Promise(r => setTimeout(r, 20));
     eff.syncEfficiency('week');

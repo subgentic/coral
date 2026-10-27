@@ -298,7 +298,7 @@ function _watchCostTables() {
     _nameCostTables();
 }
 
-export async function _refreshCostDashboard() {
+export async function _refreshCostDashboard({ force = false } = {}) {
     _watchCostTables();
     const { costRange, providerRows, modelRows, thinkingRows, agentRows } = await importOnce('./cost_data.js'); // the range and the rows, pure (#8359); loaded when the page first refreshes, as the page's other lazy parts are
     const period = document.getElementById('cost-time-range')?.value || 'day';
@@ -310,7 +310,7 @@ export async function _refreshCostDashboard() {
     _refreshOverview(); // the change against the period before, and cost by team (#7930)
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
     syncEfficiency(period);
-    showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time')); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
+    showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time'), force); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
     try {
         const [summaryResp, taskResp, tsResp, teamResp, branchResp] = await Promise.all([

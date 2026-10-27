@@ -24,7 +24,7 @@ const TEAM = `qa-a11y-pass-${Date.now() % 100000}`;
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         await ev(`window.switchNavTab('tokens'); true`); await settle(1500);
-        const view = async key => { await ev(`(() => { const b = document.querySelector('#cost-nav-list .row-btn[data-view="${key}"]'); if (b) b.click(); return !!b; })()`); await settle(900); };
+        const view = async key => { await ev(`(() => { const g = ({ provider: 'Provider', model: 'Model', thinking: 'Thinking level', team: 'Team', agent: 'Agent', branch: 'Branch', task: 'Task' })[${JSON.stringify(key)}]; const b = g ? [...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(x => x.textContent === g) : document.querySelector('#cost-nav-list .row-btn[data-view="${key}"]'); if (b) b.click(); return !!b; })()`); await settle(900); }; // a grouping is Overview's Group by (#9236)
         await S.run('a phone: an agent name in a By agent row is a 44 px target', async () => {
             await view('agent');
             const links = await ev(`[...document.querySelectorAll('#cost-by-agent .dt-link')].filter(e => e.getClientRects().length).map(e => { const b = e.getBoundingClientRect(); return [e.textContent.trim(), Math.round(b.height)]; })`);

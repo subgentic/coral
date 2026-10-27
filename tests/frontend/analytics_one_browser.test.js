@@ -26,7 +26,8 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
 
 const TASKS = [{ id: 86091, title: 'Named agent task', status: 'completed', assigned_to: 'Backend Dev', priority: 'high', cost_usd: 1.25 },
     { id: 86092, title: 'Unassigned task', status: 'completed', assigned_to: null, priority: 'low', cost_usd: 0.5 }];
-const VIEWS = ['Overview', 'By provider', 'By model', 'By thinking level', 'By team', 'By agent', 'By branch', 'By task', 'Tool and API calls', 'Tokens per commit', 'Task time'];
+const VIEWS = ['Overview', 'Tokens per commit', 'Task time', 'Tool and API calls']; // one entry per metric (#9236)
+const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking level': 'Thinking level', 'By team': 'Team', 'By agent': 'Agent', 'By branch': 'Branch', 'By task': 'Task' }; // the groupings are Overview's Group by (#9236), not sidebar entries
 const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o) => { const url = String(u && u.url || u); window.__costReq = (window.__costReq || []).concat(url);
         if (new URL(url, location.origin).pathname === '/api/board/tasks') return json({ tasks: ${JSON.stringify(TASKS)} });
@@ -58,6 +59,12 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} li .row-btn').length === ${VIEWS.length}`, 'the Analytics pane with its views', 10000);
     };
     const choose = async label => {
+        const g = GROUP_OF[label];
+        if (g) {
+            await ev(`[...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(b => b.textContent === ${JSON.stringify(g)}).click(); true`);
+            await waitFor(`document.getElementById('cost-view-title').textContent === 'Overview' && document.querySelector('#cost-group-bar .eff-seg-btn[aria-pressed="true"]').textContent === ${JSON.stringify(g)}`, 'Overview grouped by ' + g, 6000);
+            return;
+        }
         await ev(`[...document.querySelectorAll('${pane} li .row-btn')].find(b => b.textContent.trim() === ${JSON.stringify(label)}).click(); true`);
         await waitFor(`document.getElementById('cost-view-title').textContent === ${JSON.stringify(label)}`, 'the ' + label + ' view', 6000);
     };
@@ -82,7 +89,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                 assert.equal(await ev(`!!document.querySelector('#mobile-analytics-list ${pane}')`), true, at + 'the pane is in the phone page');
                 assert.equal(await ev(`[...document.querySelectorAll('#mobile-analytics-list .sidebar-hide-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Hide on a phone');
                 assert.equal(await ev(`document.getElementById('cost-page').getClientRects().length`), 0, at + 'the page is not shown until a view is chosen');
-                assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); return [rows.length, [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]]; })()`), [11, [44]], at + 'the views are the shared row: 44 px on a phone');
+                assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); return [rows.length, [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]]; })()`), [4, [44]], at + 'the views are the shared row: 44 px on a phone');
                 await shot(`analytics-one-list-${w}`);
                 await choose('By model');
                 await waitFor(`document.getElementById('cost-page').getClientRects().length > 0`, at + 'the view as a screen', 6000);
@@ -95,7 +102,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                 await shot(`analytics-one-range-${w}`);
                 await ev(`document.querySelector('.cost-phone-back').click(); true`);
                 await waitFor(`document.getElementById('mobile-analytics-list').getClientRects().length > 0 && document.getElementById('cost-page').getClientRects().length === 0`, at + 'back is the list', 4000);
-                assert.equal(await ev(`document.activeElement.dataset.view`), 'model', at + 'back puts the focus on the view just left, not on the first row');
+                assert.equal(await ev(`document.activeElement.dataset.view`), 'overview', at + 'back puts the focus on the view just left (Overview: the Model grouping is Overview with a choice made), not on the first row');
                 continue;
             }
 
@@ -113,7 +120,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             assert.deepEqual(await ev(`[...new Set([...document.querySelectorAll('#cost-summary-cards .cost-card-label')].map(e => getComputedStyle(e).fontSize + '/' + getComputedStyle(e).fontWeight))]`), ['12px/500'], at + 'every tile label is 12/500');
             assert.equal(await ev(`document.querySelectorAll('#cost-summary-cards .cost-card').length`), 7, at + 'seven tiles');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-summary-cards .cost-card-value')].filter(v => { const r = document.createRange(); r.selectNodeContents(v); return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size > 1; }).map(v => v.textContent)`), [], at + 'every figure is on one line, whole');
-            assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); const h = [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]; return [rows.length, h]; })()`), [11, [mobile ? 44 : 36]], at + 'the views are the shared sidebar row: 36 px on a desktop, 44 on a phone, the button is the row');
+            assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); const h = [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]; return [rows.length, h]; })()`), [4, [mobile ? 44 : 36]], at + 'the views are the shared sidebar row: 36 px on a desktop, 44 on a phone, the button is the row');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-dashboard-view [data-cview]')].filter(e => e.getClientRects().length).map(e => e.dataset.cview)`).then(a => [...new Set(a)]), ['overview'], at + 'only the Overview parts are shown');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#cost-dashboard-view .cost-section[data-cview=overview] .cost-section-title')); return [t.fontSize, t.fontWeight]; })()`), ['14px', '600'], at + 'a section heading is 14/600');
             await waitFor(`document.querySelectorAll('#cost-spend-chart .spend-label').length === 6`, at + 'the cumulative chart labels', 5000);
@@ -122,15 +129,15 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             await shot(`analytics-one-overview-${w}`);
 
             // choosing a view from the keyboard keeps the focus on its row (the list is drawn again, the button was a new one)
-            await ev(`(() => { const b = document.querySelector('${pane} li .row-btn[data-view="model"]'); b.focus(); b.click(); return true; })()`);
-            await waitFor(`document.getElementById('cost-view-title').textContent === 'By model'`, at + 'By model', 4000);
-            assert.equal(await ev(`document.activeElement.dataset.view`), 'model', at + 'the focus is still on the row that was chosen');
+            await ev(`(() => { const b = document.querySelector('${pane} li .row-btn[data-view="per-commit"]'); b.focus(); b.click(); return true; })()`);
+            await waitFor(`document.getElementById('cost-view-title').textContent === 'Tokens per commit'`, at + 'Tokens per commit', 4000);
+            assert.equal(await ev(`document.activeElement.dataset.view`), 'per-commit', at + 'the focus is still on the row that was chosen');
             await choose('Overview');
 
             // a table view: its own section under the title; the section heading is for a reader, not drawn twice
             await choose('By provider');
             assert.deepEqual(await ev(`[...new Set([...document.querySelectorAll('#cost-dashboard-view [data-cview]')].filter(e => e.getClientRects().length).map(e => e.dataset.cview))]`), ['provider'], at + 'only the provider section is shown');
-            assert.equal(await ev(`document.querySelector('${pane} li .row-btn[aria-current="true"]').textContent.trim()`), 'By provider', at + 'the list marks it');
+            assert.equal(await ev(`document.querySelector('${pane} li .row-btn[aria-current="true"]').textContent.trim()`), 'Overview', at + 'the list marks Overview (the grouping is Overview with a choice made)');
             assert.equal(await ev(`(() => { const t = document.querySelector('#cost-dashboard-view .cost-section[data-cview=provider] .cost-section-title'); const r = t.getBoundingClientRect(); return r.width <= 1 && r.height <= 1; })()`), true, at + 'its heading is not drawn a second time');
             assert.equal(await ev(`document.getElementById('cost-status').textContent`), 'Showing By provider', at + 'a status line says what is showing');
             assert.ok(await ev(`document.querySelectorAll('#cost-by-provider tbody tr').length`) >= 2, at + 'the table has its rows');
@@ -165,9 +172,9 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             await choose('Overview');
 
             // the search narrows the list
-            await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'team'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'task'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('${pane} li .row-btn').length === 1`, at + 'the search narrows the list', 5000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} li .row-btn')].map(b => b.textContent.trim())`), ['By team'], at + 'to the match');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} li .row-btn')].map(b => b.textContent.trim())`), ['Task time'], at + 'to the match');
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'zzz'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`!!document.querySelector('${pane} .empty-state')`, at + 'no match says so', 5000);
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);

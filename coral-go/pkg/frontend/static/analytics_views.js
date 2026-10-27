@@ -7,20 +7,23 @@ import { setText } from './dom_write.js';
 import { state } from './state.js';
 import { note } from './nav.js';
 
+// One sidebar entry per metric (the Operator's design, #9236): Overview, Tokens per commit, Task time, Tool and API calls. The groupings (provider, model, thinking level, team, agent, branch, task) are a
+// Group by selector inside Overview, not entries of their own: each is still a page of its own under /analytics/<key> (a link keeps working), drawn as Overview with that grouping chosen.
 export const VIEWS = [
     { key: 'overview', label: 'Overview' },
-    { key: 'provider', label: 'By provider' },
-    { key: 'model', label: 'By model' },
-    { key: 'thinking', label: 'By thinking level' },
-    { key: 'team', label: 'By team' },
-    { key: 'agent', label: 'By agent' },
-    { key: 'branch', label: 'By branch' },
-    { key: 'task', label: 'By task' },
-    { key: 'calls', label: 'Tool and API calls' },
     { key: 'per-commit', label: 'Tokens per commit' },
     { key: 'task-time', label: 'Task time' },
-    { key: 'agent-detail', label: 'Agent', hidden: true }, // one agent over the range: opened from By agent's Details, not listed (analytics_agent.js, #7930)
+    { key: 'calls', label: 'Tool and API calls' },
+    { key: 'provider', label: 'By provider', under: 'overview', hidden: true },
+    { key: 'model', label: 'By model', under: 'overview', hidden: true },
+    { key: 'thinking', label: 'By thinking level', under: 'overview', hidden: true },
+    { key: 'team', label: 'By team', under: 'overview', hidden: true },
+    { key: 'agent', label: 'By agent', under: 'overview', hidden: true },
+    { key: 'branch', label: 'By branch', under: 'overview', hidden: true },
+    { key: 'task', label: 'By task', under: 'overview', hidden: true },
+    { key: 'agent-detail', label: 'Agent', under: 'overview', hidden: true }, // one agent over the range: opened from the Agent grouping's Details, not listed (analytics_agent.js, #7930)
 ];
+export const GROUPS = [['all', 'All'], ['provider', 'Provider'], ['model', 'Model'], ['thinking', 'Thinking level'], ['team', 'Team'], ['agent', 'Agent'], ['branch', 'Branch'], ['task', 'Task']];
 
 let current = 'overview';
 let query = '';
@@ -38,13 +41,38 @@ function drawViews() {
     const list = document.getElementById('cost-nav-list');
     if (!list) return;
     const held = list.contains(document.activeElement) ? document.activeElement.dataset.view : null; // the list is drawn again: the keyboard stays on its row
-    const rows = shown(), on = current === 'agent-detail' ? 'agent' : current; // an agent's page is under By agent
+    const rows = shown(), on = (VIEWS.find(v => v.key === current) || {}).under || current; // a grouping and an agent's page are under Overview
     list.innerHTML = rows.map(v => `<li class="session-list-item${escapeAttr(v.key === on ? ' active' : '')}"><button type="button" class="row-btn"${v.key === on ? ' aria-current="true"' : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`).join('')
         || '<li class="empty-state empty-state-tight">No view matches the search.</li>';
     if (held) list.querySelector(`.row-btn[data-view="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
 }
 
 export function filterViews(text) { query = String(text || ''); drawViews(); }
+
+/** The Group by selector of Overview (the same switch as the two metric pages, analytics_efficiency.js): All is Overview's own page, each other choice is that grouping's page. One row of buttons, one select on a phone. */
+function drawGroupBar(key) {
+    const el = page(); if (!el) return;
+    let bar = document.getElementById('cost-group-bar');
+    const on = key === 'overview' ? 'all' : GROUPS.some(g => g[0] === key) ? key : null; // Overview and its groupings show the bar; calls, the metrics and one agent's page do not
+    if (!on) { if (bar) bar.hidden = true; return; }
+    if (!bar) {
+        bar = document.createElement('div'); bar.id = 'cost-group-bar'; bar.className = 'eff-switch';
+        const label = document.createElement('div'); label.className = 'eff-switch-label'; label.textContent = 'Group by';
+        const seg = document.createElement('div'); seg.className = 'eff-seg btn-seg'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Group by');
+        const pick = document.createElement('select'); pick.className = 'cost-time-select eff-pick'; pick.setAttribute('aria-label', 'Group by');
+        for (const [value, text] of GROUPS) {
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'btn eff-seg-btn'; b.textContent = text; b.dataset.group = value;
+            b.addEventListener('click', () => selectView(value === 'all' ? 'overview' : value, { focus: true }));
+            seg.append(b); pick.append(new Option(text, value));
+        }
+        pick.addEventListener('change', () => selectView(pick.value === 'all' ? 'overview' : pick.value, { focus: true }));
+        bar.append(label, seg, pick);
+        (el.querySelector('[data-cview]') || el.firstChild)?.before(bar);
+    }
+    bar.hidden = false;
+    for (const b of bar.querySelectorAll('.eff-seg-btn')) b.setAttribute('aria-pressed', String(b.dataset.group === on));
+    const pick = bar.querySelector('.eff-pick'); if (pick) pick.value = on;
+}
 
 /** The time range as the page says it under the title ("Last 24 hours"), from the header's select. */
 export function syncRangeLine() {
@@ -65,9 +93,10 @@ export function selectView(key, { focus = false, fromHistory = false } = {}) {
         if (isPhoneLayout()) el.setAttribute('data-phone-item', ''); else el.removeAttribute('data-phone-item');
     }
     for (const sec of document.querySelectorAll('#cost-dashboard-view [data-cview]')) sec.hidden = sec.dataset.cview !== v.key;
-    setText(document.getElementById('cost-view-title'), v.label);
+    setText(document.getElementById('cost-view-title'), v.under && v.key !== 'agent-detail' ? 'Overview' : v.label); // a grouping is Overview with a grouping chosen
     syncRangeLine();
     drawViews();
+    drawGroupBar(v.key);
     document.dispatchEvent(new CustomEvent('cost-view-change', { detail: v.key })); // a view with a chart over time reads it (cost_dashboard.js)
     const status = document.getElementById('cost-status');
     if (status && focus) setText(status, `Showing ${v.label}`);

@@ -266,8 +266,11 @@ function drawTime() {
 
 function draw() { drawSpend(); drawTime(); }
 
-async function loadSpend() {
+const SPEND_FRESH_MS = 10000; // a read of this team and range is reused for ten seconds: switching Analytics views redrew from the same numbers and asked again each time (#9250); the 15 s poll and the Refresh button read again
+async function loadSpend(force = false) {
     if (!model.team) { draw(); return; }
+    const key = `${model.team}|${model.range}`;
+    if (!force && model.data && model.key === key && Date.now() - model.at < SPEND_FRESH_MS) { model.loading = false; draw(); return; }
     const seq = ++model.seq, team = model.team;
     model.loading = !model.data; model.error = '';
     draw();
@@ -276,7 +279,7 @@ async function loadSpend() {
         if (seq !== model.seq) return;
         if (r.status === 404) { model.data = null; model.error = 'No spend data for this team yet.'; }
         else if (!r.ok) throw new Error(String(r.status));
-        else model.data = await r.json();
+        else { model.data = await r.json(); model.key = key; model.at = Date.now(); }
     } catch { if (seq !== model.seq) return; model.error = 'Spend could not be read.'; }
     model.loading = false;
     draw();
@@ -286,7 +289,7 @@ async function loadSpend() {
 const rangeOf = (period) => (period === 'week' || period === 'month' ? '7d' : '24h');
 
 /** Mount the two sections in `host` (tokens per commit) and `timeHost` (task time) and read them: `period` is the Analytics time range. Called on every refresh of the tab. */
-export function showSpend(host, period, timeHost) {
+export function showSpend(host, period, timeHost, force = false) {
     const range = rangeOf(period);
     const list = teams();
     const saved = browserLocal.get(TEAM_KEY) || '';
@@ -310,5 +313,5 @@ export function showSpend(host, period, timeHost) {
     host.querySelector('.spend-head').hidden = list.length < 2;
     if (changed) model.data = null;
     readBoards().then(more => { if (more && host.isConnected) showSpend(host, period, timeHost); }); // the boards' teams came in: the picker is drawn again with them
-    return loadSpend();
+    return loadSpend(force);
 }
