@@ -425,6 +425,28 @@ func TestSessionArtifactsForStandaloneAgent(t *testing.T) {
 	getTeamArtifacts(t, srv, "/api/session-artifacts", http.StatusBadRequest)
 }
 
+// A standalone agent's list takes the team lists' sort words over the whole list, and pages by offset after it (#8945).
+func TestSessionArtifactsSort(t *testing.T) {
+	srv, _, coralDir := teamArtifactServer(t)
+	writeUpload(t, coralDir, "solo-9", "# medium sized\n", "beta.md", "2026-10-09T10:00:00Z")
+	writeUpload(t, coralDir, "solo-9", "a very much longer file content to make this one the largest of the three\n", "Zulu.md", "2026-10-09T11:00:00Z")
+	writeUpload(t, coralDir, "solo-9", "x\n", "alpha.md", "2026-10-09T12:00:00Z")
+	names := func(qs string) []string {
+		var out []string
+		for _, a := range getTeamArtifacts(t, srv, "/api/session-artifacts?session_id=solo-9"+qs, http.StatusOK).Artifacts {
+			out = append(out, a.Name)
+		}
+		return out
+	}
+	require.Equal(t, []string{"alpha.md", "beta.md", "Zulu.md"}, names("&sort=name"))
+	require.Equal(t, []string{"Zulu.md", "beta.md", "alpha.md"}, names("&sort=name_desc"))
+	require.Equal(t, []string{"Zulu.md", "beta.md", "alpha.md"}, names("&sort=size"), "largest first")
+	require.Equal(t, []string{"alpha.md", "beta.md", "Zulu.md"}, names("&sort=size_asc"), "smallest first")
+	require.Equal(t, []string{"alpha.md", "Zulu.md", "beta.md"}, names("&sort=newest"))
+	require.Equal(t, []string{"beta.md"}, names("&sort=name&limit=1&offset=1"), "the page is cut after the sort")
+	getTeamArtifacts(t, srv, "/api/session-artifacts?session_id=solo-9&sort=bogus", http.StatusBadRequest)
+}
+
 // writeUpload records sessionID's upload of a managed object, as the upload API does.
 func writeUpload(t *testing.T, coralDir, sessionID, content, name, createdAt string) string {
 	t.Helper()
