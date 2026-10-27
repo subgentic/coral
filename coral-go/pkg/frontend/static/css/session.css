@@ -1253,16 +1253,7 @@
     flex-shrink: 0;
 }
 
-.board-paused-banner {
-    font-size: var(--fs-base);
-    font-weight: 600;
-    color: var(--error);
-    background: rgba(var(--fx-red-rgb), 0.1);
-    border-bottom: 1px solid rgba(var(--fx-red-rgb), 0.3);
-    padding: 6px 10px;
-    text-align: center;
-    flex-shrink: 0;
-}
+.board-paused-banner { flex-shrink: 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 
 .board-chat-title {
     flex: 1;
@@ -1915,17 +1906,7 @@
 .server-update-marker.server-update-required { color: var(--warning); }
 
 /* The selected agent's server is unreachable (#3151) */
-.server-unreachable-banner {
-    padding: 8px 12px;
-    border: 1px solid var(--warning, var(--fx-amber));
-    border-radius: var(--radius-lg);
-    background: var(--bg-primary);
-    background-image: linear-gradient(rgba(var(--fx-amber-rgb), 0.10), rgba(var(--fx-amber-rgb), 0.10));
-    color: var(--text-primary);
-    font-size: var(--fs-sm, 13px);
-    line-height: 1.4;
-    box-shadow: 0 2px 8px rgba(var(--black-rgb), 0.25);
-}
+
 .server-unreachable-banner[hidden] { display: none; }
 
 /* At 200% text on a phone the panel was wider than its box and clipped on the right: a fieldset is as wide as its content unless told otherwise, and the 11em

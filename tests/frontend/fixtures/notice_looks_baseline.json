@@ -1,0 +1,25 @@
+{
+  "css/agentic.css": {
+    ".agent-ui-notice": 2,
+    ".artifact-linked-notice": 2
+  },
+  "css/artifact-comments.css": {
+    ".av-notice": 1
+  },
+  "css/components.css": {
+    ".notification-toast": 1,
+    ".update-toast": 1,
+    ".security-warning-toast": 1,
+    ".leftover-tmux-banner": 1,
+    ".update-banner": 1,
+    ".default-notice-banner": 1,
+    ".settings-cloud-notice": 1
+  },
+  "css/mobile.css": {
+    ".waiting-banner": 2,
+    ".session-mobile-banner": 1
+  },
+  "css/session.css": {
+    ".waiting-banner": 1
+  }
+}

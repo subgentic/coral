@@ -203,16 +203,7 @@
     margin-bottom: 8px;
 }
 
-.sched-fail-banner {
-    margin: 0 0 14px;
-    padding: 10px 12px;
-    border-radius: var(--radius-md);
-    font-size: var(--fs-md);
-    line-height: 1.5;
-    color: var(--error, var(--error));
-    background: rgba(var(--fx-red-rgb), 0.12);
-    border: 1px solid rgba(var(--fx-red-rgb), 0.3);
-}
+.sched-fail-banner { margin: 0 0 14px; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 
 .sched-fail-banner strong {
     display: block;

@@ -118,18 +118,7 @@
 .mb-earlier-line { text-align: center; padding: var(--space-xs) 0 var(--space-md); font-size: var(--fs-sm); font-weight: 400; color: var(--text-secondary); } /* "Loading earlier messages\u2026" and "Start of the board": quiet, one line (#7762) */
 
 /* Message board — sleep banner */
-.mb-sleep-banner {
-    text-align: center;
-    padding: 12px 16px;
-    background: rgba(var(--fx-amber-rgb), 0.1);
-    border: 1px solid rgba(var(--fx-amber-rgb), 0.25);
-    border-radius: var(--radius-lg);
-    color: var(--warning);
-    font-size: var(--fs-md);
-    margin: 8px 16px 12px;
-    flex-shrink: 0; /* above the message list, not in it (#8453) */
-    display: flex; align-items: center; justify-content: center; gap: 8px; /* the moon icon and the words, a space apart */
-}
+.mb-sleep-banner { margin: 8px 16px 12px; flex-shrink: 0; } /* above the message list, not in it (#8453); where it sits: what it looks like is the one notice's (.notice, layout.css) */
 .mb-sleep-banner .material-icons { font-size: var(--icon-size); }
 
 .restart-spinner {
@@ -2455,25 +2444,8 @@
     margin-top: 12px;
 }
 
-.generated-team-banner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    margin: 12px 0;
-    border-radius: var(--radius-lg);
-    background: linear-gradient(135deg, rgba(var(--fx-indigo-rgb), 0.12), rgba(168, 85, 247, 0.08));
-    border: 1px solid rgba(var(--fx-indigo-rgb), 0.25);
-    color: var(--text-secondary);
-    font-size: var(--fs-md);
-    line-height: 1.4;
-}
+.generated-team-banner { margin: 12px 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 
-.generated-team-banner .material-icons {
-    font-size: var(--icon-size);
-    color: var(--accent);
-    flex-shrink: 0;
-}
 
 /* Collapsed card summary */
 
@@ -3149,16 +3121,7 @@
 /* Tmux missing banner — shown across the top when tmux can't be found.
    Agents need tmux to run, so we surface install instructions instead of
    silently failing on launch. */
-.tmux-missing-banner {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 16px;
-    background: color-mix(in srgb, var(--warning) 18%, var(--bg-secondary));
-    border-bottom: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
-    color: var(--text-primary);
-    font-size: var(--fs-md);
-}
+
 .tmux-missing-banner-icon {
     color: var(--warning);
     font-size: var(--fs-2xl);
@@ -3445,7 +3408,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .default-notice-banner .material-icons { color: var(--accent); }
 .default-notice-link { background: none; border: 0; padding: 0; font: inherit; color: var(--link-text); text-decoration: underline; cursor: pointer; }
 .leftover-tmux-text { flex: 1; min-width: 0; }
-.local-auth-banner { flex: none; display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px; background: color-mix(in srgb, var(--error) 16%, var(--bg-secondary)); border-bottom: 1px solid var(--error); color: var(--text-primary); font-size: var(--fs-base, 13px); } /* #4291 */
+.local-auth-banner { flex: none; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */ /* #4291 */
 .local-auth-banner[hidden] { display: none; }
 .local-auth-banner .material-icons { flex: none; color: var(--error); font-size: var(--fs-2xl); }
 .local-auth-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }

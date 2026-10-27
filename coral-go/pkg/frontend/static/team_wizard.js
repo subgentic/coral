@@ -102,7 +102,7 @@ function _populateGeneratedTeamDraft(team) {
     if (!banner && stepEl) {
         banner = document.createElement('div');
         banner.id = 'generated-team-banner';
-        banner.className = 'generated-team-banner';
+        banner.className = 'notice notice-info generated-team-banner';
         banner.innerHTML = '<span class="material-icons" aria-hidden="true">auto_awesome</span> Your AI-generated team is ready — review and edit before launching.';
         const h3 = stepEl.querySelector('h3');
         if (h3) h3.after(banner);
