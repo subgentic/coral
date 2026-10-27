@@ -282,6 +282,14 @@ export function isBoardAnswer(project, answered) {
     return boardLabel(identityKey(server, id)).toLowerCase() === name.toLowerCase();
 }
 
+/** A name-based answer cannot be checked until either its id's label or that name's board is known on the same server. Never defer a mismatch for an id, an empty answer, or a known name. */
+export function isBoardAnswerPending(project, answered) {
+    const { server, name } = splitKey(project), id = String(answered ?? '');
+    return !!id && !isBoardAnswer(project, id) && !/^b-[a-z0-9]{6,}$/.test(name)
+        && !hasBoardLabel(identityKey(server, id))
+        && ![...(_labelKeys.get(name.toLowerCase()) || [])].some(key => splitKey(key).server === server);
+}
+
 /** What people read for a board or team key: its label, or the key's name when no label is
  *  known; with a short id when another known board has the same label (#3536). */
 export function keyLabel(key) {
