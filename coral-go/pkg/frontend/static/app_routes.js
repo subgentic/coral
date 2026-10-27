@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { deserializeFromUrl } from './search_filters.js';
 import { selectHistorySession } from './sessions.js';
 import { startNav, go, note, onRoute, currentRoute } from './nav.js';
-import { liveRoute, keyRoute, routeKey, AGENT_SUBTABS, parse as parseRoute } from './routes.js';
+import { liveRoute, keyRoute, routeKey, AGENT_SUBTABS, parse as parseRoute, cloudRedirect } from './routes.js';
 import { showTerminalView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { showView, showToast } from './utils.js';
@@ -28,6 +28,7 @@ function notFound(message, listRoute) {
 function registerRouteHandlers() {
     // Any view but a team leaves the team workspace (Back from a team to where the user was).
     const route = (view, fn) => onRoute(view, async (r, opts) => {
+        const home = cloudRedirect({ view }, isCloud()); if (home.view !== view) return go(home, { replace: true }); // the Hub does not serve Automations (#9368); the tab and menu rows are hidden (nav_tabs.js, cloud.css)
         if (state.selectedTeam && await exitTeamPage() === false) {
             note(keyRoute('team', state.selectedTeam), { replace: true }); // kept: unsaved team settings
             return;
