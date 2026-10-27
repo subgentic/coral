@@ -133,34 +133,83 @@ func TestNoPrebuiltBuilds(t *testing.T) {
 	}
 }
 
-// A damaged file is never served as the dashboard (#8785): one flipped bit, at many offsets of the real bundle's file, is refused every time; the intact file still decodes. gzip's CRC and
-// the file's own checksum are each enough for most flips; together none gets through.
-func TestAFlippedBitInThePrebuiltFileIsAlwaysRefused(t *testing.T) {
+// sameBundle says two decoded prebuilt families are the same: every file byte for byte, the module lists, and what was skipped.
+func sameBundle(a, b *Bundle) bool {
+	if len(a.Files) != len(b.Files) || strings.Join(a.Modules, ",") != strings.Join(b.Modules, ",") || strings.Join(a.Lazy, ",") != strings.Join(b.Lazy, ",") || len(a.LazySkipped) != len(b.LazySkipped) {
+		return false
+	}
+	for name, want := range a.Files {
+		got, ok := b.Files[name]
+		if !ok || !bytes.Equal(got, want) {
+			return false
+		}
+	}
+	for name, e := range a.LazySkipped {
+		if f, ok := b.LazySkipped[name]; !ok || f.Error() != e.Error() {
+			return false
+		}
+	}
+	return true
+}
+
+// A damaged prebuilt file never changes what is served (#8760, #8785, #8993): a flipped bit is either refused or leaves exactly the intact family. gzip's header is ten bytes and its CRC
+// covers only the data, so a flip in the header's time, extra-flags or OS byte decodes to the same files; that is harmless, and which of 100 seeded offsets lands there depends on the file's
+// length (run 138 failed on it). What must never happen is a file that decodes without an error to different files.
+func TestAFlippedBitInThePrebuiltFileNeverChangesWhatIsServed(t *testing.T) {
 	_, static := realBundle(t)
 	index, _ := fs.ReadFile(Templates, "templates/index.html")
-	data, built, _ := prebuiltOf(t, static, index)
-	if _, _, err := DecodePrebuilt(bytes.NewReader(data)); err != nil {
+	data, _, _ := prebuiltOf(t, static, index)
+	ref, refHash, err := DecodePrebuilt(bytes.NewReader(data))
+	if err != nil {
 		t.Fatalf("the intact file is refused: %v", err)
 	}
 	seed := uint64(8785)
 	next := func() uint64 { seed = seed*6364136223846793005 + 1442695040888963407; return seed >> 33 }
-	accepted := 0
+	refused, same := 0, 0
 	for i := 0; i < 100; i++ {
 		damaged := append([]byte{}, data...)
 		damaged[int(next())%len(damaged)] ^= 1 << (next() % 8)
-		b, _, err := DecodePrebuilt(bytes.NewReader(damaged))
-		if err == nil {
-			accepted++
-			if len(b.Files) == len(built.Files) {
-				t.Errorf("flip %d: a damaged file was accepted", i)
-			}
+		b, hash, err := DecodePrebuilt(bytes.NewReader(damaged))
+		switch {
+		case err != nil:
+			refused++
+		case hash == refHash && sameBundle(b, ref):
+			same++ // a bit of the header that nothing reads: the same family
+		default:
+			t.Errorf("flip %d: a damaged file decoded without an error to different content", i)
 		}
 	}
-	if accepted > 0 {
-		t.Errorf("%d of 100 damaged files were accepted", accepted)
+	if refused < 90 {
+		t.Errorf("only %d of 100 damaged files were refused (%d decoded to the same family): the checks are not reading the data", refused, same)
 	}
 	// a file cut short, or with a trailing byte changed, is refused too
 	if _, _, err := DecodePrebuilt(bytes.NewReader(data[:len(data)-4])); err == nil {
 		t.Error("a file with its gzip trailer cut was accepted")
+	}
+}
+
+// The ten bytes of gzip's header: the first four (two ids, the method, the flags) decide how the rest is read, so a flip there is refused or leaves the same family; the next six (the modification
+// time, the extra flags and the operating system) are read by nothing, so a flip in any of them leaves exactly the same family, with no error (#8993).
+func TestEveryBitOfTheGzipHeaderEitherChangesNothingOrIsRefused(t *testing.T) {
+	_, static := realBundle(t)
+	index, _ := fs.ReadFile(Templates, "templates/index.html")
+	data, _, _ := prebuiltOf(t, static, index)
+	ref, refHash, err := DecodePrebuilt(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("the intact file is refused: %v", err)
+	}
+	for off := 0; off < 10; off++ {
+		for bit := 0; bit < 8; bit++ {
+			damaged := append([]byte{}, data...)
+			damaged[off] ^= 1 << bit
+			b, hash, err := DecodePrebuilt(bytes.NewReader(damaged))
+			identical := err == nil && hash == refHash && sameBundle(b, ref)
+			switch {
+			case off >= 4 && !identical:
+				t.Errorf("header byte %d bit %d: nothing reads it, so the family must decode unchanged (err %v)", off, bit, err)
+			case off < 4 && err == nil && !identical:
+				t.Errorf("header byte %d bit %d: decoded without an error to different content", off, bit)
+			}
+		}
 	}
 }
