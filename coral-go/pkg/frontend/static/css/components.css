@@ -180,6 +180,7 @@
     width: 100%;
     min-width: 0;
 }
+#mb-messages:has(> .empty-state:only-child) { padding-left: 0 !important; } /* the board's own notice starts at the page's content edge like every team tab's empty state, not 8 px in (#9470) */
 
 /* Message board rows (#3590, the operator's choice; no initials badge since #7315): the name and time on one line in the sender's
    palette colour, the body beneath, both at the row's left edge; no boxes or dividers, a highlight on hover. Posts in a row from one sender share the name. */
