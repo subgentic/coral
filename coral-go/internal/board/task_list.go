@@ -20,7 +20,7 @@ import (
 
 // Task list filters.
 const (
-	TaskListDefault   = ""          // every open task, plus the first page of done tasks
+	TaskListDefault   = ""          // the open tasks in priority order (paged when there are more than a page), then the done tasks
 	TaskListOpen      = "open"      // open tasks only, paged by id
 	TaskListCompleted = "completed" // done tasks only (completed or skipped), newest first
 	TaskListAll       = "all"       // every task, paged by id, newest first
@@ -139,23 +139,9 @@ func (s *Store) ListTaskPage(ctx context.Context, project string, q TaskListQuer
 	var err error
 	switch q.Status {
 	case TaskListDefault:
-		// Every open task (the working set: small), then the newest done tasks.
-		if q.Cursor != "" {
-			return nil, fmt.Errorf("%w: a cursor continues status=%s", ErrBadTaskListQuery, TaskListCompleted)
-		}
-		var open []TaskListItem
-		if err = s.reader().SelectContext(ctx, &open, `SELECT `+taskListColumns+`
-			 WHERE t.board_id = ? AND t.`+openTaskStatusSQL+`
-			 ORDER BY CASE t.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, t.id ASC`,
-			project); err != nil {
-			return nil, err
-		}
-		done, next, err := s.doneTaskPage(ctx, project, "", limit)
-		if err != nil {
-			return nil, err
-		}
-		page.Tasks = append(append(page.Tasks, open...), done...)
-		page.NextCursor = next
+		// The open tasks in priority order, then the newest done ones. A board whose open set fits one page (the usual one) gets every open task and the first page of done tasks; a bigger open set is paged,
+		// so a poll of a board with 1,500 open tasks costs one page, not 6.7 MB (#9121): see defaultTaskPage.
+		page.Tasks, page.NextCursor, err = s.defaultTaskPage(ctx, project, q.Cursor, limit)
 	case TaskListCompleted:
 		page.Tasks, page.NextCursor, err = s.doneTaskPage(ctx, project, q.Cursor, limit)
 	case TaskListOpen, TaskListAll:
@@ -206,6 +192,63 @@ func (s *Store) TaskCounts(ctx context.Context, project string) (*TaskListPage, 
 		return nil, err
 	}
 	return &TaskListPage{Tasks: []TaskListItem{}, TotalOpen: open, TotalCompleted: done}, nil
+}
+
+// openRankSQL orders the open tasks by priority (critical first); an unknown priority sorts last. It is the order the default list has always had.
+const openRankSQL = `COALESCE(CASE t.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, 4)`
+
+func priorityRank(p string) int {
+	switch p {
+	case "critical":
+		return 0
+	case "high":
+		return 1
+	case "medium":
+		return 2
+	case "low":
+		return 3
+	}
+	return 4
+}
+
+// defaultTaskPage pages the default list: the open tasks by (priority, id), `limit` at a time, then the done tasks newest first. Without a cursor, an open set that fits the page comes whole with the first page of
+// done tasks after it (what the dashboard has always drawn from one read); a bigger one comes as its first `limit` tasks with a cursor ("p", the last task's priority and id) that continues the open set. The page that
+// ends the open set is followed by the first page of done tasks, whose cursor ("d") continues them. Each page costs the open set's index walk and a sort of the open rows, never the done history.
+func (s *Store) defaultTaskPage(ctx context.Context, project, cursor string, limit int) ([]TaskListItem, string, error) {
+	if cursor != "" {
+		if _, _, err := decodeTaskCursor(cursor, project, "d"); err == nil {
+			return s.doneTaskPage(ctx, project, cursor, limit) // a done cursor: the rest of the done tasks
+		}
+	}
+	where := `t.board_id = ? AND t.` + openTaskStatusSQL
+	args := []any{project}
+	if cursor != "" {
+		rank, id, err := decodeTaskCursor(cursor, project, "p")
+		if err != nil {
+			return nil, "", err
+		}
+		r, convErr := strconv.Atoi(rank)
+		if convErr != nil {
+			return nil, "", fmt.Errorf("%w: bad cursor", ErrBadTaskListQuery)
+		}
+		where += ` AND (` + openRankSQL + ` > ? OR (` + openRankSQL + ` = ? AND t.id > ?))`
+		args = append(args, r, r, id)
+	}
+	var rows []TaskListItem
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT `+taskListColumns+` WHERE `+where+`
+		 ORDER BY `+openRankSQL+`, t.id ASC LIMIT ?`, append(args, limit+1)...); err != nil {
+		return nil, "", err
+	}
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[limit-1]
+		return rows, encodeTaskCursor(project, "p", strconv.Itoa(priorityRank(last.Priority)), last.ID), nil
+	}
+	done, next, err := s.doneTaskPage(ctx, project, "", limit)
+	if err != nil {
+		return nil, "", err
+	}
+	return append(rows, done...), next, nil
 }
 
 // doneTaskPage pages the done tasks by (completed_at DESC, id DESC). A task finished while

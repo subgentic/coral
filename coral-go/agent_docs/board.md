@@ -934,11 +934,11 @@ A page of the board's task list. Items carry list fields only: no `body`,
 
 | Parameter | Meaning |
 |---|---|
-| *(none)* | Every open task (pending, in progress, blocked, draft, review pending), ordered by priority then ID, followed by the newest done tasks (completed or skipped). `next_cursor` continues the done tasks. |
+| *(none)* | The open tasks (pending, in progress, blocked, draft, review pending), ordered by priority then ID, followed by the newest done tasks (completed or skipped). When the open tasks fit one `limit` page, the page holds every one of them and then a page of done tasks; when there are more, the page holds the first `limit` open tasks and `next_cursor` continues the open tasks, then the done ones. The totals (`total_open`, `total_completed`) are exact on every page. |
 | `status=completed` | Done tasks only, newest first (by `completed_at`, then ID). |
 | `status=open` | Open tasks only, oldest ID first. |
 | `status=all` | Every task, newest ID first. |
-| `limit` | Page size: default `50`, maximum `200`. With no `status`, it applies to the done tasks; every open task is always included. |
+| `limit` | Page size: default `50`, maximum `200`. With no `status`, it is the page of open tasks, and of done tasks after them. |
 | `cursor` | The `next_cursor` of the previous page, with the same `status`. Opaque. |
 | `full=1` | Every task in full (body, completion message, workflow), unpaged, as before pagination. For tools that need everything at once; it is slow on a large board. |
 
