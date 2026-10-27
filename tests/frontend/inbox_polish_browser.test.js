@@ -75,8 +75,8 @@ const path = require('node:path');
                 await load(`/inbox/goals/${board}/${goalId}`);
                 await waitFor(`!!document.querySelector('#inbox-page .goal-list')`, 'the goal page', 15000); await settle(300);
                 await shot('inbox-polish-goal-390-dark', 'dark'); await shot('inbox-polish-goal-390-light', 'light');
-                await waitFor(`/Goals \\([1-9]/.test((document.querySelector('#inbox-page .view-list select') || {}).selectedOptions?.[0]?.textContent || '')`, 'the folder select keeping the Goals total', 8000).catch(() => {});
-                check(`${label}: the open goal's folder select keeps the folder's total (Goals (N), not 0)`, await ev(`/Goals \\([1-9]/.test((document.querySelector('#inbox-page .view-list select') || {}).selectedOptions?.[0]?.textContent || '')`), await ev(`(document.querySelector('#inbox-page .view-list select') || {}).selectedOptions?.[0]?.textContent`));
+                await waitFor(`/Goals\\s*[1-9]/.test((document.querySelector('#inbox-page .view-list-trigger') || {}).textContent || '')`, 'the folder button keeping the Goals total', 8000).catch(() => {});
+                check(`${label}: the open goal's folder button keeps the folder's total (Goals (N), not 0)`, await ev(`/Goals\\s*[1-9]/.test((document.querySelector('#inbox-page .view-list-trigger') || {}).textContent || '')`), await ev(`(document.querySelector('#inbox-page .view-list-trigger') || {}).textContent`));
                 check(`${label}: the goal's heading does not take the focus on arrival`, await ev(`document.activeElement !== document.getElementById('goals-detail-title')`), await activeId());
             }
         }

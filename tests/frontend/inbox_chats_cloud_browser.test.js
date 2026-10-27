@@ -14,8 +14,8 @@ const SESSIONS = [1, 2, 3].map(i => ({ session_id: 'chat-00' + i, display_name: 
     const DRAW = `(async () => {
         const real = window.fetch;
         window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.origin); window.__flagWrites = window.__flagWrites || [];
-            if (url.pathname === '/api/sessions/history') return Promise.resolve(new Response(JSON.stringify({ sessions: ${JSON.stringify(SESSIONS)}, total: 3 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-            if (url.pathname === '/api/sessions/history/counts') return Promise.resolve(new Response(JSON.stringify({ all: 3, group: 0, notes: 0, starred: 0, active: 0, archived: 0, by_agent_type: {}, tags: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+            if (/\\/api\\/sessions\\/history$/.test(url.pathname)) return Promise.resolve(new Response(JSON.stringify({ sessions: ${JSON.stringify(SESSIONS)}, total: 3 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+            if (/\\/api\\/sessions\\/history\\/counts$/.test(url.pathname)) return Promise.resolve(new Response(JSON.stringify({ all: 3, group: 0, notes: 0, starred: 0, active: 0, archived: 0, by_agent_type: {}, tags: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
             if (/\\/flags$/.test(url.pathname)) window.__flagWrites.push(url.pathname);
             return real(u, o); };
         const CH = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js');
@@ -50,6 +50,8 @@ const SESSIONS = [1, 2, 3].map(i => ({ session_id: 'chat-00' + i, display_name: 
             return Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: (e.responseHeaders || []).filter(h => !/^content-length$/i.test(h.name)), body: Buffer.from(html).toString('base64') });
         });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+        // the Hub's Inbox reads the online computers (a dashboard on the Hub has no computer of its own: inboxSources, #9542): one is online
+        await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.hub = true; state.servers = [{ id: 'm1', status: 'online', label: 'Mac' }]; return true; })()`);
         assert.equal(await ev(DRAW), 3, 'three chats on the Hub');
         p = await probe();
         assert.equal(p.boot, 'cloud', 'the page believes it is on the Hub');
