@@ -151,7 +151,7 @@ function saveSettings(st) {
     return async (changes, { before, values }) => {
         const modeChanged = MODE_KEYS.some(k => k in changes);
         const pick = o => Object.fromEntries(MODE_KEYS.map(k => [k, o[k]]));
-        const saved = []; const failures = [];
+        const saved = []; const failures = []; const fieldErrors = {};
         if (modeChanged) {
             try {
                 const current = await fetch(st.workingModeURL);
@@ -176,12 +176,12 @@ function saveSettings(st) {
                 st.healthBase = JSON.parse(JSON.stringify(kept));
                 for (const [k, val] of Object.entries(healthToValues(kept))) st.view.set(k, val); // the server clamps every value: the fields show what it kept
                 saved.push(...HEALTH_KEYS);
-            } catch (error) { failures.push(error.message); }
+            } catch (error) { failures.push(error.message); Object.assign(fieldErrors, error.fields); }
         }
         if (XT_KEYS.some(k => k in changes)) {
             try { await st.xt.save(); saved.push(...XT_KEYS); } catch (error) { failures.push(error.message); }
         }
-        if (failures.length) throw Object.assign(new Error(failures[0]), { saved });
+        if (failures.length) throw Object.assign(new Error(failures[0]), { saved, fields: fieldErrors });
         return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k)) };
     };
 }
