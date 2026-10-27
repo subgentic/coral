@@ -1,7 +1,7 @@
 // Team settings on a phone (#5131; operator: "I'm unable to navigate to the team settings views on mobile."). From the agent list at 390x844 with a touch pointer: tap the team's menu
 // button, tap Team settings, and the settings are on screen (the side panel opens over the team's page; it used to stay shut, so the settings were drawn at no size behind the chat).
-// Each tab (Workflow, Prompt inspection, Health check) is reached by a tap and shows its panel, every tab is 44 px tall, nothing scrolls sideways, and the page's own link
-// (/team/<name>/settings) opens it on a reload. The Team view entry still shows the team's chat, not the panel. Both themes. Drives Chrome over CDP through agent_view_harness.js.
+// Each tab (Workflow, Prompt inspection, Health check) is reached by a tap and shows its panel, every tab is 44 px tall, nothing scrolls sideways, and the page
+// (there is no /team/<name>/settings link: a popout, #8853). The Team view entry still shows the team's chat, not the panel. Both themes. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
@@ -69,12 +69,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await reach('dark');
         console.log('   ✓ dark: the team menu → Team settings opens the page, and the four groups are reached by the selector');
 
-        // the page's own link: a reload on /team/<name>/settings opens the settings, in the light theme
-        await load('light', '/team/' + TEAM + '/settings');
-        await reach('light');
-        console.log('   ✓ light: the link /team/<name>/settings opens the settings on a phone, every section reached');
-
-        // and by the menu in the light theme
+        // (there is no /team/<name>/settings link any more: the settings are a popout, #8853)
+        // the same in the light theme
         await load('light');
         await open();
         await reach('light');

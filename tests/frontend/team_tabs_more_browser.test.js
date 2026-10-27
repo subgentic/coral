@@ -1,5 +1,5 @@
-// The team page's tabs on a phone (Goal #60, audit #8572 point 5): seven tabs scrolled sideways at 390 px. Now Goals, Agents, Tasks and Artifacts are the row and Artifacts, Knowledge and Settings are behind
-// a More menu (desktop unchanged: all seven, no More). The row never scrolls sideways; More is a 44 px menu button that says which of its tabs is open; the menu is reachable by keyboard (Enter or ArrowDown
+// The team page's tabs on a phone (Goal #60, audit #8572 point 5): seven tabs scrolled sideways at 390 px. Now Goals, Agents, Tasks and Artifacts are the row and Knowledge and Board are behind
+// a More menu (desktop: all six, no More; Settings is a popout button since #8853). The row never scrolls sideways; More is a 44 px menu button that says which of its tabs is open; the menu is reachable by keyboard (Enter or ArrowDown
 // opens it on its first item, arrows move, Escape closes it back on More, Enter chooses) and by a screen reader (a menu button with aria-haspopup and aria-expanded, a menu of menuitems named for the tabs).
 // Written failing-first against a build with seven tabs at 390. Isolated dev server, 1280 and 390 px.
 const assert = require('node:assert/strict');
@@ -27,7 +27,7 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
         return { tabs, selected: sel && sel.dataset.tab, shown: vis(more), name: more && more.getAttribute('aria-label'), text: more && more.textContent.trim(), expanded: more && more.getAttribute('aria-expanded'), haspopup: more && more.getAttribute('aria-haspopup'),
             h: r && Math.round(r.height), w: r && Math.round(r.width), sideways: tl.scrollWidth - tl.clientWidth, current: more && more.classList.contains('is-current'), inList: !!(more && tl.contains(more)),
             menuOpen: !!menu && !menu.hidden && vis(menu), items: menu ? [...menu.querySelectorAll('[role=menuitem]')].map(i => ({ tab: i.dataset.tab, name: i.textContent.replace(/\\s+/g, ' ').trim(), h: Math.round(i.getBoundingClientRect().height) })) : [],
-            focus: document.activeElement && (document.activeElement.id || document.activeElement.dataset.tab || document.activeElement.tagName), panel: ['artifacts', 'knowledge', 'settings', 'goals'].find(p => vis(document.getElementById('team-panel-' + p))) }; })()`);
+            focus: document.activeElement && (document.activeElement.id || document.activeElement.dataset.tab || document.activeElement.tagName), panel: ['artifacts', 'knowledge', 'messages', 'goals'].find(p => vis(document.getElementById('team-panel-' + p))) }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
@@ -39,7 +39,7 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
             await openTeam(ev, waitFor, TEAM); await settle(500);
             let s = await state();
             if (!mobile) {
-                check('1280: all seven tabs are in the row in the operator\'s order (Goals, Agents, Tasks, Artifacts, Knowledge, Board, Settings) and there is no More', s.tabs.join() === 'goals,agents,tasks,artifacts,knowledge,messages,settings' && !s.shown, JSON.stringify(s.tabs));
+                check('1280: all six tabs are in the row in the operator\'s order (Goals, Agents, Tasks, Artifacts, Knowledge, Board; Settings is a popout button, #8853) and there is no More', s.tabs.join() === 'goals,agents,tasks,artifacts,knowledge,messages' && !s.shown, JSON.stringify(s.tabs));
                 check('1280: the row does not scroll sideways', s.sideways <= 0, String(s.sideways));
                 await shot('team-tabs-1280');
                 continue;
@@ -52,7 +52,7 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
             await ev(`document.getElementById('team-tab-more').focus(); true`);
             await key('Enter', 13); await settle(250);
             s = await state();
-            check('390: Enter on More opens the menu with Knowledge, Board and Settings (menuitems, 44 px), the first focused, aria-expanded true', s.menuOpen && s.expanded === 'true' && s.items.map(i => i.tab).join() === 'knowledge,messages,settings' && s.items.every(i => i.h >= 44 && /^(Knowledge|Board|Settings)/.test(i.name)) && s.focus === 'knowledge' || (s.menuOpen && s.focus && /knowledge/.test(String(s.focus))), JSON.stringify(s));
+            check('390: Enter on More opens the menu with Knowledge and Board (menuitems, 44 px), the first focused, aria-expanded true', s.menuOpen && s.expanded === 'true' && s.items.map(i => i.tab).join() === 'knowledge,messages' && s.items.every(i => i.h >= 44 && /^(Knowledge|Board)/.test(i.name)) && s.focus === 'knowledge' || (s.menuOpen && s.focus && /knowledge/.test(String(s.focus))), JSON.stringify(s));
             await shot('team-tabs-390-menu');
             await key('ArrowDown', 40); await settle(100);
             check('390: ArrowDown moves to the next item', (await state()).focus === 'messages', (await state()).focus);
@@ -60,10 +60,10 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
             s = await state();
             check('390: Escape closes the menu and the keyboard is back on More', !s.menuOpen && s.expanded === 'false' && s.focus === 'team-tab-more', JSON.stringify(s));
             // choose by keyboard
-            await key('Enter', 13); await settle(200); await key('ArrowDown', 40); await key('ArrowDown', 40); await key('Enter', 13); await settle(600);
+            await key('Enter', 13); await settle(200); await key('ArrowDown', 40); await key('Enter', 13); await settle(600);
             s = await state();
-            check('390: choosing Settings from the menu opens the Settings tab, More says so (named "Settings, more tabs", underlined, its words still More so the strip keeps its width) and keeps the keyboard', s.selected === 'settings' && s.panel === 'settings' && s.name === 'Settings, more tabs' && s.current && s.text === 'More' && s.focus === 'team-tab-more' && !s.menuOpen, JSON.stringify(s));
-            await shot('team-tabs-390-settings');
+            check('390: choosing Board from the menu opens the Board tab, More says so (named "Board, more tabs", underlined, its words still More so the strip keeps its width) and keeps the keyboard', s.selected === 'messages' && s.panel === 'messages' && s.name === 'Board, more tabs' && s.current && s.text === 'More' && s.focus === 'team-tab-more' && !s.menuOpen, JSON.stringify(s));
+            await shot('team-tabs-390-board');
             // by tap
             await ev(`document.getElementById('team-tab-more').click(); true`); await settle(200);
             await ev(`document.querySelector('#team-tabs-more-menu [data-tab="knowledge"]').click(); true`); await settle(600);
