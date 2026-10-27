@@ -25,7 +25,7 @@
     "persona-files-row": "a row of a pane or a form, not a sidebar list (slice 4's second pass)",
     "send-menu-item": "a menu or dropdown item (slice 1's menus)",
     "server-strip-item": "a list inside a pane or the rail (slice 4's second pass)",
-    "session-group-item": "the agent row: two-line, its own padding, drag and selected tile; the height and radius are .list-row's, the hover and focus tints stay until the selected look is decided",
+    "session-group-item": "the phone's agent card (mobile.css: its own radius and 56 px height) and the compact row's height; the selected look, the hover and the focus are .list-row's",
     "session-name-row": "a line inside or under an agent row (slice 4, second pass)",
     "sidebar-rail-item": "a list inside a pane or the rail (slice 4's second pass)",
     "sleeping-summary-row": "a line inside or under an agent row (slice 4, second pass)",
