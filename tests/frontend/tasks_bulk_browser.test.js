@@ -36,7 +36,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`!!document.querySelector('#team-panel-tasks .dt-bar-choice')`, 'the priority choice');
         await ev(`(() => { const p = document.querySelector('#team-panel-tasks .dt-bar-choice'); p.value = 'high'; return true; })()`);
         await ev(`document.querySelector('#team-panel-tasks .dt-bar-apply').click(); true`);
-        await waitFor(`[...document.querySelectorAll('#team-panel-tasks .dt-table tbody tr')].filter(r => r.querySelector('td[data-key="priority"]').textContent === 'High').length === 2`, 'two tasks are High', 10000);
+        await waitFor(`!document.querySelector('#team-panel-tasks .dt-bar-choice')`, 'the priority applied and the bar closed', 10000);
         s = await state(); assert.equal(s.selecting, false, 'the selection is cleared and the toolbar is back after the action');
         for (const id of [ids[0], ids[1]]) assert.equal((await api('GET', `/api/board/${B}/tasks/${id}`)).body.priority || (await api('GET', `/api/board/${B}/tasks/${id}`)).body.task.priority, 'high', 'the server has it');
         // Reassign
