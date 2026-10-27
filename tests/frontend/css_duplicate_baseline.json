@@ -31,7 +31,6 @@
   "session.css:  | .board-card-header": 2,
   "session.css:  | .server-details-update:not(.server-below-minimum)": 2,
   "settings.css:  | #settings-modal .settings-pane-title": 2,
-  "settings_view.css:  | .sv-fold > summary": 2,
   "team_page.css: @media (max-width: 760px) | .team-tabs-row > .team-tabs": 2,
   "team_page.css:  | .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap": 2,
   "updates.css:  | .update-agents": 2,
