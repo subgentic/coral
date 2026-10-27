@@ -51,7 +51,7 @@
     color: var(--text-muted);
     cursor: pointer;
     flex: 1;
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
     font-family: inherit;
     transition: color 0.15s;
     -webkit-tap-highlight-color: transparent;
@@ -1101,7 +1101,7 @@
     }
 
     .modal-header h3 {
-        font-size: 0.9375rem;
+        font-size: var(--fs-lg);
     }
 
     /* Session header: extra compact */

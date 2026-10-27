@@ -12,9 +12,9 @@
 }
 
 .history-title-row h2 {
-    font-size: 1.0625rem; /* an item's page title: 17/700 (#7443) */
-    font-weight: var(--fw-strong);
-}
+    font-size: var(--fs-2xl); /* an item's page title: 17/700 (#7443) */
+    font-weight: 700;
+ }
 
 .history-title-row .btn-small {
     margin: 0;
@@ -115,8 +115,8 @@
 }
 
 .notes-rendered h1 { font-size: var(--fs-2xl); }
-.notes-rendered h2 { font-size: 1.0625rem; }
-.notes-rendered h3 { font-size: 0.9375rem; }
+.notes-rendered h2 { font-size: var(--fs-xl); }
+.notes-rendered h3 { font-size: var(--fs-lg); }
 
 .notes-rendered p {
     margin: 8px 0;
