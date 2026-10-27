@@ -76,7 +76,7 @@ const BASE = require('./test_base').BASE;
 
         console.log('Templates: the list has the built-ins, loading one fills the agents, saving adds it to the list');
         const opts = await ev(`[...document.querySelectorAll('#team-template-select option')].map(o => o.textContent)`);
-        assert.ok(opts.some(o => /^Coding Team \(5 members\)$/.test(o)), JSON.stringify(opts));
+        assert.ok(opts.some(o => /^Coding Team \(7 members\)$/.test(o)), JSON.stringify(opts));
         await ev(`import((window.__coralStatic || '/static/') + 'team_dialogs.js').then(m => m._pickTeamTemplate('Dungeon Master')); true`);
         assert.deepEqual((await teamRows()).slice(0, 2), ['Dungeon Master', 'Warrior']); assert.equal((await teamRows()).length, 7);
         assert.equal(await ev(`document.getElementById('team-template-select').value`), 'Dungeon Master', 'the chosen template is shown in the select');
