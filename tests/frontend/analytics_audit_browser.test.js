@@ -81,12 +81,12 @@ const CALLS = [{ operation: '/api/board/{project}/messages', call_type: 'api', a
         assert.equal(new Set(sizes['cost-by-model']).size, 1, 'every cell of a By model row has one font (the model is not in the code font): ' + JSON.stringify(sizes));
         console.log('   ✓');
 
-        console.log('6. On a phone the calls table lists Calls, Errors, Avg ms right after the operation');
+        console.log('6. On a phone the calls table is one line a row: the operation and Calls (#8982); the wide order is back with a wider window');
         await open(390, 844, true);
         await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => { m.selectView('calls'); return true; })`);
         await waitFor(`document.querySelectorAll('#call-metrics-summary tbody tr').length > 0 && document.querySelector('#call-metrics-summary').getClientRects().length > 0`, 'the calls view');
-        const order = await ev(`[...document.querySelectorAll('#call-metrics-summary tbody tr:first-child td')].filter(td => td.getClientRects().length).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).map(td => td.dataset.label)`);
-        assert.deepEqual(order, ['Operation', 'Calls', 'Errors', 'Avg ms', 'Type', 'Agent', 'Team'], 'phone order');
+        const order = await ev(`[...document.querySelectorAll('#call-metrics-summary tbody tr:first-child td')].filter(td => td.getClientRects().length).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left).map(td => td.dataset.label || td.dataset.key)`);
+        assert.deepEqual(order.map(x => String(x).toLowerCase()), ['operation', 'calls'], 'phone: one line, the operation and its Calls');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#call-metrics-summary td[data-key="calls"]')].map(td => td.textContent.trim())`), ['30', '7'], 'the cells hold their column\'s figures');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await waitFor(`[...document.querySelectorAll('#call-metrics-summary thead th')].map(th => th.dataset.key).join() === 'operation,call_type,agent,team,calls,errors,avg_ms'`, 'the wide order back');
