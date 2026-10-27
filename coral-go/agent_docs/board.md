@@ -1417,7 +1417,7 @@ What a request may ask for, and the answers a client can get (#4602). They hold 
 
 ## Task text versions
 
-`coral-board task edit N --title "New title" [--priority high]` edits a task's text as its creator, an active orchestrator or the Operator. `--priority` may be used alone. The task screen's **Edit** uses the same PATCH route. Completed and cancelled tasks refuse edits. An assignee alone does not have edit authority.
+`coral-board task edit N --title "New title" [--priority high]` edits a task's text as the Operator or an active orchestrator only. `--priority` may be used alone. The task screen's **Edit** uses the same PATCH route. Completed and cancelled tasks refuse edits. Neither a creator nor an assignee has edit or restore authority unless they are also an active orchestrator. This applies to title, priority, description, instructions and all restores, including during review.
 
 Snapshots include title, description, priority and effective workflow instructions. Description and instruction amendments also create versions; restoring those fields advances the instruction revision so the assignee must acknowledge the restored requirements.
 
