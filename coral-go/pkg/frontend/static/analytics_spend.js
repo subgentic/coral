@@ -20,7 +20,7 @@ let root = null, timeRoot = null;
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** 517 K, 0.8 M, 61 M: tokens as a person reads them. */
-function fmtTokens(n) {
+export function fmtTokens(n) {
     const v = Number(n);
     if (!Number.isFinite(v)) return '';
     if (v >= 999.5e6) return `${(v / 1e9).toFixed(1)} B`;
@@ -30,7 +30,7 @@ function fmtTokens(n) {
     return String(Math.round(v));
 }
 /** 38 min, 2 h 05 min, 45 s: a time as a person reads it. */
-function fmtDur(s) {
+export function fmtDur(s) {
     const v = Number(s);
     if (!Number.isFinite(v)) return '';
     if (v < 60) return `${Math.round(v)} s`;

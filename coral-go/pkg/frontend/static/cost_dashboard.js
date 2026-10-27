@@ -13,6 +13,7 @@ const { dataTable, tableState, link: dtLink, chip, tag, avatar } = await importO
 const { showViews, syncRangeLine } = await importOnce('./analytics_views.js'); // the sidebar's list of views and the page's title (#7473)
 const agentDetail = await importOnce('./analytics_agent.js'); // one agent over the range, opened from By agent (#7930)
 const series = await importOnce('./analytics_series.js'); // the lines over time above By provider, By model, By team and By agent (#7857)
+const { syncEfficiency } = await importOnce('./analytics_efficiency.js'); // the Group by switch and the comparison of Tokens per commit and Task time (Goal #77)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
@@ -307,6 +308,7 @@ export async function _refreshCostDashboard() {
     _refreshSeries(); // the chart above the open breakdown view (#7857)
     _refreshOverview(); // the change against the period before, and cost by team (#7930)
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
+    syncEfficiency(period);
     showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time')); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
     try {
