@@ -4,7 +4,7 @@
  * A colour dot (a tag's colour) is a hex colour only. Text is set with textContent only.
  *
  *   build({ id, label, sections, current, onPick, drawer })  -> the element (the column and the select; with `drawer`, the column and, on a phone, a drawer opened by a button that names the current view, in place of the select: the Inbox's, #9545)
- *   sections: [{ title?, items: [{ key, label, count?, alert?, dot?, icon?, soon? }] }]      onPick(key) is not called for a disabled item; a section's title is also the select's group label
+ *   sections: [{ title?, items: [{ key, label, count?, unread?, total?, alert?, dot?, icon?, soon? }] }]      unread: the number is the unread count (its name says "3 unread", its tooltip "N in all" from total)      onPick(key) is not called for a disabled item; a section's title is also the select's group label
  *   update(root, { sections, current })               -> draws the same element again with new counts or another current view; the keyboard stays on the item it was on */
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 const HEX = /^#[0-9a-f]{3,8}$/i;
@@ -39,9 +39,10 @@ function draw(root, { sections, current }) {
             if (it.dot && HEX.test(it.dot)) { const d = el('i', 'view-list-dot'); d.style.setProperty('--view-list-dot', it.dot); d.setAttribute('aria-hidden', 'true'); lab.append(d); }
             lab.append(el('span', 'view-list-name', it.label));
             b.append(lab);
-            b.setAttribute('aria-label', it.soon ? `${it.label}, soon` : (it.count != null ? `${it.label}, ${it.count}` : it.label)); // the name and the count are read apart ("Board history, 1"), the count once (it is not in the name's text twice)
+            b.setAttribute('aria-label', it.soon ? `${it.label}, soon` : (it.count != null ? `${it.label}, ${it.count}${it.unread ? ' unread' : ''}` : it.label)); // a number that is the unread count says so
+            if (it.unread && it.total != null) b.title = `${it.total} in all`; // the name and the count are read apart ("Board history, 1"), the count once (it is not in the name's text twice)
             if (it.soon) { b.disabled = true; b.classList.add('view-list-soon'); b.append(el('span', 'view-list-count', 'soon')); }
-            else if (it.count != null) b.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
+            else if (it.count != null) b.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : it.unread ? 'view-list-count view-list-new' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
             if (it.key === current) { b.setAttribute('aria-current', 'true'); b.classList.add('view-list-current', 'list-row-current'); }
             nav.append(b);
             if (it.key === current && trigger) { // the drawer's button: what is open, and how many
