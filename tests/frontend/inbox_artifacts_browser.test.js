@@ -105,6 +105,13 @@ const WORLD = `(() => {
             await waitFor(`document.querySelector('.inbox-detail-pane').hidden`, `${label}: the pane closes`, 5000);
             check(`${label}: the close puts the pane away and the list is still there`, (await rows()).length === 5);
 
+            // a row's Task link opens the task in the Inbox, never the team page (#8861), and Back returns to the folder
+            await ev(`document.querySelector('#group-table-view [data-task-link]').click(); true`);
+            await waitFor(`/^\\/inbox\\/tasks\\/(alpha|beta)\\/\\d+$/.test(location.pathname)`, `${label}: the Task link opens the task in the Inbox`, 8000);
+            check(`${label}: a row's Task link opens the task inside the Inbox, not the team page`, await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none' && document.body.getAttribute('data-nav-tab') === 'hub-inbox'`));
+            await ev(`history.back(); true`);
+            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: Back returns to the Artifacts folder`, 10000);
+
             // the sidebar's search is the folder's
             if (!mobile) {
                 await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'chart'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
