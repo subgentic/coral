@@ -113,6 +113,8 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
             const p = await ev(`(() => { const a = window.__tp.pane(), r = a.getBoundingClientRect(), b = a.querySelector('.detail-back'), t = a.querySelector('.detail-title'), bb = b.getBoundingClientRect(), tb = t.getBoundingClientRect(), cs = getComputedStyle(b); return { full: r.width === innerWidth && r.height === innerHeight, back: b.textContent.replace(/\\s+/g, ' ').trim(), font: cs.fontSize + ' ' + cs.fontWeight, beside: tb.top < bb.bottom - 1 && tb.left >= bb.right - 2, h: Math.round(bb.height), w: Math.round(bb.width), grip: getComputedStyle(a.querySelector('.detail-grip')).display, scrollX: document.documentElement.scrollWidth > innerWidth }; })()`);
             assert.ok(p.full, 'the pane covers the screen'); assert.equal(p.back, '\u2190 Knowledge'); assert.equal(p.font, '13px 500'); assert.ok(p.beside, 'beside the title'); assert.ok(p.h >= 44 && p.w >= 44, `a 44 px target (${p.w}x${p.h})`);
             await shot('knowledge-sidebar-phone');
+            // one way back on a phone (#9488): the sheet has the Back link, so the X is not drawn beside it
+            assert.equal(await ev(`getComputedStyle(window.__tp.pane().querySelector('.detail-close')).display`), 'none', 'one way back on a phone: the X is not drawn beside the Back link');
             assert.equal(p.grip, 'none', 'no handle on a phone'); assert.equal(p.scrollX, false, 'the page does not scroll sideways');
             await ev(`window.__tp.pane().querySelector('.detail-back').click(); true`); await settle(300);
             assert.equal(await ev(`window.__tp.pane() === null`), true, 'the way back closes the view'); assert.ok(await ev(`!!window.__tp.table()`), 'the table is there again');

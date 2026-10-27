@@ -108,6 +108,7 @@
 .detail-grip { position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; outline: none; } /* the goal page column's handle (#7702) on the pane's left edge: an 8 px target, the 2 px line drawn in the middle */
 .detail-back { min-height: 36px; align-items: center; }
 .team-page.detail-sheet .detail-back { display: inline-flex; min-height: 44px; min-width: 44px; }
+.team-page.detail-sheet .detail-head:has(.detail-back) .detail-close { display: none; } /* a phone's sheet with a Back link has that one way out; the X is for a pane that has none (#9488) */
 .detail-head-text > .phone-title-row > .detail-back { flex: 0 0 auto; margin: 0; }
 .knowledge-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .knowledge-tag { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-secondary); overflow-wrap: anywhere; }
