@@ -53,7 +53,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'), m = await import(${S} + 'inbox_tab.js'); state.liveSessions = [{ name: 'gl-agent', session_id: '00000001-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Goal Agent', working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), board_project: ${JSON.stringify(B)}, goal: { id: ${G}, title: ${JSON.stringify(TITLE)} }, sleeping: false }]; m.updateInboxTab(); return true; })()`);
         await inboxFolder('needs', '#group-table-view .dt-table tbody tr');
         await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-link')].find(b => b.textContent === ${JSON.stringify(TITLE)}).click(); true`);
-        await landed('Needs you');
+        await waitFor(`location.pathname === ${JSON.stringify(`/inbox/goals/${B}/${G}`)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'Needs you: the goal opens in the Inbox (#8861)', 15000);
+        assert.equal(await ev(`location.pathname.startsWith('/board/')`), false, 'Needs you: not the board page');
         console.log('   ✓');
 
         console.log('3. The Inbox task page\'s Goal button');
