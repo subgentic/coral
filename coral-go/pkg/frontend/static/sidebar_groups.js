@@ -122,15 +122,19 @@ function chipsHtml(t) {
 /** A table drawn somewhere other than the centre (the dock's Saved tab): `headless` leaves out its title row, the chips and the rows are the same. */
 export function tableMarkup(t) { return tableHtml(t); }
 
+let drawnTables = []; // the tables on screen, for a note's Retry to find its table (#8933)
+
 function tableHtml(t, n = 0, lead = '', bar = false) {
     const tid = n ? `group-table-title-${n + 1}` : 'group-table-title'; // a page with several tables (the landing's groups, #7722): one title id each
     const count = t.count === undefined ? t.rows.length : t.count;
     // An Inbox folder page (t.noun, with its component toolbar): the title and the count are the first thing of the toolbar's one row (folderHead), not a row of their own (#8700)
     const inRow = !!(t.noun && bar && !n);
     const top = (t.headless || inRow ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2>${count == null ? '' : `<span class="session-group-count">${count}</span>`}${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
+    // A table's quiet note (a computer that did not answer, the search note) and its Retry stay under an empty table too: the folder that is empty because a computer did not answer is the one that needs them (#8933)
+    const note = t.note ? `<p class="empty-hint group-table-note">${escapeHtml(t.note)}${t.retry ? ` <button type="button" class="btn btn-small group-table-retry" data-on-click="sgroup-retry" data-table="${Number(n)}" aria-label="${escapeAttr('Retry reading ' + String(t.title).toLowerCase())}">Retry</button>` : ''}</p>` : '';
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
-    if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
-    return top + '<div class="group-table-node"></div>' + (t.note ? `<p class="empty-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
+    if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>` + note;
+    return top + '<div class="group-table-node"></div>' + note;
 }
 
 /** An Inbox folder page's title and count, the first thing of its toolbar's one row (#8700): the h2 keeps the page's title id (the focus target when nothing else takes it). Drawn again only when its words change. */
@@ -153,6 +157,7 @@ function drawTable() {
     // the landing ('*') of a tab that says so (landing: true): every group's table, one under the other, each with its own head and count, so the page and the sidebar count the same items (#7722)
     const tables = !src ? [] : open.key === LANDING ? src.keys().map(k => src.table(k)).filter(Boolean).map((x, i) => (i ? { ...x, extra: undefined } : x)) : [src.table(open.key)].filter(Boolean);
     if (!host || !tables.length) return false;
+    drawnTables = tables;
     // a phone's way back to the list is in the table's own title row, not a row of its own above it (#7722)
     // A source with a `lead` (the Inbox: its view list as one select, #7785) puts that on top of the table on a phone instead: the select is the way to the other views, so there is no way back to a list.
     const lead = isPhoneLayout() && src.lead ? src.lead() : null;
@@ -250,6 +255,7 @@ registerActions({
     // The page's search is the sidebar's: its text goes into the sidebar's field and that field's own handler runs (the list and the table follow).
     'sgroup-search': el => { const target = document.getElementById(textOf(el.dataset.search)); if (!target || target.value === el.value) return; target.value = el.value; target.dispatchEvent(new Event('input', { bubbles: true })); },
     'gt-menu-toggle': async el => { (await importOnce('./menu_button.js')).toggleMenu(el); },
+    'sgroup-retry': el => { const t = drawnTables[Number(el.dataset.table)]; if (t && typeof t.retry === 'function') t.retry(); }, // a table's note that a computer did not answer has a Retry: the table says what it does
     'sgroup-list': el => { const kind = textOf(el.dataset.kind); open = null; sources.get(kind)?.showList?.(); },
 });
 

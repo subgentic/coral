@@ -143,6 +143,7 @@ const SLOW_MS = 20000;
 const slow = new Map(); // server id -> when its last read timed out
 const isSlow = id => { const t = slow.get(id); if (t === undefined) return false; if (Date.now() - t > SLOW_MS) { slow.delete(id); return false; } return true; };
 export function forgetSlowComputers() { slow.clear(); }
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('coral-servers', forgetSlowComputers); // a list or a status changed: a computer that is back online is read again, not given up on for what is left of its SLOW_MS (#8933)
 
 /** serverFetch for a read that is merged with other computers' (the Inbox's artifacts, goals, tasks, saved messages): a registered computer that does not answer in `ms` (hung, port still
  *  accepting) rejects with { timedOut: true } instead of holding the whole list on "Loading", so the reachable computers' rows show at once. The body is read inside the limit too; the Response

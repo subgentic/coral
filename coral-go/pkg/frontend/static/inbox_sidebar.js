@@ -13,7 +13,7 @@ import { reviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed }
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
-import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey } from './server_base.js';
+import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, forgetSlowComputers } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -353,6 +353,7 @@ function savedListSpec(where = '') {
     return { title: 'Saved', noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
         chips: !dock ? [] : [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
         empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
+        retry: v.down.length ? () => { forgetSlowComputers(); saved.loadSaved(); } : undefined,
         note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
         signature: JSON.stringify([multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
         node: () => DT.dataTable({ label: `Saved, ${rows.length}`, compact: true, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
@@ -478,7 +479,7 @@ registerGroupSource('hub-inbox', {
         }
         if (key === 'tasks') {
             const rows = taskRows();
-            return { title: 'Tasks', noun: ['task', 'tasks'], rows, note: inboxDownNote('tasks'), empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No assigned tasks.' },
+            return { title: 'Tasks', noun: ['task', 'tasks'], rows, note: inboxDownNote('tasks'), retry: () => { forgetSlowComputers(); refreshTasks(); }, empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No assigned tasks.' },
                 signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), inboxDownNote('tasks')]),
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
@@ -495,7 +496,7 @@ registerGroupSource('hub-inbox', {
         }
         if (key === 'goals') {
             const rows = goalRows();
-            return { title: 'Goals', noun: ['goal', 'goals'], rows, note: inboxDownNote('goals'), empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.' },
+            return { title: 'Goals', noun: ['goal', 'goals'], rows, note: inboxDownNote('goals'), retry: () => { forgetSlowComputers(); refreshGoals(); }, empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.' },
                 signature: JSON.stringify([rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup]), inboxDownNote('goals')]),
                 node: () => DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     open: g => {
