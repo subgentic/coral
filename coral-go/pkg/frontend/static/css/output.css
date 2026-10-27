@@ -223,7 +223,7 @@ body.panel-dragging .preview-pane {
 }
 
 .preview-tab-keep, .preview-tab-close { min-width: 24px; min-height: 24px; display: inline-flex; align-items: center; justify-content: center; } /* a 24 px target at the least on a desktop (#8830); 44 px on touch, touch.css */
-.preview-tab-keep { background: none; border: none; color: var(--text-muted); cursor: pointer; font: inherit; font-size: 0.6875rem; padding: 0 4px; border-radius: var(--radius-xs); opacity: 0; transition: opacity 0.1s, color 0.1s; flex-shrink: 0; }
+.preview-tab-keep { background: none; border: none; color: var(--text-muted); cursor: pointer; font: inherit; font-size: 0.75rem; padding: 0 6px; white-space: nowrap; border-radius: var(--radius-xs); opacity: 0; transition: opacity 0.1s, color 0.1s; flex-shrink: 0; }
 .preview-tab:hover .preview-tab-keep, .preview-tab.active .preview-tab-keep, .preview-tab-keep:focus-visible { opacity: 1; }
 .preview-tab-keep:hover { color: var(--text-primary); background: var(--bg-hover); }
 .preview-tab-keep:focus-visible, .preview-tab-close:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: -3px; } /* drawn inside the button: the tab bar clips what is outside it */
