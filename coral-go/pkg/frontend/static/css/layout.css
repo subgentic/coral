@@ -973,7 +973,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .menu { display: flex; flex-direction: column; gap: 2px; min-width: min(12rem, calc(100vw - 32px)); max-width: calc(100vw - 32px); /* at 200% text 12rem is wider than the screen: a menu never runs off its edge */ padding: 4px; background: var(--bg-secondary); border: var(--card-border); border-radius: var(--card-radius); box-shadow: var(--shadow-md); }
 .menu[hidden] { display: none; }
 .menu-panel { flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 10px; box-shadow: var(--shadow-lg); } /* a menu that holds fields (the Filters popup): its rows lie side by side, with more room */
-.menu-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); font-weight: 500; text-align: left; text-decoration: none; cursor: pointer; }
+.menu-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); font-weight: 500; text-align: left; text-decoration: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; /* not the button rule's all: a menu measured with visibility hidden then shown would fade its items' visibility in, and focus() on the first one (a keyboard open) would find it still hidden */ }
 .menu-item:hover, .menu-item:focus-visible { background: var(--bg-hover); }
 .menu-item[hidden] { display: none; }
 .menu-item-danger { color: var(--error-text); }
