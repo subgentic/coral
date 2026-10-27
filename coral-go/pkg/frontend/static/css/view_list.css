@@ -1,14 +1,6 @@
 /* The mailbox's view list (view_list.js, #7785): a column of views with counts at a desktop's width, one select below it. */
 .view-list-nav { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; background: var(--bg-secondary); border-right: 1px solid var(--border); min-width: 0; }
-.view-list-title {
-    margin: 14px 10px 4px;
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
+.view-list-title { margin: 14px 10px 4px; }
 .view-list-title:first-child { margin-top: 2px; }
 .view-list-item {
     display: flex;
@@ -62,6 +54,6 @@
 }
 
 /* In the sidebar the generic section heading rule (layout.css .sidebar-section h2: 16 px of side padding) must not move the title: it starts where the rows' text does */
-.sidebar-section-body .view-list-title { padding: 0; font-size: var(--fs-sm); letter-spacing: 0.06em; }
+.sidebar-section-body .view-list-title { padding: 0; }
 /* In the sidebar the pane is the column: no background or edge of its own */
 .sidebar-section-body > div > .view-list > .view-list-nav { background: none; border-right: 0; padding: 4px 4px 16px; }

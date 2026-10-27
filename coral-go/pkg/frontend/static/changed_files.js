@@ -74,7 +74,7 @@ function renderStarredFiles() {
         return;
     }
     container.style.display = '';
-    container.innerHTML = `<div class="starred-section-label">★ Starred</div>` +
+    container.innerHTML = `<div class="group-head starred-section-label">★ Starred</div>` +
         starred.map(filepath => {
             const { dir, name } = splitPath(filepath);
             const unstarLabel = `Unstar ${name}`, copyLabel = `Copy path of ${name}`, previewLabel = `Preview ${name}`, editLabel = `Edit ${name}`;

@@ -179,12 +179,7 @@
     margin-bottom: 24px;
 }
 
-.cost-section-title {
-    font-size: var(--fs-lg);
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 8px;
-}
+.cost-section-title { margin-bottom: 8px; }
 /* A view with one section is titled by the page's own title: its section heading stays for a reader (and names the table) but is not drawn twice */
 #cost-dashboard-view:not([data-view="overview"]) > .cost-page > .cost-section > .cost-section-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 [data-cview][hidden] { display: none !important; }
