@@ -321,7 +321,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                 afterName: [...(inbox ? (model.filters.team
                     ? serverColumns().map(c => ({ ...c, width: '7rem' })) // one team chosen: its computer is the one place the row names it, so this column stays, a phone's included
                     : [{ key: 'team', label: 'Team', width: '8rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }]) : []),
-                    ...(model.scope || by === 'task' ? [] : [{ key: 'task', label: 'Task', width: '9rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: taskCell }])], // the Task link is how a file reaches its task (#8617); the head says it where the list is grouped by task; an agent's own list has none // the team's words carry its computer ("alpha · Box Two"), so two same-named teams are told apart (#8774)
+                    ...(model.scope || by === 'goal' ? [] : [{ key: 'goal', label: 'Goal', width: '14rem', dropAt: 52, tone: 'tertiary', cell: goalCell }])], // the goal of the file's task, one line (ellipsis, the whole name on hover), a link to the goal (#9274): the Operator finds it the more useful column; the task is in the row's tooltip, its preview and, grouped by task, the group's head (#8617); the head says it where the list is grouped by task; an agent's own list has none // the team's words carry its computer ("alpha · Box Two"), so two same-named teams are told apart (#8774)
                 nameTitle: item => [readableName(item), inbox ? teamLabel(item.board_id, item.team) : '', taskText(item), originBadge(item)].filter(Boolean).join(' · '),
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
@@ -360,7 +360,20 @@ export function createArtifactsList({ inbox = false } = {}) {
         return b;
     }
 
-    /** The Task column: a link that opens the task's page (#8617); "No task" for a file no task holds. */
+    /** The Goal column (#9274): the goal of the file's task, a link that opens it, on one line (cut with an ellipsis; the whole title is its tooltip); empty for a file with no task or a task with no goal. */
+    function goalCell(item) {
+        if (!item.goal_id || !item.goal_title) return '';
+        const b = DT.link(item.goal_title, () => {
+            const team = inbox ? item.board_id : model.project, id = Number(item.goal_id);
+            if (!team || !id) return;
+            if (inbox) importOnce('./nav.js').then(m => m.go({ view: 'inbox-goals', sub: 'goals', id: team, item: id }, { from: readableName(item) })).catch(() => {});
+            else if (typeof window.openTeamPage === 'function') window.openTeamPage(team, { tab: 'goals', item: id });
+        });
+        b.title = item.goal_title; b.setAttribute('aria-label', `Goal: ${item.goal_title}`); b.dataset.goalLink = String(item.goal_id);
+        return b;
+    }
+
+    /** The task of a row as text and, when it has one, a link that opens the task's page (#8617): the row's tooltip says it; the Goal column replaced its own column (#9274). */
     function taskCell(item) {
         if (!item.task_id) return taskText(item);
         const b = DT.link(taskText(item), () => { importOnce('./task_navigation.js').then(m => m.openTask(inbox ? item.board_id : model.project, item.task_id)).catch(() => {}); });
@@ -401,7 +414,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const received = item.source === 'received';
         const facts = [
             ['MIME', un ? '' : item.media_type || 'Unknown'], // the header says the type, the size and when (#7775): nothing here repeats it
-            ...(inbox ? [['Team', teamLabel(item.board_id, item.team)]] : []), ['Task', taskCell(item)], ['Producer', item.produced_by], // the Task fact is the same link as the column: a phone drops the column
+            ...(inbox ? [['Team', teamLabel(item.board_id, item.team)]] : []), ['Task', taskCell(item)], ...(item.goal_id && item.goal_title ? [['Goal', goalCell(item)]] : []), ['Producer', item.produced_by], // the Task fact is the same link as the column: a phone drops the column
             ['Status', un ? 'Link not verified: this team has not uploaded this file, so Coral shows no size, type or preview' : ''],
             ['Sent to', item.source === 'shared' ? item.shared_to : ''], ['Sent by', item.source === 'shared' || received ? item.sent_by : ''],
             ['Received from', received ? item.received_from : ''], ['Board (claimed by the sender)', received ? item.from_board : ''],
@@ -422,7 +435,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             }
         }
         const editor = hex ? Tags.tagEditor({ project: inbox ? item.board_id : model.project, hex, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(hex, tags) }) : null; // a stored file's tags (#8594)
-        const dropped = ['team', 'task'].filter(k => { const th = root?.querySelector(`th[data-key="${k}"]`); return !!th && getComputedStyle(th).display === 'none'; }).length; // a narrow box drops the row's Team and Task columns: their facts are behind Details, and the button says how many
+        const dropped = ['team', 'goal'].filter(k => { const th = root?.querySelector(`th[data-key="${k}"]`); return !!th && getComputedStyle(th).display === 'none'; }).length; // a narrow box drops the row's Team and Task columns: their facts are behind Details, and the button says how many
         openDetailPane({
             key, opener, hiddenFacts: dropped, title: name, host: hooks.detailHost || null, extra: editor, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox, resizable: inbox,
             sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words

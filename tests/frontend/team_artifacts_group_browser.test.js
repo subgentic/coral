@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
         console.log('   ✓');
 
         const heading = () => ev(`[...document.querySelectorAll('#team-panel-artifacts thead th')].map(th => th.textContent.trim().toLowerCase())`);
-        assert.ok(!(await heading()).includes('task'), 'grouped by task: the head says the task, no Task column: ' + JSON.stringify(await heading()));
+        assert.ok(!(await heading()).includes('task') && (await heading()).includes('goal'), 'grouped by task: the head says the task, the Goal column stays (the Task column is gone, #9274): ' + JSON.stringify(await heading()));
         console.log('3. Group by Goal: the goal\'s title, and No goal for the rest');
         await pick('ta-group', 'goal');
         await waitFor(`document.querySelectorAll('#team-panel-artifacts tr.dt-group').length === 2`, 'two goal heads', 8000);
@@ -62,7 +62,7 @@ const BASE = require('./test_base').BASE;
         await shot('artifacts-group-goal');
         console.log('   ✓');
 
-        assert.ok(!(await heading()).includes('goal') && (await heading()).includes('task'), 'grouped by goal: no Goal column, the Task column is back: ' + JSON.stringify(await heading()));
+        assert.ok(!(await heading()).includes('goal') && !(await heading()).includes('task'), 'grouped by goal: the head says the goal, no Goal column and no Task column: ' + JSON.stringify(await heading()));
         console.log('4. The Task and Goal filters: the server narrows, a chip says it');
         await pick('ta-group', '');
         await pick('ta-task', String(t1));
@@ -76,12 +76,12 @@ const BASE = require('./test_base').BASE;
         await shot('artifacts-goal-filter');
         console.log('   ✓');
 
-        console.log('4b. Ungrouped: the Task column is a link to the task page (the goal is a filter and a group head, not a column)');
+        console.log('4b. Ungrouped: the Goal column is a link to the goal (the task is in the row\'s tooltip and its preview, #9274)');
         await pick('ta-goal', ''); await pick('ta-group', '');
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 4`, 'all four, ungrouped', 8000);
-        assert.ok(!(await heading()).includes('goal') && (await heading()).includes('task'), JSON.stringify(await heading()));
-        await ev(`document.querySelector('#team-panel-artifacts [data-task-link="${t1}"]').click(); true`);
-        await waitFor(`!!document.getElementById('team-task-title') && document.getElementById('team-task-title').textContent.includes('Write the report')`, 'the task page', 15000);
+        assert.ok((await heading()).includes('goal') && !(await heading()).includes('task'), JSON.stringify(await heading()));
+        await ev(`document.querySelector('#team-panel-artifacts [data-goal-link="${g.body.id}"]').click(); true`);
+        await waitFor(`location.pathname.includes('/goals/${g.body.id}')`, 'the goal page', 15000);
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 4`, 'back on the Artifacts', 15000);
         console.log('   ✓');
