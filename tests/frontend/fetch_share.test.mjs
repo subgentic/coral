@@ -6,7 +6,7 @@ let calls = [], clock = 0, fail = false, status = 200;
 globalThis.location = new URL('https://coral.test/');
 globalThis.window = { fetch: async (input, init) => { const url = String(input && input.url || input); calls.push(`${(init && init.method) || 'GET'} ${url}`); if (fail) throw new TypeError('down'); await new Promise(r => setTimeout(r, 5)); return new Response(JSON.stringify({ n: calls.length }), { status }); } };
 const { installFetchShare } = await import('../../coral-go/pkg/frontend/static/fetch_share.js');
-installFetchShare(() => clock);
+installFetchShare(() => clock, Infinity); // the load window is tested on its own below
 const get = (u, init) => window.fetch(u, init);
 const n = () => calls.length;
 
@@ -52,10 +52,10 @@ assert.equal(n(), 2, 'a network error is shared while in flight, and not kept: '
 
 // a module instance of its own over a stub of its own, for the cases that need a different stub
 let instance = 0;
-async function over(stub, clockFn = () => clock) {
+async function over(stub, clockFn = () => clock, loadMs = Infinity) {
     window.fetch = stub;
     const m = await import(`../../coral-go/pkg/frontend/static/fetch_share.js?i=${++instance}`);
-    m.installFetchShare(clockFn);
+    m.installFetchShare(clockFn, loadMs);
 }
 
 // the Security Reviewer's probe: a write takes 50 ms; a poll at 10 ms gets the old state; after the write the UI's own read must be the new state
@@ -125,4 +125,13 @@ delete globalThis.document;
 hits = 0; clock += 5000;
 await Promise.all([window.fetch('/api/sessions/live'), window.fetch('/api/remote/box-2/api/sessions/live'), window.fetch('/api/remote/box-2/api/sessions/live'), window.fetch('/api/remote/box-3/api/sessions/live')]);
 assert.equal(hits, 4, 'the plain read and each hub-proxied read are their own requests (the patterns are anchored)');
+
+// #9167: reads share only while the page loads (its first three seconds): a reload after a live event, later, is never answered from an earlier read
+hits = 0; clock = 100000;
+await over(async () => { hits++; return new Response('{}'); }, () => clock, 3000);
+await Promise.all([window.fetch('/api/cloud/status'), window.fetch('/api/cloud/status')]);
+assert.equal(hits, 1, 'in the page\'s first three seconds: shared');
+clock += 3500; hits = 0;
+await window.fetch('/api/board/alpha/status'); clock += 100; await window.fetch('/api/board/alpha/status');
+assert.equal(hits, 2, 'after the load, a read 100 ms after another is its own request (a reload after a live event is fresh)');
 console.log('fetch_share: ok');
