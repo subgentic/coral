@@ -28,7 +28,7 @@ const board = 'task-line-' + Date.now().toString(36);
                 const rows = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => { const v = e => !!e && e.getClientRects().length > 0, rect = e => { const b = e && e.getBoundingClientRect(); return b ? { x: b.x, mid: b.y + b.height / 2, w: b.width, h: b.height } : null; };
                     const chip = r.querySelector('.dt-chip'), title = r.querySelector('button.dt-primary'), av = r.querySelector('.dt-avatar'); const row = r.getBoundingClientRect();
                     const extras = ['.dt-id', '.dt-subtitle', 'td[data-key="goal"]', 'td[data-key="updated"]', 'td[data-key="files"]', 'button.dt-files'].filter(s => [...r.querySelectorAll(s)].some(v));
-                    return { chip: v(chip) && rect(chip), title: v(title) && rect(title), av: v(av) && rect(av), h: Math.round(row.height), extras, ellipsis: title ? getComputedStyle(title).textOverflow : '', scrolls: r.closest('.dt-box').scrollWidth - r.closest('.dt-box').clientWidth }; })`);
+                    return { chip: v(chip) && rect(chip), title: v(title) && rect(title), av: v(av) && rect(av), h: Math.round(row.height), extras, ellipsis: title ? getComputedStyle(title).textOverflow : '', nowrap: title ? getComputedStyle(title).whiteSpace : '', cut: !!title && title.scrollWidth > title.clientWidth, scrolls: r.closest('.dt-box').scrollWidth - r.closest('.dt-box').clientWidth }; })`);
                 for (const r of rows) {
                     assert.ok(r.chip && r.title && r.av, 'status, title and avatar are on the row: ' + JSON.stringify(r));
                     assert.ok(Math.abs(r.chip.mid - r.title.mid) < 6 && Math.abs(r.av.mid - r.title.mid) < 6, 'all three share one line: ' + JSON.stringify(r));
@@ -36,6 +36,14 @@ const board = 'task-line-' + Date.now().toString(36);
                     assert.deepEqual(r.extras, [], 'the number, time, goal and files are not on the row');
                     assert.ok(r.h <= 60, 'one line: the row is at most 60 px, not three lines: ' + r.h);
                     assert.ok(r.scrolls <= 1, 'no sideways scroll');
+                    assert.equal(r.ellipsis, 'ellipsis', 'the title is cut with an ellipsis'); assert.equal(r.nowrap, 'nowrap', 'and stays on one line'); assert.ok(r.cut, 'a long title is really cut, not wrapped (scrollWidth ' + JSON.stringify(r) + ')');
+                }
+                if (width === 390) { // 200% text on a phone: the box is about 12 rem, under the 20 rem container rule that used to let the title wrap (UI Reviewer, #8936 notes): the title still keeps one line and is cut with an ellipsis
+                    await ev(`document.documentElement.style.fontSize = '32px'; true`);
+                    await waitFor(`document.querySelector('#team-panel-tasks .dt-box').getBoundingClientRect().width / 32 < 20`, 'the narrow box at 200% text', 8000);
+                    const big = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => { const t = r.querySelector('button.dt-primary'), c = getComputedStyle(t), box = r.closest('.dt-box'); return { nowrap: c.whiteSpace, ellipsis: c.textOverflow, h: Math.round(t.getBoundingClientRect().height), lh: parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.3, over: box.scrollWidth - box.clientWidth, cut: t.scrollWidth > t.clientWidth }; })`);
+                    for (const r of big) { assert.equal(r.nowrap, 'nowrap', '200% text: the title stays on one line: ' + JSON.stringify(r)); assert.equal(r.ellipsis, 'ellipsis', '200% text: cut with an ellipsis'); assert.ok(r.h < 70, '200% text: one line high: ' + JSON.stringify(r)); assert.ok(r.cut && r.over <= 1, '200% text: cut, no sideways scroll'); }
+                    await ev(`document.documentElement.style.fontSize = ''; true`);
                 }
                 const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out'));
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await setTheme(ev, theme); fs.writeFileSync(path.join(dir, `team-tasks-one-line-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }

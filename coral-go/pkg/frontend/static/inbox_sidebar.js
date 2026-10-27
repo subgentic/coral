@@ -353,14 +353,14 @@ function savedListSpec(where = '') {
         empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
         note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
         signature: JSON.stringify([multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
-        node: () => DT.dataTable({ label: `Saved, ${rows.length}`, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
+        node: () => DT.dataTable({ label: `Saved, ${rows.length}`, compact: true, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
             open: (f, row) => dock ? openDockSavedSheet(f.id, row.querySelector('.dt-primary')) : openSavedPage(f.id),
             columns: [
-                { key: 'message', label: 'Message', primary: true, width: 'grow', nowrap: false, line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; return b; } },
-                ...(dock ? (multi ? [{ key: 'machine', label: 'Computer', line: 2, cell: f => f.serverName || '' }] : []) : serverColumns()),
+                { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; return b; } },
+                ...(dock ? (multi ? [{ key: 'machine', label: 'Computer', line: 0, cell: f => f.serverName || '' }] : []) : serverColumns().map(c => ({ ...c, line: 0 }))), // a folded row is one line: the message, when it was saved and its action (#8981); the machine and the state stay as columns where the table is wide
                 { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, cell: f => f.saved },
-                { key: 'state', label: 'State', line: 2, cell: f => (f.state ? DT.tag(f.state) : '') },
-                { key: 'action', label: 'Action', hideLabel: true, line: 2, cell: f => {
+                { key: 'state', label: 'State', line: 0, cell: f => (f.state ? DT.tag(f.state) : '') },
+                { key: 'action', label: 'Action', hideLabel: true, line: 1, cell: f => {
                     if (f.gone) return '';
                     const b = DT.el('button', 'btn btn-small dt-quiet', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`);
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
