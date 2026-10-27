@@ -260,3 +260,13 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .sched-back { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); padding: 0; margin: 0 0 4px; background: none; border: 0; color: var(--link-text, var(--accent)); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; text-align: left; }
 }
+
+/* Automations' create actions on the folder toolbar (Goal #74): the words at 1280; on a phone one 44 px "+" (or the agent icon), named whole for assistive technology (UI/UX #8862, Phone). */
+.automations-create { display: inline-flex; align-items: center; gap: 8px; }
+.automations-act:not(.automations-act-icon)::before { content: "+"; display: none; font-size: 1.25rem; line-height: 1; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .automations-create { gap: 4px; }
+    .automations-act { display: inline-flex; align-items: center; justify-content: center; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); padding: 0; }
+    .automations-act .automations-act-text { display: none; }
+    .automations-act:not(.automations-act-icon)::before { display: inline; }
+}

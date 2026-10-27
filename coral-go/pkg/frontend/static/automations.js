@@ -97,9 +97,10 @@ const FIELDS = {
         { type: 'select', key: 'step', id: 'automations-workflows-step', label: 'Step type', values: AF.STEP_TYPES, labels: AF.STEP_LABEL, any: 'Any step' }],
 };
 const button = (label, action, cls = 'btn btn-primary', icon = '') => {
-    const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.setAttribute('data-on-click', action);
+    const b = document.createElement('button'); b.type = 'button'; b.className = `${cls} automations-act${icon ? ' automations-act-icon' : ''}`.trim(); b.setAttribute('data-on-click', action);
+    b.setAttribute('aria-label', label); // a phone draws a "+" or an icon: the name stays whole
     if (icon) { const i = document.createElement('span'); i.className = 'material-icons'; i.setAttribute('aria-hidden', 'true'); i.textContent = icon; b.append(i, ' '); }
-    b.append(label); return b;
+    const text = document.createElement('span'); text.className = 'automations-act-text'; text.textContent = label; b.append(text); return b;
 };
 /** Running now and Failed create either kind: a New button with a menu of the two (the shared menu button: ArrowDown, Escape, a choice closes it). */
 function newMenu() {
@@ -107,7 +108,7 @@ function newMenu() {
     const toggle = button('New', ''); toggle.id = 'automations-new-btn'; toggle.setAttribute('data-on-click', 'automations-new-toggle'); // the action's name is spelled out where the markup is made (action_census)
     toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', 'automations-new-menu');
     const menu = document.createElement('div'); menu.id = 'automations-new-menu'; menu.className = 'team-more-menu list-bar-more-menu'; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'New'); menu.hidden = true;
-    for (const [label, action] of [['New job', 'job-new'], ['New workflow', 'wf-create']]) { const b = button(label, action, ''); b.setAttribute('role', 'menuitem'); menu.append(b); }
+    for (const [label, action] of [['New job', 'job-new'], ['New workflow', 'wf-create']]) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('data-on-click', action); b.setAttribute('role', 'menuitem'); menu.append(b); }
     box.append(toggle, menu);
     return box;
 }
