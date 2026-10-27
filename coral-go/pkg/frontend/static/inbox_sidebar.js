@@ -25,7 +25,7 @@ import { setHidden } from './dom_write.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
-const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('./inbox_coral.js');
+const { coralInboxAdapter, savedExpandFor, listInboxGoals, inboxDownNote } = await importOnce('./inbox_coral.js');
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 const TF = await importOnce('./task_filters.js');
@@ -476,8 +476,8 @@ registerGroupSource('hub-inbox', {
         }
         if (key === 'tasks') {
             const rows = taskRows();
-            return { title: 'Tasks', noun: ['task', 'tasks'], rows, empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No assigned tasks.' },
-                signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count])]),
+            return { title: 'Tasks', noun: ['task', 'tasks'], rows, note: inboxDownNote('tasks'), empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No assigned tasks.' },
+                signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), inboxDownNote('tasks')]),
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
                     const t = TV.tasksTable('mine', rows, { tweak: columns => columns.flatMap(c => c.key === 'team' ? [...serverColumns(), c] : [c]), ctx: { teamOf: t => teamLabel(t.project) }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
@@ -493,8 +493,8 @@ registerGroupSource('hub-inbox', {
         }
         if (key === 'goals') {
             const rows = goalRows();
-            return { title: 'Goals', noun: ['goal', 'goals'], rows, empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.' },
-                signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
+            return { title: 'Goals', noun: ['goal', 'goals'], rows, note: inboxDownNote('goals'), empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.' },
+                signature: JSON.stringify([rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup]), inboxDownNote('goals')]),
                 node: () => DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     open: g => {
                         quietFocus($('inbox-view')); // same pointer-only heading focus rule as the team page
