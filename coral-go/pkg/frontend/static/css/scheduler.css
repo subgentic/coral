@@ -229,10 +229,7 @@
 .sched-prompt-section > summary::before { content: '▸' / ''; }
 .sched-prompt-section[open] > summary::before { content: '▾' / ''; }
 
-/* Jobs, one list and a page that answers first (#6515, #6521). */
-.sidebar-jobs-heading { margin: 4px 8px; font-size: var(--fs-md); color: var(--text-secondary); font-weight: 600; }
-.sidebar-jobs-group { margin-bottom: 8px; }
-.sidebar-jobs-group[hidden] { display: none; }
+/* A job's page answers first (#6515, #6521). */
 .sched-header { flex-wrap: wrap; gap: 8px; }
 .sched-header h2 { margin-right: auto; overflow-wrap: anywhere; min-width: 0; }
 .sched-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0 12px; font-size: .8125rem; font-weight: 400; } /* labels 13/500, values 13/400 */

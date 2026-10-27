@@ -50,22 +50,24 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.ok(!ids.includes('dashboard'), 'no "dashboard" subscriber: ' + ids);
         console.log('PASS (6) team chat posts as the subscribed Operator (board page and side panel)');
 
-        // ── (10) The Jobs sidebar: a one-off run.
+        // ── (10) Automations, Running now: a one-off run.
+        await ev(`window.openAutomationsFolder('running'); true`);
+        await waitFor(`document.getElementById('group-table-view') && document.getElementById('group-table-view').getClientRects().length > 0`, 'the Running now folder', 10000);
         const row = await ev(`(async () => {
             const lj = await import((window.__coralStatic || '/static/') + 'live_jobs.js');
             lj.renderLiveJobs([
                 { id: 42, status: 'running', trigger_type: 'api', job_name: null, started_at: new Date().toISOString() },
                 { id: 43, status: 'running', trigger_type: 'cron', job_name: 'nightly', started_at: new Date().toISOString() },
             ]);
-            const items = [...document.querySelectorAll('#live-jobs-list li, [id$=jobs-list] li')];
-            return items.map(li => li.textContent.replace(/\\s+/g, ' ').trim());
+            await new Promise(r => setTimeout(r, 400)); // sleep-ok: the folder draws the runs the tick brought
+            return [...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => tr.textContent.replace(/\\s+/g, ' ').trim());
         })()`);
         const oneOff = row.find(t => /Job run 42/.test(t));
         assert.ok(oneOff, 'the one-off run is "Job run 42": ' + JSON.stringify(row));
-        assert.match(oneOff, /one-off/);
-        assert.ok(!/__oneshot__|\bcron\b/.test(oneOff), 'no sentinel name or cron badge: ' + oneOff);
-        assert.ok(row.some(t => /nightly/.test(t) && /\bcron\b/.test(t)), 'a scheduled run keeps its job name and cron badge');
-        console.log('PASS (10) one-off runs: "Job run N" with a one-off badge');
+        assert.match(oneOff, /One-off/);
+        assert.ok(!/__oneshot__/.test(oneOff), 'no sentinel name: ' + oneOff);
+        assert.ok(row.some(t => /nightly/.test(t)), 'a scheduled run keeps its job name');
+        console.log('PASS (10) one-off runs: "Job run N" with a One-off tag, in Running now');
     } finally {
         await removeBoards(ev, [board]);
         await client.close();
