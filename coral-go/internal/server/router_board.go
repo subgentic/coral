@@ -176,6 +176,8 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Post("/api/board/{project}/working-mode/presets/{presetID}/reset", boardHandler.ResetWorkflowPreset)
 	r.Get("/api/board/{project}/tasks", boardHandler.ListTasks)
 	r.Get("/api/board/{project}/spend", routes.NewSpendHandler(s.db, s.boardStore).Spend) // the Analytics view: tokens, commits on main, tool calls and task times (#7525); never through the Hub
+	// the Analytics view's tokens per commit and task time, grouped (#8915); never through Coral Hub
+	r.Get("/api/analytics/efficiency", routes.NewEfficiencyHandler(s.db, s.boardStore).Efficiency)
 	// Goals (#7087): board text, written by the Operator or an orchestrator, readable like tasks.
 	r.Post("/api/board/{project}/goals", boardHandler.CreateGoal)
 	r.Get("/api/goals", boardHandler.ListAllGoals) // every board's goals (#7260), the Operator's; /api/goals/metrics is the Jobs metrics

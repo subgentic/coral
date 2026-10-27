@@ -50,6 +50,7 @@ a GET /api/agent/ui
 a GET /api/agent/ui/{id}/content
 a GET /api/agent/ui/{id}/events
 b GET /api/agents/models
+b GET /api/analytics/efficiency
 b GET /api/artifacts
 a GET /api/artifacts/series/{series_id}
 a GET /api/artifacts/series/{series_id}/versions
