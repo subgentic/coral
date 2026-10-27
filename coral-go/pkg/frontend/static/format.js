@@ -18,6 +18,21 @@ export function compactCount(n, kilo = 'K') {
 /** Tokens: compactCount. */
 export function formatTokens(n) { return compactCount(n); }
 
+/** The one figure format of the Analytics pages (UI/UX, #9516): K, M, B and T with no space, one decimal at most and no trailing zero (517K, 1.2M, 999.4K, 1M); below 1,000 the plain number (a figure that is not whole, an
+ *  average, has at most one decimal). Tokens, calls and requests alike, in the cards, the tables, the series axes and Tokens per commit and Task time. */
+export function compactFigure(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return String(n);
+    const a = Math.abs(v), sign = v < 0 ? '-' : '';
+    const unit = (x, u) => { const t = x.toFixed(1); return sign + (t.endsWith('.0') ? t.slice(0, -2) : t) + u; };
+    if (a >= 999.95e9) return unit(a / 1e12, 'T');
+    if (a >= 999.95e6) return unit(a / 1e9, 'B');
+    if (a >= 999950) return unit(a / 1e6, 'M');
+    if (a >= 1000) return unit(a / 1e3, 'K');
+    const r = a >= 100 ? Math.round(v) : Math.round(v * 10) / 10;
+    return Math.abs(r) >= 1000 ? unit(Math.abs(r) / 1e3, 'K') : String(r);
+}
+
 /** An ISO timestamp as the local clock time (hh:mm:ss), or '' for none or a bad one. */
 export function formatClockTime(isoStr) {
     if (!isoStr) return '';

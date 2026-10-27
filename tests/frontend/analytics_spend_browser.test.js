@@ -37,19 +37,19 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
         await ev(`window.switchNavTab('tokens'); true`);
         await waitFor(`document.querySelectorAll('#cost-spend .spend-card').length >= 5`, 'the section', 10000);
         await run('the headline and the numbers: tokens per commit, usual, commits, cache reads (not in the total), tool calls', async () => {
-            assert.equal(await text('#cost-spend .spend-headline'), '517 K tokens per commit, usual 360 K, 44% above.');
+            assert.equal(await text('#cost-spend .spend-headline'), '516.7K tokens per commit, usual 360K, 44% above.');
             const cards = await ev(`[...document.querySelectorAll('#cost-spend .spend-card')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`);
-            assert.ok(/^517 K\s*tokens per landed commit, 24 h/.test(cards[0]), cards[0]); assert.ok(/^70\s*tool calls per landed commit.*3 of 4 agents measured/.test(cards[1]), cards[1]); assert.ok(/^360 K\s*usual/.test(cards[2]), cards[2]); assert.ok(/^6\s*commits landed on main\s*1 unattributed/.test(cards[3]), cards[3]);
-            assert.ok(/^61 M\s*cache reads, not in the total/.test(cards[4]), cards[4]);
+            assert.ok(/^516.7K\s*tokens per landed commit, 24 h/.test(cards[0]), cards[0]); assert.ok(/^70\s*tool calls per landed commit.*3 of 4 agents measured/.test(cards[1]), cards[1]); assert.ok(/^360K\s*usual/.test(cards[2]), cards[2]); assert.ok(/^6\s*commits landed on main\s*1 unattributed/.test(cards[3]), cards[3]);
+            assert.ok(/^61M\s*cache reads, not in the total/.test(cards[4]), cards[4]);
             assert.match(await text('#cost-spend .spend-sub'), /Team coral-go-team · last 24 h against the 7 days before/);
         });
         await run('one bar a day, today amber when 30% above usual, the usual line', async () => {
             const b = await ev(`(() => ({ bars: document.querySelectorAll('#cost-spend .spend-bar').length, high: [...document.querySelectorAll('#cost-spend .spend-bar')].map(x => x.classList.contains('spend-bar-high')), usual: !!document.querySelector('#cost-spend .spend-usual'), label: document.querySelector('#cost-spend .spend-bars').getAttribute('aria-label') }))()`);
-            assert.equal(b.bars, 6, 'a day with no commit has no bar, not a stub'); assert.deepEqual(b.high, [false, false, false, false, false, true]); assert.equal(b.usual, true); assert.match(b.label, /usual 360 K/);
+            assert.equal(b.bars, 6, 'a day with no commit has no bar, not a stub'); assert.deepEqual(b.high, [false, false, false, false, false, true]); assert.equal(b.usual, true); assert.match(b.label, /usual 360K/);
         });
         await run('who spends: a Not measured note, team for the Orchestrator, an Unattributed row', async () => {
             const t = await ev(`[...document.querySelectorAll('#cost-spend .dt-table tbody tr')].map(r => [...r.children].map(c => c.textContent.trim()))`);
-            assert.deepEqual(t[0], ['Frontend Dev', '800 K', '26%', '2', '14 M', '120']); assert.deepEqual(t[1], ['Orchestrator', '600 K', '19%', 'team', '12 M', '90']);
+            assert.deepEqual(t[0], ['Frontend Dev', '800K', '26%', '2', '14M', '120']); assert.deepEqual(t[1], ['Orchestrator', '600K', '19%', 'team', '12M', '90']);
             assert.deepEqual(t[2], ['Gemini DevNot measured', '', '', '', '', '']); assert.deepEqual(t[3], ['UnattributedCommits whose author matches no agent', '', '', '', '', '']); // the note is under the name: no zeros, no dashes in the figure cells
             assert.ok(await ev(`!!document.querySelector('#cost-spend .spend-how')`), 'How it is counted');
             const how = await text('#cost-spend .spend-how');
@@ -59,10 +59,10 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await ev(`window.__spend = { ...window.__spend, commits: { available: false, reason: 'no repository found for this team', window: null, usual: null, unattributed: 0 } }; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/Commits could not be read/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'the reason', 6000);
-            assert.equal(await text('#cost-spend .spend-headline'), 'Commits could not be read: no repository found for this team. 3.1 M tokens were spent.');
+            assert.equal(await text('#cost-spend .spend-headline'), 'Commits could not be read: no repository found for this team. 3.1M tokens were spent.');
             await ev(`window.__spend = ${JSON.stringify(FIX)}; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
-            await waitFor(`/517 K tokens per commit/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'back to normal', 6000);
+            await waitFor(`/516.7K tokens per commit/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'back to normal', 6000);
         });
         await run('the trend toggles: Tool calls changes the chart and its name, Hourly draws 24 hours', async () => {
             const pick = (group, key) => ev(`document.querySelector('#cost-spend .spend-toggle[aria-label="${group}"] [data-key="${key}"]').click(); true`);
@@ -120,7 +120,7 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await ev(`window.__spend = { ...window.__spend, commits: { window: 0, usual: 25, unattributed: 0 } }; true`); await ev(`window._refreshCostDashboard ? window._refreshCostDashboard({ force: true }) : 0; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/No commit landed/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'the no-commit headline', 6000);
-            assert.equal(await text('#cost-spend .spend-headline'), 'No commit landed in 24 h. 3.1 M tokens were spent.');
+            assert.equal(await text('#cost-spend .spend-headline'), 'No commit landed in 24 h. 3.1M tokens were spent.');
         });
         await run('the 7 day range asks range=7d; a 404 says there is no data', async () => {
             await ev(`document.getElementById('cost-time-range').value = 'week'; document.getElementById('cost-time-range').dispatchEvent(new Event('change', { bubbles: true })); true`);

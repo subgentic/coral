@@ -3,7 +3,7 @@
  * their text. Reads /api/token-usage/session/{id}/turns, /api/token-usage/timeseries?group_by=agent, /api/token-usage/turns?agent=... and /api/call-metrics/summary?interval=...&agent=... (#7803). Everything is
  * built with the DOM and textContent: names are written by agents. */
 import { importOnce } from './import_once.js';
-import { compactCount, formatCost } from './format.js';
+import { compactFigure as compactCount, formatCost } from './format.js'; // the one Analytics figure format (#9516)
 import { isPhoneLayout } from './phone_layout.js';
 const { dataTable, tableState, timeCell } = await importOnce('./data_table.js');
 const series = await importOnce('./analytics_series.js');

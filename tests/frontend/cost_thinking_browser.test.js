@@ -58,7 +58,7 @@ const { connect } = require('./agent_view_harness');
             const cell = (r, h) => r.cells[at(h)];
             assert.deepEqual(rows.map(r => [cell(r, 'Provider'), cell(r, 'Thinking level')].join('/')), ['claude/High', 'claude/Low', 'claude/Not reported', 'claude/Medium', 'agy/Not reported'], 'dearest first: ' + JSON.stringify(rows));
             assert.deepEqual(rows.map(r => cell(r, 'Model')).map(m => /Opus 5\.5/.test(m) ? 'opus' : /Sonnet 5\.5/.test(m) ? 'sonnet' : m), ['opus', 'opus', 'opus', 'sonnet', 'Not reported'], 'a row per provider, model and level; a model that was not recorded is Not reported');
-            assert.equal(cell(rows[0], 'Thinking'), '4.0K', 'the thinking tokens the CLI reported, as a number: ' + cell(rows[0], 'Thinking'));
+            assert.equal(cell(rows[0], 'Thinking'), '4K', 'the thinking tokens the CLI reported, as a number: ' + cell(rows[0], 'Thinking'));
             assert.equal(cell(rows[2], 'Thinking'), '–', 'Not reported has no thinking-token count');
             assert.equal(cell(rows[0], 'Calls'), '9');
             assert.deepEqual(rows.map(r => cell(r, 'Share')), ['44%', '22%', '17%', '11%', '6%'], 'shares of the cost');
