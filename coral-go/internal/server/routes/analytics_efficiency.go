@@ -225,7 +225,7 @@ func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team 
 	}
 	dominantModel := efficiency.DominantModels(in.Usage)
 
-	// A commit belongs to the first session that saw it and had begun by then: one that started after the commit was dated found it on the branch (a session that is not known to have begun is taken to have
+	// A commit belongs to the first session that saw it, had begun by then and is the author's (by its git identity; a commit whose author was not recorded can be anyone's): one that started after the commit was dated found it on the branch (a session that is not known to have begun is taken to have
 	// begun before it).
 	type timed struct {
 		session string
@@ -240,6 +240,9 @@ func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team 
 			start := sh.sessionStart(sg.SessionID, facts)
 			if !start.IsZero() && c.At.Before(start.Add(-foundThere)) {
 				continue
+			}
+			if !c.MadeBy(*sg, deref(sh.live[sg.SessionID].DisplayName)) {
+				continue // someone else's commit that this session pulled in
 			}
 			owner = sg
 			break
@@ -257,7 +260,8 @@ func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team 
 		}
 	}
 
-	// A task is the work of the session recorded at its claim, which a restart of the agent since does not change; one with none recorded has no session, no provider and no commits.
+	// A task is the work of the session recorded at its claim, which a restart of the agent since does not change; one with none recorded has no session, no provider and no commits. Its commits are those
+	// made in any round of its work (a send-back keeps each earlier round's claim and hand-in), as its tokens and time are.
 	type window struct {
 		claimed, ended time.Time
 		row            int
@@ -279,10 +283,14 @@ func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team 
 		} else if ls, ok := sh.live[t.Session]; ok {
 			row.Model = deref(ls.Model)
 		}
-		claimed, errClaimed := time.Parse(time.RFC3339, t.ClaimedAt)
-		ended, errEnded := time.Parse(time.RFC3339, t.EndedAt)
-		if t.Session != "" && errClaimed == nil && errEnded == nil {
-			windows[t.Session] = append(windows[t.Session], window{claimed.UTC(), ended.UTC(), len(in.Tasks)})
+		if t.Session != "" {
+			for _, win := range t.Windows {
+				claimed, errClaimed := time.Parse(time.RFC3339, win.Claimed)
+				ended, errEnded := time.Parse(time.RFC3339, win.Ended)
+				if errClaimed == nil && errEnded == nil {
+					windows[t.Session] = append(windows[t.Session], window{claimed.UTC(), ended.UTC(), len(in.Tasks)})
+				}
+			}
 		}
 		in.Tasks = append(in.Tasks, row)
 	}

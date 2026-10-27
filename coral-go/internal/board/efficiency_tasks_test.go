@@ -174,6 +174,7 @@ func TestEfficiencyTasksKeepTheWorkOfTheRoundsBeforeTheLast(t *testing.T) {
 	require.NotNil(t, got[0].WorkSeconds)
 	assert.InDelta(t, 700, *got[0].WorkSeconds, 0.001, "100 s of round one and 600 s of round two, not the review of either")
 	assert.True(t, got[0].SentBack)
+	assert.Equal(t, []WorkWindow{{"2026-10-20T10:00:00Z", "2026-10-20T10:01:40Z"}, {"2026-10-21T12:00:00Z", "2026-10-21T12:10:00Z"}}, got[0].Windows, "both rounds' claim and hand-in (#8999)")
 
 	// an approved task sent back after completion keeps its round too
 	_, err = rt.s.SendBack(rt.ctx, "team", rt.parent.ID, "Lead", "one more thing")

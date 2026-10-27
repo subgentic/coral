@@ -50,3 +50,35 @@ func TestSessionFactsReadEndedSessionsToo(t *testing.T) {
 	assert.True(t, facts["unknown"].Start.IsZero())
 	assert.Equal(t, "", facts["unknown"].Provider)
 }
+
+// #8996: a commit is credited only to a session whose identity it matches; one with no recorded author is anyone's.
+func TestACommitIsMadeByTheSessionWhoseIdentityItsAuthorMatches(t *testing.T) {
+	c := EfficiencyCommit{AuthorName: "Backend Dev", AuthorHash: IdentityHash("bd@example.invalid")}
+	assert.True(t, c.MadeBy(CommitSighting{AgentName: "backend dev"}, ""), "by the agent's name, in any case")
+	assert.True(t, c.MadeBy(CommitSighting{AgentName: "agent-7"}, "Backend Dev"), "by the agent's display name")
+	assert.True(t, c.MadeBy(CommitSighting{AgentName: "x", IdentHash: IdentityHash(" BD@example.invalid ")}, ""), "by the email's hash, whatever its case")
+	assert.True(t, c.MadeBy(CommitSighting{AgentName: "x", IdentName: "Backend Dev"}, ""), "by the checkout's configured name")
+	assert.False(t, c.MadeBy(CommitSighting{AgentName: "Frontend Dev", IdentName: "Operator", IdentHash: IdentityHash("op@example.invalid")}, "Frontend Dev"), "a teammate who pulled it")
+	assert.True(t, EfficiencyCommit{}.MadeBy(CommitSighting{AgentName: "Anyone"}, ""), "no recorded author: as before")
+	assert.Equal(t, "", IdentityHash("  "))
+	assert.Len(t, IdentityHash("a@b"), 16)
+}
+
+// #8999: two commits with the same subject and author second but different authors are two commits; a rebased copy by the same author is one.
+func TestEfficiencyCommitCopiesNeedTheSameAuthorToo(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	gs := NewGitStore(db)
+	now := time.Now().UTC()
+	at := now.Add(-time.Hour).Format(time.RFC3339)
+	snap := func(sid, hash, author string) {
+		require.NoError(t, gs.UpsertGitSnapshot(ctx, &GitSnapshot{AgentName: sid, AgentType: "claude", WorkingDirectory: "/w", Branch: "b", CommitHash: hash, CommitSubject: "WIP", CommitTimestamp: &at, SessionID: &sid,
+			AuthorName: author, AuthorHash: IdentityHash(author + "@example.invalid")}))
+	}
+	snap("s1", "h1", "ann")
+	snap("s1", "h2", "ann") // a rebased copy
+	snap("s2", "h3", "bob") // another author's commit of the same subject in the same second
+	got, err := NewSessionStore(db).EfficiencyCommits(ctx, now.Add(-24*time.Hour), now)
+	require.NoError(t, err)
+	assert.Len(t, got, 2)
+}

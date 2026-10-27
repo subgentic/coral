@@ -9,7 +9,7 @@
 //     (what the board stored when it was completed). Its time is the work: from the claim to the submission for review (or to completion when it had none), and the same for each round before it that a
 //     rejection or send-back ended; review time is not counted. A commit belongs to at most one task: the latest-claimed of its session's tasks that was open when it was made.
 //   - A task whose session is not known (none was recorded at its claim) or whose provider is not measured (Gemini writes no usage) is left out of BOTH measures: a measure over fewer tasks than exist
-//     says which providers it cannot read (Unmeasured), and the rest are not guessed.
+//     says which providers it cannot read (Unmeasured, and "unknown" for tasks of no known session), and the rest are not guessed.
 //   - A figure nobody could answer (tokens per commit with no commit, a median with no task) is absent, never zero. Result.Median is the median task time, or the ratio of all tokens to all commits (the
 //     "average" of the view's JSON).
 package efficiency
@@ -199,9 +199,7 @@ func tokensPerCommit(dim string, in Input) Result {
 	if dim == Task {
 		for _, t := range in.Tasks {
 			if !in.Measured[t.Provider] {
-				if t.Provider != "" {
-					unmeasured[t.Provider] = true
-				}
+				unmeasured[unmeasuredName(t.Provider)] = true
 				continue
 			}
 			g := get(fmt.Sprint(t.ID))
@@ -278,9 +276,7 @@ func taskTime(dim string, in Input) Result {
 	var all []float64
 	for _, t := range in.Tasks {
 		if !in.Measured[t.Provider] { // the same rule as tokens per commit: a provider Coral reads no usage of, or a task of no known session, is not counted
-			if t.Provider != "" {
-				unmeasured[t.Provider] = true
-			}
+			unmeasured[unmeasuredName(t.Provider)] = true
 			continue
 		}
 		key := ""
@@ -421,6 +417,16 @@ func label(dim, key, given string, in Input) string {
 	return key
 }
 
+// Unknown names, in Unmeasured, the tasks that are left out because no session was recorded at their claim, so no provider is known.
+const Unknown = "unknown"
+
+func unmeasuredName(provider string) string {
+	if provider == "" {
+		return Unknown
+	}
+	return provider
+}
+
 // ProviderLabel is a provider's name as the view shows it.
 func ProviderLabel(p string) string {
 	switch p {
@@ -434,6 +440,8 @@ func ProviderLabel(p string) string {
 		return "Pi"
 	case "agy":
 		return "Antigravity"
+	case Unknown:
+		return "Provider not recorded"
 	}
 	return p
 }
