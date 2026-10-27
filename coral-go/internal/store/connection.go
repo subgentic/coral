@@ -179,7 +179,9 @@ func (d *DB) ensureSchema(ctx context.Context) error {
 	// they never saw (a run finished after this is unread until it is opened). ALTER succeeds only when the column is new, so the backfill runs once.
 	for _, table := range []string{"scheduled_runs", "workflow_runs"} {
 		if _, err := d.ExecContext(ctx, "ALTER TABLE "+table+" ADD COLUMN seen_at TEXT"); err == nil {
-			d.ExecContext(ctx, "UPDATE "+table+" SET seen_at = ? WHERE status NOT IN ('running', 'pending')", time.Now().UTC().Format(ISOFormat))
+			if _, err := d.ExecContext(ctx, "UPDATE "+table+" SET seen_at = ? WHERE status NOT IN ('running', 'pending')", time.Now().UTC().Format(ISOFormat)); err != nil {
+				slog.Warn("could not mark the runs that were already over as opened; they show as unread", "table", table, "error", err)
+			}
 		}
 	}
 

@@ -337,6 +337,7 @@ b POST /api/saved
 b POST /api/remote/{server}/*
 b POST /api/scheduled/jobs
 b POST /api/scheduled/jobs/{jobID}/toggle
+b POST /api/scheduled/runs/{runID}/seen
 b POST /api/scheduled/validate-cron
 b POST /api/servers
 b POST /api/servers/{id}/test
@@ -406,6 +407,7 @@ b POST /api/views
 b POST /api/workflows
 b POST /api/workflows/by-name/{name}/trigger
 b POST /api/workflows/runs/{runID}/kill
+b POST /api/workflows/runs/{runID}/seen
 b POST /api/workflows/{workflowID}/trigger
 b POST /api/worktrees/remove
 a PUT /api/agent/ui/{id}

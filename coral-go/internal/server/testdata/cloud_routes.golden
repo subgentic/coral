@@ -325,6 +325,7 @@ POST /api/pinned-folders launch
 POST /api/saved interact
 POST /api/scheduled/jobs never
 POST /api/scheduled/jobs/{jobID}/toggle never
+POST /api/scheduled/runs/{runID}/seen interact
 POST /api/scheduled/validate-cron never
 POST /api/sessions/history/{sessionID}/resummarize never
 POST /api/sessions/history/{sessionID}/tags never
@@ -391,6 +392,7 @@ POST /api/views never
 POST /api/workflows never
 POST /api/workflows/by-name/{name}/trigger launch
 POST /api/workflows/runs/{runID}/kill interact
+POST /api/workflows/runs/{runID}/seen interact
 POST /api/workflows/{workflowID}/trigger launch
 POST /api/worktrees/remove never
 PUT /api/agent/ui/{id} never
