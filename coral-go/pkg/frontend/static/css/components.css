@@ -4336,16 +4336,15 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 
 /* the form row outside a settings_view (#9186, Goal #84 item 7): the hand-built dialogs write the same row, the label above, the control, and under it the shared .settings-hint, from the same --sv-* tokens (settings_view.css keeps only .sv rules, so the hand-built row is here), and never a style attribute on a field */
 .form-row { display: grid; gap: 4px; margin: 0 0 12px; min-width: 0; }
+.form-row[hidden] { display: none; }
 .form-row-inline { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); }
 .form-label, .modal-content .form-label { display: block; margin: 0 0 6px; font-size: var(--sv-label-size); font-weight: var(--sv-label-weight); color: var(--sv-label-color); } /* in a dialog too: .modal-content label (12 px below, secondary) would otherwise win */
 .form-row .form-label, .modal-content .form-row .form-label { margin: 0; }
 .form-label-nowrap, .modal-content .form-label-nowrap { white-space: nowrap; }
-.form-label-block, .modal-content .form-label-block { margin-bottom: 8px; }
 .form-label-strong, .modal-content .form-label-strong { font-weight: 600; }
 .form-control-full { width: 100%; }
 .form-control-grow { flex: 1; min-width: 0; }
 .form-control-auto { width: auto; }
-.form-control-gap { margin-top: 4px; }
 .form-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); }
 .form-check-compact { gap: 6px; padding: 2px 0; cursor: pointer; white-space: nowrap; }
 .form-textarea-readonly { width: 100%; height: 260px; padding: 12px; box-sizing: border-box; font-family: var(--font-mono); font-size: var(--fs-base); resize: vertical; color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-lg); }
