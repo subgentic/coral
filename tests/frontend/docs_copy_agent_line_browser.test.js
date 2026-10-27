@@ -30,6 +30,11 @@ const LINE = "Coral's docs for agents: run `coral-agent docs` to list the topics
             await stubClipboard(true);
             const before = await ev(`({ text: document.getElementById('docs-copy-agent-line').textContent.replace(/\\s+/g, ' ').trim(), vw: innerWidth, page: document.documentElement.scrollWidth - innerWidth,
                 box: (r => ({ l: r.left, r: r.right, h: r.height }))(document.getElementById('docs-copy-agent-line').getBoundingClientRect()) })`);
+            // DIAGNOSTIC (#8776, not to be merged): the button's ancestors as laid out now, and how long until it is 24 px tall
+            const chain = await ev(`(() => { const out = []; for (let e = document.getElementById('docs-copy-agent-line'); e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e), r = e.getBoundingClientRect(); out.push([e.tagName + (e.id ? '#' + e.id : ''), cs.display, cs.visibility, !!e.hidden, Math.round(r.width), Math.round(r.height)]); } return out.slice(0, 7); })()`);
+            let lateMs = before.box.h >= 24 ? 0 : -1;
+            if (lateMs < 0) { const t0 = Date.now(); while (Date.now() - t0 < 3000) { if ((await ev(`document.getElementById('docs-copy-agent-line').getBoundingClientRect().height`)) >= 24) { lateMs = Date.now() - t0; break; } await new Promise(r => setTimeout(r, 100)); } } // sleep-ok: diagnostic
+            before.diag = { chain, lateMs, docsViewDisplay: await ev(`getComputedStyle(document.getElementById('docs-view')).display`) };
             assert.match(before.text, /Copy docs line for agents/, JSON.stringify(before));
             assert.ok(before.box.l >= 0 && before.box.r <= before.vw && before.box.h >= 24, 'the button is on the screen and tappable: ' + JSON.stringify(before));
             assert.ok(before.page <= 1, 'no page-wide horizontal scroll: ' + JSON.stringify(before));
