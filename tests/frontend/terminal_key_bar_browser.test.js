@@ -1,5 +1,5 @@
-// The phone's terminal key bar (#6676, the phone terminal audit #6669 finding 1): a phone's keyboard has no Esc, Tab, Ctrl or arrows, so the Terminal view gets a row of keys under the terminal: Esc, Tab, Ctrl-C, the four arrows
-// and | ~ / -, each a 44 px target with a name, two rows with every key on the screen, phone width and the Terminal view only. A tap sends the key to the agent (the keys route, the names the server takes) and leaves focus
+// The phone's terminal key bar (#6676, the phone terminal audit #6669 finding 1): a phone's keyboard has no Esc, Tab, Ctrl or arrows, so the Terminal view gets a row of keys under the terminal: Esc, Tab, Ctrl-C, the four arrows,
+// Enter and | ~ / - (shown and hidden by the Keys chip, #8745), each a 44 px target with a name, two rows with every key on the screen, phone width and the Terminal view only. A tap sends the key to the agent (the keys route, the names the server takes) and leaves focus
 // where it is. The message box says it is a message and not the terminal; the terminal's own input says what it is. 390 and 360 px, 1280 for "not on a desktop"; both themes for contrast. The agent is the harness's mock.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -7,7 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 
-const KEYS = [['Esc', 'Escape', 'Escape'], ['Tab', 'Tab', 'Tab'], ['Ctrl-C', 'C-c', 'Ctrl-C, interrupt'], ['←', 'Left', 'Left arrow'], ['↑', 'Up', 'Up arrow'], ['↓', 'Down', 'Down arrow'], ['→', 'Right', 'Right arrow'], ['|', '|', 'Pipe'], ['~', '~', 'Tilde'], ['/', '/', 'Slash'], ['-', '-', 'Dash']];
+const KEYS = [['Esc', 'Escape', 'Escape'], ['Tab', 'Tab', 'Tab'], ['Ctrl-C', 'C-c', 'Ctrl-C, interrupt'], ['←', 'Left', 'Left arrow'], ['↑', 'Up', 'Up arrow'], ['↓', 'Down', 'Down arrow'], ['→', 'Right', 'Right arrow'], ['Enter', 'Enter', 'Enter'], ['|', '|', 'Pipe'], ['~', '~', 'Tilde'], ['/', '/', 'Slash'], ['-', '-', 'Dash']];
 const STUB = `(() => { const real = window.fetch; window.__keys = [];
     window.fetch = (u, o = {}) => { if (/\\/api\\/sessions\\/live\\/[^/]+\\/keys$/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'POST') { window.__keys.push(JSON.parse(o.body).keys); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })); } return real(u, o); };
     return true; })()`;
@@ -22,7 +22,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`); await ev(STUB);
-            await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('tk-a', 'A', 4, { sleeping: false }); true`);
+            await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); localStorage.removeItem('coral-agent-keys'); window.__m.add('tk-a', 'A', 4, { sleeping: false }); true`);
             await select('tk-a');
             await ev(`window.setLiveViewMode('chat'); true`);
             await waitFor(`!window.__vis('#terminal-statusbar')`, 'the Chat view', 8000);
@@ -35,7 +35,9 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             await waitFor(`window.__vis('#terminal-statusbar')`, 'the terminal bar', 8000);
             if (!mobile) { assert.equal(await ev(`window.__vis('#terminal-key-bar')`), false, at + 'a desktop has a keyboard: no key bar'); continue; }
 
-            // Terminal view on a phone: the bar, its keys, their names and sizes
+            // Terminal view on a phone: the bar is closed until the Keys chip opens it (#8745: one key area), then its keys, their names and sizes
+            assert.equal(await ev(`window.__vis('#terminal-key-bar')`), false, at + 'the key bar is closed until the Keys chip opens it');
+            await ev(`document.getElementById('keys-chip').click(); true`);
             await waitFor(`window.__vis('#terminal-key-bar')`, 'the key bar', 8000);
             assert.equal(await ev(`document.getElementById('terminal-key-bar').getAttribute('role') + '|' + document.getElementById('terminal-key-bar').getAttribute('aria-label')`), 'group|Terminal keys');
             const keys = await ev(`[...document.querySelectorAll('#terminal-key-bar .tkb-key')].map(b => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), keys: b.dataset.keys, name: b.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height), left: Math.round(r.left), right: Math.round(r.right) }; })`);

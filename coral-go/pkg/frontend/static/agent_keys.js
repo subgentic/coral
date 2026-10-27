@@ -2,19 +2,20 @@
  * this shows there, and the server refuses a viewer's keys anyway):
  *  - Stop: while the agent works and the message box is empty (no words, no pictures) the round Send button is a red rounded square, "Stop the agent". It sends Escape (the CLI's interrupt; Ctrl-C quits the
  *    Claude CLI on a second press), once: it is aria-disabled (still focusable) until the agent's state changes or 3 s pass. Typing a word turns it back into Send.
- *  - The Keys chip (aria-pressed) opens a row of seven keys above the message box. It is closed on every visit until the person opens it; what they chose (open or closed) is kept in this browser and used on every visit.
+ *  - The Keys chip (aria-pressed) shows and hides the terminal's own key bar (Esc, Tab, Ctrl-C, the arrows, Enter, | ~ / -, #terminal-key-bar) under the terminal: one key area, in the Terminal view only (#8745). It is closed on every visit until the person opens it; what they chose (open or closed) is kept in this browser and used on every visit.
  *  - A question or menu (the needs-input state) opens the strip by itself, once per question, unless the person closed it for that question or turned the strip off; when the question is answered it closes again only if it opened itself.
  * Everything the screen reader hears goes through #agent-keys-status, a region that is in the page from the start. The key taps themselves say "Sent: Escape" through the toast (the Notifications regions). */
 import { deriveSessionState } from './session_state.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { registerActions } from './actions.js';
-import { setHidden, setAttr, setText } from './dom_write.js';
+import { setAttr, setText } from './dom_write.js';
 import { sendRawKeys } from './controls.js';
 import { browserLocal } from './safe_storage.js';
+import { setTerminalKeysOpen } from './terminal_statusbar.js';
 
 const $ = id => document.getElementById(id);
 const STOP_AGAIN_MS = 3000;
-const MIN_CHAT_PX = 72; // three lines: below it with the keyboard up the strip offers to close itself
+const MIN_ROOM_PX = 40; // two lines of the terminal: below it with the keyboard up the key bar closes itself (a phone turned sideways keeps its bar with the keyboard up: the top bar steps aside once the terminal has focus)
 
 let open = false;            // the strip is showing
 let openedBy = null;         // byChip | byQuestion
@@ -50,9 +51,9 @@ function stopWanted({ working, text, pictures, viewOnly, phone }) {
 }
 
 function paintStrip() {
-    const strip = $('agent-key-strip'), chip = $('keys-chip');
+    const strip = $('terminal-key-bar'), chip = $('keys-chip');
     if (!strip || !chip) return;
-    setHidden(strip, !open);
+    setTerminalKeysOpen(open);
     setAttr(chip, 'aria-pressed', String(open));
 }
 
@@ -64,7 +65,7 @@ function openStrip(by, words) {
 
 function closeStrip(words, { forQuestion = false } = {}) {
     if (!open) return;
-    const strip = $('agent-key-strip'), box = $('command-input');
+    const strip = $('terminal-key-bar'), box = $('command-input');
     if (strip && strip.contains(document.activeElement) && box) box.focus(); // never to the page
     open = false; openedBy = null; paintStrip();
     if (forQuestion && last) closedFor = questionKey(last) || closedFor;
@@ -134,17 +135,17 @@ registerActions({
     },
 });
 
-/** With the keyboard up the strip must not push the output out: under three lines of the terminal it closes itself and says so. */
+/** With the keyboard up the strip must not push the output out: under two lines of the terminal it closes itself and says so. */
 function checkRoom() {
     if (!open) return;
     const shown = [$('xterm-container'), $('pane-capture')].find(e => e && e.checkVisibility && e.checkVisibility()); // the strip is in the terminal view: the room is the terminal's output
     const h = shown ? shown.clientHeight : 0;
-    if (h && h < MIN_CHAT_PX) closeStrip('Keys closed: there is no room for them with the keyboard up', { forQuestion: true });
+    if (h && h < MIN_ROOM_PX) closeStrip('Keys closed: there is no room for them with the keyboard up', { forQuestion: true });
 }
 
 if (typeof document !== 'undefined') {
     const wire = () => {
-        const strip = $('agent-key-strip'), chip = $('keys-chip'), btn = $('mobile-send-btn'), box = $('command-input');
+        const strip = $('terminal-key-bar'), chip = $('keys-chip'), btn = $('mobile-send-btn'), box = $('command-input');
         if (!strip || !chip || !btn) return false;
         // a tap on a key, the chip or Stop leaves focus where it is: the on-screen keyboard stays open (a keyboard or switch user still reaches them by Tab and Enter)
         for (const el of [strip, chip, btn]) el.addEventListener('pointerdown', e => { if (e.pointerType === 'touch' || e.pointerType === 'pen') e.preventDefault(); });
