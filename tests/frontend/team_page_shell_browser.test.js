@@ -1,10 +1,10 @@
 // The team page's shell (#7453, stage 1; UI/UX's team page doc 7aa984fe and mock 896e13f3): a team's row opens the page on Goals; the header holds the team's name and ONE status and the buttons Add agent and More;
-// a tablist named Team has Goals, Messages, Tasks, Agents, Artifacts, Knowledge, Settings (counts in the names); Left/Right/Home/End move between the tabs; and the header and the tab strip are at the same pixels
+// a tablist named Team has Goals, Messages, Tasks, Agents, Artifacts, Knowledge (Settings is a popout button, #8853) (counts in the names); Left/Right/Home/End move between the tabs; and the header and the tab strip are at the same pixels
 // on every tab and on a goal's page and a task's page, at 1280, 1024 and 390 px. Written failing-first by QA (#7466): controls by role and accessible name (helpers/team_page.js), never an id or a class.
 // Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installTP, TABS, seed, openTeam, goTab, rect, scenarios } = require('./helpers/team_page');
+const { install: installTP, TABS, seed, openTeam, goTab, closeSettings, rect, scenarios } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
@@ -40,8 +40,8 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 assert.ok(r.add, 'a button named Add agent'); assert.ok(r.more, 'a button named More');
                 assert.ok(r.statuses.length <= 1, `one status in the header, not ${r.statuses.length}: ${JSON.stringify(r.statuses)}`);
             });
-            await S.run(`${label}: the tablist named Team has the seven tabs in order, each name carrying its count where it has one`, async () => {
-                const names = await ev(`window.__tp.allTabs().map(t => window.__tp.tabLabel(t))`); // a phone has Artifacts, Knowledge and Settings behind its More menu (team_tabs_more_browser): they are still the tablist's tabs
+            await S.run(`${label}: the tablist named Team has the six tabs in order, each name carrying its count where it has one`, async () => {
+                const names = await ev(`window.__tp.allTabs().map(t => window.__tp.tabLabel(t))`); // a phone has Knowledge and Board behind its More menu (team_tabs_more_browser): they are still the tablist's tabs
                 assert.deepEqual(names, TABS, 'the tabs, in order');
                 const full = await ev(`window.__tp.allTabs().map(t => window.__na.name(t))`);
                 assert.ok(/Goals\s*2/.test(full[0]), `Goals carries its count 2 (got ${JSON.stringify(full[0])})`);
@@ -53,7 +53,7 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 const tabindexes = await ev(`window.__tp.tabs().map(t => t.tabIndex)`);
                 assert.deepEqual(tabindexes.filter(i => i === 0).length, 1, `exactly one tab is a tab stop (got ${JSON.stringify(tabindexes)})`);
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Agents', 'Right moves to Agents');
-                const last = mobile ? 'Artifacts' : 'Settings'; // a phone's row ends at Artifacts (the first four tabs): the rest are behind More
+                const last = mobile ? 'Artifacts' : 'Board'; // a phone's row ends at Artifacts (the first four tabs): the rest are behind More
                 await key('End'); assert.equal(await focusedTab(), last, `End moves to ${last}`);
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Goals', 'Right wraps to Goals');
                 await key('ArrowLeft'); assert.equal(await focusedTab(), last, `Left wraps to ${last}`);
@@ -70,10 +70,13 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 await open('/Explore goals with two teams/', 'button, a, [role=row], tr'); same(base, await rect(ev), 'on the goal page');
                 await goTab(ev, settle, 'Tasks'); await open('/Add the goal filter/', 'button, a, [role=row], tr'); same(base, await rect(ev), 'on the task page');
             });
-            await S.run(`${label}: Settings and the other tabs have their own address (/team/<name>/<tab>), and a reload opens the same tab`, async () => {
-                await goTab(ev, settle, 'Settings'); await settle(300);
+            await S.run(`${label}: The tabs have their own address (/team/<name>/<tab>); Settings, a popout, has none and leaves the address as it was`, async () => {
+                await goTab(ev, settle, 'Board'); await settle(300);
                 const path = await ev(`location.pathname`);
-                assert.ok(new RegExp('/team/' + TEAM + '/settings$').test(path), `the address is /team/${TEAM}/settings (got ${path})`);
+                assert.ok(new RegExp('/team/' + TEAM + '/board$').test(path), `the address is /team/${TEAM}/board (got ${path})`);
+                await goTab(ev, settle, 'Settings'); await settle(300);
+                assert.equal(await ev(`location.pathname`), path, 'the Settings dialog does not change the address');
+                await closeSettings(ev, settle);
             });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first

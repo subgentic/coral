@@ -74,6 +74,10 @@ const TEAM = `qa-tsm-${Date.now() % 100000}`;
             check(`${label}: Leave without saving closes it, and focus is back on the button that opened it`, !(await modal()) && (await ev(`document.activeElement === window.__opener || (document.activeElement && document.activeElement.id === window.__opener.id)`)), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className)`));
 
             // with nothing changed, Escape closes it at once
+            // with nothing changed, Cancel closes it too (it is never disabled); with a change it drops the change and the dialog stays
+            await openSettings(ev, settle);
+            await ev(`document.querySelector('.team-settings-modal .sv-cancel').click(); true`); await settle(500);
+            check(`${label}: with nothing changed Cancel closes the dialog`, !(await modal()));
             await openSettings(ev, settle);
             await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
             await settle(500);

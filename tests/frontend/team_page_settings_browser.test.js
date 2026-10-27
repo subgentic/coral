@@ -108,7 +108,8 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                     assert.ok(end.inside && Math.abs(end.gap)<=24,'the whole save bar is reachable at the scroll end: '+JSON.stringify(end));
                     await ev(`document.querySelector('#team-settings-workspace .sv-scroll').scrollTop=0; true`);
                 } else {
-                    assert.ok(b.vh - (b.save.y + b.save.h) <= 24, `the bar is at the bottom of the screen (${b.vh - (b.save.y + b.save.h)} px under it)`);
+                    const under = await ev(`(() => { const c = document.querySelector('.team-settings-modal .modal-content').getBoundingClientRect(); return Math.round(c.bottom); })()`); // the popout (#8853): the bar is at the bottom of its dialog
+                    assert.ok(under - (b.save.y + b.save.h) <= 24, `the bar is at the bottom of the dialog (${under - (b.save.y + b.save.h)} px under it)`);
                     await ev(`document.querySelector('#team-settings-workspace .settings-panes').scrollTop=10000; true`);
                     const b2=await bar();
                     assert.ok(Math.abs(b2.save.y-b.save.y)<=1,'the wide view save bar does not scroll with its pane');
