@@ -51,9 +51,9 @@ function buildOnce() {
     S.built = true;
     const tabs = $('team-tabs');
     for (const t of TEAM_TABS) {
-        const b = el('button', 'team-tab'); b.type = 'button'; b.id = `team-tab-${t}`; b.dataset.tab = t;
+        const b = el('button', 'tab team-tab'); b.type = 'button'; b.id = `team-tab-${t}`; b.dataset.tab = t;
         b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', 'false'); b.setAttribute('aria-controls', `team-panel-${t}`); b.tabIndex = -1;
-        b.append(el('span', 'team-tab-label', LABEL[t]), el('span', 'team-tab-count'));
+        b.append(el('span', 'team-tab-label', LABEL[t]), el('span', 'tab-count team-tab-count'));
         b.addEventListener('click', () => { goTab(t, { focus: false, user: true }); });
         tabs.append(b);
     }
@@ -82,13 +82,13 @@ function buildOnce() {
 function buildTabsMore(tabs) {
     const row = el('div', 'team-tabs-row'); row.id = 'team-tabs-row';
     tabs.replaceWith(row); row.append(tabs);
-    const b = el('button', 'team-tab team-tab-more'); b.type = 'button'; b.id = 'team-tab-more';
+    const b = el('button', 'tab team-tab team-tab-more'); b.type = 'button'; b.id = 'team-tab-more';
     b.setAttribute('aria-haspopup', 'menu'); b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-tabs-more-menu'); b.setAttribute('aria-label', 'More tabs');
     b.append(el('span', 'team-tab-label', 'More'));
     const menu = el('div', 'team-more-menu team-tabs-more-menu'); menu.id = 'team-tabs-more-menu'; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More tabs');
     for (const t of PHONE_MORE) {
         const m = el('button', null); m.type = 'button'; m.setAttribute('role', 'menuitem'); m.dataset.tab = t;
-        m.append(el('span', 'team-more-label', LABEL[t]), el('span', 'team-tab-count'));
+        m.append(el('span', 'team-more-label', LABEL[t]), el('span', 'tab-count team-tab-count'));
         menu.append(m);
     }
     row.append(b, menu);

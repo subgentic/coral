@@ -286,13 +286,13 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     function drawTabs(g) {
         const wrap = el('div', 'goal-lists');
-        const strip = el('div', 'goal-tabs'); strip.setAttribute('role', 'tablist'); strip.setAttribute('aria-label', `The tasks and artifacts of ${g.title}`);
+        const strip = el('div', 'tabs goal-tabs'); strip.setAttribute('role', 'tablist'); strip.setAttribute('aria-label', `The tasks and artifacts of ${g.title}`);
         const tabs = [['tasks', 'Tasks', totalOf(g.rollup)], ...(isCloud() ? [] : [['artifacts', 'Artifacts', artifacts.total]])];
         if (!tabs.some(t => t[0] === model.tab)) model.tab = 'tasks';
         for (const [key, label, n] of tabs) {
-            const b = btn('goal-tab', null, () => { if (model.tab === key) return; model.tab = key; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${key}`)?.focus({ preventScroll: true }); });
+            const b = btn('tab goal-tab', null, () => { if (model.tab === key) return; model.tab = key; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${key}`)?.focus({ preventScroll: true }); });
             b.id = `goal-tab-${key}`; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(model.tab === key)); b.setAttribute('aria-controls', 'goal-list'); b.tabIndex = model.tab === key ? 0 : -1;
-            b.append(el('span', 'goal-tab-label', label), el('span', 'goal-tab-count', n == null ? '' : ` ${n}`));
+            b.append(el('span', 'goal-tab-label', label), el('span', 'tab-count goal-tab-count', n == null ? '' : ` ${n}`));
             b.addEventListener('keydown', e => { if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return; e.preventDefault(); const i = tabs.findIndex(t => t[0] === key), next = (e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length])[0]; model.tab = next; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${next}`)?.focus({ preventScroll: true }); });
             strip.append(b);
         }

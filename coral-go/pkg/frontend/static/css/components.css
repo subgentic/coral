@@ -82,6 +82,18 @@
 .btn-quiet.btn-danger:hover { background: rgba(var(--fx-red-rgb), 0.15); color: var(--error-text); }
 .btn[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
 
+/* One text tab strip (Goal #88, spec item 10, #9210): .tabs holds .tab buttons (role tab, aria-selected): 13/500, a 2 px transparent underline that is the accent on the chosen tab (text-primary, 600), a count in .tab-count, 40 px high
+   (44 on touch). A strip that scrolls sideways keeps its layout in its own class; a choice between two to five buttons is a segmented control (.btn-seg), not tabs. */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--text-secondary); font: inherit; font-size: var(--fs-md); font-weight: 500; cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--text-primary); }
+.tab[aria-selected="true"], .tab.is-current { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--accent); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-sm); }
+.tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-sm); font-weight: 600; line-height: 1.5; }
+.tab-count[hidden] { display: none; }
+@media (max-width: 767px), (pointer: coarse) { .tab { min-height: var(--control-touch-height); } }
+
 /* A segmented control (Goal #84, #9096): one choice among two to five buttons, joined in one box: one height (32, 44 on touch), one radius, one padding; the chosen one is the accent fill above. A text tab strip is not one. */
 .btn-seg { display: inline-flex; width: fit-content; max-width: 100%; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow: hidden; }
 .btn-seg > .btn { margin: 0; border: 0; border-radius: 0; min-height: var(--control-compact-height); padding: 0 var(--space-lg); background: var(--bg-secondary); color: var(--text-secondary); white-space: nowrap; }
