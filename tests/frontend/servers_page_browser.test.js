@@ -36,7 +36,7 @@ const SERVERS = [
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
-            await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.hub = true; s.state.servers = ${JSON.stringify(SERVERS)}; s.state.liveSessions = [{ session_id: 'w1', name: 'waiter', agent_type: 'claude', server: 'lan', waiting_for_input: true }, { session_id: 'w2', name: 'busy', agent_type: 'claude', server: 'lan', waiting_for_input: false }]; return true; })()`); // one agent of LAN box waits for its person (the Needs you column)
+            await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.hub = true; s.state.servers = ${JSON.stringify(SERVERS)}; s.state.liveSessions = [{ session_id: 'w1', name: 'waiter', agent_type: 'claude', server: 'lan', waiting_for_input: true }, { session_id: 'w2', name: 'busy', agent_type: 'claude', server: 'lan', waiting_for_input: false }, { session_id: 'w3', name: 'hinted', agent_type: 'codex', server: 'lan', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 20000).toISOString(), display_activity_hint: 'working', display_activity_hint_at: new Date().toISOString() }]; return true; })()`); // w3 is waiting by its hook but its screen says working: the Inbox does not count it, so neither does this page // one agent of LAN box waits for its person (the Needs you column)
             await ev(`window.switchNavTab('servers'); true`);
             await waitFor(`!!document.querySelector('#server-row-lan')`, 'the servers table');
 
@@ -76,7 +76,7 @@ const SERVERS = [
             assert.equal(p.remove, true, at + 'Remove is the danger button');
             assert.equal(p.small, false, at + 'the normal button size');
             assert.ok(p.barBottomGap <= 1, at + 'the bar is at the foot of the page: ' + p.barBottomGap);
-            assert.equal(p.facts.URL, 'http://192.168.1.50:8420'); assert.match(p.facts['Last contact'] || '', /\S/, at + 'last contact, as it is not online'); assert.equal(p.facts.Agents, '2 agents'); // the two live sessions seeded for LAN box (one of them waits: the Needs you column)
+            assert.equal(p.facts.URL, 'http://192.168.1.50:8420'); assert.match(p.facts['Last contact'] || '', /\S/, at + 'last contact, as it is not online'); assert.equal(p.facts.Agents, '3 agents'); // the three live sessions seeded for LAN box (one waits for the person, one only by its hook: the Needs you column counts the first)
             assert.match(p.error || '', /Is Coral running on that machine/, at + 'what to do about it');
             assert.equal(p.table, false, at + 'the table is not on the page');
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), false, at + 'the page has no "Servers" title: its back link says it');
