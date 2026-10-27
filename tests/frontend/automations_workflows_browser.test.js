@@ -39,6 +39,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const themed = async (name, w) => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await shot(`${name}-${theme}-${w}`); } await setTheme(ev, 'dark'); };
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e || !e.getClientRects().length) return null; const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); })()`);
     const names = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-primary')].map(b => b.textContent.trim())`);
     const pathname = () => ev(`location.pathname`);
@@ -72,7 +73,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['All 3', 'Active 2', 'Paused 1'], at + 'the pills have the table\'s counts');
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the table is on the scale');
-            await shot(`automations-workflows-table-${w}`);
+            await themed('automations-workflows-table', w);
 
             // the toolbar: pills, Filters, search
             if (!mobile) {
@@ -126,7 +127,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on the workflow');
             assert.equal(await ev(`(() => { const r = document.querySelector('#wf-detail .item-bar').getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.top >= 0; })()`), true, at + 'the bar is on screen without scrolling');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('wf-detail'), ${SCALE})`), [], at + "every text of the workflow's page is on the scale");
-            await shot(`automations-workflows-page-${w}`);
+            await ev(`document.querySelectorAll('#toast-host > .toast').forEach(t => t.remove()); true`); await themed('automations-workflows-page', w);
 
             // a run's page
             await ev(`document.querySelector('#wf-detail .wf-runs-table .dt-primary').click(); true`);
@@ -135,7 +136,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.equal(await ev(`document.getElementById('wf-run-back').textContent`), '\u2190 nightly-build', at + 'back goes to its workflow');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#wf-run-detail .wf-run-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + 'Run #2 is 17/700');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#wf-run-detail .item-bar .btn')].map(b => b.textContent.replace(/replay|stop/, '').trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['Re-run*'], at + "the run's bar");
-            await shot(`automations-workflows-run-${w}`);
+            await ev(`document.querySelectorAll('#toast-host > .toast').forEach(t => t.remove()); true`); await themed('automations-workflows-run', w);
             await ev(`document.getElementById('wf-run-back').click(); true`);
             await waitFor(`document.getElementById('wf-title') && document.getElementById('wf-title').textContent === 'nightly-build'`, at + 'back is the workflow', 8000);
             await ev(`[...document.querySelectorAll('#wf-detail [data-on-click="automations-back"]')].find(b => b.getClientRects().length).click(); true`);
@@ -150,6 +151,14 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             await Page.navigate({ url: BASE + '/workflows' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await waitFor(`location.pathname === '/automations/workflows' && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + '/workflows opens the Workflows folder', 10000);
 
+            // no workflow on a phone: the same one line, its hint and the toolbar's actions (a shot for UI/UX)
+            if (mobile) {
+                await ev(`window.__wfEmpty = true; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
+                await waitFor(`!!document.querySelector('#group-table-view .empty-pane .empty-line') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 0`, at + 'the empty folder on a phone', 8000);
+                for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await shot(`automations-workflows-empty-${theme}-${w}`); }
+                await setTheme(ev, 'dark');
+                await ev(`window.__wfEmpty = false; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
+            }
             // no workflow: one empty line with its hint (the toolbar keeps the create actions)
             if (w === 1280) {
                 await ev(`window.__wfEmpty = true; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
