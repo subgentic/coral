@@ -17,7 +17,7 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
     const panel = `[role=tabpanel][id^=team-panel-]:not([hidden])`; // the team page's open tab, not the goal screen's own Tasks | Artifacts panel inside a hidden one (#8914)
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const rows = () => ev(`[...document.querySelectorAll('${panel} .dt-primary')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);
-    const chips = () => ev(`[...document.querySelectorAll('${panel} .team-tb-chip')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);
+    const chips = () => ev(`[...document.querySelectorAll('${panel} .team-tb-chip:not(.team-tb-chip-more)')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);
     const pick = async (id, value) => { await ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -81,7 +81,10 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
                 await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 3`, 'only the three tasks of the goal', 8000);
                 assert.deepEqual((await rows()).map(r => r.replace(/^#\d+\s*/, '')).sort(), ['Add the goal filter', 'Check the Settings dialog', 'Review the filter']);
                 assert.deepEqual(await chips(), [`Goal: ${G1} ×`]);
-                if (mobile) { const chipH = await ev(`Math.round(document.querySelector('${panel} .team-tb-chip').getBoundingClientRect().height)`); assert.ok(chipH >= 44, 'the chip that removes the filter is a 44 px target on a phone: ' + chipH); }
+                if (mobile) { // a phone's row has no room for the chips (#9078): the Filters control says how many are on, and the chip is still in the list
+                    const said = await ev(`[...document.querySelectorAll('${panel} .list-bar-toggle, ${panel} .list-bar-filter-btn')].some(b => /1 on|Filters \\(1\\)/.test((b.getAttribute('aria-label') || '') + ' ' + b.textContent))`);
+                    assert.ok(said, 'a phone: no chip in the row, the Filters control says 1 filter is on');
+                }
                 await ev(`document.querySelector('${panel} .team-tb-chip').click(); true`);
                 await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 5 && !document.querySelector('${panel} .team-tb-chip')`, 'every task again', 8000);
             });
