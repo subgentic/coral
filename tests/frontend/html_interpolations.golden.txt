@@ -281,15 +281,10 @@
 1	sandbox_frame.js	DOC_CSP
 1	sandbox_frame.js	content
 2	saved_marks.js	BOOKMARK_SVG
-1	scheduler.js	backLinkHtml('jobs', group.key, group.label)
 1	scheduler.js	doesHtml
-1	scheduler.js	dot
-1	scheduler.js	failBadge
 1	scheduler.js	failBanner
-1	scheduler.js	fails
 1	scheduler.js	fails === 1 ? 'The last run failed' : `The last ${fails} runs failed`
 1	scheduler.js	k
-1	scheduler.js	paused
 1	scheduler.js	promptHtml
 1	scheduler.js	settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')
 1	scheduler.js	v

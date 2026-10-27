@@ -30,20 +30,19 @@ const S = `(window.__coralStatic || '/static/')`;
                     return real(u, o); };
                 return true; })()`);
             await ev(`import(${S} + 'scheduler.js').then(m => { window.__sched = m; return true; })`);
-            await ev(`window.switchNavTab('jobs'); window.__sched.refreshJobs().then(() => true)`);
-            await waitFor(`document.querySelectorAll('#scheduled-jobs-list .sched-row').length === 4`, 'the four job rows', 8000);
-            const rows = await ev(`Object.fromEntries([...document.querySelectorAll('#scheduled-jobs-list .sched-row')].map(r => [r.querySelector('.sched-row-name').textContent, { meta: r.querySelector('.sched-row-meta').textContent, problem: (r.querySelector('.sched-row-problem') || {}).textContent || '', dotWords: r.querySelector('.sched-dot').getAttribute('aria-label') }]))`);
-            assert.match(rows['fails-plain'].problem, /The agent exited with code 1/, at + 'a generic failed run says why on its row: ' + JSON.stringify(rows['fails-plain']));
-            assert.equal(rows['passes'].dotWords, 'Last run passed', at + 'the dot of a pass is named as its text says');
-            assert.match(rows['odd-cron'].meta, /^Every 5 minutes, from 09:00 to 17:59, weekdays \(UTC\)/, at + 'an unusual schedule is in words, with its zone: ' + rows['odd-cron'].meta);
-            assert.match(rows['passes'].meta, /^Every day at 02:00 \(UTC\)/, at + 'the row names the schedule\'s zone: ' + rows['passes'].meta);
+            await ev(`window.switchNavTab('automations'); window.__sched.refreshJobs().then(() => true)`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 4`, 'the four job rows', 8000);
+            const rows = await ev(`Object.fromEntries([...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => [r.querySelector('.dt-primary').textContent, r.textContent.replace(/\\s+/g, ' ').trim()]))`);
+            assert.match(rows['passes'], /last run passed/, at + 'a pass says so in its row: ' + JSON.stringify(rows['passes']));
+            assert.match(rows['fails-plain'], /last run failed/, at + 'a failed run says so in its row: ' + JSON.stringify(rows['fails-plain']));
+            assert.match(rows['odd-cron'], /Every 5 minutes, from 09:00 to 17:59, weekdays \(UTC\)/, at + 'an unusual schedule is in words, with its zone: ' + rows['odd-cron']);
+            assert.match(rows['passes'], /Every day at 02:00 \(UTC\)/, at + 'the row names the schedule\'s zone: ' + rows['passes']);
             await shot(`jobs-list-${w}`);
-            // Jobs is titled once; an empty pane says to choose a job
+            // Jobs is titled once
             const heads = await ev(`[...document.querySelectorAll('h1, h2, h3')].filter(h => h.textContent.replace(/\\s+/g, ' ').trim() === 'Jobs' || /^Jobs \\d*$/.test(h.textContent.replace(/\\s+/g, ' ').trim())).filter(h => h.checkVisibility() && h.getBoundingClientRect().width > 4 && h.getBoundingClientRect().height > 4).length`);
             assert.ok(heads <= 1, at + `Jobs is titled once on screen (${heads})`);
-            if (!mobile) assert.match(await ev(`document.getElementById('scheduler-detail').textContent`), /Choose a job/, at + 'an empty pane says to choose a job');
             // the Runs table: the unseen result is neutral, with its sentence as text
-            await ev(`document.querySelector('#scheduled-jobs-list .sched-row[data-job-id="2"]').click(); true`);
+            await ev(`document.querySelector('#group-table-view tr[data-key="2"] .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('.sched-runs-section .sched-status')`, 'the runs table', 6000); await sleep(300); // sleep-ok: the runs answer replaces the first draw
             const cells = await ev(`[...document.querySelectorAll('.sched-runs-section .sched-status')].map(s => ({ text: s.textContent.trim(), cls: s.className, cellText: s.closest('td').textContent.replace(/\\s+/g, ' ').trim() }))`);
             assert.ok(!/goal-state-task-done/.test(cells[0].cls), at + 'the unseen result is not drawn in the green of a pass: ' + JSON.stringify(cells[0]));

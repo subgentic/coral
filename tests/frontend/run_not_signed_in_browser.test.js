@@ -76,7 +76,7 @@ const JOB = { id: 5, name: 'Nightly review', enabled: true, cron_expr: '0 3 * * 
 
         console.log('3. The scheduled job');
         await ev(`import(${S} + 'scheduler.js').then(async m => { await m.initScheduler(); return true; })`);
-        await waitFor(`document.querySelectorAll('#scheduled-jobs-list li').length >= 1`, 'the job in the sidebar');
+        check('the job is read', await ev(`import(${S} + 'scheduler.js').then(async m => { await m.refreshJobs(); return m.jobList().length >= 1; })`));
         await ev(`import(${S} + 'scheduler.js').then(m => m.selectScheduledJob(5)).then(() => true)`);
         await waitFor(`!!document.querySelector('.sched-runs-section')`, 'the job view');
         const banner = await text('.sched-fail-banner');

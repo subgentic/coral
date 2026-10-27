@@ -44,9 +44,9 @@
                     </div>
                 </section>
             </div>
-            <div class="sidebar-pane" data-pane="jobs" hidden>
-                {{ template "includes/sidebar_header" "jobs" }}
-                <section class="sidebar-section" data-section="jobs">
+            <div class="sidebar-pane sidebar-pane-fixed" data-pane="automations" hidden>
+                {{ template "includes/sidebar_header" "automations" }}
+                <section class="sidebar-section" data-section="automations">
                     <div class="sidebar-section-body">
                     <p id="live-jobs-status" class="sr-only" role="status" aria-live="polite"></p>
                     <div id="live-jobs-group" class="sidebar-jobs-group" hidden>
@@ -54,14 +54,9 @@
                         <ul id="live-jobs-list" class="session-list"></ul>
                     </div>
                     <div id="jobs-live" class="sr-only" role="status"></div><!-- always in the page: scheduler.js says in it that a job's last run failed (#6707) -->
-                    <ul id="scheduled-jobs-list" class="session-list">
-                        <li class="empty-state">No jobs yet. New job schedules one.</li>
-                    </ul>
+                    <div id="automations-nav-list"></div><!-- the folders (automations.js): Jobs now, Workflows, Running now and Failed with their commits -->
                     </div>
                 </section>
-                <div class="sidebar-footer">
-                    <button class="btn btn-primary sidebar-new-btn-full" data-on-click="job-new">+ New job</button>
-                </div>
             </div>
             <div class="sidebar-pane" data-pane="workflows" hidden>
                 {{ template "includes/sidebar_header" "workflows" }}
@@ -111,13 +106,13 @@
                         <svg class="sidebar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
                         {{ if eq . "agents" }}<input type="search" id="agent-search-input" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search agents" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
                         {{ else if eq . "history" }}<input type="search" id="history-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search chats">
-                        {{ else if eq . "jobs" }}<input type="search" id="jobs-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search jobs" data-on-input="jobs-search-filter">
+                        {{ else if eq . "automations" }}<input type="search" id="automations-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search jobs" data-on-input="automations-search-filter">
                         {{ else if eq . "tokens" }}<input type="search" id="analytics-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search views" data-on-input="analytics-search-filter">
                         {{ else if eq . "hub-inbox" }}<input type="search" id="inbox-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search the Inbox" data-on-input="inbox-search-filter">
                         {{ else if eq . "workflows" }}<input type="search" id="workflows-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search workflows" data-on-input="workflows-search-filter">
                         {{ else }}<input type="search" id="docs-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search docs" data-on-input="docs-search-filter">{{ end }}
                     </div>
-                    {{ if ne . "jobs" }}{{ if ne . "docs" }}{{ if ne . "workflows" }}{{ if ne . "tokens" }}<!-- Display options (#3085): the button opens a panel in place with the tab's filters and what a row shows; absent on a tab that has none -->
+                    {{ if ne . "automations" }}{{ if ne . "docs" }}{{ if ne . "workflows" }}{{ if ne . "tokens" }}<!-- Display options (#3085): the button opens a panel in place with the tab's filters and what a row shows; absent on a tab that has none -->
                     <button class="sidebar-collapse-btn" {{ if eq . "agents" }}id="sidebar-summary-btn" {{ end }}type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" title="Display options" aria-label="Display options">
                         <span class="material-icons" style="font-size:1.125rem" aria-hidden="true">notes</span><span class="display-badge" {{ if eq . "history" }}id="hf-active-count"{{ else }}data-display-badge{{ end }} hidden></span>
                     </button>{{ end }}{{ end }}{{ end }}{{ end }}
@@ -130,7 +125,7 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M16 9l-3 3 3 3"/></svg>
                     </button>
                     {{ if eq . "agents" }}<span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>{{ end }}
-                    {{ if ne . "jobs" }}{{ if ne . "docs" }}{{ if ne . "workflows" }}{{ if ne . "tokens" }}<div class="list-display-panel" id="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
+                    {{ if ne . "automations" }}{{ if ne . "docs" }}{{ if ne . "workflows" }}{{ if ne . "tokens" }}<div class="list-display-panel" id="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
                         {{ if eq . "agents" }}<div class="agent-list-bar" id="agent-list-bar" hidden></div>
                     <div class="list-display-options">
                         <label class="list-display-option"><input type="checkbox" id="display-show-summary" data-display-input="summary" data-on-change="toggle-session-summary"> Show summaries</label>
