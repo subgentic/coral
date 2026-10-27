@@ -37,6 +37,7 @@ type BoardHealthMonitor struct {
 
 	mu        sync.Mutex
 	lastCheck map[string]time.Time       // per board
+	landing   *LandingWatch              // the landing alert's view of the repositories (git_poller.go feeds it); nil: the alert has nothing to read
 	offShown  map[string][]offBooksShown // per board: the off-the-books occurrences the check composed last, said once it is delivered (board_health_offbooks.go)
 }
 
@@ -58,6 +59,9 @@ func (m *BoardHealthMonitor) SetAgents(ts *store.TaskStore, rt AgentRuntime, dis
 		return err
 	}
 }
+
+// SetLandingWatch gives the check the landing alert's repository view.
+func (m *BoardHealthMonitor) SetLandingWatch(w *LandingWatch) { m.landing = w }
 
 // SetIdleThresholds sets how long an agent with nothing assigned is idle before the check names it
 // (the first value; the second is no longer used: Coral's status nudge escalates stale tasks).
