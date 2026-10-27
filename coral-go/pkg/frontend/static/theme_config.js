@@ -80,14 +80,14 @@ function renderModal() {
                 ${isCloud() ? '' : '<button class="btn btn-sm" data-on-click="theme-import">Import</button>'}
                 <button class="btn btn-sm" data-on-click="theme-export">Export</button>
             </div>
-            ${isCloud() ? '' : `<div class="toolbar toolbar-pad-bare theme-generate-bar">
+            ${isCloud() ? '' : `<div class="toolbar toolbar-stretch toolbar-nowrap toolbar-pad-bare theme-generate-bar">
                 <input type="text" id="theme-ai-prompt" class="settings-input" placeholder="Describe your theme... (e.g. &quot;cyberpunk neon with pink and teal&quot;)">
                 <button class="btn btn-sm btn-primary" id="theme-generate-btn" data-on-click="theme-generate">Generate</button>
             </div>`}
             <div class="theme-editor-scroll">
                 ${groups}
             </div>
-            <div class="toolbar toolbar-pad-bare theme-save-bar">
+            <div class="toolbar toolbar-stretch toolbar-pad-bare theme-save-bar">
                 <input type="text" id="theme-save-name" class="settings-input" placeholder="Theme name">
                 <input type="text" id="theme-save-desc" class="settings-input" placeholder="Description (optional)">
                 <select id="theme-save-base" class="settings-select form-control-auto">
