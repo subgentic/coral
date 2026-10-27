@@ -25,6 +25,7 @@ const BASE = require('./test_base').BASE;
             const closed = await boxes();
             assert.equal(closed.cls, false, at + 'no keyboard: nothing compact');
             assert.ok(closed.banner && closed.status && (w > 767 || closed.input >= 60), at + 'the banner, the status bar and the message box are as they were: ' + JSON.stringify(closed));
+            if (touch) await ev(`(() => { const c = document.getElementById('keys-chip'); if (c.getAttribute('aria-pressed') !== 'true') c.click(); return true; })()`); // the key bar is closed until the Keys chip opens it (#8745): open it before the keyboard goes up
             await size(w, kb, touch);
             await new Promise(r => setTimeout(r, 700)); // sleep-ok: the viewport change reaches the page's resize listener
             const open = await boxes();

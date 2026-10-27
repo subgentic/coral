@@ -20,6 +20,15 @@ import { copyText, showToast } from './utils.js';
 
 /** Show the bar with the terminal (the Terminal view) or hide it with it. */
 let keyBarWired = false;
+let terminalOn = false;  // the Terminal view is showing
+let keysWanted = false;  // the person (or a question) opened the keys with the Keys chip (agent_keys.js): closed until then
+
+/** The Keys chip opens or closes the phone's key bar: it shows only in the Terminal view, and only while the keys are open (#8745). */
+export function setTerminalKeysOpen(open) {
+    keysWanted = !!open;
+    const keys = document.getElementById('terminal-key-bar');
+    if (keys) keys.hidden = !(terminalOn && keysWanted);
+}
 
 export function showTerminalStatusbar(on) {
     const b = bar();
@@ -27,10 +36,11 @@ export function showTerminalStatusbar(on) {
     if (on) startKeyboardWatch();
     const copy = document.getElementById('terminal-copy-screen-btn');
     if (copy) copy.hidden = !on;
-    // The phone's key bar (#6676) is part of the Terminal view: shown with it (its CSS shows it at phone width only, and not in the Chat view).
+    // The phone's key bar (#6676) is part of the Terminal view: shown with it while the Keys chip has the keys open (#8745) (its CSS shows it at phone width only, and not in the Chat view).
+    terminalOn = on;
     const keys = document.getElementById('terminal-key-bar');
     if (keys) {
-        keys.hidden = !on;
+        keys.hidden = !(terminalOn && keysWanted);
         if (!keyBarWired) { keyBarWired = true; keys.addEventListener('pointerdown', e => e.preventDefault()); } // a tap on a key leaves focus where it is: the on-screen keyboard stays open
     }
 }
