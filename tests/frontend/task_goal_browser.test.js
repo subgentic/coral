@@ -29,11 +29,9 @@ const BASE = require('./test_base').BASE;
         await ev(`(() => { if (document.getElementById('agentic-state').getBoundingClientRect().width < 50) document.getElementById('panel-toggle-btn').click(); document.getElementById('agentic-tab-tasks').click(); return true; })()`);
         await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length >= 2 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'the tasks', 15000);
 
-        console.log('1. a Tasks row names its goal in a quiet chip; a task with no goal has none');
-        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .dt-subtitle').length === 1`, 'the goal chip', 8000);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].map(r => [r.querySelector('.board-task-desc').textContent.trim(), (r.querySelector('.dt-subtitle') || {}).textContent || ''])`),
-            await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].map(r => [r.querySelector('.board-task-desc').textContent.trim(), /installer/.test(r.querySelector('.board-task-desc').textContent) ? 'Goal: Ship the new installer' : ''])`));
-        assert.equal(await ev(`document.querySelector('#agentic-panel-tasks .dt-subtitle').textContent`), 'Goal: Ship the new installer', 'the chip says Goal: to a screen reader (hidden words), then the title (#7313)');
+        console.log('1. a dock Tasks row is one line (#8792): no goal chip on it; the goal is on the task\'s own detail (step 3)');
+        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length === 2`, 'the two rows', 8000);
+        assert.equal(await ev(`document.querySelectorAll('#agentic-panel-tasks .dt-subtitle').length`), 0, 'no secondary line on a row: the status, the title and who');
 
         console.log('2. Create Task: the Goal select lists the open goals; the task is made under the chosen one');
         await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
@@ -48,10 +46,10 @@ const BASE = require('./test_base').BASE;
         console.log('3. a task\'s page has a Goal line that names the goal and opens it on the Goals tab');
         await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length >= 3`, 'the new row', 8000);
         await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].find(r => /Build the installer/.test(r.textContent)).querySelector('.board-task-open').click(); true`);
-        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && !!document.querySelector('#team-panel-item .goals-facts button.team-link[data-goal-link], #team-panel-item .goals-facts dd button.team-link')`, 'the task page with its Goal line', 12000);
-        await waitFor(`[...document.querySelectorAll('#team-panel-item .goals-facts dd button.team-link')].some(b => b.textContent === 'Ship the new installer')`, 'the Goal line to name its goal', 8000);
+        await waitFor(`!!document.querySelector('#preview-pane #team-task-title') && !!document.querySelector('#preview-pane .goals-facts button.team-link[data-goal-link], #preview-pane .goals-facts dd button.team-link')`, 'the task page with its Goal line', 12000);
+        await waitFor(`[...document.querySelectorAll('#preview-pane .goals-facts dd button.team-link')].some(b => b.textContent === 'Ship the new installer')`, 'the Goal line to name its goal', 8000);
         assert.equal(await shown('task-detail-modal'), false, 'no dialog opened');
-        await ev(`[...document.querySelectorAll('#team-panel-item .goals-facts dd button.team-link')].find(b => b.textContent === 'Ship the new installer').click(); true`);
+        await ev(`[...document.querySelectorAll('#preview-pane .goals-facts dd button.team-link')].find(b => b.textContent === 'Ship the new installer').click(); true`);
         await waitFor(`!!document.querySelector('#team-panel-goals .goals-detail-title') && document.querySelector('#team-panel-goals .goals-detail-title').textContent === 'Ship the new installer'`, 'the goal to open on the Goals tab', 10000);
 
         console.log('4. Edit: the Goal select moves the task to another goal and back to none');
