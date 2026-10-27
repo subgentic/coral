@@ -2,6 +2,11 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -88,4 +93,59 @@ func TestWelcomePendingOnFirstLaunchOnly(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The seeded workflow's last step shows its message as a notification. A workflow step has no agent session token and a curl to
+// /api/notifications with no credential, or with the API key, is a 401 (the route takes an agent's token or the Operator): the step
+// runs coral-agent notify, which signs the request as the Operator (#9363). This runs the step's own shell command with a stand-in
+// coral-agent first on the PATH and checks what the real one would be given: the command, the title, the message of the step
+// before it (quotes and all) and the level.
+func TestSeededDemoWorkflowNotificationStepRunsCoralAgentNotify(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the step is a POSIX shell command")
+	}
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh is not installed")
+	}
+	t.Setenv("CORAL_NO_DEMO_SEED", "")
+	cfg := newE2EConfig(t, t.TempDir())
+	db, err := storetest.Open(t, cfg.DBPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	stack := newTermStack(t)
+	newTestServer(t, cfg, db, stack.backend, stack.terminal)
+
+	var stepsJSON string
+	require.NoError(t, db.GetContext(context.Background(), &stepsJSON, `SELECT steps_json FROM workflows WHERE name = 'daily-motivation'`))
+	var steps []struct {
+		Name    string `json:"name"`
+		Type    string `json:"type"`
+		Command string `json:"command"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(stepsJSON), &steps))
+	command := ""
+	for _, s := range steps {
+		if s.Name == "show-notification" && s.Type == "shell" {
+			command = s.Command
+		}
+	}
+	require.NotEmpty(t, command, "the seeded workflow has a shell step named show-notification")
+	assert.NotContains(t, command, "curl", "a curl to /api/notifications is a 401 in a workflow step")
+
+	bin, out := t.TempDir(), filepath.Join(t.TempDir(), "args")
+	stub := "#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\"; done > \"" + out + "\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "coral-agent"), []byte(stub), 0o755))
+	prev := filepath.Join(t.TempDir(), "prev_stdout")
+	message := `Don't "quit" $HOME today.`
+	require.NoError(t, os.WriteFile(prev, []byte(message), 0o600))
+
+	cmd := exec.Command("sh", "-c", strings.ReplaceAll(command, "{{prev_stdout}}", prev))
+	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	combined, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(combined))
+
+	raw, err := os.ReadFile(out)
+	require.NoError(t, err, "the step ran coral-agent")
+	args := strings.Split(strings.TrimRight(string(raw), "\n"), "\n")
+	assert.Equal(t, []string{"notify", "--title", "\u2600\ufe0f Daily Motivation", "--message", message, "--level", "success", "--alert"}, args)
 }
