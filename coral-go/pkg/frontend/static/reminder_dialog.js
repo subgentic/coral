@@ -42,7 +42,7 @@ function close() { if (dialog && dialog.open) dialog.close(); }
 /** Open the dialog. opts: title, intro (a sentence under it), askMessage (also ask for the instruction), minutes (the box's start), submitLabel, and onSubmit({ message, seconds }) -> Promise<{ ok, error }>. */
 export function openReminderDialog(opts) {
     if (!dialog) {
-        dialog = mk('dialog', 'modal-content modal-md reminder-dialog'); // the dashboard's own dialog card (components.css .modal-content): header, body, footer as its children
+        dialog = mk('dialog', 'modal-content dlg-confirm reminder-dialog'); // the dashboard's own dialog card (components.css .modal-content): header, body, footer as its children
         dialog.id = 'reminder-dialog';
         dialog.setAttribute('aria-labelledby', 'reminder-title');
         dialog.addEventListener('cancel', (e) => { if (dialog.dataset.busy) e.preventDefault(); }); // Escape does not drop a request in flight

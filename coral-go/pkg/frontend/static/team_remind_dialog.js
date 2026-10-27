@@ -15,7 +15,7 @@ const close = () => { if (dialog && dialog.open) dialog.close(); };
 /** Open the dialog for `name`. opts: onSend({ message, seconds }) -> Promise<{ ok, error }> (seconds is 0 for no repeat), opener (the button, to take the focus back). */
 export function openRemindDialog(name, opts) {
     if (!dialog) {
-        dialog = mk('dialog', 'modal-content modal-md reminder-dialog remind-dialog');
+        dialog = mk('dialog', 'modal-content dlg-confirm reminder-dialog remind-dialog');
         dialog.id = 'remind-dialog';
         dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true');
         dialog.setAttribute('aria-labelledby', 'remind-title');

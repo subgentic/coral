@@ -135,7 +135,7 @@ const ASK_MODES = [
 ];
 
 function _connectHtml() {
-    return `<div class="modal-content editions-content">
+    return `<div class="modal-content dlg-form editions-content">
         <h2 id="editions-title" class="editions-title">Connect to Coral Hub</h2>
         <p class="editions-sub">Use your agents from any browser, including your phone, at app.coralhub.dev. Coral Hub is in an invite-only beta.</p>
         <div class="editions-cloud">
@@ -172,7 +172,7 @@ function _connectHtml() {
 }
 
 function _ownHubHtml() {
-    return `<div class="modal-content editions-content">
+    return `<div class="modal-content dlg-form editions-content">
         <h2 id="editions-title" class="editions-title">Run your own hub</h2>
         <p class="editions-sub">One dashboard for the agents on all your machines. Free and self-hosted.</p>
         <ol class="editions-steps">

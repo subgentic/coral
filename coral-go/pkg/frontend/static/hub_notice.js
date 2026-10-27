@@ -38,7 +38,7 @@ function showHubNotice() {
     const opener = document.activeElement;
     const modal = el('div', 'modal'); modal.id = 'hub-signin-notice';
     modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-labelledby', 'hub-signin-notice-title');
-    const content = el('div', 'modal-content modal-md');
+    const content = el('div', 'modal-content dlg-confirm');
     const head = el('div', 'modal-header'); const title = el('h3', '', 'Let Coral Hub sign you in here?'); title.id = 'hub-signin-notice-title'; head.append(title);
     const body = el('div', 'modal-body');
     body.append(el('p', 'pw-lead', 'You linked this computer to Coral Hub. You can let your Coral Hub account sign in to this dashboard from any browser, instead of a password.'));

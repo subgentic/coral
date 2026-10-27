@@ -2116,7 +2116,6 @@ body.panel-dragging .agentic-state {
 .board-rename-note { flex-basis: 100%; margin: 0; font-size: var(--fs-base); color: var(--text-secondary); }
 
 /* A launch naming a board that exists: join it or start another (#3536) */
-.board-choice-modal .modal-content { width: min(480px, calc(100vw - 32px)); }
 .board-choice-text { margin: 8px 0 12px; font-size: var(--fs-md); color: var(--text-secondary); }
 .board-choice-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .board-choice-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-md); }
