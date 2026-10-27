@@ -413,7 +413,7 @@
 }
 
 /* Message board multi-select */
-.mb-select-checkbox { margin-right: 8px; }
+input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that places the box outweighs input.check (0,1,1) */
 
 .mb-message-selected {
     background: rgba(var(--accent-rgb), 0.08);

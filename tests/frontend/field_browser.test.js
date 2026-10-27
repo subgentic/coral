@@ -34,6 +34,8 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.querySelectorAll('.sv-switch').length`), 0, at + 'no second switch class');
             const ck = await ev(`(() => { const d = document.createElement('div'); d.className = 'modal-content'; const p = document.createElement('input'); p.type = 'checkbox'; p.className = 'check'; d.append(p); document.body.append(d); const c = getComputedStyle(p); return { w: c.width, h: c.height, m: c.marginTop }; })()`);
             assert.deepEqual([ck.w, ck.h, ck.m], ['16px', '16px', '0px'], at + 'a plain checkbox is 16 px, also inside a dialog: ' + JSON.stringify(ck));
+            const gap = await ev(`(() => { const p = document.createElement('input'); p.type = 'checkbox'; p.className = 'check mb-select-checkbox'; document.body.append(p); return getComputedStyle(p).marginRight; })()`);
+            assert.equal(gap, '8px', at + 'the message board\'s select box keeps its 8 px gap to the text (the page class outweighs .check)');
             const inDialog = await ev(`(() => { const d = document.createElement('div'); d.className = 'modal-content'; const p = document.createElement('input'); p.type = 'checkbox'; p.className = 'switch'; d.append(p); document.body.append(d); const c = getComputedStyle(p); return { w: c.width, mt: c.marginTop }; })()`);
             assert.equal(inDialog.w, mobile ? '44px' : '40px', at + 'a switch inside a dialog (.modal-content input) is not stretched: ' + inDialog.w); assert.equal(inDialog.mt, '0px', at + 'and has no margin above it');
             await ev(`(() => { const e = document.querySelector('#agent-search-input'); if (e) e.focus(); return true; })()`);
