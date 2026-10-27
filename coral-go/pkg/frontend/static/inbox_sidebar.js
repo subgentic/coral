@@ -449,7 +449,7 @@ registerGroupSource('hub-inbox', {
                         ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
                         ...serverColumns(),
                         { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
-                        ...(goal ? [{ key: 'goal', label: 'Goal', line: 0, cell: s => { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; } }] : []),
+                        ...(goal ? [{ key: 'goal', label: 'Goal', line: 0, cell: s => { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => { const team = s.goal.board || s.board_project || '', id = Number(s.goal.id); if (team && id) go({ view: 'inbox-goals', sub: 'goals', id: team, item: id }); }); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; } }] : []),
                         ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', width: '14rem', line: 1, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
                         { key: 'waiting', label: 'Waiting', tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(s => s.review) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
                     ] });
