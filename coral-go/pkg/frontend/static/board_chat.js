@@ -127,7 +127,7 @@ export function showBoardChatTab(boardName, agent = null) {
                     </div>
                 </div>
                 <!-- After the text box in the DOM so Tab reaches the box first, then @all, then Send; CSS order draws them under it, as the chat's composer does -->
-                <div class="command-pane-toolbar board-chat-toolbar">
+                <div class="toolbar toolbar-pad command-pane-toolbar board-chat-toolbar">
                     <button type="button" class="btn-nav board-mention-chip" data-on-click="board-chat-all" title="Notify all agents">@all</button>
                     <span class="toolbar-spacer"></span>
                     <button type="button" class="btn-nav btn-send" data-on-click="board-chat-send" data-board="${escapeAttr(boardName)}" aria-label="Send message" title="Send message (Enter)">

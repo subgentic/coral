@@ -10,11 +10,6 @@
 }
 
 .theme-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--toolbar-gap);
-    padding: var(--toolbar-pad-bare);
     flex-shrink: 0;
 }
 
@@ -23,9 +18,6 @@
 }
 
 .theme-generate-bar {
-    display: flex;
-    gap: var(--toolbar-gap);
-    padding: var(--toolbar-pad-bare);
     flex-shrink: 0;
 }
 
@@ -121,10 +113,6 @@
 }
 
 .theme-save-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--toolbar-gap);
-    padding: var(--toolbar-pad-bare);
     flex-shrink: 0;
 }
 

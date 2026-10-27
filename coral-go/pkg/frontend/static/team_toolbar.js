@@ -49,7 +49,7 @@ export function adopt(row, { pills = null, chips = [], action = null } = {}) {
 
 /** A row of its own for a tab with no list bar: a search field in the list bar's make (so it looks and measures the same), then the pills, then the action. */
 export function build({ id = '', label, placeholder, value = '', onSearch = null, pills = null, action = null }) {
-    const row = el('div', 'list-bar-search-row team-toolbar-row');
+    const row = el('div', 'toolbar list-bar-search-row team-toolbar-row');
     const wrap = el('div', 'list-bar-search-wrap');
     const q = el('input', 'list-bar-search'); q.type = 'search'; q.placeholder = placeholder; q.maxLength = 200; q.autocomplete = 'off'; q.spellcheck = false; q.value = value; if (id) q.id = id;
     q.setAttribute('aria-label', label);
