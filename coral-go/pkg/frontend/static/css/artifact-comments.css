@@ -59,12 +59,11 @@
 .ac-act:hover, .ac-jump:hover { color: var(--text-primary); text-decoration: underline; }
 /* a .btn is 36 px tall (--control-height): these are small links and chips inside a card; the phone and touch rules below give them 44 */
 .ac-panel .ac-act, .ac-panel .ac-jump, .ac-panel .ac-resolve, .ac-panel .ac-showresolved { min-height: 22px; }
-.ac-panel .ac-replybox { min-height: 32px; }
 /* Resolve, at the top right of the card */
 .ac-panel .ac-resolve { flex: none; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0 8px; background: none; color: var(--text-primary); font-size: var(--fs-sm, 0.8125rem); font-weight: 500; }
 .ac-panel .ac-resolve:hover { background: var(--bg-tertiary); text-decoration: none; }
 /* the reply box at the foot of the card: it looks like the field it opens */
-.ac-panel .ac-replybox { display: block; width: 100%; box-sizing: border-box; text-align: left; margin-top: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); cursor: text; }
+.ac-panel .ac-replybox { min-height: 32px; display: block; width: 100%; box-sizing: border-box; text-align: left; margin-top: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); cursor: text; }
 .ac-panel .ac-replybox:hover { border-color: var(--text-muted); color: var(--text-secondary); }
 .ac-composer { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .ac-input { width: 100%; resize: vertical; }
