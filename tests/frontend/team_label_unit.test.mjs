@@ -14,4 +14,6 @@ assert.equal(local, 'alpha · This computer');
 assert.match(remote, /^alpha · .*Box Two/, 'the remote one names its computer');
 assert.notEqual(local, remote, 'two teams called alpha are told apart');
 assert.equal(teamLabel('@box-2/beta'), remote.replace('alpha', 'beta'));
+assert.equal(teamLabel('@box-2/b-abc1234567', 'alpha'), 'alpha · Box Two'.replace('Box Two', remote.split(' · ')[1]), 'a row that carries its own team words (the Inbox Artifacts) uses them, with the computer');
+assert.equal(teamLabel('b-xyz', 'alpha'), 'alpha · This computer', 'on this computer too');
 console.log('team_label_unit: ok');

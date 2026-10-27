@@ -8,6 +8,8 @@ const path = require('node:path');
 
 const GOALS = { local: [{ id: 1, board_id: 'alpha', title: 'Local goal', outcome: 'Ship the local importer', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-26T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }],
     'box-2': [{ id: 1, board_id: 'alpha', title: 'Remote goal', outcome: 'Ship the remote importer', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-25T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }] };
+const ARTS = { local: [{ id: '1'.repeat(64), name: 'local-report.md', media_type: 'text/markdown', size: 1000, created_at: '2026-10-26T10:00:00Z', task_id: 7, task_title: 'Local task', source: 'task', uri: 'coral://artifacts/' + '1'.repeat(64), available: true, inline: false, reference_count: 1, board_id: 'alpha', team: 'alpha' }],
+    'box-2': [{ id: '2'.repeat(64), name: 'remote-report.md', media_type: 'text/markdown', size: 2000, created_at: '2026-10-25T10:00:00Z', task_id: 7, task_title: 'Remote task', source: 'task', uri: 'coral://artifacts/' + '2'.repeat(64), available: true, inline: false, reference_count: 1, board_id: 'alpha', team: 'alpha' }] };
 const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priority: 'high', status: 'queued', assigned_to: 'Operator', updated_at: '2026-10-26T10:00:00Z' }],
     'box-2': [{ id: 7, board_id: 'alpha', title: 'Remote task', priority: 'medium', status: 'queued', assigned_to: 'Operator', updated_at: '2026-10-25T10:00:00Z' }] };
 
@@ -36,6 +38,8 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
                 window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.href), where = url.pathname.startsWith('/api/remote/box-2/') ? 'box-2' : 'local', path = url.pathname.replace(/^\\/api\\/remote\\/box-2/, '');
                     if (path === '/api/goals') return json({ goals: ${JSON.stringify(GOALS)}[where] });
                     if (path === '/api/board/tasks') return json({ tasks: ${JSON.stringify(TASKS)}[where] });
+                    if (path === '/api/team-artifacts') return json({ artifacts: ${JSON.stringify(ARTS)}[where], limit: 100, offset: 0, has_more: false, truncated: false, total: 1, all: 1, teams: [{ board_id: 'alpha', team: 'alpha', all: 1 }] });
+                    if (path === '/api/system/artifact-store/kept') return json({ kept: [] });
                     return R(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
@@ -84,6 +88,14 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             await open('needs');
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: two waiting agents`, 10000);
             const nteams = await column('Team');
+            // Artifacts: the files of each computer's alpha
+            await open('artifacts');
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: two files`, 10000); await settle(500);
+            const arows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
+            check(`${label}: Artifacts' Team words tell the two alpha teams apart (This computer's file and Box Two's)`, arows.some(t => /local-report/.test(t) && /alpha · This computer/.test(t)) && arows.some(t => /remote-report/.test(t) && /alpha · Box Two/.test(t)), JSON.stringify(arows));
+            await panel();
+            const achoices = await teamChoices();
+            check(`${label}: Artifacts' Team filter lists the two teams by their computer, each with its count`, achoices.filter(([v]) => v).length === 2 && achoices.some(([v, t]) => v === '@box-2/alpha' && /alpha · Box Two \(1\)/.test(t)) && achoices.some(([v, t]) => v === 'alpha' && /alpha · This computer \(1\)/.test(t)), JSON.stringify(achoices));
             check(`${label}: Needs you's Team column tells the two alpha teams apart`, nteams && nteams.length === 2 && nteams[0] !== nteams[1] && nteams.some(t => /alpha.*This computer/.test(t)) && nteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(nteams));
         }
     } finally { await client.close(); }

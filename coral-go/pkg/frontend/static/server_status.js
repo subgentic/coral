@@ -56,8 +56,8 @@ export function serverLabel(id) {
 
 /** A team's name for a list that can hold teams of more than one computer (#8774): its label, and, with a remote registered on this hub, the computer it is on, "alpha · This computer" or "alpha · box-2"
  *  (a team called alpha on two computers is two rows, told apart). Without a remote it is the plain label, as it always was. */
-export function teamLabel(key) {
-    const label = keyLabel(key);
+export function teamLabel(key, named = '') { // named: the words the row itself carries for its team (the Inbox Artifacts' `team`), when the page has not been told this team's label
+    const label = named || keyLabel(key);
     if (!showServerLabels()) return label;
     const server = normServer(splitKey(key).server);
     return `${label} · ${server === LOCAL_SERVER ? 'This computer' : serverLabel(server)}`;

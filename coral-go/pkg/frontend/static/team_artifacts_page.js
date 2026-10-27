@@ -1,4 +1,5 @@
 import { serverColumns, serverOf, readInboxArtifacts } from './inbox_servers.js';
+import { teamLabel } from './server_status.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
@@ -287,7 +288,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                             return first;
                         } },
                     ...(inbox ? serverColumns() : []),
-                    ...(inbox && !model.filters.team ? [{ key: 'team', label: 'Team', line: 2, tone: 'tertiary', cell: item => item.team || item.board_id || '' }] : []), // the Inbox's list spans teams; one team chosen, the column says nothing new
+                    ...(inbox && !model.filters.team ? [{ key: 'team', label: 'Team', line: 2, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }] : []), // the Inbox's list spans teams; one team chosen, the column says nothing new
                 { key: 'type', label: 'Type', line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
                     { key: 'size', label: 'Size', line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
                     // the head says the task or goal a group is: its own column would say it on every row (#8617)
@@ -312,7 +313,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             bar.setOptions(TAG_KEY, names, Object.fromEntries(names.map(t => [t, `${t} (${model.tagCounts[t]})`])));
         }
         if (!model.scope) { const seen = noteChoices(model.items); bar.setOptions('task', seen.tasks.map(([id]) => id), Object.fromEntries(seen.tasks)); bar.setOptions('goal', seen.goals.map(([id]) => id), Object.fromEntries(seen.goals)); }
-        if (inbox && bar.setOptions) bar.setOptions('team', model.teams.map(t => t.board_id), Object.fromEntries(model.teams.map(t => [t.board_id, `${t.team || t.board_id} (${t.all})`]))); // the teams that hold artifacts, with what each holds
+        if (inbox && bar.setOptions) bar.setOptions('team', model.teams.map(t => t.board_id), Object.fromEntries(model.teams.map(t => [t.board_id, `${teamLabel(t.board_id, t.team)} (${t.all})`]))); // the teams that hold artifacts, with what each holds
     bar.names([...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Uploaded by field
         bar.set(model.filters, model.counts ? model.counts : model.items.length || !model.loading ? { matched: model.items.length, all: model.items.length } : null);
         drawnRows = model.items.length;
@@ -375,7 +376,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const received = item.source === 'received';
         const facts = [
             ['MIME', un ? '' : item.media_type || 'Unknown'], // the header says the type, the size and when (#7775): nothing here repeats it
-            ...(inbox ? [['Team', item.team || item.board_id]] : []), ['Task', taskText(item)], ['Producer', item.produced_by],
+            ...(inbox ? [['Team', teamLabel(item.board_id, item.team)]] : []), ['Task', taskText(item)], ['Producer', item.produced_by],
             ['Status', un ? 'Link not verified: this team has not uploaded this file, so Coral shows no size, type or preview' : ''],
             ['Sent to', item.source === 'shared' ? item.shared_to : ''], ['Sent by', item.source === 'shared' || received ? item.sent_by : ''],
             ['Received from', received ? item.received_from : ''], ['Board (claimed by the sender)', received ? item.from_board : ''],
