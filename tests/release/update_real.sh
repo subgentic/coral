@@ -112,7 +112,7 @@ fi
 # ---- 2 start -----------------------------------------------------------------------------------------------
 echo accepted > "$HH/.coral/.eula-accepted"
 PORT=$(free_port)
-env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HH" CORAL_DATA_DIR="$DD" CORAL_CLOUD_URL=off \
+env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HH" CORAL_DATA_DIR="$DD" CORAL_CLOUD_URL=off CORAL_TELEMETRY_DISABLED=1 \
   "$app/Contents/MacOS/coral-tray" --foreground --no-browser --port "$PORT" --home "$HH" --backend tmux > "$work/tray.out" 2>&1 & TRAY=$!
 PIDS+=("$TRAY"); disown "$TRAY"
 for i in $(seq 1 120); do lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1 && break; sleep 0.5; done
@@ -127,7 +127,7 @@ api() { curl -s -m 30 -H "Authorization: Bearer $KEY" -H 'Content-Type: applicat
 person() { env -i HOME="$HH" PATH=/usr/bin:/bin "$work/bin/person-call" --data-dir "$DD" --url "$base" "$@"; }   # prints "CODE body"
 pbody() { sed 's/^[0-9]* //'; }
 health() { curl -s -m 5 "$base/api/health" | jget version; }
-upd_env() { env -i HOME="$HH" PATH=/usr/bin:/bin CORAL_DATA_DIR="$DD" CORAL_CLOUD_URL=off "$app/Contents/MacOS/coral-update" "$@"; }
+upd_env() { env -i HOME="$HH" PATH=/usr/bin:/bin CORAL_DATA_DIR="$DD" CORAL_CLOUD_URL=off CORAL_TELEMETRY_DISABLED=1 "$app/Contents/MacOS/coral-update" "$@"; }
 if [ -z "$SRV0" ] || [ -z "$KEY" ] || [ "$(health)" != "$fromv" ]; then
   result "2 start" FAIL "server=[$SRV0] key=[${KEY:+set}] health=[$(health)] want $fromv; tray: $(tail -c 300 "$work/tray.out" | tr '\n' ' ')"; finish
 fi
