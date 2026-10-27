@@ -76,11 +76,11 @@
 .empty-launch:hover { border-color: var(--border-light); background: var(--bg-tertiary); } /* --bg-hover takes the muted line under 4.5:1 (#4218) */
 .empty-launch { position: relative; display: flex; border: 1px solid var(--border); font-family: inherit; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .15s ease; flex-direction: column; align-items: flex-start; gap: 14px; min-width: 0; padding: 20px; border-radius: 14px; background: var(--bg-secondary); color: var(--text-secondary); text-align: left; }
 .empty-launch:hover { transform: translateY(-1px); }
-.empty-launch .empty-launch-icon { display: flex; align-items: center; justify-content: center; width: 2.625rem; height: 2.625rem; border-radius: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 1.3125rem; line-height: 1; }
+.empty-launch .empty-launch-icon { display: flex; align-items: center; justify-content: center; width: 2.625rem; height: 2.625rem; border-radius: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: var(--glyph-sm); line-height: 1; }
 .empty-launch-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .empty-launch-copy strong { color: var(--text-primary); font-size: var(--fs-lg); }
 .empty-launch-copy span { color: var(--text-muted); font-size: var(--fs-base); line-height: var(--lh-ui); }
-.empty-launch .empty-launch-arrow { position: absolute; top: 20px; right: 20px; color: var(--text-muted); font-size: 1.1875rem; }
+.empty-launch .empty-launch-arrow { position: absolute; top: 20px; right: 20px; color: var(--text-muted); font-size: var(--icon-size); }
 .empty-launch:hover .empty-launch-arrow { color: var(--accent); }
 .empty-launch-list > .empty-launch:first-child { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg-secondary)); } /* as the desktop welcome: Launch agent is the start (#6042) */
 .empty-launch-list > .empty-launch:first-child .empty-launch-icon { background: var(--accent-dim, var(--accent)); color: var(--text-on-accent); }

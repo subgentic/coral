@@ -78,7 +78,7 @@
 @media (max-width: 639px) {
     .nav-select, .top-bar-actions > .top-bar-btn:not(.hub-indicator), .top-bar-actions .top-bar-settings-wrapper, .top-bar-actions .cloud-account-wrapper { display: none !important; }
     .top-menu-btn { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; min-height: 44px; margin: 0 8px; padding: 0 12px; background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-ml); color: var(--text-primary); font: inherit; font-weight: var(--fw-strong); cursor: pointer; text-align: left; }
-    .top-menu-btn .material-icons { font-size: 1.5rem; flex-shrink: 0; }
+    .top-menu-btn .material-icons { font-size: var(--glyph-sm); flex-shrink: 0; }
     .top-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
@@ -667,11 +667,11 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .welcome-launch-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } /* agent, team, Open folder (#3630) */
 .welcome-launch { position: relative; display: flex; border: 1px solid var(--border); font-family: inherit; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .15s ease; flex-direction: column; align-items: flex-start; gap: 14px; min-width: 0; padding: 20px; border-radius: 14px; background: var(--bg-secondary); color: var(--text-secondary); text-align: left; }
 .welcome-launch:hover { transform: translateY(-1px); }
-.welcome-launch .welcome-launch-icon { display: flex; align-items: center; justify-content: center; width: 2.625rem; height: 2.625rem; border-radius: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 1.3125rem; line-height: 1; }
+.welcome-launch .welcome-launch-icon { display: flex; align-items: center; justify-content: center; width: 2.625rem; height: 2.625rem; border-radius: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: var(--glyph-sm); line-height: 1; }
 .welcome-launch-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .welcome-launch-copy strong { color: var(--text-primary); font-size: var(--fs-lg); }
 .welcome-launch-copy span { color: var(--text-muted); font-size: var(--fs-base); line-height: var(--lh-ui); }
-.welcome-launch .welcome-launch-arrow { position: absolute; top: 20px; right: 20px; color: var(--text-muted); font-size: 1.1875rem; }
+.welcome-launch .welcome-launch-arrow { position: absolute; top: 20px; right: 20px; color: var(--text-muted); font-size: var(--icon-size); }
 .welcome-launch:hover .welcome-launch-arrow { color: var(--accent); }
 /* Home: one obvious start (#6042). Launch agent, the first card, carries the accent (border, tint, a filled icon); Launch team and Open folder stay as they were. */
 .welcome-launch-list > .welcome-launch:first-child { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg-secondary)); }
@@ -826,7 +826,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 }
 .group-table-head { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl); min-height: 36px; } /* one fixed row on every tab, with a header button or without: the title does not move between tabs (UI/UX #7588 item 8) */
 @media (pointer: coarse), (max-width: 767px) { .group-table-head { min-height: var(--control-touch-height, 44px); } }
-.group-table-head h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
+.group-table-head h2 { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
 #group-table-title:focus { outline: none; } /* it takes the focus by script when a group opens: a mouse click on a group header shows no box, a keyboard start does (QA Reviewer 2's #7577 note) */
 #group-table-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
 .group-table-head .session-group-count { font-weight: var(--fw-strong); }
