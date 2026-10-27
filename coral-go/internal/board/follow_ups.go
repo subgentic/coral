@@ -21,7 +21,7 @@ func (s *Store) FollowUps(ctx context.Context, board string, parentID int64) ([]
 	var out []FollowUp
 	err := s.reader().SelectContext(ctx, &out, `SELECT t.id, t.title, t.status, t.assigned_to
 		FROM task_workflows w JOIN board_tasks t ON t.id = w.task_id
-		WHERE t.board_id = ? AND json_extract(w.data, '$.parent_task_id') = ? ORDER BY t.id`, board, parentID)
+		WHERE t.board_id = ? AND w.lst_parent > 0 AND w.lst_parent = ? ORDER BY t.id`, board, parentID)
 	return out, err
 }
 
@@ -29,6 +29,6 @@ func (s *Store) FollowUps(ctx context.Context, board string, parentID int64) ([]
 func (s *Store) goalFollowUpsOpen(ctx context.Context, board string, goalID int64) (int, error) {
 	var n int
 	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_tasks t JOIN task_workflows w ON w.task_id = t.id
-		WHERE t.board_id = ? AND t.goal_id = ? AND t.status NOT IN `+followUpsDone+` AND COALESCE(json_extract(w.data, '$.parent_task_id'), 0) > 0`, board, goalID)
+		WHERE t.board_id = ? AND t.goal_id = ? AND t.status NOT IN `+followUpsDone+` AND w.lst_parent > 0`, board, goalID)
 	return n, err
 }

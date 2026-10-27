@@ -26,6 +26,7 @@ var listFactCols = []struct{ name, def, none string }{
 	{"lst_in_pool", "INTEGER NOT NULL DEFAULT 0", "0"},
 	{"lst_wanted", "INTEGER NOT NULL DEFAULT 0", "0"},
 	{"lst_artifacts", "INTEGER NOT NULL DEFAULT 0", "0"},
+	{"lst_parent", "INTEGER NOT NULL DEFAULT 0", "0"}, // the task this one is a follow-up of (0: none): task detail lists a task's follow-ups from it (#9560)
 }
 
 // listFactExprs are the expressions of the columns over a document d (a column or NEW.data), in listFactCols order. The artifact count is the distinct stored objects and links of the completion's and the
@@ -44,6 +45,7 @@ func listFactExprs(d string) []string {
 		`CASE WHEN COALESCE(json_extract(` + d + `, '$.review_in_pool'), 0) = 1 THEN 1 ELSE 0 END`,
 		`COALESCE(json_extract(` + d + `, '$.reviewers_wanted'), 0)`,
 		`CASE WHEN ` + d + ` LIKE '%` + artifactsMark + `%' THEN ` + uris + ` + ` + inline("$.artifacts") + ` + ` + inline("$.completion_review.artifacts") + ` ELSE 0 END`, // a document without the mark (most tasks) holds no artifact row: the text test is cheaper than the two walks (the same mark has_artifacts uses)
+		`COALESCE(json_extract(` + d + `, '$.parent_task_id'), 0)`,
 	}
 }
 
@@ -102,6 +104,10 @@ func (s *Store) ensureWorkflowListFacts(ctx context.Context) error {
 	}
 	if n, _ := res.RowsAffected(); n > 0 {
 		log.Printf("board: re-derived the task list facts of %d task workflow(s): they did not match the stored documents", n)
+	}
+	// the follow-ups of a task are the rows with its id here: a partial index of the few follow-ups, so task detail does not walk every workflow (#9560)
+	if _, err := tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_task_workflows_parent ON task_workflows(lst_parent) WHERE lst_parent > 0`); err != nil {
+		return err
 	}
 	for _, t := range []struct{ name, event string }{{"task_workflows_lst_ai", "AFTER INSERT ON task_workflows"}, {"task_workflows_lst_au", "AFTER UPDATE OF data ON task_workflows"}} {
 		if _, err := tx.ExecContext(ctx, `CREATE TRIGGER IF NOT EXISTS `+t.name+` `+t.event+` BEGIN UPDATE task_workflows SET `+listFactAssign("NEW.data")+` WHERE task_id = NEW.task_id; END`); err != nil {
