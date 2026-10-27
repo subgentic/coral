@@ -1,4 +1,3 @@
-import { openTask } from './task_navigation.js';
 /* Agent task bar — CRUD, rendering, drag reorder */
 
 // Load order only (#4996): the imports below with no names are loaded for what the module registers at load, in the order this module imported them before the split (the startup-sequence golden records it).
@@ -27,7 +26,7 @@ import './task_board_context.js';
 import './task_verify_marks.js';
 import { _updateDepTags } from './task_dep_picker.js';
 import './task_reminders.js';
-import { _boardTaskPollTick, _boardTaskPollTimer, _toggleHideCompleted, _toggleTaskSort, renderBoardTaskList } from './task_list.js';
+import { openDockTaskPreview, _boardTaskPollTick, _boardTaskPollTimer, _toggleHideCompleted, _toggleTaskSort, renderBoardTaskList } from './task_list.js';
 import { lazyFns, loadTaskDetail } from './lazy_panels.js';
 export { boardTaskFetchHooks, boardTaskPollHooks, loadAgentTasks, loadBoardTasks, renderBoardTaskList, renderTaskList, startBoardTaskPoll, stopBoardTaskPoll } from './task_list.js';
 export { hideCreateTaskModal, showCreateTaskModal } from './task_create.js';
@@ -141,7 +140,7 @@ const depContainer = el => { const id = tokenOf(el.dataset.container); return id
 registerActions({
     'task-close': () => window.hideTaskDetailModal(),
     'task-hide-done': () => _toggleHideCompleted(),
-    'task-open': el => withId(el.dataset.taskId, id => (el.dataset.kind === 'agent' ? window.showAgentTaskDetailModal(id) : openTask(_getBoardProject(), id))), // an agent's own task is the dialog's; a board's is the team page's task page (#7644)
+    'task-open': el => withId(el.dataset.taskId, id => (el.dataset.kind === 'agent' ? window.showAgentTaskDetailModal(id) : openDockTaskPreview(id, el))), // standalone agent tasks keep their dialog; board tasks use the shared preview pane (#8788)
     'task-subagent-open': el => { const sid = textOf(el.dataset.subagentId); if (sid) showSubagentDetailModal(sid); },
     'dep-picker-toggle': el => {
         const list = depContainer(el) && document.getElementById(el.dataset.container + '-list');
