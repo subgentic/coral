@@ -456,9 +456,9 @@
 
 .session-board-card {
     /* Team card: hairline frame + a little more breathing room between groups */
-    border: 1px solid var(--sidebar-separator);
+    border: var(--card-border);
     border-left: 2px solid transparent;
-    border-radius: var(--radius-sm);
+    border-radius: var(--card-radius);
     background: rgba(var(--white-rgb), 0.025) !important;
     margin: 6px 8px 6px 10px !important;
     padding: 0 !important;
@@ -474,7 +474,7 @@
 .board-card-header {
     padding: 5px 10px !important;
     margin: 0;
-    border-radius: 3px 3px 0 0;
+    border-radius: var(--card-radius) var(--card-radius) 0 0;
     box-sizing: border-box;
     /* header/agents boundary lives here (the agents list no longer draws its own) */
     box-shadow: inset 0 -1px 0 var(--sidebar-separator);
@@ -1578,7 +1578,7 @@
 .workflow-preset-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .preset-editor input[name="preset_name"] { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .prompt-inspection-content { display: grid; gap: 10px; }
-.prompt-inspection-card { min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-tertiary); }
+.prompt-inspection-card { min-width: 0; padding: var(--card-pad); border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-tertiary); }
 .prompt-inspection-card h4 { margin: 0 0 6px; font-size: var(--fs-lg); }
 .prompt-inspection-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; color: var(--text-secondary); font-size: var(--fs-base) !important; line-height: 1.4; } /* the line height is the label's own, so the (i) beside it (centred on its first line by 1lh) sits on that line in a settings page too */
 .prompt-inspection-fragment { margin-top: 10px; }
