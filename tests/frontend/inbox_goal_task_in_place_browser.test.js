@@ -37,7 +37,17 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
             await waitFor(`location.pathname === ${JSON.stringify(goalUrl)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'Back returns to the goal', 15000);
             console.log('   ✓');
+
+            console.log(`${at}a task's Goal line opens the goal in the Inbox, Back returns to the task`);
+            await load(taskUrl);
+            await waitFor(`document.querySelector('#inbox-page .team-task-page')?.textContent.includes(${JSON.stringify(TASK)})`, 'the Inbox task', 15000);
+            await ev(`[...document.querySelectorAll('#inbox-page .goals-facts dd button.team-link')].find(b => b.textContent === ${JSON.stringify(TITLE)}).click(); true`);
+            await waitFor(`location.pathname === ${JSON.stringify(goalUrl)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'the goal in the Inbox at ' + goalUrl, 15000);
+            assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none'`), true, at + 'the team page is not on screen');
+            await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
+            await waitFor(`location.pathname === ${JSON.stringify(taskUrl)} && document.querySelector('#inbox-page .team-task-page')?.textContent.includes(${JSON.stringify(TASK)})`, 'Back returns to the task', 15000);
+            console.log('   ✓');
         }
-        console.log('PASS inbox goal task in place: the goal\'s task list opens the task in the Inbox, Back returns to the goal, at 1280 and 390');
+        console.log('PASS inbox goal task in place: the goal\'s task opens in the Inbox and the task\'s Goal opens in the Inbox, Back returns each time, at 1280 and 390');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
