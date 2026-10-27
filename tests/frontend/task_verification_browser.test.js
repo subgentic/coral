@@ -1,8 +1,5 @@
-// A finished task's verification, quietly (#4564, operator feedback): in the board's Tasks list a small muted icon after the title only for Evidence attached,
-// its words only in the tooltip and the accessible name, and nothing at all for a verified or an unverified one; on the task's page one plain muted line ("Verified by ..." or "Not independently verified (evidence attached)"), none for unverified, no chip; no filter in the
-// list (the API's filter is for agents and coral-hub). The icon reaches 3:1 in both themes and fits a 390 px phone. The tasks are the real isolated server's; the verification field (Backend's #4563:
-// {state, by, at}) is added to its answers in the page, and a task without the field gets nothing.
-//
+// #8792: verification stays in task details; dock rows only show status/title/avatar.
+// Real API tasks with injected verification fields cover verified, evidence, unverified and absent states.
 // Drives Chrome over CDP through agent_view_harness.js; run_cdp_suites.mjs finds CDP suites by that name.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -44,24 +41,6 @@ const ADD = `(() => {
     };
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const rows = () => ev(`[...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')].map(r => ({ title: r.querySelector('.board-task-desc').textContent.replace(/[a-z_]+$/, m => m).trim(), mark: (() => { const b = r.querySelector('.board-task-verify-mark'); return b ? { cls: b.className.replace('board-task-verify-mark', '').trim(), aria: b.getAttribute('aria-label'), title: b.title, role: b.getAttribute('role'), words: b.textContent.trim() } : null; })() }))`);
-    // WCAG contrast of each mark's icon against what is behind it, counting every opacity on the way up (a dimmed row dims what is in it).
-    const CONTRAST = `(() => {
-        const lum = c => { const [r, g, b] = c.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-        const parse = s => { const m = s.match(/rgba?\\(([^)]+)\\)/); if (!m) return null; const p = m[1].split(',').map(x => parseFloat(x)); return { rgb: p.slice(0, 3), a: p.length > 3 ? p[3] : 1 }; };
-        const opacityOf = el => { let o = 1; for (let e = el; e; e = e.parentElement) o *= parseFloat(getComputedStyle(e).opacity); return o; };
-        const bgOf = el => { let bg = [255, 255, 255]; const chain = []; for (let e = el; e; e = e.parentElement) chain.push(e); for (const e of chain.reverse()) { const c = parse(getComputedStyle(e).backgroundColor); if (c && c.a > 0) bg = bg.map((v, i) => Math.round(c.rgb[i] * c.a + v * (1 - c.a))); } return bg; };
-        const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
-        const out = {};
-        for (const b of document.querySelectorAll('#board-task-list .board-task-verify-mark')) {
-            const st = 'evidence';
-            const bg = bgOf(b), o = opacityOf(b);
-            const seen = rgb => rgb.map((v, i) => Math.round(v * o + bg[i] * (1 - o)));
-            const icon = Math.round(ratio(seen(parse(getComputedStyle(b.querySelector('.material-icons')).color).rgb), bg) * 100) / 100;
-            out[st] = Math.min(out[st] || 99, icon);
-        }
-        return out;
-    })()`;
-
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -101,26 +80,24 @@ const ADD = `(() => {
         d = await detailLine('u-one'); assert.equal(d.line, null, 'an unverified task has no line');
         d = await detailLine('n-one'); assert.equal(d.line, null, 'no state from the server, no line');
 
-        console.log('3. The icon reaches 3:1 in both themes');
+        console.log('3. Verification marks stay out of the row in both themes');
         for (const theme of ['dark', 'light']) {
             await ev(`import((window.__coralStatic || '/static/') + 'settings_core.js').then(m => { m.clearCustomThemeVars(); m.applyTheme('${theme}'); return true; })`);
-            await sleep(400); // sleep-ok: the theme is applied over a frame
+            assert.ok((await rows()).every(r => r.mark === null), 'detail-only verification in ' + theme);
             if (theme === 'light') await shot('verify-list-light');
-            const c = await ev(CONTRAST);
-            assert.deepEqual(Object.keys(c).sort(), ['evidence']);
-            for (const [st, v] of Object.entries(c)) assert.ok(v >= 3, `${theme}: the ${st} icon is ${v}:1`);
         }
 
-        console.log('4. A 390 px phone, touch: the icons fit the row and nothing scrolls sideways');
+        console.log('4. A 390 px phone: verification stays in detail and the rows fit');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true });
         await sleep(400); // sleep-ok: the layout settles over frames after a viewport change; there is no completion event
         await ev(`window.toggleAgenticPanel(true); document.getElementById('agentic-tab-tasks').click(); true`);
-        await waitFor(`document.querySelectorAll('#board-task-list .board-task-verify-mark').length === 2`, 'the icons on the phone', 8000);
+        await waitFor(`document.querySelectorAll('#board-task-list .board-task-item').length === 8`, 'the phone rows', 8000);
+        assert.ok((await rows()).every(r => r.mark === null), 'no verification icon in phone rows');
         const phone = await ev(`(() => { const dock = document.getElementById('agentic-state').getBoundingClientRect();
-            const over = [...document.querySelectorAll('#board-task-list .board-task-verify-mark')].filter(b => b.getBoundingClientRect().right > dock.right + 1 || b.getBoundingClientRect().left < dock.left - 1).length;
+            const over = [...document.querySelectorAll('#board-task-list .board-task-item')].filter(b => b.getBoundingClientRect().right > dock.right + 1 || b.getBoundingClientRect().left < dock.left - 1).length;
             return { over, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-        assert.equal(phone.over, 0, 'no icon is cut off: ' + JSON.stringify(phone));
+        assert.equal(phone.over, 0, 'no row is cut off: ' + JSON.stringify(phone));
         assert.ok(phone.page <= 0, 'no sideways scroll: ' + JSON.stringify(phone));
         await shot('verify-list-phone');
         await Emulation.setTouchEmulationEnabled({ enabled: false });
