@@ -42,7 +42,7 @@ export function showAgentTaskDetailModal(taskId) {
         footer.innerHTML = `
             <span style="flex:1"></span>
             <button class="btn" data-on-click="task-close">Close</button>
-            ${open ? `<button class="btn btn-success" data-on-click="task-complete" data-task-id="${Number(task.id)}" data-personal="1">Complete</button>` : ''}`;
+            ${open ? `<button class="btn btn-primary" data-on-click="task-complete" data-task-id="${Number(task.id)}" data-personal="1">Complete</button>` : ''}`;
     }
 
     _openTaskDetailModal(modal);
@@ -88,7 +88,7 @@ export function completeAgentTask(taskId) {
     footer.innerHTML = `
         <button class="btn" data-on-click="task-complete-back" data-task-id="${Number(taskId)}">Back</button>
         <span style="flex:1"></span>
-        <button class="btn btn-success" data-on-click="task-complete-do" data-task-id="${Number(taskId)}">Complete</button>`;
+        <button class="btn btn-primary" data-on-click="task-complete-do" data-task-id="${Number(taskId)}">Complete</button>`;
     document.getElementById('task-complete-message').focus();
 }
 

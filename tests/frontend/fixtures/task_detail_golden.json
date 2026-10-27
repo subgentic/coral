@@ -1,9 +1,9 @@
 {
   "about": "what the task detail shows for each task, for task_detail_golden_browser.test.js: sha256 of the detail html, footer and title, and the readable text. CORAL_UPDATE_GOLDEN=1 rewrites it.",
   "hashes": {
-    "a new task": "c7afa91cd240c27a2af0759a371cf65782a998f7ef713faf24584aa679b421e6",
+    "a new task": "e7738739975f74c6f9f659cc8ea2f759760816beb3b879da95a3e975dd40bb8b",
     "a draft": "22d3b3c04d0774c86150a3bba5dc402c998e8ae65990d44a21329cb56b38af67",
-    "in progress, claimed": "25963734a0bdf0780d52d200044f806546494fb3af5b47826969d538ccf34760",
+    "in progress, claimed": "e246e0ed67960dc9a54e4b2b6aca52af02d620b78bafb1b60d22e331ebe44b25",
     "blocked, every kind of dependency": "99ad872b4f07f04d885da55ba8fddcb4a12a624c10ae5154f63926122353e361",
     "completed with a message and a cost": "98d5da6500955261d8873429f80c972b40400ef257f86154e2a0591c8422e3bf",
     "completed over a dollar": "d4c64cc7743bd8f61b93ca409033dc683f1388608b2f552f647785098ed35555",
@@ -12,11 +12,11 @@
     "cancelled": "d9aba46df938f4758ec2b274199c865dd6d956603ede448a7456da36fc07f610",
     "review pending, slot released": "b2f22f2614c7232fb86b6e434ea7f7e13499a3b4071a545573444fff870f8807",
     "completion review, slot occupied": "82779ceba83104158a00c5fb42b567d70caff93430ac95178b39775003ad8698",
-    "a workflow with everything": "055a498531307fbb70f9dc9cc168d46acf04a4b550fcdebf83c9714ecd442778",
-    "amended twice": "1a4cda89c0b657de8cc4c5b9ecbb8e60574548c79cca60f47ac3fe60177428bc",
-    "markup in every text": "80424acff81989188c9bf318c07d3bfa8e62564c80a2c4676a819c66e94d38f8",
-    "running, with a live cost": "5320f67df217cc40223be30f40a0592424047ac9b23fa3da55e829b4ac635ff3",
-    "an agent task": "7874cd21a27e68d6330c8b02d88db1fcd4b235e9d297e6678246e03a26a4a460"
+    "a workflow with everything": "a1a768067de5a85749c63abc3038db9735e71a07a6541282bd9de1fe71bc9e26",
+    "amended twice": "1f274ece4890df3c11bba789f09568baee9d93792f211f4604437fdac418acc3",
+    "markup in every text": "e2676b05884a9e621a5db429852df912a93899aa1b31c2e6561ff0976fb506a7",
+    "running, with a live cost": "cc45986476dda58235358df1f361dc4f539717e831e539801e271a0a2858dc67",
+    "an agent task": "7139f18120470f0ed4e6ba62e9706fc7ae870ede9418cb6e39f07f3999663159"
   },
   "lines": {
     "a new task": "#1 Plain | ← Tasks#1 PlainQueuedAssigned toNobody yetGoalNo goalPriorityMediumCreated byOrchestratorCreatedOct 1MoreEditCancel taskComplete | footer More | Complete",
