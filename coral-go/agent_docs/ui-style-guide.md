@@ -27,7 +27,7 @@ Build new dashboard UI from the shared families below. Each family is one class 
 - **Table**: the shared data table (`data_table.js`, `dt-*` classes in `data_table.css`); no other stylesheet styles a table. Guard: `data_table_census`.
 - **Dialog**: one of `.dlg-confirm` (28 rem), `.dlg-form` (40 rem) or `.dlg-flow` (60 rem, 640 high) beside `.modal-content`; its width and radius come from the `--dlg-*` tokens (`--dlg-title` is the title's type). Guard: `dialog_census`.
 - **Empty state**: `.empty-state` with `-line`, `-hint`, `-action` (a line, an optional hint, an optional action, no box). Guard: `empty_state_census`.
-- **Back link**: `.back-link`, an arrow and the name of where it goes (the class draws the arrow). Guard: `back_link_census`.
+- **Back link**: `.back-link`, with the arrow and the name in its text ("← Name", naming where it goes). Guard: `back_link_census`.
 
 ## Rules every new screen follows
 
