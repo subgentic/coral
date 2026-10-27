@@ -179,8 +179,8 @@ func TestEfficiencyTaskTimeByThinkingLevelAndSentBackShare(t *testing.T) {
 		raw, err := sql.Open("sqlite", e.boardPath+"?_pragma=busy_timeout(5000)")
 		require.NoError(t, err)
 		defer raw.Close()
-		_, err = raw.ExecContext(ctx, `UPDATE board_tasks SET claimed_at = ?, completed_at = ?, input_tokens = 50, output_tokens = 50, cost_usd = 1 WHERE id = ?`,
-			e.now.Add(-claimAgo).Format("2006-01-02T15:04:05Z"), e.now.Add(-doneAgo).Format("2006-01-02T15:04:05Z"), task.ID)
+		_, err = raw.ExecContext(ctx, `UPDATE board_tasks SET claimed_at = ?, completed_at = ?, input_tokens = 50, output_tokens = 50, cost_usd = 1, session_id = ? WHERE id = ?`,
+			e.now.Add(-claimAgo).Format("2006-01-02T15:04:05Z"), e.now.Add(-doneAgo).Format("2006-01-02T15:04:05Z"), effSessA, task.ID)
 		require.NoError(t, err)
 		return task.ID
 	}
@@ -223,4 +223,138 @@ func TestEfficiencyIgnoresACommitFromBeforeTheSessionBegan(t *testing.T) {
 	code, body := e.get(t, "metric=tokens_per_commit&group_by=provider")
 	require.Equal(t, http.StatusOK, code)
 	assert.EqualValues(t, 1, groupsOf(t, body)["codex"]["n"])
+}
+
+// finishedTask makes a completed task of Alpha Dev on the alpha board: claimed claimAgo before the test's now, done doneAgo before it, with the session recorded at its claim (sid, "" for none).
+func (e *effEnv) finishedTask(t *testing.T, title, sid string, claimAgo, doneAgo time.Duration) int64 {
+	t.Helper()
+	ctx := context.Background()
+	bs := e.h.bs
+	_, _ = bs.Subscribe(ctx, "alpha", "Lead", "Orchestrator", "lead-session", nil, "all")
+	_, _ = bs.Subscribe(ctx, "alpha", "Alpha Dev", "Dev", "claude-"+effSessB, nil, "mentions") // a session the agent was restarted on since
+	task, err := bs.CreateTask(ctx, "alpha", title, "", "high", "Lead", "Alpha Dev")
+	require.NoError(t, err)
+	_, err = bs.ClaimTask(ctx, "alpha", "Alpha Dev", task.ID)
+	require.NoError(t, err)
+	_, err = bs.CompleteTask(ctx, "alpha", task.ID, "Alpha Dev", nil)
+	require.NoError(t, err)
+	raw, err := sql.Open("sqlite", e.boardPath+"?_pragma=busy_timeout(5000)")
+	require.NoError(t, err)
+	defer raw.Close()
+	_, err = raw.ExecContext(ctx, `UPDATE board_tasks SET claimed_at = ?, completed_at = ?, input_tokens = 50, output_tokens = 50, cost_usd = 1, session_id = NULLIF(?, '') WHERE id = ?`,
+		e.now.Add(-claimAgo).Format("2006-01-02T15:04:05Z"), e.now.Add(-doneAgo).Format("2006-01-02T15:04:05Z"), sid, task.ID)
+	require.NoError(t, err)
+	return task.ID
+}
+
+// #8968 (1): a task is the work of the session recorded at its claim. The agent was restarted on another session since: the task keeps the first one's provider and commits.
+func TestEfficiencyATaskKeepsTheSessionOfItsClaim(t *testing.T) {
+	e := newEffEnv(t)
+	id := e.finishedTask(t, "done before the restart", effSessA, 3*time.Hour, 20*time.Minute) // c1 (1 h ago) and c2 (90 min) are session A's
+	code, body := e.get(t, "metric=tokens_per_commit&group_by=task&range=24h")
+	require.Equal(t, http.StatusOK, code)
+	g := groupsOf(t, body)[fmt.Sprint(id)]
+	require.NotNil(t, g)
+	assert.EqualValues(t, 2, g["n"], "both of session A's commits, though the agent is on session B now")
+	assert.InDelta(t, 50, g["value"], 0.001)
+	code, body = e.get(t, "metric=task_time&group_by=provider&range=24h")
+	require.Equal(t, http.StatusOK, code)
+	assert.Contains(t, groupsOf(t, body), "claude", "session A is a claude one; the restarted session is codex")
+	assert.NotContains(t, groupsOf(t, body), "codex")
+}
+
+// #8968 (2): a commit goes to one task. Two tasks of one session overlap; a commit exactly at one's end and the next's claim is the next's.
+func TestEfficiencyACommitCountsForOneTaskOnly(t *testing.T) {
+	e := newEffEnv(t)
+	first := e.finishedTask(t, "first", effSessA, 3*time.Hour, 70*time.Minute)    // c2 (90 min ago) is inside; c1 (60 min ago) is not
+	second := e.finishedTask(t, "second", effSessA, 2*time.Hour, 20*time.Minute)  // c2 and c1 are inside it too: the latest-claimed wins both
+	third := e.finishedTask(t, "third", effSessA, 20*time.Minute, 10*time.Minute) // nothing in it
+	_ = third
+	code, body := e.get(t, "metric=tokens_per_commit&group_by=task&range=24h")
+	require.Equal(t, http.StatusOK, code)
+	g := groupsOf(t, body)
+	assert.EqualValues(t, 0, g[fmt.Sprint(first)]["n"], "the second task was claimed later and was open: it has both")
+	assert.EqualValues(t, 2, g[fmt.Sprint(second)]["n"])
+	assert.EqualValues(t, 2, body["total"].(map[string]any)["n"], "never more than the commits there are")
+}
+
+func TestEfficiencyACommitAtOneTasksEndIsTheNextTasks(t *testing.T) {
+	e := newEffEnv(t)
+	a := e.finishedTask(t, "ends at c1", effSessA, 3*time.Hour, time.Hour) // ends at the instant of c1 (1 h ago): half-open, so not in it
+	b := e.finishedTask(t, "starts at c1", effSessA, time.Hour, 10*time.Minute)
+	_, body := e.get(t, "metric=tokens_per_commit&group_by=task&range=24h")
+	g := groupsOf(t, body)
+	assert.EqualValues(t, 1, g[fmt.Sprint(a)]["n"], "c2 (90 min ago) only")
+	assert.EqualValues(t, 1, g[fmt.Sprint(b)]["n"], "c1, made at its claim")
+}
+
+// #8968 (3): one rule for both measures: a task of Gemini (no usage) or of no known session is in neither; Gemini is named as unmeasured by both.
+func TestEfficiencyBothMeasuresLeaveOutTasksTheyCannotRead(t *testing.T) {
+	e := newEffEnv(t)
+	e.finishedTask(t, "claude task", effSessA, 3*time.Hour, 2*time.Hour)
+	e.finishedTask(t, "gemini task", effSessG, 3*time.Hour, 2*time.Hour)
+	e.finishedTask(t, "no session", "", 3*time.Hour, 2*time.Hour)
+	for _, metric := range []string{"task_time", "tokens_per_commit"} {
+		code, body := e.get(t, "metric="+metric+"&group_by=task&range=24h")
+		require.Equal(t, http.StatusOK, code)
+		assert.Len(t, groupsOf(t, body), 1, metric+": only the claude task")
+		assert.Equal(t, []any{"gemini"}, body["unmeasured"], metric)
+	}
+	_, body := e.get(t, "metric=task_time&group_by=provider&range=24h")
+	assert.EqualValues(t, 1, body["total"].(map[string]any)["n"])
+}
+
+// #8968 (4): a rebased or cherry-picked copy of a commit (new hash, same subject and author time) is one commit; a commit already on the branch when a session began is another session's, and goes to the first
+// session that had begun.
+func TestEfficiencyCommitsAreCountedOnceAcrossRebasesAndSessions(t *testing.T) {
+	e := newEffEnv(t)
+	ctx := context.Background()
+	db, err := storetest.Open(t, e.storePath)
+	require.NoError(t, err)
+	gs := store.NewGitStore(db)
+	at := e.now.Add(-5 * time.Hour).Format(time.RFC3339)
+	snap := func(sid, typ, name, hash string) {
+		sidp := sid
+		require.NoError(t, gs.UpsertGitSnapshot(ctx, &store.GitSnapshot{AgentName: name, AgentType: typ, WorkingDirectory: "/w", Branch: "feat", CommitHash: hash, CommitSubject: "Fix the thing", CommitTimestamp: &at, SessionID: &sidp}))
+	}
+	// codex's session began 90 minutes ago: the 5-hour-old commit was there before. It polled it first; claude's session (began 30 days ago) is the author.
+	_, err = db.ExecContext(ctx, `UPDATE live_sessions SET created_at = ? WHERE session_id = ?`, e.now.Add(-90*time.Minute).Format(store.ISOFormat), effSessB)
+	require.NoError(t, err)
+	snap(effSessB, "codex", "Beta Dev", "aaa1")
+	snap(effSessA, "claude", "Alpha Dev", "aaa1")
+	snap(effSessA, "claude", "Alpha Dev", "bbb2") // the same commit rebased: another hash, same subject and time
+	code, body := e.get(t, "metric=tokens_per_commit&group_by=provider&range=24h")
+	require.Equal(t, http.StatusOK, code)
+	g := groupsOf(t, body)
+	assert.EqualValues(t, 3, g["claude"]["n"], "c1, c2 and the one commit, once (not twice for its two hashes)")
+	assert.EqualValues(t, 1, g["codex"]["n"], "codex keeps only c3 (c4, 2 h old, was there before it began)")
+}
+
+// #8968 (5): a session that has ended (no live row) is held to the same rule: its start is read from its usage rows.
+func TestEfficiencyTheFoundItThereRuleHoldsForEndedSessions(t *testing.T) {
+	e := newEffEnv(t)
+	ctx := context.Background()
+	db, err := storetest.Open(t, e.storePath)
+	require.NoError(t, err)
+	ended := "0000000d-3864-4864-8864-00000000000d"
+	ts := store.NewTokenUsageStore(db)
+	require.NoError(t, ts.RecordUsage(ctx, &store.TokenUsage{SessionID: ended, AgentName: "Gone", AgentType: "claude", BoardName: ptrString("alpha"), InputTokens: 100, TotalTokens: 100, Source: "jsonl",
+		SessionStartAt: e.now.Add(-30 * time.Minute).Format(store.ISOFormat), RecordedAt: e.now.Add(-20 * time.Minute).Format(store.ISOFormat)}))
+	gs := store.NewGitStore(db)
+	for hash, ago := range map[string]time.Duration{"found": 3 * time.Hour, "made": 10 * time.Minute} {
+		at := e.now.Add(-ago).Format(time.RFC3339)
+		sid := ended
+		require.NoError(t, gs.UpsertGitSnapshot(ctx, &store.GitSnapshot{AgentName: "Gone", AgentType: "claude", WorkingDirectory: "/w", Branch: "x", CommitHash: hash, CommitTimestamp: &at, SessionID: &sid}))
+	}
+	_, body := e.get(t, "metric=tokens_per_commit&group_by=agent&range=24h")
+	assert.EqualValues(t, 1, groupsOf(t, body)["Gone"]["n"], "the commit from 3 h ago was on the branch before the session began, 30 minutes ago")
+}
+
+// #8968 (item 16): an error reply carries no store text.
+func TestEfficiencyAFailedReadSaysNothingOfTheStore(t *testing.T) {
+	e := newEffEnv(t)
+	require.NoError(t, e.h.bs.Close())
+	code, body := e.get(t, "metric=task_time&group_by=team&range=24h")
+	assert.Equal(t, http.StatusInternalServerError, code)
+	assert.Equal(t, "the efficiency read failed", body["error"])
 }
