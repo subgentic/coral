@@ -153,7 +153,7 @@ export async function selectWorkflow(id) {
 function runResult(r) {
     const failed = r.status === 'failed' || r.status === 'killed';
     const name = r.status === 'killed' ? 'Stopped' : failed && r.failed_step ? `Failed: step ${Number(r.failed_step.number)} (${r.failed_step.name})` : resultWords(r);
-    const cell = DT.el('span'); cell.append(DT.chip(name, failed ? 'goal-state-task-blocked' : r.status === 'completed' ? 'goal-state-task-done' : r.status === 'running' ? 'goal-state-task-active' : ''));
+    const cell = DT.el('span'); cell.append(DT.chip(name, failed ? 'team-state-bad' : r.status === 'completed' ? 'goal-state-task-done' : r.status === 'running' ? 'goal-state-task-active' : ''));
     const failure = runFailure(r); if (failure) cell.append(' ', DT.tag(`(${failure.short})`));
     return cell;
 }
