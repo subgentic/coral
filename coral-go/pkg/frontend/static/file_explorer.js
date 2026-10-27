@@ -326,10 +326,10 @@ function render() {
         const heading = element('div','explorer-heading');
         rootLabel = element('span','explorer-root');
         const actions=element('div','team-artifact-actions');
-        refreshButton=element('button','team-artifacts-action team-artifact-icon-btn');refreshButton.type='button';
+        refreshButton=element('button','btn btn-quiet btn-icon btn-small');refreshButton.type='button';
         refreshButton.innerHTML='<span class="material-icons" aria-hidden="true">refresh</span>';refreshButton.title='Refresh';refreshButton.setAttribute('aria-label','Refresh');
         refreshButton.addEventListener('click',()=>{reset();load('.');});
-        collapseButton=element('button','team-artifacts-action team-artifact-icon-btn');collapseButton.type='button';
+        collapseButton=element('button','btn btn-quiet btn-icon btn-small');collapseButton.type='button';
         collapseButton.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>';collapseButton.title='Collapse all';collapseButton.setAttribute('aria-label','Collapse all');
         collapseButton.addEventListener('click',()=>{expanded.clear();focused=null;render();});
         actions.append(refreshButton,collapseButton);heading.append(rootLabel,actions);

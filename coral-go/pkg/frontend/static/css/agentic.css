@@ -1141,8 +1141,7 @@ body.panel-dragging .agentic-state {
 .file-star-btn:hover, .file-star-btn:focus-visible { opacity: 1; }
 .file-star-btn.starred { opacity: 1; color: var(--warning); }
 
-.refresh-files-btn { color: var(--text-secondary); } /* the size, padding and shape are the tabs' icon button (team-artifact-icon-btn) */
-.refresh-files-btn:hover { color: var(--text-primary); }
+/* the size, padding and shape are the tabs' icon button (team-artifact-icon-btn) */
 
 .refresh-files-btn.refreshing {
     animation: spin 1s linear infinite; /* a transform only: the button keeps its display (inline-block here shifted the title by a sub-pixel while it spun) */
@@ -1754,7 +1753,6 @@ body.panel-dragging .agentic-state {
 
 /* The icons sit in one row so rows stay short. */
 .team-artifact-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-xs); flex-shrink: 0; }
-.team-artifact-icon-btn { padding: var(--space-xs); min-width: 32px; min-height: 32px; border-radius: var(--radius-md); }
 .artifact-linked-preview { display: flex; flex-direction: column; height: 100%; min-height: 320px; }
 .artifact-linked-status { margin: 0; padding: 10px 12px; font-size: var(--fs-base); color: var(--text-secondary); }
 .artifact-linked-notice { margin: 0; } /* a .notice-bar: where it sits only */
@@ -1764,8 +1762,6 @@ body.panel-dragging .agentic-state {
 }
 /* On a touch screen every control of the table is a 44 px target, and the five icons wrap into two rows of three and two inside their column (#4469). */
 @media (pointer: coarse) {
-    .team-artifact-icon-btn { min-width: 44px; min-height: 44px; }
-    .list-bar-more-btn { min-width: 44px; min-height: 44px; }
 }
 
 /* Human-readable JSON artifacts, without changing their source/download. */

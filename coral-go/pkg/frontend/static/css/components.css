@@ -364,7 +364,6 @@
 /* Message board delete button */
 /* A dense .btn-icon.btn-xs (#9332); .btn-xs's margin has no auto side, so the header's actions are pushed right by the rule below. */
 .mb-delete-msg-btn {
-    font-size: var(--fs-xl);
     line-height: 1;
     opacity: 0;
     transition: opacity 0.15s, color 0.15s;

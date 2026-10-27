@@ -88,7 +88,6 @@ body.cloud-mode .settings-cloud-note { margin: 0 0 12px; }
 .cs-revoke { color: var(--error); }
 .cs-more { position: relative; }
 .cs-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
-@media (pointer: coarse), (max-width: 767px) { .cs-more-btn { min-height: var(--control-touch-height, 44px); } }
 .cs-revoke:disabled { opacity: .5; cursor: not-allowed; }
 /* Narrow (phone): the table folds itself (data_table.js); the access select fills its line and the actions start at the left. */
 @container servers-tab (max-width: 640px) {
