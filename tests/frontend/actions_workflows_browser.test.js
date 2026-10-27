@@ -178,12 +178,12 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await clear();
         await click('#scheduler-view [data-on-click="job-run-now"]');
         check('Run now asks the server to run the job once', await sent('POST /api/scheduled/jobs/5/run', 'the run'));
-        await ev(`window.__confirmModal = null; window.showConfirmModal = (t, m, c, x, o) => { window.__confirmModal = t; window.__confirmMsg = m; window.__confirmLabel = o && o.label; }; true`);
+        await ev(`window.__confirmModal = null; window.showConfirmModal = (t, m, c, x, o) => { window.__confirmModal = t; window.__confirmMsg = m; window.__confirmLabel = o && o.label; window.__confirmDanger = !!(o && o.danger); }; true`);
         await clear();
         await click('#scheduler-view [data-on-click="job-delete"]');
         await sleep(300); // sleep-ok: shows that nothing is sent (no condition to wait for)
         check('Delete still asks first, and nothing is sent without a Yes', (await ev(`window.__confirmModal`)) === 'Delete job' && !(await reqs()).some(r => r.startsWith('DELETE')), JSON.stringify(await reqs()));
-        check('the delete question names the job and its runs, and the button says Delete job (#9294)', /^Delete .+ (and its \d+ runs?\?|\? It has no runs yet\.)/.test(await ev(`window.__confirmMsg || ''`)) && (await ev(`window.__confirmLabel`)) === 'Delete job', await ev(`window.__confirmMsg + ' | ' + window.__confirmLabel`));
+        check('the delete question names the job and its runs, and the button says Delete job (#9294)', /^Delete .+?( and its \d+ runs?\? This cannot be undone\.|\? It has no runs yet\.)$/.test(await ev(`window.__confirmMsg || ''`)) && (await ev(`window.__confirmLabel`)) === 'Delete job' && (await ev(`window.__confirmDanger`)) === true, await ev(`window.__confirmMsg + ' | ' + window.__confirmLabel`));
         await ev(`window.__hist = []; window.selectHistorySession = id => window.__hist.push(id); true`);
         await openJob(6);
         await until(`!!document.querySelector('#scheduler-view [data-on-click="job-run-session"]')`, 'the agent job\'s runs', 5000);

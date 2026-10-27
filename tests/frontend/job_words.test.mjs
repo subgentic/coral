@@ -31,4 +31,9 @@ for (const [cron, words] of [['*/5 9-17 * * 1-5', 'Every 5 minutes, from 09:00 t
 for (const [cron, words] of [['0 9,12,18 * * *', 'At 09:00, 12:00 and 18:00'], ['0,30 9,17 * * *', 'At 09:00, 17:00 and 09:30, 17:30'.replace('At 09:00, 17:00 and 09:30, 17:30', 'At 09:00, 09:30, 17:00 and 17:30')], ['0 9 1 * 1', 'At 09:00, on day 1 of the month or on Mondays'], ['0 9 1,15 * 1-5', 'At 09:00, on days 1 and 15 of the month or on weekdays'],
     ['0 9 1 7 1', 'At 09:00, on July 1 or on Mondays'], ['0 9 */2 * 1', 'At 09:00, every 2 days, Mondays'], ['30 8,17 * * *', 'At 08:30 and 17:30'], ['0 9 15 * 1', 'At 09:00, on day 15 of the month or on Mondays']]) assert.equal(w.cronWords(cron), words, cron);
 for (const raw of ['0 9 * * MON', '0 9 L * *', '*/5 9-17/2 * * *', '1 2 3 4', '60 * * * *']) assert.match(w.cronWords(raw), /^Schedule: |^$/, raw + ' stays raw');
+// the delete question names the job and how many runs go (#9294): none, one, several, and a job with no name
+assert.equal(w.deleteJobWords({ name: 'greet-hourly' }, 0), 'Delete greet-hourly? It has no runs yet.');
+assert.equal(w.deleteJobWords({ name: 'greet-hourly' }, 1), 'Delete greet-hourly and its 1 run? This cannot be undone.');
+assert.equal(w.deleteJobWords({ name: 'greet-hourly' }, 12), 'Delete greet-hourly and its 12 runs? This cannot be undone.');
+assert.equal(w.deleteJobWords(null, 3), 'Delete this job and its 3 runs? This cannot be undone.');
 console.log('PASS job_words');

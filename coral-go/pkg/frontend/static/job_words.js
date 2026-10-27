@@ -173,3 +173,9 @@ export function limitWords(s) {
     if (n % 60 === 0) return `${n / 60} minute${n === 60 ? '' : 's'}`;
     return `${n} seconds`;
 }
+
+/** The delete question names the job and how many runs go with it: "Delete greet-hourly and its 12 runs? This cannot be undone." (#9294) */
+export function deleteJobWords(job, runCount) {
+    const name = job && job.name ? job.name : 'this job';
+    return runCount > 0 ? `Delete ${name} and its ${runCount} run${runCount === 1 ? '' : 's'}? This cannot be undone.` : `Delete ${name}? It has no runs yet.`;
+}

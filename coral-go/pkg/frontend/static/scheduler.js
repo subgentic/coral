@@ -9,7 +9,7 @@ import { pollEvery } from './overload.js';
 import { showJobModal, editScheduledJob } from './job_form.js';
 import { formatDuration } from './format.js';
 import { runFailure } from './run_failure.js';
-import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote } from './job_words.js';
+import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords } from './job_words.js';
 import { foldWayBack } from './sidebar_groups.js';
 import { note } from './nav.js';
 import { importOnce } from './import_once.js';
@@ -300,16 +300,10 @@ async function runScheduledJobNow(jobId, btn) {
     }
 }
 
-/** The question names the job and how many runs go with it ("Delete greet-hourly and its 12 runs?"). */
-function deleteWords(job, runCount) {
-    const name = job && job.name ? job.name : 'this job';
-    return runCount > 0 ? `Delete ${name} and its ${runCount} run${runCount === 1 ? '' : 's'}? This cannot be undone.` : `Delete ${name}? It has no runs yet.`;
-}
-
 function deleteScheduledJob(jobId) {
     const job = scheduledJobs.find(j => Number(j.id) === Number(jobId));
     const runCount = runsPage && Number(runsPage.jobId) === Number(jobId) ? Number(runsPage.total) || 0 : 0;
-    window.showConfirmModal('Delete job', deleteWords(job, runCount), async () => {
+    window.showConfirmModal('Delete job', deleteJobWords(job, runCount), async () => {
         try {
             const gone = (scheduledJobs.find(j => j.id === jobId) || {}).name || 'the job';
             await fetch(`/api/scheduled/jobs/${jobId}`, { method: 'DELETE' });
@@ -321,7 +315,7 @@ function deleteScheduledJob(jobId) {
         } catch (e) {
             showToast('Failed to delete job', true);
         }
-    }, undefined, { label: 'Delete job' }); // the button says what it does, not Yes
+    }, undefined, { label: 'Delete job', danger: true }); // the button says what it does, not Yes
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────
