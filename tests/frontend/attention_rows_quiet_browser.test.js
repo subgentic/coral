@@ -1,6 +1,6 @@
 // The agent list's attention states are quiet (#5123; operator: the "Needs input · Permission" row was "a bit too loud", an amber wash across the row and an amber pill with an
 // amber ring). No amber (or red) wash across a row that needs the Operator; the state pill has the neutral pill's surface and hairline with only its text warm, and no expanding
-// ring (the row's dot flashes by itself, with no ring either, #5140; it stops with reduced motion); on a phone the card has no amber border and the banner and chip are quiet the same way; the text of
+// ring (the row's dot flashes by itself, with no ring either, #5140; it stops with reduced motion); on a phone the card has no amber border and its one chip is quiet the same way (the phone card's banner and second chip went with #9686); the text of
 // every pill is at least 4.5:1 in both themes; the words, not the colour, say which state it is. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -53,7 +53,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                 if (!v.mobile) assert.equal(s.rows[id].bg, transparent, `${v.name}: the ${id} row has no wash (${s.rows[id].bg})`);
                 else assert.equal(s.rows[id].border, s.rows['r6'].border, `${v.name}: the ${id} card has the border of a quiet card, no amber one (${s.rows[id].border} against ${s.rows['r6'].border})`);
             }
-            if (!v.mobile) {
+            { // the row's one chip is the same on a phone and a desktop (#9686: no phone banner, no second status chip): neutral surface, hairline, no ring, the words say the state
                 for (const id of ['r2', 'r3', 'r4', 'r5']) {
                     const p = s.pills[id];
                     assert.ok(p && p.shown, `${v.name}: ${id} has its state pill`);
@@ -63,12 +63,6 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                     assert.equal(p.ring, 'none', `${v.name}: no expanding ring around the pill (${p.ring})`);
                 }
                 assert.deepEqual(['r2', 'r3', 'r4', 'r5'].map(id => s.pills[id].text), ['Needs input · Permission', 'Needs input · Question', 'Check terminal', 'Stuck'], 'the words say which state it is');
-            } else {
-                assert.equal(s.chips.r2.bg, s.tertiary, `${v.name}: the Needs input chip is on the neutral surface (${s.chips.r2.bg})`);
-                assert.equal(s.chips.r5, null, `${v.name}: a Stuck card has no state chip, its banner says it (#9464)`);
-                assert.equal(s.banners.r2, null, `${v.name}: a Needs input card is one chip, no banner saying it again (#9464)`);
-                assert.equal(s.banners.r5.bg, s.tertiary, `${v.name}: the Stuck card's banner is on the neutral surface (${s.banners.r5.bg})`);
-                assert.equal(s.banners.r5.border, s.borderVar, `${v.name}: with the neutral hairline (${s.banners.r5.border})`);
             }
             // The row's dot flashes by itself, with no ring around it (#5140): it animates with no preference, and stops with reduced motion.
             assert.equal(s.dots.r2.name, 'pulse-waiting', `${v.name}: the waiting dot flashes (${s.dots.r2.name})`);
@@ -79,7 +73,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             const still = await ev(`(() => { const e = document.querySelector('${root} [data-session-id="r2"] .session-dot'); return e.getAnimations().every(a => a.effect.getTiming().iterations !== Infinity); })()`);
             assert.equal(still, true, `${v.name}: the dot stops with reduced motion`);
             // Every pill's text is readable: 4.5:1 in this theme.
-            const sel = v.mobile ? ['.session-status-chip', '.session-mobile-banner'] : ['.session-state-pill'];
+            const sel = ['.session-state-pill'];
             const audit = await auditRegion(ev, sel.map(x => root + ' ' + x));
             assert.deepEqual(audit.fails, [], `${v.name}: contrast of the state pills: ` + JSON.stringify(audit.fails));
             assert.ok(audit.checked >= 3, `${v.name}: the audit looked at the pills (${audit.checked})`);
