@@ -64,19 +64,19 @@ function _showCLINotFoundModal(agentType, server = LOCAL_SERVER, { retry = null 
     modal.className = 'modal';
     modal.style.display = 'flex';
     modal.innerHTML = `
-        <div class="modal-content" style="width:480px">
+        <div class="modal-content cli-dialog">
             <h3>${label} is not installed</h3>
-            <p style="color:var(--text-secondary);font-size:var(--fs-md);line-height:1.5;margin:8px 0 12px">
+            <p class="cli-dialog-text">
                 Coral starts ${label} for you, but it is not installed ${where}. Run this in a terminal, then press Check again.
             </p>
-            <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:var(--fs-md);display:flex;align-items:center;gap:8px">
-                <code style="flex:1;user-select:all">${escapeHtml(info.cmd)}</code>
+            <div class="cli-dialog-command">
+                <code>${escapeHtml(info.cmd)}</code>
                 <button class="btn btn-small" data-on-click="info-copy" data-cmd="${escapeAttr(info.cmd)}">Copy</button>
             </div>
-            ${/^https:\/\/[^\s"'<>]+$/.test(info.url || '') ? `<p style="font-size:var(--fs-md);margin:10px 0 0">Or use the official install page:<br><a href="${escapeAttr(info.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--link-text);overflow-wrap:anywhere">${escapeHtml(info.url.replace(/^https:\/\//, ''))}</a></p>` : ''}
-            ${info.note ? `<p style="color:var(--text-secondary);font-size:var(--fs-base);line-height:1.5;margin:8px 0 0">${escapeHtml(info.note)}</p>` : ''}
+            ${/^https:\/\/[^\s"'<>]+$/.test(info.url || '') ? `<p class="cli-dialog-alt">Or use the official install page:<br><a href="${escapeAttr(info.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(info.url.replace(/^https:\/\//, ''))}</a></p>` : ''}
+            ${info.note ? `<p class="cli-dialog-note">${escapeHtml(info.note)}</p>` : ''}
             <p class="cli-recheck-status" role="status" aria-live="polite"></p>
-            <div class="modal-actions" style="margin-top:16px">
+            <div class="modal-actions cli-dialog-actions">
                 ${remote ? '' : '<button class="btn" data-action="settings">It is installed somewhere else</button>'}
                 <button class="btn" data-action="close">Got it</button>
                 <button class="btn btn-primary" data-action="recheck">Check again</button>
@@ -127,12 +127,12 @@ function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER, picked
         modal.className = 'modal';
         modal.style.display = 'flex';
         modal.innerHTML = `
-            <div class="modal-content" style="width:460px">
+            <div class="modal-content cli-dialog cli-dialog-narrow">
                 <h3>Permission Prompt Warning</h3>
-                <p style="color:var(--text-secondary);font-size:var(--fs-md);line-height:1.5;margin:8px 0 16px">
+                <p class="cli-dialog-text cli-dialog-text-roomy">
                     Agents may get stuck on permission prompts without <code>${escapeHtml(permFlag)}</code>. Would you like to enable it?
                 </p>
-                <div class="modal-actions" style="gap:8px">
+                <div class="modal-actions cli-dialog-actions-tight">
                     <button class="btn" data-action="cancel">Cancel</button>
                     <button class="btn" data-action="skip">Launch Without</button>
                     <button class="btn btn-primary" data-action="enable">Enable &amp; Launch</button>

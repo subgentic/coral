@@ -90,7 +90,7 @@ function renderModal() {
             <div class="theme-save-bar">
                 <input type="text" id="theme-save-name" class="settings-input" placeholder="Theme name">
                 <input type="text" id="theme-save-desc" class="settings-input" placeholder="Description (optional)">
-                <select id="theme-save-base" class="settings-select" style="width:auto">
+                <select id="theme-save-base" class="settings-select form-control-auto">
                     <option value="dark">Based on: Dark</option>
                     <option value="light">Based on: Light</option>
                 </select>
