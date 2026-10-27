@@ -42,7 +42,7 @@ try {
     mock.timers.reset();
 
     // when it answers, both computers' files are listed and nobody is down
-    stalled = false;
+    stalled = false; (await importUi('server_base')).forgetSlowComputers(); // a Retry
     const ok = await readInboxArtifacts(new URLSearchParams({ limit: '50' }), {});
     assert.deepEqual(ok.artifacts.map(a => a.name).sort(), ['a.md', 'b.md'], 'both computers\' files');
     assert.deepEqual(ok.down, [{ server: 'box-3', label: 'Box Three' }], 'only the offline one is down');
@@ -62,6 +62,15 @@ try {
     assert.deepEqual(t.artifacts.map(a => a.name).sort(), ['a.md', 'c.md'], 'this computer\'s and Box Three\'s files are listed');
     assert.deepEqual(t.down.map(x => x.server), ['box-2'], 'only Box Two is named, not the healthy Box Three');
     assert.ok(maxInflight <= 2, 'still at most 2 at once after the first two timed out');
+    // the computer just ran out its time: the next read is given up on at once (no second wait behind the sidebar's reads), and a Retry forgets it
+    await assert.rejects(serverRead('box-2', '/api/late'), e => e.timedOut === true, 'given up on at once, not waited for again');
+    const { forgetSlowComputers } = await importUi('server_base');
+    forgetSlowComputers(); inflight = 0;
+    const again = serverRead('box-2', '/api/again').then(() => 'answered', e => e.timedOut ? 'timed out' : 'failed');
+    await new Promise(r => setImmediate(r));
+    assert.equal(inflight, 1, 'after Retry the computer is asked again');
+    mock.timers.tick(8000);
+    assert.equal(await again, 'timed out');
     mock.timers.tick(8000); mock.timers.tick(8000);
     assert.ok((await Promise.all(extra)).every(r => r === 'timed out'), 'every Box Two request ends as "did not answer", none hangs');
     mock.timers.reset();
