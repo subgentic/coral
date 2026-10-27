@@ -1,0 +1,124 @@
+name: release-dryrun
+
+# The pre-tag dry run (#8642, Goal #65): release.yml's `resolve` job on a candidate commit, before anything is tagged. It runs the release provenance record
+# (who, which commit, on main, and whether go-tests, go-race and cdp-gate passed on exactly that code) and every release self-test that the real resolve
+# step runs, never stopping at the first failure, and ends with ONE line: `GO` or the failing line of each check. Nothing is built, signed or published, and
+# nothing here can be used to tag: the token is read-only. Run it as the step before every tag:
+#   gh workflow run release-dryrun.yml --ref main        (the candidate is the commit the run starts on, GITHUB_SHA)
+# or push a branch named dryrun/<anything> to try the workflow itself. Keep the self-test list in step with release.yml's resolve job (tests/release/release_dryrun_test.py checks it; the dry run runs that test too).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['dryrun/**']
+
+concurrency:
+  group: release-dryrun-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read   # the provenance record reads the heavy gates' runs on the candidate commit
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: coral-go/go.mod
+          cache: false
+      # Only this step gets the token (the provenance record reads the gates' runs); the candidate's own test scripts below never see it.
+      - name: Release provenance record
+        id: prov
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -uo pipefail
+          set +e   # the step runs under bash -e: the result is recorded for the next step, not fatal here
+          rc=0
+          out=$(python3 tests/release/release_provenance.py "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$ACTOR" 2>&1) || rc=$?
+          last=$(printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-200)
+          printf '%s\n' "$out" | tail -20
+          {
+            echo "rc=$rc"
+            echo "line=$last"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Run release.yml's resolve checks on this commit
+        env:
+          PROV_RC: ${{ steps.prov.outputs.rc }}
+          PROV_LINE: ${{ steps.prov.outputs.line }}
+        run: |
+          set -uo pipefail
+          set +e   # the step runs under bash -e: a failing check is recorded below, it must not end the step
+          fails=()
+          # name | command: each runs to its end; a failure is recorded with its last line, never fatal here.
+          run_check() {
+            local name="$1"; shift
+            local out rc
+            rc=0
+            out=$("$@" 2>&1) || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              echo "PASS  $name"
+            else
+              local last
+              last=$(printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-200)
+              echo "FAIL  $name: $last"
+              printf '%s\n' "$out" | tail -20 | sed 's/^/        /'
+              fails+=("$name: $last")
+            fi
+          }
+          {
+            echo "## Release dry run"
+            echo
+            echo "Candidate commit \`$GITHUB_SHA\`."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${PROV_RC:-1}" = "0" ]; then
+            echo "PASS  release provenance (gates green on this exact code)"
+          else
+            echo "FAIL  release provenance (gates green on this exact code): ${PROV_LINE:-no result}"
+            fails+=("release provenance: ${PROV_LINE:-no result}")
+          fi
+          run_check "release_provenance_test" python3 -I tests/release/release_provenance_test.py
+          run_check "resolve_release_test" bash tests/release/resolve_release_test.sh
+          run_check "install_cli_tools_test" bash tests/release/install_cli_tools_test.sh
+          run_check "require_cosign_test" bash tests/release/require_cosign_test.sh
+          run_check "verify_release_strip_test" bash tests/release/verify_release_strip_test.sh
+          run_check "verify_release_fake_identity_test" bash tests/release/verify_release_fake_identity_test.sh
+          run_check "release_homes_test" bash tests/release/release_homes_test.sh
+          run_check "download_section_test" bash tests/release/download_section_test.sh
+          run_check "test_release_upload_loop" bash tests/release/test_release_upload_loop.sh
+          run_check "approve_release_test" bash tests/release/approve_release_test.sh
+          run_check "update_tap_test" bash tests/release/update_tap_test.sh
+          run_check "release_cadence_test" bash tests/release/release_cadence_test.sh
+          run_check "release_notes_edits_test" bash tests/release/release_notes_edits_test.sh
+          run_check "notes_commit_test" bash tests/release/notes_commit_test.sh
+          run_check "windows_build_census_test" python3 tests/release/windows_build_census_test.py
+          run_check "trimpath_census_test" python3 tests/release/trimpath_census_test.py
+          run_check "verify_buildinfo_test" python3 tests/release/verify_buildinfo_test.py
+          run_check "release_code_test" python3 tests/release/release_code_test.py
+          run_check "promote_workflow_test" python3 tests/release/promote_workflow_test.py
+          run_check "promote_copy_check_test" bash tests/release/promote_copy_check_test.sh
+          run_check "signature_required_check_test" bash tests/release/signature_required_check_test.sh
+          run_check "ldflags_build_test" bash tests/release/ldflags_build_test.sh
+          run_check "workflows_lint" python3 tests/release/workflows_lint.py
+          run_check "release_dryrun_test (this list matches release.yml)" python3 tests/release/release_dryrun_test.py
+          if [ "${#fails[@]}" -eq 0 ]; then
+            echo "GO"
+            echo '**GO**: every check passed on this commit.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "NO-GO: ${#fails[@]} check(s) failed"
+          {
+            echo "**NO-GO**: ${#fails[@]} check(s) failed on this commit:"
+            echo
+            for f in "${fails[@]}"; do echo "- ${f//|/ }"; done
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
