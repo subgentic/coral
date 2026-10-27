@@ -319,7 +319,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                 },
                 tagsDropAt: inbox ? 62 : 0, // the Inbox list is crowded (a team, a task): its Tags go first, before Team and Task
                 afterName: [...(inbox ? (model.filters.team
-                    ? serverColumns().map(c => ({ ...c, width: '7rem', dropAt: 52 })) // one team chosen: its computer, in its own column
+                    ? serverColumns().map(c => ({ ...c, width: '7rem' })) // one team chosen: its computer is the one place the row names it, so this column stays, a phone's included
                     : [{ key: 'team', label: 'Team', width: '8rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }]) : []),
                     ...(model.scope || by === 'task' ? [] : [{ key: 'task', label: 'Task', width: '9rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: taskCell }])], // the Task link is how a file reaches its task (#8617); the head says it where the list is grouped by task; an agent's own list has none // the team's words carry its computer ("alpha · Box Two"), so two same-named teams are told apart (#8774)
                 nameTitle: item => [readableName(item), inbox ? teamLabel(item.board_id, item.team) : '', taskText(item), originBadge(item)].filter(Boolean).join(' · '),
