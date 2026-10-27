@@ -395,3 +395,56 @@ func TestEfficiencyASentBackTasksCommitsCoverAllItsRounds(t *testing.T) {
 	_, body := e.get(t, "metric=tokens_per_commit&group_by=task&range=24h")
 	assert.EqualValues(t, 1, groupsOf(t, body)[fmt.Sprint(id)]["n"], "the first round's commit")
 }
+
+// #9151: the read takes the commits of both windows in one pass over the snapshots. Seeded with 30,000 commit snapshots over 30 days (and 10,000 usage rows), the request time is logged; the answer is
+// the same as ever (the tests above), so this one asserts the figures that depend on both windows are there.
+func TestEfficiencyOnASeededBoardAnswersBothWindowsAndLogsItsTime(t *testing.T) {
+	if testing.Short() {
+		t.Skip("seeds 30,000 snapshots")
+	}
+	e := newEffEnv(t)
+	ctx := context.Background()
+	db, err := storetest.Open(t, e.storePath)
+	require.NoError(t, err)
+	now := e.now
+	tx, err := db.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	for i := 0; i < 30000; i++ {
+		sid := fmt.Sprintf("%08d-3864-4864-8864-0000000000%02d", i%30, i%30)
+		at := now.Add(-time.Duration((i*7919)%(30*24*60)) * time.Minute).Format(time.RFC3339)
+		_, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO git_snapshots (agent_name, agent_type, working_directory, branch, commit_hash, commit_subject, commit_timestamp, session_id, recorded_at)
+			VALUES (?, 'claude', '/w', ?, ?, ?, ?, ?, ?)`, "Agent "+fmt.Sprint(i%30), "branch-"+fmt.Sprint(i%7), fmt.Sprintf("%040d", i), "Commit "+fmt.Sprint(i), at, sid, now.Format(store.ISOFormat))
+		require.NoError(t, err)
+	}
+	require.NoError(t, tx.Commit())
+	ts := store.NewTokenUsageStore(db)
+	batch := make([]*store.TokenUsage, 0, 500)
+	for i := 0; i < 10000; i++ {
+		sid := fmt.Sprintf("%08d-3864-4864-8864-0000000000%02d", i%30, i%30)
+		at := now.Add(-time.Duration((i*104729)%(30*24*60)+30) * time.Minute)
+		batch = append(batch, &store.TokenUsage{SessionID: sid, AgentName: "Agent " + fmt.Sprint(i%30), AgentType: "claude", BoardName: ptrString("alpha"), InputTokens: 1000, OutputTokens: 250, TotalTokens: 1250, CostUSD: 0.01, Model: "opus", Source: "jsonl", RecordedAt: at.Format(store.ISOFormat)})
+		if len(batch) == cap(batch) {
+			for _, err := range ts.RecordUsageBatch(ctx, batch) {
+				require.NoError(t, err)
+			}
+			batch = batch[:0]
+		}
+	}
+	for _, err := range ts.RecordUsageBatch(ctx, batch) {
+		require.NoError(t, err)
+	}
+	best := time.Duration(1<<63 - 1)
+	var body map[string]any
+	for i := 0; i < 5; i++ {
+		t0 := time.Now()
+		_, body = e.get(t, "metric=tokens_per_commit&group_by=agent&range=7d")
+		if d := time.Since(t0); d < best {
+			best = d
+		}
+	}
+	t.Logf("30,000 commit snapshots and 10,000 usage rows over 30 days: the efficiency read (tokens per commit by agent, 7d) takes %v at best of 5", best)
+	avg := body["average"].(map[string]any)
+	assert.NotNil(t, avg["value"], "the current window has its figure")
+	assert.NotNil(t, avg["usual"], "and so has the usual one, from the same read")
+	assert.Greater(t, body["total"].(map[string]any)["n"], float64(1000))
+}
