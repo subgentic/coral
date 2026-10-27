@@ -62,7 +62,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`document.querySelector('#group-table-view .dt-table tbody tr .dt-primary').click(); true`);
         await waitFor(`!![...document.querySelectorAll('#inbox-page .goals-facts dt')].find(x=>x.textContent==='Goal')?.nextElementSibling.querySelector('button')`, 'the task page with its Goal button', 15000);
         await ev(`[...document.querySelectorAll('#inbox-page .goals-facts dt')].find(x=>x.textContent==='Goal')?.nextElementSibling.querySelector('button').click(); true`);
-        await landed('Inbox task page');
+        // since #8861 the goal opens inside the Inbox, at its own address (the quiet team link is the way out)
+        await waitFor(`location.pathname === ${JSON.stringify(`/inbox/goals/${B}/${G}`)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'Inbox task page: the goal opens in the Inbox', 15000);
+        assert.equal(await ev(`location.pathname.startsWith('/board/')`), false, 'Inbox task page: not the board page');
         console.log('   ✓');
 
         console.log('4. A task\'s Goal line (task-goal-open)');
