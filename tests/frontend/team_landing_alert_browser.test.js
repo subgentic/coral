@@ -61,7 +61,8 @@ const BASE = require('./test_base').BASE;
             await ev(`{ const s = ${h('landing_nudge')}; s.append(Object.assign(document.createElement('option'), { value: 'Ghost', textContent: 'Ghost' })); } true`);
             await fire('landing_nudge', 'Ghost'); await save();
             await waitFor(`/not a member/.test((document.querySelector('${P} .sv-row[data-key=landing_nudge] .sv-error') || {}).textContent || '')`, 'the refusal at the field', 8000);
-            assert.match(await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`), /not a member|Could not save/, at + 'and in the bar');
+            const bar = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`);
+            assert.match(bar, /Also tell: "Ghost" is not a member of this team/, at + 'the bar names the field by its label'); assert.doesNotMatch(bar, /landing\.|health\.|_/, at + 'and no API path reaches the screen: ' + bar);
             await shot(`landing-alert-refused-${w}`);
 
             console.log(`${at}goals ready to close and open tasks with no goal or assignee (#9006)`);
@@ -79,6 +80,14 @@ const BASE = require('./test_base').BASE;
             await fire('unowned_tasks_on', true); await fire('unowned_tasks_nudge', 'Ghost'); await save();
             await waitFor(`/not a member/.test((document.querySelector('${P} .sv-row[data-key=unowned_tasks_nudge] .sv-error') || {}).textContent || '')`, 'the unowned-tasks refusal at its field', 8000);
             await shot(`health-wait-checks-${w}`);
+            const bar2 = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`);
+            assert.match(bar2, /Also tell: "Ghost" is not a member of this team/, at + 'the unowned-tasks refusal is named by its label in the bar'); assert.doesNotMatch(bar2, /unowned_tasks|health\./, at + 'with no API path: ' + bar2);
+            // any other health field: a refusal that names the recipient says "Send it to", not health.recipient
+            await ev(`{ window.__fetchBefore = window.fetch; const w = window.fetch; window.fetch = (u, o = {}) => (o.method === 'PUT' && /board\\/[^/]+\\/settings$/.test(String(u))) ? Promise.resolve(new Response(JSON.stringify({ error: 'health.recipient: "Gone" is not a member of this team' }), { status: 400, headers: { 'content-type': 'application/json' } })) : w(u, o); } true`);
+            await fire('unowned_tasks_nudge', ''); await fire('interval_min', '17'); await save();
+            await waitFor(`/Send it to: "Gone" is not a member/.test(document.querySelector('#team-settings-workspace .sv-status').textContent)`, 'the recipient refusal by its label', 8000);
+            assert.doesNotMatch(await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`), /health\./, at + 'no health. path');
+            await ev(`window.fetch = window.__fetchBefore; true`); // the next width starts with the real PUT
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, at + 'no sideways scroll');
             console.log('   ✓');
         }
