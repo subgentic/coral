@@ -22,7 +22,7 @@ const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's re
 const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 
 const PAGE = 50;
-const REREAD_PAGES = 5; // a refresh reads at most this many loaded pages again: a person who scrolled a big board to its end does not make 30 requests every 10 s (#9121)
+const REREAD_PAGES = 5; // a refresh reads at most this many loaded pages again: a person who scrolled a big board to its end does not make 30 requests every 10 s (#9121); the pages beyond are dropped, Load more fetches them again
 const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['needs_review', 'Needs review'], ['done', 'Done']];
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css)
 let phoneWatched = false, newTask = null; // one New task button, moved between the search row and the chips' row
@@ -74,11 +74,7 @@ export async function loadTasks() {
             rows = rows.concat((next.tasks || []).filter(t => !have.has(t.id)));
             cursor = typeof next.next_cursor === 'string' ? next.next_cursor : '';
         }
-        if (depth > reread) { // the pages beyond the cap keep what the person had on screen, and "Load more" continues after them
-            const have = new Set(rows.map(t => t.id));
-            rows = rows.concat(model.rows.filter(t => !have.has(t.id)));
-            cursor = model.cursor;
-        }
+        if (depth > reread) model.extraPages = reread; // the pages beyond the cap are dropped (rows and cursor end at the last page read again): "Load more" fetches them again, and no stale row comes back (#9153)
         model.rows = rows;
         model.cursor = cursor;
         model.totalOpen = Number.isFinite(json.total_open) ? json.total_open : null;
