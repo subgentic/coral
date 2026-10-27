@@ -3,9 +3,9 @@
 import { lazyFns, loadTeamPage, loadTeamSettings, loadWorkflows, loadCostDashboard, loadDocs, loadThemeConfig, loadModals, loadResumeDialog, loadDefaultPromptsDialog } from './lazy_panels.js';
 
 export const {
-    showWorkflowsTab, selectWorkflow, selectWorkflowRun, killWorkflowRun, deleteWorkflow,
+    selectWorkflow, selectWorkflowRun, killWorkflowRun, deleteWorkflow,
     showWorkflowCreateModal, hideWorkflowCreateModal, editWorkflowWithAgent, workflowsBackToList, launchWorkflowAgent,
-} = lazyFns(loadWorkflows, ['showWorkflowsTab', 'selectWorkflow', 'selectWorkflowRun', 'killWorkflowRun', 'deleteWorkflow',
+} = lazyFns(loadWorkflows, ['selectWorkflow', 'selectWorkflowRun', 'killWorkflowRun', 'deleteWorkflow',
     'showWorkflowCreateModal', 'hideWorkflowCreateModal', 'editWorkflowWithAgent', 'workflowsBackToList', 'launchWorkflowAgent']);
 
 export const { showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged } =

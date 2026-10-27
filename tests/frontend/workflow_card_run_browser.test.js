@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'settings')`);
             if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
-            await ev(`window.switchNavTab('workflows'); true`);
+            await ev(`window.openAutomationsFolder('workflows'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view .dt-action').length === 2`, `${tag}: a Run button on each row of the table`, 8000);
             const r = await ev(`[...document.querySelectorAll('#group-table-view .dt-action')].map(b => { const bb = b.getBoundingClientRect(), row = b.closest('tr'), rb = row.getBoundingClientRect(); return { name: b.getAttribute('aria-label'), text: b.textContent.trim(), inside: !!b.closest('button:not(.dt-action)'), h: Math.round(bb.height), within: bb.top >= rb.top - 1 && bb.bottom <= rb.bottom + 1 && bb.right <= innerWidth }; })`);
             assert.deepEqual(r.map(x => x.name), ['Run nightly-build', 'Run release-notes'], `${tag}: each button is named for its workflow`);

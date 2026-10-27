@@ -1,17 +1,16 @@
-/* Workflows: list, detail, run views, and CRUD */
+/* Workflows: the workflows' list data, a workflow's page, a run's page, and CRUD. The folder (its table, toolbar and way back) is Automations' (automations.js, Goal #74); this module is the pages. */
 
 import { escapeHtml as esc, escapeAttr as escAttr, showView, showToast } from './utils.js';
 import { registerActions, withId, textOf } from './actions.js';
 import { apiFetch } from './api.js';
 import { selectLiveSession } from './sessions.js';
 import { pollEvery } from './overload.js';
-import { note, currentRoute } from './nav.js';
+import { note } from './nav.js';
 import { KILL_LOG_NOTE } from './render.js';
 import { formatDuration } from './format.js';
 import { runFailureHtml, runFailure } from './run_failure.js';
-import { whenWords, resultWords, limitWords, runDot } from './job_words.js'; // the Jobs pages' words: one set for both
-import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, backLinkHtml, foldWayBack } from './sidebar_groups.js';
-import { onViewShown } from './view_switch.js';
+import { resultWords, limitWords } from './job_words.js'; // the Jobs pages' words: one set for both
+import { foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 import { whenText } from './when_text.js';
@@ -21,99 +20,45 @@ const WE = await importOnce('./workflow_editor.js'); // the create and edit form
 const WR = await importOnce('./workflow_run_html.js'); // the run page's markup (#8360): pure builders that load with this panel
 const { formatTime, runDurationHtml, runProgressHtml, runStepHtml, runMetaHtml } = WR;
 const WA = await importOnce('./workflow_agent.js'); // Build with Agent and Edit with Agent (#8360): a part of this panel that loads with it
-const workflowTableStates = new Map();
-
 let workflows = [];
 let selectedWorkflowId = null;
 let currentRunPollTimer = null;
 let shownRun = null; // the run renderRunDetail last drew, for the Kill confirmation's wording
-let wfQuery = '';    // the sidebar search's text, lower case
+const listeners = new Set();
+/** The workflows as the last read left them (Automations' folder draws its rows from it), a way to be told when a read changed them, and the one open on screen. */
+export const workflowList = () => workflows;
+export const onWorkflowsChanged = fn => { listeners.add(fn); return () => listeners.delete(fn); };
+export const openWorkflowId = () => selectedWorkflowId;
 
-// ── Groups (#7471): Active and Paused (a workflow that is switched off: it is finished, not a draft) ─────────
-const WF_GROUPS = [{ key: 'active', label: 'Active', has: w => w.enabled }, { key: 'wf-paused', label: 'Paused', has: w => !w.enabled }];
-const stepsOf = w => w.step_count || (w.steps ? w.steps.length : 0);
-const wfMatches = w => !wfQuery || String(w.name || '').toLowerCase().includes(wfQuery) || String(w.description || '').toLowerCase().includes(wfQuery);
-const wfGroups = () => WF_GROUPS.map(g => ({ ...g, items: workflows.filter(wfMatches).filter(g.has) })).filter(g => g.items.length);
-const groupOfWorkflow = w => WF_GROUPS.find(g => g.has(w)) || WF_GROUPS[0];
-export function filterWorkflows(value) { wfQuery = String(value || '').trim().toLowerCase(); renderWorkflowList(); }
-
-/** What a workflow's last run was, in words, for the table and the sidebar row: "Passed", "Failed: step 2 (Test)", or "" when it never ran. */
-function lastResult(lr) {
+/** What a workflow's last run was, in words, for the folder's table: "Passed", "Failed: step 2 (Test)", or "" when it never ran. */
+export function lastResult(lr) {
     if (!lr) return '';
     if (lr.status === 'failed' || lr.status === 'killed') { const fs = lr.failed_step; return lr.status === 'killed' ? 'Stopped' : fs ? `Failed: step ${Number(fs.number)} (${fs.name})` : 'Failed'; }
     return resultWords(lr);
 }
 
-registerGroupSource('workflows', {
-    landing: true, // the page it opens on lists every group the sidebar has (#7722)
-    keys: () => wfGroups().map(g => g.key),
-    redraw: () => renderWorkflowList(),
-    table: key => {
-        const g = wfGroups().find(x => x.key === key);
-        if (!g) return null;
-        if (!workflowTableStates.has(key)) workflowTableStates.set(key, DT.tableState());
-        return { title: g.label, rows: g.items, signature: JSON.stringify(g.items),
-            node: () => DT.dataTable({
-                label: `${g.label} workflows, ${g.items.length}`, rows: g.items, layout: 'fixed',
-                rowKey: w => w.id, rowName: w => w.name, state: workflowTableStates.get(key),
-                open: w => selectWorkflow(Number(w.id)),
-                columns: [
-                    { key: 'workflow', label: 'Workflow', field: 'name', primary: true, width: 'grow', line: 1, sort: true, cell: w => DT.primaryButton(w.name) },
-                    { key: 'steps', label: 'Steps', numeric: true, width: '4rem', line: 2, tone: 'tertiary', sort: 'number', sortValue: stepsOf, cell: w => String(stepsOf(w)) },
-                    { key: 'last-run', label: 'Last run', width: '8rem', line: 1, tone: 'tertiary', sort: 'date', sortValue: w => w.last_run?.started_at, cell: w => w.last_run?.started_at ? whenWords(w.last_run.started_at) : 'Never' },
-                    { key: 'result', label: 'Result', width: '12rem', line: 2, sort: true, sortValue: w => lastResult(w.last_run), cell: w => lastResult(w.last_run) || 'No runs' },
-                    { key: 'run', label: 'Run', width: '4rem', line: 2, cell: w => {
-                        const b = DT.el('button', 'btn btn-small dt-action', 'Run'); b.type = 'button';
-                        b.setAttribute('aria-label', `Run ${w.name}`);
-                        b.addEventListener('click', () => triggerWorkflow(Number(w.id), b));
-                        return b;
-                    } },
-                ],
-            }).el,
-            extra: { action: 'wf-build-agent', label: 'Build with Agent', icon: 'smart_toy', title: 'Starts an agent that builds the workflow with you' } };
-    },
-    toolbar: () => ({ search: { id: 'workflows-search', label: 'Search workflows' }, action: { name: 'wf-create', label: 'New workflow' }, menu: { noun: 'workflow', items: [{ name: 'wf-build-agent', label: 'Build with Agent' }] } }), // the create action on the page's toolbar line, Build with Agent its second way (#7723)
-    isEmpty: () => false, // the tab opens its first table itself (fetchWorkflows)
-    showList: () => workflowsBackToList(),
-    empty: () => workflowsBackToList(),
-});
-
-// A group's table on screen is the page: no workflow or run is open (the sidebar's open row clears).
-onViewShown(id => { if (id === 'group-table-view' && document.body.getAttribute('data-nav-tab') === 'workflows' && (selectedWorkflowId || openRunId)) { selectedWorkflowId = null; openRunId = null; stopRunPolling(); renderWorkflowList(); } });
 let openRunId = null;
 
-/** On a phone the list is the page and an open workflow or run is the screen after it (data-phone-item, workflows.css). */
+/** On a phone a workflow or a run is a screen of its own (data-phone-item, workflows.css); the folder's table is the page before it. */
 function syncPhonePage() {
     const view = document.getElementById('workflows-view');
     if (!view) return;
     if (isPhoneLayout() && (selectedWorkflowId || openRunId)) view.setAttribute('data-phone-item', ''); else view.removeAttribute('data-phone-item');
-    // With no workflow on a phone the empty page (its hint and Build with Agent) is shown under the list, or Build with Agent could not be reached
-    if (isPhoneLayout() && !workflows.length && !selectedWorkflowId && !openRunId) view.setAttribute('data-phone-empty', ''); else view.removeAttribute('data-phone-empty');
-}
-export function workflowsPhoneBack() {
-    selectedWorkflowId = null; openRunId = null; stopRunPolling();
-    syncPhonePage();
-    renderWorkflowList();
-    document.querySelector('#wf-nav-list .row-btn')?.focus({ preventScroll: true });
 }
 
 // ── API helpers ────────────────────────────────────────────────────────
 
-async function fetchWorkflows({ openFirst = false } = {}) {
+async function fetchWorkflows() {
     try {
         const data = await apiFetch('/api/workflows');
         workflows = data.workflows || [];
-        renderWorkflowList();
-        // The tab opens on its first group's table (a phone shows the list); with no workflow the page says so
-        if (openFirst && !selectedWorkflowId && !openRunId) {
-            showListPage();
-            if (workflows.length && !isPhoneLayout()) openFirstGroupTable('workflows');
-        }
-        syncPhonePage();
+        for (const f of listeners) f();
     } catch (e) {
         console.error('Failed to fetch workflows:', e);
     }
 }
+/** Read the workflows again now (the folder asks when it is shown, and a page asks after what it changed). */
+export const refreshWorkflows = fetchWorkflows;
 
 async function fetchWorkflowDetail(id) {
     try {
@@ -167,52 +112,22 @@ async function fetchRunDetail(runId) {
 
 // ── Initialization ─────────────────────────────────────────────────────
 
-export function showWorkflowsTab() {
-    showView('workflows-view');
-    if (selectedWorkflowId || openRunId) { syncPhonePage(); fetchWorkflows(); return; } // a workflow or a run is open: the tab returns to it
-    showListPage();
-    fetchWorkflows({ openFirst: true });
-}
-
-/** The page of no open workflow or run: only the empty line is in it (the table is its own view). */
-function showListPage() {
-    document.getElementById('wf-list-container').style.display = workflows.length ? 'none' : '';
-    document.getElementById('wf-detail-container').style.display = 'none';
-    document.getElementById('wf-run-detail-container').style.display = 'none';
-}
-
 export const { launchWorkflowAgent, editWorkflowWithAgent } = WA;
 export const { showWorkflowCreateModal, hideWorkflowCreateModal, editWorkflow, saveWorkflow } = WE;
 WE.initWorkflowEditor({ fetchDetail: id => fetchWorkflowDetail(id), saved: editedId => { fetchWorkflows(); if (editedId) selectWorkflow(editedId); } }); // the names the lazy panel hands the page (app.js)
 
-// ── Workflow list ──────────────────────────────────────────────────────
-
-function renderWorkflowList() {
-    const list = document.getElementById('wf-nav-list');
-    if (!list) return;
-    // The workflows by group in the sidebar: a row is its name and one muted line (its steps and how its last run went).
-    const groups = wfGroups();
-    const row = w => {
-        const last = w.last_run ? [lastResult(w.last_run), w.last_run.started_at ? whenWords(w.last_run.started_at) : ''].filter(Boolean).join(' ') : 'never run';
-        const n = stepsOf(w);
-        const rd = runDot(w.last_run); // the dot a job's row has: one state, one look
-        const open = Number(selectedWorkflowId) === Number(w.id);
-        return `<li class="session-list-item wf-nav-row${escAttr(open ? ' active' : '')}"><button type="button" class="row-btn"${open ? ' aria-current="true"' : ''} data-on-click="wf-select" data-workflow-id="${Number(w.id)}"><span class="sched-row-head"><span class="sched-row-title"><span class="sched-dot sched-dot-${escAttr(rd.dot)}" role="img" aria-label="${escAttr(rd.words)}" title="${escAttr(rd.words)}"></span><span class="sched-row-name wf-nav-name">${esc(w.name)}</span></span></span><span class="sched-row-meta wf-nav-meta">${esc(`${n} step${n !== 1 ? 's' : ''} \u00b7 ${last}`)}</span></button></li>`;
-    };
-    list.innerHTML = groups.map(g => groupHeaderHtml('workflows', g.key, g.label, g.items.length) + (isGroupFolded('workflows', g.key) ? '' : g.items.map(row).join(''))).join('')
-        || (workflows.length ? '<li class="empty-state">No workflow matches the search.</li>' : '<li class="empty-state">No workflows yet.</li>');
-    // No workflow at all: the page says so (once there are some, the first group's table is the page)
-    const empty = document.getElementById('wf-list-container');
-    if (empty && !selectedWorkflowId && !openRunId) empty.style.display = workflows.length ? 'none' : '';
-    syncPaneGroupToggle('workflows');
-    refreshGroupTable('workflows');
-}
-
 // ── Workflow detail ────────────────────────────────────────────────────
 
-/** A workflow's or run's page (#3532), unless the user has left Workflows while it loaded. */
-function noteWorkflows(route) {
-    if (currentRoute()?.view === 'workflows') note(route);
+/** A workflow's or run's address (#3532, Automations' folder), unless the person has left Automations while it loaded. */
+function noteWorkflows(id, run = 0) {
+    if (document.body.getAttribute('data-nav-tab') === 'automations') note({ view: 'automations', folder: 'workflows', id: Number(id), ...(run ? { run: Number(run) } : {}) });
+}
+
+/** The folder's table is on screen: no workflow or run is open, and a run that was being followed is not any more. */
+export function leaveWorkflowPage() {
+    stopRunPolling();
+    selectedWorkflowId = null; openRunId = null;
+    syncPhonePage();
 }
 
 export async function selectWorkflow(id) {
@@ -221,15 +136,13 @@ export async function selectWorkflow(id) {
 
     const wf = await fetchWorkflowDetail(id);
     if (!wf) return false;
-    noteWorkflows({ view: 'workflows', id: Number(id) });
+    noteWorkflows(id);
 
     // The workflow is the page now (a group's table may be on screen)
     showView('workflows-view');
-    document.getElementById('wf-list-container').style.display = 'none';
     document.getElementById('wf-run-detail-container').style.display = 'none';
     document.getElementById('wf-detail-container').style.display = '';
     syncPhonePage();
-    renderWorkflowList(); // the open row says so
 
     const first = await fetchWorkflowRuns(id) || { runs: [], total: 0 };
     runsPage = { workflowId: id, rows: first.runs, total: first.total, busy: false };
@@ -278,12 +191,11 @@ function renderWorkflowDetail(wf, runs) {
             The last run ${last.status === 'killed' ? 'was stopped' : 'failed'}${last.started_at ? ' ' + esc(whenText(last.started_at)) : ''}${last.failed_step ? `: step ${Number(last.failed_step.number)} (${esc(last.failed_step.name)})${last.failure_reason ? ': ' + esc(last.failure_reason) : ''}` : ''}.
             <button class="btn-link" data-on-click="wf-run" data-run-id="${Number(last.id)}">Open the failed run</button></p>` : '';
 
-    const group = groupOfWorkflow(wf);
     // One facts line under the name (folder, time limit, when it was made, and that it is off)
     const facts = [`Folder ${wf.repo_path || 'not set'}`, `Time limit ${limitWords(wf.max_duration_s || 3600)}`, wf.created_at ? `Created ${formatTime(wf.created_at)}` : '', wf.enabled ? '' : 'Disabled'].filter(Boolean).join(' \u00b7 ');
     container.innerHTML = `
-        ${backLinkHtml('workflows', group.key, group.label, 'wf-back-btn')}
-        <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Workflows</button>
+        <button type="button" class="group-back" id="wf-back-btn" data-on-click="automations-back" data-folder="workflows">\u2190 Workflows</button>
+        <button type="button" class="group-back wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
         <h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2>
         <p class="item-meta wf-facts-line">${esc(facts)}</p>
         ${wf.description ? `<p class="wf-desc">${esc(wf.description)}</p>` : ''}
@@ -325,16 +237,14 @@ export async function selectWorkflowRun(runId, { workflowId } = {}) {
     const run = await fetchRunDetail(runId);
     if (!run) return false;
     const wfId = Number(run.workflow_id || workflowId || selectedWorkflowId);
-    if (wfId) noteWorkflows({ view: 'workflows', id: wfId, run: Number(runId) });
+    if (wfId) noteWorkflows(wfId, runId);
 
     // The run is the page now (a group's table may be on screen)
     openRunId = Number(runId); selectedWorkflowId = wfId || selectedWorkflowId;
     showView('workflows-view');
-    document.getElementById('wf-list-container').style.display = 'none';
     document.getElementById('wf-detail-container').style.display = 'none';
     document.getElementById('wf-run-detail-container').style.display = '';
     syncPhonePage();
-    renderWorkflowList();
 
     renderRunDetail(run);
 
@@ -400,7 +310,7 @@ function renderRunDetail(run) {
         : '';
     container.innerHTML = `
         ${backHtml}
-        <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Workflows</button>
+        <button type="button" class="group-back wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
         <h2 class="wf-item-title wf-run-title">Run #${run.id}</h2>
         ${startedNote && startedNote.runId === Number(run.id) ? `<p class="item-meta wf-started-line">${esc(startedNote.text)}</p>` : ''}
         ${runMetaHtml(run, signInFailure, errorExcerpt)}
@@ -490,14 +400,9 @@ export function deleteWorkflow(id, name) {
 
 // ── Navigation ─────────────────────────────────────────────────────────
 
-export function workflowsBackToList() {
-    noteWorkflows({ view: 'workflows' });
-    stopRunPolling();
-    selectedWorkflowId = null; openRunId = null;
-    showView('workflows-view');
-    showListPage();
-    syncPhonePage();
-    fetchWorkflows({ openFirst: true });
+export async function workflowsBackToList() {
+    leaveWorkflowPage();
+    (await importOnce('./automations.js')).backToFolder('workflows');
 }
 
 // The Workflows view's generated markup (#3645): data-on-* names, never code. The view's own

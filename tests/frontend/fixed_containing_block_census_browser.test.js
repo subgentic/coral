@@ -54,7 +54,7 @@ const SCAN = `(() => { const sel = e => (e.id ? '#' + e.id : e.tagName.toLowerCa
                 ['Settings', `window.showSettingsModal('general'); true`],
                 ['New Agent', `window.hideSettingsModal && window.hideSettingsModal(); window.showLaunchModal && window.showLaunchModal(); true`],
                 ['Jobs', `window.hideLaunchModal && window.hideLaunchModal(); window.switchNavTab('automations'); true`],
-                ['Workflows', `window.switchNavTab('workflows'); true`],
+                ['Workflows', `window.openAutomationsFolder('workflows'); true`],
                 ['Docs', `window.switchNavTab('docs'); true`],
                 ['the kebab and settings menus', `window.switchNavTab('agents'); document.querySelectorAll('.sidebar-kebab-btn').forEach(b => b.click()); const m = document.querySelector('[aria-controls="top-bar-settings-menu"]'); if (m) m.click(); true`],
                 ['toasts and the kept-worktree notice', `Promise.all([import(${S} + 'utils.js').then(u => { u.showToast('Saved.'); u.showToast('Could not save.', true); }), import(${S} + 'worktree_notice.js').then(m => m.showWorktreeNotice({ state: 'kept', path: '/tmp/x', branch: 'b', reason: 'r' }, 'team'))]).then(() => true)`],

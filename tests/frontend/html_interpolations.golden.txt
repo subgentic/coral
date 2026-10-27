@@ -532,10 +532,6 @@
 1	workflow_run_html.js	timingHtml
 1	workflow_run_html.js	totalSteps
 1	workflows.js	backHtml
-1	workflows.js	backLinkHtml('workflows', group.key, group.label, 'wf-back-btn')
-1	workflows.js	escAttr(open ? ' active' : '')
-1	workflows.js	escAttr(rd.dot)
-2	workflows.js	escAttr(rd.words)
 2	workflows.js	escAttr(wf.name)
 1	workflows.js	killBtn
 1	workflows.js	killBtn || retriggerBtn ? `<div class="item-bar wf-run-actions">${killBtn}${retriggerBtn}</div>` : ''

@@ -44,7 +44,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 3`, `${at}the three jobs in the folder's table`, 10000);
             assert.equal(await pathname(), '/automations/jobs', `${at}the address is the folder's`);
             const folderWords = mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`;
-            assert.deepEqual(await ev(folderWords), mobile ? ['Jobs (3)'] : ['Jobs3'], `${at}one folder with its count, not job rows`);
+            assert.deepEqual(await ev(folderWords), mobile ? ['Jobs (3)', 'Workflows (1)'] : ['Jobs3', 'Workflows1'], `${at}the folders with their counts, not job rows`);
             assert.equal(await ev(`document.querySelectorAll('#automations-nav-list .sched-row').length`), 0, `${at}no job rows in the sidebar`);
             assert.deepEqual(await names(), ['nightly-build-job', 'summarize-the-day', 'weekly-cleanup'], `${at}by next run (20 h, 30 h), the paused job last`);
             const subs = await ev(`[...document.querySelectorAll('#group-table-view .dt-subtitle')].map(e => e.textContent.trim())`);
