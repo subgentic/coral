@@ -439,3 +439,9 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-line:has(> .dt-mail-team) > .dt-mail-title { flex-shrink: 100; min-width: 4ch; } /* the agent's name gives way before the team: the computer ends the team, and it tells two same-named teams apart (#9664) */
 .dt-mail-team { flex: 0 0 auto; max-width: 70%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); font-weight: var(--fw-regular); }
 @container dt (max-width: 20rem) { .dt-mail-line:has(> .dt-mail-team) { flex-wrap: wrap; } .dt-mail-line:has(> .dt-mail-team) > .dt-mail-title { max-width: 100%; flex-shrink: 1; } .dt-mail-team { flex: 1 0 100%; max-width: 100%; white-space: normal; overflow-wrap: anywhere; } } /* at large text the team has its own line and wraps whole instead of being cut (#9664) */
+/* At large text (a 390 px phone at 200% is about 12 rem wide) the mail row's title and first words do not share a line: the title, then the words under it, each cut by its own ellipsis; the time keeps its space (#9646). */
+@container dt (max-width: 20rem) {
+    .dt-mail-line:not(:has(> .dt-mail-team)) { flex-direction: column; gap: 2px; } /* a line with a team wraps instead (below): its team has its own line */
+    .dt-mail-line:not(:has(> .dt-mail-team)) > .dt-mail-title { max-width: 100%; }
+    .dt-mail-line:not(:has(> .dt-mail-team)) > .dt-mail-snippet { flex: none; }
+}
