@@ -178,7 +178,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     // ── the goal's lists and its preview (#8914, Goal #73: the Operator's goal screen) ─────
     // Left: the goal's details, then one Tasks | Artifacts strip over one-line rows; right: the clicked task or artifact in the shared detail pane (one at a time; nothing opens by itself, and the list has the
     // whole width until one does). On a narrow screen the pane covers the list with a Back. The pane's element lives across drawings, so what is open stays open while the page is drawn again.
-    const previewEl = el('aside', 'detail-pane goal-detail-pane'); previewEl.hidden = true;
+    const previewEl = el('aside', 'detail-pane goal-detail-pane'); previewEl.hidden = true; previewEl.setAttribute('aria-label', 'Details'); // named, as the team page's own Details pane is (#9117)
     const preview = { key: '', rowKey: '' };
     const artifacts = { id: 0, host: null, api: null, total: null };
     const splitEl = () => root.querySelector('.goal-split');
