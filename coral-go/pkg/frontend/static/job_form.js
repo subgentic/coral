@@ -4,7 +4,8 @@ import { mountSettingsView } from './settings_view.js';
 import { ensureBuilt } from './lazy_dom.js';
 import { escapeHtml, showToast } from './utils.js';
 import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
-import { cronWords, atWords } from './job_words.js';
+import { cronWords, atWords, localZone, zoneNote } from './job_words.js';
+import { DAYS, composeCron, parseCron } from './cron_picker.js';
 import { limitSeconds, limitParts } from './time_limit.js';
 
 let view = null;
@@ -13,7 +14,9 @@ let openedJob = null;     // what the editor showed for the job it opened (#4423
 let noWorkflows = false;  // the workflow list came back empty: the form says so and offers to make one
 
 const DEFAULT_CRON = '0 * * * *';
-const PRESETS = [['Every hour', DEFAULT_CRON], ['Every 6 hours', '0 */6 * * *'], ['Every day at 02:00', '0 2 * * *'], ['Mondays at 09:00', '0 9 * * 1'], ['Custom', '']];
+const LOCAL_ZONE = localZone(); // a schedule is read in the person's own zone unless they pick another (Automations #4)
+// The ways to say when: the first four are pickers, Advanced is the cron box. `compose` turns a picker's state into the cron expression the server takes; `parse` reads one back (null: only the cron box can say it).
+const MODES = [['minutes', 'Every N minutes'], ['hours', 'Every N hours'], ['daily', 'Daily at'], ['weekly', 'Weekly on'], ['cron', 'Advanced']];
 
 // A choice button's on state: the look (active) and what a screen reader hears (aria-pressed), set together (#6348).
 const press = (b, on) => { b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(!!on)); };
@@ -31,50 +34,64 @@ document.addEventListener('focusout', e => { if (e.target && e.target.id === 'jo
 function zoneKnown(tz) {
     try { new Intl.DateTimeFormat('en', { timeZone: tz }); return true; } catch { return false; }
 }
-const zoneMessage = tz => (zoneKnown(tz || 'UTC') ? '' : `"${tz}" is not a time zone name. Use one like UTC or Europe/Berlin.`);
+const zoneMessage = tz => (zoneKnown(tz || LOCAL_ZONE) ? '' : `"${tz}" is not a time zone name. Use one like UTC or Europe/Berlin.`);
 
 /** aria-invalid is "true" or absent: an empty attribute reads as false to a screen reader. */
 function markInvalid(e, bad) { if (bad) e.setAttribute('aria-invalid', 'true'); else e.removeAttribute('aria-invalid'); }
 
-// -- the schedule picker: presets, a cron field behind Custom, one sentence for what it means ------------
+// -- the schedule picker: four pickers and an Advanced cron box, one sentence for what it means ------------
 
-function pickPreset(btn) {
-    document.querySelectorAll('#sched-picker .sched-preset').forEach(b => press(b, b === btn));
-    const cron = btn.dataset.cron;
+const pickerState = { mode: 'hours', n: 1, at: '09:00', days: new Set([1]) };
+
+/** Shows the picker the mode names (its panel, its pressed button) and writes the cron expression the picker says into the box the form reads. */
+function setMode(mode, { focus = false, keepCron = false } = {}) {
+    pickerState.mode = mode;
+    document.querySelectorAll('#sched-picker .sched-preset').forEach(b => press(b, b.dataset.mode === mode));
+    for (const p of document.querySelectorAll('#sched-picker [data-for]')) p.hidden = !p.dataset.for.split(' ').includes(mode);
+    const unit = document.getElementById('sched-every-unit'); if (unit) unit.textContent = mode === 'minutes' ? 'minutes' : 'hours';
     const cronInput = document.getElementById('job-modal-cron');
-    const customRow = document.getElementById('sched-custom-row');
-    if (cron === '') {
-        if (customRow) customRow.hidden = false;
-        if (cronInput) cronInput.focus();
-    } else {
-        if (customRow) customRow.hidden = true;
-        if (cronInput) cronInput.value = cron;
-    }
+    if (mode !== 'cron' && !keepCron) cronInput.value = composeCron(pickerState);
+    if (mode === 'cron' && focus) cronInput.focus();
     checkSchedule();
     view && view.refresh();
 }
-
-/** The cron expression in the picker: the matching preset looks chosen, anything else is Custom with its field shown. */
+/** A picker's control changed: its state is the cron box's new value. */
+function pickerChanged() {
+    const st = pickerState;
+    st.n = Number(document.getElementById('job-modal-every').value) || 1;
+    st.at = document.getElementById('job-modal-at').value || '09:00';
+    st.days = new Set([...document.querySelectorAll('#sched-picker .sched-day')].filter(b => b.getAttribute('aria-pressed') === 'true').map(b => +b.dataset.day));
+    document.getElementById('job-modal-cron').value = composeCron(st);
+    checkSchedule();
+    view && view.refresh();
+}
+/** The cron expression in the picker: a shape a picker can say shows in it, anything else is Advanced with its box shown. */
 function showCron(expr) {
-    const isPreset = PRESETS.some(([, c]) => c !== '' && c === expr);
+    const st = parseCron(expr);
     document.getElementById('job-modal-cron').value = expr;
-    document.querySelectorAll('#sched-picker .sched-preset').forEach(b => press(b, isPreset ? b.dataset.cron === expr : b.dataset.cron === ''));
-    document.getElementById('sched-custom-row').hidden = isPreset;
+    if (st) {
+        Object.assign(pickerState, { n: 1, at: '09:00', days: new Set([1]) }, st);
+        document.getElementById('job-modal-every').value = String(pickerState.n);
+        document.getElementById('job-modal-at').value = pickerState.at;
+        document.querySelectorAll('#sched-picker .sched-day').forEach(b => b.setAttribute('aria-pressed', String(pickerState.days.has(+b.dataset.day))));
+    }
+    setMode(st ? st.mode : 'cron', { keepCron: true });
 }
 
-/** "Runs every day at 02:00 (UTC). Next: tomorrow 02:00, your time." The schedule as the Jobs page says it. */
+/** "Runs every day at 02:00. Next: tomorrow 02:00." The schedule as the Jobs page says it; a zone other than the person's own is named: "Runs every day at 02:00 (Asia/Tokyo). Next: today 18:00, your time." */
 export function previewWords(expr, tz, nextIso) {
     const words = cronWords(expr);
     const runs = words.startsWith('Schedule:') ? `Runs on the schedule ${expr}` : 'Runs ' + words.charAt(0).toLowerCase() + words.slice(1);
-    const next = nextIso ? ` Next: ${atWords(nextIso)}, your time.` : '';
-    return `${runs} (${tz}).${next}`;
+    const other = zoneNote(tz);
+    const next = nextIso ? ` Next: ${atWords(nextIso)}${other ? ', your time' : ''}.` : '';
+    return `${runs}${other}.${next}`;
 }
 
 let checkSeq = 0;
 async function checkSchedule() {
     const my = ++checkSeq;
     const expr = document.getElementById('job-modal-cron').value.trim();
-    const tz = document.getElementById('job-modal-timezone').value.trim() || 'UTC';
+    const tz = document.getElementById('job-modal-timezone').value.trim() || LOCAL_ZONE;
     const preview = document.getElementById('cron-preview');
     const zoneOk = zoneKnown(tz);
     if (view) view.error('timezone', zoneOk ? '' : zoneMessage(tz));
@@ -107,15 +124,31 @@ function scheduleField() {
         key: 'cron_expr', type: 'custom', id: 'sched-picker', labelId: 'sched-label', label: 'When', required: true, requiredMessage: 'Enter a schedule, or pick one above.', default: DEFAULT_CRON,
         render: slot => {
             slot.setAttribute('role', 'group'); slot.setAttribute('aria-labelledby', 'sched-label');
-            const presets = el('div', 'sched-presets');
-            for (const [label, cron] of PRESETS) {
-                const b = el('button', 'sched-preset', label); b.type = 'button'; b.dataset.cron = cron; press(b, cron === DEFAULT_CRON);
-                b.addEventListener('click', () => pickPreset(b));
-                presets.append(b);
+            const modes = el('div', 'sched-presets');
+            for (const [mode, label] of MODES) {
+                const b = el('button', 'sched-preset', label); b.type = 'button'; b.dataset.mode = mode; press(b, mode === pickerState.mode);
+                b.addEventListener('click', () => setMode(mode, { focus: true }));
+                modes.append(b);
             }
-            const row = el('div', 'sched-custom-row'); row.id = 'sched-custom-row'; row.hidden = true;
+            // the pickers: a number (every N minutes or hours), a time, and the days of the week; each says its part of the sentence and writes the cron expression behind it
+            const every = el('div', 'sched-line'); every.dataset.for = 'minutes hours';
+            const everyLab = el('label', 'sched-line-label', 'Every'); const n = el('input', 'field field-dense sched-n'); n.type = 'number'; n.id = 'job-modal-every'; n.min = '1'; n.max = '59'; n.value = '1'; n.setAttribute('aria-label', 'Every, how many');
+            n.addEventListener('input', pickerChanged);
+            const unit = el('span', 'sched-unit', 'hours'); unit.id = 'sched-every-unit';
+            every.append(everyLab, n, unit);
+            const days = el('div', 'sched-days'); days.dataset.for = 'weekly'; days.setAttribute('role', 'group'); days.setAttribute('aria-label', 'Days of the week');
+            for (const [num, name] of DAYS) {
+                const d = el('button', 'btn btn-small sched-day', name); d.type = 'button'; d.dataset.day = String(num); d.setAttribute('aria-pressed', String(pickerState.days.has(num)));
+                d.addEventListener('click', () => { d.setAttribute('aria-pressed', String(d.getAttribute('aria-pressed') !== 'true')); pickerChanged(); });
+                days.append(d);
+            }
+            const at = el('div', 'sched-line'); at.dataset.for = 'daily weekly';
+            const atLab = el('label', 'sched-line-label', 'At'); const time = el('input', 'field field-dense sched-time'); time.type = 'time'; time.id = 'job-modal-at'; time.value = pickerState.at;
+            time.addEventListener('input', pickerChanged);
+            at.append(atLab, time);
+            const row = el('div', 'sched-custom-row'); row.id = 'sched-custom-row'; row.dataset.for = 'cron'; row.hidden = true;
             const lab = el('label', 'sched-cron-field', 'Cron expression');
-            const input = el('input', 'sched-cron-input'); input.type = 'text'; input.id = 'job-modal-cron'; input.placeholder = '0 2 * * *'; input.value = DEFAULT_CRON; input.setAttribute('aria-describedby', 'sched-cron-help cron-preview');
+            const input = el('input', 'field sched-cron-input'); input.type = 'text'; input.id = 'job-modal-cron'; input.placeholder = '0 2 * * *'; input.value = DEFAULT_CRON; input.setAttribute('aria-describedby', 'sched-cron-help cron-preview');
             input.addEventListener('input', () => checkSchedule());
             lab.append(input);
             const help = el('div', 'job-help'); help.id = 'sched-cron-help';
@@ -123,12 +156,13 @@ function scheduleField() {
             help.append('Five fields: minute, hour, day of month, month, day of week. ', code, ' is every day at 02:00.');
             row.append(lab, help);
             const preview = el('div', 'sched-preview'); preview.id = 'cron-preview'; preview.setAttribute('role', 'status');
-            slot.append(presets, row, preview);
+            slot.append(modes, every, days, at, row, preview);
+            for (const p of slot.querySelectorAll('[data-for]')) p.hidden = !p.dataset.for.split(' ').includes(pickerState.mode);
             return {
                 get: () => input.value.trim(),
                 set: v => showCron(v || ''),
                 invalid: on => { if (on || !document.getElementById('cron-preview').classList.contains('sched-preview-bad')) markInvalid(input, on); }, // the cron box itself carries the mark a screen reader reads
-                focus: () => { const custom = slot.querySelector('.sched-preset[data-cron=""]'); if (!input.value.trim() && custom) pickPreset(custom); (input.closest('[hidden]') ? slot.querySelector('.sched-preset.active') : input)?.focus(); }, // the field is behind Custom: choose it, which shows the field
+                focus: () => { if (pickerState.mode === 'weekly' && !composeCron(pickerState)) { slot.querySelector('.sched-day')?.focus(); return; } if (!input.value.trim() && pickerState.mode !== 'cron') setMode('cron'); (input.closest('[hidden]') ? slot.querySelector('.sched-preset.active') : input)?.focus(); }, // the field a person must fill: the first day of a weekly schedule with none, else the cron box (shown for an empty one)
             };
         },
     };
@@ -203,8 +237,8 @@ function jobFields(host) {
         { key: 'extras', type: 'heading', fold: true, id: 'job-modal-more', label: 'More options' },
         { key: 'description', type: 'text', id: 'job-modal-description', label: 'Description', placeholder: 'e.g. Runs the full test suite' },
         {
-            key: 'timezone', type: 'text', id: 'job-modal-timezone', label: 'Time zone', default: 'UTC', placeholder: 'UTC',
-            validate: v => zoneMessage(String(v || '').trim() || 'UTC'),
+            key: 'timezone', type: 'text', id: 'job-modal-timezone', label: 'Time zone', default: LOCAL_ZONE, placeholder: LOCAL_ZONE,
+            validate: v => zoneMessage(String(v || '').trim() || LOCAL_ZONE),
             setup: e => { e.classList.add('field sched-tz-input'); e.addEventListener('input', () => checkSchedule()); },
         },
         limitField(),
@@ -233,7 +267,7 @@ function jobFormValues() {
         name: String(v.name || '').trim(),
         description: String(v.description || '').trim(),
         cron_expr: String(v.cron_expr || '').trim(),
-        timezone: String(v.timezone || '').trim() || 'UTC',
+        timezone: String(v.timezone || '').trim() || LOCAL_ZONE,
         max_duration_s: (limit && limit.seconds) || 3600,
         cleanup_worktree: v.cleanup_worktree ? 1 : 0,
         job_type: v.job_type,
@@ -349,7 +383,7 @@ export async function editScheduledJob(jobId) {
     })) v.set(k, val);
     document.getElementById('cron-preview').textContent = '';
     // Nothing a job already has is hidden: More options opens when it holds something other than the defaults.
-    v.fold(!!(job.description || (job.timezone && job.timezone !== 'UTC') || (job.max_duration_s && job.max_duration_s !== 3600) || job.flags || (job.base_branch && job.base_branch !== 'main')));
+    v.fold(!!(job.description || (job.timezone && job.timezone !== LOCAL_ZONE) || (job.max_duration_s && job.max_duration_s !== 3600) || job.flags || (job.base_branch && job.base_branch !== 'main')));
     document.getElementById('job-modal-flags').dispatchEvent(new Event('input')); // the flag shortcuts show which flags are on
     if (type === 'workflow') {
         await loadWorkflowOptions();
