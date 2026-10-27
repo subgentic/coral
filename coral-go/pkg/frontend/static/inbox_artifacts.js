@@ -20,11 +20,11 @@ let onCount = () => {};
 /** The folder's count in the sidebar: what the teams hold before any filter. */
 export const artifactCount = () => count;
 
-/** Read the count without drawing the page (the Inbox was opened): a request for one row, at most one in 30 seconds and one at a time; `force` asks now (the person pressed refresh). The Artifacts list tells the
+/** Read the count without drawing the page (the Inbox was opened): a request for one row, at most one in 30 seconds and one at a time. The Artifacts list tells the
  *  folder its own count whenever it reads (hooks below), which is the "refreshed on change". */
-export function refreshArtifactCount(done, { force = false } = {}) {
+export function refreshArtifactCount(done) {
     if (done) onCount = done;
-    if (!force && count !== null && Date.now() - countAt < COUNT_FRESH_MS) return counting || Promise.resolve();
+    if (count !== null && Date.now() - countAt < COUNT_FRESH_MS) return counting || Promise.resolve();
     if (counting) return counting;
     counting = (async () => {
         try {
