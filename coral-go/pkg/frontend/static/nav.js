@@ -23,7 +23,9 @@ function write(route, replace, from) {
     const here = location.pathname + location.search;
     if (replace || url === here) {
         const prev = history.state && typeof history.state.prev === 'string' ? history.state.prev : null;
-        history.replaceState({ coralRoute: route, prev }, '', url);
+        const kept = url === here && history.state && typeof history.state.from === 'string' ? history.state.from : ''; // the same address written again keeps the title it was opened with (#8898)
+        const f = from || kept;
+        history.replaceState({ coralRoute: route, prev, ...(f ? { from: f } : {}) }, '', url);
     } else {
         history.pushState({ coralRoute: route, prev: here, ...(from ? { from: String(from) } : {}) }, '', url); // from: the title of the goal or task this was opened from, so its Back says where it goes (#8861)
     }
@@ -48,13 +50,13 @@ export function go(route, { replace = false, from = '' } = {}) {
  *  clicking calls this, so the click and Back stay in step without showing it twice. Nothing is
  *  written before startNav(): the pop-out (/agent/<id>) never starts it, and its URL is its
  *  identity, so the views it shares with the dashboard can't rewrite it. */
-export function note(route, { replace = false } = {}) {
+export function note(route, { replace = false, from = '' } = {}) {
     try {
         if (!started) return;
         route = normalize(route);
         if (!route) return;
         const same = current && build(current) === build(route);
-        write(route, replace || same);
+        write(route, replace || same, from);
     } finally {
         routeChanged(); // what is on screen changed whether or not a history entry was written (the pop-out writes none)
     }
