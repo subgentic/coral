@@ -240,7 +240,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     /** A group of the column (Open, Done): the one table, folded to its two-line row in the column's narrow box. */
     function sideTable(g, name, rows) {
-        return TV.tasksTable('goal', rows.map(taskOf), { label: `${name} tasks of ${g.title}`, ctx: { goalTitleOf: (gid) => (goalById(gid) || {}).title || `Goal ${gid}` },
+        return TV.tasksTable('goal', rows.map(taskOf), { label: `${name} tasks of ${g.title}`, ctx: { hideTaskId: true, goalTitleOf: (gid) => (goalById(gid) || {}).title || `Goal ${gid}` },
             open: task => onTask ? onTask(task, g) : openTask(model.project, task.id), sortBar: false, bare: true, state: sideState(g.id, name) });
     }
     const sideStates = new Map();

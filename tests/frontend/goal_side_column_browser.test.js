@@ -11,7 +11,8 @@ const BASE = require('./test_base').BASE;
     const B = 'gsc-' + Date.now().toString(36);
     const check = (label, ok, detail) => { console.log(`[${ok ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); if (!ok) process.exitCode = 1; };
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && require('node:path').join(process.env.RUNNER_TEMP, 'out', 'shots')); if (!d) return; const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true }); await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); new Promise(r => setTimeout(r, 350))`); /* sleep-ok: a screenshot waits out transitions */ fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const rows = () => ev(`[...document.querySelectorAll('.goal-side .dt-table tbody tr')].map(r => ({ title: r.querySelector('.dt-title-cell').textContent.replace(/^(#\\d+)/, '$1 '), who: (() => { const c = r.querySelector('td[data-key="who"]'), i = c.querySelector('[role=img]'); return i ? i.getAttribute('aria-label') : c.textContent.trim(); })(), circles: r.querySelectorAll('td[data-key="who"] .dt-avatar').length, chip: r.querySelector('.goal-chip').textContent, current: r.getAttribute('aria-current') }))`);
+    const lightShot = async name => { await ev(`import((window.__coralStatic || '/static/') + 'settings_core.js').then(sc => { sc.applyTheme('light'); return true; })`); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: the theme repaints, there is no event for it */ await shot(name); await ev(`import((window.__coralStatic || '/static/') + 'settings_core.js').then(sc => { sc.applyTheme('dark'); return true; })`); }; // the same scene in the light theme (#8784)
+    const rows = () => ev(`[...document.querySelectorAll('.goal-side .dt-table tbody tr')].map(r => ({ title: r.querySelector('.dt-title-cell').textContent, hover: r.querySelector('.dt-title-cell').title, who: (() => { const c = r.querySelector('td[data-key="who"]'), i = c.querySelector('[role=img]'); return i ? i.getAttribute('aria-label') : c.textContent.trim(); })(), circles: r.querySelectorAll('td[data-key="who"] .dt-avatar').length, chip: r.querySelector('.goal-chip').textContent, current: r.getAttribute('aria-current') }))`);
     const openGoal = async (goal, tab = 'goals') => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: ${JSON.stringify(tab)}, item: ${goal} }); true`); await waitFor(`!!document.querySelector('.goal-split') && document.querySelectorAll('.dt-primary').length > 0 && document.querySelector('.goal-side').getClientRects().length + document.querySelector('.goal-main').getClientRects().length > 0`, 'the goal page', 15000); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -34,13 +35,13 @@ const BASE = require('./test_base').BASE;
         check('the column is beside the goal, 340 px wide, with the goal in the main pane and no task table', lay.sideRight && lay.w === 340 && lay.title === 'Tasks and goals stay readable' && !lay.table && lay.add, JSON.stringify(lay));
         check('the header counts the tasks and the groups are Open then Done', /^Tasks\s*2 open, 1 done$/.test(lay.head) && JSON.stringify(lay.groups) === JSON.stringify(['Open 2', 'Done 1']), JSON.stringify([lay.head, lay.groups]));
         const rs = await rows();
-        check('each row: the title with its number, a state chip, and who', rs.length === 3 && rs[0].title === '#' + second + ' Second open task' && rs[0].chip === 'Queued' && rs[0].who === 'Nobody yet', JSON.stringify(rs));
+        check('each row: the title without its number (it is the hover title, #8784), a state chip, and who', rs.length === 3 && rs[0].title === 'Second open task' && rs[0].hover === 'Task #' + second && rs[0].chip === 'Queued' && rs[0].who === 'Nobody yet', JSON.stringify(rs));
         check('Assigned to is the person as one circle, named "Done by dev" (its accessible name and hover text), not the words (#8492)', rs[2].circles === 1 && await ev(`(() => { const i = document.querySelector('.goal-side .dt-table tbody tr:last-child td[data-key="who"] [role=img]'); return !!i && i.title === 'Done by dev' && !i.querySelector('.dt-person-name'); })()`), JSON.stringify(rs[2]));
-        check('a done task says who built it, not the orchestrator who completed it ("Done by dev")', rs[2].title === '#' + built + ' Build the column' && rs[2].who === 'Done by dev' && rs[2].chip === 'Done', JSON.stringify(rs[2]));
+        check('a done task says who built it, not the orchestrator who completed it ("Done by dev")', rs[2].title === 'Build the column' && rs[2].hover === 'Task #' + built && rs[2].who === 'Done by dev' && rs[2].chip === 'Done', JSON.stringify(rs[2]));
         check('the title has a gap under its back link', await ev(`(() => { const b = document.querySelector('.goal-main .goals-back').getBoundingClientRect(), t = document.getElementById('goals-detail-title').getBoundingClientRect(); return t.top - b.bottom >= 8; })()`));
         const compactDesktop = await ev(`[...document.querySelectorAll('.goal-side .dt-row')].map(r => r.getBoundingClientRect().height)`);
         check('goal Tasks rows are at most 68px', compactDesktop.every(h => h > 0 && h <= 68), JSON.stringify(compactDesktop));
-        await shot('goal-column-desktop');
+        await shot('goal-column-desktop'); await lightShot('goal-column-desktop-light');
 
         console.log('1b. The column is a right sidebar: flush right, the page height, resized like the dock');
         const flush = await ev(`(() => { const s = document.querySelector('.goal-side').getBoundingClientRect(), p = document.getElementById('team-page-scroll') || document.querySelector('.team-page-scroll'), pr = p.getBoundingClientRect(), g = document.querySelector('.goal-side-grip'); return { right: Math.round(pr.right - s.right), top: Math.round(s.top - pr.top), bottom: Math.round(pr.bottom - s.bottom), margin: getComputedStyle(document.querySelector('.goal-side')).margin, radius: getComputedStyle(document.querySelector('.goal-side')).borderRadius, grip: !!g && g.getAttribute('role') === 'separator', pageScrolls: p.scrollHeight > p.clientHeight + 1 }; })()`);
@@ -80,7 +81,7 @@ const BASE = require('./test_base').BASE;
 
         console.log('2. Search');
         await ev(`(() => { const s = document.querySelector('.goal-side-search'); s.value = 'third'; s.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-        check('the search narrows the column', JSON.stringify((await rows()).map(r => r.title)) === JSON.stringify(['#' + third + ' Third open task']));
+        check('the search narrows the column', JSON.stringify((await rows()).map(r => r.title)) === JSON.stringify(['Third open task']));
         await ev(`(() => { const s = document.querySelector('.goal-side-search'); s.value = 'zzz'; s.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         check('and says when nothing matches', /No task matches/.test(await ev(`document.querySelector('.goal-side-list').textContent`)));
         await ev(`(() => { const s = document.querySelector('.goal-side-search'); s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
@@ -104,7 +105,7 @@ const BASE = require('./test_base').BASE;
         // column's existing busy state to clear before checking its refreshed groups.
         await waitFor(`!!document.querySelector('.goal-side-list') && document.querySelector('.goal-side-list').getAttribute('aria-busy') !== 'true'`, 'goal task rows refreshed after completion', 15000);
         check('the goal column reflects completion on the shared page', JSON.stringify(await ev(`[...document.querySelectorAll('.goal-side-group')].map(h => h.textContent)`)) === JSON.stringify(['Open 1', 'Done 2']), JSON.stringify(await rows()));
-        check('the completed task row now says Done', (await rows()).some(r => r.title === '#' + second + ' Second open task' && r.chip === 'Done'));
+        check('the completed task row now says Done', (await rows()).some(r => r.title === 'Second open task' && r.chip === 'Done'));
 
         console.log('4. A phone: the goal, its task list and a task are three screens');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
@@ -122,7 +123,7 @@ const BASE = require('./test_base').BASE;
         check('the list screen runs the page\'s whole width', await ev(`(() => { const s = document.querySelector('.goal-side').getBoundingClientRect(), p = document.querySelector('.goal-split').getBoundingClientRect(); return Math.abs(s.width - p.width) <= 1; })()`));
         const compactPhone = await ev(`[...document.querySelectorAll('.goal-side .dt-row')].map(r => r.getBoundingClientRect().height)`);
         check('goal Tasks rows are at most 68px', compactPhone.every(h => h > 0 && h <= 68), JSON.stringify(compactPhone));
-        await shot('goal-phone-list');
+        await shot('goal-phone-list'); await lightShot('goal-phone-list-light');
         await ev(`document.querySelector('.dt-primary[data-task-id="${third}"]').click(); true`);
         await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-panel-item').getClientRects().length > 0`, 'the canonical task screen');
         check('a phone task opens the same Tasks page and URL', await ev(`location.pathname === '/team/${B}/tasks/${third}' && document.querySelector('#team-tab-tasks').getAttribute('aria-selected') === 'true'`));
