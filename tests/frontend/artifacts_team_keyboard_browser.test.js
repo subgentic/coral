@@ -45,7 +45,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         await ev(`window.switchAgenticTab('artifacts', 'top'); true`);
         const ROW = '#agentic-panel-artifacts-view tbody tr';
         await waitFor(`document.querySelectorAll('${ROW}').length === 3`, 'the artifact rows', 8000);
-        const controls = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view button, #agentic-panel-artifacts-view a[href]')].filter(e => !e.closest('.list-bar-menu, .list-bar-more-menu, [hidden]')).map(e => ({ name: (e.getAttribute('aria-label') || e.textContent || '').trim(), tab: e.tabIndex, shown: e.getClientRects().length > 0 }))`);
+        const controls = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view button, #agentic-panel-artifacts-view a[href]')].filter(e => !e.closest('.list-bar-menu, .list-bar-more-menu, [hidden]') && (e.getClientRects().length > 0 || !e.closest('th'))).map(e => ({ name: (e.getAttribute('aria-label') || e.textContent || '').trim(), tab: e.tabIndex, shown: e.getClientRects().length > 0 }))`);
         assert.ok(controls.every(c => c.shown && c.tab >= 0 && c.name), 'every control is shown, focusable and named: ' + JSON.stringify(controls.filter(c => !(c.shown && c.tab >= 0 && c.name))));
         const bar = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view .list-bar-search, #agentic-panel-artifacts-view .list-bar-toggle, #agentic-panel-artifacts-view .list-bar-more-btn')].map(e => e.getAttribute('aria-label') || e.placeholder)`);
         assert.deepEqual(bar, ['More artifact actions'], 'an agent with no team has the More icon in its header and no Refresh (its list has no search or filters)');

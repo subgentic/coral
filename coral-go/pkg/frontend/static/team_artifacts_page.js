@@ -1,4 +1,4 @@
-import { serverOf, readInboxArtifacts } from './inbox_servers.js';
+import { serverColumns, serverOf, readInboxArtifacts } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
@@ -11,7 +11,7 @@ import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { showToast } from './utils.js';
 const DT = await importOnce('./data_table.js');
-const { artifactTable, serverArtifactSort } = await importOnce('./artifact_table.js');
+const { artifactTable, serverArtifactSort, tableSortOf } = await importOnce('./artifact_table.js');
 const SORT_PARAM = 'so' + 'rt'; // the query word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 const Toolbar = await importOnce('./team_toolbar.js');
 const { el } = DT; // lazy modules load the others they need through importOnce, so a failed load is retried
@@ -176,7 +176,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     /** What the filters are remembered under: the board, or for an agent the board and the agent (the key the old agent tab used). */
     const filterKey = () => (model.scope ? `${model.project}::agent::${model.scope.session}` : model.project);
     function setFilters(next) {
-        if (next.sort !== model.filters.sort) artifactState.sort = next.sort === 'name' ? { key: 'name', dir: 'asc' } : next.sort === 'size' ? { key: 'size', dir: 'desc' } : { key: 'updated', dir: next.sort === 'oldest' ? 'asc' : 'desc' };
+        if (next.sort !== model.filters.sort) artifactState.sort = tableSortOf(next.sort);
         model.filters = next;
         F.save(filterKey(), next);
         loadArtifacts();
@@ -317,6 +317,11 @@ export function createArtifactsList({ inbox = false } = {}) {
                     const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;
                 },
+                tagsDropAt: inbox ? 62 : 0, // the Inbox list is crowded (a team, a task): its Tags go first, before Team and Task
+                afterName: [...(inbox ? (model.filters.team
+                    ? serverColumns().map(c => ({ ...c, width: '7rem', dropAt: 52 })) // one team chosen: its computer, in its own column
+                    : [{ key: 'team', label: 'Team', width: '8rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }]) : []),
+                    ...(model.scope || by === 'task' ? [] : [{ key: 'task', label: 'Task', width: '9rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: taskCell }])], // the Task link is how a file reaches its task (#8617); the head says it where the list is grouped by task; an agent's own list has none // the team's words carry its computer ("alpha · Box Two"), so two same-named teams are told apart (#8774)
                 nameTitle: item => [readableName(item), inbox ? teamLabel(item.board_id, item.team) : '', taskText(item), originBadge(item)].filter(Boolean).join(' · '),
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
@@ -352,6 +357,14 @@ export function createArtifactsList({ inbox = false } = {}) {
         b.title = `Details for ${readableName(item)}`;
         b.classList.add('artifact-details');
         b.setAttribute('aria-label', `Details for ${readableName(item)}`);
+        return b;
+    }
+
+    /** The Task column: a link that opens the task's page (#8617); "No task" for a file no task holds. */
+    function taskCell(item) {
+        if (!item.task_id) return taskText(item);
+        const b = DT.link(taskText(item), () => { importOnce('./task_navigation.js').then(m => m.openTask(inbox ? item.board_id : model.project, item.task_id)).catch(() => {}); });
+        b.dataset.taskLink = String(item.task_id);
         return b;
     }
 
