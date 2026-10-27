@@ -8,6 +8,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { TOUCH_AREA } = require('./helpers/touch_area');
 
 const FILES = [
     { filepath: 'docs/guide.md', status: 'D', additions: 0, deletions: 3 }, { filepath: 'internal/store/store_test.go', status: 'A', additions: 9, deletions: 0 },
@@ -47,7 +48,7 @@ const ROOT = '/work/demo/projects/queue-service';
             console.log(at + 'Files');
             await openTab('files');
             await waitFor(`document.querySelectorAll('#changed-files-list .file-item').length === 5`, at + 'the five changed files', 10000);
-            const rows = await ev(`[...document.querySelectorAll('#changed-files-list .file-item')].map(r => { const n = r.querySelector('.file-name'), more = r.querySelector('.file-more-btn'), b = more && more.getBoundingClientRect(); return { name: n.textContent, cut: n.scrollWidth > n.clientWidth + 1, more: !!more && b.width >= 43.5 && b.height >= 43.5, label: more && more.getAttribute('aria-label'), actionsShown: getComputedStyle(r.querySelector('.file-action-btns')).display !== 'none' }; })`);
+            const rows = await ev(`[...document.querySelectorAll('#changed-files-list .file-item')].map(r => { const n = r.querySelector('.file-name'), more = r.querySelector('.file-more-btn'), b = more && (${TOUCH_AREA})(more); return { name: n.textContent, cut: n.scrollWidth > n.clientWidth + 1, more: !!more && b.w >= 43.5 && b.h >= 43.5, label: more && more.getAttribute('aria-label'), actionsShown: getComputedStyle(r.querySelector('.file-action-btns')).display !== 'none' }; })`);
             for (const r of rows) {
                 assert.equal(r.cut, false, `${at}${r.name} is shown whole`); assert.ok(r.more, `${at}${r.name} has a 44 px More button`);
                 assert.equal(r.actionsShown, false, `${at}${r.name}: Copy, Preview and Edit are closed`); assert.ok(/^More for /.test(r.label), `${at}named: ${r.label}`);
