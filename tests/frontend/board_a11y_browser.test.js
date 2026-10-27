@@ -88,7 +88,7 @@ const BASE = require('./test_base').BASE;
                 const row = await ev(`(() => { const r = [...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].filter(x => x.querySelector('.board-task-open')); const first = r[0]; const stops = [...first.querySelectorAll('button, [tabindex], a[href], input, select')]; return { rows: r.length, roleOnRow: r.filter(x => x.getAttribute('role') === 'button' || x.hasAttribute('tabindex')).length, stops: stops.map(x => x.tagName + ':' + (x.getAttribute('aria-label') || x.className)), nestedInButton: !!first.closest('[role=button]') }; })()`);
                 assert.equal(row.roleOnRow, 0, 'no row has a role or a tab stop of its own: ' + JSON.stringify(row));
                 assert.equal(row.nestedInButton, false);
-                assert.ok(row.stops.some(x => /^BUTTON:Open task #\d+: /.test(x)), 'the row has the native Open button: ' + JSON.stringify(row.stops));
+                assert.ok(row.stops.some(x => /^BUTTON:Open task: /.test(x)), 'the row has the native Open button: ' + JSON.stringify(row.stops));
                 assert.ok(row.stops.length <= 2, 'one control, and at most the status detail: ' + JSON.stringify(row.stops));
                 const title = await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').textContent`);
                 await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').focus(); true`);

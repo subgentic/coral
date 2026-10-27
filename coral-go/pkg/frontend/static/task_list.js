@@ -20,6 +20,8 @@ import { taskStatusWord, statusClass } from './goal_words.js';
 import { whenText } from './when_text.js';
 
 const dockTaskTableState = DT.tableState();
+/** The state as it is said: the word the chip shows, then the richer detail when there is one ("In progress (Claimed · Working)"): what is seen is what is heard (#8830). The task number is the row's hover title, not in its name. */
+const spoken = (word, st) => { const d = st.detail || ''; return d.toLowerCase().startsWith(word.toLowerCase()) ? d : /·/.test(d) ? `${word} (${d})` : word; }; // "Blocked: waiting for prerequisites" already starts with its word
 let previewTask = null;
 export async function openDockTaskPreview(id, opener) {
     const project = _currentBoardKey(), session = state.currentSession;
@@ -31,10 +33,9 @@ export async function openDockTaskPreview(id, opener) {
     previewTask = selection;
     const mark = () => { for (const row of document.querySelectorAll('#board-task-list tbody tr')) { if (previewTask?.project === project && row.dataset.key === previewTask?.key) row.setAttribute('aria-current', 'true'); else row.removeAttribute('aria-current'); } };
     const row = () => { const tr = opener && opener.isConnected ? opener.closest('tr') : [...document.querySelectorAll('#board-task-list tbody tr')].find(r => r.dataset.key === key); return tr?.querySelector('.dt-primary') || null; }; // the row's one button: what had the focus (the click's target may be the row itself, which is not focusable)
-    pane.openTaskPreview(project, id, opener?.closest('tr')?.querySelector('.dt-primary')?.textContent || `Task ${id}`, () => {
+    pane.openTaskPreview(project, id, opener?.closest('tr')?.querySelector('.dt-primary')?.textContent || `Task ${id}`, ({ keyboard } = {}) => {
         if (previewTask === selection) { previewTask = null; mark(); }
-        const a = document.activeElement; // closing the preview gives the focus back to the row that opened it, at every width (#8830); a close that came from a click elsewhere leaves the focus where it is
-        if (!a || a === document.body || a.closest('#preview-pane')) queueMicrotask(() => row()?.focus({ preventScroll: true })); // after the pane has been redrawn and hidden: the focus is moved last
+        if (keyboard) queueMicrotask(() => row()?.focus({ preventScroll: true })); // a keyboard close gives the focus back to the row that opened it, at every width (#8830), after the pane has been redrawn and hidden; after a mouse click the row would wear a ring
     });
     mark();
 }
@@ -508,12 +509,12 @@ function _taskTable(tasks, footer) {
         const [stateCol, taskCol, whoCol] = columns;
         stateCol.sort = false;
         stateCol.width = 'content'; // the dock knows a review is asked for from the task's workflow, which the shared word reads from review_requested
-        stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip; };
+        stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', spoken(word, st)); return chip; };
         taskCol.firstDir = 'desc';
         taskCol.cell = t => {
             const cell = DT.el('span', 'dt-title-cell'), description = span('board-task-desc dt-title-content');
             const name = t.title || t.description || '';
-            const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${taskStatus(t).detail}`);
+            const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : 'Open task'}: ${name}, ${spoken(taskStatusWord(t.status, reviewRequested(t)), taskStatus(t))}`);
             b.classList.add('board-task-open', 'board-task-name');
             cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
             description.title = cell.title;

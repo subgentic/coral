@@ -94,6 +94,8 @@
 .team-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .team-link { background: none; border: 0; padding: 0; color: var(--link-text, var(--accent)); font: inherit; text-align: left; cursor: pointer; }
 .team-link:hover { text-decoration: underline; }
+.team-task-page .team-link { display: inline-flex; align-items: center; min-height: 24px; } /* the goal's link is a target of at least 24 px (#8830) */
+@media (pointer: coarse), (max-width: 767px) { .team-task-page .team-link { min-height: var(--control-touch-height, 44px); } }
 
 /* a goal's page and a task's page: facts side by side, tasks as a table, the actions pinned at the bottom */
 .goals-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: 0.875rem; max-width: 70ch; }

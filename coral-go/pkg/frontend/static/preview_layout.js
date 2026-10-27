@@ -205,7 +205,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
             _fullOpener = document.activeElement; _fullOpenerPath = _pathOf(_fullOpener) || getLastOpenedPath();
             _fullOverlay = pushOverlay(() => _setPhoneFull(false, { popped: true })); // Back closes it, in its order among the overlays (overlay_history.js)
         } else {
-            pane.removeAttribute('role'); pane.removeAttribute('aria-modal'); pane.removeAttribute('aria-label');
+            pane.setAttribute('role', 'region'); pane.removeAttribute('aria-modal'); pane.setAttribute('aria-label', 'Preview'); // beside the chat it is a named region (#8830)
             if (_fullOverlay) { const id = _fullOverlay; _fullOverlay = 0; if (!popped) popOverlay(id); }
         }
         _paintMaxButton();
