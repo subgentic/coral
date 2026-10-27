@@ -333,14 +333,29 @@ const countOf = key => key === 'needs' ? waitingSessions().length + unreadReview
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
-const folderSections = () => (nativeInbox() ? [{ title: 'Needs attention', items: GROUPS.map(g => ({ key: g.key, label: g.label })) }, ...CH.chatSections()] : [{ title: 'Needs attention', items: [
+/** The phone drawer's Boards group (#9583, UI/UX's spec #9529): each team's board by its name, opening its messages in the Inbox. No unread count: nothing records what was read yet. A desktop's sidebar has the Board history folder only. */
+let boardList = []; // { key: team key, label }
+async function refreshBoards() {
+    if (!isPhoneLayout()) return;
+    try {
+        const { fetchProjects } = await importOnce('./board_fetch.js');
+        boardList = (await fetchProjects()).map(p => ({ key: String(p.project), label: teamLabel(p.project, p.board_label || '') })).filter(b => b.key).sort((a, b) => a.label.localeCompare(b.label));
+    } catch { boardList = []; }
+    renderInboxNav(true);
+}
+const BOARD_ITEM = 'board:';
+const boardSection = () => (isPhoneLayout() && boardList.length ? [{ title: 'Boards', items: boardList.map(b => ({ key: BOARD_ITEM + b.key, label: b.label })) }] : []);
+/** What the folder list shows as current: on a phone an open board is its own entry of the Boards group (the folder it belongs to elsewhere is Board history). */
+const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_ITEM + page.project : pageGroup());
+const folderSections = () => (nativeInbox() ? [{ title: 'Needs attention', items: GROUPS.map(g => ({ key: g.key, label: g.label })) }, ...CH.chatSections(), ...boardSection()] : [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
     { key: 'goals', label: 'Goals', count: countOf('goals') },
     { key: 'saved', label: 'Saved', count: countOf('saved') }] },
-    { title: 'Files', items: [{ key: 'artifacts', label: 'Artifacts', count: countOf('artifacts') }] }, ...CH.chatSections()]).map(section => ({ ...section, items: section.items.map(item => ({ ...item, icon: FOLDER_ICONS[item.key] || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
+    { title: 'Files', items: [{ key: 'artifacts', label: 'Artifacts', count: countOf('artifacts') }] }, ...CH.chatSections(), ...boardSection()]).map(section => ({ ...section, items: section.items.map(item => ({ ...item, icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
 let _navKey = null, _folders = null, _poll = 0;
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
 function pickFolder(key) {
+    if (key.startsWith(BOARD_ITEM)) { openItemRoute(BOARDS_SUB, key.slice(BOARD_ITEM.length), null, key); return; } // a board of the phone drawer's Boards group: its messages, in the Inbox
     if (page) closePage(false);
     setGroup(key);
     noteFolder(key);
@@ -362,7 +377,7 @@ function noteFolder(key) {
 function renderInboxNav(force = false) {
     const list = $('inbox-nav-list');
     if (!list) return;
-    const here = pageGroup(), sections = folderSections();
+    const here = navCurrent(), sections = folderSections();
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
     const key = JSON.stringify([here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
@@ -393,6 +408,7 @@ function savedListSpec(where = '') {
         signature: JSON.stringify([multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
         node: () => DT.dataTable({ label: `Saved, ${rows.length}`, compact: true, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
             open: (f, row) => dock ? openDockSavedSheet(f.id, row.querySelector('.dt-primary')) : openSavedPage(f.id),
+            mail: f => ({ lead: { text: f.title || f.which, name: f.title || f.which }, title: f.title || f.which, snippet: f.snippet, time: f.saved }), // a phone's row (#9583): who it is from, the message, when it was saved
             columns: [
                 { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; if (multi && f.serverName) b.title = `${f.which} · ${f.serverName}`; return b; } }, // a narrow row drops the Computer column (#8981): its name stays one hover or one sheet away
                 ...(dock ? (multi ? [{ key: 'machine', label: 'Computer', line: 0, cell: f => f.serverName || '' }] : []) : serverColumns().map(c => ({ ...c, line: 0 }))), // a folded row is one line: the message, when it was saved and its action (#8981); the machine and the state stay as columns where the table is wide
@@ -567,13 +583,14 @@ registerGroupSource('hub-inbox', {
                         go({ ...folderRoute, id: g.board_id, item: g.id });
                     },
                     oneLine: true, sortBar: false,
+                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: g.title, snippet: g.outcome || g.state, time: DT.timeCell(g.updated_at).textContent }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }).el };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
         if (key === 'saved') return savedListSpec();
         return null;
     },
-    lead: () => { const here = pageGroup(), sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true }) }; }, // a phone: the folders are one select on top of the table
+    lead: () => { const here = navCurrent(), sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true }) }; }, // a phone: the folders are one select on top of the table
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
     showList: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
     empty: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
@@ -730,6 +747,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     setGroup(group);
     renderInboxNav(true);
     CH.loadChatCounts(() => renderInboxNav(true));
+    refreshBoards(); // the phone drawer's Boards group
     if (!nativeInbox()) { // the Hub-served Inbox has the chat folders only: no request for what it does not draw
         refreshTasks();
         refreshReviews(true);
@@ -817,7 +835,7 @@ export async function openInboxItem(kind, team, id) {
     setGroup(key);
     const host = $('inbox-page'); host.hidden = false; host.classList.add('inbox-item-page'); host.replaceChildren();
     showView('inbox-view'); $('inbox-view')?.setAttribute('data-phone-item', '');
-    host.append(VL.build({ id: 'inbox-item-folders', label: 'Inbox views', sections: folderSections(), current: key, onPick: pickFolder, drawer: true }));
+    host.append(VL.build({ id: 'inbox-item-folders', label: 'Inbox views', sections: folderSections(), current: navCurrent(), onPick: pickFolder, drawer: true }));
     const body = el('div', 'inbox-item-body'); host.append(body);
     const before = String(history.state?.prev || '');
     itemMount = mountInboxItem(body, { kind, team, id, onChanged: refreshTasks, backLabel: kind === 'tasks' ? backLabelFor('task', before, openedFrom()) : '', back: () => { if (backIs(route) || cameFromInbox()) history.back(); else go(route); } }); // Back returns to the Inbox screen it was opened from (a goal, another task), else to the folder

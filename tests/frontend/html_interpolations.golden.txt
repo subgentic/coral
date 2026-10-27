@@ -235,6 +235,7 @@
 1	model_chip.js	checked
 2	model_chip.js	how
 1	model_chip.js	kind
+1	needs_input_card.js	apart.map(o => optionButtonHtml(o, "", fullLabels[o.label])).join("")
 1	needs_input_card.js	controls.foot
 1	needs_input_card.js	hint
 2	needs_input_card.js	kicker
