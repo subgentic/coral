@@ -31,10 +31,11 @@ const BASE = require('./test_base').BASE;
             await evaluate(`window.switchNavTab('agents')`);
             assert.deepEqual(await visible(), ['mobile-agent-list']);
             await evaluate(`window.switchNavTab('automations')`);
-            assert.deepEqual(await visible(), ['scheduler-view']);
+            await evaluate(`new Promise(resolve => { const wait = () => document.getElementById('group-table-view').getClientRects().length > 0 ? resolve() : setTimeout(wait, 50); wait(); })`); // Automations opens its first folder's table once its module has loaded
+            assert.deepEqual(await visible(), ['group-table-view'], 'Automations with nothing open is a folder table (Goal #74), not a job page');
             await evaluate(`window.mobileBack()`);
             assert.deepEqual(await visible(), ['mobile-agent-list']);
-            await evaluate(`window.openAutomationsFolder('workflows'); window.switchMobileTab('agents')`);
+            await evaluate(`Promise.resolve(window.openAutomationsFolder('workflows')).then(() => new Promise(resolve => { const wait = () => document.getElementById('group-table-view').getClientRects().length > 0 ? resolve() : setTimeout(wait, 50); wait(); })).then(() => window.switchNavTab('agents'))`); // the folder opens asynchronously: wait for its table, then take the tab to Agents (the bottom tab bar is hidden on a phone: switchMobileTab is for the agent pages)
             assert.deepEqual(await visible(), ['mobile-agent-list']);
             assert.ok(await evaluate(`(() => { const nav = document.querySelector('.top-nav-tabs'); nav.scrollLeft = nav.scrollWidth; const last = document.getElementById('nav-tab-docs').getBoundingClientRect(); const bounds = nav.getBoundingClientRect(); return document.documentElement.scrollWidth <= innerWidth && last.right <= bounds.right + 1 && bounds.right <= innerWidth; })()`), `tabs reachable at ${width}px`);
             console.log(`PASS ${width}px: exclusive views and reachable navigation`);

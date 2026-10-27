@@ -63,8 +63,8 @@ const PRELOAD = `(() => {
             check(`both themes: readable (4.5:1) and a visible focus ring (${audit.checked} checked)`, audit.fails.length === 0 && audit.checked >= 2, JSON.stringify(audit.fails));
             // it names what waits, it is only where that matters, and it can be dismissed for the day (#6200)
             const where = async tab => { await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`); await new Promise(r => setTimeout(r, 200)); return ev(`getComputedStyle(document.getElementById('claude-signin-line')).display !== 'none' && !document.getElementById('claude-signin-line').hidden`); }; // sleep-ok: the tab's page settles
-            const seen = {}; for (const tab of ['agents', 'jobs', 'workflows', 'history', 'board', 'docs', 'tokens', 'hub-inbox']) seen[tab] = await where(tab);
-            check('shown on Agents, Jobs and Workflows only: not on Chats, Board, Docs, Analytics or Inbox', seen.agents && seen.jobs && seen.workflows && !seen.history && !seen.board && !seen.docs && !seen.tokens && !seen['hub-inbox'], JSON.stringify(seen));
+            const seen = {}; for (const tab of ['agents', 'automations', 'history', 'board', 'docs', 'tokens', 'hub-inbox']) seen[tab] = await where(tab);
+            check('shown on Agents and Automations only: not on Chats, Board, Docs, Analytics or Inbox', seen.agents && seen.automations && !seen.history && !seen.board && !seen.docs && !seen.tokens && !seen['hub-inbox'], JSON.stringify(seen));
             await where('agents');
             check('it has a Dismiss button, named, and a touch target on a phone', await ev(`(() => { const b = document.getElementById('signin-line-dismiss'); const r = b.getBoundingClientRect(); return b.getAttribute('aria-label') === 'Dismiss the Claude sign-in note' && r.width >= (${view.mobile ? 44 : 20}) && r.height >= (${view.mobile ? 44 : 20}); })()`));
             await ev(`document.getElementById('signin-line-dismiss').click(); true`);
