@@ -92,6 +92,15 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await pick('pty');
         r = await row();
         check('picking pty says it switches when Coral restarts', r.pending === 'Switches to pty when Coral restarts. Apply asks first.', r.pending);
+        // the one line under the choice says what the chosen backend does, and follows the choice (#9490); the pty sentence says they wake next time only while Wake agents after a restart is on (#6263)
+        const hint = () => ev(`document.querySelector('#tb-choice').closest('.sv-row').querySelector('.tb-hint').textContent`);
+        const tick = on => ev(`(() => { const b = document.getElementById('tb-autowake-on'); b.checked = ${on}; b.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await tick(true);
+        check('with Wake agents after a restart on, the pty hint says they wake next time', (await hint()) === 'Agents stop when you quit Coral and wake next time.', await hint());
+        await tick(false);
+        check('with it off, the pty hint no longer says they wake', (await hint()) === 'Agents stop when you quit Coral.', await hint());
+        await pick('tmux');
+        check("picking tmux changes the hint to tmux's", (await hint()) === "Agents keep running when you quit Coral, and can reach each other's terminals.", await hint());
 
         // ── Apply, then Cancel: nothing saved, Settings stays open ──────────
         await ev(`window.__tbFake = { status: () => ({ saved: 'tmux', running: 'tmux', next: 'tmux', forced: false, choice: true, restart_required: false, can_restart: true, running_agents: 2, leftover_tmux_agents: 0 }) }; true`);

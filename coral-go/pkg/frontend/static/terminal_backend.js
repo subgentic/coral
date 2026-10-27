@@ -7,6 +7,7 @@
  * this exists through Coral Hub. */
 
 import { showToast } from './utils.js';
+import { backendHint } from './settings_fields.js';
 import { setHooksMissing } from './hooks_missing.js';
 import { isCloud } from './server_base.js';
 import { isSignedOut, pollEvery } from './overload.js';
@@ -19,6 +20,12 @@ let _status = null; // GET /api/system/terminal-backend
 let _autoWakeShown = null; // the auto-wake values as the dialog opened (#3636)
 const show = (id, on) => { const r = document.getElementById(id)?.closest('.sv-row'); if (r) r.hidden = !on; };
 const $ = id => document.getElementById(id);
+
+/** Writes the sentence that goes with the choice under the select (a redraw of the form reads it again through the field's helpOf). */
+function paintBackendHint() {
+    const p = $('tb-choice')?.closest('.sv-row')?.querySelector('.tb-hint');
+    if (p) p.textContent = backendHint();
+}
 
 async function fetchStatus() {
     const resp = await fetch('/api/system/terminal-backend');
@@ -79,9 +86,12 @@ export async function loadTerminalBackendRow() {
         const sel = $('tb-choice');
         if (sel) {
             sel.value = next;
-            if (!sel._tbWired) { sel._tbWired = true; sel.addEventListener('change', renderPending); }
+            if (!sel._tbWired) { sel._tbWired = true; sel.addEventListener('change', () => { renderPending(); paintBackendHint(); }); }
         }
         renderPending();
+        paintBackendHint();
+        const box = $('tb-autowake-on');
+        if (box && !box._tbWakes) { box._tbWakes = true; box.addEventListener('change', paintBackendHint); }
     }
 }
 

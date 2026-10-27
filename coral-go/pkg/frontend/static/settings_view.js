@@ -19,7 +19,7 @@
  *   field = { key, type: 'text'|'textarea'|'number'|'select'|'toggle'|'multiselect'|'radio'|'secret'|'path'|'custom', label, help?: string | { text, more },
  *             id?, default?, required?, placeholder?, rows?, min?, max?, step?, unit?, options?: [{ value, label, help?, id? }] | async () => [...], validate?(value, values) => '' | 'message',
  *             live?: [element ids or { id, wide?, describes?: false }] (page elements a module fills, moved under the help, or under the whole row; the control is described by them),
- *             visibleWhen?(values), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, compact?, render?(slot, ctl) => { get, invalid?(on) (mark the control's own input), focus?, set, onChange? } }
+ *             visibleWhen?(values), helpOf?() => the sentence under the label, read again at every redraw (a sentence that follows the choice), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, compact?, render?(slot, ctl) => { get, invalid?(on) (mark the control's own input), focus?, set, onChange? } }
  *
  * The controller: values() set(key, v) dirty() isDirty() changes() error(key, message) clearErrors() validate({ focus }) save() cancel() showGroup(id) reload() destroy(), and retext(key, { label?, help?, required?, optional?, requiredMessage? })
  * (a field that is worded for the mode its dialog is in: the label, the sentence under it, Required).
@@ -328,7 +328,7 @@ export function mountSettingsView(host, spec) {
             if (r.actionEl) r.actionEl.disabled = off && !!(globalReadOnly || ro);
             const why = reasonOf(ro) || reasonOf(dis);
             if (off) r.row.setAttribute('data-disabled', '1'); else r.row.removeAttribute('data-disabled');
-            if (r.helpEl) { const t = r.helpEl.querySelector('.sv-help-text'); r.baseHelp = r.baseHelp ?? t.textContent; t.textContent = why ? `${why}${r.baseHelp ? ' ' + r.baseHelp : ''}` : r.baseHelp; }
+            if (r.helpEl) { const t = r.helpEl.querySelector('.sv-help-text'); r.baseHelp = r.field.helpOf ? r.field.helpOf() : (r.baseHelp ?? t.textContent); t.textContent = why ? `${why}${r.baseHelp ? ' ' + r.baseHelp : ''}` : r.baseHelp; }
         }
     }
     function paintBar() {
