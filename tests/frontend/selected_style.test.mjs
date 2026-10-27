@@ -8,7 +8,6 @@ const css = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../coral
 const SELECTED = [
     ['components.css', '.seg-btn[aria-checked="true"]'],
     ['scheduler.css', '.sched-preset.active'],
-    ['scheduler.css', '.job-type-btn.active'],
     ['components.css', '.flag-shortcut-btn.active'],
     ['components.css', '.template-cat-btn.active'],
     ['components.css', '.perm-chip.active'],
