@@ -17,9 +17,9 @@
     --table-head-color: var(--text-muted);
     --table-head-active: var(--text-primary);
     --table-code-font: var(--font-mono, monospace);
-    --table-primary-size: 0.875rem;
-    --table-primary-weight: 600;
-    --table-fold-primary-weight: 500;
+    --table-primary-size: var(--fs-md);
+    --table-primary-weight: 400;
+    --table-fold-primary-weight: 400;
     --table-fold-line-h: 24px;
     --table-fold-meta-h: 20px;
     --table-fold-row-h: 60px;
