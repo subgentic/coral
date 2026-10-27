@@ -69,10 +69,10 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await ev(`document.body.dataset.navTab`),'hub-inbox','preview keeps Inbox');
                 // Close the shared viewer using its visible control, retaining the list.
                 await ev(`document.querySelector('.artifact-viewer-close').click();true`);
-                await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Mark reviewed').click();true`);
+                await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Mark reviewed'||(b.getAttribute('aria-label')||'').startsWith('Mark reviewed')).click();true`);
                 await waitFor(`document.body.textContent.includes('Review save failed')`,'failed save is visible');
                 assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'failed save keeps row');
-                await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Mark reviewed').click();true`);
+                await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Mark reviewed'||(b.getAttribute('aria-label')||'').startsWith('Mark reviewed')).click();true`);
                 await waitFor(`!(${row('Review file 01.txt')})`,'reviewed row removed');
                 assert.deepEqual((await ev(`window.__reviewWrites.at(-1).tags`)).sort(),['internal','reviewed']);
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'12');

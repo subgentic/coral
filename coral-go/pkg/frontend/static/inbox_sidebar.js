@@ -9,7 +9,7 @@ import { needsInputAttention } from './display_activity_hint.js';
  * The one search box searches the group on screen: it narrows the rows of Needs you and Tasks, and is the Saved search (the server matches, so it covers every saved message). Saved's Filters and Sort
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
-import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed, setReviewRead, isRead } from './inbox_reviews.js';
+import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
@@ -136,7 +136,7 @@ const needsState = DT.tableState();
 async function openReview(row) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
     openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name });
-    if (!isRead(row)) setReviewRead(row, true).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); a failed save is said, and the item keeps counting
+    markOpenedRead(row.hex).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
 function reviewActions(row) {
     const box = DT.el('div', 'inbox-review-actions');
@@ -156,7 +156,8 @@ function reviewActions(row) {
     box.append(open);
     if (isRead(row)) {
         box.classList.add('inbox-review-actions-read');
-        const unread = DT.el('button', 'btn btn-small', 'Unread'); unread.type = 'button'; // the word is short so the row stays one line; its name says what it does
+        const unread = DT.el('button', 'btn btn-small inbox-review-icon'); unread.type = 'button'; unread.title = 'Mark unread'; // an icon, so a phone's row stays one line; its name says what it does
+        unread.append(DT.el('span', 'material-icons', 'replay')); unread.firstChild.setAttribute('aria-hidden', 'true');
         unread.setAttribute('aria-label', `Mark unread: ${row.name}`);
         unread.addEventListener('click', async () => {
             unread.disabled = true; errorText.textContent = '';
@@ -164,6 +165,7 @@ function reviewActions(row) {
         });
         box.append(unread);
     }
+    if (isRead(row)) { done.classList.add('inbox-review-icon'); done.title = 'Mark reviewed'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'done_all')); done.firstChild.setAttribute('aria-hidden', 'true'); }
     box.append(done, errorText); return box;
 }
 

@@ -1,6 +1,7 @@
 /* Coral artifact rendering for the preview pane (manifests, reports, media, sandboxed HTML) */
 
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
 import { escapeHtml, escapeAttr, renderImagePanes } from './utils.js';
 import { renderJSONReport } from './artifact_report.js';
 import { splitKey, serverUrl, contextServer, isCloud, artifactPath } from './server_base.js';
@@ -178,6 +179,8 @@ export async function renderArtifact(body, uri, options, ctx) {
     const source = resolveArtifactSource(uri, options);
     if (!source) { body.innerHTML = '<div class="inline-preview-error">Artifact unavailable</div>'; return; }
     const { url, externalURL } = source;
+    const opened = CORAL_ARTIFACT_URI_RE.exec(uri);
+    if (opened) importOnce('./inbox_reviews.js').then(m => m.markOpenedRead(opened[1])).catch(() => {}); // a for-review artifact opened in a preview is read (#9277); any other is never tagged
     body.innerHTML = '<div class="inline-preview-loading">Loading...</div>';
     if (externalURL) {
         _renderSandboxed(body, { url: externalURL, name: options.filename, isStale: ctx.isStale });
