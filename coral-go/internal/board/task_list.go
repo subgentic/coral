@@ -77,7 +77,7 @@ type TaskListItem struct {
 	Reviewers []string `db:"-" json:"reviewers,omitempty"`
 	// ArtifactCount: how many distinct artifacts the task's own results hold (its completion's and its review's, each stored object or link once): the Tasks tab's file count (#8579). Absent for none.
 	ArtifactCount int `db:"-" json:"artifact_count,omitempty"`
-	// ArtifactRows is the number of artifact rows in the workflow as the query counts them; fillListArtifactCounts turns it into ArtifactCount.
+	// ArtifactRows is the workflow's distinct artifact count (its lst_artifacts column); ArtifactCount is it unless the exact counter says otherwise (fillListArtifactCounts).
 	ArtifactRows int `db:"artifact_rows" json:"-"`
 	// ReviewersJSON is the reviewers as the query reads them (a JSON array of names); fillListReviewers turns it into Reviewers.
 	ReviewersJSON string `db:"reviewers_json" json:"-"`
@@ -106,22 +106,22 @@ type TaskListQuery struct {
 }
 
 // taskListColumns selects a TaskListItem. body_preview is the first 200 characters (the
-// row tooltip); the workflow JSON is read for its outcome and whether a review is pending.
+// row tooltip); the workflow's facts (outcome, reviewers, artifact count...) are its lst_* columns (task_list_facts.go), never its JSON.
 const taskListColumns = `t.id, t.revision, t.board_id, t.title,
 	COALESCE(SUBSTR(t.body, 1, 200), '') AS body_preview,
 	t.status, t.priority, t.created_by, t.assigned_to, t.completed_by, t.created_at, t.claimed_at,
 	t.completed_at, t.session_id, t.goal_id, t.cost_usd,
-	COALESCE(json_extract(w.data, '$.outcome'), '') AS outcome,
-	COALESCE(json_type(w.data, '$.completion_review') = 'object', 0) AS review_requested,
-	CASE WHEN COALESCE(json_extract(w.data, '$.original_author'), '') != '' THEN json_extract(w.data, '$.original_author')
+	COALESCE(w.lst_outcome, '') AS outcome,
+	COALESCE(w.lst_review_requested, 0) AS review_requested,
+	CASE WHEN COALESCE(w.lst_author, '') != '' THEN w.lst_author
 	     WHEN t.status = 'completed' AND COALESCE(t.completed_by, '') != '' THEN t.completed_by
 	     ELSE COALESCE(t.assigned_to, '') END AS worked_by,
 	` + prefixedUpdatedAtSQL + ` AS updated_at,
-	COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(w.data, '$.review_rounds[#-1].reviewers') v), '[]') AS reviewers_json,
-	COALESCE(json_array_length(w.data, '$.artifacts'), 0) + COALESCE(json_array_length(w.data, '$.completion_review.artifacts'), 0) AS artifact_rows,
-	COALESCE(json_extract(w.data, '$.review_areas'), '[]') AS review_areas_json,
-	CASE WHEN t.status = 'review_pending' AND COALESCE(json_extract(w.data, '$.review_in_pool'), 0) = 1 THEN 1 ELSE 0 END AS review_in_pool,
-	COALESCE(json_extract(w.data, '$.reviewers_wanted'), 0) AS reviewers_wanted
+	COALESCE(w.lst_reviewers, '[]') AS reviewers_json,
+	COALESCE(w.lst_artifacts, 0) AS artifact_rows,
+	COALESCE(w.lst_review_areas, '[]') AS review_areas_json,
+	CASE WHEN t.status = 'review_pending' AND COALESCE(w.lst_in_pool, 0) = 1 THEN 1 ELSE 0 END AS review_in_pool,
+	COALESCE(w.lst_wanted, 0) AS reviewers_wanted
 	FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id`
 
 // ListTaskPage returns a page of the board's task list. Each page costs O(limit) rows:
@@ -383,8 +383,8 @@ func (s *Store) ListNeedsReview(ctx context.Context, project string, limit int) 
 	return page, nil
 }
 
-// fillListArtifactCounts sets ArtifactCount on the items that hold artifact rows: one batched read of their workflows, then each distinct stored object or link counted once, and a
-// piece of inline content once for its place (the task page's list collapses the same way, #8579).
+// fillListArtifactCounts sets ArtifactCount: the exact counter's, when there is one, else the distinct count the workflow's lst_artifacts column holds (each stored object or link once, a piece of inline content
+// once for its place, the way the task page's list collapses them, #8579).
 func (s *Store) fillListArtifactCounts(ctx context.Context, items []TaskListItem) {
 	if s.artifactCounter.Load() != nil { // the exact counts, a board at a time (a list is of one board; a goal's page too)
 		byBoard := map[string]map[int64]int{}
@@ -400,29 +400,8 @@ func (s *Store) fillListArtifactCounts(ctx context.Context, items []TaskListItem
 		}
 		return
 	}
-	var ids []int64
-	for i := range items {
-		if items[i].ArtifactRows > 0 {
-			ids = append(ids, items[i].ID)
-		}
-	}
-	if len(ids) == 0 {
-		return
-	}
-	data, err := s.loadWorkflowData(ctx, ids)
-	if err != nil {
-		return
-	}
-	for i := range items {
-		if items[i].ArtifactRows == 0 {
-			continue
-		}
-		raw, found := data[items[i].ID]
-		w, err := decodeWorkflow(raw, found)
-		if err != nil {
-			continue
-		}
-		items[i].ArtifactCount = countDistinctArtifacts(&w)
+	for i := range items { // the count the workflow's columns hold: no document is read
+		items[i].ArtifactCount = items[i].ArtifactRows
 	}
 }
 

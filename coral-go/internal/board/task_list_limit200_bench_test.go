@@ -176,3 +176,20 @@ func BenchmarkTaskListLimit200Reply(b *testing.B) {
 	})
 	b.Logf("json %d bytes, gzip %d bytes", len(raw), zlen)
 }
+
+// What the open-time check costs on 5,000 workflows (every open re-derives the rows that disagree; here none do).
+func BenchmarkWorkflowListFactsOpen(b *testing.B) {
+	s, err := NewStoreWithKey(filepath.Join(b.TempDir(), "board_bench6.db"), "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { s.Close() })
+	seedTaskBoardWithWorkflows(b, s, 1500, 3500)
+	ctx := context.Background()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := s.ensureWorkflowListFacts(ctx); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

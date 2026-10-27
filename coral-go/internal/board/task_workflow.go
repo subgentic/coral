@@ -120,7 +120,10 @@ func (s *Store) initTaskWorkflows(ctx context.Context) error {
 	if err := s.ensureWorkflowArtifactFlag(ctx); err != nil {
 		return err
 	}
-	return s.ensureWorkflowEfficiencyFacts(ctx)
+	if err := s.ensureWorkflowEfficiencyFacts(ctx); err != nil {
+		return err
+	}
+	return s.ensureWorkflowListFacts(ctx)
 }
 
 // artifactsMark is the text a workflow's JSON holds when any result of the task (its completion's, its review's) lists an artifact: the team artifacts read used to find those tasks by a LIKE over every
