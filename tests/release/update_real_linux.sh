@@ -47,6 +47,9 @@ while [ $# -gt 0 ]; do
     *) echo "update_real_linux: unknown option $1" >&2; exit 2 ;;
   esac
 done
+# the tag regex of the update-real-macos workflow (a plain release tag, or one of the build-suffixed ones): nothing else reaches a URL, a path or a command
+tag_re='^v[0-9]+\.[0-9]+\.[0-9]+(-(rc[0-9]*|beta|dev|forDropbox))?$'
+for t in "$from" "$to"; do [[ "$t" =~ $tag_re ]] || { echo "update_real_linux: not a release tag, refused: $t" >&2; exit 2; }; done
 [ "$(uname -s)" = Linux ] || { echo "update_real_linux: Linux only (the macOS run is tests/release/update_real.sh)" >&2; exit 2; }
 case "$(uname -m)" in x86_64) arch=amd64 ;; aarch64|arm64) arch=arm64 ;; *) echo "update_real_linux: amd64 and arm64 only, this is $(uname -m)" >&2; exit 2 ;; esac
 for t in curl python3 tar sha256sum; do command -v "$t" >/dev/null || { echo "update_real_linux: needs $t" >&2; exit 2; }; done
@@ -56,10 +59,12 @@ work=$(mktemp -d /tmp/coral-upd.XXXXXX) || exit 2   # short path: tmux and pty s
 PIDS=()
 DD="$work/d"; HH="$work/h"
 app="$work/app"
+# at cleanup a recorded pid is killed only if its program is still a file of this work folder (a pid that ended and was reused by another process is never killed)
+in_work() { local exe; exe=$(readlink "/proc/$1/exe" 2>/dev/null); case "$exe" in "$work"/*) return 0 ;; *) return 1 ;; esac; }
 cleanup() {
-  for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null || true; done
+  for p in ${PIDS[@]+"${PIDS[@]}"}; do in_work "$p" && kill "$p" 2>/dev/null; done
   sleep 2
-  for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null; done
+  for p in ${PIDS[@]+"${PIDS[@]}"}; do in_work "$p" && kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null; done
   # the tmux server of this run outlives Coral on purpose: stop it by the socket of this run's own data folder
   if [ -S "$DD/tmux.sock" ] && command -v tmux >/dev/null; then tmux -S "$DD/tmux.sock" kill-server 2>/dev/null || true; fi
   if [ "$keep" = 1 ]; then echo "update_real_linux: kept $work"; else case "$work" in /tmp/coral-upd.??????) rm -rf -- "$work" ;; esac; fi
@@ -143,7 +148,9 @@ for i in $(seq 1 150); do curl -sf -m 3 "http://127.0.0.1:$PORT/api/health" >/de
 for i in $(seq 1 80); do [ -r "$DD/api_key" ] && break; sleep 0.5; done
 KEY=$(tr -d '[:space:]' < "$DD/api_key" 2>/dev/null)
 base="http://127.0.0.1:$PORT"
-api() { curl -s -m 30 -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' "$@"; }
+# the throwaway instance's API key goes to curl from files (-H @file), never on a command line that ps shows
+( umask 077; printf 'Authorization: Bearer %s\n' "$KEY" > "$work/hdr.auth"; printf 'X-API-Key: %s\n' "$KEY" > "$work/hdr.key" )
+api() { curl -s -m 30 -H @"$work/hdr.auth" -H 'Content-Type: application/json' "$@"; }
 person() { env -i HOME="$HH" PATH=/usr/bin:/bin "$work/bin/person-call" --data-dir "$DD" --url "$base" "$@"; }   # prints "CODE body"
 pbody() { sed 's/^[0-9]* //'; }
 health() { curl -s -m 5 "$base/api/health" | jget version; }
@@ -220,7 +227,7 @@ fi
 
 # ---- 4 ask -------------------------------------------------------------------------------------------------
 body="{\"ack\":\"$tok\"}"
-c_key=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -X POST -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d "$body" "$base/api/system/update/relaunch-local")
+c_key=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -X POST -H @"$work/hdr.key" -H 'Content-Type: application/json' -d "$body" "$base/api/system/update/relaunch-local")
 c_agent=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -X POST -H "X-Coral-Session-Token: not-a-token" -H 'Content-Type: application/json' -d "$body" "$base/api/system/update/relaunch-local")
 if [ "$c_key" -ge 400 ] 2>/dev/null && [ "$c_agent" -ge 400 ] 2>/dev/null && [ "$(health)" = "$fromv" ] && kill -0 "$SRV0" 2>/dev/null; then
   result "4 ask" PASS "an API key ($c_key) and an agent's token ($c_agent) are refused; $fromv still the one running"
