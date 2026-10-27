@@ -25,6 +25,8 @@ const board = 'task-preview-' + Date.now().toString(36);
    const before=await ev(`(()=>{const r=[...document.querySelectorAll('#board-task-list .board-task-item')].at(-1);r.querySelector('.board-task-name').scrollIntoView({block:'nearest'});window.__previewOpener=r;return {url:location.pathname,title:r.querySelector('.board-task-name').textContent,scroll:document.getElementById('agentic-panel-tasks').scrollTop};})()`);
    await ev(`window.__previewOpener.querySelector('.board-task-name').click();true`);
    await waitFor(`!!document.querySelector('#preview-pane .team-task-page')`,'task detail in shared preview pane',7000);
+   assert.equal(await ev(`document.activeElement?.id === 'team-task-title'`),false,'opening never focuses the heading');
+   assert.equal(await ev(`!!document.querySelector('#preview-pane .goals-back')?.getClientRects().length`),false,'no duplicate Tasks back link');
    assert.equal(await ev(`location.pathname`),before.url,'opening keeps the agent URL');
    assert.equal(await ev(`document.getElementById('agentic-panel-tasks').scrollTop`),before.scroll,'list scroll stays put');
    assert.equal(await ev(`window.__previewOpener.getAttribute('aria-current')`),'true','clicked row remains highlighted');
@@ -38,7 +40,7 @@ const board = 'task-preview-' + Date.now().toString(36);
    await waitFor(`!!document.querySelector('#preview-pane #task-edit-title')`,'edit form in preview');
    await ev(`[...document.querySelectorAll('#preview-pane .goals-pinbar button')].find(b=>b.textContent==='Cancel').click();true`);
    await waitFor(`!document.querySelector('#preview-pane #task-edit-title') && !!document.querySelector('#preview-pane .team-task-body')`,'cancel restores detail');
-   assert.equal(await ev(`document.activeElement === document.querySelector('#preview-pane .goals-back')`),true,'preview focuses Back rather than the task heading');
+   assert.equal(await ev(`document.activeElement === document.querySelector('#preview-pane .preview-tab.active .preview-tab-close')`),true,'preview focuses its existing close control rather than the task heading');
    const dir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
    if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(dir,`dock-task-preview-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
    if(width===390){await ev(`document.getElementById('preview-full-back').click();true`);await waitFor(`document.getElementById('agentic-panel-tasks').getClientRects().length>0`,'Back restores list');}
