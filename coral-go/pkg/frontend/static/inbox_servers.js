@@ -19,7 +19,11 @@ export const serverColumns = () => multipleServers() ? [{ key: 'server', label: 
 /** Each source owns its cursor. Never send one machine's cursor or team key to another. */
 export async function readInboxArtifacts(params, filters = {}, signal) {
     let cursors = {};
-    if (params.get('cursor')) cursors = JSON.parse(params.get('cursor'));
+    try {
+        const parsed = JSON.parse(params.get('cursor') || '{}');
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) &&
+            Object.values(parsed).every(value => value && typeof value === 'object' && !Array.isArray(value))) cursors = parsed;
+    } catch { /* Old single-source or malformed cursors restart each source from the top. */ }
     const team = filters.team ? splitKey(filters.team) : null;
     const sources = inboxSources().filter(id => (!multipleServers() || !filters.server || filters.server === id) && (!team || team.server === id));
     const results = await Promise.all(sources.map(async server => {
@@ -40,6 +44,6 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
     const next = Object.fromEntries(results.map(({ artifacts, ...data }) => [data.server, data]));
     return { artifacts: results.flatMap(d => d.artifacts), teams: results.flatMap(d => d.teams || []),
         all: results.reduce((n,d) => n + (d.all || 0), 0), total: results.reduce((n,d) => n + (d.total || 0), 0),
-        tag_counts: results.reduce((counts,d) => { for (const [tag,n] of Object.entries(d.tag_counts || {})) counts[tag] = (counts[tag] || 0) + n; return counts; }, {}),
+        tag_counts: results.reduce((counts,d) => { for (const [tag,n] of Object.entries(d.tag_counts || {})) counts[tag] = (counts[tag] || 0) + n; return counts; }, Object.create(null)),
         has_more: results.some(d => !d.done), next_cursor: JSON.stringify(next), truncated: results.some(d => d.truncated) };
 }

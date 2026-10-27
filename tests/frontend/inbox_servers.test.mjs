@@ -24,6 +24,13 @@ assert.equal(reads.length,3);
 reads.length=0;
 const selected=await readInboxArtifacts(new URLSearchParams({limit:'1',team:'@box-2/same'}),{server:'box-2',team:'@box-2/same'});
 assert.equal(selected.artifacts[0].server,'box-2');assert.equal(reads.length,1);assert.equal(reads[0].searchParams.get('team'),'same');
+for (const cursor of ['old-cursor', 'null', '[]', '42', '"old-cursor"', '{"local":"old-cursor"}']) {
+ reads.length=0;
+ const restarted=await readInboxArtifacts(new URLSearchParams({cursor}));
+ assert.equal(restarted.artifacts.length,2,'invalid cursor restarts all sources');
+ assert.ok(reads.every(u=>!u.searchParams.has('cursor')&&u.searchParams.get('offset')==='0'),'invalid cursor never reaches a source');
+}
+assert.equal(Object.getPrototypeOf(first.tag_counts),null,'remote tag names do not inherit object keys');
 state.hub=false;
 assert.equal(multipleServers(),false);assert.deepEqual(serverColumns(),[]);assert.equal(serverMatches({server:'local'},{server:'box-2'}),true);
 state.hub=true;state.servers=[{id:'local'}];assert.equal(multipleServers(),false);
