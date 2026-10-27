@@ -44,12 +44,11 @@ let _boardChatSelectMode = false;
 let _boardChatSelectedIds = new Set();
 
 // An agent's dock shows what that agent would read (#8484): the messages its read delivers (its @mentions, @all and the rest of the server's one rule), asked of the board with for_subscriber.
-// "Whole board" shows everything; the choice is kept per browser, as Table | Chat is. The Orchestrator's dock, and an agent with no member id, has no switch and shows the whole board.
-const SCOPE_KEY = 'coral.board.scope';
+// The Orchestrator's dock, and an agent with no member id, shows the whole board; the team page's Board tab is the whole board for everyone.
+const SCOPE_KEY = 'coral.board.scope'; // the removed "For this agent | Whole board" choice (#8930): forgotten from the browser when a dock is drawn
 let _boardChatScope = '';      // the member whose read the list is (empty: the whole board)
 let _boardChatReader = null;   // { id, name } the dock's agent as a board member, or null when its dock shows the whole board
 let _boardChatBoardTotal = 0;  // the whole board's count, beside the reader's own
-const scopePref = () => (browserLocal.get(SCOPE_KEY) === 'all' ? 'all' : 'agent');
 const scopeQuery = () => (_boardChatScope ? `&for_subscriber=${encodeURIComponent(_boardChatScope)}` : '');
 
 // The dock's search is the board page's search bar in its own instance (board_search.js), asking for the same list the dock shows: for the agent's list, the matches are the search and that list together.
@@ -63,7 +62,7 @@ const _dockSearchHooks = {
     latest: () => { const box = document.getElementById('board-panel-msgs'); if (box) box.scrollTop = box.scrollHeight; },
     expandAll: () => setAllRows(document.getElementById('board-panel-msgs'), true),
     collapseAll: () => setAllRows(document.getElementById('board-panel-msgs'), false),
-    noMatch: () => (_boardChatScope && _boardChatReader ? { text: `No match in what ${_boardChatReader.name} reads`, link: { label: 'Show the whole board', run: () => _setBoardChatScopePref('all') } } : null),
+    noMatch: () => (_boardChatScope && _boardChatReader ? { text: `No match in what ${_boardChatReader.name} reads` } : null),
 };
 
 // What a rebuild used to reset and a kept panel must reset itself on a switch: select mode, an open @-mention list, the title.
@@ -86,7 +85,8 @@ function _resetBoardPanelForSwitch(panel, boardName) {
 export function showBoardChatTab(boardName, agent = null) {
     _activeBoardChat = boardName;
     _boardChatReader = agent && agent.subscriber && !agent.orchestrator ? { id: String(agent.subscriber), name: agent.name || String(agent.subscriber) } : null;
-    const scope = _boardChatReader && scopePref() === 'agent' ? _boardChatReader.id : '';
+    browserLocal.remove(SCOPE_KEY);
+    const scope = _boardChatReader ? _boardChatReader.id : '';
     ++_boardChatGen;
     const panel = document.getElementById('agentic-panel-board');
     if (!panel) return;
@@ -159,7 +159,7 @@ export function showBoardChatTab(boardName, agent = null) {
     }
     _boardChatSelectMode = false;
     _boardChatSelectedIds.clear();
-    _syncScopeBar(panel, agent);
+    _syncScopeBar(panel);
     _mountDockSearch(panel, boardName);
     if (_boardChatLoaded) _renderBoardPanelMessages(document.getElementById('board-panel-msgs'), true);
 
@@ -343,13 +343,8 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
     if (!msgsEl) return;
     const messages = _boardChatMessages;
     if (!messages.length && _boardChatOffset <= 0) {
-        if (_boardChatScope && _boardChatReader) { // nothing for this agent yet: say so, and the way to the whole board
-            const line = document.createElement('div'); line.className = 'board-chat-empty';
-            const more = document.createElement('button'); more.type = 'button'; more.className = 'board-scope-link'; more.textContent = 'Show the whole board';
-            more.addEventListener('click', () => _setBoardChatScopePref('all'));
-            line.append(`Nothing for ${_boardChatReader.name} yet. `, more);
-            msgsEl.replaceChildren(line);
-        } else msgsEl.innerHTML = `<div class="board-chat-empty">${escapeHtml(_emptyBoardLine())}</div>`;
+        if (_boardChatScope && _boardChatReader) msgsEl.innerHTML = `<div class="board-chat-empty">${escapeHtml(`Nothing for ${_boardChatReader.name} yet.`)}</div>`; // nothing for this agent yet
+        else msgsEl.innerHTML = `<div class="board-chat-empty">${escapeHtml(_emptyBoardLine())}</div>`;
         msgsEl.dataset.rendered = '1';
         _syncScopeNote();
         return;
@@ -563,36 +558,20 @@ async function _dockJumpTo(id) {
     _dockSearch.highlight(box);
 }
 
-/** The dock's choice between what this agent reads and the whole board, kept per browser; the list is asked for again. */
-function _setBoardChatScopePref(pref) {
-    browserLocal.set(SCOPE_KEY, pref === 'all' ? 'all' : 'agent');
-    if (_activeBoardChat) showBoardChatTab(_activeBoardChat, _boardChatAgentArg);
-    _dockSearch.rerun(); // a search in hand was of the other list
-}
-let _boardChatAgentArg = null;
-
-/** The scope row under the dock's head: the "For this agent | Whole board" switch and, while the list is filtered, one quiet line saying what it is. Not drawn for the Orchestrator or an agent with no member id. */
-function _syncScopeBar(panel, agent) {
-    _boardChatAgentArg = agent;
+/** The scope row under the dock's head: one quiet line saying what the agent's list is. Not drawn for the Orchestrator or an agent with no member id. */
+function _syncScopeBar(panel) {
     let bar = panel.querySelector(':scope > .board-chat-scope');
     if (!_boardChatReader) { bar?.remove(); return; }
     if (!bar) {
         bar = document.createElement('div'); bar.className = 'board-chat-scope';
-        const sw = document.createElement('div'); sw.className = 'mb-view-switch'; sw.setAttribute('role', 'group'); sw.setAttribute('aria-label', 'Show on the board');
-        for (const [key, label] of [['agent', 'For this agent'], ['all', 'Whole board']]) {
-            const b = document.createElement('button'); b.type = 'button'; b.className = 'mb-view-btn'; b.dataset.scope = key; b.textContent = label;
-            b.addEventListener('click', () => _setBoardChatScopePref(key));
-            sw.append(b);
-        }
         const note = document.createElement('p'); note.className = 'board-chat-scope-note'; note.id = 'board-chat-scope-note';
-        bar.append(sw, note);
+        bar.append(note);
         panel.querySelector('.board-chat-header').after(bar);
     }
-    for (const b of bar.querySelectorAll('.mb-view-btn')) b.setAttribute('aria-pressed', String((b.dataset.scope === 'agent') === !!_boardChatScope));
     _syncScopeNote();
 }
 
-/** "Showing what Ada reads: its mentions, @all, its replies and its own posts. 12 of 184 messages": only while the list is filtered. */
+/** "Showing what Ada reads: its mentions, @all, its replies and its own posts. 12 of 184 messages": whenever the dock is an agent's. */
 function _syncScopeNote() {
     const note = document.getElementById('board-chat-scope-note');
     if (!note) return;
