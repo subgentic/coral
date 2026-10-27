@@ -65,11 +65,9 @@ const GOAL = 'Explore goals with two teams';
                 assert.ok(/Outcome/.test(body) && /Try goals, task links and cross-team requests\./.test(body), 'Outcome with its text');
                 assert.ok(/Done when/.test(body) && /You have linked tasks and closed a goal\./.test(body), 'Done when with its text');
                 assert.ok(await ev(`!!window.__tp.find('button, a', /^(\\u2190\\s*)?Goals$/)`), 'a back link named Goals');
-                // the goal's tasks are a column beside it, not a table under it (#7665): the shared sidebar's look, Open then Done
-                assert.equal(await ev(`!!window.__tp.page().querySelector('.goal-main table')`), false, 'no task table in the goal\'s main pane (the tasks are the column\'s)');
-                const col = await ev(`(() => { const s = window.__tp.page().querySelector('.goal-side'); const m = window.__tp.page().querySelector('.goal-main'); if (!s || !s.getClientRects().length) return { shown: false, onPhone: !!m && m.getClientRects().length > 0 }; return { shown: true, right: s.getBoundingClientRect().left >= m.getBoundingClientRect().right - 1, rows: s.querySelectorAll('.dt-primary').length }; })()`);
-                if (col.shown) { assert.ok(col.right && col.rows === 3, `a column at the right with the goal's three tasks: ${JSON.stringify(col)}`); }
-                else { assert.ok(col.onPhone, 'on a phone the goal is the first screen and its task list the next'); await click('button', /^Tasks, 3 open, 0 done$/i, 'button'); assert.equal(await ev(`window.__tp.page().querySelectorAll('.dt-primary').length`), 3, 'three tasks belong to the goal'); await click('button, a', /^(\u2190\s*)?Goal: /, 'back link'); }
+                // the goal's tasks are one list under a Tasks | Artifacts tab strip, in the goal's own pane (#8914)
+                assert.equal(await ev(`!!window.__tp.page().querySelector('.goal-side, .goal-tasks-open')`), false, 'no right-hand Tasks column and no phone Tasks button');
+                assert.equal(await ev(`window.__tp.page().querySelectorAll('.goal-list .dt-primary').length`), 3, 'the goal\'s three tasks are rows of the list under the strip');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Add task$/i)`), 'Add task');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Close goal/i)`), 'Close goal');
                 if (!mobile) { const bar = await assertPinnedBar(ev, '#team-panel-goals .goals-pinbar, .goals-table-page .goals-pinbar, .goals-pinbar', "a goal's page"); assert.match(bar.names.at(-1), /^Close goal/, 'Close goal is the primary, last (named for its goal)'); }
