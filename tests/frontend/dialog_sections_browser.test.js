@@ -68,9 +68,14 @@ const BASE = require('./test_base').BASE;
         assert.equal(v.open, 'agent'); assert.equal(v.panesVisible, 1, 'one section at a time'); assert.equal(v.title, 'Model'); assert.equal(v.desc, '', 'no pane sub-title (#6012)');
         assert.ok(v.listShown && !v.pickShown, 'a wide dialog has the list, not the selector');
         assert.equal(v.footShown && v.footBottom <= v.contentBottom, true, 'the footer is inside the dialog, at its bottom');
-        assert.match(await ev(`document.querySelector('#restart-acf .acf-provider-fixed').textContent`), /^Runs on Claude\. To change the provider, launch a new agent\.$/, 'the provider is said, not offered');
-        assert.equal(await ev(`document.querySelector('#restart-acf .acf-agent-type').disabled`), true);
-        assert.equal(await ev(vis('#restart-acf .acf-provider-label .seg-btn')), false, 'no provider choice');
+        // the provider is New Agent's own picker (#8973): the four radios, the agent's own checked, the select behind it enabled; picking another provider is a switch the restart carries
+        const pick = await ev(`(() => { const g = document.querySelector('#restart-acf .acf-agent-pick'); return g ? { shown: !g.hidden, role: g.getAttribute('role'), radios: [...g.querySelectorAll('input')].map(i => [i.value, i.checked]), disabled: document.querySelector('#restart-acf .acf-agent-type').disabled, fixedLine: !!document.querySelector('#restart-acf .acf-provider-fixed') } : null; })()`);
+        assert.ok(pick && pick.shown && pick.role === 'radiogroup', 'the provider picker is there: ' + JSON.stringify(pick));
+        assert.deepEqual(pick.radios, [['claude', true], ['codex', false], ['agy', false], ['pi', false]], 'the four providers, the agent\'s own chosen');
+        assert.equal(pick.disabled, false, 'the provider can be changed'); assert.equal(pick.fixedLine, false, 'no "launch a new agent" line');
+        await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="codex"]').click(); true`);
+        assert.equal(await ev(`window.getAgentConfig('restart-acf').agentType`), 'codex', 'the restart carries the new provider');
+        await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="claude"]').click(); true`);
         await shot('restart-agent-desktop');
         await go('#restart-modal', 'permissions'); await shot('restart-permissions-desktop');
         // Claude in Bypass Permissions mode never asks, so Allow pre-approves nothing and its row is not shown (UI audit #5589); any other mode shows it.
@@ -121,6 +126,8 @@ const BASE = require('./test_base').BASE;
         await step('next');
         v = await view('#restart-modal');
         assert.ok(v.pickShown && !v.listShown, 'the selector, not the list'); assert.equal(v.overflow, 0);
+        assert.equal(await ev(`[...document.querySelectorAll('#restart-acf .acf-agent-pick .launch-agent-opt')].every(l => l.getBoundingClientRect().height >= 44)`), true, 'the provider choices are touch targets');
+        await shot('restart-agent-phone');
         assert.equal(await ev(`[...document.querySelectorAll('#restart-modal .settings-group-pick select, #restart-modal .modal-footer .btn')].filter(e => e.getBoundingClientRect().width).every(e => e.getBoundingClientRect().height >= 44)`), true, 'targets of 44 px');
         await go('#restart-modal', 'permissions'); v = await view('#restart-modal'); assert.equal(v.open, 'permissions'); assert.equal(v.pick, 'permissions');
         assert.equal(v.footShown && v.footBottom <= v.contentBottom, true, 'the footer stays in view');
