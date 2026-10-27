@@ -10,6 +10,7 @@ import { onViewShown } from './view_switch.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { foldWayBack } from './way_back.js';
 import { importOnce } from './import_once.js';
+import { menuMove } from './menu_keys.js';
 
 const DT = await importOnce('./data_table.js');
 const docTableStates = new Map();
@@ -286,7 +287,7 @@ registerActions({
     'doc-open-key': (el, event) => {
         if (event.target === el && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { // between the topics: the one Tab stop goes with the focus (Enter and Space press the button itself)
             const all = [...document.querySelectorAll('#docs-nav-list [data-doc]')], at = all.indexOf(el);
-            const to = event.key === 'Home' ? 0 : event.key === 'End' ? all.length - 1 : event.key === 'ArrowDown' ? (at + 1) % all.length : (at + all.length - 1) % all.length;
+            const to = menuMove(event.key, all.length, at);
             event.preventDefault();
             all.forEach((e, i) => { e.tabIndex = i === to ? 0 : -1; });
             all[to].focus();

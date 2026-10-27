@@ -85,9 +85,9 @@ function buildTabsMore(tabs) {
     const b = el('button', 'tab team-tab team-tab-more'); b.type = 'button'; b.id = 'team-tab-more';
     b.setAttribute('aria-haspopup', 'menu'); b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-tabs-more-menu'); b.setAttribute('aria-label', 'More tabs');
     b.append(el('span', 'team-tab-label', 'More'));
-    const menu = el('div', 'team-more-menu team-tabs-more-menu'); menu.id = 'team-tabs-more-menu'; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More tabs');
+    const menu = el('div', 'menu team-more-menu team-tabs-more-menu'); menu.id = 'team-tabs-more-menu'; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More tabs');
     for (const t of PHONE_MORE) {
-        const m = el('button', null); m.type = 'button'; m.setAttribute('role', 'menuitem'); m.dataset.tab = t;
+        const m = el('button', 'menu-item'); m.type = 'button'; m.setAttribute('role', 'menuitem'); m.dataset.tab = t;
         m.append(el('span', 'team-more-label', LABEL[t]), el('span', 'tab-count team-tab-count'));
         menu.append(m);
     }
@@ -128,10 +128,10 @@ function openSettings() { importOnce('./team_settings_modal.js').then(m => m.ope
 function buildMore() {
     const host = $('team-page-actions');
     const b = el('button', 'btn team-page-more', 'More'); b.type = 'button'; b.id = 'team-page-more'; b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
-    const menu = el('div', 'team-more-menu'); menu.id = 'team-page-more-menu'; menu.hidden = true; menu.setAttribute('aria-label', 'More team actions');
-    const add = el('button', 'team-more-add', 'Add agent'); add.type = 'button'; add.id = 'team-page-more-add'; // a phone's header has one button: More, with Add agent first, then Settings
+    const menu = el('div', 'menu team-more-menu'); menu.id = 'team-page-more-menu'; menu.hidden = true; menu.setAttribute('aria-label', 'More team actions');
+    const add = el('button', 'menu-item team-more-add', 'Add agent'); add.type = 'button'; add.id = 'team-page-more-add'; // a phone's header has one button: More, with Add agent first, then Settings
     add.addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
-    const settings = el('button', 'team-more-add team-more-settings', 'Settings'); settings.type = 'button'; settings.id = 'team-page-more-settings';
+    const settings = el('button', 'menu-item team-more-add team-more-settings', 'Settings'); settings.type = 'button'; settings.id = 'team-page-more-settings';
     settings.addEventListener('click', () => { openSettings(); });
     menu.append(add, settings);
     host.append(b, menu);
