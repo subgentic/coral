@@ -479,7 +479,7 @@ function wireAcfAgentType(container) {
     container.querySelector('.acf-agent-type')?.addEventListener('change', () => {
         const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
         _checkAgentCLI(agentType, cliWarningOf(container));
-        if (container.querySelector('.acf-restart-name')) { const f = container.querySelector('.acf-flags'); if (f) f.value = ''; } // Restart: another provider's CLI does not take the old one's flags (#8973)
+        if (container._acfRestartOrigin) { const f = container.querySelector('.acf-flags'), o = container._acfRestartOrigin; if (f) f.value = (agentType === o.type || (o.alias[agentType] || agentType) === (o.alias[o.type] || o.type)) ? o.flags : ''; } // Restart: another provider's CLI does not take the old one's flags; back on the agent's own (aliases are one provider) they are as they were (#8973, #9003)
         setThinking(container, undefined); // a provider has its own levels: the choice goes back to Default and is not sent (#7391; only a provider resets the Model and Thinking)
         // Still showing the default (nobody picked a mode here): it follows the agent type, Auto for Claude and the other CLIs' own default (#5836)
         syncDefaultPermissionMode(container.querySelector('.acf-permission-mode'), _settingsFor(_acfServer(container)), agentType);
@@ -495,6 +495,8 @@ function wireAcfAgentType(container) {
 function finishAcfControls(container, opts) {
     if (opts.restart) { // Restart's controls (#7391, #8973): the name read-only, and the provider is New Agent's own picker (launch_agent_pick.js): a restart may switch it, keeping the name, role, board and prompt
         const nm = container.querySelector('.acf-restart-name'); if (nm) nm.textContent = opts.restartName || '';
+        const typeSel = container.querySelector('.acf-agent-type'), flagsEl = container.querySelector('.acf-flags');
+        if (typeSel && flagsEl) container._acfRestartOrigin = { type: typeSel.value, flags: flagsEl.value, alias: { gemini: 'agy', antigravity: 'agy' } }; // the agent's own provider and flags: a switch away clears them, a switch back restores them (#9003)
         const group = container.querySelector('.acf-agent-pick');
         if (group) importOnce('./launch_agent_pick.js').then(m => m.buildAgentPick({ group, form: container, server: _acfServer(container) })).catch(e => console.error('provider picker', e));
     }

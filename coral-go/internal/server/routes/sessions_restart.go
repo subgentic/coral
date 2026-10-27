@@ -235,6 +235,17 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 	return p, nil
 }
 
+// sameProvider: gemini, antigravity and agy are one provider (the picker says agy for all three), so a restart from one to another is not a switch.
+func sameProvider(a, b string) bool {
+	canon := func(t string) string {
+		if t == at.Gemini || t == at.Antigravity {
+			return at.Agy
+		}
+		return t
+	}
+	return canon(a) == canon(b)
+}
+
 // oldAgentType is the provider the agent runs on now: its terminal and board subscription are named by it. A restart may switch the provider (agentType is the one it starts with, #8973).
 func (p *restartPlan) oldAgentType() string {
 	if p.stored != nil && p.stored.AgentType != "" {
@@ -261,7 +272,7 @@ func (p *restartPlan) restartSettings() {
 	var storedFlags []string
 	if ls := p.stored; ls != nil {
 		storedFlags = store.UnmarshalFlags(ls.Flags)
-		if ls.AgentType != "" && ls.AgentType != p.agentType {
+		if ls.AgentType != "" && !sameProvider(ls.AgentType, p.agentType) {
 			storedFlags = nil // a switch to another provider: the flags belong to the CLI it ran on, they do not carry (#8973)
 		}
 		p.prompt = ptr.Value(ls.Prompt)

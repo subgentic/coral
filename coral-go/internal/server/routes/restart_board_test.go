@@ -179,3 +179,29 @@ func TestRestartSwitchRefusesAStaleModelAndLeavesTheAgentRunning(t *testing.T) {
 	assert.Equal(t, "claude", ls.AgentType, "the old agent is untouched")
 	assert.Empty(t, term.sentCommands(), "nothing was sent to any terminal")
 }
+
+// gemini, antigravity and agy are one provider: a restart from one to another keeps the agent's stored flags (it is not a switch), while a real switch drops them (#9003).
+func TestRestartProviderAliasesAreNotASwitch(t *testing.T) {
+	t.Parallel()
+	server, _, term, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	const oldID = "alias-worker"
+	const oldName = "gemini-" + oldID
+	term.addSession(oldName, t.TempDir())
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{
+		SessionID: oldID, AgentType: "gemini", AgentName: "coral-go", Flags: store.MarshalFlags([]string{"--kept-flag"}),
+	}))
+	resp, err := http.Post(server.URL+"/api/sessions/live/"+oldName+"/restart", "application/json",
+		bytes.NewBufferString(`{"session_id":"alias-worker","agent_type":"agy","model":""}`))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var result struct {
+		SessionID string `json:"session_id"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+	ls, err := ss.GetLiveSession(ctx, result.SessionID)
+	require.NoError(t, err)
+	require.NotNil(t, ls)
+	assert.Contains(t, ptr.Value(ls.Flags), "--kept-flag", "gemini to agy is the same provider: the flags are kept")
+}
