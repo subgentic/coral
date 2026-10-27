@@ -71,12 +71,13 @@ const BASE = require('./test_base').BASE;
         await key('Escape', 'Escape', 27);
 
         console.log('2. the task preview is named by its task and gives the focus back');
+        const openerId = await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').closest('tr').dataset.taskId`);
         await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').focus(); document.querySelector('#agentic-panel-tasks .board-task-open').click(); true`);
         await waitFor(`!!document.querySelector('#preview-pane #team-task-title') && document.activeElement === document.querySelector('#preview-pane .preview-tab.active .preview-tab-close') && getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`, 'the task preview (and no dialog)', 12000);
         const nm = await ev(`({ region: document.querySelector('#preview-pane .team-task-page').parentElement.getAttribute('aria-label'), title: document.querySelector('#preview-pane #team-task-title').textContent, focus: document.activeElement.classList.contains('preview-tab-close') })`);
         assert.ok(/^Task \d+$/.test(nm.region) && /^#\d+ (Ship the queue|Write the docs)$/.test(nm.title) && nm.focus, 'the preview content is named by its task and the close control has focus: ' + JSON.stringify(nm));
         await key('Escape', 'Escape', 27);
-        await waitFor(`!document.querySelector('#preview-pane #team-task-title') && document.activeElement?.classList.contains('dt-primary') && !!document.activeElement.dataset.taskId`, 'the focus back on the task\'s row', 8000);
+        await waitFor(`!document.querySelector('#preview-pane #team-task-title') && document.activeElement?.classList.contains('dt-primary') && document.activeElement.closest('#board-task-list tr')?.dataset.taskId === ${JSON.stringify(openerId)}`, 'the focus back on the task\'s row', 8000);
 
         console.log('3. both themes hold 4.5:1 in the dialog and on the page');
         await installAudit(ev);
