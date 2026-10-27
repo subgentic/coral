@@ -42,9 +42,6 @@ body.popout-mode .terminal-session-label {
 }
 
 .terminal-state-pill {
-    font-size: 0.625rem;
-    line-height: 16px;
-    padding: 0 6px;
     flex-shrink: 0;
 }
 

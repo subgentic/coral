@@ -109,7 +109,7 @@ export function updateNotice(e) {
 export function updateBadgeHtml(e) {
     const n = updateNotice(e);
     if (!n) return '';
-    return `<a class="server-update-badge server-update-${n.level}" href="${escHtml(RELEASES_URL)}" target="_blank" rel="noopener noreferrer"`
+    return `<a class="chip server-update-badge server-update-${n.level}" href="${escHtml(RELEASES_URL)}" target="_blank" rel="noopener noreferrer"`
         + ` title="${escHtml(n.text)}" aria-label="${escHtml(n.text)}">${escHtml(n.label)}</a>`;
 }
 

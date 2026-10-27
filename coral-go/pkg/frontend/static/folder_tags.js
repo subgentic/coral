@@ -26,7 +26,7 @@ export function renderFolderTagPills(tags) {
     if (!tags || tags.length === 0) return "";
     if (tags.length <= 2) {
         return tags.map(t =>
-            `<span class="folder-tag-full" style="background:${escapeAttr(tagColor(t.color))}">${escapeHtml(t.name)}</span>`
+            `<span class="chip chip-tag folder-tag-full" style="background:${escapeAttr(tagColor(t.color))}">${escapeHtml(t.name)}</span>`
         ).join("");
     }
     return '<span class="sidebar-tag-pills">' +
@@ -79,7 +79,7 @@ function _buildDropdownHtml(folderName, currentTags) {
     let currentHtml = "";
     if (currentTags.length > 0) {
         currentHtml = `<div class="folder-tag-current">${currentTags.map(t =>
-            `<span class="tag-pill" style="background:${escapeAttr(tagColor(t.color))}">
+            `<span class="chip tag-pill" style="background:${escapeAttr(tagColor(t.color))}">
                 ${escapeHtml(t.name)}
                 <span class="tag-remove" data-on-click="folder-tag-remove" data-folder="${escapeAttr(folderName)}" data-tag-id="${Number(t.id)}">&times;</span>
             </span>`

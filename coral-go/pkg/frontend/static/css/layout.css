@@ -491,15 +491,8 @@ body.panel-dragging .sidebar {
 }
 
 .section-count-badge {
-    font-size: var(--fs-sm);
-    font-weight: 600;
     color: var(--text-muted);
     background: var(--bg-tertiary);
-    border-radius: var(--radius-lg);
-    padding: 0 6px;
-    line-height: 16px;
-    min-width: 16px;
-    text-align: center;
 }
 
 .sidebar-new-btn-full {

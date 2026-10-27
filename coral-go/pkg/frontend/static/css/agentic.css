@@ -1047,12 +1047,6 @@ body.panel-dragging .agentic-state {
 }
 
 .dep-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.6875rem;
-    padding: 2px 8px;
-    border-radius: var(--radius-sm);
     background: rgba(var(--accent-rgb), 0.12);
     color: var(--accent);
 }

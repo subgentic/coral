@@ -25,7 +25,7 @@ function providerBadge(src) {
     const t = String(src || '').toLowerCase();
     if (!t || t === 'claude') return '';
     const word = t === 'gemini' || t === 'antigravity' ? 'agy' : t;
-    return `<span class="badge agy">${escapeHtml(word)}</span>`;
+    return `<span class="chip chip-caps agy">${escapeHtml(word)}</span>`;
 }
 /** How long a chat went on, in words that cannot be taken for an age: "ran 21 min", "ran 2 h 5 min". */
 function ranFor(sec) {

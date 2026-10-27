@@ -33,7 +33,7 @@ const S = `(window.__coralStatic || '/static/')`;
                 m.renderHistorySessions(rows, rows.length, 1, 50); return true; })()`);
             await waitFor(`document.querySelectorAll('#history-sessions-list li[data-session-id], #history-sessions-list li[data-board]').length === 9`, 'the nine rows', 8000);
             await sleep(300); // sleep-ok: the list lays out
-            const rows = await ev(`[...document.querySelectorAll('#history-sessions-list li')].map(li => { const lr = li.getBoundingClientRect(); const bd = li.querySelector('.badge'); const br = bd && bd.getBoundingClientRect();
+            const rows = await ev(`[...document.querySelectorAll('#history-sessions-list li')].map(li => { const lr = li.getBoundingClientRect(); const bd = li.querySelector('.chip'); const br = bd && bd.getBoundingClientRect();
                 return { title: (li.querySelector('.session-label') || {}).textContent, facts: (li.querySelector('.chat-row-facts') || {}).textContent || '', top: !!li.querySelector('.session-row-top'), badge: bd ? bd.textContent : '', badgeIn: br ? br.right <= lr.right + 0.5 && br.left >= lr.left - 0.5 && br.width > 8 : null, geo: br ? [Math.round(lr.left), Math.round(lr.right), Math.round(br.left), Math.round(br.right), Math.round((li.querySelector('.session-label') || li).getBoundingClientRect().width), getComputedStyle(li.querySelector('.chat-row-title') || li).display] : null, label: li.querySelector('.session-time time') ? li.querySelector('.session-time time').textContent : '' }; })`);
             const by = t => rows.find(r => r.title && r.title.startsWith(t));
             const exp = await ev(`window.__exp`);

@@ -83,7 +83,7 @@ function chipTitle(s) {
 /** The AUTO chip for an agent's sidebar row ('' when auto-accept is off). */
 export function autoAcceptChip(s) {
     if (!s || !s.auto_accept) return '';
-    return `<span class="auto-accept-chip" title="${escapeAttr(chipTitle(s))}">AUTO</span>`;
+    return `<span class="chip auto-accept-chip" title="${escapeAttr(chipTitle(s))}">AUTO</span>`;
 }
 
 /** The "Auto-accept prompts" switch for an agent's menu. */
@@ -269,7 +269,7 @@ export function syncAutoAcceptHeader() {
         chip.setAttribute('aria-label', 'Auto-accept is off. Turn it on');
         return;
     }
-    chip.className = 'auto-accept-chip auto-accept-header-chip';
+    chip.className = 'chip auto-accept-chip auto-accept-header-chip';
     chip.setAttribute('aria-label', 'Auto-accept is on. Turn it off');
     const left = s.auto_accept_until ? Math.ceil((s.auto_accept_until * 1000 - Date.now()) / 60000) : null;
     chip.textContent = left != null && left <= 60 ? `AUTO ${Math.max(left, 0)}m` : 'AUTO';

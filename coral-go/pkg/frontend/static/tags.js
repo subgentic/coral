@@ -47,7 +47,7 @@ export function renderSessionTags(tags) {
     }
 
     container.innerHTML = tags.map(tag =>
-        `<span class="tag-pill" style="background:${escapeAttr(tagColor(tag.color))}">
+        `<span class="chip tag-pill" style="background:${escapeAttr(tagColor(tag.color))}">
             ${escapeHtml(tag.name)}
             <span class="tag-remove" data-history-local-only data-on-click="session-tag-remove" data-name="${escapeAttr(state.currentSession.name)}" data-tag-id="${Number(tag.id)}">&times;</span>
         </span>`

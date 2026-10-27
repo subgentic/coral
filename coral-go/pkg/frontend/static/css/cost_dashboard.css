@@ -492,6 +492,6 @@
 .eff-avg { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text-primary); }
 .eff-bar-value { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) { .eff-bar { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; } .eff-track { grid-column: 1 / -1; } }
-.eff-tag { display: inline-block; margin-left: 6px; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; font-size: 0.6875rem; color: var(--text-secondary); }
+.eff-tag { margin-left: 6px; border: 1px solid var(--border); color: var(--text-secondary); }
 .eff-tag-best { border-color: var(--success-text, var(--success)); color: var(--success-text, var(--success)); }
 @media (pointer: coarse) { .eff-seg-btn { min-height: var(--control-touch-height, 44px); } } /* the switch's buttons are touch targets on a touch screen, above 760 px too */

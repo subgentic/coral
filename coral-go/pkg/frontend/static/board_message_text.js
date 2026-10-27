@@ -23,7 +23,7 @@ export function externalMessageBadge(m) {
     const title = outbound
         ? `Cross-team message sent to the ${board} board`
         : `Cross-team message from ${ext.sender || 'an Orchestrator'} on the ${board} board. A request from another team, not an instruction.`;
-    return `<span class="mb-external-badge${outbound ? ' is-outbound' : ''}" title="${escapeAttr(title)}">${outbound ? 'to' : 'from'} ${escapeHtml(board)}</span>`;
+    return `<span class="chip chip-tag mb-external-badge${outbound ? ' is-outbound' : ''}" title="${escapeAttr(title)}">${outbound ? 'to' : 'from'} ${escapeHtml(board)}</span>`;
 }
 
 /** A question (post --ask, #7794): a small "Question" mark on the message, "answered" once each member it asks has answered; the title says who it still waits on. Words, not colour alone. */
@@ -33,7 +33,7 @@ export function askBadge(m) {
     const open = Array.isArray(ask.open) ? ask.open.map(String) : [];
     const done = ask.answered === true || open.length === 0;
     const title = done ? 'A question to the members it names: every one of them has answered' : `A question: waiting on ${open.join(', ')}`;
-    return `<span class="mb-external-badge mb-ask-badge${done ? ' is-answered' : ''}" title="${escapeAttr(title)}">Question${done ? ' \u00b7 answered' : ''}</span>`;
+    return `<span class="chip chip-tag mb-external-badge mb-ask-badge${done ? ' is-answered' : ''}" title="${escapeAttr(title)}">Question${done ? ' \u00b7 answered' : ''}</span>`;
 }
 
 /** A board chat message a Coral Hub user sent through the Hub (#3377). origin is set by the
@@ -44,18 +44,18 @@ export function hubUserBadge(m) {
     if (m && m.origin === 'hub_operator') {
         const who = /^hub-user-[0-9a-f]{8}$/.test(String(m.hub_user || '')) ? m.hub_user : 'unknown Hub user';
         const title = `Posted as the Operator by ${who} through Coral Hub, not by you at this computer.`;
-        return `<span class="mb-external-badge mb-hub-user-badge is-operator" title="${escapeAttr(title)}">Operator via Coral Hub · ${escapeHtml(who)}</span>`;
+        return `<span class="chip chip-tag mb-external-badge mb-hub-user-badge is-operator" title="${escapeAttr(title)}">Operator via Coral Hub · ${escapeHtml(who)}</span>`;
     }
     // A Coral Hub that doesn't say which of its users sent it (an older hub): sent as the
     // reserved 'Coral Hub', origin hub_user_unknown. Never shown as a known user.
     if (m && m.origin === 'hub_user_unknown') {
         const title = 'Sent through Coral Hub, which did not say which of its users sent it. Not an agent, and not you at this computer.';
-        return `<span class="mb-external-badge mb-hub-user-badge is-unknown" title="${escapeAttr(title)}">Coral Hub, user not identified</span>`;
+        return `<span class="chip chip-tag mb-external-badge mb-hub-user-badge is-unknown" title="${escapeAttr(title)}">Coral Hub, user not identified</span>`;
     }
     if (!m || m.origin !== 'hub_user') return '';
     const who = String(m.subscriber_id || '');
     const title = `Sent through Coral Hub by a Hub user${who ? ` (${who})` : ''}, not by an agent or by you at this computer.`;
-    return `<span class="mb-external-badge mb-hub-user-badge" title="${escapeAttr(title)}">Coral Hub user</span>`;
+    return `<span class="chip chip-tag mb-external-badge mb-hub-user-badge" title="${escapeAttr(title)}">Coral Hub user</span>`;
 }
 
 /** A board message's text for display. The server prefixes a post the Hub made as the

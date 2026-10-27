@@ -139,7 +139,7 @@ export function runMetaHtml(run, signInFailure, errorExcerpt) {
     const durationHtml = runDurationHtml(run);
     return `
         <div class="wf-run-meta">
-            <span><span class="wf-status-badge ${esc(run.status)}">${esc(run.status)}</span></span>
+            <span><span class="chip wf-status-badge ${esc(run.status)}">${esc(run.status)}</span></span>
             <span><span class="material-icons" aria-hidden="true">bolt</span> ${esc(run.trigger_type || 'api')}</span>
             ${run.started_at ? `<span><span class="material-icons" aria-hidden="true">schedule</span> ${formatTime(run.started_at)}</span>` : ''}
             ${durationHtml}

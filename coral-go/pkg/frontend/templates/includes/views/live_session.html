@@ -10,13 +10,13 @@
                             <button class="goal-action-btn" data-on-click="goal-refresh" title="Ask agent to update goal" aria-label="Refresh goal"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg></button>
                             <button class="goal-action-btn" data-on-click="goal-edit" title="Edit goal" aria-label="Edit goal"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg></button>
                         </div>
-                        <span id="session-branch" class="branch-chip" style="display:none">
+                        <span id="session-branch" class="chip chip-tag branch-chip" style="display:none">
                             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v5a3 3 0 0 0 3 3h1"/><circle cx="6" cy="3" r="1.5"/><circle cx="11" cy="11" r="1.5"/></svg>
                             <span class="branch-text"></span>
                             <span class="branch-git-state"></span>
                             <button class="copy-branch-btn" data-on-click="copy-branch" title="Copy branch name" aria-label="Copy branch name"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M5 11H3.5A1.5 1.5 0 0 1 2 9.5V3.5A1.5 1.5 0 0 1 3.5 2h6A1.5 1.5 0 0 1 11 3.5V5"/></svg></button>
                         </span>
-                        <span id="session-type-badge" class="badge" style="display:none">claude</span>
+                        <span id="session-type-badge" class="chip chip-caps" style="display:none">claude</span>
                         <h2 id="session-name" style="display:none"></h2>
                         <div class="session-title-actions">
                         </div>
@@ -51,7 +51,7 @@
                                     </span>
                                     <!-- Cloud Hub: this server only allows viewing (hub_access.js, #3068) -->
                                     <span class="hub-readonly-chip" id="hub-readonly-chip" role="status"></span>
-                                    <span class="badge terminal-state-pill" id="terminal-state-pill" data-state="" hidden></span>
+                                    <span class="chip chip-caps terminal-state-pill" id="terminal-state-pill" data-state="" hidden></span>
                                 </div>
                                 <div class="terminal-header-actions">
                                     <span class="terminal-folder" id="terminal-header-folder" hidden>
@@ -159,7 +159,7 @@
                                     <a class="btn btn-secondary" id="popout-open-dashboard" href="/">Open Coral</a>
                                 </div>
                             </div>
-                            <div id="selection-pause-badge" class="selection-pause-badge" role="status" aria-live="polite" style="display:none">Updates paused — text selected</div>
+                            <div id="selection-pause-badge" class="chip selection-pause-badge" role="status" aria-live="polite" style="display:none">Updates paused — text selected</div>
                             <div id="xterm-disconnected-badge" class="xterm-disconnected-badge" role="status" aria-live="assertive">Disconnected — reconnecting...</div>
                         </div>
 

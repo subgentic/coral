@@ -100,5 +100,5 @@ export function resetRelaunchReads() { seenTab = false; }
 /** The badge element for machine `id`, or null. `h` is the page's element builder; the words are this module's constants. */
 export function relaunchBadge(h, id) {
     if (!badgeShown(id)) return null;
-    return h('span', { className: 'server-relaunch-badge', role: 'img', 'aria-label': BADGE_NAME, title: BADGE_TIP, text: BADGE_TEXT });
+    return h('span', { className: 'chip server-relaunch-badge', role: 'img', 'aria-label': BADGE_NAME, title: BADGE_TIP, text: BADGE_TEXT });
 }
