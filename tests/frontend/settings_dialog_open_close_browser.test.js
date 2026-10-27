@@ -35,7 +35,7 @@ const SAVED = { theme: 'light', default_agent_type: 'codex', default_working_dir
         });
         await run('opens on the group asked for with focus inside, and remembers the last group', async () => {
             await ev(`window.hideSettingsModal(); true`); await open('terminal'); assert.equal(await group(), 'terminal');
-            assert.equal(await ev(`document.getElementById('settings-modal').contains(document.activeElement)`), true, 'focus is inside the dialog');
+            await waitFor(`document.getElementById('settings-modal').contains(document.activeElement)`, 'focus is inside the dialog (it moves in on the frame after the open)', 5000);
             assert.equal(await ev(`document.getElementById('settings-tab-terminal').getAttribute('aria-selected')`), 'true');
             await ev(`document.getElementById('settings-tab-terminal').click(); true`);
             await ev(`window.hideSettingsModal(); true`); await open(); assert.equal(await group(), 'terminal', 'no group asked for: the last one chosen');
