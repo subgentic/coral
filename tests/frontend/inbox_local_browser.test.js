@@ -175,7 +175,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         mm = await more();
         check('a click elsewhere closes it', mm.expanded === 'false' && !mm.shown, JSON.stringify(mm));
         await ev(`document.querySelector('#inbox-page .wf-more > .btn').click(); true`);
-        await ev(`document.querySelector('#inbox-page .wf-more-menu .btn').click(); true`);
+        await ev(`document.querySelector('#inbox-page .wf-more-menu .menu-item').click(); true`);
 
         await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .dt-primary').length === 6`, 'a removal in the Inbox');
         s = await state();

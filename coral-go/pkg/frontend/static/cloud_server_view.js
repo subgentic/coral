@@ -185,8 +185,8 @@ function rowActions(s, isBusy) {
            h('div', { className: 'cs-more', onkeydown: e => { if (e.key === 'Escape' && moreOpen === s.id) { e.preventDefault(); e.stopPropagation(); moreOpen = null; render(); focusRow(s.id, '.cs-more-btn'); } } },
                h('button', { type: 'button', className: 'btn btn-small cs-more-btn', text: 'More', 'aria-label': `More for ${s.label || 'this server'}`, 'aria-expanded': String(moreOpen === s.id), 'aria-controls': `${rowId(s.id)}-more`,
                    onclick: () => { moreOpen = moreOpen === s.id ? null : s.id; render(); focusRow(s.id, '.cs-more-btn'); } }),
-               h('div', { className: 'cs-more-menu', id: `${rowId(s.id)}-more`, hidden: moreOpen !== s.id },
-                   h('button', { type: 'button', className: 'btn btn-small btn-quiet btn-danger cs-revoke', text: 'Revoke', 'aria-label': `Revoke ${s.label || 'this server'}`, disabled: isBusy, onclick: () => askRevoke(s) })))];
+               h('div', { className: 'menu cs-more-menu', id: `${rowId(s.id)}-more`, hidden: moreOpen !== s.id },
+                   h('button', { type: 'button', className: 'menu-item menu-item-danger cs-revoke', text: 'Revoke', 'aria-label': `Revoke ${s.label || 'this server'}`, disabled: isBusy, onclick: () => askRevoke(s) })))];
 }
 
 function detailCell(s, live, online, isBusy, helpId) {
