@@ -35,10 +35,10 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelectorAll('#group-table-view .dt-link').length`), 1);
 
         await shot('inbox-needs-goal');
-        console.log('2. the link opens the goal on its team page\'s Goals tab (#8048)');
+        console.log('2. the link opens the goal in the Inbox, at its own address (#8861; the team page only through the quiet team link)');
         await ev(`document.querySelector('#group-table-view .dt-link').click(); true`);
-        await waitFor(`!!document.querySelector('#team-panel-goals .goals-detail-title') && document.querySelector('#team-panel-goals .goals-detail-title').textContent === 'Ship the new installer' && location.pathname.startsWith('/team/')`, 'the goal to open on the team page', 12000);
-        await waitFor(`document.activeElement.id === 'goals-detail-title'`, 'the focus on the goal\'s heading (a person chose it)', 6000);
+        await waitFor(`!!document.querySelector('#inbox-page #goals-detail-title') && document.querySelector('#inbox-page #goals-detail-title').textContent === 'Ship the new installer' && location.pathname.startsWith('/inbox/goals/')`, 'the goal to open in the Inbox', 12000);
+        assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none'`), true, 'the team page is not on screen');
 
         console.log('3. an opened task in the Inbox shows the same link when its row carries a goal, and nothing when it has none');
         await ev(`window.switchNavTab('hub-inbox'); true`);
@@ -56,7 +56,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(links.sort((a, b) => a.t.localeCompare(b.t)), [{ t: 'Pick the icon', g: '' }, { t: 'Sign the installer', g: 'Ship the new installer' }]);
         assert.equal(await ev(`location.pathname`), `/inbox/tasks/${B}/${t1.json.id}`, 'Inbox task row stays in the Inbox');
         await ev(`[...document.querySelectorAll('#inbox-page .goals-facts dt')].find(x => x.textContent === 'Goal').nextElementSibling.querySelector('button').click(); true`);
-        await waitFor(`document.querySelector('#team-panel-goals .goals-detail-title')?.textContent === 'Ship the new installer' && location.pathname.includes('/goals/')`, 'task Goal link opens the goal', 10000);
+        await waitFor(`document.querySelector('#inbox-page #goals-detail-title')?.textContent === 'Ship the new installer' && location.pathname.startsWith('/inbox/goals/')`, 'task Goal link opens the goal in the Inbox (#8861)', 10000);
         await shot('inbox-task-goal');
         console.log('PASS the goal a waiting agent or task serves');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
