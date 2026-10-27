@@ -92,6 +92,8 @@ body.panel-dragging .preview-pane {
 }
 
 
+/* The dense toggles at the bar's edge have a 44 px hit area that reaches 10 px past it: clipped there, it does not widen the pane's scroll width (a sideways scroll at 390 and 320 px, preview_phone_full). */
+.preview-tabbar { overflow-x: clip; }
 .preview-tabbar .preview-tabs {
     flex: 1;
     min-width: 0;
