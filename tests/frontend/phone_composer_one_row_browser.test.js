@@ -45,6 +45,11 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.equal(o.name, 'Model and thinking'); assert.equal(o.popup, 'menu'); assert.equal(o.expanded, 'false'); assert.match(o.item || '', /Model and thinking/, 'the chevron menu names it');
         await ev(`document.querySelector('.mobile-send-options-btn').click(); true`);
         await waitFor(`!!document.querySelector('.mobile-send-menu [data-on-click=\"send-menu-options\"]') && getComputedStyle(document.querySelector('.mobile-send-menu [data-on-click=\"send-menu-options\"]')).display !== 'none'`, 'the chevron menu with its Model and thinking item', 3000);
+        // #9570 (UI/UX's check of the batch shots): the open menu is the shared .menu surface and opens whole above the composer's row, and the chevron is the left half of one split Send
+        const sm = await ev(`(() => { const m = document.querySelector('.mobile-send-menu'), c = getComputedStyle(m), r = m.getBoundingClientRect(), box = document.getElementById('command-input').getBoundingClientRect(), o = document.querySelector('.mobile-send-options-btn').getBoundingClientRect(), s = document.getElementById('mobile-send-btn').getBoundingClientRect(); return { filled: c.backgroundColor !== 'rgba(0, 0, 0, 0)' && c.backgroundColor !== 'transparent', border: parseFloat(c.borderTopWidth) > 0, surface: m.classList.contains('menu'), menuBottom: r.bottom, boxTop: box.top, seam: s.left - o.right, oh: o.height, sh: s.height, onScreen: r.left >= 0 && r.right <= innerWidth && r.top >= 0 }; })()`);
+        assert.ok(sm.surface && sm.filled && sm.border, 'the send options menu has the menu surface (a fill and a border): ' + JSON.stringify(sm));
+        assert.ok(sm.menuBottom <= sm.boxTop + 0.5 && sm.onScreen, `it opens whole above the composer's row, on the screen: ${JSON.stringify(sm)}`);
+        assert.ok(sm.seam >= 0 && sm.seam <= 2 && Math.abs(sm.oh - sm.sh) < 1, `the chevron and Send are one box, no gap (seam ${sm.seam}px): ${JSON.stringify(sm)}`);
         await ev(`document.querySelector('.mobile-send-menu [data-on-click=\"send-menu-options\"]').click(); true`);
         await waitFor(`!document.getElementById('options-chip-menu').hidden`, 'the Options sheet', 3000);
         assert.equal(await ev(`document.getElementById('options-chip').getAttribute('aria-expanded')`), 'true');
