@@ -21,6 +21,11 @@ const levels = html => { const box = document.createElement('div'); box.innerHTM
 const want = ['h1:4', 'h2:5', 'h3:6', 'h4:6', 'h6:6'];
 assert.deepEqual(levels(renderMarkdown(MD, undefined, 'chat')), want, 'a chat message');
 assert.deepEqual(levels(renderMarkdown(MD, { breaks: true }, 'board')), want, 'a board message, a note, a plan');
+// the cache key has the base: one text through two hosts is two results (#9522 follow-up)
+const same = '# Cached heading';
+assert.deepEqual(levels(renderMarkdown(same, undefined, 'chat')), ['h1:4']);
+assert.deepEqual(levels(renderMarkdown(same, undefined, 'chat', 2)), ['h1:3'], 'the same text with another base is its own entry, not the cached chat one');
+assert.deepEqual(levels(renderMarkdown(same, undefined, 'chat')), ['h1:4'], 'and the first entry is unchanged');
 assert.deepEqual(levels(renderMarkdownStrict(MD)), ['h1:3', 'h2:4', 'h3:5', 'h4:6', 'h6:6'], 'a viewed Markdown file sits under its dialog\'s h2: its h1 is level 3');
 assert.deepEqual(levels(renderDocsMarkdown(MD)), ['h1:null', 'h2:null', 'h3:null', 'h4:null', 'h6:null'], 'a Docs page owns its h1');
 
