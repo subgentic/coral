@@ -24,7 +24,8 @@ const GOALS = [
         const chips = [...b.querySelectorAll('.list-bar-chip:not(.list-bar-chip-all):not(.list-bar-chip-more), .team-tb-chip:not(.team-tb-chip-more)')].filter(c => c.getClientRects().length);
         const pills = r.querySelector('.team-tb-pills'), tr = t.getBoundingClientRect();
         const first = chips[0], more = [...b.querySelectorAll('.list-bar-chip-more')].find(c => c.getClientRects().length), badge = t.querySelector('.display-badge');
-        const extra = { chipW: first ? Math.round(first.getBoundingClientRect().width) : 0, more: more ? more.textContent.trim() : '', badge: badge && !badge.hidden ? badge.textContent.trim() : '', label: t.getAttribute('aria-label') };
+        const box = r.querySelector('.list-bar-chips-inrow'), clipped = !!box && box.getClientRects().length > 0 && box.scrollWidth > box.clientWidth + 1;
+        const extra = { clipped, chipW: first ? Math.round(first.getBoundingClientRect().width) : 0, more: more ? more.textContent.trim() : '', badge: badge && !badge.hidden ? badge.textContent.trim() : '', label: t.getAttribute('aria-label') };
         return { ...extra, h: Math.round(b.getBoundingClientRect().height), rowH: Math.round(r.getBoundingClientRect().height), chips: chips.length, inRow: chips.every(c => r.contains(c)),
             beforeIcon: chips.every(c => c.getBoundingClientRect().right <= tr.left + 1), afterPills: !pills || !pills.getClientRects().length || chips.every(c => c.getBoundingClientRect().left >= pills.getBoundingClientRect().right - 1),
             sameLine: chips.every(c => Math.abs((c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2) - (tr.top + tr.height / 2)) < 8), over: Math.round(document.documentElement.scrollWidth - innerWidth) }; })()`);
@@ -52,7 +53,7 @@ const GOALS = [
             check(`${label}: no filter on: no chip, no number on the Filters icon`, none.chips === 0 && none.badge === '', JSON.stringify(none));
             if (!mobile) {
                 check(`${label}: one chip is in the search row, after the pills and before the Filters icon, on the icon's line, readable (128 px or more), no "+N"`, one.chips === 1 && one.inRow && one.beforeIcon && one.afterPills && one.sameLine && one.chipW >= 128 && one.more === '', JSON.stringify(one));
-                check(`${label}: two filters: still one readable chip and "+1" in the row`, two.chips === 1 && two.inRow && two.beforeIcon && two.afterPills && two.sameLine && two.chipW >= 128 && two.more === '+1', JSON.stringify(two));
+                check(`${label}: two filters: still one readable chip; "+1" is there only if it shows whole (this row is about 55 rem: beside five pills it does not fit, the icon's number says 2); nothing of the chips is cut off`, two.chips === 1 && two.inRow && two.beforeIcon && two.afterPills && two.sameLine && two.chipW >= 128 && (two.more === '' || two.more === '+1') && !two.clipped && !one.clipped, JSON.stringify(two));
             } else check(`${label}: no room in the row: no chip, no "+N"; the Filters icon says 1, then 2`, one.chips === 0 && two.chips === 0 && one.more === '' && two.more === '', JSON.stringify([one, two]));
             check(`${label}: the Filters icon carries the number of filters on (a number, not a dot): 1 then 2`, one.badge === '1' && two.badge === '2' && /2 on/.test(two.label || ''), JSON.stringify([one.badge, two.badge, two.label]));
             check(`${label}: the toolbar is the same height with no filter, one chip and two (${none.h}, ${one.h}, ${two.h})`, one.h === none.h && two.h === none.h && one.rowH === none.rowH && two.rowH === none.rowH, JSON.stringify([none, one, two]));
