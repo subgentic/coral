@@ -3139,7 +3139,7 @@ input.switch:checked::before { background: var(--text-on-accent); transform: tra
 input.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 input.switch:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { input.switch::before { transition: none; } }
-@media (max-width: 767px), (pointer: coarse) { input.switch { width: 44px; } input.switch:checked::before { transform: translateX(24px); } }
+@media (max-width: 767px), (pointer: coarse) { input.switch { width: 2.75rem; } input.switch:checked::before { transform: translateX(calc(1.35rem + 2px)); } } /* in rem, like the track's height and the knob: at 200% text a 44 px track with a knob that grew pushed the knob out of its right edge */
 @media (forced-colors: active) {
     input.switch { background: Canvas; border: 2px solid ButtonText; }
     input.switch::before { background: ButtonText; }
