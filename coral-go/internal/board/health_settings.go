@@ -39,6 +39,51 @@ type HealthSettings struct {
 	// Landing puts a line in the health check (off by default, #8942, goal #80) when the branch work lands on (Branch, "main" by default) has not moved for WaitMin although tasks were approved or completed
 	// since it last did (#8942, goal #80): done work that is not landed. It reads the local branch only, never CI or GitHub.
 	Landing HealthLanding `json:"landing"`
+	// Release puts a line in the health check (off by default, #8948, goal #80) when Branch has been past the newest tag matching TagPattern for longer than WaitMin with tasks completed since the tag:
+	// work that is landed and not released. It reads local branches and tags only.
+	Release HealthRelease `json:"release"`
+}
+
+// HealthRelease: the branch and the tag pattern (a git glob, "v*" by default) to compare, how long the branch may be past the newest matching tag before Coral says so, and who else is told.
+type HealthRelease struct {
+	On         bool   `json:"on"`
+	Branch     string `json:"branch"`
+	TagPattern string `json:"tag_pattern"`
+	WaitMin    int    `json:"wait_min"`
+	Nudge      string `json:"nudge"`
+}
+
+// ReleaseWaitMin and ReleaseWaitMax bound the release wait, in minutes (an hour to thirty days).
+const (
+	ReleaseWaitMin = 60
+	ReleaseWaitMax = 43200
+)
+
+// ReleaseTagPatternValid says a tag pattern is one Coral reads: letters, digits and . _ - / * ? [ ] ^, not starting with -, at most 60 bytes. It is an argument of git tag --list, never a shell.
+func ReleaseTagPatternValid(p string) bool {
+	if p == "" || len(p) > 60 || p[0] == '-' {
+		return false
+	}
+	for _, r := range p {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._-/*?[]^", r)) {
+			return false
+		}
+	}
+	return true
+}
+
+// Problem is what is wrong with the setting as a user saves it, in words for them, or "". A field a body does not carry (empty, 0) is the default and is not a problem.
+func (r HealthRelease) Problem() string {
+	if b := strings.TrimSpace(r.Branch); b != "" && !LandingBranchValid(b) {
+		return fmt.Sprintf("release.branch: %q is not a branch name Coral reads (letters, digits, . _ - /; at most 100 characters)", OneLine(b))
+	}
+	if p := strings.TrimSpace(r.TagPattern); p != "" && !ReleaseTagPatternValid(p) {
+		return fmt.Sprintf("release.tag_pattern: %q is not a tag pattern Coral reads (letters, digits, . _ - / and the glob characters * ? [ ]; at most 60 characters)", OneLine(p))
+	}
+	if r.WaitMin != 0 && (r.WaitMin < ReleaseWaitMin || r.WaitMin > ReleaseWaitMax) {
+		return fmt.Sprintf("release.wait_min: %d is outside %d to %d minutes", r.WaitMin, ReleaseWaitMin, ReleaseWaitMax)
+	}
+	return ""
 }
 
 // HealthLanding: the branch to watch and how long it may stand still, with tasks finished, before Coral says so (again after each further WaitMin until it moves).
@@ -127,6 +172,7 @@ func DefaultHealthSettings() HealthSettings {
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
 		Landing:        HealthLanding{On: false, Branch: "main", WaitMin: 120},
+		Release:        HealthRelease{On: false, Branch: "main", TagPattern: "v*", WaitMin: 1440},
 	}
 }
 
@@ -152,6 +198,19 @@ func (h HealthSettings) Clamp() HealthSettings {
 	}
 	h.Landing.WaitMin = min(max(h.Landing.WaitMin, LandingWaitMin), LandingWaitMax)
 	h.Landing.Nudge = strings.TrimSpace(h.Landing.Nudge)
+	h.Release.Branch = strings.TrimSpace(h.Release.Branch)
+	if !LandingBranchValid(h.Release.Branch) {
+		h.Release.Branch = "main"
+	}
+	h.Release.TagPattern = strings.TrimSpace(h.Release.TagPattern)
+	if !ReleaseTagPatternValid(h.Release.TagPattern) {
+		h.Release.TagPattern = "v*"
+	}
+	if h.Release.WaitMin == 0 {
+		h.Release.WaitMin = 1440
+	}
+	h.Release.WaitMin = min(max(h.Release.WaitMin, ReleaseWaitMin), ReleaseWaitMax)
+	h.Release.Nudge = strings.TrimSpace(h.Release.Nudge)
 	h.Recipient = strings.TrimSpace(h.Recipient)
 	var revs []string
 	for _, r := range h.DefaultReviewers {

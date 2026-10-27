@@ -103,6 +103,9 @@ func (s *Store) HadTaskInProgress(ctx context.Context, project, member string, a
 // which wait it is (each further wait is a new occurrence).
 const OffBooksLanding = "landing"
 
+// OffBooksRelease is the kind of a line about the branch standing past its newest release tag (#8948): the same queue, a line of the check; the ref is the repository, branch, tag and which wait it is.
+const OffBooksRelease = "release"
+
 // AddOffBooksOnce is AddOffBooks that says whether the occurrence was new: one recorded before, shown or not, is not.
 func (s *Store) AddOffBooksOnce(ctx context.Context, project, kind, agent, ref, detail string, at time.Time) (bool, error) {
 	res, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO health_offbooks (project, kind, agent, ref, detail, at) VALUES (?, ?, ?, ?, ?, ?)`,
