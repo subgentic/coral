@@ -15,6 +15,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w}px: `;
+            await Emulation.setTimezoneOverride({ timezoneId: 'America/New_York' }); // the zone is named only when it differs from the viewer's (zoneNote): the jobs are UTC, so the viewer is not, whatever machine runs this (CI's browser is UTC)
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
