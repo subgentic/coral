@@ -258,5 +258,6 @@ export function createPreviewLayout({ getTabs, getLastOpenedPath, _onToolbarClic
         }
         _placePane();
     }
-    return { initPreviewPane, _setMaximised, _setPhoneFull, _placePane, _showPane, _isMobile };
+    function showColumn() { if (!_isMobile()) _dock = 'column'; _placePane(); }
+    return { showColumn, initPreviewPane, _setMaximised, _setPhoneFull, _placePane, _showPane, _isMobile };
 }
