@@ -257,7 +257,7 @@ func TestTaskQueryRefusals(t *testing.T) {
 		"nope=1&zip=2":                        "unknown parameter nope, zip",
 		"fields=id,secret":                    "unknown field secret",
 		"fields=session_id":                   "unknown field session_id",
-		"fields=cost_usd,input_tokens":        "unknown field cost_usd, input_tokens",
+		"fields=session_id,workflow":          "unknown field session_id, workflow",
 		"fields=workflow,blocked_by":          "unknown field workflow, blocked_by",
 		"fields=id;DROP":                      "the query string is not valid",
 		"fields=id%zz":                        "the query string is not valid",

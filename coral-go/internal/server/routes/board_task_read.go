@@ -76,6 +76,20 @@ func (h *BoardHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteJSONValidated(w, r, http.StatusOK, page)
 		return
 	}
+	if q.Get("counts") == "1" {
+		// Only the two totals (#9100): the team page's tab counts, not a page of rows. No other parameter goes with it.
+		if q.Get("status") != "" || q.Get("cursor") != "" || q.Get("limit") != "" {
+			errBadRequest(w, "counts=1 is the totals alone: it takes no status, cursor or limit")
+			return
+		}
+		page, err := h.bs.TaskCounts(r.Context(), project)
+		if err != nil {
+			errInternalServer(w, err.Error())
+			return
+		}
+		httputil.WriteJSONValidated(w, r, http.StatusOK, page)
+		return
+	}
 	query := board.TaskListQuery{Status: q.Get("status"), Cursor: q.Get("cursor")}
 	if l := q.Get("limit"); l != "" {
 		n, err := strconv.Atoi(l)
