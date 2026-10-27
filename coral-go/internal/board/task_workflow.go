@@ -59,23 +59,25 @@ type TaskInput struct {
 }
 
 type TaskWorkflow struct {
-	CompletionReview      *CompletionReview      `json:"completion_review,omitempty"`
-	TeamMode              *WorkingMode           `json:"team_mode,omitempty"`
-	Instructions          string                 `json:"instructions"`
-	Name                  string                 `json:"name,omitempty"`
-	Stage                 string                 `json:"stage,omitempty"`
-	ParentTaskID          int64                  `json:"parent_task_id,omitempty"`
-	RetryOf               int64                  `json:"retry_of,omitempty"`
-	RequiredOutputs       []string               `json:"required_outputs,omitempty"`
-	Inputs                []TaskInput            `json:"inputs,omitempty"`
-	Artifacts             []TaskArtifact         `json:"artifacts,omitempty"`
-	Outcome               string                 `json:"outcome,omitempty"`
-	Amendments            []TaskAmendment        `json:"amendments,omitempty"`
-	EffectiveInstructions string                 `json:"effective_instructions,omitempty"`
-	AcknowledgedRevision  int                    `json:"acknowledged_revision,omitempty"`
-	CompletionGates       []CompletionGate       `json:"completion_gates,omitempty"`
-	GateResults           []CompletionGateResult `json:"gate_results,omitempty"`
-	CandidateRevision     string                 `json:"candidate_revision,omitempty"`
+	CompletionReview             *CompletionReview      `json:"completion_review,omitempty"`
+	TeamMode                     *WorkingMode           `json:"team_mode,omitempty"`
+	RestoredInstructions         *string                `json:"restored_instructions,omitempty"`
+	RestoredInstructionsRevision int                    `json:"restored_instructions_revision,omitempty"`
+	Instructions                 string                 `json:"instructions"`
+	Name                         string                 `json:"name,omitempty"`
+	Stage                        string                 `json:"stage,omitempty"`
+	ParentTaskID                 int64                  `json:"parent_task_id,omitempty"`
+	RetryOf                      int64                  `json:"retry_of,omitempty"`
+	RequiredOutputs              []string               `json:"required_outputs,omitempty"`
+	Inputs                       []TaskInput            `json:"inputs,omitempty"`
+	Artifacts                    []TaskArtifact         `json:"artifacts,omitempty"`
+	Outcome                      string                 `json:"outcome,omitempty"`
+	Amendments                   []TaskAmendment        `json:"amendments,omitempty"`
+	EffectiveInstructions        string                 `json:"effective_instructions,omitempty"`
+	AcknowledgedRevision         int                    `json:"acknowledged_revision,omitempty"`
+	CompletionGates              []CompletionGate       `json:"completion_gates,omitempty"`
+	GateResults                  []CompletionGateResult `json:"gate_results,omitempty"`
+	CandidateRevision            string                 `json:"candidate_revision,omitempty"`
 	// The review flow (#3725): who did the work (a task in review is assigned to the
 	// orchestrator, then to reviewers), the parent of a review task, and the review rounds.
 	OriginalAuthor string        `json:"original_author,omitempty"`
@@ -411,7 +413,13 @@ func (s *Store) hydrateWorkflow(ctx context.Context, t *Task) error {
 // instructions, implied outcome) and attaches w to t.
 func finishWorkflow(t *Task, w TaskWorkflow) {
 	w.EffectiveInstructions = w.Instructions
+	if w.RestoredInstructions != nil {
+		w.EffectiveInstructions = *w.RestoredInstructions
+	}
 	for _, amendment := range w.Amendments {
+		if w.RestoredInstructions != nil && amendment.Revision <= w.RestoredInstructionsRevision {
+			continue
+		}
 		if value, ok := amendment.Changes["workflow_instructions"].(string); ok && strings.TrimSpace(value) != "" {
 			w.EffectiveInstructions += "\n\nTask amendment (revision " + fmt.Sprint(amendment.Revision) + "):\n" + value
 		}

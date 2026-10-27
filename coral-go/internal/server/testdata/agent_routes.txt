@@ -96,6 +96,7 @@ a GET /api/board/{project}/status
 a GET /api/board/{project}/subscribers
 a GET /api/board/{project}/tasks
 a GET /api/board/{project}/tasks/{taskID}
+a GET /api/board/{project}/tasks/{taskID}/history
 c GET /api/board/{project}/tasks/{taskID}/artifact-content
 c GET /api/board/{project}/tasks/{taskID}/changes.diff
 c GET /api/board/{project}/tasks/{taskID}/cost

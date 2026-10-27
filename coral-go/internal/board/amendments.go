@@ -88,6 +88,10 @@ func (s *Store) AmendTask(ctx context.Context, project string, taskID int64, act
 	if err != nil {
 		return nil, err
 	}
+	beforeText, err := readTaskText(ctx, tx, taskID)
+	if err != nil {
+		return nil, err
+	}
 	previousGates := workflow.CompletionGates
 	if previousGates == nil {
 		previousGates = []CompletionGate{}
@@ -124,6 +128,13 @@ func (s *Store) AmendTask(ctx context.Context, project string, taskID int64, act
 		return nil, err
 	}
 	if err := saveWorkflow(ctx, tx, taskID, workflow); err != nil {
+		return nil, err
+	}
+	afterText, err := readTaskText(ctx, tx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if err = recordTaskText(ctx, tx, taskID, actor, beforeText, afterText); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

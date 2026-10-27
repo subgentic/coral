@@ -63,6 +63,7 @@ GET /api/board/{project}/tasks/{taskID} | board-claims
 GET /api/board/{project}/tasks/{taskID}/artifact-content | board-claims
 GET /api/board/{project}/tasks/{taskID}/changes.diff | board-claims
 GET /api/board/{project}/tasks/{taskID}/cost | board-claims
+GET /api/board/{project}/tasks/{taskID}/history | board-claims
 GET /api/board/{project}/waits | board-claims
 GET /api/board/{project}/waits/poll | board-claims
 GET /api/board/{project}/working-mode | board-claims

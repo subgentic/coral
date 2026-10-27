@@ -25,6 +25,7 @@ GET /api/board/{project}/tasks redact
 GET /api/board/{project}/tasks/{id} redact
 GET /api/board/{project}/tasks/{id}/artifact-content redact
 GET /api/board/{project}/tasks/{id}/cost redact
+GET /api/board/{project}/tasks/{id}/history redact
 GET /api/board/{project}/working-mode redact
 GET /api/board/{project}/working-mode/presets redact
 GET /api/call-metrics/summary redact

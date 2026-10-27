@@ -109,6 +109,9 @@ func (h *BoardHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid task ID")
 		return
 	}
+	if h.taskVersionRead(w, r, id) {
+		return
+	}
 	task, err := h.bs.GetTask(r.Context(), urlParam(r, "project"), id)
 	if err != nil {
 		errNotFound(w, "task not found")

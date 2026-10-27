@@ -41,6 +41,10 @@ Subcommands:
 	taskArgs := os.Args[3:]
 
 	switch sub {
+	case "edit":
+		cmdTaskEdit(st, taskArgs)
+	case "history":
+		cmdTaskHistory(st, taskArgs)
 	case "add":
 		cmdTaskAdd(st, taskArgs)
 	case "list":
@@ -64,7 +68,22 @@ Subcommands:
 			fmt.Fprintln(os.Stderr, "task detail requires a positive task ID")
 			clierr.Exit1()
 		}
-		data, status, err := apiCallRaw("GET", fmt.Sprintf("/%s/tasks/%d", url.PathEscape(st.Project), id), nil)
+		path := fmt.Sprintf("/%s/tasks/%d", url.PathEscape(st.Project), id)
+		if len(taskArgs) > 1 {
+			if len(taskArgs) != 3 || taskArgs[1] != "--version" {
+				fmt.Fprintln(os.Stderr, "Usage: task detail N [--version K]")
+				exitFn(2)
+				return
+			}
+			v, err := strconv.Atoi(taskArgs[2])
+			if err != nil || v < 1 {
+				fmt.Fprintln(os.Stderr, "version must be positive")
+				exitFn(2)
+				return
+			}
+			path += fmt.Sprintf("?version=%d", v)
+		}
+		data, status, err := apiCallRaw("GET", path, nil)
 		if err != nil || status != http.StatusOK {
 			fmt.Fprintln(os.Stderr, "Unable to read task: "+clierr.Describe(err, status, data))
 			clierr.Exit1()
@@ -74,6 +93,9 @@ Subcommands:
 			fmt.Fprintln(os.Stderr, err)
 			clierr.Exit1()
 		}
+		if _, ok := task["id"]; !ok {
+			task["id"] = float64(id)
+		} // a historical snapshot still records the version this caller read
 		noteSeenRound(st.Project, task)
 		pretty, _ := json.MarshalIndent(task, "", "  ")
 		fmt.Println(string(pretty))
@@ -116,13 +138,16 @@ Subcommands:
   goal <task-id> <goal-id|none>    Put a task on a goal of this board, move it, or take it off (coral-board goal ... manages the goals)
   claim [id]                       Claim a specific task or the next available one
   current                          Show your current in-progress task
-  detail <id> [--json]             Read task instructions, inputs and results (always JSON; --json is accepted)
+  edit <id> --title TEXT [--priority P]  Edit text as a new version (creator, orchestrator or Operator)
+  edit <id> --restore-version K     Restore old text as a new version; --base-version K refuses a concurrent edit
+  history <id>                     Immutable text versions, editors, times and field diffs
+  detail <id> [--version K] [--json]             Read task instructions, inputs and results (always JSON; --json is accepted)
   show <id> [--json]               A task for a person: title, status, assignee, body, outcome, result message and its
                                    artifacts' coral:// links (--json: those fields as one JSON object)
   submit-review <id> --reason "review pending" [--revision N] [--message "note"] [--outcome success|failed] [--artifacts manifest.json]
                                    Hands the task to the team's orchestrator (frees your slot); with no orchestrator, completes it
   review <id> --to "Security Reviewer,QA Engineer"  The orchestrator delegates a task in review: one review task each
-  approve <id> [--round N] [--revision N] [--note "..."]  A reviewer approves, any time the task is in review; the last approval completes it
+  approve <id> [--task-version K] [--round N] [--revision N] [--note "..."]  A reviewer approves, any time the task is in review; the last approval completes it
   reject <id> [--round N] --note "why"     A reviewer rejects: back to its author; the reviewers stay on it and review the resubmission
   attach <id> --artifacts manifest.json    Add patch rows to a task in review (a next revision, a reviewer's fix); a reviewer who had approved reviews the new bytes again
   send-back <id> --note "why"              The orchestrator returns an approved, completed task to its author (a fix after approval, a patch that would not apply)

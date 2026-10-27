@@ -50,13 +50,21 @@ type ReviewRound struct {
 	SentBackDigests []string `json:"sent_back_digests,omitempty"`
 }
 
+type TaskTextApproval struct {
+	Version int    `json:"version"`
+	Note    string `json:"note,omitempty"`
+	At      string `json:"at"`
+}
+
 // ReviewerState is one reviewer's part in a round.
 type ReviewerState struct {
-	Reviewer     string `json:"reviewer"`
-	ReviewTaskID int64  `json:"review_task_id"`
-	State        string `json:"state"` // pending, approved or rejected
-	Note         string `json:"note,omitempty"`
-	At           string `json:"at,omitempty"`
+	Reviewer              string             `json:"reviewer"`
+	TaskVersion           int                `json:"task_version,omitempty"`
+	PreviousTextApprovals []TaskTextApproval `json:"previous_text_approvals,omitempty"`
+	ReviewTaskID          int64              `json:"review_task_id"`
+	State                 string             `json:"state"` // pending, approved or rejected
+	Note                  string             `json:"note,omitempty"`
+	At                    string             `json:"at,omitempty"`
 }
 
 // ErrNoOrchestrator: the team has no active orchestrator to review the task.
@@ -283,7 +291,7 @@ func (s *Store) ApproveReviewAt(ctx context.Context, project string, id int64, a
 	return s.reviewVerdictAt(ctx, project, id, actor, note, true, round, revision)
 }
 
-func (s *Store) reviewVerdictAt(ctx context.Context, project string, id int64, actor, note string, approve bool, reviewed, revision int) (*ReviewVerdict, error) {
+func (s *Store) reviewVerdictAt(ctx context.Context, project string, id int64, actor, note string, approve bool, reviewed, revision int, textVersions ...int) (*ReviewVerdict, error) {
 	if len(note) > 4096 {
 		return nil, fmt.Errorf("the note is too long (4096 characters at most)")
 	}
@@ -331,6 +339,14 @@ func (s *Store) reviewVerdictAt(ctx context.Context, project string, id int64, a
 	if !approve {
 		outcome, verdict = "failed", "rejected"
 	}
+	var currentVersion int
+	if err := tx.GetContext(ctx, &currentVersion, "SELECT COALESCE(MAX(version),1) FROM task_versions WHERE task_id=?", id); err != nil {
+		return nil, err
+	}
+	if approve && currentVersion > 1 && (len(textVersions) == 0 || textVersions[0] != currentVersion) {
+		return nil, fmt.Errorf("task #%d changed to v%d; read task detail and approve with --task-version %d", id, currentVersion, currentVersion)
+	}
+	me.TaskVersion = currentVersion
 	me.State, me.Note, me.At = verdict, note, now
 	msg := fmt.Sprintf("%s task #%d", strings.ToUpper(verdict[:1])+verdict[1:], id)
 	if note != "" {
@@ -388,7 +404,7 @@ func roundReviewer(id int64, round *ReviewRound, actor string, reviewed int) (*R
 	if me == nil {
 		return nil, fmt.Errorf("only the reviewers task #%d was given to can approve or reject it", id)
 	}
-	if me.State != "pending" {
+	if me.State != "pending" && me.State != "stale" {
 		return nil, fmt.Errorf("you already %s task #%d in round %d", me.State, id, round.Round)
 	}
 	return me, nil
@@ -456,4 +472,9 @@ func finishReviewTask(ctx context.Context, tx *sqlx.Tx, project string, reviewTa
 func lastRoundRejected(w TaskWorkflow) bool {
 	n := len(w.ReviewRounds)
 	return n > 0 && w.ReviewRounds[n-1].Result == "rejected"
+}
+
+// ApproveReviewTextVersion names both the patch revision and the task text read.
+func (s *Store) ApproveReviewTextVersion(ctx context.Context, project string, id int64, actor, note string, round, revision, version int) (*ReviewVerdict, error) {
+	return s.reviewVerdictAt(ctx, project, id, actor, note, true, round, revision, version)
 }

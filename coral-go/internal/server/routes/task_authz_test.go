@@ -57,7 +57,7 @@ func TestTaskRoutesNeedAPlannerOrTheAssignee(t *testing.T) {
 
 	// Title and priority edits.
 	assert.Equal(t, http.StatusForbidden, req("PATCH", p(""), map[string]any{"subscriber_id": "Dev2", "title": "do something else"}))
-	assert.Equal(t, http.StatusOK, req("PATCH", p(""), map[string]any{"subscriber_id": "Dev1", "priority": "high"}), "the assignee")
+	assert.Equal(t, http.StatusForbidden, req("PATCH", p(""), map[string]any{"subscriber_id": "Dev1", "priority": "high"}), "#8951: the assignee alone cannot edit task text")
 	assert.Equal(t, http.StatusOK, req("PATCH", p(""), map[string]any{"subscriber_id": "Orch", "title": "work, sharpened"}), "a planner")
 
 	// Nudge and reminders (start, stop).

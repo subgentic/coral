@@ -29,6 +29,7 @@ func (s *Store) migrateBoardColumns(ctx context.Context) {
 		"ALTER TABLE board_tasks ADD COLUMN cache_read_tokens INTEGER",
 		"ALTER TABLE board_tasks ADD COLUMN cache_write_tokens INTEGER",
 		"ALTER TABLE board_tasks ADD COLUMN revision INTEGER NOT NULL DEFAULT 1",
+		"ALTER TABLE board_tasks ADD COLUMN initial_instructions TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE board_messages ADD COLUMN external_json TEXT",
 		"ALTER TABLE board_messages ADD COLUMN origin TEXT",
 		"ALTER TABLE board_messages ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0",
