@@ -149,8 +149,8 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             assert.ok(ths.length === 11 && ths.every(t => t.btn && ['none', 'ascending', 'descending'].includes(t.sort)), 'every column header is a sort button with aria-sort: ' + JSON.stringify(ths));
             assert.ok(ths[0].filter[0] && /Filter/.test(ths[0].filter[0]), 'a filter button has a name: ' + JSON.stringify(ths[0]));
             assert.equal(ths.filter(t => t.sort !== 'none').length, 1, 'exactly one column is the sort');
-            // folded (a phone): the header row is not drawn, and the "Sort by" select, labelled, takes its place (the keyboard steps below are the header's)
-            if (mobile) await waitFor(`document.querySelector('#cost-by-thinking .dt-box').classList.contains('dt-folded')`, 'the table folds on a phone', 4000);
+            // a phone (#8982): one line a row, the header row stays and its sort buttons are the controls; a folded table (header not drawn) would have the labelled "Sort by" select in its place
+            if (mobile) await waitFor(`document.querySelector('#cost-by-thinking .dt-box').classList.contains('dt-one-line')`, 'the table is one line a row on a phone (#8982: Analytics tables drop columns, they do not fold)', 4000);
             const folded = await ev(`getComputedStyle(document.querySelector('#cost-by-thinking thead')).display === 'none'`);
             if (folded) {
                 const sel = await ax('#cost-by-thinking .dt-sortbar-select'); assert.match(sel.name, /sort by/i, 'the select is named: ' + sel.name);

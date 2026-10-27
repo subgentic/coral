@@ -44,7 +44,7 @@ const TASKS = { tasks: [{ id: 4242, board_id: 'cost-board', title: 'A costly tas
                 const u = String(url && url.url || url);
                 const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
                 if (u.includes('/api/token-usage/summary')) { window.__cost.summary++; return json(${JSON.stringify(SUMMARY)}); }
-                if (u.endsWith('/api/board/tasks')) return json(${JSON.stringify(TASKS)});
+                if (u.split('?')[0].endsWith('/api/board/tasks')) return json(${JSON.stringify(TASKS)});
                 if (u.includes('/api/token-usage/')) return json({});
                 return inner(url, opts);
             };
