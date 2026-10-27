@@ -38,6 +38,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { settle } = require('./helpers/wait').bind(ev);
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const themed = async (name, w) => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await shot(`${name}-${theme}-${w}`); } await setTheme(ev, 'dark'); };
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e || !e.getClientRects().length) return null; const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); })()`);
@@ -153,19 +154,23 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
 
             // no workflow on a phone: the same one line, its hint and the toolbar's actions (a shot for UI/UX)
             if (mobile) {
+                await settle(1100); // the page keeps a read for 1 s (#9111), and this mock changed behind its back: ask after that
                 await ev(`window.__wfEmpty = true; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
                 await waitFor(`!!document.querySelector('#group-table-view .empty-pane .empty-line') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 0`, at + 'the empty folder on a phone', 8000);
                 for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await shot(`automations-workflows-empty-${theme}-${w}`); }
                 await setTheme(ev, 'dark');
+                await settle(1100); // the page keeps a read for 1 s (#9111), and this mock changed behind its back: ask after that
                 await ev(`window.__wfEmpty = false; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
             }
             // no workflow: one empty line with its hint (the toolbar keeps the create actions)
             if (w === 1280) {
+                await settle(1100); // the page keeps a read for 1 s (#9111), and this mock changed behind its back: ask after that
                 await ev(`window.__wfEmpty = true; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
                 await waitFor(`!!document.querySelector('#group-table-view .empty-pane .empty-line') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 0`, at + 'the empty folder', 8000);
                 assert.equal(await ev(`document.querySelector('#group-table-view .empty-pane .empty-line').textContent`), 'No workflows yet.', at + 'one empty line');
                 assert.equal(await ev(`[...document.querySelectorAll('#group-table-view [data-on-click="wf-build-agent"]')].some(b => b.getClientRects().length > 0)`), true, at + 'Build with Agent is on the toolbar');
                 await shot(`automations-workflows-empty-${w}`);
+                await settle(1100); // the page keeps a read for 1 s (#9111), and this mock changed behind its back: ask after that
                 await ev(`window.__wfEmpty = false; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
                 await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'the table is back', 8000);
 
