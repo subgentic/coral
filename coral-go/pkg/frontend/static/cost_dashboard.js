@@ -717,10 +717,11 @@ function _renderSpendChart(buckets) {
 
     // X-axis labels (first, middle, last): a multi-day chart must distinguish dates, not repeat the same time.
     const multiDay = Date.parse(buckets[n - 1].bucket) - Date.parse(buckets[0].bucket) > 86400000;
+    const daily = buckets.every(b => /T00:00:00(\.0+)?Z$/.test(String(b.bucket))); // day buckets are UTC days: their date is the UTC one (#9511); hourly buckets are instants, dated in the browser's zone
     const formatBucketLabel = (b) => {
         try {
             const d = new Date(b);
-            return multiDay ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+            return multiDay ? d.toLocaleDateString(undefined, daily ? { month: 'short', day: 'numeric', timeZone: 'UTC' } : { month: 'short', day: 'numeric' })
                 : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
         } catch { return ''; }
     };

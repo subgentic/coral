@@ -106,7 +106,7 @@ const colorOf = line => (line.other ? 'var(--viz-other)' : `var(--viz-${((line.s
 
 export function timeLabel(ms, interval) {
     const d = new Date(ms);
-    if (interval === '1d') return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    if (interval === '1d') return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }); // a day bucket is a UTC day (the route's strftime): its date is the UTC one, not the browser's day of its start (#9511)
     if (interval === '5m') return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
     return d.toLocaleString(undefined, { weekday: 'short', hour: 'numeric' });
 }
