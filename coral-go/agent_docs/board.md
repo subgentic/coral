@@ -966,12 +966,13 @@ and the connector accepts only the parameters below.
 
 | Parameter | Values |
 |---|---|
-| `fields` | Which fields come back: comma list (or repeated) of `summary` and/or `id`, `revision`, `board_id`, `board_label`, `title`, `status`, `priority`, `created_by`, `assigned_to`, `completed_by`, `parked_reason`, `parked_until`, `remind_at`, `created_at`, `claimed_at`, `completed_at`, `updated_at`, `verification`, `goal_id`, `goal_title`, `body`, `completion_message`. `summary` stands for `id`, `title`, `status`, `priority`, `assigned_to`, `board_id`, `board_label`, `parked_reason`, `parked_until`, `created_at`, `updated_at`: no long text. `body` and `completion_message` come back only when named. Without `fields` the reply carries the whole task rows as the plain list does. `board_label` is left out for a board that has no label. `goal_id` and `goal_title` (#7345) are what the whole rows carry: the id of the goal a task is linked to and that goal's title, `goal_id` is null for a task with no goal, like the other nullable fields, and `goal_title` is then left out (a goal id of another board gives no title either); `goal_title` is read once for the page from the task's own board's goals, and neither is in `summary`. |
+| `fields` | Which fields come back: comma list (or repeated) of `summary` and/or `id`, `revision`, `board_id`, `board_label`, `title`, `status`, `priority`, `created_by`, `assigned_to`, `completed_by`, `parked_reason`, `parked_until`, `remind_at`, `created_at`, `claimed_at`, `completed_at`, `updated_at`, `verification`, `goal_id`, `goal_title`, `cost_usd`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens` (what the task cost; null until an agent has worked on it), `body`, `completion_message`. `summary` stands for `id`, `title`, `status`, `priority`, `assigned_to`, `board_id`, `board_label`, `parked_reason`, `parked_until`, `created_at`, `updated_at`: no long text. `body` and `completion_message` come back only when named. Without `fields` the reply carries the whole task rows as the plain list does. `board_label` is left out for a board that has no label. `goal_id` and `goal_title` (#7345) are what the whole rows carry: the id of the goal a task is linked to and that goal's title, `goal_id` is null for a task with no goal, like the other nullable fields, and `goal_title` is then left out (a goal id of another board gives no title either); `goal_title` is read once for the page from the task's own board's goals, and neither is in `summary`. |
 | `status` | Multi: `pending`, `in_progress`, `completed`, `skipped`, `blocked`, `draft`, `review_pending` |
 | `assigned_to`, `board`, `created_by` | Multi: exact names (a board is its `board_id`) |
 | `priority` | Multi: `critical`, `high`, `medium`, `low` |
 | `verification` | Multi: `verified`, `evidence`, `unverified`: the state of a completed task (see Verification below); tasks that have none are never returned by it |
 | `goal_id` | Multi: a goal number of the task's own board, or `none` (a task that serves no goal), e.g. `goal_id=5`, `goal_id=none`, `goal_id=5,none` (#7782) |
+| `has_cost` | `true`: only the tasks with a recorded cost (`cost_usd` above 0); `false`: only those with none (#9100: the Analytics By task table) |
 | `parked` | `true`: parked now (a reason, and a park time not yet past or none); `false`: not parked |
 | `created_since`, `updated_since` | RFC 3339 time (an offset is read as that instant); tasks created or updated at or after it |
 | `q` | Search text (#4745): a plain, case-insensitive substring of a task's title, body or completion message, at most 200 characters, no control characters, given once. `%` and `_` are ordinary characters (no pattern); whitespace around it is trimmed, and an empty `q` is no search. It combines with every other filter. Through Coral Hub it is matched on the text a viewer sees (a token in a body is not there to match, and the marker `[redacted token]` that stands in for it is), and a `q` holding a token, key or password is refused with a 400 |
@@ -1052,6 +1053,8 @@ than ignoring the part it cannot read). Every filter runs in SQL as a bound para
 one; `review_requested` is true while a completion review is pending;
 `cost_usd`, `completed_by` and `completed_at` appear when known.
 `next_cursor` is `""` on the last page.
+
+`GET /api/board/{project}/tasks?counts=1` is the two totals alone (`total_open`, `total_completed`, and `"tasks": []`), for a client that only shows the counts (the team page's tab counts); it takes no `status`, `cursor` or `limit` (a 400). It answers `304` while unchanged, like the list (#9100).
 
 ### Current Task
 
