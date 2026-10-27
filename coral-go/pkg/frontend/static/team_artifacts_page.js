@@ -438,7 +438,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const editor = hex ? Tags.tagEditor({ project: inbox ? item.board_id : model.project, hex, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(hex, tags) }) : null; // a stored file's tags (#8594)
         const dropped = ['team', 'goal'].filter(k => { const th = root?.querySelector(`th[data-key="${k}"]`); return !!th && getComputedStyle(th).display === 'none'; }).length; // a narrow box drops the row's Team and Task columns: their facts are behind Details, and the button says how many
         openDetailPane({
-            key, opener, hiddenFacts: dropped, title: name, host: hooks.detailHost || null, extra: editor, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox, resizable: inbox,
+            key, opener, hiddenFacts: dropped, title: name, host: hooks.detailHost || null, extra: editor, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox, resizable: true, // the team page's pane wears the same handle as the Inbox's (detail_pane.js: drag, keys, double click, the width kept; the agent's Artifacts sheet has a host and no handle) (#9410)
             sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words
             facts: facts.filter(([, v]) => v != null && v !== ''),
             details: link && link.preview && hex ? (h, { isStale }) => { // the Operator's "Who can read this" (#5577) is behind Details with the facts, for a stored artifact
