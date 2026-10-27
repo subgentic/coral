@@ -57,7 +57,7 @@
 .sv .telemetry-install-id code { flex: 0 1 auto; } /* a value in the dialog is the dialog's control size, not the page's */
 .sv-ctl-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; } /* a control with its buttons: the key on its own full-width line, its buttons below (#3152, #8460) */
 .sv-ctl-line > .sv-input { flex: 1 1 100%; min-width: 0; }
-.sv-ctl-icon { font-size: 0.875rem; vertical-align: middle; }
+.sv-ctl-icon { font-size: var(--fs-lg); vertical-align: middle; }
 .sv-live-wide { grid-column: 1 / -1; min-width: 0; } /* a live part under the whole row (field.live { wide: true }) */
 .sv-row[data-disabled] .sv-label { color: var(--sv-value-color); }
 .sv-choices { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
@@ -94,7 +94,7 @@
 /* the line reads as a control, not a caption: one "▸" marker (a flex summary draws no native one), 32 px high (44 on a coarse pointer, touch.css), the CLI paths' fold (#7041, #8460) */
 .sv-fold > summary { display: flex; align-items: center; gap: 6px; min-height: 32px; list-style: none; font-size: var(--fs-md); }
 .sv-fold > summary::-webkit-details-marker { display: none; }
-.sv-fold > summary::before { content: '▸'; font-size: 0.75rem; flex: none; }
+.sv-fold > summary::before { content: '▸'; font-size: var(--fs-base); flex: none; }
 .sv-fold[open] > summary::before { transform: rotate(90deg); }
 .sv-fold[open] > summary { margin-bottom: 8px; }
 @media (pointer: coarse) { .sv-fold > summary { min-height: var(--control-touch-height, 44px); } }
@@ -118,7 +118,7 @@
     .sv-shell { flex-direction: column; }
     .sv .settings-tabs { display: none; }
     .sv .settings-nav .settings-group-pick { display: block; }
-    .sv .settings-group-pick select { width: 100%; min-height: var(--sv-control-height-touch); font-size: 0.875rem; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); }
+    .sv .settings-group-pick select { width: 100%; min-height: var(--sv-control-height-touch); font-size: var(--fs-lg); background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); }
     .sv .settings-panes { padding: 12px 16px 20px; } /* px: the margins do not grow with the text size, the words get the room */
     .sv-settings:not(.sv-flat) .sv-row { grid-template-columns: minmax(0, 1fr); }
     .sv-settings:not(.sv-flat) .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; }

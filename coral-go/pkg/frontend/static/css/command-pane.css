@@ -78,7 +78,7 @@
     z-index: 1;
 }
 .attach-image-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.attach-image-btn .material-icons { font-size: 1.25rem; }
+.attach-image-btn .material-icons { font-size: var(--fs-2xl); }
 .command-editor:has(> .attach-image-btn) textarea { padding-right: 44px !important; }
 @media (pointer: coarse) {
     .attach-image-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); right: 2px; top: 0; }
@@ -105,7 +105,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     border: 1px solid var(--control-border);
     border-radius: var(--radius-md);
     color: var(--text-primary);
-    font-size: 0.8125rem;   /* 13px; rem so it follows the text size */
+    font-size: var(--fs-md);   /* 13px; rem so it follows the text size */
     font-family: var(--font-sans); /* the same on a phone as in the desktop card (#3218) */
     outline: none;
     transition: border-color 0.15s;
@@ -144,7 +144,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     border: 1px solid var(--control-border);
     background: var(--bg-primary);
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: var(--fs-base);
     line-height: 1;
     padding: 0;
     cursor: pointer;
@@ -164,7 +164,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 }
 
 .btn-add-macro {
-    font-size: 1rem;
+    font-size: var(--fs-xl);
     font-weight: 400;
     color: var(--text-muted);
     border-style: dashed;
@@ -215,7 +215,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     background: none;
     border: none;
     color: var(--text-secondary);
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
     font-family: inherit;
     cursor: pointer;
     border-radius: var(--radius-md);
@@ -263,7 +263,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 
 .command-mention-item {
     padding: 6px 12px;
-    font-size: 0.75rem;
+    font-size: var(--fs-base);
     font-family: var(--font-mono);
     color: var(--text-secondary);
     cursor: pointer;
@@ -302,7 +302,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 
 .file-mention-item {
     padding: 6px 12px;
-    font-size: 0.75rem;
+    font-size: var(--fs-base);
     font-family: var(--font-mono);
     color: var(--text-secondary);
     cursor: pointer;
@@ -324,7 +324,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 
 .file-mention-breadcrumb {
     padding: 4px 12px;
-    font-size: 0.6875rem;
+    font-size: var(--fs-sm);
     font-family: var(--font-mono);
     color: var(--text-muted);
     border-bottom: 1px solid var(--border);
@@ -332,7 +332,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 
 .file-mention-dir-icon {
     margin-right: 4px;
-    font-size: 0.6875rem;
+    font-size: var(--fs-sm);
 }
 
 /* ── Composer card (desktop) ──────────────────────────────── */
@@ -379,7 +379,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
         border: none;
         border-radius: 0;
         font-family: var(--font-sans);
-        font-size: 0.875rem;
+        font-size: var(--fs-lg);
         overflow-y: auto;
     }
     :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar {
@@ -463,7 +463,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     #board-chat-input-pane textarea {
         flex: none; min-height: 2.75rem; max-height: 40vh; padding: 0;
         background: transparent; border: none; border-radius: 0;
-        font-family: var(--font-sans); font-size: 1rem; /* 16px at the default size: no iOS zoom on focus, and it follows the text size */
+        font-family: var(--font-sans); font-size: var(--fs-xl); /* 16px at the default size: no iOS zoom on focus, and it follows the text size */
         overflow-y: auto;
     }
     #board-chat-input-pane .command-pane-toolbar { order: 1; gap: 4px; border-bottom: none; padding: 6px 8px 8px; }
@@ -492,7 +492,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     flex-shrink: 0;
     border-bottom: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
 }
 .sleeping-composer[hidden] {
     display: none;
@@ -531,7 +531,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     border-radius: var(--radius-lg);
     background: rgba(var(--error-rgb), 0.1);
     color: var(--error-text); /* red as text on its own tint: 4.5:1 (#6171) */
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
     line-height: 1.35;
 }
 .composer-error[hidden] { display: none; }
@@ -546,7 +546,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     border: none;
     background: none;
     color: inherit;
-    font-size: 1rem;
+    font-size: var(--fs-xl);
     cursor: pointer;
 }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
@@ -572,7 +572,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 .model-chip-wrap[hidden] { display: none; }
 .options-chip-wrap { display: none; } /* a phone's one Options button (#7623): the media query below shows it */
 .model-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 28px; padding: 2px 8px 2px 10px; border: 1px solid var(--border); border-radius: 999px;
-    background: var(--bg-tertiary); color: var(--text-secondary); font: inherit; font-size: 0.75rem; cursor: pointer; }
+    background: var(--bg-tertiary); color: var(--text-secondary); font: inherit; font-size: var(--fs-base); cursor: pointer; }
 .model-chip:hover { color: var(--text-primary); border-color: var(--text-muted); }
 .model-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .model-chip-key { display: none; color: var(--text-muted); white-space: nowrap; flex: none; }
@@ -581,8 +581,8 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 .model-chip[data-state="requested"] .model-chip-text { font-style: italic; }
 .model-chip[data-state="pending"] { color: var(--text-primary); border-color: var(--accent); } /* the accent is the border: as text it is 4.1:1 on the chip in the light theme (#5042) */
 .model-chip[data-state="failed"] { color: var(--error-text, var(--fx-red-hot)); border-color: var(--danger, var(--fx-red-hot)); }
-.model-chip-caret { font-size: 1rem; }
-.model-chip-note { order: 2; font-size: 0.75rem; color: var(--text-muted); }
+.model-chip-caret { font-size: var(--fs-xl); }
+.model-chip-note { order: 2; font-size: var(--fs-base); color: var(--text-muted); }
 .model-chip-note:not(:empty) { padding: 0 16px 10px; margin-top: -4px; }
 /* Empty, the note takes no room but stays in the accessibility tree: a live region that is display:none when its text arrives is not announced (#5042). */
 .model-chip-note:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -590,24 +590,24 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 .model-chip-menu { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 30; min-width: 260px; max-width: min(92vw, 360px); max-height: 50vh; overflow-y: auto; padding: 6px;
     background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-ml); box-shadow: 0 8px 24px rgba(var(--black-rgb), 0.35); }
 .model-chip-menu[hidden] { display: none; }
-.model-chip-head { padding: 6px 8px 2px; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.model-chip-head { padding: 6px 8px 2px; font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
 .model-chip-how { text-transform: none; letter-spacing: 0; margin-left: 6px; color: var(--link-text); } /* the accent was 4.44:1 on the menu in the light theme */
 .model-chip-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 36px; padding: 6px 8px; border: 0; border-radius: var(--radius-md);
-    background: transparent; color: var(--text-primary); font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; }
+    background: transparent; color: var(--text-primary); font: inherit; font-size: var(--fs-md); text-align: left; cursor: pointer; }
 .model-chip-item:hover, .model-chip-item:focus-visible { background: var(--bg-tertiary); }
 .model-chip-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; } /* a tint alone is not a focus indicator (#5042) */
 .model-chip-item.checked { font-weight: 600; }
-.model-chip-item .material-icons { font-size: 1rem; }
-.model-chip-empty { padding: 10px; font-size: 0.8125rem; color: var(--text-muted); }
+.model-chip-item .material-icons { font-size: var(--fs-xl); }
+.model-chip-empty { padding: 10px; font-size: var(--fs-md); color: var(--text-muted); }
 /* "Add a model…" at the end of the model menu (#5938): a separated item, and its small form (the id, an optional name) in the same panel */
 .model-chip-add-row { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
 .model-chip-add-form { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding: 8px; border-top: 1px solid var(--border); }
-.model-chip-add-field { display: flex; flex-direction: column; gap: 2px; font-size: 0.8125rem; color: var(--text-secondary); }
+.model-chip-add-field { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-md); color: var(--text-secondary); }
 .model-chip-add-field input { width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .model-chip-add-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .model-chip-add-field input[aria-invalid="true"] { border-color: var(--error-text, var(--fx-red-hot)); }
-.model-chip-add-help { margin: 0; font-size: 0.75rem; color: var(--text-secondary); }
-.model-chip-add-err { margin: 0; font-size: 0.8125rem; color: var(--error-text, var(--fx-red-hot)); }
+.model-chip-add-help { margin: 0; font-size: var(--fs-base); color: var(--text-secondary); }
+.model-chip-add-err { margin: 0; font-size: var(--fs-md); color: var(--error-text, var(--fx-red-hot)); }
 .model-chip-add-actions { display: flex; gap: 6px; }
 
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {

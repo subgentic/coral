@@ -69,7 +69,7 @@
 @media (pointer: coarse) { .dt-sort { min-height: var(--table-touch); min-width: var(--table-touch); } } /* a header button is a touch-size box both ways: a short heading (Task, Who) was 41 px wide (#8854) */
 .dt-sort:focus-visible, .dt-primary:focus-visible, .dt-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .dt-filter { display: inline-flex; align-items: center; margin-left: 4px; padding: 0; background: none; border: 0; color: var(--table-head-color); cursor: pointer; vertical-align: middle; }
-.dt-filter .material-icons { font-size: 0.8125rem; }
+.dt-filter .material-icons { font-size: var(--fs-md); }
 .dt-filter { opacity: 0; } /* a filter is offered when the head is hovered or focused, and shown while one is set */
 .dt-table th:hover .dt-filter, .dt-filter:focus-visible, .dt-filter-on { opacity: 1; }
 @media (hover: none) { .dt-filter { opacity: 1; } }
@@ -101,11 +101,11 @@
 .dt-id { flex: none; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
 .dt-tag { display: inline-block; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 1px 6px; font-size: var(--table-head-size); font-weight: var(--table-head-weight); color: var(--table-secondary-color); } /* a tag is one line: a server called build-west was build- / west at 390 (#8220) */
 .dt-person { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
-.dt-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--table-avatar); height: var(--table-avatar); border-radius: 50%; color: var(--on-avatar); font-size: 0.6875rem; font-weight: 700; }
+.dt-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--table-avatar); height: var(--table-avatar); border-radius: 50%; color: var(--on-avatar); font-size: var(--fs-sm); font-weight: 700; }
 .dt-avatars { gap: 4px; }
 .dt-avatars > .dt-avatar { background: var(--dt-avatar-bg); }
 /* a reviewer: smaller, outlined in its colour, the letter in the text colour (#8492) */
-.dt-avatars > .dt-avatar-review { width: calc(var(--table-avatar) - 4px); height: calc(var(--table-avatar) - 4px); background: transparent; border: 1.5px solid var(--dt-avatar-bg); color: var(--text-primary); font-size: 0.625rem; }
+.dt-avatars > .dt-avatar-review { width: calc(var(--table-avatar) - 4px); height: calc(var(--table-avatar) - 4px); background: transparent; border: 1.5px solid var(--dt-avatar-bg); color: var(--text-primary); font-size: var(--fs-xs); }
 .dt-avatars-more { font-size: var(--table-tertiary-size); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
 .dt-person-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dt-quiet { font-size: var(--table-tertiary-size); font-weight: var(--table-secondary-weight); color: var(--table-secondary-color); } /* a row's own small action (Done, Reopen): quiet, not a call to action */
@@ -115,7 +115,7 @@
 .dt-chat-flags { display: inline-flex; gap: 2px; justify-content: flex-end; }
 .dt-flag { display: inline-flex; align-items: center; justify-content: center; width: var(--control-compact-height); height: var(--control-compact-height); padding: 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--table-tertiary-color); cursor: pointer; }
 .dt-row .dt-flag { opacity: 0; }
-.dt-flag .material-icons { font-size: 1.125rem; }
+.dt-flag .material-icons { font-size: var(--icon-size); }
 .dt-row:hover .dt-flag, .dt-row:focus-within .dt-flag, .dt-row .dt-flag:focus-visible, .dt-row .dt-flag-on { opacity: 1; } /* a chat's Star and Archive show on its row's hover or focus; a starred chat keeps its star drawn */
 .dt-flag-on { color: var(--warning); }
 .dt-flag:hover { color: var(--table-primary-color); }
@@ -289,31 +289,31 @@
 .dt-box.dt-fit:not(.dt-folded) td.dt-grow { min-width: var(--table-fit-name-min); }
 
 /* The Details link on an agent's artifact row (#8539): 12/400 in the link colour on the meta line, never hover-only; its 44 px target on a phone or a coarse pointer is a pseudo-element around it, not a taller row. */
-.dt-box .artifact-details, .dt-box.dt-folded .artifact-details { position: relative; display: inline; min-height: 0; min-width: 0; font-size: 0.75rem; font-weight: 400; }
+.dt-box .artifact-details, .dt-box.dt-folded .artifact-details { position: relative; display: inline; min-height: 0; min-width: 0; font-size: var(--fs-base); font-weight: 400; }
 @media (max-width: 767px), (pointer: coarse) { .dt-box .artifact-details::after { content: ""; position: absolute; inset: -16px -10px; } }
 /* The "3 files" button of a task row (#8575): the page icon and the count, 12/400 tertiary, always shown; its 44 px target on a phone or a coarse pointer is a pseudo-element, so a row keeps its height. */
 .dt-box .dt-files, .dt-box.dt-folded .dt-files { position: relative; display: inline-flex; align-items: center; gap: 2px; min-height: 0; min-width: 0; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); }
-.dt-box .dt-files .material-icons { font-size: 0.875rem; }
+.dt-box .dt-files .material-icons { font-size: var(--fs-lg); }
 .dt-box .dt-files:hover { color: var(--accent); }
 @media (max-width: 767px), (pointer: coarse) { .dt-box .dt-files::after { content: ""; position: absolute; inset: -16px -10px; } }
 
 /* Artifact tags (#8594): small outlined chips (11/600, the quiet tone), two on a row then +N; in the sheet each has an x, and "+ Tag" opens the starter set and a box */
 .artifact-tags-row { display: inline-flex; gap: 4px; margin-top: 2px; max-width: 100%; flex-wrap: wrap; }
-.artifact-tag { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 0 6px; font-size: 0.6875rem; font-weight: 600; line-height: 1.5; color: var(--table-secondary-color); }
+.artifact-tag { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 0 6px; font-size: var(--fs-sm); font-weight: 600; line-height: 1.5; color: var(--table-secondary-color); }
 .artifact-tag-more { border-style: dashed; }
 .artifact-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .artifact-tag-list { display: contents; list-style: none; margin: 0; padding: 0; }
 .artifact-tag-item { display: inline-flex; }
 .artifact-tag-remove { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; border-radius: 50%; }
-.artifact-tag-remove .material-icons { font-size: 0.75rem; }
+.artifact-tag-remove .material-icons { font-size: var(--fs-base); }
 .artifact-tag-remove::after { content: ''; position: absolute; inset: -14px; } /* a 44 px target without a taller chip */
-.artifact-tag-add { min-height: 24px; padding: 0 8px; border: 1px dashed var(--table-outer); border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.artifact-tag-add { min-height: 24px; padding: 0 8px; border: 1px dashed var(--table-outer); border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: var(--fs-base); cursor: pointer; }
 .artifact-tag-box { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
 .artifact-tag-offers { display: flex; flex-wrap: wrap; gap: 6px; }
-.artifact-tag-offer { min-height: 28px; padding: 0 8px; border: 1px solid var(--table-outer); border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.artifact-tag-offer { min-height: 28px; padding: 0 8px; border: 1px solid var(--table-outer); border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-base); cursor: pointer; }
 .artifact-tag-form { display: flex; gap: 6px; }
-.artifact-tag-input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 0.8125rem; }
-.artifact-tag-status { margin: 0; flex-basis: 100%; font-size: 0.75rem; }
+.artifact-tag-input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: var(--fs-md); }
+.artifact-tag-status { margin: 0; flex-basis: 100%; font-size: var(--fs-base); }
 .artifact-tag-error { color: var(--table-danger); }
 @media (pointer: coarse) { /* the buttons of the tag editor are 44 px targets on a phone (phone_targets_census): + Tag, the offers, Add and the box */
     .artifact-tag-add, .artifact-tag-offer, .artifact-tag-form .btn, .artifact-tag-input { min-height: 44px; }

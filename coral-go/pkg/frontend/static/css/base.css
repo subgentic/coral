@@ -59,7 +59,7 @@ body.no-scrollbars {
     gap: 8px;
     padding: 24px 16px;
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: var(--fs-base);
 }
 
 .loading-indicator::before {
@@ -75,6 +75,9 @@ body.no-scrollbars {
 @keyframes loading-spin {
     to { transform: rotate(360deg); }
 }
+
+/* Native controls take the page's font family, not the browser's Arial (Goal #84: 74 elements showed it). The size, weight and line height are each rule's own. */
+button, input, select, textarea, optgroup { font-family: inherit; }
 
 /* Placeholders at AA (#4851): the browser's own #757575 is 4.1-4.2:1 on the panels and 3.8-3.9:1 on the board's post box, in either theme; the muted text token is 4.5:1 or more on every panel in both. */
 input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1; }
