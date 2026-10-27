@@ -218,7 +218,7 @@ function deleteSelectedTheme() {
     const select = document.getElementById('theme-load-select');
     const name = select.value;
     if (!name) return;
-    window.showConfirmModal('Delete Theme', `Delete theme "${name}"?`, async () => { try {
+    window.showConfirmModal('Delete theme', `Delete theme "${name}"?`, async () => { try {
         await fetch(`/api/themes/${encodeURIComponent(name)}`, { method: 'DELETE' });
         // If active theme is being deleted, clear the setting
         if (state.settings.custom_theme === name) {

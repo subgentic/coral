@@ -13,7 +13,7 @@ export function hasUnsavedTeamSettings() {
  *  chose to leave in the confirm dialog (Cancel, Escape and a replaced dialog all resolve false). */
 export function confirmTeamWorkspaceChange() {
     if (!hasUnsavedTeamSettings()) return Promise.resolve(true);
-    return new Promise(resolve => window.showConfirmModal('Unsaved Team Settings', 'Team settings have unsaved changes. Leave without saving?',
+    return new Promise(resolve => window.showConfirmModal('Unsaved team settings', 'Team settings have unsaved changes. Leave without saving?',
         () => resolve(true), () => resolve(false), { label: 'Leave', cancelLabel: 'Keep editing', danger: true }));
 }
 

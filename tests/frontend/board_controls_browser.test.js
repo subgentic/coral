@@ -66,7 +66,7 @@ const { openBoardPage } = require('./helpers/team_board');
         await ev(`window.__confirm = null; window.showConfirmModal = (title, text, ok) => { window.__confirm = { title, text, ok }; }; true`);
         await ev(`(() => { const b = document.createElement('button'); b.setAttribute('data-on-click', 'mb-msg-delete'); b.dataset.msgId = ${JSON.stringify(String(ID))}; document.body.append(b); b.click(); b.remove(); return true; })()`);
         const asked = await ev(`({ title: window.__confirm.title, text: window.__confirm.text })`);
-        assert.equal(asked.title, 'Delete Message');
+        assert.equal(asked.title, 'Delete message');
         assert.equal(asked.text, 'Delete the message from Orchestrator ("First thing to say, with some length so it is cut in the con…")? This cannot be undone.');
         assert.equal(await ev(`document.querySelectorAll('#mb-messages .mb-message').length`), 3, 'asking deletes nothing');
         await ev(`window.__confirm.ok(); true`);

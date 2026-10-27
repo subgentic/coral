@@ -88,7 +88,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await click('#confirm-modal .btn:not(#confirm-modal-yes)');
         await sleep(300); // sleep-ok: shows that nothing is sent (no condition to wait for)
         check('Delete still asks first (in the confirm dialog, with the name), and Cancel sends nothing',
-            delAsked.title === 'Delete Workflow' && /Nightly "build"/.test(delAsked.message) && !(await reqs()).some(r => r.startsWith('DELETE')), JSON.stringify({ delAsked, reqs: await reqs() }));
+            delAsked.title === 'Delete workflow' && /Nightly "build"/.test(delAsked.message) && !(await reqs()).some(r => r.startsWith('DELETE')), JSON.stringify({ delAsked, reqs: await reqs() }));
 
         await clear();
         await click('#wf-detail-container [data-on-click="wf-edit"]');
@@ -113,8 +113,8 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         const closedByBackdrop = await ev(`getComputedStyle(document.getElementById('wf-create-modal')).display === 'none'`);
         check('the dialog closes on its backdrop, not on a click inside it', stillOpen && closedByBackdrop, `${stillOpen}/${closedByBackdrop}`);
         await ev(`window.showWorkflowCreateModal(); true`);
-        await click('#wf-create-modal [data-on-click="wf-modal-close"].modal-close-btn');
-        check('the dialog\'s close button closes it', await ev(`getComputedStyle(document.getElementById('wf-create-modal')).display === 'none'`));
+        await ev(`[...document.querySelectorAll('#wf-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
+        check('the dialog\'s Cancel closes it (no X, #9456)', await ev(`getComputedStyle(document.getElementById('wf-create-modal')).display === 'none'`));
 
         await clear();
         await click('#wf-detail-container .wf-runs-table tr.dt-row[data-key="31"]');
@@ -130,7 +130,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await click('#wf-run-detail-container [data-on-click="wf-kill-run"]');
         await until(`!!document.getElementById('confirm-modal') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog');
         const killAsked = await modalState();
-        check('Kill asks first, naming the run and its workflow', killAsked.open && killAsked.title === 'Kill Run' && killAsked.message.includes('run #31') && killAsked.message.includes('"Nightly"'), JSON.stringify(killAsked));
+        check('Kill asks first, naming the run and its workflow', killAsked.open && killAsked.title === 'Kill run' && killAsked.message.includes('run #31') && killAsked.message.includes('"Nightly"'), JSON.stringify(killAsked));
         await click('#confirm-modal .btn:not(#confirm-modal-yes)');
         await sleep(300); // sleep-ok: shows that Cancel sends nothing (no condition to wait for)
         check('Cancel closes the dialog and kills nothing', !(await modalState()).open && !(await reqs()).some(r => r.includes('/kill')), JSON.stringify(await reqs()));
@@ -150,7 +150,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await click('#wf-run-detail-container [data-on-click="wf-kill-run"]');
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog for the agent run');
         const agentAsked = await modalState();
-        check('Kill Run with a running agent step says what happens to its terminal log', agentAsked.title === 'Kill Run' && agentAsked.message.endsWith("Its terminal log is kept, in the logs folder of Coral's data folder."), JSON.stringify(agentAsked));
+        check('Kill Run with a running agent step says what happens to its terminal log', agentAsked.title === 'Kill run' && agentAsked.message.endsWith("Its terminal log is kept, in the logs folder of Coral's data folder."), JSON.stringify(agentAsked));
         await click('#confirm-modal .btn:not(#confirm-modal-yes)');
         check('...and Cancel kills nothing', !(await reqs()).some(r => r.includes('/kill')), JSON.stringify(await reqs()));
 

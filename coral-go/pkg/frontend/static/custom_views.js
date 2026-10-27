@@ -244,7 +244,7 @@ function _showViewContextMenu(event, viewId) {
 };
 
 async function _deleteView(viewId) {
-    window.showConfirmModal?.('Delete Custom View', 'Delete this custom view?', async () => {
+    window.showConfirmModal?.('Delete custom view', 'Delete this custom view?', async () => {
         try {
             await fetch(`/api/views/${viewId}`, { method: 'DELETE' });
             await loadCustomViews();

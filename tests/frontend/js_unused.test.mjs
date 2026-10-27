@@ -25,6 +25,8 @@ const rel = f => path.relative(st, f);
 
 // name -> reason. Add a name only with the reason it is used in a way this scan cannot see.
 export const ALLOW = new Map([
+    ['hideCreateTaskModal', 'the dialog has no Close X (#9456) and its Cancel is the form bar\'s: no markup names this window hook now, the suites (actions_tasks, team_page_tasks, keyboard_census_desktop) close the dialog by it'],
+    ['hideJobModal', 'the New job dialog has no Close X (#9456) and its Cancel is the form bar\'s: no markup names this window hook now, keyboard_census_desktop closes the dialog by it'],
     ['mountSettingsView', 'settings_view.js (#7744) has no product caller until its first surface is converted (step 1: the team page\'s Settings tab); settings_view_browser imports the module by URL. Remove this entry in that commit.'],
     ['mountSelection', 'the toolbar\'s place for the selection bar of data_table (#7743, Frontend Dev builds it on this contract); team_toolbar_browser drives it by URL until that table is built'],
     ['__coralReady', 'the suites wait on it (ready.js): a promise-like with the page\'s startup parts, in 117 suites and the harness preload'],

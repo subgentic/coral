@@ -89,7 +89,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
             await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none'`, 'create', 5000);
             const c = await auditRegion(ev, ['#create-task-modal']); await shot(`create-${theme}`);
-            await ev(`document.querySelector('#create-task-modal .modal-close-btn').click(); true`);
+            await ev(`[...document.querySelectorAll('#create-task-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
             assert.ok(c.checked > 0 && !c.fails.length, `${theme}: the Create task dialog holds 4.5:1: ` + JSON.stringify(c.fails).slice(0, 400));
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks', item: ${ids[0]} }); true`);
             await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').getClientRects().length > 0 && !!document.querySelector('#team-panel-item .goals-pinbar .btn, #team-panel-item .goals-pinbar [role=menuitem]')`, 'the page (drawn, not the last one left behind a hidden view)', 12000);

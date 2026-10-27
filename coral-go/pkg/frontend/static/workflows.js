@@ -369,7 +369,7 @@ function sayStarted(text) { const s = document.getElementById('wf-status'); if (
     const name = shownRun && Number(shownRun.id) === runId && shownRun.workflow_name ? ` of workflow "${shownRun.workflow_name}"` : '';
     // Kill Run stops the step that is running; an agent step goes through the same kill as Kill Session, which keeps its terminal log (#4399, #4437).
     const agentRunning = !!shownRun && Number(shownRun.id) === runId && (shownRun.steps || []).some(s => s.type === 'agent' && s.status === 'running');
-    window.showConfirmModal('Kill Run', `Stop run #${runId}${name}? Its steps stop where they are and the run cannot be resumed.${agentRunning ? ' ' + KILL_LOG_NOTE : ''}`, () => killWorkflowRun(runId), undefined, { label: 'Kill run', danger: true });
+    window.showConfirmModal('Kill run', `Stop run #${runId}${name}? Its steps stop where they are and the run cannot be resumed.${agentRunning ? ' ' + KILL_LOG_NOTE : ''}`, () => killWorkflowRun(runId), undefined, { label: 'Kill run', danger: true });
 }
 
 export async function killWorkflowRun(runId) {
@@ -388,7 +388,7 @@ export async function killWorkflowRun(runId) {
 // ── Delete ─────────────────────────────────────────────────────────────
 
 export function deleteWorkflow(id, name) {
-    window.showConfirmModal('Delete Workflow', `Delete workflow "${name}"? This will also delete all run history.`, async () => {
+    window.showConfirmModal('Delete workflow', `Delete workflow "${name}"? This will also delete all run history.`, async () => {
         try {
             await apiFetch(`/api/workflows/${id}`, { method: 'DELETE' });
             showToast(`Deleted workflow "${name}"`);

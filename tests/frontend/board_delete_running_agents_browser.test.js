@@ -46,7 +46,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__feed('bd-agent-id', { sleeping: true }); true`);
         await waitFor(`((window.T.state.liveSessions || []).find(s => s.name === 'bd-agent') || {}).sleeping === true`, 'the agent asleep in the list', 6000);
         await clickDelete();
-        assert.equal(await ev(`window.__confirm && window.__confirm.title`), 'Delete Board', 'a board with nothing running asks first');
+        assert.equal(await ev(`window.__confirm && window.__confirm.title`), 'Delete board', 'a board with nothing running asks first');
         assert.deepEqual(await toasts(), [], 'and says nothing else');
         await ev(`window.__server409 = true; window.__confirm.cb(); true`);
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /1 agent is still on this board \\(Late Agent\\)/.test(t.textContent))`, 'the server\'s message', 6000);

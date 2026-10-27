@@ -179,7 +179,7 @@ const fixtures = async () => {
                     assert.ok(await ev(`Array.from(document.querySelectorAll('#task-detail-modal-footer button')).filter(b=>b.getBoundingClientRect().width).every(b=>{const r=b.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight})`),'all task actions remain visible');
                     await c.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
                     await c.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-                    await ev(`document.querySelector('#task-detail-modal .modal-close-btn').focus()`);
+                    await ev(`document.querySelector('#task-detail-modal-footer .btn').focus()`);
                     assert.equal(await ev(`getComputedStyle(document.activeElement).outlineStyle`),'solid');
                 }
                 if(!baseline && view==='workflows') {
@@ -199,7 +199,7 @@ const fixtures = async () => {
         if(!baseline){
             await c.Emulation.setDeviceMetricsOverride({width:1440,height:960,deviceScaleFactor:1,mobile:false});
             await ev(`uiView('tasks')`);await wait();
-            await ev(`document.querySelector('#task-detail-modal .modal-close-btn').focus()`);
+            await ev(`document.querySelector('#task-detail-modal-footer .btn').focus()`);
             await c.Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',text:'\r',windowsVirtualKeyCode:13});
             await c.Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
             assert.equal(await ev(`document.getElementById('task-detail-modal').style.display`),'none','keyboard closes the real task dialog');

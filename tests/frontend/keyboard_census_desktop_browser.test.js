@@ -129,7 +129,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         await ev(`window.hideJobModal(); window.showWorkflowCreateModal(); true`);
         await sc('workflow new', async () => { await waitFor(`document.getElementById('wf-create-modal').getClientRects().length > 0 && !!document.querySelector('#wf-steps-editor .wf-step-editor-item')`, 'the new workflow form', 10000); }, { min: 5, expect: `document.getElementById('wf-create-modal').getClientRects().length > 0 && document.querySelectorAll('#wf-steps-editor .wf-step-editor-item').length === 1` });
         await sc('workflow new, more options', async () => { await ev(`document.querySelector('#wf-more > summary').click(); true`); }, { min: 5, expect: `document.getElementById('wf-more').open && document.getElementById('wf-input-max-dur').getClientRects().length > 0` });
-        await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); true`);
+        await ev(`[...document.querySelectorAll('#wf-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
         await ev(`document.querySelectorAll('.modal.show, dialog[open]').forEach(m => { m.classList.remove('show'); if (m.close) m.close(); }); true`);
         await load();
         for (const [n, tab, label] of [['analytics', 'tokens', 'Analytics'], ['docs', 'docs', 'Docs'], ['inbox', 'hub-inbox', 'Inbox']]) await sc(n, async () => { await ev(`window.switchNavTab('${tab}'); true`); }, { min: 3 });
