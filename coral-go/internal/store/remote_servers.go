@@ -372,3 +372,12 @@ func (s *RemoteServerStore) RotateMasterKey(ctx context.Context) error {
 	s.mu.Unlock()
 	return nil
 }
+
+// MAC is a keyed pseudonym of msg under label, with this install's master key (creating the key on first use when no encrypted row needs a key that is missing, as every other use of it does).
+func (s *RemoteServerStore) MAC(ctx context.Context, label string, msg []byte) ([]byte, error) {
+	box, err := s.getBox(ctx, true, false)
+	if err != nil {
+		return nil, err
+	}
+	return box.MAC(label, msg), nil
+}
