@@ -3895,6 +3895,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* Folded section: one summary style. A user sets only the --dz-* variables that differ. */
 .disclosure > summary { cursor: pointer; width: var(--dz-width, fit-content); padding: var(--dz-pad, .25rem .5rem .25rem 0); color: var(--dz-color, inherit); font-size: var(--dz-size, var(--fs-md)); font-weight: var(--fw-strong); }
 .disclosure[open] > summary { margin-bottom: var(--dz-gap, .4rem); }
+.disclosure > summary, .preset-editor > summary { line-height: normal; } /* a summary keeps the browser's line height: the body's 1.4 made each one 2 px taller */
 .launch-type-glyph { font-size: 2rem; } /* the agent card draws the same robot as the start page */
 
 /* Settings' footer: the note that something is not saved yet, on the left (UI audit #5589, finding 27); and the CLI paths behind one line. */
@@ -4259,7 +4260,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 /* The Servers tab of a self-hosted hub (#7638): a table (Server, Status, Agents), and a server's page with its facts and Test, Edit and Remove in a bar pinned at its foot */
 .servers-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .servers-page > * { flex-shrink: 0; }
-.servers-page-name { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-strong); line-height: var(--lh-label); color: var(--text-primary); overflow-wrap: anywhere; }
+.servers-page-name { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-page .item-meta { display: flex; align-items: center; gap: var(--space-md); }
 .servers-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px var(--space-xl); margin: var(--space-lg) 0; }
 .servers-fact { display: contents; }

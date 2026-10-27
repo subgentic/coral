@@ -268,7 +268,7 @@ const SETTINGS_PRELOAD = `(() => {
             return { w: [server.fontWeight, team.fontWeight, folder.fontWeight, agent.fontWeight].map(Number), serverColor: server.color, primary: probe('var(--text-primary)'),
                 team: team.color, folder: folder.color, agent: agent.color, secondary: probe('var(--text-secondary)') };
         })()`);
-        assert.deepEqual(hier.w, [700, 600, 600, 500], `weights: server, team, folder, agent (${JSON.stringify(hier)})`);
+        assert.deepEqual(hier.w, [600, 600, 600, 500], `weights: server, team, folder, agent (700 is only for the 20 and 32 px titles, Goal #84) (${JSON.stringify(hier)})`);
         assert.equal(hier.serverColor, hier.primary, 'the server header is the brightest text');
         assert.equal(hier.folder, hier.team, 'folders match teams (no accent blue)'); assert.equal(hier.team, col.neutral);
         assert.equal(hier.agent, hier.secondary, 'agent names are muted (no light blue)');

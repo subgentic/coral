@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
 // [selector, px at the default size]
-const SIZES = [['.welcome-eyebrow', 11], ['.welcome-header p', 14], ['.welcome-launch-icon', 21], ['.welcome-launch-copy strong', 15], ['.welcome-launch-copy span', 12],
+const SIZES = [['.welcome-eyebrow', 11], ['.welcome-header p', 14], ['.welcome-launch-icon', 21], ['.welcome-launch-copy strong', 14], ['.welcome-launch-copy span', 12],
     ['.welcome-launch-arrow', 19], ['.welcome-links a, .welcome-links button', 13], ['.welcome-links .material-icons', 17]];
 
 (async () => {

@@ -321,10 +321,10 @@
 .spend-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
 .spend-team { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--text-secondary); }
 .spend-sub { margin: 0 0 4px; font-size: var(--fs-md); color: var(--text-secondary); }
-.spend-headline { margin: 0 0 12px; font-size: var(--fs-2xl); font-weight: var(--fw-strong); }
+.spend-headline { margin: 0 0 12px; font-size: var(--fs-xl); font-weight: var(--fw-strong); }
 .spend-cards { margin-bottom: 12px; }
 /* Missing-data words can wrap between words; numeric figures keep their single line. */
-.spend-card .cost-card-value-word { white-space: normal; font-size: var(--fs-2xl); }
+.spend-card .cost-card-value-word { white-space: normal; font-size: var(--fs-xl); }
 .spend-card-sub { font-size: var(--fs-base); color: var(--text-secondary); margin-top: 2px; }
 .spend-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; margin-bottom: 16px; }
 .spend-box { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); padding: 14px 16px; min-width: 0; }
