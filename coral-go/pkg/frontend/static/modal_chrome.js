@@ -7,6 +7,7 @@
 
 import { hideRestartModal } from './controls.js';
 import { attachDialogFocus, restoreDialogFocus } from './dialog_focus.js';
+import { trapTarget } from './focus_trap.js';
 
 // The control that last had focus outside every dialog. A dialog opened from a menu item (the top
 // bar's menu closes as the item is chosen, and most dialogs load their code first) finds focus
@@ -129,18 +130,8 @@ document.addEventListener("keydown", (e) => {
                 )).filter(el => el.getClientRects().length > 0);
                 const stops = all.filter(el => el.tabIndex >= 0); // the ones the Tab key reaches: a roving-tabindex tab (-1) is not a stop (#7407)
                 if (stops.length === 0) return;
-                const first = stops[0];
-                const last = stops[stops.length - 1];
-                const active = document.activeElement;
-                // Focus outside the modal (left on the control that opened it) comes in too.
-                const outside = !modal.contains(active);
-                if (e.shiftKey && (outside || active === first || active === all[0])) { // (the first of all, a tab that was clicked or focused by script, wraps too)
-                    e.preventDefault();
-                    last.focus();
-                } else if (!e.shiftKey && (outside || active === last || active === all[all.length - 1])) {
-                    e.preventDefault();
-                    first.focus();
-                }
+                const target = trapTarget({ modal, box: modal.querySelector('.modal-content'), all, stops, active: document.activeElement, shift: e.shiftKey });
+                if (target) { e.preventDefault(); target.focus(); }
                 return;
             }
         }
