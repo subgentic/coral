@@ -87,8 +87,8 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
                         assert.equal(savedNames.length, INBOX_SAVED.length, `${where}: both Saved titles are present`);
                         for (const savedName of savedNames) {
                             assert.ok(savedName.width >= savedName.need-1, `${where}: Saved name needs at least 8rem: ${JSON.stringify(savedName)}`);
-                            assert.equal(savedName.clamp, '2', `${where}: Saved titles use at most two lines`);
-                            assert.ok(Math.abs(savedName.height-2*savedName.lineHeight)<=1, `${where}: the long Saved title has two visible lines: ${JSON.stringify(savedName)}`);
+                            assert.ok(savedName.clamp === 'none' || savedName.clamp === '', `${where}: a Saved title is one line with an ellipsis, not a wrapping clamp (#8981): ${JSON.stringify(savedName)}`);
+                            assert.ok(savedName.height < 1.6*savedName.lineHeight, `${where}: the long Saved title is one visible line: ${JSON.stringify(savedName)}`);
                             assert.ok(savedName.inside, `${where}: Saved name stays in its row: ${JSON.stringify(savedName)}`);
                         }
                     }
