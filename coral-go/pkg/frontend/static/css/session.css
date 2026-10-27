@@ -246,7 +246,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--fs-md);
-    font-weight: var(--fw-regular); /* .list-row-title's 13/400 (#9311) */
+    font-weight: var(--fw-medium); /* an agent's name: 13/500 primary (UI/UX #9358, #9686); the one line of its row */
 }
 
 .session-info {
@@ -270,63 +270,11 @@
     flex: 1;
 }
 
-.session-goal {
-    display: block;
-    /* Line 2 starts exactly under the agent name (not under the dot) */
-    margin-left: var(--row-dot-block, 16px);
-    line-height: 0.875rem;
-    height: 0.875rem;
-    /* Quiet italic, dimmer than secondary so the goal recedes behind the name,
-       but still >= 4.5:1 on row, hover and selected surfaces */
-    font-style: italic;
-    color: var(--text-goal, color-mix(in srgb, var(--text-secondary) 65%, var(--text-muted)));
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    margin-top: 0;
-}
-
 /* No summary / first prompt yet: inline generate-goal affordance, always visible */
-.session-goal-empty {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--text-goal, color-mix(in srgb, var(--text-secondary) 65%, var(--text-muted)));
-    opacity: 1;
-}
-
-.session-goal-empty-label {
-    /* Passive text: no pointer, no hover accent. Clicks bubble to the row. */
-    font-style: italic;
-    cursor: inherit;
-}
-
-.session-goal-empty:hover {
-    opacity: 1;
-}
 
 /* The sparkle is the only goal trigger: give it a visible hover state and a
    24x24 hit target. Negative vertical margins keep the row height at the
    goal line's 15px so density (D6) is unaffected. */
-.sidebar-goal-btn-inline,
-.session-group-item .sidebar-goal-btn-inline {
-    opacity: 0.8;
-}
-
-.session-goal-empty:hover .sidebar-goal-btn-inline {
-    opacity: 1;
-}
-
-.sidebar-goal-btn {
-    opacity: 0;
-    transition: opacity 0.15s;
-}
-.session-group-item:hover .sidebar-goal-btn {
-    opacity: 0.6;
-}
-.sidebar-goal-btn:hover {
-    opacity: 1 !important;
-}
 
 /* ── Sidebar Kebab Menu ───────────────────────────────────── */
 
@@ -604,7 +552,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     align-self: center;
 }
 
-
 .session-group-header:hover .folder-copy-btn {
     display: inline-flex;
     align-items: center;
@@ -621,12 +568,13 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     /* Rows are inset rounded tiles: 6px side margins, so the padding shrinks
        by the same amount to keep the name at the task #155 indent. */
     padding: 5px 4px 5px 36px !important; /* a folder header's chevron (#5989) moved its label 22px right: 14px + 22px */
+    min-height: 36px; /* one line a row (#9686): the dot, the name and at most one chip */
+    align-items: center;
     margin-left: 6px;
     margin-right: 6px;
     cursor: grab;
     border-left: 0;
 }
-
 
 /* A row that needs the Operator has no tint of its own (#5123: the amber wash across the row was louder than the context and Waiting badges): its flashing dot and its state pill carry it. */
 
@@ -639,25 +587,9 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
    specificity; this later rule restores --text-secondary (>= 4.5:1), or the
    theme's goal colour where secondary is too light on a hovered row (light,
    #4209). The dimmed NAME above already carries the sleeping state. */
-.session-group-item.sleeping .session-goal,
-.session-group-item.sleeping .session-goal-empty {
-    color: var(--text-goal, var(--text-secondary));
-    opacity: 1;
-}
 
 /* Line 2 = goal + optional unread count. The goal keeps its left inset so it
    still starts exactly under the agent name. */
-.session-line2 {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    height: 14px;
-}
-.session-line2 .session-goal {
-    flex: 1 1 auto;
-    min-width: 0;
-}
 
 /* Selected and attention rows keep full-strength names for readability/contrast */
 .session-group-item.active .session-label,
@@ -728,7 +660,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     box-shadow: inset 0 0 0 1px var(--border);
 }
 
-
 [data-theme="light"] .session-group-item .chip.session-state-pill {
     color: var(--warning);
 }
@@ -782,21 +713,9 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 /* The selected tile is darker than a plain row: lift its goal line back to
    secondary so it keeps >= 4.5:1 there (the light theme's goal colour is
    already dark enough for it, #4209). */
-.session-group-item.active .session-goal,
-.session-group-item.active .session-goal-empty {
-    color: var(--text-goal, var(--text-secondary));
-}
-
-.session-status-chip {
-    display: none;
-}
 
 /* Mobile-only banner + meta rows: one signal per state on desktop.
    mobile.css re-enables these under #mobile-session-list. */
-.session-mobile-banner-row,
-.session-mobile-meta {
-    display: none;
-}
 
 .session-group-item.dragging {
     opacity: 0.4;
@@ -952,23 +871,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .gs-dirty { color: var(--text-muted); }
 
 /* Per-agent branch line, shown only for agents on their own worktree */
-.session-worktree-line {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--fs-base);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    margin-top: 1px;
-    min-width: 0;
-}
-.session-worktree-line svg { flex-shrink: 0; opacity: 0.7; }
-.session-worktree-line .wt-branch {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-}
 
 .copy-branch-btn {
     margin-left: 2px;
@@ -1120,7 +1022,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 }
 
 /* The team view's group chat uses the board's soft cards (components.css). */
-
 
 /* The board's composer card is the chat's (command-pane.css, #6239): this keeps what is the board's own. */
 .board-chat-input-pane {
@@ -1651,8 +1552,8 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .list-display-options { display: flex; flex-direction: column; gap: var(--space-xs); padding: 0 var(--space-xs); }
 .list-display-option { display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; padding: 4px 0; font-size: var(--fs-md); }
 .list-display-option[hidden] { display: none; }
-.list-display-hint { margin: var(--space-xs) var(--space-xs) 0; font-size: var(--fs-sm, 11px); color: var(--text-muted); }
-.list-display-hint[hidden] { display: none; }
+
+
 .list-display-panel .agent-list-bar:not([hidden]) + .list-display-options { border-top: 1px solid var(--border); padding-top: var(--space-xs); }
 /* What is on while the panel is shut: a count on the button, and a line under the search saying which filters and which sort. */
 /* A dot on the corner of the button, hanging off it so it never covers the icon (at 200% text too); the count is its data-count, and the button's name says it (agent_list_bar.js). */
@@ -1751,7 +1652,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
    select and 7em number box did not shrink. Nothing in the form is wider than its container (#4259). */
 
 /* The agent's model under its row in the list: "Claude · Opus 4.1" (#4066) */
-.session-model { margin-top: 1px; font-size: var(--fs-sm, 11px); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* A long agent name keeps its last characters (#4624): the head shrinks with an ellipsis, the tail and the chips after it do not push it out, and the chips give way first. */
 .session-label.session-label-split { display: flex; align-items: baseline; min-width: 0; text-overflow: clip; }
@@ -1788,7 +1688,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .availability-help > .availability-note { margin: 0; }
 
 /* What waits for an agent (#7727): the last automated message Coral did not type, one small line in the warning colour on the agent's row; the agent view has the unread count, a list and Send now. */
-.session-held-line { margin-top: 2px; font-size: var(--fs-sm); line-height: var(--lh-label); color: var(--warning); overflow-wrap: anywhere; }
+
 .composer-hint.composer-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); } /* the sentence, then What waits (a link), Send now (a small button) and Show terminal (a link), spaced apart */
 #composer-waiting-send { margin: 0; } /* .btn-small carries a 20px margin for the sidebars: it left a blank line before the links on a phone */
 .composer-waiting-detail .composer-waiting-why { margin: 0 0 6px; }

@@ -3,11 +3,9 @@
 import { onBuilt, ensureBuilt } from './lazy_dom.js';
 import { mountSettingsView } from './settings_view.js';
 import { drawSettingsGroups } from './settings_fields.js';
-import { applySessionSummaryPref } from './session_rows.js';
 
 function draw(modal) {
     drawSettingsGroups(modal, mountSettingsView);
-    applySessionSummaryPref(); // the summary box is set from the saved preference as soon as it exists (session_rows.js ran its own hook before these rows were drawn)
 }
 onBuilt('settings-modal', draw);
 

@@ -131,11 +131,7 @@
         min-width: var(--control-touch-height);
         min-height: var(--control-touch-height);
     }
-    #agent-search-input,
-    .session-group-item,
-    /* the compact one-line rows when summaries are hidden (layout.css) */
-    .sidebar.summary-hidden .session-group-item:not(:has(.session-unread-chip)),
-    .sidebar.summary-hidden .board-card-agents .session-group-item:not(:has(.session-unread-chip)) {
+    #agent-search-input, .session-group-item {
         min-height: var(--control-touch-height);
     }
     /* The home view's link row (Documentation, GitHub, Forum, Mobile QR code). */

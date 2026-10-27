@@ -112,15 +112,9 @@
                     {{ if ne . "automations" }}{{ if ne . "docs" }}{{ if ne . "tokens" }}<div class="list-display-panel" id="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
                         {{ if eq . "agents" }}<div class="agent-list-bar" id="agent-list-bar" hidden></div>
                     <div class="list-display-options">
-                        <label class="list-display-option"><input type="checkbox" id="display-show-summary" data-display-input="summary" data-on-change="toggle-session-summary"> Show summaries</label>
                         <label class="list-display-option" id="display-show-server-row" data-display-row="server" hidden><input type="checkbox" id="display-show-server" data-display-input="server" data-on-change="toggle-show-server"> Show server</label>
                         <label class="list-display-option" id="display-group-by-server-row" data-display-row="group" hidden><input type="checkbox" id="display-group-by-server" data-display-input="group" data-on-change="toggle-group-by-server"> Group by server</label>
-                        <label class="list-display-option" data-display-row="branches"><input type="checkbox" id="display-show-branches" data-display-input="branches" data-on-change="toggle-show-branches"> Show branches</label>
-                        <label class="list-display-option" data-display-row="provider"><input type="checkbox" id="display-show-provider" data-display-input="provider" data-on-change="toggle-show-provider"> Show provider</label>
-                        <label class="list-display-option" data-display-row="model"><input type="checkbox" id="display-show-model" data-display-input="model" data-on-change="toggle-show-model"> Show model</label>
-                        <label class="list-display-option" data-display-row="thinking"><input type="checkbox" id="display-show-thinking" data-display-input="thinking" data-on-change="toggle-show-thinking"> Show thinking level</label>
                     </div>
-                    <p class="list-display-hint" data-display-hint role="status" hidden></p>
                         {{ else if eq . "hub-inbox" }}<div id="inbox-saved-bar" class="inbox-saved-bar"></div><!-- the Saved list's Filters and Sort (saved.js builds the bar here; the search is the box above) -->
                         {{ else }}<div class="hf-row">
                             <label class="hf-label">Group by</label>

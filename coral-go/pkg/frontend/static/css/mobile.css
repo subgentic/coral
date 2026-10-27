@@ -585,7 +585,6 @@
 
     .scheduler-view .item-bar { position: static; margin-bottom: 0; padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px)); } /* in the flow after the job's content, as the workflow's is (a long page would have a pinned bar over its runs) */
 
-
     /* Job cards stack full width */
 
     /* History session view mobile */
@@ -744,15 +743,17 @@
     }
 
     #mobile-session-list .session-group-item {
-    padding: 12px 12px 12px 14px !important;
-    margin: 8px 0;
-    border: 1px solid rgba(var(--white-rgb), 0.06);
-    border-radius: var(--radius-xl);
-    background: linear-gradient(180deg, rgba(var(--white-rgb), 0.04), rgba(var(--white-rgb), 0.02));
-    align-items: flex-start;
+    /* One line a row (#9686, UI/UX's #9358): the dot, the name and at most one chip, 44 px, a hairline between rows; the card of four to six lines is gone. */
+    padding: 0 12px 0 14px !important;
+    margin: 0;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: none;
+    align-items: center;
     gap: 10px;
-    box-shadow: 0 10px 24px rgba(var(--black-rgb), 0.16);
-    min-height: 56px;
+    box-shadow: none;
+    min-height: var(--control-touch-height);
     /* touch target */
         /* Phone: cards are already inset by their group container; keep the
            card padding (usable width) and only align line 2 with the name:
@@ -761,9 +762,8 @@
 }
 
     #mobile-session-list .session-group-item.active {
-        border-left: 1px solid rgba(var(--white-rgb), 0.06);
-        border-color: rgba(var(--accent-rgb), 0.45);
-        box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.18), 0 14px 28px rgba(var(--black-rgb), 0.2);
+        background: var(--bg-hover);
+        box-shadow: inset 3px 0 0 var(--accent);
     }
 
     /* A card that needs the Operator has no amber border or glow of its own (#5123): its flashing dot and the state chip carry it. */
@@ -774,10 +774,7 @@
     }
 
     
-    #mobile-session-list .session-mobile-banner-row,
-    #mobile-session-list .session-mobile-meta {
-        margin-left: var(--row-dot-block, 24px);
-    }
+    
 
     /* Folder-group cards sit under their header like team cards do (which are
        inset by .board-card-agents): one consistent ~17-19px name offset. */
@@ -790,7 +787,6 @@
         height: 10px;
         margin: 5px 6px 0 0;
     }
-
 
     #mobile-session-list .session-name-row {
         align-items: flex-start;
@@ -817,85 +813,38 @@
         display: none; /* the phone shows the state chip in the meta row */
     }
 
-    #mobile-session-list .session-mobile-banner-row {
-        display: block;
-    }
+    
 
-    #mobile-session-list .session-mobile-banner-row:empty {
-        display: none;
-    }
+    
 
-    #mobile-session-list .session-mobile-banner {
-        margin: 8px 0 0; /* where it sits; the look is .chip .chip-attn (components.css) */
-    }
+    
 
-    #mobile-session-list .session-mobile-meta {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
-        margin-top: 8px;
-    }
+    
 
-    #mobile-session-list .session-status-chip,
-    #mobile-session-list .session-mobile-meta-pill {
-        display: inline-flex; /* the chip's size, caps and weight (#9329); shown on a phone only */
-    }
+    
 
-    #mobile-session-list .session-status-chip.running {
-        background: rgba(var(--working-rgb), 0.16);
-        color: var(--working);
-    }
-    [data-theme="light"] #mobile-session-list .session-status-chip.running { color: var(--accent-dim); } /* 3.8:1 with --working on its tint, 5.6:1 with this (#4851) */
+    
+     /* 3.8:1 with --working on its tint, 5.6:1 with this (#4851) */
 
-    #mobile-session-list .session-status-chip.idle {
-        background: rgba(148, 163, 184, 0.16);
-        color: var(--text-secondary);
-    }
+    
 
-    #mobile-session-list .session-status-chip.needs-input {
-        background: var(--bg-tertiary); /* quiet (#5123): only the text is warm */
-        color: var(--warning);
-        font-weight: var(--fw-strong);
-        text-transform: none;
-    }
+    
 
     /* "Ready for input" rows carry no chip; with no unread pill either the meta row is
        empty and must not leave its 8px top margin behind. */
-    #mobile-session-list .session-mobile-meta:empty { display: none; }
-    #mobile-session-list .session-line2 { height: auto; align-items: flex-start; }
+    
+    
     #mobile-session-list .session-dot.sleeping::before { font-size: var(--fs-md); inset: -4px -2px; }
 
-    #mobile-session-list .session-status-chip.error {
-        background: var(--bg-tertiary);
-        color: color-mix(in srgb, var(--error) 62%, var(--text-primary));
-        font-weight: var(--fw-strong);
-    }
+    
 
-    #mobile-session-list .session-mobile-meta-pill {
-        background: rgba(var(--fx-green-deep-rgb), 0.14);
-        color: #7ee787;
-    }
+    
 
-    #mobile-session-list .session-goal {
-        margin-top: 8px;
-        white-space: normal;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        overflow: hidden;
-        line-height: var(--lh-ui);
-    }
+    
 
     /* The empty-goal affordance (sparkle + "No goal yet") must stay a single
        row: the -webkit-box clamp above would stack its two children. */
-    #mobile-session-list .session-goal.session-goal-empty {
-        display: flex;
-        align-items: center;
-        white-space: nowrap;
-        -webkit-line-clamp: none;
-        overflow: visible;
-    }
+    
 
     #mobile-session-list .sidebar-kebab-btn {
         opacity: 0.75 !important;
@@ -931,7 +880,6 @@
         z-index: 19; /* just under .top-bar (20), so the settings menu opens over the panel, not behind it */
         background: var(--bg-secondary);
     }
-
 
     .agentic-state.mobile-panel-overlay .agentic-block {
         flex: 1;
@@ -1233,8 +1181,6 @@
 .mobile-list-title { font-size: var(--fs-xl); font-weight: var(--fw-strong); color: var(--text-primary); margin: 0; }
 
 /* The artifacts table scrolls sideways; on a phone the default scrollbar is a thick grey bar under the header. */
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-}
 
 /* 200 percent page zoom on a phone is a page under 260 px wide: the top bar (brand, view dropdown, home and settings buttons) needs 216 px,
    so the dropdown drops to its own row instead of widening the page (#4086). */
@@ -1245,13 +1191,9 @@
 
 /* Text on a phone is at least 13px (coral-hub's Mobile probe found 10 to 12px in the Servers view and the agent list). Desktop sizes are unchanged. */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    body .session-group-count,
-    body #mobile-session-list .session-goal,
-    body #mobile-session-list .session-status-chip,
-    body #mobile-session-list .session-mobile-meta-pill,
-    body .machine-health-title, body .machine-health-status, body .machine-health-grid { font-size: var(--fs-md); }
+    body .session-group-count, body .machine-health-title, body .machine-health-status, body .machine-health-grid { font-size: var(--fs-md); }
     /* the goal's box was a fixed 14px, which cut a 13px line (that base rule is for 12px on a desktop row): on a phone it is as high as its lines, up to the two this list's clamp allows */
-    body #mobile-session-list .session-goal { height: auto; }
+    
 }
 
 /* Close buttons and the Details button are 44px targets on a phone-width window on any pointer (the touch rule covers a coarse pointer only) (#5681, #7796). The pane's Details button ends the title's small line:

@@ -226,12 +226,7 @@
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count
 1	mobile.js	switchRow({ label: 'Group by server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group
-1	mobile.js	switchRow({ label: 'Show branches', labelClass: 'list-display-option', labelAttrs: ' data-display-row="branche
-1	mobile.js	switchRow({ label: 'Show model', labelClass: 'list-display-option', labelAttrs: ' data-display-row="model"', a
-1	mobile.js	switchRow({ label: 'Show provider', labelClass: 'list-display-option', labelAttrs: ' data-display-row="provide
 1	mobile.js	switchRow({ label: 'Show server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" h
-1	mobile.js	switchRow({ label: 'Show summaries', labelClass: 'list-display-option', attrs: ' data-display-input="summary" 
-1	mobile.js	switchRow({ label: 'Show thinking level', labelClass: 'list-display-option', labelAttrs: ' data-display-row="t
 1	model_chip.js	checked
 2	model_chip.js	how
 1	model_chip.js	kind
@@ -302,45 +297,32 @@
 1	server_status.js	serverDetailsHtml(e)
 1	server_status.js	serverLaunchActionsHtml(e)
 1	server_status.js	updateBadgeHtml(e)
-1	session_rows.js	(goalLine || unreadChip) ? `<div class="session-line2">${goalLine}${unreadChip}</div>` : ''
 1	session_rows.js	MORE_DOTS_SVG
-1	session_rows.js	_WORKTREE_ICON
 2	session_rows.js	_archiveItem
-1	session_rows.js	_gitStateSummary(gsWt)
-1	session_rows.js	agentLineHtml(s)
 1	session_rows.js	agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''
 1	session_rows.js	attentionClass
 1	session_rows.js	autoAcceptChip(s)
 1	session_rows.js	autoAcceptMenuItem(s)
-1	session_rows.js	branchTag
 1	session_rows.js	clickHandler
 1	session_rows.js	collapsedClass
 1	session_rows.js	compactClass
 1	session_rows.js	count
 1	session_rows.js	dirChip
 1	session_rows.js	dotClass
-1	session_rows.js	goalBtn
-1	session_rows.js	goalLine
-1	session_rows.js	heldLine
 1	session_rows.js	hooksMissingChip(s)
 1	session_rows.js	label
-1	session_rows.js	mobileAttentionBanner
-1	session_rows.js	mobileStatusChip
-1	session_rows.js	mobileUnread
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
 1	session_rows.js	pillKind
 1	session_rows.js	reminderTag
 1	session_rows.js	sleepingClass
 1	session_rows.js	stale ? '' : kebabMenu
-1	session_rows.js	stale ? '' : waitingBadge + ctxPill
+1	session_rows.js	stale ? '' : waitingBadge + heldChip + ctxPill
 1	session_rows.js	staleClass
 1	session_rows.js	stateInfo.pill
 1	session_rows.js	stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''
 1	session_rows.js	stuckClass
 1	session_rows.js	terminalGoneChip(s)
 1	session_rows.js	typeTag
-1	session_rows.js	unreadBoardBadge
-1	session_rows.js	unreadChip
 1	session_state.js	gs.ahead
 1	session_state.js	gs.behind
 1	session_state.js	gs.dirty
