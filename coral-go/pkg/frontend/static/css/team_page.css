@@ -394,3 +394,7 @@
     .team-settings-dialog-body { padding: 8px 0 0; } /* the form has its own 16px margins: the full 390 px is its width, so it keeps the bar-at-the-foot layout (a container under 24rem scrolls as a whole) */
 }
 
+/* The Inbox Artifacts' line for a computer that did not answer (#8904): the words and a small Retry on one quiet row */
+.team-artifacts-down-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 4px 0 8px; }
+.team-artifacts-down-row .goals-note { margin: 0; }
+.team-artifacts-down-row .btn { width: auto; flex: none; }

@@ -7,7 +7,7 @@ const dom = installDom({mode:'local'});
 try {
     const { state } = await importUi('state');
     state.hub = true;
-    state.servers = [{id:'local',status:'online'},{id:'box-2',label:'Box Two',status:'online'}];
+    state.servers = [{id:'local',status:'online'},{id:'box-2',label:'Box Two',status:'online'},{id:'box-3',label:'Box Three',status:'offline'}]; // box-3: the hub already knows it is not answering
     const art = id => ({ id: id.repeat(64), name: id + '.md', media_type: 'text/markdown', size: 1, created_at: new Date().toISOString(), board_id: 'alpha', team: 'alpha', task_id: 1, uri: 'coral://artifacts/' + id.repeat(64), available: true });
     let stalled = true;
     globalThis.fetch = window.fetch = (url, opts = {}) => {
@@ -29,21 +29,21 @@ try {
     mock.timers.tick(8000);
     const d = await pending;
     assert.deepEqual(d.artifacts.map(a => a.name), ['a.md'], 'this computer\'s file is listed at once');
-    assert.deepEqual(d.down, [{ server: 'box-2', label: 'Box Two' }], 'Box Two is named as not answering');
+    assert.deepEqual(d.down, [{ server: 'box-2', label: 'Box Two' }, { server: 'box-3', label: 'Box Three' }], 'Box Two (timed out) and Box Three (known offline) are named');
     assert.equal(d.has_more, false, 'a computer that did not answer does not keep Load more on');
     // Goals: the same limit
     const goals = inbox.listInboxGoals(); await new Promise(r => setImmediate(r)); mock.timers.tick(8000);
     assert.deepEqual((await goals).map(g => g.title), ['Local goal'], 'goals: the reachable computer\'s rows, no waiting');
-    assert.equal(inbox.inboxDownNote('goals'), 'Box Two did not answer, so its goals are not shown.', 'Goals says so, quietly');
+    assert.equal(inbox.inboxDownNote('goals'), 'Box Two, Box Three did not answer, so their goals are not shown.', 'Goals says so, quietly');
     const tasks = inbox.coralInboxAdapter.listTasks(); await new Promise(r => setImmediate(r)); mock.timers.tick(8000); await tasks;
-    assert.equal(inbox.inboxDownNote('tasks'), 'Box Two did not answer, so its tasks are not shown.', 'Tasks says so, quietly');
+    assert.equal(inbox.inboxDownNote('tasks'), 'Box Two, Box Three did not answer, so their tasks are not shown.', 'Tasks says so, quietly');
     mock.timers.reset();
 
     // when it answers, both computers' files are listed and nobody is down
     stalled = false;
     const ok = await readInboxArtifacts(new URLSearchParams({ limit: '50' }), {});
     assert.deepEqual(ok.artifacts.map(a => a.name).sort(), ['a.md', 'b.md'], 'both computers\' files');
-    assert.deepEqual(ok.down, [], 'nobody is down');
-    await inbox.listInboxGoals(); assert.equal(inbox.inboxDownNote('goals'), '', 'the line goes when Box Two answers');
+    assert.deepEqual(ok.down, [{ server: 'box-3', label: 'Box Three' }], 'only the offline one is down');
+    await inbox.listInboxGoals(); assert.equal(inbox.inboxDownNote('goals'), 'Box Three did not answer, so its goals are not shown.', 'the line keeps only the offline one when Box Two answers');
     console.log('inbox_server_timeout: ok');
 } finally { dom.close && dom.close(); }
