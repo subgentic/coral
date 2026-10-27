@@ -111,7 +111,7 @@ function toolbarHtml(bar, first) {
             + `<div class="team-more-menu list-bar-more-menu" id="gt-more-menu" role="menu" aria-label="${escapeAttr(label)}" hidden>${items.map(i => `<button type="button" role="menuitem" ${TOOLBAR_ACTION_ATTR[i.name]}>${escapeHtml(i.label)}</button>`).join('')}</div></span>`;
     }
     if (bar.action && TOOLBAR_ACTION_ATTR[bar.action.name]) html += `<button type="button" class="btn btn-primary team-tb-action" ${TOOLBAR_ACTION_ATTR[bar.action.name]}>${escapeHtml(bar.action.label)}</button>`;
-    return `<div class="list-bar-search-row team-toolbar-row gt-toolbar">${html}</div>`;
+    return `<div class="toolbar list-bar-search-row team-toolbar-row gt-toolbar">${html}</div>`;
 }
 
 function chipsHtml(t) {

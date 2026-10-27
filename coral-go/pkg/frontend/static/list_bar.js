@@ -96,7 +96,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     // spec.collapsible (#5293, the agent list's pattern): the Filters button and the Sort row give way to one icon on the search row, with the count beside it; it opens a panel under the row that holds the
     // fields, the sort and Clear filters, and the chips of what is on stay under the row when it is shut. spec.expandAll adds the second icon (the list's expand or collapse all), told by hooks.onExpandAll.
     const collapsible = !!spec.collapsible && !spec.noSearch && !inline;
-    const searchRow = make('div', 'list-bar-search-row');
+    const searchRow = make('div', 'toolbar list-bar-search-row');
     const wrap = make('div', 'list-bar-search-wrap');
     const q = make('input', 'list-bar-search'); q.type = 'search'; q.id = `${p}-search`; q.placeholder = spec.placeholder; q.maxLength = 200; q.autocomplete = 'off'; q.spellcheck = false;
     q.setAttribute('aria-label', spec.searchLabel);

@@ -1877,7 +1877,7 @@ body.panel-dragging .agentic-state {
 .list-bar-has-header { padding-top: 6px; }
 .list-bar-has-header .team-artifacts-action { flex: none; }
 @container (max-width: 560px) { .list-bar-has-header .list-bar-count { display: none; } } /* the status line under the bar says the count */
-.list-bar-search-row { display: flex; align-items: center; gap: var(--toolbar-gap); flex-wrap: wrap; }
+/* .list-bar-search-row: the row itself is the one toolbar's (.toolbar, layout.css) */
 .list-bar-search-wrap { position: relative; flex: 1 1 12em; min-width: 0; }
 .list-bar-search { width: 100%; box-sizing: border-box; padding: 6px 28px 6px 8px; font-size: var(--fs-md); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); }
 .list-bar-search::-webkit-search-cancel-button { display: none; }

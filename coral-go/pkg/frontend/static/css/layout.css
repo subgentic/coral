@@ -1024,3 +1024,9 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
     .inbox-saved-actions .wf-more { flex: 1 1 100%; }
     .inbox-saved-actions .wf-more-menu { position: static; margin-top: 4px; }
 }
+
+/* The one toolbar (#9216, Goal #88, spec item 4): a row of controls, the list bar's: centred, one gap, wrapping. A page's own class (list-bar-search-row, theme-toolbar, command-pane-toolbar ...) says where the row sits and what is special about it, never the row itself;
+ * .toolbar-pad is the row with its own side padding, .toolbar-pad-bare the row inside a pane that has its own. toolbar_census.test.mjs fails a rule that declares the row's look on a page class, and a script or template that builds one without .toolbar. */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--toolbar-gap); }
+.toolbar-pad { padding: var(--toolbar-pad); }
+.toolbar-pad-bare { padding: var(--toolbar-pad-bare); }

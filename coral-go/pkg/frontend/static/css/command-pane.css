@@ -20,15 +20,10 @@
 
 .command-pane-toolbar {
     order: -1; /* drawn above the text box; it follows the box in the DOM so Tab reaches the box first */
-    display: flex;
-    align-items: center;
-    gap: var(--toolbar-gap);
-    padding: var(--toolbar-pad);
-    flex-shrink: 0;
+    flex-shrink: 0; /* the row itself is the one toolbar's (.toolbar .toolbar-pad, layout.css) */
     border-bottom: 1px solid var(--border);
     min-width: 0;
     overflow: visible;
-    flex-wrap: wrap;
     position: relative;
     z-index: 20;
 }
