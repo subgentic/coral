@@ -1,14 +1,13 @@
 // #8866: the actual Inbox folder column uses UI/UX's existing icons and shared provider marks.
 // Checks decoration/accessibility, wrapping/count geometry at 200% text, and the phone's compact select; captures both themes at1280/390.
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', chats: 'chat_bubble_outline', 'chats-group': 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' };
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = require('./helpers/scene_shots')(Page, 'inbox-folder-icons');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const width of [1280, 390]) for (const font of [16, 32]) for (const theme of ['dark', 'light']) {
@@ -55,8 +54,7 @@ const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved
             }
             assert.equal(probe.overflow, false, `${label}: no page overflow`);
             if (width === 390) assert.ok(await ev(`!!document.querySelector('#group-table-view .view-list-select')?.getClientRects().length`), `${label}: phone folder select remains usable`);
-            const shots = process.env.CORAL_SCREENSHOT_DIR;
-            if (shots) { fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(path.join(shots, 'inbox-folder-icons-' + label + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+            await shot(label);
             console.log('PASS ' + label + ': folder icons, provider marks, labels and counts');
         }
     } finally { await client.close(); }
