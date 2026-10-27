@@ -135,6 +135,9 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
             await waitFor(`Object.keys(JSON.parse(localStorage.getItem('coral.inbox.read.v1')).items).some(k => /^chat:/.test(k))`, `${w}px: opening a chat stores it as read`, 5000);
             await ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: Date.now() - 90 * 86400000, items: {} })); true`); // the next width starts as unread again
         }
+        // a chat opened by an address, a saved message or a link (selectHistorySession, not the list) is read too
+        await ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: Date.now() - 90 * 86400000, items: {} })); window.selectHistorySession('chat-005'); true`);
+        await waitFor(`'chat:local:chat-005' in JSON.parse(localStorage.getItem('coral.inbox.read.v1')).items`, 'a chat opened by its address is stored as read', 5000);
         console.log('   ✓');
         console.log('PASS Mailbox chat folders: counts, the Gmail line, day dividers, reading on, flags, one filter per folder');
     } finally { await client.close(); }
