@@ -314,6 +314,54 @@ func collectTeamArtifacts(project string, tasks []board.TeamArtifactTask, subscr
 
 // enrichTeamArtifact fills size, availability and URLs. Only the sidecar
 // metadata file of Coral-managed objects is read, never the object itself.
+// sidecarMetaCache holds the parsed sidecar of a managed object by its path, so a list does not open, read and parse the same small
+// files on every request (#9535). An entry answers only while the sidecar's size and mtime are the ones it was read at (the stat that
+// checks them is the only syscall a hit costs), and a sidecar modified within uploadDirSettle is never kept: a coarse mtime cannot then hide
+// a rewrite made within the same tick. The map is bounded: when full it starts over.
+var sidecarMetaCache = struct {
+	sync.Mutex
+	m map[string]sidecarMetaEntry
+}{m: map[string]sidecarMetaEntry{}}
+
+const maxSidecarMetaEntries = 4096
+
+type sidecarMetaEntry struct {
+	mod  time.Time
+	size int64
+	meta agentArtifactMeta
+}
+
+// readArtifactSidecar is the parsed sidecar at metaPath; false when it is missing, over maxArtifactMetaBytes or not JSON.
+func readArtifactSidecar(metaPath string) (agentArtifactMeta, bool) {
+	st, err := os.Stat(metaPath)
+	if err != nil || st.Size() > maxArtifactMetaBytes {
+		return agentArtifactMeta{}, false
+	}
+	sidecarMetaCache.Lock()
+	e, hit := sidecarMetaCache.m[metaPath]
+	sidecarMetaCache.Unlock()
+	if hit && e.size == st.Size() && e.mod.Equal(st.ModTime()) {
+		return e.meta, true
+	}
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return agentArtifactMeta{}, false
+	}
+	var meta agentArtifactMeta
+	if json.Unmarshal(data, &meta) != nil {
+		return agentArtifactMeta{}, false
+	}
+	if time.Since(st.ModTime()) > uploadDirSettle {
+		sidecarMetaCache.Lock()
+		if len(sidecarMetaCache.m) >= maxSidecarMetaEntries {
+			sidecarMetaCache.m = map[string]sidecarMetaEntry{}
+		}
+		sidecarMetaCache.m[metaPath] = sidecarMetaEntry{mod: st.ModTime(), size: st.Size(), meta: meta}
+		sidecarMetaCache.Unlock()
+	}
+	return meta, true
+}
+
 func enrichTeamArtifact(it *teamArtifact, objectDir string) {
 	switch {
 	case it.managed != "":
@@ -331,17 +379,8 @@ func enrichTeamArtifact(it *teamArtifact, objectDir string) {
 		}
 		size := blob.Size()
 		it.Size, it.Available = &size, true
-		metaPath := path + ".json"
-		st, err := os.Stat(metaPath)
-		if err != nil || st.Size() > maxArtifactMetaBytes {
-			return
-		}
-		data, err := os.ReadFile(metaPath)
-		if err != nil {
-			return
-		}
-		var meta agentArtifactMeta
-		if json.Unmarshal(data, &meta) != nil {
+		meta, ok := readArtifactSidecar(path + ".json")
+		if !ok {
 			return
 		}
 		if meta.MediaType != "" {
