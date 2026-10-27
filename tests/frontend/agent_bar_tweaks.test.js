@@ -664,7 +664,7 @@ async function run() {
         check('mobile sparkle + label sit on one line', mobile.sideBySide && mobile.centerDelta <= 6 && mobile.labelHeight <= 26 && mobile.emptyHeight <= 30, JSON.stringify(mobile));
         check('mobile sparkle hit target is at least 24x24', mobile.sparkle[0] >= 24 && mobile.sparkle[1] >= 24, JSON.stringify(mobile.sparkle));
         check('mobile banner row visible', mobile.bannerDisplay === 'block' && mobile.bannerText === 'Nothing yet — open the terminal', JSON.stringify([mobile.bannerDisplay, mobile.bannerText]));
-        check('mobile meta row visible', mobile.metaDisplay === 'flex' && mobile.metaVisibleH > 0, JSON.stringify([mobile.metaDisplay, mobile.metaVisibleH]));
+        check('mobile: a Check terminal card is its banner alone, the state chip row is empty and not drawn (one chip per state, #9464)', mobile.metaDisplay === 'none' && mobile.metaVisibleH === 0, JSON.stringify([mobile.metaDisplay, mobile.metaVisibleH]));
         // Back to desktop; the desktop rules must still hide the mobile rows.
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await evalInPage(`window.dispatchEvent(new Event('resize')); true`);
