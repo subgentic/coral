@@ -3,7 +3,7 @@ import { teamLabel } from './server_status.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
-import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBoardAnswerPending, onBoardLabelsChanged, LOCAL_SERVER } from './server_base.js';
+import { forgetSlowComputers, boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBoardAnswerPending, onBoardLabelsChanged, LOCAL_SERVER } from './server_base.js';
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
@@ -288,7 +288,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         if (!model.error && !model.loading && inbox && model.down && model.down.length) { // a quiet line per computer that did not answer, with Retry: the reachable computers' files are listed above it
             const names = model.down.map(d => d.label || serverLabel(d.server));
             const line = el('p', 'goals-note team-artifacts-down', `${names.join(', ')} did not answer, so ${names.length === 1 ? 'its' : 'their'} artifacts are not shown.`); line.setAttribute('role', 'status');
-            const row = el('div', 'team-artifacts-down-row'); row.append(line, btn('btn btn-small team-artifacts-down-retry', 'Retry', () => loadArtifacts({ keep: true }))); body.append(row); // one quiet row: the words and a small Retry beside them
+            const row = el('div', 'team-artifacts-down-row'); row.append(line, btn('btn btn-small team-artifacts-down-retry', 'Retry', () => { forgetSlowComputers(); loadArtifacts({ keep: true }); })); body.append(row); // one quiet row: the words and a small Retry beside them
         }
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
             // A label timeout needs another board-list read, not only the same artifact answer. Do not await a possibly offline list: the fresh artifact read has its own bounded label wait.
