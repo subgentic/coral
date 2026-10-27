@@ -63,7 +63,7 @@ const { setTheme } = require('./helpers/contrast');
             assert.equal(on.shadow, 'none', `${tag}: on has no ring (${on.shadow})`);
             assert.equal(on.border, '0px', `${tag}: on has no border (${on.border})`);
             assert.ok(parseFloat(on.stroke) >= 2, `${tag}: drawn with the heavier stroke (${on.stroke})`);
-            if (mobile) assert.ok(on.w >= 44 && on.h >= 44, `${dev}: the 44 px target (${on.w}x${on.h})`);
+            if (mobile) { const hit = await ev(`parseFloat(getComputedStyle(document.querySelector('.team-health-btn'), '::after').width) || 0`); assert.ok(hit >= 44, `${dev}: the 44 px target: a ${on.w}x${on.h} box with a ${hit} px hit area (the dense icon button's ::after)`); }
             const onContrast = await contrast();
             assert.ok(onContrast >= 3, `${tag}: the accent icon is 3:1 on its panel (${onContrast.toFixed(2)})`);
             await shot(`${tag}-on`);

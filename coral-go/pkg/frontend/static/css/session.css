@@ -311,38 +311,21 @@
 .sidebar-goal-btn-inline,
 .session-group-item .sidebar-goal-btn-inline {
     opacity: 0.8;
-    padding: 0;
-    min-width: 24px;
-    min-height: 24px;
-    margin: -5px 0;
-    justify-content: center;
-    border-radius: var(--radius-sm);
-    height: 24px;
 }
 
 .session-goal-empty:hover .sidebar-goal-btn-inline {
     opacity: 1;
-    color: var(--accent);
-    background: rgba(var(--white-rgb), 0.06);
 }
 
 .sidebar-goal-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 2px;
     opacity: 0;
     transition: opacity 0.15s;
-    display: flex;
-    align-items: center;
 }
 .session-group-item:hover .sidebar-goal-btn {
     opacity: 0.6;
 }
 .sidebar-goal-btn:hover {
     opacity: 1 !important;
-    color: var(--accent);
 }
 
 /* ── Sidebar Kebab Menu ───────────────────────────────────── */
@@ -366,8 +349,8 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 /* Target size (#5713, WCAG 2.5.8): the sidebar's kebab and open buttons and the Launch dialog's Back are 12 to 22 px across, which at 125 or 150% display scaling is a
    small target to hit. An invisible 24 px square around each is part of the button, so the row does not change. */
-.folder-copy-btn, .launch-back-btn { position: relative; }
-.folder-copy-btn::after, .launch-back-btn::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 24px); height: max(100%, 24px); transform: translate(-50%, -50%); }
+.launch-back-btn { position: relative; }
+.launch-back-btn::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 24px); height: max(100%, 24px); transform: translate(-50%, -50%); }
 
 .session-list li:hover .sidebar-kebab-btn,
 .session-list li:focus-within .sidebar-kebab-btn {
@@ -617,21 +600,10 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .folder-copy-btn {
     display: none;
-    cursor: pointer;
-    color: var(--text-muted);
-    padding: 2px 4px;
-    border-radius: var(--radius-xs);
-    background: none;
-    border: none;
-    line-height: 1;
     flex-shrink: 0;
     align-self: center;
 }
 
-.folder-copy-btn:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-}
 
 .session-group-header:hover .folder-copy-btn {
     display: inline-flex;
@@ -999,11 +971,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 }
 
 .copy-branch-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 2px 4px;
     margin-left: 2px;
     vertical-align: middle;
     opacity: 0.5;
@@ -1012,7 +979,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .copy-branch-btn:hover {
     opacity: 1;
-    color: var(--accent);
 }
 
 .sidebar-branch {
@@ -1871,7 +1837,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 /* Chats (#7157): the empty pane's hint is a small grey line, not the page's biggest heading; the copy-branch icon is a 44 px target on a phone; and a long chat title wraps to two lines with the badge under it. */
 #chats-empty-view { align-items: flex-start; justify-content: flex-start; text-align: left; } /* the empty line starts where a table does (#7443) */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .copy-branch-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
     #history-sessions-list .chat-row-title { flex-wrap: nowrap; align-items: flex-start; column-gap: 6px; } /* the badge stays beside the title, also when the title wraps to two lines (#7722) */
     #history-sessions-list .chat-row-title .session-label { flex: 0 1 auto; min-width: 0; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     #history-sessions-list .chat-row-title .chip { flex: 0 0 auto; }
