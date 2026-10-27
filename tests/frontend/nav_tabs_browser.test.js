@@ -36,9 +36,12 @@ const BASE = require('./test_base').BASE;
         assert.ok(tabs.length >= 3, `${label}: tabs are shown (${tabs.length})`);
         const tops = tabs.map(t => Math.round(t.top));
         assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, `${label}: one row, none wrapped (tops ${JSON.stringify(tops)})`);
-        for (let i = 1; i < tabs.length; i++) assert.ok(tabs[i].left - tabs[i - 1].right >= 20, `${label}: ${tabs[i - 1].id} and ${tabs[i].id} keep their gap (${(tabs[i].left - tabs[i - 1].right).toFixed(1)} px)`);
+        // the words, not the boxes: a tab carries its own 12 px each side (the tab family), so the gap is the boxes' plus both paddings
+        const pads = await ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab:not(.nav-overflowed), .top-nav-tabs .nav-more-btn')].filter(n => { const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).map(n => { const c = getComputedStyle(n); return [parseFloat(c.paddingLeft), parseFloat(c.paddingRight)]; })`);
+        const wordGap = i => tabs[i].left + pads[i][0] - (tabs[i - 1].right - pads[i - 1][1]);
+        for (let i = 1; i < tabs.length; i++) assert.ok(wordGap(i) >= 20, `${label}: ${tabs[i - 1].id} and ${tabs[i].id} keep their gap (${wordGap(i).toFixed(1)} px)`);
         const nav = (await rects('.top-nav-tabs'))[0];
-        assert.ok(tabs[tabs.length - 1].right <= nav.right + 1, `${label}: the last tab is inside the row`);
+        assert.ok(tabs[tabs.length - 1].right <= nav.right + 1, `${label}: the last tab is inside the row (${tabs[tabs.length - 1].id} right ${tabs[tabs.length - 1].right.toFixed(1)}, row right ${nav.right.toFixed(1)})`);
         const actions = (await rects('.top-bar-actions'))[0], brand = (await rects('.top-bar-brand'))[0] || { right: 0 };
         assert.ok(tabs[0].left >= brand.right - 1 && tabs[tabs.length - 1].right <= actions.left + 1, `${label}: clear of the brand and the action buttons`);
         assert.equal(await ev(`!!document.querySelector('.top-nav-tab.active:not(.nav-overflowed)') || !!document.querySelector('.nav-more-btn.active')`), true, `${label}: the active tab is visible`);
@@ -51,7 +54,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(look.bg, 'rgba(0, 0, 0, 0)', `${label}: no pill behind the active tab`);
         assert.equal(look.shadow, 'none', `${label}: no inset shadow`);
         assert.equal(look.underline, '2px solid', `${label}: the active tab is underlined`);
-        assert.equal(look.padX, '0px/0px', `${label}: the tabs are plain text (no side padding)`);
+        assert.equal(look.padX, '12px/12px', `${label}: the tabs are plain text with the tab family's 12 px each side (no pill)`);
     };
     const reachable = async () => {
         const row = await ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]:not(.nav-overflowed)')].filter(n => !n.hidden && n.style.display !== 'none').map(n => n.dataset.arg)`);

@@ -27,7 +27,7 @@
 .tabs.top-nav-tabs {
     display: flex;
     align-items: center;
-    gap: 12px; /* each tab brings 12 px of its own to either side: 24 px between the words */
+    gap: 0; /* each tab brings 12 px of its own to either side: 24 px between the words, as before the tab family */
     margin-left: 12px;
     margin-right: auto;
     flex: 1 1 auto;

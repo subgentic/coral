@@ -12,7 +12,7 @@
       "marginTop": "0px",
       "marginRight": "0px",
       "marginBottom": "0px",
-      "marginLeft": "24px"
+      "marginLeft": "12px"
     },
     "light": {
       "fontSize": "16px",
@@ -26,7 +26,7 @@
       "marginTop": "0px",
       "marginRight": "0px",
       "marginBottom": "0px",
-      "marginLeft": "24px"
+      "marginLeft": "12px"
     }
   },
   "nav-tab": {
@@ -35,13 +35,13 @@
       "fontWeight": "600",
       "color": "rgb(240, 240, 242)",
       "backgroundColor": "rgba(0, 0, 0, 0)",
-      "paddingTop": "4px",
-      "paddingRight": "0px",
-      "paddingBottom": "6px",
-      "paddingLeft": "0px",
+      "paddingTop": "0px",
+      "paddingRight": "12px",
+      "paddingBottom": "0px",
+      "paddingLeft": "12px",
       "marginTop": "0px",
       "marginRight": "0px",
-      "marginBottom": "0px",
+      "marginBottom": "-1px",
       "marginLeft": "0px"
     },
     "light": {
@@ -49,13 +49,13 @@
       "fontWeight": "600",
       "color": "rgb(31, 35, 40)",
       "backgroundColor": "rgba(0, 0, 0, 0)",
-      "paddingTop": "4px",
-      "paddingRight": "0px",
-      "paddingBottom": "6px",
-      "paddingLeft": "0px",
+      "paddingTop": "0px",
+      "paddingRight": "12px",
+      "paddingBottom": "0px",
+      "paddingLeft": "12px",
       "marginTop": "0px",
       "marginRight": "0px",
-      "marginBottom": "0px",
+      "marginBottom": "-1px",
       "marginLeft": "0px"
     }
   },
