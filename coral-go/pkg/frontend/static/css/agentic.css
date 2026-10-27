@@ -195,16 +195,11 @@ body.panel-dragging .agentic-state {
 .agentic-tab.tab-more { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); pointer-events: none; }
 .agentic-more { position: relative; display: flex; flex: 0 0 auto; }
 .agentic-more > .agentic-tab, .agentic-state-tabs[data-words] .agentic-more > .agentic-tab { flex: 0 0 auto; padding-inline: 4px; }
-.agentic-more-menu { position: fixed; top: 100%; right: 0; z-index: 30; min-width: 180px; padding: 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); display: flex; flex-direction: column; gap: 2px; }
-.agentic-more-menu[hidden] { display: none; }
-.agentic-more-item { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); text-align: left; cursor: pointer; }
-.agentic-more-item:hover, .agentic-more-item:focus-visible { background: var(--bg-hover); }
-.agentic-more-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.agentic-more-menu { position: fixed; top: 100%; right: 0; z-index: 30; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .agentic-more-item.active { color: var(--accent); font-weight: 600; }
 .agentic-more-item .material-icons { font-size: var(--icon-size); }
 .agentic-more-count { margin-left: auto; color: var(--text-secondary); font-size: var(--fs-base); }
 .agentic-more-count:empty { display: none; }
-@media (pointer: coarse), (max-width: 767px) { .agentic-more-item { min-height: var(--control-touch-height, 44px); } }
 .agentic-tab-customize[aria-expanded="true"] { background: var(--bg-hover); color: var(--text-primary); }
 
 .tab-customize {
@@ -1673,30 +1668,8 @@ body.panel-dragging .agentic-state {
 /* Context menu for custom view tabs */
 .view-context-menu {
     position: fixed;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 4px;
     z-index: 200;
-    box-shadow: var(--shadow-md);
-}
-
-.view-context-menu button {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 6px 12px;
-    border: none;
-    background: none;
-    color: var(--text-primary);
-    font-size: var(--fs-base);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-}
-
-.view-context-menu button:hover {
-    background: var(--bg-hover);
-}
+} /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 
 /* ── Inline Diffs in the Files Tab ─────────────────────────── */
 
@@ -1835,8 +1808,6 @@ body.panel-dragging .agentic-state {
 .list-bar-filter-btn[aria-expanded="true"] { background: var(--bg-hover); }
 .list-bar-sort, .list-bar-field { display: flex; align-items: center; gap: 6px; font-size: var(--fs-base); color: var(--text-secondary); }
 .list-bar-sort { margin-left: auto; }
-.list-bar-menu { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
-.list-bar-menu[hidden] { display: none; }
 /* Each field is a line of its own; the tool-group boxes of the events panels (list-bar-group, #4798) go two to a line. */
 .list-bar-menu > * { flex: 0 0 100%; box-sizing: border-box; }
 .list-bar-menu > .list-bar-group { flex: 0 0 calc(50% - 4px); min-width: 0; }
