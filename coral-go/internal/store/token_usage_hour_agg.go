@@ -174,11 +174,17 @@ func usageCoarseRelation(ctx context.Context, db sqlGetter, since string) (frag 
 	return usageRelationOf(ctx, db, since, "", true)
 }
 
+// usageCoarseRelationUntil is usageCoarseRelation for a window that ends at until (#9442): the aggregates answer for the whole clean days and hours inside it, and the day and hour until falls in is read from
+// its rows. The raw rows after until may still be in the relation: the caller leaves out those at or after until, as with usageRelation.
+func usageCoarseRelationUntil(ctx context.Context, db sqlGetter, since, until string) (frag string, args []any) {
+	return usageRelationOf(ctx, db, since, until, true)
+}
+
 func usageRelationOf(ctx context.Context, db sqlGetter, since, until string, coarse bool) (frag string, args []any) {
 	raw := `SELECT ` + usageCols + `, 1 AS n_rows, recorded_at, recorded_at AS min_at, recorded_at AS max_at FROM token_usage`
 	bound := windowBound(since) // what the stamps are compared with; since itself is parsed below
 	plain := func() (string, []any) {
-		hp, ha := hourlyBranches(ctx, db, since, bound, coarse)
+		hp, ha := hourlyBranches(ctx, db, since, bound, coarse, until)
 		if since == "" {
 			return `(` + raw + ` UNION ALL ` + strings.Join(hp, ` UNION ALL `) + `)`, ha
 		}
@@ -232,7 +238,7 @@ func usageRelationOf(ctx context.Context, db sqlGetter, since, until string, coa
 	// the raw rows after the last aggregated hour
 	parts = append(parts, raw+` WHERE recorded_at >= ?`)
 	args = append(args, last.String+"~")
-	hp, ha := hourlyBranches(ctx, db, since, bound, coarse)
+	hp, ha := hourlyBranches(ctx, db, since, bound, coarse, until)
 	parts = append(parts, hp...)
 	args = append(args, ha...)
 	frag = `(`
