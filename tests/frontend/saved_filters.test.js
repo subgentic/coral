@@ -37,5 +37,10 @@ const { pathToFileURL } = require('node:url');
     assert.equal(m.keeps(it('', '2026-10-19T08:00:00Z'), { ...m.EMPTY, from: '2026-10-21' }), false, 'saved before the day');
     assert.equal(m.keeps(it('', '2026-10-21T12:00:00Z'), { ...m.EMPTY, from: '2026-10-21' }), true, 'the day itself counts');
     assert.equal(m.keeps(it('', ''), { ...m.EMPTY, from: '2026-10-21' }), false, 'an item with no time is not "since"');
+    // two computers' teams called alpha are two Team choices (#8839): the key is the team's identity, not its bare name
+    const here = { team: 'alpha', server: 'local' }, there = { team: 'alpha', server: 'box-2' };
+    assert.equal(m.teamKeyOf(here), 'alpha'); assert.equal(m.teamKeyOf(there), '@box-2/alpha'); assert.equal(m.teamKeyOf({ team: '' }), '');
+    assert.deepEqual([here, there].filter(it => m.keeps(it, { ...m.EMPTY, team: 'alpha' })), [here], 'the plain key is this computer\'s alpha');
+    assert.deepEqual([here, there].filter(it => m.keeps(it, { ...m.EMPTY, team: '@box-2/alpha' })), [there], 'and the qualified key is the other computer\'s');
     console.log('saved_filters: ok');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -5,6 +5,7 @@ import { serverMatches } from './inbox_servers.js';
  * opens in Chats (History) at the message; a board opens and jumps to the message as the board's search does. A message that is gone (the transcript no longer has
  * it, the board message was deleted) is marked Gone on its item, which keeps its snippet and can only be removed. */
 import { isPhoneLayout } from './phone_layout.js';
+import { teamLabel } from './server_status.js';
 import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
@@ -16,7 +17,7 @@ import { buildListBar } from './list_bar.js';
 import { importOnce } from './import_once.js';
 import { selectInboxTab, rememberInboxGroup } from './inbox_tab.js';
 // This module is loaded lazily, so its own parts are loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
-const { KINDS, KIND_LABEL, SORTS, SORT_LABEL, makeModel: savedModel, clean: cleanSaved, isFiltered: savedFiltered, toQuery: savedQuery, keeps: savedKeeps, loadFilters: loadSavedFilters, saveFilters: saveSavedFilters } = await importOnce('./saved_filters.js');
+const { KINDS, KIND_LABEL, SORTS, SORT_LABEL, makeModel: savedModel, clean: cleanSaved, isFiltered: savedFiltered, toQuery: savedQuery, keeps: savedKeeps, loadFilters: loadSavedFilters, saveFilters: saveSavedFilters, teamKeyOf, setTeamNames } = await importOnce('./saved_filters.js');
 
 const $ = id => document.getElementById(id);
 let tab = 'open';
@@ -405,9 +406,11 @@ export const savedPageSpec = () => ({
 export function savedPageOptions() {
     const refs = [...convTitles.keys()].sort((a, b) => convLabel(a).localeCompare(convLabel(b)));
     if (filters.conv && !refs.includes(filters.conv)) refs.push(filters.conv);
-    const teams = [...new Set(items.map(i => i.team).filter(Boolean))].sort();
+    const teams = [...new Set(items.map(teamKeyOf).filter(Boolean))].sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
     if (filters.team && !teams.includes(filters.team)) teams.push(filters.team);
-    return { conv: { values: refs, labels: Object.fromEntries(refs.map(r => [r, convLabel(r)])) }, team: { values: teams, labels: {} } };
+    const teamWords = Object.fromEntries(teams.map(k => [k, teamLabel(k)])); // with the computer when a hub has more than one (#8839)
+    setTeamNames(new Map(Object.entries(teamWords)));
+    return { conv: { values: refs, labels: Object.fromEntries(refs.map(r => [r, convLabel(r)])) }, team: { values: teams, labels: teamWords } };
 }
 /** The bar for the Inbox's Display options (Filters and Sort; no search), built once into `host`. */
 export function mountInboxSavedBar(host) {
