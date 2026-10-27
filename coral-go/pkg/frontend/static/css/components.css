@@ -643,6 +643,8 @@
 .chip-tag { font-size: var(--fs-base); font-weight: 400; }
 .chip-count { min-width: var(--chip-height, 1.125rem); justify-content: center; padding: 0 6px; }
 .chip-caps { text-transform: uppercase; }
+.chip-attn { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--warning); } /* the quiet attention line of an agent row on a phone (#5123): the neutral surface and hairline, only the words warm */
+.chip-attn-error { color: color-mix(in srgb, var(--error) 62%, var(--text-primary)); } /* plain --error is 4.2:1 on the neutral surface in the dark theme */
 
 .chip.claude { background: var(--badge-claude); color: var(--text-on-accent); }
 .chip.agy, .chip.antigravity { background: var(--badge-agy); color: var(--text-on-accent); }
@@ -1172,21 +1174,14 @@
 
 /* ── Notification Toast (top-right, larger) ───────────────── */
 
+/* Where it sits and how it arrives; what it looks like is the one notice's (.notice .notice-float .notice-flush, layout.css) */
 .notification-toast {
     position: fixed;
     top: 20px;
     right: 20px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--warning);
-    border-left: 4px solid var(--warning);
-    border-radius: var(--radius-ml);
-    padding: 0;
-    font-size: var(--fs-lg);
-    color: var(--text-primary);
     z-index: 300;
     min-width: 300px;
     max-width: 420px;
-    box-shadow: 0 8px 24px rgba(var(--black-rgb), 0.4);
     animation: slideInFromTop 0.3s ease, fadeOut 0.3s ease 9.7s;
     overflow: hidden;
 }
@@ -1330,27 +1325,17 @@
     position: fixed;
     top: 20px;
     right: 20px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--accent-dim);
-    border-left: 4px solid var(--accent);
-    border-radius: var(--radius-ml);
-    padding: 0;
-    font-size: var(--fs-md);
-    color: var(--text-primary);
     z-index: 300;
     min-width: 320px;
     max-width: 440px;
-    box-shadow: 0 8px 24px rgba(var(--black-rgb), 0.4);
     animation: slideInFromTop 0.3s ease;
 }
 
-/* The data folder security warning (#3637): the update notice's look, in the warning colour,
+/* The data folder security warning (#3637): the update notice, in the warning tone (notice-warn),
    below it so both can show. */
 .security-warning-toast {
     top: auto;
     bottom: 20px;
-    border-color: rgba(var(--warning-rgb), 0.5);
-    border-left-color: var(--warning);
 }
 
 .security-warning-text {
@@ -3399,13 +3384,10 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .tb-learn { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--link-text, var(--accent)); font: inherit; font-size: var(--fs-base); cursor: pointer; text-decoration: underline; }
 @media (pointer: coarse) { .acf-learn { min-height: var(--control-touch-height, 44px); } } /* the member form's Learn more (the Codex network line) is a 44 px target on touch */
 .tb-note { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; margin: var(--space-xs) 0 0; }
-.leftover-tmux-banner { display: flex; align-items: center; gap: var(--space-lg); margin: var(--space-md) var(--space-xl) 0; padding: var(--space-md) var(--space-lg); border-radius: var(--radius-lg); border: 1px solid color-mix(in srgb, var(--warning) 50%, var(--border)); background: color-mix(in srgb, var(--warning) 12%, var(--bg-secondary)); color: var(--text-primary); font-size: var(--fs-md); }
+.leftover-tmux-banner { align-items: center; margin: var(--space-md) var(--space-xl) 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 .leftover-tmux-banner[hidden] { display: none; }
-.update-banner:has(#update-banner-text:empty) { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */
-.leftover-tmux-banner .material-icons { color: var(--warning); }
-/* The built-in terminal default (#6064) is news, not a warning: the accent, not the warning colour. */
-.default-notice-banner { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 10%, var(--bg-secondary)); }
-.default-notice-banner .material-icons { color: var(--accent); }
+#update-banner:has(#update-banner-text:empty) { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */
+/* The built-in terminal default (#6064) is news, not a warning: notice-info (the accent), not the warning tone. */
 .default-notice-link { background: none; border: 0; padding: 0; font: inherit; color: var(--link-text); text-decoration: underline; cursor: pointer; }
 .leftover-tmux-text { flex: 1; min-width: 0; }
 .local-auth-banner { flex: none; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */ /* #4291 */
@@ -3907,7 +3889,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .settings-cloud-head > [data-cloud="status"] { flex: 0 1 auto; min-width: 0; margin: 0; } /* the sentence takes what it needs and its Learn more follows it on the line (#8276); the actions go to the far end */
 #settings-cloud .settings-cloud-head .settings-cloud-actions { margin: 0 0 0 auto; }
 #settings-cloud .settings-cloud-connect-row { margin: 10px 0 4px; }
-#settings-cloud .settings-cloud-notice { border: 1px solid var(--warning); border-radius: var(--radius-md); padding: 8px 10px; margin: 8px 0 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+#settings-cloud .settings-cloud-notice { margin: 8px 0 12px; flex-direction: column; align-items: flex-start; } /* where it sits: the look is .notice's */
 #settings-cloud .settings-cloud-notice[hidden] { display: none; }
 #settings-cloud .settings-cloud-more { margin-top: 10px; }
 #settings-cloud .settings-cloud-more > summary { color: var(--text-primary); font-weight: 600; overflow-wrap: anywhere; }

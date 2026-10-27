@@ -121,10 +121,10 @@ function _mobileRowParts(s, stateInfo) {
         ? `<span class="session-mobile-meta-pill">${mobileUnread} unread</span>`
         : '';
     const mobileAttentionBanner = stateInfo.key === 'needs_input'
-        ? '<div class="session-mobile-banner">Waiting for your input</div>'
+        ? '<div class="chip chip-attn session-mobile-banner">Waiting for your input</div>'
         : (stateInfo.key === 'check_terminal'
-            ? '<div class="session-mobile-banner">Nothing yet — open the terminal</div>'
-            : (stateInfo.key === 'stuck' ? '<div class="session-mobile-banner error">Session needs attention</div>' : ''));
+            ? '<div class="chip chip-attn session-mobile-banner">Nothing yet — open the terminal</div>'
+            : (stateInfo.key === 'stuck' ? '<div class="chip chip-attn chip-attn-error session-mobile-banner">Session needs attention</div>' : ''));
     return { mobileStatusChip, unreadBoardBadge, mobileAttentionBanner };
 }
 
