@@ -81,21 +81,25 @@ func (s *Store) DeleteMessage(ctx context.Context, project string, messageID int
 	return n > 0, nil
 }
 
-// ListProjects returns all known projects with subscriber and message counts.
-func (s *Store) ListProjects(ctx context.Context) ([]ProjectInfo, error) {
-	var projects []ProjectInfo
-	err := s.reader().SelectContext(ctx, &projects,
-		`SELECT project,
+// listProjectsSQL is ListProjects' query. The message count and the list of boards that have messages come from board_message_counts (message_counts.go), not from a COUNT and a
+// DISTINCT over every message (#9503).
+const listProjectsSQL = `SELECT project,
 		        COALESCE((SELECT b.created_at FROM boards b WHERE b.id = p.project), '') as created_at,
 		        (SELECT COUNT(*) FROM board_subscribers s WHERE s.project = p.project AND s.is_active = 1) as subscriber_count,
-		        (SELECT COUNT(*) FROM board_messages m WHERE m.project = p.project) as message_count,
+		        COALESCE((SELECT n FROM board_message_counts c WHERE c.project = p.project), 0) as message_count,
 		        (SELECT COUNT(*) FROM board_goals g WHERE g.board_id = p.project AND g.state IN ('proposed', 'active', 'blocked')) as goals_open,
 		        COALESCE((SELECT seq FROM board_goal_meta gm WHERE gm.board_id = p.project), 0) as goals_seq
 		 FROM (
 		     SELECT DISTINCT project FROM board_subscribers WHERE is_active = 1
 		     UNION
-		     SELECT DISTINCT project FROM board_messages
-		 ) p ORDER BY project`)
+		     SELECT project FROM board_message_counts WHERE n > 0
+		 ) p ORDER BY project`
+
+// ListProjects returns all known projects with subscriber and message counts.
+func (s *Store) ListProjects(ctx context.Context) ([]ProjectInfo, error) {
+	var projects []ProjectInfo
+	err := s.reader().SelectContext(ctx, &projects,
+		listProjectsSQL)
 	if err == nil {
 		ids := make([]string, len(projects))
 		for i := range projects {
