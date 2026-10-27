@@ -12,7 +12,7 @@
  *     group: 'id',                      the group open first (a deep link); onGroup(id) is called when it changes; remember: 'key' keeps the last group per surface
  *     load: async () => ({ key: value }),
  *     save: async (changes, ctx) => ({ saved?: [words], note?: 'text' }),    changes = only the changed fields; ctx = { before, values }
- *     saveBar: { save: 'Save settings', cancel: 'Cancel', onCancel? } | false,
+ *     saveBar: { save: 'Save settings', cancel: 'Cancel', onCancel?, cancelAlways? } | false,   cancelAlways: Cancel stays enabled with nothing changed (a dialog's Cancel closes it)
  *     readOnly: false | 'reason' | (key) => false | 'reason',
  *     words: { none, dirty, saved, failed, busy },  onApply(key, value) for apply: 'now' fields
  *   }
@@ -328,7 +328,7 @@ export function mountSettingsView(host, spec) {
     }
     function paintBar() {
         const dirty = dirtyKeys().size > 0 || partsDirty().length > 0;
-        if (saveBtn) { saveBtn.disabled = formSpec ? busy : !dirty || busy || !!globalReadOnly; cancelBtn.disabled = formSpec ? busy : !dirty || busy; }
+        if (saveBtn) { saveBtn.disabled = formSpec ? busy : !dirty || busy || !!globalReadOnly; cancelBtn.disabled = formSpec ? busy : (!dirty && !(barSpec && barSpec.cancelAlways)) || busy; }
         if (statusEl) {
             const text = busy ? words.busy : status !== null ? status : formSpec ? '' : dirty ? words.dirty : lastSaved ? words.saved : words.none;
             statusEl.textContent = text; statusEl.classList.toggle('is-error', statusError && !busy);
