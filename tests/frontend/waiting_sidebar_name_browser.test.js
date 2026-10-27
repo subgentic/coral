@@ -44,8 +44,11 @@ const NAME = 'Senior Backend Reliability Engineer for the Tunnel Subsystem';
                     assert.equal(facts.name, NAME); assert.equal(facts.title, NAME); assert.ok(facts.aria.startsWith(NAME + ','));
                     assert.ok(facts.firstVisible, 'name beginning remains visible: ' + JSON.stringify(facts));
                     assert.equal(facts.ellipsis, 'ellipsis'); assert.equal(facts.whiteSpace, 'nowrap');
-                    assert.ok(facts.tag && facts.tagWhole && !facts.overlap && !facts.overflow, 'whole tag and no overlap: ' + JSON.stringify(facts));
-                    if (narrow || width === 390) assert.ok(facts.tagBelow, 'tag below name in narrow layout: ' + JSON.stringify(facts));
+                    // an agent row is one line, the dot, the name and at most one chip (#9686): on a phone the chip is not drawn today (mobile.css hides .session-state-pill in #mobile-session-list), so nothing
+                    // can take the name's width there and the name keeps the row; where a chip is drawn it is whole and does not overlap the name (and on a phone, if it is drawn again, it sits on the line, not below)
+                    if (width === 390 && !facts.tag) assert.ok(facts.nameWidth >= 250, 'no chip is drawn on a phone: the name keeps the row: ' + JSON.stringify(facts));
+                    else assert.ok(facts.tag && facts.tagWhole && !facts.overlap && !facts.overflow, 'whole tag and no overlap: ' + JSON.stringify(facts));
+                    if (narrow) assert.ok(facts.tagBelow, 'tag below name in narrow layout: ' + JSON.stringify(facts));
                 } catch (error) { failures.push(at + ': ' + error.message); }
                 const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, 'out', 'shots-8268') : '');
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, `waiting-name-${at}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
