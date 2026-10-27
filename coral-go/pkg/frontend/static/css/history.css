@@ -13,7 +13,7 @@
 
 .history-title-row h2 {
     font-size: var(--fs-2xl); /* an item's page title: 17/700 (#7443) */
-    font-weight: 700;
+    font-weight: var(--fw-title);
  }
 
 .history-title-row .btn-small {
