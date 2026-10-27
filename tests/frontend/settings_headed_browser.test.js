@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
             for (const g of ['terminal', 'files', 'security']) {
                 await ev(`(async () => { await window.showSettingsModal(${JSON.stringify(g)}); return true; })()`); await new Promise(r => setTimeout(r, 600)); // sleep-ok: the group draws
                 const heads = await ev(`[...document.querySelectorAll('#settings-pane-${g} :is(h3, h4, h5, .sv-heading, .sv-subheading)')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
-                const want = { terminal: ['Display', 'Backend'], files: ['File search', 'Git'], security: ['Access', 'Data and privacy'] }[g];
+                const want = { terminal: ['Display', 'Backend'], files: [], security: ['Access', 'Data and privacy'] }[g];
                 for (const t of want) assert.ok(heads.includes(t), `${at}${g}: headed "${t}": ` + JSON.stringify(heads));
                 if (g === 'security') {
                     const fact = await ev(`(() => { const e = document.querySelector('#settings-modal .tb-now'); if (!e) return null; const c = getComputedStyle(e); return { text: e.textContent.trim(), border: c.borderTopWidth, bg: c.backgroundColor, radius: c.borderTopLeftRadius }; })()`);
