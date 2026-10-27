@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"strings"
@@ -42,7 +41,7 @@ type GitSnapshot struct {
 	Ahead      int    `db:"ahead" json:"ahead,omitempty"`
 	Behind     int    `db:"behind" json:"behind,omitempty"`
 	DirtyCount int    `db:"dirty_count" json:"dirty_count,omitempty"`
-	// AuthorName and AuthorHash are who made the commit (a name, and IdentityHash of their email); IdentName and IdentHash are the git identity configured in the checkout the snapshot was taken in
+	// AuthorName and AuthorHash are who made the commit (a name, and the IdentityHasher pseudonym of their email); IdentName and IdentHash are the git identity configured in the checkout the snapshot was taken in
 	// (#8996). None is served: they only let the efficiency read tell whose commit it is.
 	AuthorName string `db:"author_name" json:"-"`
 	AuthorHash string `db:"author_hash" json:"-"`
@@ -50,14 +49,24 @@ type GitSnapshot struct {
 	IdentHash  string `db:"ident_hash" json:"-"`
 }
 
-// IdentityHash is a short hash of a git email address (lower-cased, trimmed): enough to tell whether two commits share an author, and never the address itself. "" for no address.
-func IdentityHash(email string) string {
-	email = strings.ToLower(strings.TrimSpace(email))
-	if email == "" {
-		return ""
+// IdentityHasher turns a git email address into the short pseudonym stored in git_snapshots: enough to tell whether two commits share an author, never the address, and keyed with this install's master key
+// (HMAC-SHA256, 16 hex characters), so it cannot be recomputed from a copy of the database. "" for no address, or when the key cannot be read (nothing is stored then: the names still match). A key
+// rotation changes every pseudonym: older rows stop matching by email, and still match by name.
+type IdentityHasher func(email string) string
+
+// NewIdentityHasher is the hasher keyed by rs's master key, read when first used.
+func NewIdentityHasher(rs *RemoteServerStore) IdentityHasher {
+	return func(email string) string {
+		email = strings.ToLower(strings.TrimSpace(email))
+		if email == "" || rs == nil {
+			return ""
+		}
+		mac, err := rs.MAC(context.Background(), "git-identity/v1", []byte(email))
+		if err != nil {
+			return ""
+		}
+		return hex.EncodeToString(mac[:8])
 	}
-	sum := sha256.Sum256([]byte(email))
-	return hex.EncodeToString(sum[:8])
 }
 
 // FileAgent records which agent last edited a file and when.

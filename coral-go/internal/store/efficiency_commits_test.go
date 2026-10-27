@@ -53,6 +53,7 @@ func TestSessionFactsReadEndedSessionsToo(t *testing.T) {
 
 // #8996: a commit is credited only to a session whose identity it matches; one with no recorded author is anyone's.
 func TestACommitIsMadeByTheSessionWhoseIdentityItsAuthorMatches(t *testing.T) {
+	IdentityHash := testHasher(t)
 	c := EfficiencyCommit{AuthorName: "Backend Dev", AuthorHash: IdentityHash("bd@example.invalid")}
 	assert.True(t, c.MadeBy(CommitSighting{AgentName: "backend dev"}, ""), "by the agent's name, in any case")
 	assert.True(t, c.MadeBy(CommitSighting{AgentName: "agent-7"}, "Backend Dev"), "by the agent's display name")
@@ -64,9 +65,32 @@ func TestACommitIsMadeByTheSessionWhoseIdentityItsAuthorMatches(t *testing.T) {
 	assert.Len(t, IdentityHash("a@b"), 16)
 }
 
+// testHasher is the real hasher, keyed by a master key made in a temporary data directory.
+func testHasher(t *testing.T) IdentityHasher {
+	t.Helper()
+	return NewIdentityHasher(NewRemoteServerStore(openTestDB(t), t.TempDir()))
+}
+
+// #9046: the pseudonym of an email is keyed with the install's master key: stable for one key, different under another, and the address is not in it.
+func TestTheIdentityPseudonymIsKeyedByTheInstallsMasterKey(t *testing.T) {
+	db := openTestDB(t)
+	dirA, dirB := t.TempDir(), t.TempDir()
+	a1 := NewIdentityHasher(NewRemoteServerStore(db, dirA))
+	a2 := NewIdentityHasher(NewRemoteServerStore(db, dirA)) // another store of the same install
+	b := NewIdentityHasher(NewRemoteServerStore(db, dirB))
+	h := a1("Backend-Dev@Example.invalid")
+	require.Len(t, h, 16)
+	assert.Equal(t, h, a2(" backend-dev@example.invalid "), "the same install, whatever the case or spaces")
+	assert.NotEqual(t, h, b("backend-dev@example.invalid"), "another install's key: another pseudonym, so a copy of the database cannot be matched against guesses")
+	assert.NotContains(t, h, "@")
+	assert.Equal(t, "", a1(""))
+	assert.Equal(t, "", NewIdentityHasher(nil)("a@b"), "no key store: nothing is stored")
+}
+
 // #8999: two commits with the same subject and author second but different authors are two commits; a rebased copy by the same author is one.
 func TestEfficiencyCommitCopiesNeedTheSameAuthorToo(t *testing.T) {
 	db := openTestDB(t)
+	IdentityHash := NewIdentityHasher(NewRemoteServerStore(db, t.TempDir()))
 	ctx := context.Background()
 	gs := NewGitStore(db)
 	now := time.Now().UTC()
