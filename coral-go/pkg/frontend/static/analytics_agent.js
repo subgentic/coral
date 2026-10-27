@@ -70,7 +70,7 @@ function draw() {
     const row = st.row, r = RANGES[st.period], phone = isPhoneLayout();
     if (!row) return;
     const heading = document.getElementById('cost-view-title'); if (heading) heading.textContent = agentName(row); // the page's title is the agent
-    const back = el('button', 'back-link viz-back'); back.type = 'button'; { const arrow = el('span', null, '\u2190'); arrow.setAttribute('aria-hidden', 'true'); back.append(arrow, document.createTextNode(' By agent')); } // the back link of the page, as everywhere else
+    const back = el('button', 'back-link viz-back'); back.type = 'button'; { const arrow = el('span', null, '\u2190'); arrow.setAttribute('aria-hidden', 'true'); back.append(arrow, document.createTextNode(' Overview')); } // the back link of the page, as everywhere else
     back.addEventListener('click', () => views.selectView('agent', { focus: true }));
     const about = [row.board_name ? `Team ${row.board_name}` : '', row.folder || ''].filter(Boolean).join(' \u00b7 '); // the range is under the page's title
     h.append(back);
