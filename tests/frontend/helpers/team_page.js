@@ -32,7 +32,7 @@ const SOURCE = `(() => {
     return true;
 })()`;
 const install = async ev => { await na.install(ev); return ev(SOURCE); };
-const TABS = ['Goals', 'Board', 'Tasks', 'Agents', 'Artifacts', 'Knowledge', 'Settings'];
+const TABS = ['Goals', 'Agents', 'Tasks', 'Artifacts', 'Knowledge', 'Board', 'Settings']; // the operator's order (#8791)
 
 // A team as the sidebar shows it (live agents of one board_project, the way team_header_open does) and the same board's goals and tasks on the real isolated server, made through the page's own fetch.
 const post = (ev, url, body) => ev(`fetch(${JSON.stringify(url)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(body)}) }).then(r => r.json().catch(() => ({})))`);
