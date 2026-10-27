@@ -59,7 +59,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     if(width===390)assert.ok(await ev(`${cells}.every(e=>e.getClientRects().length>0)`),(artifacts?'Team':'Server')+' visible on phone');
     assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
     const sortable=await ev(`(() => {const s=[...document.querySelectorAll('#group-table-view .dt-sortbar select')].find(s=>[...s.options].some(o=>o.value==='server'));if(s&&s.getClientRects().length){s.value='server';s.dispatchEvent(new Event('change',{bubbles:true}));return true;}const h=document.querySelector('#group-table-view th[data-key="server"]');const b=h?.querySelector('button');if(b){b.click();return true;}return false;})()`);
-    if(!artifacts)assert.ok(sortable,'Server sort control in '+folder);
+    if(!artifacts&&!folder.startsWith('chats'))assert.ok(sortable,'Server sort control in '+folder); // a chat row is one line with no sort controls (#8961): its order is the newest first
     if(!artifacts)await waitFor(`(()=>{const values=${cells}.map(e=>e.textContent);return values.length>1&&values.every((v,i)=>!i||values[i-1].localeCompare(v)<=0);})()`,'Server ascending order in '+folder);
     const shotDir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
     if(shotDir){fs.mkdirSync(shotDir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(shotDir,`inbox-server-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
