@@ -11,8 +11,8 @@
 .theme-toolbar {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 0;
+    gap: var(--toolbar-gap);
+    padding: var(--toolbar-pad-bare);
     flex-shrink: 0;
 }
 
@@ -22,8 +22,8 @@
 
 .theme-generate-bar {
     display: flex;
-    gap: 6px;
-    padding: 8px 0;
+    gap: var(--toolbar-gap);
+    padding: var(--toolbar-pad-bare);
     flex-shrink: 0;
 }
 
@@ -120,8 +120,8 @@
 
 .theme-save-bar {
     display: flex;
-    gap: 6px;
-    padding: 8px 0 4px;
+    gap: var(--toolbar-gap);
+    padding: var(--toolbar-pad-bare);
     flex-shrink: 0;
 }
 

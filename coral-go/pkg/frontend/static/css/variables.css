@@ -134,6 +134,14 @@
     --card-radius: var(--radius-lg);
     --card-border: 1px solid var(--border);
 
+    /* Design Tokens — Toolbar (Goal #88, spec item 4): every toolbar row takes one gap and one padding: the Inbox list bar's. Bare: a row inside a pane that has its own side padding; dense: a pop-out window */
+    --toolbar-gap: 8px;
+    --toolbar-pad: 8px 12px;
+    --toolbar-pad-bare: 8px 0;
+    --toolbar-gap-dense: 6px;
+    --toolbar-pad-dense: 6px 8px;
+    --toolbar-control-h: 32px;
+
     /* Design Tokens — Border Radius Scale */
     --radius-sm:  4px;
     --radius-md:  6px;
