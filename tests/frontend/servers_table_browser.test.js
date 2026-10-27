@@ -23,6 +23,7 @@ const SERVERS = [
     { id: 'm3', label: 'Box Three', online: false, access_mode: 'follow', local_mode: 'launch', last_seen: '2026-10-12T00:00:00Z' },
     { id: 'm4', label: 'Box Four', online: true, access_mode: 'interact', effective_mode: 'view', limited_by: 'machine', last_seen: '2026-10-13T00:00:00Z' },
 ];
+const SESSIONS = [{ session_id: 'a1', name: 'waiter', agent_type: 'claude', server: 'm1', waiting_for_input: true }, { session_id: 'a2', name: 'busy', agent_type: 'claude', server: 'm1', waiting_for_input: false }]; // one agent of Box One waits for its person (the Needs you column)
 const LIVE = [
     { id: 'm1', label: 'Box One', status: 'online', coral_version: '1.4.10', agents: 7, update: 'required', latest_coral: '1.5.0' },
     { id: 'm2', label: 'box two', status: 'online', version: '1.4.9', agents: 1, update: 'available', latest_coral: '1.5.0' },
@@ -99,7 +100,7 @@ const contrast = (a, b) => {
         await Page.navigate({ url: BASE + '/' + where });
         await loaded;
         await install();
-        await ev(`(() => { T.state.servers = ${JSON.stringify(LIVE)}; return true; })()`);
+        await ev(`(() => { T.state.servers = ${JSON.stringify(LIVE)}; T.state.liveSessions = ${JSON.stringify(SESSIONS)}; return true; })()`);
     };
     const tabState = () => ev(`(() => {
         const tab = document.getElementById('nav-tab-servers'), view = document.getElementById('servers-view');
@@ -130,7 +131,7 @@ const contrast = (a, b) => {
             return { role: t.getAttribute('role'), label: t.getAttribute('aria-label'),
                 actionsHead: (t.querySelector('thead th.cs-col-actions') || {}).textContent || null, heads: [...t.querySelectorAll('thead th')].filter(th => th.querySelector('button')).map(th => ({ text: th.textContent.replace(/[▲▼↑↓↕]/g, '').trim(), sort: th.getAttribute('aria-sort'), scope: th.getAttribute('scope'), button: !!th.querySelector('button') })),
                 names: rows.map(r => r.querySelector('.cs-name').textContent),
-                rows: rows.map(r => ({ id: r.id, status: r.querySelector('.cs-col-status').textContent, version: r.querySelector('.cs-col-version').textContent, agents: r.querySelector('.cs-col-agents').textContent,
+                rows: rows.map(r => ({ id: r.id, status: r.querySelector('.cs-col-status').textContent, version: r.querySelector('.cs-col-version').textContent, agents: r.querySelector('.cs-col-agents').textContent, needs: r.querySelector('.cs-col-needs').textContent.trim(), seen: r.querySelector('.cs-col-seen').textContent.trim(),
                     select: r.querySelector('.cs-col-access select').value, selectLabel: r.querySelector('.cs-col-access .sr-only').textContent.trim(),
                     expanded: r.querySelector('.cs-toggle').getAttribute('aria-expanded'), controls: r.querySelector('.cs-toggle').getAttribute('aria-controls'),
                     detailHidden: document.getElementById(r.querySelector('.cs-toggle').getAttribute('aria-controls')).hidden })) }; })()`);
@@ -148,13 +149,15 @@ const contrast = (a, b) => {
         await waitFor(`document.querySelectorAll('#servers-view tr.cs-row').length === ${SERVERS.length}`, 'the rows', 6000);
         let t = await table();
         assert.equal(t.role, 'table'); assert.equal(t.label, 'Your computers');
-        assert.deepEqual(t.heads.map(h => h.text), ['Name', 'Status', 'Coral', 'Agents', 'Hub access']);
+        assert.deepEqual(t.heads.map(h => h.text), ['Name', 'Status', 'Agents', 'Needs you', 'Last seen', 'Coral', 'Hub access']);
         assert.ok(t.heads.every(h => h.scope === 'col' && h.button), 'every sortable header is a button in a column header');
         assert.equal(t.actionsHead, 'Actions', 'the last column is the row actions, named for a screen reader, not sortable');
-        assert.deepEqual(t.heads.map(h => h.sort), ['ascending', 'none', 'none', 'none', 'none'], 'sorted by name, ascending, to start with');
+        assert.deepEqual(t.heads.map(h => h.sort), ['ascending', 'none', 'none', 'none', 'none', 'none', 'none'], 'sorted by name, ascending, to start with');
         assert.deepEqual(t.names, ['Box Four', 'Box One', 'Box Three', 'box two'].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())), 'by name, case ignored');
         const m1 = t.rows.find(r => r.id === 'server-row-m1');
         assert.equal(m1.status, 'Online'); assert.equal(m1.version.replace(/\s+/g, ' ').trim(), '1.4.10 Update required'); assert.equal(m1.agents, '7');
+        assert.equal(m1.needs, '1', 'Needs you: the agent that waits: ' + JSON.stringify(t.rows.map(r => [r.id, r.needs, r.seen]))); assert.ok(t.rows.filter(r => r.id !== 'server-row-m1').every(r => r.needs === ''), 'and nothing at zero');
+        assert.ok(t.rows.filter(r => r.id !== 'server-row-m3').every(r => r.seen === 'now') && t.rows.find(r => r.id === 'server-row-m3').seen !== 'now' && t.rows.find(r => r.id === 'server-row-m3').seen !== '', 'Last seen: now while online, the contact time for an offline machine: ' + JSON.stringify(t.rows.map(r => r.seen)));
         assert.equal(m1.select, 'view'); assert.equal(m1.selectLabel, 'Hub access for Box One');
         assert.ok(t.rows.every(r => r.expanded === 'false' && r.detailHidden), 'every row starts closed');
         const order = await ev(`[...document.getElementById('cs-add-machine').parentElement.children].map(e => e.id || e.className.split(' ')[0])`);
@@ -168,21 +171,21 @@ const contrast = (a, b) => {
         console.log('2. Sorting: each header sorts, a second press reverses, aria-sort follows, versions compare as numbers');
         await sortBy('version');
         t = await table();
-        assert.deepEqual(t.heads.map(h => h.sort), ['none', 'none', 'ascending', 'none', 'none']);
+        assert.deepEqual(t.heads.map(h => h.sort), ['none', 'none', 'none', 'none', 'none', 'ascending', 'none']);
         assert.deepEqual(t.names, ['Box Four', 'box two', 'Box One', 'Box Three'], '(none), 1.4.9, 1.4.10, 1.5.0: 1.4.10 is after 1.4.9');
         await sortBy('version');
         assert.deepEqual((await table()).names, ['Box Three', 'Box One', 'box two', 'Box Four']);
         await sortBy('agents');
-        t = await table(); assert.equal(t.heads[3].sort, 'descending', 'agents start with the most');
+        t = await table(); assert.equal(t.heads[2].sort, 'descending', 'agents start with the most');
         assert.deepEqual(t.names, ['Box Four', 'Box One', 'box two', 'Box Three']);
         await sortBy('status');
         t = await table(); assert.equal(t.heads[1].sort, 'ascending');
         assert.equal(t.rows[0].status, 'Offline', 'ascending: offline first');
         await sortBy('access');
-        t = await table(); assert.equal(t.heads[4].sort, 'descending');
+        t = await table(); assert.equal(t.heads[6].sort, 'descending');
         assert.deepEqual(t.names[0], 'Box Three', 'the most access first (following a computer that allows Launch)');
         await sortBy('name');
-        assert.deepEqual((await table()).heads.map(h => h.sort), ['ascending', 'none', 'none', 'none', 'none']);
+        assert.deepEqual((await table()).heads.map(h => h.sort), ['ascending', 'none', 'none', 'none', 'none', 'none', 'none']);
         // The keyboard: a header is a button; Enter and Space press it, and focus stays on it.
         await ev(`document.querySelector('#servers-view .cs-sort[data-key="agents"]').focus(); true`);
         await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });

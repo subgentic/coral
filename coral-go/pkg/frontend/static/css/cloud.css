@@ -137,3 +137,5 @@ body.cloud-mode .settings-cloud-note { margin: 0 0 12px; }
 
 /* The Hub-served dashboard draws its own Inbox (Goal #100): the Chats and Board tabs of the top row are not shown (nav_tabs.js leaves them out of the hamburger and the More menu too). */
 body.native-inbox [data-native-inbox-hides] { display: none !important; }
+
+.cs-needs { color: var(--warning-text); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; } /* the Hub's machine list's Needs you count: the one thing that sends a person to the Inbox (#9680) */
