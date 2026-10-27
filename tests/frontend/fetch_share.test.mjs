@@ -101,6 +101,26 @@ hits = 0; clock += 5000;
 await Promise.all([window.fetch('/api/system/status'), window.fetch('/api/system/status')]);
 assert.equal(hits, 1, 'and a plain read is still shared');
 
+// #9167: a person's own input is a refresh: no read is shared within two seconds of it, and what was kept is forgotten
+globalThis.document = new EventTarget();
+await over(async () => { hits++; return new Response('{}'); });
+hits = 0; clock += 5000;
+await window.fetch('/api/scheduled/jobs'); document.dispatchEvent(new Event('click'));
+await window.fetch('/api/scheduled/jobs');
+assert.equal(hits, 2, 'a click forgets the read kept from before it: Refresh reads fresh');
+hits = 0; clock += 500;
+await Promise.all([window.fetch('/api/workflows'), window.fetch('/api/workflows')]);
+assert.equal(hits, 2, 'within two seconds of the click, two reads are two requests');
+for (const type of ['pointerdown', 'keydown', 'touchstart']) {
+    clock += 5000; hits = 0; document.dispatchEvent(new Event(type));
+    await Promise.all([window.fetch('/api/system/status'), window.fetch('/api/system/status')]);
+    assert.equal(hits, 2, type + ' is input too');
+}
+hits = 0; clock += 2500;
+await Promise.all([window.fetch('/api/workflows'), window.fetch('/api/workflows')]);
+assert.equal(hits, 1, 'two seconds after the input the page\'s own reads are shared again');
+delete globalThis.document;
+
 // a hub-proxied route and the plain one are never shared
 hits = 0; clock += 5000;
 await Promise.all([window.fetch('/api/sessions/live'), window.fetch('/api/remote/box-2/api/sessions/live'), window.fetch('/api/remote/box-2/api/sessions/live'), window.fetch('/api/remote/box-3/api/sessions/live')]);

@@ -3,8 +3,11 @@
  * while the first is in flight, or within a second after it answered, gets the first one's answer (each caller a clone of it, so each reads its own body). Only these named
  * reads, only a plain read (no abort signal, headers, cache mode, credentials, mode, referrer or redirect, and not a Request object: a caller that asks for a fresh read
  * gets one), and a write to Coral's /api forgets everything when it starts AND when it ends, and no read is shared while one is in flight, so a read after a change is never
- * the answer from before it. A failed answer is not kept. */
+ * the answer from before it. A failed answer is not kept. A person's own input (a click, a key, a touch) forgets everything too, and a read made within two seconds of it
+ * is never shared: a Refresh, a Retry, or a reload after the person's own action reads fresh, and only the reads a page makes by itself at load share (#9167). */
 const SHARE_MS = 1000;
+const INPUT_MS = 2000; // after a person's input, reads are their own
+const INPUT_EVENTS = ['pointerdown', 'click', 'keydown', 'touchstart'];
 const SHARED = [
     /^\/api\/cloud\/status$/, /^\/api\/sessions\/live$/, /^\/api\/board\/projects$/, /^\/api\/board\/[^/]+\/status$/, /^\/api\/board\/[^/]+\/goals$/,
     /^\/api\/teams\/detail\/[^/]+\/(?:knowledge|distill-knowledge)$/, /^\/api\/workflows$/, /^\/api\/system\/(?:status|artifact-store)$/, /^\/api\/scheduled\/jobs$/,
@@ -30,6 +33,10 @@ export function installFetchShare(now = () => Date.now()) {
     const orig = window.fetch.bind(window);
     const entries = new Map(); // "path?query" -> { p: Promise<Response>, open: true while in flight, doneAt }
     let writing = 0; // writes to /api in flight
+    let lastInput = -Infinity; // when a person last pressed, clicked or touched something
+    if (typeof document !== 'undefined' && document.addEventListener) {
+        for (const t of INPUT_EVENTS) document.addEventListener(t, () => { lastInput = now(); entries.clear(); }, true);
+    }
     window.fetch = function (input, init) {
         const u = localApi(input);
         if (!u) return orig(input, init);
@@ -39,7 +46,7 @@ export function installFetchShare(now = () => Date.now()) {
             return orig(input, init).finally(() => { writing--; entries.clear(); });
         }
         const signal = (init && init.signal) || (input && typeof input === 'object' && input.signal);
-        if (writing > 0 || signal || fresh(input, init) || !SHARED.some(re => re.test(u.pathname))) return orig(input, init);
+        if (writing > 0 || now() - lastInput < INPUT_MS || signal || fresh(input, init) || !SHARED.some(re => re.test(u.pathname))) return orig(input, init);
         const key = u.pathname + u.search;
         const hit = entries.get(key);
         if (hit && (hit.open || now() - hit.doneAt < SHARE_MS)) return hit.p.then(r => r.clone());
