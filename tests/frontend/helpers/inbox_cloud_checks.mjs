@@ -92,6 +92,17 @@ try {
         assert.equal(histReads(), 1, `Enter sends one read of the one online computer: ${calls}`);
         calls.length = 0; sb.filterInbox('needle'); await settle(300);
         assert.equal(histReads(), 1, `the same words again send one more: ${calls}`);
+        // a held Enter (keydown repeats about 30 times a second) is ONE search, from either field; only the searched folder's kept list is forgotten
+        for (const id of ['inbox-search', 'inbox-chats-search']) {
+            const box = document.getElementById(id); box.value = 'held ' + id; calls.length = 0;
+            const key = repeat => box.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, repeat }));
+            key(false); for (let i = 0; i < 30; i++) key(true);
+            await settle(300);
+            assert.equal(histReads(), 1, `a held Enter in #${id} sends one read, not thirty: ${calls.length} requests`);
+        }
+        const CHm = await importUi('mailbox_chats');
+        assert.equal(typeof CHm.resetChatLists, 'function'); CHm.resetChatLists('chats-archived'); // another folder's reset does not touch the folder on screen
+        calls.length = 0; await settle(100); assert.equal(histReads(), 0, 'forgetting another folder reads nothing');
         const ok = new Set(['/api/remote/box-2/api/sessions/history/counts', '/api/remote/box-2/api/sessions/history']);
         assert.ok(calls.every(c => ok.has(c)), `only the chat folders are read: ${[...new Set(calls)]}`);
     }
