@@ -220,7 +220,7 @@
 .run-failure-text { font-weight: var(--fw-strong); }
 .run-failure-hint { color: var(--text-secondary); }
 
-.sched-prompt-section > summary { display: flex; align-items: center; gap: 4px; list-style: none; font-size: var(--fs-lg); /* a section heading: 14/600 */ font-weight: var(--fw-strong); margin-bottom: 8px; }
+.sched-prompt-section > summary { display: flex; align-items: center; gap: 4px; list-style: none; margin-bottom: 8px; --dz-color: var(--text-secondary); --dz-size: var(--fs-lg); } /* a long prompt's heading is the group head too (#9458, QA Reviewer 2): .group-head-lg's 14/600 secondary, through the disclosure's own variables (its rule is the stronger one) */
 .sched-prompt-section > summary::-webkit-details-marker { display: none; }
 .sched-prompt-section > summary::before { content: '▸' / ''; }
 .sched-prompt-section[open] > summary::before { content: '▾' / ''; }
