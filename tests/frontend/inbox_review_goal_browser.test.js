@@ -45,20 +45,21 @@ const BASE = require('./test_base').BASE;
                 await ev(`window.switchNavTab('hub-inbox');true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
-                const goals = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => ({ name: (r.querySelector('.inbox-review-name') || {}).textContent, goal: (r.querySelector('.inbox-review-goal [data-goal-link]') || {}).textContent || ((r.querySelector('.inbox-review-nogoal') || {}).textContent) || null, task: (r.querySelector('.inbox-review-task') || {}).textContent || null, taskShown: !!(r.querySelector('.inbox-review-task') && r.querySelector('.inbox-review-task').getClientRects().length), inLine2: !!r.querySelector('td[data-key=goal].dt-line-2, td[data-key=goal][class*="line-2"]') }))`);
+                const goals = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => ({ name: (r.querySelector('.inbox-review-name') || {}).textContent, goal: (r.querySelector('.inbox-review-goal [data-goal-link]') || {}).textContent || ((r.querySelector('.inbox-review-nogoal') || {}).textContent) || null, task: (r.querySelector('.inbox-review-goal') || {}).title || null, links: r.querySelectorAll('.inbox-review-goal a, .inbox-review-goal button').length,  taskShown: !!(r.querySelector('.inbox-review-task') && r.querySelector('.inbox-review-task').getClientRects().length), inLine2: !!r.querySelector('td[data-key=goal].dt-line-2, td[data-key=goal][class*="line-2"]') }))`);
                 const by = n => goals.find(g => g.name === n);
                 assert.equal(by('Review file 01.txt').goal, 'Ship the installer', 'a review row shows its goal: ' + JSON.stringify(by('Review file 01.txt')));
                 assert.equal(by('Review file 04.txt').goal, 'Docs sweep');
                 assert.equal(by('Review file 05.txt').goal, 'No goal', 'a task with no goal says No goal: ' + JSON.stringify(by('Review file 05.txt')));
                 assert.equal(by('Review file 09.txt').goal, 'No goal');
-                assert.equal(by('Review file 01.txt').task, 'Build the installer', 'its task is under the goal');
-                assert.equal(by('Review file 05.txt').task, 'Loose task'); assert.equal(by('Review file 09.txt').task, null, 'no task, none shown');
-                if (width === 390) { assert.equal(by('Review file 01.txt').taskShown, false, 'a phone row shows the goal only'); assert.ok(by('Review file 01.txt').inLine2, 'the goal is on the row\'s second line: ' + JSON.stringify(by('Review file 01.txt'))); }
-                else assert.equal(by('Review file 01.txt').taskShown, true);
+                // one line, one goal (#9060): the cell is the goal link alone; the task is in its tooltip, not a second link under it
+                assert.match(by('Review file 01.txt').task, /Goal: Ship the installer · Task: Build the installer/, 'the tooltip says the goal and its task: ' + JSON.stringify(by('Review file 01.txt')));
+                assert.match(by('Review file 05.txt').task, /^No goal · Task: Loose task$/); assert.equal(by('Review file 09.txt').task, 'No goal', 'no task, none said');
+                for (const g of goals) assert.ok(g.links <= 1, 'one goal link in the Goal cell, never two stacked: ' + JSON.stringify(g));
+                if (width === 390) assert.ok(by('Review file 01.txt').inLine2, 'the goal is on the row\'s second line: ' + JSON.stringify(by('Review file 01.txt')));
                 if (width === 1280) {
                     assert.ok(await ev(`[...document.querySelectorAll('#group-table-view th')].some(h => h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim() === 'Goal')`), 'the table has a Goal column');
-                    const geo = await ev(`(() => { const r = ${row('Review file 01.txt')}, g = r.querySelector('.inbox-review-goal [data-goal-link]').getBoundingClientRect(), t = r.querySelector('.inbox-review-task').getBoundingClientRect(); return { under: t.top >= g.bottom - 1, h: Math.round(r.getBoundingClientRect().height) }; })()`);
-                    assert.ok(geo.under, 'the task is under the goal: ' + JSON.stringify(geo));
+                    const geo = await ev(`(() => { const r = ${row('Review file 01.txt')}, c = r.querySelector('.inbox-review-goal'), g = c.querySelector('[data-goal-link]').getBoundingClientRect(); return { oneLine: c.getBoundingClientRect().height <= g.height + 6, h: Math.round(c.getBoundingClientRect().height), gh: Math.round(g.height) }; })()`);
+                    assert.ok(geo.oneLine, 'the Goal cell is one line (the goal link alone): ' + JSON.stringify(geo));
                     // sortable: Docs sweep, Ship the installer, then No goal last
                     await ev(`[...document.querySelectorAll('#group-table-view th button.dt-sort, #group-table-view th .dt-sort')].find(b => /^Goal/.test(b.textContent.trim())).click(); true`);
                     await waitFor(`(() => { const t = [...document.querySelectorAll('#group-table-view tbody tr .inbox-review-goal')].map(c => c.firstChild.textContent); return t[0] === 'Docs sweep'; })()`, 'sorted by goal', 6000);
