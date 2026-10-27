@@ -175,12 +175,12 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         const isHistory = r => /^\/api\/sessions\/history(\/|$)/.test(r.p), withText = r => r.p === '/api/sessions/history' && r.keys.some(k => ['q', 'page_size', 'fts_mode'].includes(k));
         const keystroke = typing.filter(withText);
         if (driven.nativeInbox !== null && fieldRuns.length) {
-            // typing sends nothing to the history routes, key by key, from either field; Enter commits the search: at most one history read with q per online computer per Enter (a read per source, not per key)
+            // typing sends nothing to the history routes, key by key, from either field; Enter commits the search: exactly one history read with q per online computer per Enter (a read per source, not per key; coral-hub's promise, #9574)
             const report = [];
             for (const f of fieldRuns) {
                 assert.deepEqual(f.typed.filter(isHistory).map(r => `${r.m} ${r.p} ?${r.keys}`), [], `typing in ${f.label} sends nothing to the history routes, key by key`);
                 const reads = f.entered.filter(r => r.proxied && withText(r)), local = f.entered.filter(r => !r.proxied && isHistory(r));
-                assert.ok(reads.length <= online, `Enter in ${f.label} sends at most one history read with q per online computer (${reads.length} reads, ${online} computers online): ${JSON.stringify(reads.map(r => r.keys))}`);
+                assert.equal(reads.length, online, `Enter in ${f.label} sends exactly one history read with q per online computer (${reads.length} reads, ${online} computers online): ${JSON.stringify(reads.map(r => r.keys))}`);
                 assert.deepEqual(local.map(r => `${r.m} ${r.p}`), [], `Enter in ${f.label} reads no history from the Hub itself`);
                 report.push(`${f.label}: Enter sent ${reads.length} history reads with q (${online} computers)`);
             }
