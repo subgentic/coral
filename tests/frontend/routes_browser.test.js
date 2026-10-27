@@ -19,7 +19,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 400));
         return r.result.value;
     };
-    const { waitFor, coralReady } = require('./helpers/wait').bind(ev);
+    const { waitFor, coralReady, waitStable } = require('./helpers/wait').bind(ev);
     const url = () => ev('location.pathname + location.search + location.hash');
     const tab = () => ev(`(document.querySelector('.top-nav-tab.active') || {}).id || null`);
     const shown = id => `(() => { const e = document.getElementById(${JSON.stringify(id)}); return !!e && getComputedStyle(e).display !== 'none'; })()`;
@@ -243,6 +243,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await open(`/board/${encodeURIComponent(climb)}`);
         await until(`${TITLE} === ${JSON.stringify(climb)}`, 'the ../../api board');
         await until(`performance.getEntriesByType('resource').some(r => new URL(r.name).pathname.startsWith('/api/board/..%2F..%2Fapi'))`, 'the board asked for its own name under /api/board/'); // the title can show before the board's requests are made: read the entries once the encoded-name request is in them (a flake, 1 in 10)
+        await waitStable(`performance.getEntriesByType('resource').length`, 'the board\'s requests to settle', 300).catch(() => {}); // then read them all: a later request that escaped /api/board/ is in the entries too (Security Reviewer, #8827)
         const reqs = await ev(`performance.getEntriesByType('resource').map(r => new URL(r.name).pathname).filter(p => p.startsWith('/api/'))`);
         const outside = reqs.filter(p => /^\/api\/(subscribe|messages|api)\b/.test(p));
         check('a name with ../ stays inside /api/board/', outside.length === 0 && reqs.some(p => p.startsWith('/api/board/..%2F..%2Fapi')), JSON.stringify(outside.length ? outside : reqs.filter(p => p.startsWith('/api/board/')).slice(0, 4)));
