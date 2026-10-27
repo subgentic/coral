@@ -5,7 +5,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { showToast, escapeAttr } from './utils.js';
-import { isCloud, sessionServer, normServer, splitKey, serverFetch, LOCAL_SERVER } from './server_base.js';
+import { isCloud, sessionServer, normServer, splitKey, serverFetch, serverRead, LOCAL_SERVER } from './server_base.js';
 import { dockKind, onDockPage } from './dock_page.js';
 import { scopeOf, withScope, ALL } from './saved_scope.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Inbox's Saved tab
@@ -212,7 +212,7 @@ export function currentScope() {
     return scopeOf({ dock, session }) || ALL;
 }
 let countScopeKey = ''; // the scope the count on screen is of
-const openOf = (servers, scope) => Promise.all(servers.map(id => serverFetch(id, '/api/saved' + withScope('?limit=0', scope)).then(r => (r.ok ? r.json() : null)).then(d => (d && d.open) || 0).catch(() => 0))).then(c => c.reduce((a, b) => a + b, 0));
+const openOf = (servers, scope) => Promise.all(servers.map(id => serverRead(id, '/api/saved' + withScope('?limit=0', scope)).then(r => (r.ok ? r.json() : null)).then(d => (d && d.open) || 0).catch(() => 0))).then(c => c.reduce((a, b) => a + b, 0));
 /** The scope's kind on the body: the right sidebar has a Saved tab only for an agent's or a team's page (the CSS follows it), the Inbox's Saved list is everything's. */
 function syncScopeAttr() { const k = currentScope().kind; if (document.body.getAttribute('data-saved-scope') !== k) document.body.setAttribute('data-saved-scope', k); }
 function refreshSavedCount() {
