@@ -3,7 +3,7 @@
  * An item is a button (a view is not a link); the current one says aria-current and is marked by a bar and weight, not by colour alone; a view that is not built yet is disabled and says "soon" in words.
  * A colour dot (a tag's colour) is a hex colour only. Text is set with textContent only.
  *
- *   build({ id, label, sections, current, onPick })  -> the element (the column and the select)
+ *   build({ id, label, sections, current, onPick, drawer })  -> the element (the column and the select; with `drawer`, the column and, on a phone, a drawer opened by a button that names the current view, in place of the select: the Inbox's, #9545)
  *   sections: [{ title?, items: [{ key, label, count?, alert?, dot?, icon?, soon? }] }]      onPick(key) is not called for a disabled item; a section's title is also the select's group label
  *   update(root, { sections, current })               -> draws the same element again with new counts or another current view; the keyboard stays on the item it was on */
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
@@ -24,13 +24,13 @@ function folderIcon(name) {
 }
 
 function draw(root, { sections, current }) {
-    const nav = root.querySelector('.view-list-nav'), select = root.querySelector('.view-list-select');
+    const nav = root.querySelector('.view-list-nav'), select = root.querySelector('.view-list-select'), trigger = root.querySelector('.view-list-trigger');
     const held = nav.contains(document.activeElement) ? document.activeElement.dataset.key : null;
-    nav.replaceChildren(); select.replaceChildren();
+    nav.replaceChildren(); select?.replaceChildren();
     for (const sec of sections) {
         if (sec.title) nav.append(el('h2', 'group-head view-list-title', sec.title));
-        const group = sec.title ? document.createElement('optgroup') : select;
-        if (sec.title) group.label = sec.title;
+        const group = select ? (sec.title ? document.createElement('optgroup') : select) : null;
+        if (group && sec.title) group.label = sec.title;
         for (const it of sec.items) {
             const b = el('button', 'view-list-item list-row'); b.type = 'button'; b.dataset.key = it.key;
             const lab = el('span', 'view-list-label');
@@ -44,12 +44,18 @@ function draw(root, { sections, current }) {
             else if (it.count != null) b.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
             if (it.key === current) { b.setAttribute('aria-current', 'true'); b.classList.add('view-list-current', 'list-row-current'); }
             nav.append(b);
-            if (!it.soon) {
+            if (it.key === current && trigger) { // the drawer's button: what is open, and how many
+                trigger.replaceChildren(el('span', 'material-icons view-list-trigger-icon', 'menu'), el('span', 'view-list-trigger-name', it.label));
+                trigger.firstChild.setAttribute('aria-hidden', 'true');
+                if (it.count != null) trigger.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : 'view-list-count', it.count));
+                trigger.setAttribute('aria-label', `${it.label}${it.count != null ? `, ${it.count}` : ''}. Open the folders`);
+            }
+            if (!it.soon && group) {
                 const o = el('option', null, it.count != null ? `${it.label} (${it.count})` : it.label); o.value = it.key; o.selected = it.key === current;
                 group.append(o);
             }
         }
-        if (sec.title && group.children.length) select.append(group);
+        if (group && sec.title && group.children.length) select.append(group);
     }
     // One Tab stop for the whole column (about fifteen views and tags): the item the keyboard is on, else the current view; Up, Down, Home and End move between the views (Enter and Space choose, as for any button).
     const items = [...nav.querySelectorAll('.view-list-item')].filter(b => !b.disabled);
@@ -71,14 +77,34 @@ function wireKeys(nav) {
     });
 }
 
-export function build({ id, label, sections, current, onPick }) {
-    const root = el('div', 'view-list'); root.dataset.viewList = id;
+/** The drawer (a phone's, with `drawer`): a button that names the current view opens the column as a panel over the page, 86 percent of the width, a scrim behind it; a view, the scrim and Escape close it, and the focus goes back to the button. */
+function wireDrawer(root, nav) {
+    const trigger = el('button', 'view-list-trigger'); trigger.type = 'button'; trigger.setAttribute('aria-expanded', 'false');
+    const scrim = el('div', 'view-list-scrim'); scrim.setAttribute('aria-hidden', 'true');
+    nav.id = `${root.dataset.viewList}-drawer`; trigger.setAttribute('aria-controls', nav.id);
+    const open = () => { root.classList.add('view-list-open'); trigger.setAttribute('aria-expanded', 'true'); (nav.querySelector('.view-list-item[tabindex="0"]') || nav.querySelector('.view-list-item'))?.focus(); };
+    const close = ({ refocus = true } = {}) => {
+        if (!root.classList.contains('view-list-open')) return;
+        const inside = nav.contains(document.activeElement);
+        root.classList.remove('view-list-open'); trigger.setAttribute('aria-expanded', 'false');
+        if (refocus && inside) trigger.focus({ preventScroll: true });
+    };
+    trigger.addEventListener('click', () => (root.classList.contains('view-list-open') ? close() : open()));
+    scrim.addEventListener('click', () => close());
+    root.addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('view-list-open')) { e.stopPropagation(); close(); } });
+    root.prepend(trigger); root.append(scrim);
+    return close;
+}
+
+export function build({ id, label, sections, current, onPick, drawer = false }) {
+    const root = el('div', drawer ? 'view-list view-list-drawer' : 'view-list'); root.dataset.viewList = id;
     const nav = el('nav', 'view-list-nav'); nav.setAttribute('aria-label', label);
-    const select = el('select', 'field view-list-select'); select.setAttribute('aria-label', label);
-    root.append(nav, select);
+    const select = drawer ? null : el('select', 'field view-list-select'); if (select) select.setAttribute('aria-label', label);
+    root.append(nav); if (select) root.append(select);
+    const closeDrawer = drawer ? wireDrawer(root, nav) : () => {};
     wireKeys(nav);
-    nav.addEventListener('click', e => { const b = e.target instanceof Element && e.target.closest('.view-list-item'); if (b && !b.disabled) onPick(b.dataset.key); });
-    select.addEventListener('change', () => onPick(select.value));
+    nav.addEventListener('click', e => { const b = e.target instanceof Element && e.target.closest('.view-list-item'); if (b && !b.disabled) { closeDrawer({ refocus: false }); onPick(b.dataset.key); } });
+    select?.addEventListener('change', () => onPick(select.value));
     draw(root, { sections, current });
     return root;
 }

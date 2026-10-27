@@ -102,9 +102,9 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         console.log('5. Phone: one-line rows (Title and When), the folders as one select');
         await open(390, 844, true);
         await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-one-line') && !document.querySelector('#group-table-view .dt-box.dt-folded')`, 'the one-row table, which never folds (#8961)', 5000);
-        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; return { h: rows.slice(0, 5).map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, select: !!document.querySelector('.view-list-select') && getComputedStyle(document.querySelector('.view-list-select')).display !== 'none' }; })()`);
+        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; return { h: rows.slice(0, 5).map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, select: !!document.querySelector('#group-table-view .view-list-trigger') && getComputedStyle(document.querySelector('#group-table-view .view-list-trigger')).display !== 'none' }; })()`);
         assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-chat-flags')].some(f => f.getClientRects().length > 0)`), false, 'a phone\'s rows have no hover icons');
-        assert.ok(p.h.every(h => h >= 44) && p.over <= 1 && p.select, 'phone rows are 44 px or more, no sideways scroll, folders in a select ' + JSON.stringify(p));
+        assert.ok(p.h.every(h => h >= 44) && p.over <= 1 && p.select, 'phone rows are 44 px or more, no sideways scroll, folders in a drawer ' + JSON.stringify(p));
         console.log('   ✓');
         console.log('PASS Mailbox chat folders: counts, the Gmail line, day dividers, reading on, flags, one filter per folder');
     } finally { await client.close(); }
