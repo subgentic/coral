@@ -149,7 +149,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check('both boards are offered by label, with a short id', Array.isArray(opts) && opts.length === 2 && opts.every(t => t.startsWith(NAME + ' (b-')), JSON.stringify(opts));
 
         console.log('6. Rename in Team settings: the label only');
-        await ev(`window.openTeamPage(${JSON.stringify(idB)}, { tab: 'settings' }); true`);
+        await ev(`window.openTeamPage(${JSON.stringify(idB)}, { tab: 'goals' }); window.showTeamWorkingModeWorkspace(${JSON.stringify(idB)}); true`);
         await until(`!!document.querySelector('#team-panel-settings .board-rename-toggle')`, 'the rename control');
         await ev(`document.querySelector('#team-panel-settings .board-rename-toggle').click(); true`);
         const prefilled = await ev(`document.querySelector('#team-panel-settings .board-rename-form input').value`);

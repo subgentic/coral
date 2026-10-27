@@ -113,7 +113,7 @@ const { setTheme } = require('./helpers/contrast');
         await render(false);
         assert.equal(await icon(), null, 'a new team has the check off: no icon, the settings are reached from the info button');
         await ev(`window.showTeamWorkingModeWorkspace(${JSON.stringify(TEAM)}); true`);
-        await waitFor(`document.getElementById('team-tab-settings')?.getAttribute('aria-selected') === 'true' && !!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('#team-settings-health [name=on]')`, 'the Settings tab with the Health check section', 15000);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('#team-settings-health [name=on]')`, 'the Settings tab with the Health check section', 15000);
         await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
         const panel = await ev(`(() => { const h = n => document.querySelector('#team-settings-health [name="' + n + '"]'); return { on: h('on').checked, text: document.querySelector('#team-settings-health .sv-row[data-key=on] .sv-help').textContent, shown: !document.getElementById('team-settings-health').hidden, interval: h('interval_min').value }; })()`);
         assert.equal(panel.on, false, 'a new team has the check off');

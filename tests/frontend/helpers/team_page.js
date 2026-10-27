@@ -5,7 +5,7 @@ const na = require('./new_agent');
 const SOURCE = `(() => {
     const A = window.__na;
     const main = () => [...document.querySelectorAll('main, [role=main]')].filter(A.vis).find(m => [...m.querySelectorAll('h1')].some(A.vis)) || null;
-    const page = () => main();
+    const page = () => [...document.querySelectorAll('.team-settings-modal')].find(A.vis) || main(); // team settings are a popout (#8853): while it is open it is the page the settings suites read
     const h1 = () => { const m = main(); return m ? [...m.querySelectorAll('h1')].find(A.vis) || null : null; };
     const tablist = () => { const m = main(); return m ? [...m.querySelectorAll('[role=tablist]')].find(t => /^Team$/i.test(A.name(t))) || null : null; };
     const tabs = () => { const t = tablist(); return t ? [...t.querySelectorAll('[role=tab]')].filter(A.vis) : []; };
@@ -32,7 +32,7 @@ const SOURCE = `(() => {
     return true;
 })()`;
 const install = async ev => { await na.install(ev); return ev(SOURCE); };
-const TABS = ['Goals', 'Agents', 'Tasks', 'Artifacts', 'Knowledge', 'Board', 'Settings']; // the operator's order (#8791)
+const TABS = ['Goals', 'Agents', 'Tasks', 'Artifacts', 'Knowledge', 'Board']; // the operator's order (#8791); team settings are a popout, not a tab (#8853)
 
 // A team as the sidebar shows it (live agents of one board_project, the way team_header_open does) and the same board's goals and tasks on the real isolated server, made through the page's own fetch.
 const post = (ev, url, body) => ev(`fetch(${JSON.stringify(url)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(body)}) }).then(r => r.json().catch(() => ({})))`);
@@ -63,7 +63,14 @@ async function openTeam(ev, waitFor, team) {
     await ev(`(() => { const side = window.__tp.sidebar() || document; const b = [...side.querySelectorAll('button, a, [role=button]')].filter(window.__na.vis).find(x => window.__na.name(x).replace(/^Open team\\s+/i, '').startsWith(${JSON.stringify(team)}) && !/^(Collapse|Expand)/i.test(window.__na.name(x))); if (!b) return false; b.click(); return true; })()`);
     await waitFor(`!!window.__tp.h1() && window.__tp.h1().textContent.includes(${JSON.stringify(team)})`, `the team page of ${team} (a main region with the team's h1)`, 6000);
 }
-const goTab = async (ev, settle, name) => { await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}); if (t) { t.click(); return true; } const li = [...document.querySelectorAll('#team-tabs-more-menu [role=menuitem]')].find(i => i.textContent.trim().startsWith(${JSON.stringify(name)})); if (!li) return false; li.click(); return true; })()`); await settle(300); }; // a phone's tabs behind More (Artifacts, Knowledge, Settings) are chosen from its menu: the suite taps its item
+const goTab = async (ev, settle, name) => { if (name === 'Settings') return openSettings(ev, settle); await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}); if (t) { t.click(); return true; } const li = [...document.querySelectorAll('#team-tabs-more-menu [role=menuitem]')].find(i => i.textContent.trim().startsWith(${JSON.stringify(name)})); if (!li) return false; li.click(); return true; })()`); await settle(300); }; // a phone's tabs behind More (Artifacts, Knowledge, Settings) are chosen from its menu: the suite taps its item
+/** Team settings: the header's Settings button (a phone's More menu item), then the dialog is up and drawn (#8853: it used to be the Settings tab, goTab(ev, settle, 'Settings')). */
+const openSettings = async (ev, settle) => {
+    await ev(`(() => { const b = document.getElementById('team-page-settings'); if (b && b.getClientRects().length) { b.focus(); b.click(); return true; } const more = document.getElementById('team-page-more'); more.focus(); more.click(); document.getElementById('team-page-more-settings').click(); return true; })()`); // a mouse click focuses the button: so does the helper
+    await ev(`new Promise(res => { const t0 = Date.now(); const tick = () => (document.querySelector('.team-settings-modal #team-settings-workspace .sv[data-ready]') || Date.now() - t0 > 8000) ? res(true) : setTimeout(tick, 100); tick(); })`);
+    await settle(300);
+};
+const closeSettings = async (ev, settle) => { await ev(`(() => { const m = document.querySelector('.team-settings-modal'); if (m) m.querySelector('.modal-close-btn').click(); return true; })()`); await settle(300); };
 const rect = ev => ev(`(() => { const h = window.__tp.h1(), t = window.__tp.tablist(); return { h1: window.__tp.box(h), tabs: window.__tp.box(t) }; })()`);
 // The seeded members have no terminal, so the board's status calls them Ended (offline, #8271) and the Agents tab draws no Remind for them. A suite about Remind's place on a row needs them up: the board's /status answer is read
 // as it is, the first offline member made available and the others waiting for input (a team with someone to remind, two statuses and a health icon).
@@ -74,4 +81,4 @@ async function agentsUp(ev) {
         d.agents = d.agents.map((a, i) => (a.availability === 'offline' ? (i === 0 ? { ...a, availability: 'available', available: true, reason: 'Idle' } : { ...a, availability: 'needs_input', available: false, reason: 'Waiting for user input or approval' }) : a));
         return new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } }); }; return true; })()`);
 }
-module.exports = { SOURCE, install, TABS, seed, agentsUp, post, openTeam, goTab, rect, scenarios: na.scenarios };
+module.exports = { SOURCE, install, TABS, seed, agentsUp, post, openTeam, goTab, openSettings, closeSettings, rect, scenarios: na.scenarios };

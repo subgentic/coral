@@ -24,11 +24,11 @@ rt('/chats?page=2&q=battle', { view: 'chats', query: 'page=2&q=battle' }); // th
 rt(`/chats/${S}`, { view: 'chats', id: S });
 rt('/team/coral-go-team', { view: 'team', server: null, id: 'coral-go-team', sub: null });
 rt('/team/@m2/settings', { view: 'team', server: 'm2', id: 'settings', sub: null });
-rt('/team/m2/settings', { view: 'team', server: null, id: 'm2', sub: 'settings' });
-rt('/team/%40m2/settings', { view: 'team', server: null, id: '@m2', sub: 'settings' });
+assert.equal(parse('/team/m2/settings'), null, 'team settings are a popout, not a tab (#8853): there is no such path');
+assert.equal(parse('/team/%40m2/settings'), null);
 rt('/team/a%2Fb', { view: 'team', server: null, id: 'a/b', sub: null });
 // The team page's tabs and its item pages (#7453)
-for (const tab of ['goals', 'tasks', 'agents', 'artifacts', 'knowledge', 'settings']) rt(`/team/qa/${tab}`, { view: 'team', server: null, id: 'qa', sub: tab });
+for (const tab of ['goals', 'tasks', 'agents', 'artifacts', 'knowledge']) rt(`/team/qa/${tab}`, { view: 'team', server: null, id: 'qa', sub: tab });
 // The Board tab's path word is board; the page still names it messages, and the old /messages address reads as the same tab (#8652)
 rt('/team/qa/board', { view: 'team', server: null, id: 'qa', sub: 'messages' });
 assert.deepEqual(parse('/team/qa/messages'), { view: 'team', server: null, id: 'qa', sub: 'messages' }, 'the old address is the Board tab');
@@ -109,7 +109,7 @@ assert.deepEqual(fromLegacyHash(`#chat/m2/${S}`), { view: 'agents', server: 'm2'
 assert.deepEqual(fromLegacyHash(`#session/${S}`), { view: 'chats', id: S });
 assert.deepEqual(fromLegacyHash(`#history/${S}`), { view: 'chats', id: S });
 assert.deepEqual(fromLegacyHash('#team-view=%40m2%2Fcoral-go-team'), { view: 'team', server: 'm2', id: 'coral-go-team', sub: 'agents' }); // the Team view is the Agents tab (#7453)
-assert.deepEqual(fromLegacyHash('#team-settings=qa'), { view: 'team', server: null, id: 'qa', sub: 'settings' });
+assert.deepEqual(fromLegacyHash('#team-settings=qa'), { view: 'team', server: null, id: 'qa', sub: null }, 'an old settings link opens the team (settings are a popout now)');
 assert.deepEqual(fromLegacyHash('#servers/m2'), { view: 'servers', id: 'm2' });
 assert.deepEqual(fromLegacyHash('#tokens'), { view: 'analytics' });
 assert.deepEqual(fromLegacyHash('#agents'), { view: 'agents' });
@@ -144,11 +144,11 @@ console.log('routes_unit: ok');
     assert.equal(build(liveRoute('local', u)), `/agents/${u}`);
     assert.equal(build(liveRoute(null, u, 'files')), `/agents/${u}/files`);
     assert.equal(build(liveRoute('m2', u)), `/agents/@m2/${u}`);
-    assert.equal(build(keyRoute('team', '@m2/qa', 'settings')), '/team/@m2/qa/settings');
+    assert.equal(build(keyRoute('team', '@m2/qa', 'settings')), '/team/@m2/qa', 'there is no settings tab to write');
     assert.equal(build(keyRoute('board', '@odd')), '/board/%40odd');
     assert.equal(build(keyRoute('team', 'a/b')), '/team/a%2Fb');
     assert.equal(build(keyRoute('team', 'qa', 'goals', 5)), '/team/qa/goals/5');
-    assert.equal(build(keyRoute('team', 'qa', 'settings', 5)), '/team/qa/settings', 'only goals, tasks and messages have an item');
+    assert.equal(build(keyRoute('team', 'qa', 'settings', 5)), '/team/qa', 'there is no settings tab to write');
     for (const k of ['qa', '@m2/qa', '@odd', 'a/b', '@m2/@x', '@x!/y']) {
         assert.equal(routeKey(normalize(keyRoute('board', k))), k, k);
         assert.equal(routeKey(normalize(keyRoute('team', k))), k, k);
