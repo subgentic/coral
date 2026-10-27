@@ -123,7 +123,7 @@ function confirmWith(title, message, yesLabel, opts = {}) {
         const yes = $('confirm-modal-yes');
         const before = yes ? yes.textContent : '';
         const restore = () => { const b = $('confirm-modal-yes'); if (b) b.textContent = before; };
-        showConfirmModal(title, message, () => { restore(); resolve(true); }, () => { restore(); resolve(false); }, { danger: opts.danger === true });
+        showConfirmModal(title, message, () => { restore(); resolve(true); }, () => { restore(); resolve(false); }, { danger: opts.danger === true, label: yesLabel });
         const b = $('confirm-modal-yes');
         if (b) b.textContent = yesLabel;
     });

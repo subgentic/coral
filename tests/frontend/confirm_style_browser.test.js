@@ -1,5 +1,5 @@
 // The confirm dialog's button style (#9318): a question that loses something passes { danger: true } and its confirming button is the danger style; one that loses nothing passes
-// { danger: false }, or a call that names nothing, gets the primary; a danger question's button says what it does, not Yes. The real dialog, asked with callers' own words. The style is set on every call, so a danger dialog followed by a plain one is not still red.
+// { danger: false }, or a call that names nothing, gets the primary; every question's button says what it does (Sleep agent, Archive, Delete workflow), never Yes. The real dialog, asked with callers' own words. The style is set on every call, so a danger dialog followed by a plain one is not still red.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -9,8 +9,10 @@ const CASES = [ // key, title, message, options, class, the button's words
     ['danger-delete-workflow', 'Delete Workflow', 'Delete workflow "nightly-build"? This will also delete all run history.', { label: 'Delete workflow', danger: true }, 'btn-danger', 'Delete workflow'],
     ['danger-kill-run', 'Kill Run', 'Stop run #12? Its steps stop where they are and the run cannot be resumed.', { label: 'Kill run', danger: true }, 'btn-danger', 'Kill run'],
     ['danger-paste', 'Paste 3 lines?', 'This terminal isn\u2019t in paste mode, so each line is sent as if typed and runs on its own.', { label: 'Paste and run', danger: true }, 'btn-danger', 'Paste and run'],
-    ['primary-sleep-agent', 'Sleep Agent', 'Put "Backend Dev" to sleep?', { danger: false }, 'btn-primary', 'Yes'],
-    ['primary-unnamed', 'Anything', 'A call that names no choice.', undefined, 'btn-primary', 'Yes'],
+    ['primary-sleep-agent', 'Sleep Agent', 'Put "Backend Dev" to sleep?', { danger: false, label: 'Sleep agent' }, 'btn-primary', 'Sleep agent'],
+    ['primary-archive', 'Archive Agent', 'Archive "Backend Dev"? Archived agents are not woken with their team or by Wake All.', { danger: false, label: 'Archive' }, 'btn-primary', 'Archive'],
+    ['primary-sleep-team', 'Sleep Team', 'Put all agents on "coral-go-team" to sleep?', { danger: false, label: 'Sleep team' }, 'btn-primary', 'Sleep team'],
+    ['primary-unnamed', 'Anything', 'A call that names no choice.', undefined, 'btn-primary', 'Confirm'], // census-guarded: no real caller leaves it out, and the fallback is not a Yes (#9413)
 ];
 
 (async () => {

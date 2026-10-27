@@ -256,7 +256,7 @@ export function toggleTeamSleep(boardName, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep Team', `Put all agents on "${keyLabel(boardName)}" to sleep?`, doIt, undefined, { danger: false });
+        showConfirmModal('Sleep Team', `Put all agents on "${keyLabel(boardName)}" to sleep?`, doIt, undefined, { danger: false, label: 'Sleep team' });
     } else {
         doIt();
     }
