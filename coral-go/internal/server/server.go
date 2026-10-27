@@ -517,6 +517,7 @@ var DashboardPagePaths = []string{
 	"/inbox/*", // the Inbox folders (#8652): /inbox/<folder>; a bare /inbox is Coral Hub's own page and is not served here
 	"/workflows", "/workflows/*",
 	"/jobs", "/jobs/*",
+	"/automations", "/automations/*", // Workflows and Jobs as one screen (Goal #74): /automations/<folder>[/<id>]; /jobs and /workflows stay and are redirected by the client
 	"/analytics", "/analytics/*",
 	"/docs", "/docs/*",
 	"/servers", "/servers/*",
