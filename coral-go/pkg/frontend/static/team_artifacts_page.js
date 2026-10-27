@@ -1,4 +1,4 @@
-import { serverColumns, serverOf, readInboxArtifacts } from './inbox_servers.js';
+import { serverColumns, serverOf, serverLabel, multipleServers, readInboxArtifacts } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
@@ -321,8 +321,11 @@ export function createArtifactsList({ inbox = false } = {}) {
                 tagsDropAt: inbox ? 62 : 0, // the Inbox list is crowded (a team, a task): its Tags go first, before Team and Task
                 afterName: [...(inbox ? (model.filters.team
                     ? serverColumns().map(c => ({ ...c, width: '7rem' })) // one team chosen: its computer is the one place the row names it, so this column stays, a phone's included
-                    : [{ key: 'team', label: 'Team', width: '8rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }]) : []),
-                    ...(model.scope || by === 'goal' ? [] : [{ key: 'goal', label: 'Goal', width: '10rem', dropAt: 52, tone: 'tertiary', cell: goalCell }])], // the goal of the file's task, one line (ellipsis, the whole name on hover), a link to the goal (#9274): the Operator finds it the more useful column; the task is in the row's tooltip, its preview and, grouped by task, the group's head (#8617); the head says it where the list is grouped by task; an agent's own list has none // the team's words carry its computer ("alpha · Box Two"), so two same-named teams are told apart (#8774)
+                    : multipleServers() // several computers on this hub (#9408): the team by its own name, its computer in a column of its own, one line each; a narrow list drops both and the row's hover and preview name the computer
+                        ? [{ key: 'team', label: 'Team', width: '6rem', dropAt: 52, tone: 'tertiary', cell: item => item.team || keyLabel(item.board_id) },
+                            { key: 'server', label: 'Computer', width: '7.5rem', dropAt: 52, tone: 'tertiary', cell: item => serverLabel(serverOf(item)) }]
+                        : [{ key: 'team', label: 'Team', width: '8rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }]) : []),
+                    ...(model.scope || by === 'goal' ? [] : [{ key: 'goal', label: 'Goal', width: inbox && multipleServers() ? '8.5rem' : '10rem', dropAt: 52, tone: 'tertiary', cell: goalCell }])], // the goal of the file's task, one line (ellipsis, the whole name on hover), a link to the goal (#9274): the Operator finds it the more useful column; the task is in the row's tooltip, its preview and, grouped by task, the group's head (#8617); the head says it where the list is grouped by task; an agent's own list has none // the team's words carry its computer ("alpha · Box Two"), so two same-named teams are told apart (#8774)
                 nameTitle: item => [readableName(item), inbox ? teamLabel(item.board_id, item.team) : '', taskText(item), originBadge(item)].filter(Boolean).join(' · '),
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
@@ -415,7 +418,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const received = item.source === 'received';
         const facts = [
             ['MIME', un ? '' : item.media_type || 'Unknown'], // the header says the type, the size and when (#7775): nothing here repeats it
-            ...(inbox ? [['Team', teamLabel(item.board_id, item.team)]] : []), ['Task', taskCell(item)], ...(item.goal_id && item.goal_title ? [['Goal', goalCell(item)]] : []), ['Producer', item.produced_by], // the Task fact is the same link as the column: a phone drops the column
+            ...(inbox ? (multipleServers() ? [['Team', item.team || keyLabel(item.board_id)], ['Computer', serverLabel(serverOf(item))]] : [['Team', teamLabel(item.board_id, item.team)]]) : []), ['Task', taskCell(item)], ...(item.goal_id && item.goal_title ? [['Goal', goalCell(item)]] : []), ['Producer', item.produced_by], // the Task fact is the same link as the column: a phone drops the column
             ['Status', un ? 'Link not verified: this team has not uploaded this file, so Coral shows no size, type or preview' : ''],
             ['Sent to', item.source === 'shared' ? item.shared_to : ''], ['Sent by', item.source === 'shared' || received ? item.sent_by : ''],
             ['Received from', received ? item.received_from : ''], ['Board (claimed by the sender)', received ? item.from_board : ''],
