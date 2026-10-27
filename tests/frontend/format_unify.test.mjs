@@ -5,7 +5,6 @@ import { installDom, importUi } from './helpers/jsdom_env.mjs';
 
 installDom({ mode: 'local' });
 const { formatDuration, formatCost } = await importUi('format');
-const { formatDurationSec } = await importUi('utils');
 
 // ── the old bodies, verbatim ──
 const oldEvent = ms => {
@@ -32,16 +31,6 @@ const oldWorkflows = sec => {
     if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
     const h = Math.floor(m / 60);
     return `${h}h ${m % 60}m`;
-};
-const oldSec = sec => {
-    const n = Number(sec);
-    if (!Number.isFinite(n) || n <= 0) return '';
-    if (n < 60) return `${Math.floor(n)}s`;
-    const mins = Math.round(n / 60);
-    if (mins < 60) return `${mins}m`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
 };
 const oldCostDashboardDuration = diffMs => { // the part of cost_dashboard's _formatDuration after the date arithmetic
     const secs = Math.floor(diffMs / 1000);
@@ -83,8 +72,6 @@ for (const x of durations) {
     same('event', tryCall(formatDuration, x, { shape: 'precise' }), tryCall(oldEvent, x), x);
     same('scheduler', tryCall(formatDuration, x), tryCall(oldScheduler, x), x);
     same('workflows', tryCall(formatDuration, x, { unit: 's', dropZeroSeconds: true }), tryCall(oldWorkflows, x), x);
-    same('seconds', tryCall(formatDuration, x, { shape: 'rounded' }), tryCall(oldSec, x), x);
-    same('seconds export', tryCall(formatDurationSec, x), tryCall(oldSec, x), x);
     same('cost dashboard', tryCall(formatDuration, x), tryCall(oldCostDashboardDuration, x), x);
     same('subagents', tryCall(formatDuration, Math.round(x / 1000), { unit: 's' }), tryCall(oldSubagents, x), x);
 }

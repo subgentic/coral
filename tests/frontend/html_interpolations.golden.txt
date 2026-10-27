@@ -502,6 +502,9 @@
 1	view_sandbox.js	prelude(ctx)
 1	workflow_run_html.js	agentHtml
 1	workflow_run_html.js	autoExpand
+1	workflow_run_html.js	compactDuration(dur)
+1	workflow_run_html.js	compactDuration(durSec)
+1	workflow_run_html.js	compactDuration(elapsed)
 1	workflow_run_html.js	completedCount
 1	workflow_run_html.js	ecClass
 1	workflow_run_html.js	escAttr('Files of ' + (s.name || 'step ' + (i + 1)))
@@ -514,9 +517,6 @@
 1	workflow_run_html.js	exitCodeHtml
 1	workflow_run_html.js	fileItems
 1	workflow_run_html.js	filesHtml
-1	workflow_run_html.js	formatDuration(dur, { unit: 's', dropZeroSeconds: true })
-1	workflow_run_html.js	formatDuration(durSec, { unit: 's', dropZeroSeconds: true })
-1	workflow_run_html.js	formatDuration(elapsed, { unit: 's', dropZeroSeconds: true })
 1	workflow_run_html.js	i + 1
 1	workflow_run_html.js	icon
 2	workflow_run_html.js	iconClass
