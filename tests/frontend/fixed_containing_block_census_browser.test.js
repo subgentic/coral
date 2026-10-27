@@ -71,7 +71,7 @@ const SCAN = `(() => { const sel = e => (e.id ? '#' + e.id : e.tagName.toLowerCa
             }
             check(`${tag}: the scenes with their own openers (History, the artifact viewer, a team board, the update notice and dialog) all opened`, broken.length === 0 && ['History', 'the artifact viewer', 'a team board', 'the update notice and its dialog'].every(n => visited.has(n)), JSON.stringify(broken));
             check(`${tag}: the census saw position:fixed elements on the screens (${fixedSeen}), so it is not passing on an empty page`, fixedSeen >= 8, String(fixedSeen));
-            const stray = [...found.values()].filter(x => !INTENDED.some(([a, f]) => x.ancEl === a && ('.' + x.fixedClass) === f));
+            const stray = [...found.values()].filter(x => !INTENDED.some(([a, f]) => x.ancEl === a && x.fixed.split('.').slice(1).includes(f.slice(1))));   // any of the element's first three classes: the menu family puts .menu first (#9312)
             check(`${tag}: no filter, transform, perspective, will-change, contain or container-type box holds a fixed descendant that is not listed as intended`, stray.length === 0, JSON.stringify(stray.slice(0, 5).map(x => `${x.scene}: ${x.anc} [${x.reason}] holds ${x.fixed}`)));
             if (mobile) {
                 // the listed pair, for real: the model menu OPENED by a tap on the chip, with its items, at 390 x 844 and with the keyboard up (390 x 464), and with the kept-worktree bar on screen too: the sheet is a real
