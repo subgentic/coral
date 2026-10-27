@@ -1,4 +1,4 @@
-import { serverOf, readInboxArtifacts } from './inbox_servers.js';
+import { serverOf, serverLabel, readInboxArtifacts } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
@@ -159,6 +159,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             model.items = append ? model.items.concat(rows) : rows;
             if (!append) model.tagCounts = data.tag_counts && typeof data.tag_counts === 'object' ? data.tag_counts : {}; // the team's tags with how many files carry each (the whole list, not the page)
             if (inbox) model.teams = Array.isArray(data.teams) ? data.teams.filter(t => t && t.board_id) : [];
+            model.down = inbox && Array.isArray(data.down) ? data.down : []; // the registered computers that did not answer (#8904): their files are left out and the page says so
             model.hasMore = !!data.has_more; model.truncated = !!data.truncated; model.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : '';
             const matched = Number.isSafeInteger(data.total) ? data.total : model.items.length;
             model.counts = { matched, all: Number.isSafeInteger(data.all) ? Math.max(data.all, matched) : matched, truncated: !!data.truncated };
@@ -289,6 +290,11 @@ export function createArtifactsList({ inbox = false } = {}) {
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' team-empty-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
+        if (!model.error && !model.loading && inbox && model.down && model.down.length) { // a quiet line per computer that did not answer, with Retry: the reachable computers' files are listed above it
+            const names = model.down.map(d => d.label || serverLabel(d.server));
+            const line = el('p', 'goals-note team-artifacts-down', `${names.join(', ')} did not answer, so ${names.length === 1 ? 'its' : 'their'} artifacts are not shown.`); line.setAttribute('role', 'status');
+            body.append(line, btn('btn btn-small team-artifacts-down-retry', 'Retry', () => loadArtifacts({ keep: true })));
+        }
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
             // A label timeout needs another board-list read, not only the same artifact answer. Do not await a possibly offline list: the fresh artifact read has its own bounded label wait.
             if (retryLabels) importOnce('./board_fetch.js').then(m => m.fetchProjects()).catch(() => {});
