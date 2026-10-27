@@ -26,7 +26,6 @@
   "output.css:  | .preview-pane-markdown": 2,
   "scheduler.css:  | .sched-view-header h2": 2,
   "scheduler.css:  | .sched-preview": 2,
-  "scheduler.css:  | .sched-tz-input": 2,
   "scheduler.css:  | .sched-header": 2,
   "scheduler.css:  | .sched-header h2": 2,
   "session.css:  | .empty-launch:hover": 2,

@@ -83,7 +83,7 @@
 }
 
 
-.sched-tz-input { width: 80px; }
+.sched-tz-input { width: 100%; }
 
 /* ── New job / Edit job (#6540, #6578) ─────────────────────── */
 
@@ -100,7 +100,6 @@
 .sched-limit-fields { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 8px; }
 .sched-limit-fields > * { margin-top: 4px; }
 .sched-limit-fields input, .sched-limit-fields select { margin-top: 0; }
-.sched-tz-input { width: 100%; }
 .sched-preview { margin: 0 0 8px; }
 .sched-preview-bad { color: var(--error-text, var(--error)); }
 /* A phone: the dialog already has a 16 px edge (its own padding); the body's own 24 px made the fields start 41 px in */
