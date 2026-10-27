@@ -109,41 +109,8 @@
 
 /* ── Job type toggle ───────────────────────────────────────── */
 
-.job-type-toggle {
-    display: flex;
-    gap: 4px;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-lg);
-    padding: 3px;
-    margin-bottom: 8px;
-}
-
-.job-type-btn {
-    font-family: inherit; /* a button takes the browser's own font otherwise (#8409) */
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 8px 12px;
-    border: none;
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: var(--fs-md);
-    font-weight: var(--fw-medium);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-}
-
-.job-type-btn:hover {
-    color: var(--text-primary);
-}
-
-.job-type-btn.active {
-    background: var(--accent-dim); /* the one selected style of a segment or a chip in a form (#8054): the accent fill, the same at every width and theme */
-    color: var(--text-on-accent);
-}
+.job-type-toggle { width: 100%; margin-bottom: 8px; } /* the box and its buttons are the family's segmented control (.btn-seg > .btn, components.css); this is only its width (#9505) */
+.job-type-toggle > .job-type-btn { flex: 1; gap: 6px; }
 
 .sched-header {
     display: flex;
