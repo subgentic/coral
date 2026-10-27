@@ -109,11 +109,19 @@ func validateNewRemoteURL(raw string, allowPrivate bool) (string, error) {
 // not this computer: its API key crosses the network unencrypted.
 const remoteHTTPWarning = "the key crosses the network unencrypted; use https or a tunnel"
 
-// remoteURLWarning is remoteHTTPWarning for such a URL, and "" for https and for a loopback host.
+// remoteURLWarning is remoteHTTPWarning for such a URL, and "" for a readable https URL and for plain http to a loopback host. It fails closed (#9688): a stored URL that does not parse (a legacy
+// row), or whose scheme is neither https nor http, is not known to keep the key off the network, so it warns too.
 func remoteURLWarning(raw string) string {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "http" {
+	if err != nil {
+		return remoteHTTPWarning
+	}
+	switch u.Scheme {
+	case "https":
 		return ""
+	case "http":
+	default:
+		return remoteHTTPWarning
 	}
 	host := u.Hostname()
 	if strings.EqualFold(host, "localhost") {
