@@ -84,7 +84,7 @@
             <button class="top-nav-tab" id="nav-tab-hub-inbox" data-on-click="m-switch-nav-tab" data-arg="hub-inbox" data-label="Inbox" aria-controls="inbox-view">Inbox<span class="nav-tab-badge" id="nav-tab-hub-inbox-badge" hidden></span></button>
             <button class="top-nav-tab" data-cloud-only id="nav-tab-history" data-on-click="m-switch-nav-tab" data-arg="history">Chats</button>
             <button class="top-nav-tab" data-local-only id="nav-tab-workflows" data-on-click="m-switch-nav-tab" data-arg="workflows">Workflows</button>
-            <button class="top-nav-tab" data-local-only id="nav-tab-jobs" data-on-click="m-switch-nav-tab" data-arg="jobs">Jobs</button>
+            <button class="top-nav-tab" data-local-only id="nav-tab-automations" data-on-click="m-switch-nav-tab" data-arg="automations" aria-controls="scheduler-view">Automations</button>
             <button class="top-nav-tab" data-local-only id="nav-tab-tokens" data-on-click="m-switch-nav-tab" data-arg="tokens" title="Analytics — token usage and cost">Analytics</button>
             <!-- Servers right after Analytics, before Docs (the operator's order, #8704: Agents, Inbox, Workflows, Jobs, Analytics, Servers, Docs; on the Hub's own pages, where the local tabs are not drawn, right after Chats). -->
             <button class="top-nav-tab" id="nav-tab-servers" data-on-click="m-switch-nav-tab" data-arg="servers" aria-controls="servers-view" hidden>Servers</button>
@@ -360,9 +360,8 @@
             <!-- Scheduler Job Detail View -->
             <div id="scheduler-view" style="display:none" class="scheduler-view">
                 <div class="sched-view-header" id="sched-view-header">
-                    <h2>Jobs</h2>
+                    <h2>Automations</h2>
                 </div>
-                <div id="mobile-jobs-list"></div>
                 <div id="scheduler-detail"><div class="empty-pane sched-empty-hint"><p class="empty-line">Choose a job in the list.</p><p class="empty-hint">It shows what the job does and how its runs went.</p></div></div>
             </div>
 

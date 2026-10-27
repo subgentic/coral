@@ -38,7 +38,7 @@ const NAME = 'Production build server for the release candidate integration and 
             })()`);
             for (const theme of ['dark','light']) {
                 await swapTheme(ev,theme);
-                await ev(`window.switchNavTab('jobs'); import(${S}+'scheduler.js').then(async m=>{await m.refreshJobs(); await m.selectScheduledJob(1);return true;})`);
+                await ev(`window.switchNavTab('automations'); import(${S}+'scheduler.js').then(async m=>{await m.refreshJobs(); await m.selectScheduledJob(1);return true;})`);
                 await waitFor(`!!document.querySelector('#sched-run-history .dt-clamp-2')`, 'the reason below Failed');
                 const reason=await ev(`(()=>{const chip=document.querySelector('#sched-run-history .sched-status'),r=document.querySelector('#sched-run-history .dt-clamp-2'),s=getComputedStyle(r);return {chip:chip.textContent,text:r.textContent,title:r.title,size:s.fontSize,weight:s.fontWeight,color:s.color,secondary:getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),clamp:s.webkitLineClamp,normal:s.whiteSpace,below:r.getBoundingClientRect().top>=chip.getBoundingClientRect().bottom-1,over:document.documentElement.scrollWidth-innerWidth};})()`);
                 assert.equal(reason.chip,'Failed'); assert.equal(reason.text,REASON); assert.equal(reason.title,REASON);

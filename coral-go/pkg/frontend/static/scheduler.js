@@ -8,15 +8,19 @@ import { pollEvery } from './overload.js';
 import { showJobModal, editScheduledJob } from './job_form.js';
 import { formatDuration } from './format.js';
 import { runFailure } from './run_failure.js';
-import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, runDot } from './job_words.js';
-import { updateJobsSectionCount } from './live_jobs.js';
-import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, backLinkHtml, foldWayBack } from './sidebar_groups.js';
+import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine } from './job_words.js';
+import { foldWayBack } from './sidebar_groups.js';
+import { note } from './nav.js';
+import { importOnce } from './import_once.js';
 import * as DT from './data_table.js';
-
-const jobTableStates = new Map();
 
 let scheduledJobs = [];
 let selectedJobId = null;
+const jobsListeners = new Set();
+/** The jobs as the last read left them (the folders of Automations draw their rows from it) and a way to be told when a read changed them. */
+export const jobList = () => scheduledJobs;
+export const onJobsChanged = fn => { jobsListeners.add(fn); return () => jobsListeners.delete(fn); };
+export const openJobId = () => selectedJobId;
 
 // ── API helpers ──────────────────────────────────────────────────────────
 
@@ -41,7 +45,7 @@ async function fetchJobs() {
         const data = await resp.json();
         const before = jobsSeen;
         scheduledJobs = data.jobs || [];
-        renderJobsSidebar();
+        for (const f of jobsListeners) f();
         announceFailedRuns(before);
     } catch (e) {
         console.error('Failed to fetch scheduled jobs:', e);
@@ -62,107 +66,10 @@ async function fetchJobRuns(jobId) {
     }
 }
 
-// ── Sidebar rendering ────────────────────────────────────────────────────
+// ── Words a job's row and page share ─────────────────────────────────────
 
-// ── Groups (#7443): Active and Paused; a group's name opens it as a table in the centre ──
-
-let jobsQuery = ''; // the search box's text, lower case
-const matchesQuery = job => !jobsQuery || String(job.name || '').toLowerCase().includes(jobsQuery);
-function filterJobs(value) { jobsQuery = String(value || '').trim().toLowerCase(); renderJobsSidebar(); }
-
-const JOB_GROUPS = [{ key: 'active', label: 'Active', has: job => job.enabled }, { key: 'paused', label: 'Paused', has: job => !job.enabled }];
-const jobGroups = () => JOB_GROUPS.map(g => ({ ...g, jobs: scheduledJobs.filter(matchesQuery).filter(g.has) })).filter(g => g.jobs.length);
-
-const scheduleOf = job => cronWords(job.cron_expr) + (job.timezone ? ` (${job.timezone})` : '');
-const nextOf = job => !job.enabled ? 'Paused' : job.next_fire_at ? awayWords(job.next_fire_at) : 'Not scheduled';
-
-registerGroupSource('jobs', {
-    landing: true, // the page it opens on lists every group the sidebar has (#7722)
-    keys: () => jobGroups().map(g => g.key),
-    redraw: () => renderJobsSidebar(),
-    toolbar: () => ({ search: { id: 'jobs-search', label: 'Search jobs' }, action: { name: 'job-new', label: 'New job' } }), // the create action on the page's toolbar line (#7723)
-    table: key => {
-        const g = jobGroups().find(x => x.key === key);
-        if (!g) return null;
-        if (!jobTableStates.has(key)) jobTableStates.set(key, DT.tableState());
-        return { title: g.label, rows: g.jobs,
-            signature: JSON.stringify(g.jobs.map(job => [job, lastWords(job.last_run), nextOf(job)])),
-            node: () => DT.dataTable({
-                label: `${g.label} jobs, ${g.jobs.length}`, rows: g.jobs, layout: 'fixed',
-                rowKey: job => job.id, rowName: job => job.name, state: jobTableStates.get(key),
-                open: job => selectScheduledJob(Number(job.id)),
-                columns: [
-                    { key: 'job', label: 'Job', field: 'name', primary: true, width: 'grow', line: 1, sort: true, cell: job => DT.primaryButton(job.name) },
-                    { key: 'schedule', label: 'Schedule', width: '12rem', line: 2, sort: true, sortValue: scheduleOf, cell: scheduleOf },
-                    { key: 'last-run', label: 'Last run', width: '9rem', line: 2, tone: 'tertiary', sort: 'date', sortValue: job => job.last_run?.started_at, cell: job => {
-                        const run = job.last_run;
-                        if (!run) return lastWords(run);
-                        const cls = run.status === 'failed' ? 'team-state-bad' : run.status === 'running' ? 'goal-state-task-active' : run.status === 'completed' && run.exit_reason !== 'ended_while_coral_was_down' ? 'goal-state-task-done' : '';
-                        return DT.chip(lastWords(run), cls);
-                    } },
-                    { key: 'next', label: 'Next', width: '7rem', line: 1, tone: 'tertiary', sort: 'date', sortValue: job => job.enabled ? job.next_fire_at : '', cell: job => {
-                        const cell = job.enabled ? DT.el('span', 'dt-time', nextOf(job)) : DT.chip('Paused');
-                        if (job.enabled && job.next_fire_at) cell.title = `Next run ${atWords(job.next_fire_at)} your time`;
-                        return cell;
-                    } },
-                ],
-            }).el,
-        };
-    },
-    isEmpty: () => document.getElementById('scheduler-view')?.style.display === 'block' && !!document.querySelector('#scheduler-detail > .sched-empty-hint') && document.body.getAttribute('data-nav-tab') === 'jobs',
-    showList: () => window.switchNavTab?.('jobs'),
-    empty: () => window.switchNavTab?.('jobs'),
-});
-
-/** One job's row in the list. */
-function jobRowHtml(job) {
-    const active = selectedJobId === job.id ? 'active' : '';
-    const lastStatus = job.last_run ? job.last_run.status : '';
-    const unseenRun = lastStatus === 'completed' && job.last_run.exit_reason === 'ended_while_coral_was_down'; // done, but Coral did not see the result: not the green of a pass (#6907)
-    const rd = runDot(job.last_run); // the same dot and words a workflow's row has
-    const dot = unseenRun ? 'none' : rd.dot;
-    const dotWords = unseenRun ? 'Last run completed, result not seen' : rd.words; // the dot is a coloured circle: its words say what it means
-    const paused = job.enabled ? '' : `<span class="sched-chip">${job.paused_reason ? 'paused: failing' : 'paused'}</span>`;
-    // A job whose scheduling works but whose every run fails otherwise looks identical to a healthy one here.
-    const fails = job.consecutive_failures || 0;
-    const failBadge = fails >= 2
-        ? `<span class="sched-fail-badge" title="The last ${escapeAttr(fails)} runs failed">${fails} failed</span>`
-        : '';
-    const meta = [cronWords(job.cron_expr) + (job.timezone ? ` (${job.timezone})` : ''), lastWords(job.last_run), job.enabled && job.next_fire_at ? `next ${awayWords(job.next_fire_at)}` : ''].filter(Boolean).join(' · ');
-    // A run that failed for its folder or branch says so on the row, in the server's plain sentence (error_code names those), not "never run" with the cause out of sight (#6707).
-    const problem = job.last_run && job.last_run.status === 'failed' ? (job.last_run.error_code ? runError(job.last_run) : reasonWords(job.last_run)) : ''; // any failed run says why (#6956): the server's plain sentence for a coded one, the run's own error for the rest
-    const note = exitNote(job.last_run); // what the last run's exit_reason adds to its status (#6907): on the row as text, not only on hover
-    const nextTitle = job.enabled && job.next_fire_at ? `Next run ${atWords(job.next_fire_at)} your time` : '';
-    return `<li class="session-list-item sched-row ${escapeAttr(active)}" data-on-click="job-select" data-job-id="${Number(job.id)}" title="${escapeAttr(nextTitle)}"><button type="button" class="row-btn"${active ? ' aria-current="true"' : ''}>
-        <span class="sched-row-head"><span class="sched-row-title"><span class="sched-dot sched-dot-${dot}" role="img" aria-label="${escapeAttr(dotWords)}" title="${escapeAttr(dotWords)}"></span><span class="sched-row-name">${escapeHtml(job.name)}</span></span>${paused}${failBadge}</span>
-        <span class="sched-row-meta">${escapeHtml(meta)}</span>
-        ${problem ? `<span class="sched-row-problem">${escapeHtml(problem)}</span>` : note && !problem ? `<span class="sched-row-note">${escapeHtml(note)}</span>` : ''}
-    </button></li>`;
-}
-
-function renderJobsSidebar() {
-    const list = document.getElementById('scheduled-jobs-list');
-    if (!list) return;
-    const hint = document.querySelector('#scheduler-detail > .sched-empty-hint'); // the empty pane says what to do (#6956)
-    if (hint) {
-        const line = hint.querySelector('.empty-line'), more = hint.querySelector('.empty-hint');
-        if (line) line.textContent = scheduledJobs.length ? 'Choose a job in the list.' : 'No jobs yet.';
-        if (more) more.textContent = scheduledJobs.length ? 'It shows what the job does and how its runs went.' : 'New job, in the sidebar, schedules one.';
-    }
-    const groups = jobGroups();
-    if (!groups.length) {
-        list.innerHTML = scheduledJobs.length ? '<li class="empty-state">No job matches the search.</li>' : '<li class="empty-state">No jobs yet. New job schedules one.</li>';
-        syncPaneGroupToggle('jobs');
-        refreshGroupTable('jobs');
-        updateJobsSectionCount();
-        return;
-    }
-    // Every job (#6521): its schedule, its last result and its next run in words, under its state's group.
-    list.innerHTML = groups.map(g => groupHeaderHtml('jobs', g.key, g.label, g.jobs.length) + (isGroupFolded('jobs', g.key) ? '' : g.jobs.map(jobRowHtml).join(''))).join('');
-    syncPaneGroupToggle('jobs');
-    refreshGroupTable('jobs');
-    updateJobsSectionCount();
-}
+export const scheduleOf = job => cronWords(job.cron_expr) + (job.timezone ? ` (${job.timezone})` : '');
+export const nextOf = job => !job.enabled ? 'Paused' : job.next_fire_at ? awayWords(job.next_fire_at) : 'Not scheduled';
 
 // ── Job detail view ──────────────────────────────────────────────────────
 
@@ -179,19 +86,17 @@ async function loadWorkflowsById() {
 
 export async function selectScheduledJob(jobId) {
     selectedJobId = jobId;
-    renderJobsSidebar();
 
     const job = scheduledJobs.find(j => j.id === jobId);
     if (!job) return;
 
     // Hide other views, show scheduler view
     showView("scheduler-view");
+    note({ view: 'automations', folder: 'jobs', id: jobId }); // the address follows the job on screen (Goal #74), whoever opened it
 
     // Deselect live/history sessions
     state.currentSession = null;
-    document.querySelectorAll('.session-list-item.active').forEach(el => {
-        if (!el.closest('#scheduled-jobs-list')) setRowCurrent(el, false);
-    });
+    document.querySelectorAll('.session-list-item.active').forEach(el => setRowCurrent(el, false));
 
     const [jobRuns, , workflowPage] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null,
         job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw new Error('Unable to load workflow runs'); return r.json(); }).then(data => ({ runs: data.runs || [], total: data.total })).catch(() => null) : null]);
@@ -242,7 +147,6 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
     ].filter(Boolean);
 
     const moreId = `sched-more-${Number(job.id)}`;
-    const group = JOB_GROUPS.find(g => g.has(job));
     const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Paused'), lastWords(job.last_run), job.enabled && job.next_fire_at ? `next ${awayWords(job.next_fire_at)}` : ''].filter(Boolean).join(' \u00b7 ');
     // A short prompt is shown; a long one is folded (it would push the runs off the page)
     const longPrompt = (job.prompt || '').length > 600 || (job.prompt || '').split('\n').length > 10;
@@ -252,8 +156,8 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             : `<section class="sched-prompt-section sched-prompt-shown"><h3>Prompt</h3><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></section>`)
         : '';
     container.innerHTML = `
-        ${backLinkHtml('jobs', group.key, group.label)}
-        <button type="button" class="sched-back" data-on-click="job-back">&larr; Jobs</button>
+        <button type="button" class="group-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
+        <button type="button" class="sched-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
         ${failBanner}
         <div class="sched-header">
             <h2>${escapeHtml(job.name)}</h2>
@@ -369,8 +273,8 @@ function deleteScheduledJob(jobId) {
             await fetch(`/api/scheduled/jobs/${jobId}`, { method: 'DELETE' });
             showToast('Job deleted');
             selectedJobId = null;
-            showView("welcome-screen");
             await fetchJobs();
+            (await importOnce('./automations.js')).backToFolder('jobs');
         } catch (e) {
             showToast('Failed to delete job', true);
         }
@@ -405,9 +309,6 @@ export function initScheduler() {
 // Ids are checked (idOf, uuidOf) before use: a bad one does nothing. Deleting still asks first.
 registerActions({
     'job-new': () => showJobModal(),
-    'jobs-search-filter': el => filterJobs(el.value),
-    'job-select': el => withId(el.dataset.jobId, selectScheduledJob),
-    'job-back': () => { document.getElementById('scheduler-view')?.removeAttribute('data-phone-item'); const list = document.getElementById('scheduled-jobs-list'); const open = list && (list.querySelector('[aria-current="true"] .row-btn') || list.querySelector('.row-btn')); if (open) open.focus({ preventScroll: true }); }, // a phone: the job's page is under the list; back to the list with the open job focused (#7121)
     'job-edit': el => withId(el.dataset.jobId, editScheduledJob),
     'job-toggle': el => withId(el.dataset.jobId, toggleScheduledJob),
     'job-delete': el => withId(el.dataset.jobId, deleteScheduledJob),
