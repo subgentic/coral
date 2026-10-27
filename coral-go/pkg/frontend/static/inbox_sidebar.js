@@ -10,6 +10,7 @@ import { needsInputAttention } from './display_activity_hint.js';
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 import { reviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed } from './inbox_reviews.js';
+import { failedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
@@ -79,10 +80,13 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsInputAttention);
 const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
-const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : resolveSessionIdentity(s);
+const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : resolveSessionIdentity(s);
 const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
-const allNeeds = () => [...waitingSessions(), ...reviewRows()];
-const needsText = s => [s.review?.name || '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
+/** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
+const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automation-run:${r.key}`, display_name: r.name, board_project: '', server: '', waiting_kind: 'run', waiting_summary: failureWords(r) ? `Run failed: ${failureWords(r)}` : 'Run failed', waiting_since: r.finishedAt || r.at }));
+const isItem = s => !!(s.review || s.autorun); // a row that is not an agent: a review or a run, shown as an item
+const allNeeds = () => [...waitingSessions(), ...reviewRows(), ...runRows()];
+const needsText = s => [s.review?.name || '', s.autorun ? `${s.autorun.name} ${s.waiting_summary}` : '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;
 const NO_GOAL = 'No goal';
 const goalLabel = s => (s.goal && s.goal.id && s.goal.title ? String(s.goal.title) : NO_GOAL); // the goal a row's task serves (a review's artifact roll-up, #8579; an agent's task, #7302), or the words for none
@@ -93,6 +97,7 @@ const needsRows = () => {
     const all = filteredNeeds(), visible = new Set(reviewGroups(all.filter(s => s.review).map(s => s.review)).flatMap(g => g.rows.map(a => a.reviewKey)));
     return all.filter(s => !s.review || visible.has(s.review.reviewKey));
 };
+const kindShown = k => (k !== 'review' || reviewItems().length || needsFilters.kind === 'review') && (k !== 'run' || failedUnread().length || needsFilters.kind === 'run'); // a pill for what is not there is not drawn, unless it is the one on
 /** The Needs you folder's toolbar (#8604): the search, the kind pills (All, Permission, Question, Needs input), the Filters icon (Team, Agent, Waiting longer than, Sort), the chips of what is on. */
 function inboxNeedsToolbar() {
     if (!needsBar) {
@@ -116,12 +121,12 @@ function inboxNeedsToolbar() {
     const teams = [...new Set(all.map(teamOf).filter(Boolean))].sort(), names = [...new Set(all.map(needsName))].sort();
     const goalNames = [...new Set(all.filter(s => s.review || s.goal).map(goalLabel))].sort((a, b) => (a === NO_GOAL) - (b === NO_GOAL) || a.localeCompare(b)); // review rows and rows with a goal: "No goal" last
     const rows = all.filter(s => NF.matches(s, { ...needsFilters, kind: '' }, needsCtx));
-    const counts = NF.KINDS.filter(k => k !== 'review' || reviewItems().length || needsFilters.kind === 'review').map(k => rows.filter(s => NF.kindOf(s) === k).length);
+    const counts = NF.KINDS.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length);
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: rows.length }, ...NF.KINDS.filter(k => k !== 'review' || reviewItems().length || needsFilters.kind === 'review').map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: counts[i] }))],
+            items: [{ key: 'all', label: 'All', count: rows.length }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: counts[i] }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
     });
     return { node, signature: JSON.stringify([needsFilters, teams, names, goalNames, counts, rows.length]) };
@@ -153,6 +158,18 @@ function reviewActions(row) {
         } catch (error) { done.disabled = false; errorText.textContent = error.message; }
     });
     box.append(open, done, errorText); return box;
+}
+
+/** A failed run opens on its job's or workflow's page; opening it is what clears it from Needs you. */
+function openRun(run) { markSeen(run); go(runRoute(run)); }
+function runActions(run) {
+    const box = DT.el('div', 'inbox-review-actions');
+    const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
+    open.setAttribute('aria-label', `Open ${run.name}, failed run`); open.addEventListener('click', () => openRun(run));
+    const done = DT.el('button', 'btn btn-small', 'Dismiss'); done.type = 'button';
+    done.setAttribute('aria-label', `Dismiss the failed run of ${run.name}`);
+    done.addEventListener('click', () => { markSeen(run); sayLive(`Dismissed the failed run of ${run.name}.`); $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }); });
+    box.append(open, done); return box;
 }
 
 const dockSavedState = DT.tableState();
@@ -445,11 +462,12 @@ registerGroupSource('hub-inbox', {
             const total = filteredNeeds().length;
             return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.' },
                 signature: JSON.stringify([needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s)])]), // the words move on with the clock: they are part of what was drawn
-                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : resolveSessionIdentity(s),
-                    open: s => { if (s.review) { openReview(s.review); return; } window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
+                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : resolveSessionIdentity(s),
+                    open: s => { if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
                     columns: [
-                        { key: 'agent', label: rows.some(s => s.review) ? 'Item' : 'Agent', primary: true, width: rows.some(s => s.review) ? 'grow' : rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; return name; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
-                        ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: rows.some(s => s.review) ? 'content' : 'grow', line: 2, cell: s => {
+                        { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: rows.some(isItem) ? 'grow' : rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); name.title = s.autorun.name; return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; return name; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                        ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: rows.some(isItem) ? 'content' : 'grow', line: 2, cell: s => {
+                            if (s.autorun) { const why = DT.el('span', null, askOf(s)); why.title = askOf(s); return why; } // the whole reason is the tooltip: the line is one
                             if (!s.review) return askOf(s) || '';
                             const metadata = DT.el('span', 'inbox-review-metadata'); metadata.append(DT.el('span', null, 'For review'), DT.el('span', 'inbox-review-team', teamOf(s)));
                             if (s.task) { const t = DT.link(s.task.title || `Task ${s.task.id}`, () => openItemRoute('tasks', s.review.team, String(s.task.id), `${s.review.team}#${s.task.id}`)); t.classList.add('inbox-review-task'); t.setAttribute('aria-label', `Task: ${s.task.title || s.task.id}`); t.dataset.taskLink = String(s.task.id); t.title = `Task: ${s.task.title || `#${s.task.id}`}`; metadata.append(t); } // the task a review is for opens in the Inbox, in place (#8917): with the item's own words, not under the goal where it read as a second goal (#9060)
@@ -458,8 +476,8 @@ registerGroupSource('hub-inbox', {
                         ...(rows.some(s => s.agent_type) ? [{ key: 'cli', label: 'CLI', sort: true, sortValue: s => providerName(s.agent_type) || '', line: 2, cell: s => (s.agent_type ? DT.tag(providerName(s.agent_type)) : '') }] : []),
                         ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
                         ...serverColumns(),
-                        { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
-                        ...(goal || rows.some(s => s.review) ? [{ key: 'goal', label: 'Goal', sort: true, sortValue: s => (goalOf(s) ? s.goal.title : '\uffff'), line: rows.some(s => s.review) ? 2 : 0, cell: s => {
+                        ...(rows.every(s => s.autorun) ? [] : [{ key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) }]), // a run belongs to no team: with only runs there is no Team column
+                        ...(goal || rows.some(s => s.review) ? [{ key: 'goal', label: 'Goal', sort: true, sortValue: s => (goalOf(s) ? s.goal.title : '\uffff'), line: rows.some(isItem) ? 2 : 0, cell: s => {
                             // a review's goal and task come from its artifact's roll-up (#8579); they open in the Inbox, in place; "No goal" when it serves none
                             if (!s.review) { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => { const team = goalTeamKey(s), id = Number(s.goal.id); if (team && id) go({ view: 'inbox-goals', sub: 'goals', id: team, item: id }); }); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; }
                             const cell = DT.el('span', 'inbox-review-goal');
@@ -468,8 +486,8 @@ registerGroupSource('hub-inbox', {
                             cell.title = [goalOf(s) ? `Goal: ${s.goal.title}` : NO_GOAL, s.task ? `Task: ${s.task.title || `#${s.task.id}`}` : ''].filter(Boolean).join(' \u00b7 ');
                             return cell;
                         } }] : []),
-                        ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', width: '14rem', line: 1, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
-                        { key: 'waiting', label: 'Waiting', tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(s => s.review) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
+                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', width: '14rem', line: 1, cell: s => (s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : '') }] : []),
+                        { key: 'waiting', label: 'Waiting', tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
                     ] });
                     wrap.append(table.el);
                     for (const g of needsOverflow()) {
@@ -669,6 +687,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     renderInboxNav(true);
     refreshTasks();
     refreshReviews(true);
+    refreshRuns(true);
     refreshGoals();
     CH.loadChatCounts(() => renderInboxNav(true));
     IA.refreshArtifactCount(() => renderInboxNav(true));

@@ -55,7 +55,7 @@ const STUB = `(() => {
             await ev(`window.openAutomationsFolder('failed'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}the two failures in the Failed folder`, 10000);
             assert.equal(await pathname(), '/automations/failed', `${at}the address is the folder's`);
-            assert.deepEqual(await folderWords(mobile), mobile ? ['Running now (2)', 'Failed (2)', 'Jobs (4)', 'Workflows (3)'] : ['Running now2', 'Failed2', 'Jobs4', 'Workflows3'], `${at}the folders with their counts: Needs attention, then the library`);
+            assert.deepEqual(await folderWords(mobile), mobile ? ['Running now (2)', 'Failed (2)', 'Recent runs (0)', 'Jobs (4)', 'Workflows (3)'] : ['Running now2', 'Failed2', 'Recent runs0', 'Jobs4', 'Workflows3'], `${at}the folders with their counts: Needs attention, then the library`);
             if (!mobile) {
                 assert.deepEqual(await ev(`[...document.querySelectorAll('.view-list-title')].map(e => e.textContent.trim())`), ['Needs attention', 'Library'], `${at}two sections`);
                 assert.equal(await ev(`!!document.querySelector('.view-list-item[data-key="failed"] .view-list-alert')`), true, `${at}Failed's count is the red pill`);
