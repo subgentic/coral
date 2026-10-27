@@ -16,17 +16,22 @@ All sizes are CSS pixels at the browser's default zoom. The exact role is chosen
 
 | Role | Size / line height / weight | Token mapping and use |
 | --- | --- | --- |
-| Page title | 20px / 1.3 / 700 | **Target** `--type-page-size: 20px`; main page/dialog workspace title, and a group's table. |
-| Item page title | 17px / 1.3 / 700 | The name on a chat's or a job's own page, under its link back (see Sidebar). |
-| Section title | `--fs-xl` 16px / 1.4 / 600 | Major section and dialog heading. |
+| Display | `--fs-display` 32px / 1.2 / 700 | The welcome title only. |
+| Page title | `--fs-2xl` 20px / 1.2 / 700 | Main page/dialog workspace title, a group's table, a big figure (an Analytics card value). `--type-page-size` is this token. |
+| Item page title | `--fs-2xl` 20px / 1.2 / 700 | The name on a chat's, job's, goal's or team's own page, under its link back (the team page title too): the same look as a page title, never 17px. |
+| Section title | `--fs-xl` 16px / 1.4 / 600 | Major section, dialog title and a dialog's pane title. |
 | Item title | `--fs-lg` 14px / 1.4 / 600 | Card, artifact, task, and file group title. |
 | Body / chat prose | `--fs-lg` 14px / 1.5 / 400 | Reading text, descriptions, assistant/human prose. Preserve existing rich text hierarchy and user font choices. |
 | UI text / control | `--fs-md` 13px / 1.4 / 500 | Navigation, buttons, input value, file row name, compact explanatory copy. Use 600 for selected tab or emphasized item name. |
 | Metadata / helper | `--fs-base` 12px / 1.4 / 400 | Timestamps, file type/size, task attribution, helper and tool summary text. Use 500 for table headers and labels. |
-| Badge / nonessential count | `--fs-sm` 11px / 1.3 / 600 | Compact badges/counts only; a badge cannot be the sole source of status. |
+| Badge / nonessential count | `--fs-sm` 11px / 1.2 / 600 | Compact badges/counts only; a badge cannot be the sole source of status. |
 | Code / terminal | User setting or current code style / 1.4 or terminal setting / 400 | `--font-mono`; preserve syntax, indentation, wrapping, and terminal grid. No blanket UI font rule on xterm, editors, `pre`, or code. |
 
-`--fs-xs` (10px) is already defined. It is not a default role for new readable UI. When adapting existing 9–11px labels, raise essential information to metadata size instead of adding another tiny size.
+**The scale is seven sizes and no others** (Goal #84, signed off by UI/UX): `--fs-sm` 11, `--fs-base` 12, `--fs-md` 13, `--fs-lg` 14, `--fs-xl` 16, `--fs-2xl` 20, `--fs-display` 32. Every font-size in CSS and every inline style is one of these tokens; a literal size is a lint failure. `--fs-xs` (10px) is retired: raise a 9 to 10px label to 11, an essential one to 12. The in-between values go to the nearest token (12.5 to 12, 13.5 to 13, 15 to 14, 17 to 16 or, for a page's own title, 20, 38 and 48 to 32). Prose headings in rendered markdown keep a relative `em` scale (chat.css) and are documented as such.
+
+**Weights are three:** `--fw-regular` 400, `--fw-medium` 500 (UI text, buttons, labels), `--fw-strong` 600 (titles, selected items, badges, uppercase labels). 700 is only for the 20px and 32px titles, never for a 10 to 14px label.
+
+**Line heights are three:** `--lh-label` 1.2 (badges, tabs, single-line controls, the 20px and 32px titles), `--lh-ui` 1.4 (the default: `body { line-height: var(--lh-ui) }`), `--lh-body` 1.5 (reading text, chat prose, descriptions). Families are `--font-sans`, `--font-mono` and the one icon family; a button and a native control use `font: inherit`.
 
 ## Spacing, shape, and icons
 
@@ -34,7 +39,7 @@ Use existing `--space-xs: 4px`, `--space-sm: 6px`, `--space-md: 8px`, `--space-l
 
 Use `--radius-md: 6px` for buttons/fields, `--radius-lg: 8px` for cards, and `--radius-xl: 12px` for dialogs. Text tabs have no enclosing border or pill radius. Use a 1px `--border` divider for table rows and panel separation. Avoid stacking multiple borders around one action.
 
-Use the existing Material Icons family for functional icons. The standard glyph is 18px, dense inline glyph 16px, and prominent navigation glyph 20px. An icon-only button has a 32px square visual box on desktop and a 44px minimum target on touch layouts. Use one icon for one meaning across surfaces, but keep a visible text label for primary actions and ambiguous actions such as Preview, Download, Save, and Send. The chat Stop control is the documented icon-only exception below. Give every icon-only button an accessible name; `title` is supplemental, not the name. Decorative emoji may remain content. Replace raw action glyphs (for example star/refresh) only when the same semantics and keyboard behavior are retained.
+Use the existing Material Icons family for functional icons. Icon sizes are four tokens, not text sizes: `--icon-sm` 16px (dense inline), `--icon` 18px (the standard, and the top bar's), `--icon-lg` 24px (an empty state, a card), `--icon-xl` 32px (the welcome screen only); 17, 19, 20 and 21px glyphs go to the nearest. An icon-only button has a 32px square visual box on desktop and a 44px minimum target on touch layouts. Use one icon for one meaning across surfaces, but keep a visible text label for primary actions and ambiguous actions such as Preview, Download, Save, and Send. The chat Stop control is the documented icon-only exception below. Give every icon-only button an accessible name; `title` is supplemental, not the name. Decorative emoji may remain content. Replace raw action glyphs (for example star/refresh) only when the same semantics and keyboard behavior are retained.
 
 ## Component contracts
 
@@ -47,6 +52,21 @@ Use the existing Material Icons family for functional icons. The standard glyph 
 | Status / metadata | Status text at 12px/500 with icon or word; semantic token for status; metadata at 12px/400 with `--text-secondary`. | Task board in `css/agentic.css`, workflow status in `css/workflows.css`. |
 
 These dimensions are **target conventions**, not a directive to shrink the composer, sidebar, file preview, or existing accessible hit targets. At pointer-coarse/mobile widths, controls and tab targets have at least 44px hit height, including quiet actions. For an icon embedded in a text button, size the icon separately; do not enlarge text via the icon font.
+
+### Shared components (one definition each)
+
+Goal #84. A new screen uses these and adds no look of its own; the existing copies move to them one family at a time.
+
+1. **Table:** `data_table.js` (the only table).
+2. **Chip:** one `.chip` family with three variants: status (11px/600, a dot or icon with the word, semantic colour), tag (12px/400), count badge (11px/600, muted). One height; no other chip looks.
+3. **Button:** primary, secondary, quiet, danger and icon-only. 13px/500; 36px standard and 32px dense on a fine pointer, 44px on touch. The selected state of any choice is one style: the accent fill.
+4. **Toolbar:** the Inbox list bar (title and count, search, state pills, Filters, one create action); other toolbars are instances of it.
+5. **Pane:** the right sidebar and preview (header, body, pinned footer) and the in-place item page, with one Back link (13px/500, accent, "<- Name": the label names where it goes).
+6. **Dialog:** the three sizes above, one radius, header and footer, the `--dlg-*` roles.
+7. **Form row:** the `settings_view` row (label above or beside, control, hint); launch and job forms use it.
+8. **Empty state:** one line (14px/400, secondary), an optional hint and an optional action; no dashed box.
+9. **Card:** shared padding, radius and border tokens; no card inside a card.
+10. **Tabs and segmented control:** one text tab strip with an accent underline, and one segmented control for two to four choices.
 
 ### Interaction states
 
@@ -94,7 +114,7 @@ The example shows structure only; production URLs, data, local time and accessib
 - **Composer:** retain current full textarea size and Send/Stop controls. In chat, Stop uses a square icon with an accessible name and a tooltip explaining that it sends Escape to interrupt the agent or dismiss its prompt; terminal mode retains the Esc label. This is the explicit exception to labeled primary actions. Dialog dismissal actions remain Cancel. Align button, helper, keyboard hint and counter typography to roles. Never reduce the composer as a side effect of shared button rules.
 - **Tasks, board, workflows:** use the same item title, metadata and status roles. Keep status words/icons and task actions. Use semantic success/warning/error tokens in both themes, including workflow timelines.
 - **Agent UI:** style Coral's surrounding tabs, labels, request controls, help text, status and dialog. Agent-published iframe content is separate and sandboxed; do not impose workspace CSS inside it. Preserve expand/collapse and published interaction semantics.
-- **Forms/settings/dialogs:** follow [Dialogs and settings panels](#dialogs-and-settings-panels) (one fixed size, one type scale, one row pattern, footer order). Keep form labels programmatically associated, native checkbox/select behavior, and focus trapping/return for dialogs.
+- **Forms/settings/dialogs:** follow [Dialogs and settings panels](#dialogs-and-settings-panels) (a fixed size per kind, one type scale, one row pattern, footer order). Keep form labels programmatically associated, native checkbox/select behavior, and focus trapping/return for dialogs.
 
 ## Dialogs and settings panels
 
@@ -102,7 +122,7 @@ Written from the designs the operator approved: New agent and Restart Session, N
 
 ### Size and stability
 
-- A dialog has **one fixed size** on desktop: 960 x 640 for a short flow (New agent) and 960 x 720 for a long one (New team, Edit member, Settings), never taller than the window minus 32px. It is the same size and in the same place on every step, every tab, and after every choice (a template, a provider, a mode, a theme). Only the body scrolls; the title, the tab or step strip, the recap and the footer stay put.
+- A dialog has **one fixed size for its kind** on desktop: a confirmation 28rem wide, a short form 40rem, and a flow or settings panel 960 x 640 (New agent) or 960 x 720 (New team, Edit member, Settings), never taller than the window minus 32px. It is the same size and in the same place on every step, every tab, and after every choice (a template, a provider, a mode, a theme). Only the body scrolls; the title, the tab or step strip, the recap and the footer stay put.
 - **Reserve space for what may appear.** A note, warning or error that depends on a choice lives in a slot that already has its height (an invisible copy of the longest text keeps the slot sized), so choosing a provider does not move the Model control. A line that appears must not push the controls below it; if it cannot be reserved, it goes in a polite status line above the footer, not in the body.
 - **Phone:** the dialog is a full-height sheet, the section list becomes a "Section" dropdown, the footer buttons are 44px high with Cancel at the left edge, and nothing scrolls sideways at 390px or at 200% text.
 - A choice changes only what it names: a thinking level, a mode or a persona never changes the model; only a provider resets that agent's Model and Thinking. Text the person typed survives Next, Back and a tab change.
@@ -122,8 +142,8 @@ One scale for every dialog and settings panel, in `--font-sans` only (Plus Jakar
 
 | Role | Size / weight | Use |
 | --- | --- | --- |
-| Dialog title | 16px / 700 | The header. |
-| Pane title | 17px / 700 | The title of the open tab or step. |
+| Dialog title | 16px / 600 | The header. |
+| Pane title | 16px / 600 | The title of the open tab or step. |
 | Section heading | 14px / 600 | A group of rows inside a pane, under a 1px divider. |
 | Nav tab | 14px / 400, selected 14px / 600 | The section list. |
 | Row label | 13px / 500 | A setting's name; `--text-primary`, or `--text-secondary` above a field. |
@@ -194,7 +214,7 @@ On a phone the sidebar is the tab's own page: the pane moves into it, without Hi
 | Keep artifact fields in six labeled table columns. | Join MIME, size, task, and date into one metadata sentence. |
 | Keep Preview and Download/Open as explicit accessible actions. | Rely on hover-only glyphs or a clickable row with no action name. |
 | Preserve code/terminal font settings and HTML preview isolation. | Apply workspace font/reset to xterm or relax iframe sandbox for a visual change. |
-| Give a dialog one fixed size and reserve space for conditional notes. | Let a tab, a choice or a warning resize or move the dialog. |
+| Give a dialog a fixed size for its kind and reserve space for conditional notes. | Let a tab, a choice or a warning resize or move the dialog. |
 | Say what is required and why a primary button is off, in words. | Disable a primary with no visible reason, or mark required fields with a colour only. |
 | Put a setting's hint under its label; use the one row pattern. | Hide explanations in (i) tooltips, or lay rows out three different ways. |
 | Make list rows read-only and edit in one dialog. | Offer the same field inline and in a dialog, or a detached Change button. |
