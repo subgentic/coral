@@ -166,13 +166,21 @@ func (c *checker) save() {
 
 // fail records a failure for version and its back-off.
 func (c *checker) fail(version, kind, stageName string) Result {
+	return c.failAfter(version, kind, stageName, 0)
+}
+
+// failAfter is fail with the wait given (the rate limit's), or the kind's back-off when wait is 0.
+func (c *checker) failAfter(version, kind, stageName string, wait time.Duration) Result {
 	s := c.st.Stage
 	if s == nil || s.Version != version {
 		s = &verify.StageState{Version: version, Staged: stageField(c.st), StagedAt: stagedAtField(c.st)}
 	}
 	s.Attempts++
 	s.ErrorKind = kind
-	s.NextAttempt = c.now.Add(backoff(kind, s.Attempts)).UTC().Format(time.RFC3339)
+	if wait <= 0 {
+		wait = backoff(kind, s.Attempts)
+	}
+	s.NextAttempt = c.now.Add(wait).UTC().Format(time.RFC3339)
 	c.st.Stage = s
 	c.save()
 	c.res.Result, c.res.Version, c.res.FailedStage, c.res.NextAttempt = ResultFailed, version, stageName, s.NextAttempt
@@ -221,6 +229,11 @@ func (c *checker) run(ctx context.Context) Result {
 		log.Printf("[update] %v", nv)
 		return c.refused(nv.version, nv.failure)
 	case err != nil:
+		var se *verify.StatusError
+		if errors.As(err, &se) && se.RateLimited {
+			log.Printf("[update] GitHub's limit on anonymous requests is on; the next check is after it")
+			return c.failAfter("", KindRateLimit, "manifest", rateLimitWait(c.now, se.RetryAt))
+		}
 		return c.fail("", KindNetwork, "manifest")
 	}
 	manifest, m := p.manifest, p.m

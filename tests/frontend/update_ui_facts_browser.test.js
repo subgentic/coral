@@ -61,6 +61,7 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
             ['unknown', idle(), /Nothing is ready to install/, /up to date/i],
             ['up_to_date', idle({ not_ready_reason: 'up_to_date' }), /Coral is up to date/, null],
             ['not_promoted', idle({ not_ready_reason: 'not_promoted', latest: '1.4.130' }), /Coral 1\.4\.130 is out.*Installing it is up to you/, /up to date/i],
+            ['rate_limited', idle({ not_ready_reason: 'rate_limited' }), /could not check for updates.*GitHub limits how many anonymous requests.*check again when the limit is over/, /up to date/i],
             ['check_failed', idle({ not_ready_reason: 'check_failed' }), /could not check for updates/, /up to date/i],
             ['switch_off', idle({ not_ready_reason: 'switch_off' }), /Automatic update checks are off/, /up to date/i],
         ]) {

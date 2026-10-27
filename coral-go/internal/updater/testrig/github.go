@@ -28,6 +28,8 @@ type FakeGitHub struct {
 	Mutate func(path string, body []byte) []byte
 	// Status answers a path with this status and no body.
 	Status map[string]int
+	// Headers are sent with a Status answer of the path (a rate limit's x-ratelimit-reset, Retry-After: #9704).
+	Headers map[string]map[string]string
 	// RedirectTo sends a path to this absolute URL instead of its file.
 	RedirectTo map[string]string
 	// NoRedirect serves the latest files directly.
@@ -169,6 +171,9 @@ func (g *FakeGitHub) serve(w http.ResponseWriter, req *http.Request) {
 	g.Hits[p]++
 	if p == "repos/"+FakeRepo+"/releases" {
 		if code, ok := g.Status["list"]; ok {
+			for k, v := range g.Headers["list"] {
+				w.Header().Set(k, v)
+			}
 			w.WriteHeader(code)
 			return
 		}

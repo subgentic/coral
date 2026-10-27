@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,10 +23,14 @@ const maxRedirects = 3
 var ErrTooLarge = errors.New("the body is larger than the limit")
 
 // StatusError is an answer other than 200: the caller tells a 404 (the file is not there) from a failure to reach GitHub.
+// RateLimited is GitHub's refusal for too many anonymous requests from this address (a 403 or 429 that says the quota is spent or when to come back), and RetryAt when it said that would be
+// over (the zero time when it did not say): the caller waits until then instead of retrying on its own schedule (#9704).
 type StatusError struct {
-	URL    string
-	Status int
-	Text   string
+	URL         string
+	Status      int
+	Text        string
+	RateLimited bool
+	RetryAt     time.Time
 }
 
 func (e *StatusError) Error() string { return fmt.Sprintf("%s: %s", e.URL, e.Text) }
@@ -108,7 +113,9 @@ func (f *Fetcher) Copy(ctx context.Context, rawURL string, w io.Writer, max int6
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return &StatusError{URL: u.Redacted(), Status: resp.StatusCode, Text: resp.Status}
+		e := &StatusError{URL: u.Redacted(), Status: resp.StatusCode, Text: resp.Status}
+		e.RateLimited, e.RetryAt = rateLimited(resp, time.Now())
+		return e
 	}
 	if resp.ContentLength > max {
 		return fmt.Errorf("%w: %d bytes, more than %d", ErrTooLarge, resp.ContentLength, max)
@@ -134,4 +141,29 @@ func (l *limitBuffer) Write(p []byte) (int, error) {
 	}
 	l.b = append(l.b, p...)
 	return len(p), nil
+}
+
+// rateLimited reads GitHub's rate-limit answer: a 429, or a 403 whose x-ratelimit-remaining is 0 or that carries Retry-After. The time it is over is Retry-After (seconds, or an HTTP date) when
+// given, else x-ratelimit-reset (Unix seconds); a header that does not parse says nothing, and the caller then waits its own default. The values are read as numbers only: nothing in them is shown.
+func rateLimited(resp *http.Response, now time.Time) (bool, time.Time) {
+	h := resp.Header
+	remaining0 := strings.TrimSpace(h.Get("X-RateLimit-Remaining")) == "0"
+	retryAfter := strings.TrimSpace(h.Get("Retry-After"))
+	if resp.StatusCode != http.StatusTooManyRequests && !(resp.StatusCode == http.StatusForbidden && (remaining0 || retryAfter != "")) {
+		return false, time.Time{}
+	}
+	if retryAfter != "" {
+		if secs, err := strconv.ParseInt(retryAfter, 10, 64); err == nil && secs >= 0 && secs < 1<<31 {
+			return true, now.Add(time.Duration(secs) * time.Second)
+		}
+		if t, err := http.ParseTime(retryAfter); err == nil {
+			return true, t
+		}
+	}
+	if reset := strings.TrimSpace(h.Get("X-RateLimit-Reset")); reset != "" {
+		if secs, err := strconv.ParseInt(reset, 10, 64); err == nil && secs > 0 && secs < 1<<40 {
+			return true, time.Unix(secs, 0)
+		}
+	}
+	return true, time.Time{}
 }
