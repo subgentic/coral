@@ -31,7 +31,7 @@ for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
         const owner = [...parts.slice(0, -1)].reverse().map(p => /\.([a-z][\w-]*)/.exec(p)).find(Boolean);
         if (!owner) continue;
         const cls = owner[1];
-        if (cls === 'prose') continue;
+        if (cls === 'prose' || cls === 'prose-doc') continue; // .prose-doc is the document's two hairlines, part of the family
         // a heading of a chrome part (a dialog title, a page header, a card) is not rendered markdown: only the containers of rendered text are on the list
         if (!/(markdown|md$|prose|rendered|message-text|message-body|docs-content|plan|detail-md|content)/.test(cls)) continue;
         if (/^(modal|dialog|header|team-|cost-|cloud-|agent-ui|availability|hooks|servers|mb-actions|mb-view|template)/.test(cls) || cls === 'modal-content') continue;
@@ -45,6 +45,6 @@ for (const f of [...walk(path.join(root, 'static'), ['.js']), ...walk(path.join(
     for (const m of text.matchAll(/class="([^"]*\bpreview-pane-markdown\b[^"]*)"/g)) if (!/(^|\s)prose(\s|$)/.test(m[1])) problems.push(`${path.relative(root, f)}: "${m[1]}" draws markdown without .prose`);
     for (const m of text.matchAll(/class="([^"]*\bmessage-text\b[^"]*)">\$\{renderMarkdown\(/g)) if (!/(^|\s)(prose|cni-plan)(\s|$)/.test(m[1])) problems.push(`${path.relative(root, f)}: a chat message's markdown ("${m[1]}") has no .prose`);
 }
-if (!/\.prose h1 \{ font-size: var\(--prose-h1\)/.test(css)) problems.push('css: the .prose heading scale is missing');
+if (!/\.prose h1 \{[^}]*font-size: var\(--prose-h1\)/.test(css)) problems.push('css: the .prose heading scale is missing');
 if (problems.length) { console.error('prose_census: FAIL\n  ' + [...new Set(problems)].join('\n  ')); process.exit(1); }
 console.log(`prose_census: ok (.prose; ${Object.keys(BASELINE).length} containers of rendered text still have heading rules of their own)`);
