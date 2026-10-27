@@ -15,7 +15,8 @@ import (
 //
 // The idle screen's "You have 1 usage limit reset available" is not one.
 
-var codexLimitRe = regexp.MustCompile(`(?i)^[^\p{L}\p{N}]*you['’]ve hit your usage limit\b`)
+// codexLimitRe: the notice starts its line behind Codex's ■ bullet; a program's echo or a pasted line without it is not the notice.
+var codexLimitRe = regexp.MustCompile(`(?i)^\s*\x{25A0}\s*you['’]ve hit your usage limit\b`)
 
 // codexLimitLines is how much of the screen's bottom counts: the notice scrolls away once Codex works again.
 const codexLimitLines = 10
@@ -27,7 +28,7 @@ var (
 )
 
 // CodexLimitOnScreen reports whether Codex's screen shows its usage-limit notice near the bottom, and how long until it resets (0 when the
-// screen does not say, or says something that is not a time). A reset time with no date is the next such time after now, in now's zone.
+// screen does not say, or says something that is not a time). A reset time with no date is today's, in now's zone; a date or time already behind now is a notice that is stale: the agent is not blocked.
 func CodexLimitOnScreen(screen string, now time.Time) (resets time.Duration, ok bool) {
 	lines := tailLines(screenText(screen), codexLimitLines)
 	for i := len(lines) - 1; i >= 0; i-- {
@@ -40,12 +41,18 @@ func CodexLimitOnScreen(screen string, now time.Time) (resets time.Duration, ok 
 				text += " " + t
 			}
 		}
-		return codexResetIn(text, now), true
+		resets, passed := codexResetIn(text, now)
+		if passed {
+			continue // the reset the notice names has come: the agent can work again, and an old notice must not stop the nudges that wake it
+		}
+		return resets, true
 	}
 	return 0, false
 }
 
-func codexResetIn(text string, now time.Time) time.Duration {
+// codexResetIn is how long until the reset the notice names (0: it names none, or none that reads as a time), and passed when it names a
+// date or time that is already behind now.
+func codexResetIn(text string, now time.Time) (d time.Duration, passed bool) {
 	if m := codexRelResetRe.FindStringSubmatch(text); m != nil {
 		var d time.Duration
 		for _, p := range codexRelPartRe.FindAllStringSubmatch(m[1], -1) {
@@ -61,43 +68,38 @@ func codexResetIn(text string, now time.Time) time.Duration {
 				d += time.Duration(n) * time.Second
 			}
 		}
-		return d
+		return d, false
 	}
 	m := codexAbsResetRe.FindStringSubmatch(text)
 	if m == nil {
-		return 0
+		return 0, false
 	}
 	hour, _ := strconv.Atoi(m[4])
 	min, _ := strconv.Atoi(m[5])
 	if hour < 1 || hour > 12 || min > 59 {
-		return 0
+		return 0, false
 	}
 	hour %= 12
 	if strings.EqualFold(m[6], "p") {
 		hour += 12
 	}
-	at := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location())
-	if m[1] != "" { // a dated reset
+	at := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()) // a time with no date: today
+	if m[1] != "" {                                                                      // a dated reset
 		month := parseMonth(m[1])
 		day, _ := strconv.Atoi(m[2])
 		if month == 0 || day < 1 || day > 31 {
-			return 0
+			return 0, false
 		}
 		year := now.Year()
 		if m[3] != "" {
 			year, _ = strconv.Atoi(m[3])
 		}
 		at = time.Date(year, month, day, hour, min, 0, 0, now.Location())
-		if m[3] == "" && at.Before(now) {
-			at = at.AddDate(1, 0, 0)
-		}
-	} else if at.Before(now) {
-		at = at.AddDate(0, 0, 1)
 	}
 	if d := at.Sub(now); d > 0 {
-		return d
+		return d, false
 	}
-	return 0
+	return 0, true
 }
 
 func parseMonth(s string) time.Month {
