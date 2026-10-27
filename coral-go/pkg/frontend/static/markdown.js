@@ -48,6 +48,12 @@ function contentConfig(config, knowledgeLinks) {
 }
 
 /** The attribute allowlist and the form-control rule, on DOMPurify's own DOM (see above). */
+/** A heading in rendered Markdown is a heading of the dashboard's own page, so its level in the page's outline starts below the page's own h1 to h3: aria-level base + n, at most 6 (the same rule as the Hub renderer's md-h,
+ *  vendor/safe-markdown.js: "a message cannot take over the page's own outline"). The tag and the look stay (an h1 in a message is still drawn as the prose h1); only a screen reader's level moves (#9522). */
+function demoteHeadings(frag, base) {
+    for (const h of frag.querySelectorAll('h1, h2, h3, h4, h5, h6')) h.setAttribute('aria-level', String(Math.min(6, base + Number(h.nodeName[1]))));
+}
+
 function scrubContent(frag, linkMode, knowledgeLinks) {
     for (const el of [...frag.querySelectorAll('*')]) {
         if (el.nodeName === 'INPUT') {
@@ -285,13 +291,15 @@ function highlightMarked(frag) {
 export function sanitizeHtml(html, config, opts) {
     if (typeof DOMPurify === 'undefined') return escapeHtml(html);
     installSanitizerHooks();
-    // opts.links: 'file', 'board' or 'chat' (applyLinkPolicy); strictLinks is the 'file' mode (#3540).
+    // opts.links: 'file', 'board' or 'chat' (applyLinkPolicy); strictLinks is the 'file' mode (#3540). opts.headings: the base of the headings' aria-level (default 3, demoteHeadings), 0 keeps them as written.
     const linkMode = opts && (opts.links || (opts.strictLinks && 'file'));
     const knowledgeLinks = !!(opts && opts.knowledgeLinks);
     const frag = DOMPurify.sanitize(html, { ...contentConfig(config, knowledgeLinks), RETURN_DOM_FRAGMENT: true });
     highlightMarked(frag);
     scrubContent(frag, linkMode, knowledgeLinks);
     unblockAsLinks(frag);
+    const headings = opts && opts.headings !== undefined ? opts.headings : 3; // the level the first heading takes below (3: h4); 0 for a page that owns its h1 (Docs)
+    if (headings > 0) demoteHeadings(frag, headings);
     if (linkMode && LINK_MODES.has(linkMode)) applyLinkPolicy(frag, linkMode, knowledgeLinks);
     const box = document.createElement('div');
     box.appendChild(frag);
@@ -415,7 +423,7 @@ export function renderDocsMarkdown(md) {
         });
     }
     if (!_docsMarked) return null;
-    return sanitizeHtml(_docsMarked.parse(String(md || '')), DOMPURIFY_CONFIG, { links: 'board' });
+    return sanitizeHtml(_docsMarked.parse(String(md || '')), DOMPURIFY_CONFIG, { links: 'board', headings: 0 }); // a Docs page owns its h1: the outline is the page's own
 }
 
 // A fenced code block that names a language (```js, ~~~ python).
