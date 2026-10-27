@@ -25,7 +25,7 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
     const token = (group._pickToken = (group._pickToken || 0) + 1);
     delete group.dataset.probed;
     group.querySelectorAll('.launch-agent-opt').forEach(e => e.remove()); // the "Agent:" label stays
-    const note = document.getElementById('launch-codex-note'); // Codex stops on Coral's hooks question the first time (hooks_review.js, #6409): said once, here, for this computer's Codex
+    const note = group.id === 'launch-agent-pick' ? document.getElementById('launch-codex-note') : null; // New Agent's own group only: Restart's does not toggle its note. Codex stops on Coral's hooks question the first time (hooks_review.js, #6409): said once, here, for this computer's Codex
     const sync = () => { const v = ALIAS[select.value] || select.value; for (const r of group.querySelectorAll('input')) r.checked = r.value === v; if (note) { note.hidden = !(v === 'codex' && normServer(server) === LOCAL_SERVER); describeBy(note); } };
     const describeBy = note => { // the agent radios (the group and each choice) are described by the note while it shows: a hidden note would still be read, so the link is only there then
         const on = !note.hidden;
@@ -39,7 +39,7 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
         wrap.className = 'launch-agent-opt';
         const input = document.createElement('input');
         input.type = 'radio';
-        input.name = 'launch-agent-pick';
+        input.name = group.id ? `${group.id}-radios` : 'launch-agent-pick'; // one name per group: two groups in the document (New Agent's, Restart's) must not share a radio set
         input.value = type;
         input.addEventListener('change', () => { if (!input.checked) return; chosen = true; select.value = type; select.dispatchEvent(new Event('change', { bubbles: true })); });
         const name = document.createElement('span'); name.className = 'launch-agent-name'; name.textContent = label;
