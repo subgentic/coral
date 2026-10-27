@@ -63,7 +63,7 @@ let _sessionKey = null;   // agent whose tabs are showing
 const _stash = new Map(); // session key -> { tabs, activeId } for agents in the background
 let _lastOpenedPath = '';
 
-const layout = createPreviewLayout({ getTabs: () => _tabs, getLastOpenedPath: () => _lastOpenedPath, _onToolbarClick });
+const layout = createPreviewLayout({ getTabs: () => _tabs, isTaskPreview: () => _activeTab()?.kind === 'task', getLastOpenedPath: () => _lastOpenedPath, _onToolbarClick });
 const { _setMaximised, _setPhoneFull, _placePane, _showPane, _isMobile } = layout;
 const { _destroyEditor, _captureEditor, _mountEditor, _mountDiff } = createPreviewEditor({ _activeTab, _isDirty, _renderTabs, _fileUrl, _setBody });
 
@@ -277,7 +277,7 @@ export function openTaskPreview(project, taskId, title, onClose) {
     let tab = _tabs.find(t => t.kind === 'task' && t.project === project && t.taskId === taskId);
     if (!tab) { tab = _newTab({ kind: 'task', project, taskId, title, filepath: title, onClose }); _addTab(tab); }
     else { tab.onClose = onClose; }
-    layout.showColumn();
+    layout.showBottom();
     _activate(tab);
 }
 

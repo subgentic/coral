@@ -6,7 +6,7 @@ import { trapTab } from './dialog_focus.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
 import { browserLocal } from './safe_storage.js';
 
-export function createPreviewLayout({ getTabs, getLastOpenedPath, _onToolbarClick }) {
+export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath, _onToolbarClick }) {
 
     let _paneHeight = null;
     let _paneWidth = null;
@@ -17,6 +17,7 @@ export function createPreviewLayout({ getTabs, getLastOpenedPath, _onToolbarClic
     let _fullOpenerPath = ''; // the file row to restore when the original opener was redrawn (#7652)
     const _pathOf = el => (el && el.closest && el.closest('[data-path]') ? el.closest('[data-path]').dataset.path : '') || '';
     const _rowFor = p => (p ? document.querySelector(`.file-more-btn[data-path="${CSS.escape(p)}"]`) || document.querySelector(`[data-path="${CSS.escape(p)}"][tabindex]`) : null);
+    let _restoreBottom = false; // expanding a dock task returns to its sidebar split on restore
     let _maximised = false;    // the column covers Chat (#4931): not saved (a reload opens with Chat); ends when the pane is hidden, moves to the bottom, or another agent is shown
 
     const DOCK_ICONS = {
@@ -134,6 +135,7 @@ export function createPreviewLayout({ getTabs, getLastOpenedPath, _onToolbarClic
         });
 
         document.getElementById('preview-dock-btn')?.addEventListener('click', () => {
+            _restoreBottom = false;
             _dock = _dock === 'column' ? 'bottom' : 'column';
             browserLocal.set('coral-preview-pane-dock', _dock);
             _placePane();
@@ -165,11 +167,15 @@ export function createPreviewLayout({ getTabs, getLastOpenedPath, _onToolbarClic
 
     /** Maximise the column over Chat, or give Chat its place back (#4931). The width the column had is untouched: restoring is taking one class off. */
     function _setMaximised(on) {
+        if (on && !_isMobile() && _dock === 'bottom' && isTaskPreview() && getTabs().length) { _restoreBottom = true; _dock = 'column'; }
         on = !!on && _effectiveDock() === 'column' && getTabs().length > 0;
+        const restore = !on && _restoreBottom;
+        if (restore) { _restoreBottom = false; _dock = 'bottom'; }
         const body = document.querySelector('.live-body');
         const changed = on !== _maximised;
         _maximised = on;
         if (body) body.classList.toggle('preview-maximised', on);
+        _placePane();
         _paintMaxButton();
         if (changed) fitTerminal(); // the chat or terminal got its room back or lost it
     }
@@ -180,7 +186,7 @@ export function createPreviewLayout({ getTabs, getLastOpenedPath, _onToolbarClic
         if (!btn) return;
         const phone = _isMobile(), on = phone ? _phoneFull : _maximised;
         btn.innerHTML = on ? MAX_ICON_ON : MAX_ICON_OFF;
-        btn.title = phone ? (on ? 'Leave full screen (Escape)' : 'Show the preview full screen') : (on ? 'Restore the preview beside the chat (Escape)' : 'Maximise the preview over the chat');
+        btn.title = phone ? (on ? 'Leave full screen (Escape)' : 'Show the preview full screen') : (on ? (_restoreBottom ? 'Restore the preview in the sidebar (Escape)' : 'Restore the preview beside the chat (Escape)') : 'Maximise the preview over the chat');
         btn.setAttribute('aria-label', btn.title);
         btn.setAttribute('aria-pressed', String(on));
     }
@@ -237,7 +243,7 @@ export function createPreviewLayout({ getTabs, getLastOpenedPath, _onToolbarClic
         if (_maximised && !(dock === 'column' && visible)) _setMaximised(false);
         if (_phoneFull && !(_isMobile() && visible)) _setPhoneFull(false); // the last tab closed, or the window grew past a phone
         const maxBtn = document.getElementById('preview-max-btn');
-        if (maxBtn) { maxBtn.hidden = _isMobile() ? !visible : !(dock === 'column' && visible); _paintMaxButton(); }
+        if (maxBtn) { maxBtn.hidden = _isMobile() ? !visible : !(visible && (dock === 'column' || isTaskPreview())); _paintMaxButton(); }
 
         const btn = document.getElementById('preview-dock-btn');
         if (btn) {
@@ -258,6 +264,11 @@ export function createPreviewLayout({ getTabs, getLastOpenedPath, _onToolbarClic
         }
         _placePane();
     }
-    function showColumn() { if (!_isMobile()) _dock = 'column'; _placePane(); }
-    return { showColumn, initPreviewPane, _setMaximised, _setPhoneFull, _placePane, _showPane, _isMobile };
+    function showBottom() {
+        _setMaximised(false);
+        _dock = 'bottom';
+        if (!_isMobile()) _paneHeight = Math.round((document.getElementById('agentic-state')?.getBoundingClientRect().height || window.innerHeight) / 2);
+        _placePane();
+    }
+    return { showBottom, initPreviewPane, _setMaximised, _setPhoneFull, _placePane, _showPane, _isMobile };
 }
