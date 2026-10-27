@@ -73,8 +73,11 @@ const BASE = require('./test_base').BASE;
         assert.ok(pick && pick.shown && pick.role === 'radiogroup', 'the provider picker is there: ' + JSON.stringify(pick));
         assert.deepEqual(pick.radios, [['claude', true], ['codex', false], ['agy', false], ['pi', false]], 'the four providers, the agent\'s own chosen');
         assert.equal(pick.disabled, false, 'the provider can be changed'); assert.equal(pick.fixedLine, false, 'no "launch a new agent" line');
+        // the Flags field starts at a known value (the agent's own flags, as the form read them), so the clear on a switch and the restore on the way back are measured and not both ''
+        await ev(`{ const c = document.getElementById('restart-acf'), f = c.querySelector('.acf-flags'); f.value = '--origin-flag'; c._acfRestartOrigin.flags = '--origin-flag'; } true`);
         await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="codex"]').click(); true`);
         assert.equal(await ev(`window.getAgentConfig('restart-acf').agentType`), 'codex', 'the restart carries the new provider');
+        assert.equal(await ev(`document.querySelector('#restart-acf .acf-flags').value`), '', 'a switch to another provider clears the flags: they belong to the CLI the agent ran on');
         // a provider has its own levels: Thinking goes back to Default (not sent) after a switch (#8990). A model the catalog does not know stays in its field (it is the person's own): if it is wrong for the
         // new provider the server answers 400 naming it (restart_board_test.go) and the restart's toast says so (restart_flow.js shows result.error).
         assert.equal(await ev(`window.getAgentConfig('restart-acf').thinking`), undefined, 'Thinking is back to Default after a switch');
@@ -89,6 +92,7 @@ const BASE = require('./test_base').BASE;
         const flagsOrigin = await ev(`document.getElementById('restart-acf')._acfRestartOrigin.flags`);
         await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="claude"]').click(); true`);
         assert.equal(await ev(`document.querySelector('#restart-acf .acf-flags').value`).then(v => v.trim()), String(flagsOrigin).trim(), 'back on the agent\'s own provider the flags are as they were');
+        assert.equal(String(flagsOrigin), '--origin-flag', 'and they were the known value, so the restore above is not an empty string equal to an empty string');
         await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="claude"]').click(); true`);
         await shot('restart-agent-desktop');
         await go('#restart-modal', 'permissions'); await shot('restart-permissions-desktop');
