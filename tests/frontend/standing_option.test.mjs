@@ -8,9 +8,11 @@ const STANDING = [
     'Yes, allow always', 'Allow always', 'Yes, always allow access to this folder', 'Always allow', "Yes, and never ask again", "Yes, don't ask me again", 'Yes, and remember this decision',
     'Yes, allow this for the rest of the session', 'Trust this folder', 'Yes, add to allowlist', "Yes, and don't ask again for this command (p)", 'Yes, and stop asking',
     "Don't ask again", 'Never ask again', 'Approve and remember', 'Something nobody has seen before',
+    'Yes, for this session only', 'Allow this session only', 'Yes, allow reading from this project only', 'Yes, allow once and remember', "Yes, and don't ask again, just once more", // QA Reviewer 2's round 2: a wider reach with an only or a once
+    "Yes (for this session's command only)", // ambiguous: set apart (a reach, not unsafe)
 ];
 const ONE_TIME = [
-    'Yes', 'Yes, proceed', 'Yes, proceed (y)', 'Allow', 'Allow once', 'Allow once only', 'Yes, just this once', 'Yes, this time', 'Approve', 'OK', 'Proceed', 'Yes (for this session\'s command only)',
+    'Yes', 'Yes, proceed', 'Yes, proceed (y)', 'Allow', 'Allow once', 'Allow once only', 'Yes, just this once', 'Yes, this time', 'Approve', 'OK', 'Proceed', 'Yes, once only', 'Yes, this one time only', 'Yes, allow this one time', 'Yes, run command',
     'No', 'No, and tell Claude what to do differently (esc)', 'No, and tell Codex what to do differently (esc)', 'Deny', 'Cancel', 'Reject',
     'No, and tell it why it must not be allowed during this session', "No, don't ask again later today?", 'No, keep asking', 'Esc',
 ];
