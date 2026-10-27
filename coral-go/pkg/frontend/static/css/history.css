@@ -34,36 +34,7 @@
 
 /* ── History Tabs ──────────────────────────────────────────── */
 
-.history-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-secondary);
-    padding: 0 20px;
-    flex-shrink: 0;
-}
-
-.history-tab-btn {
-    padding: 8px 16px;
-    font-size: var(--fs-md);
-    font-weight: 500;
-    color: var(--text-secondary);
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-@media (pointer: coarse), (max-width: 767px) { .history-tab-btn { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } } /* a chat's tabs are 44 px targets on a phone (#6094, #6130) */
-.history-tab-btn:hover {
-    color: var(--text-primary);
-}
-
-.history-tab-btn.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-}
-[data-theme="light"] .history-tab-btn.active { color: var(--accent-dim); } /* 4.4:1 with --accent on the light panel, 5.5:1 with this (#4851) */
+.tabs.history-tabs { padding-inline: 20px; flex-shrink: 0; } /* the look is the family's (.tabs .tab, components.css); the strip is inset like the panel under it */
 
 .history-tab-content {
     display: none;
