@@ -92,6 +92,7 @@ func TestServers_ListIncludesLocal(t *testing.T) {
 	decode(t, w, &out)
 	require.Len(t, out, 1)
 	assert.Equal(t, "local", out[0]["id"])
+	assert.Equal(t, "This computer", out[0]["label"], "the hub names itself as the Inbox and Analytics do (#8881)")
 }
 
 func TestServers_AddTestPatchDelete(t *testing.T) {

@@ -90,7 +90,7 @@ function serverCell(s) {
     const box = DT.el('div'), wrap = DT.el('span', 'dt-title-cell'); // the name and its tags on one line, the warning under them, whole and wrapping
     box.append(wrap);
     if (isLocal(s)) {
-        wrap.append(DT.el('span', 'dt-name-text', s.label || 'Local'), DT.tag('local'));
+        wrap.append(DT.el('span', 'dt-name-text', s.label || 'This computer'), DT.tag('local'));
         return box;
     }
     const b = DT.primaryButton(s.label || s.id, `Open ${s.label || s.id}`);
@@ -210,7 +210,7 @@ function render() {
     const allRemotes = _servers.filter(s => !(s.local || s.id === 'local'));
     syncServersBar(allRemotes, 'server', render); // the search box, from six servers up
     const remotes = allRemotes.filter(serverVisible);
-    const local = _servers.find(s => s.local || s.id === 'local') || { local: true, id: 'local', label: 'Local' };
+    const local = _servers.find(s => s.local || s.id === 'local') || { local: true, id: 'local', label: 'This computer' };
     // The periodic refresh must not pull focus out of a row the user is on.
     const activeRow = document.activeElement && m.contains(document.activeElement) ? document.activeElement.closest('.dt-row, .servers-page') : null;
     const keep = activeRow && _editing === null ? { row: activeRow.id, action: document.activeElement.dataset.action } : null;

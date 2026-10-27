@@ -208,7 +208,7 @@ func CheckRemoteHealth(ctx context.Context, baseURL, apiKey string, allowPrivate
 
 func localServerEntry() map[string]any {
 	return map[string]any{
-		"id": store.LocalServerID, "label": "Local", "url": "",
+		"id": store.LocalServerID, "label": "This computer", "url": "",
 		"status": store.RemoteStatusOnline, "allow_private": false,
 		"last_seen": nil, "last_error": nil, "local": true,
 	}
