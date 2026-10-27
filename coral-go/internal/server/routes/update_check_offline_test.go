@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -45,4 +46,59 @@ func TestUpdateCheckDoesNotWaitForABlackHoledNetwork(t *testing.T) {
 		f, err := feedWithin(context.Background(), updatecheck.Approved, feeds, false, 250*time.Millisecond)
 		return err == nil && f != nil && f.Offer.Version == "9.9.9"
 	}, 5*time.Second, 50*time.Millisecond)
+}
+
+// #9467 (the #9360 review's LOW): a person's "Check for Updates" (refresh) waits for the whole request. Past updateCheckWait the page's own check gives up, but refresh must not:
+// with the feed still not answering it is still waiting, and it returns the feed once the answer comes.
+func TestRefreshWaitsForTheWholeRequestWhereThePagesCheckGivesUp(t *testing.T) {
+	release := make(chan struct{})
+	var asked atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked.Add(1)
+		select {
+		case <-release:
+		case <-r.Context().Done():
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"tag_name": "v8.8.8", "draft": false, "prerelease": false, "html_url": "https://github.com/subgentic/coral/releases/tag/v8.8.8"})
+	}))
+	t.Cleanup(server.Close)
+	released := false
+	releaseOnce := func() {
+		if !released {
+			released = true
+			close(release)
+		}
+	}
+	t.Cleanup(releaseOnce)
+	feeds := updatecheck.Feeds{Approved: uniqueFeedURL(server.URL), Agentic: uniqueFeedURL(server.URL)}
+
+	const wait = 150 * time.Millisecond
+	type result struct {
+		feed *updatecheck.Feed
+		err  error
+	}
+	done := make(chan result, 1)
+	start := time.Now()
+	go func() {
+		f, err := feedWithin(context.Background(), updatecheck.Approved, feeds, true, wait)
+		done <- result{f, err}
+	}()
+	select {
+	case r := <-done:
+		t.Fatalf("a refresh came back after %v, before the feed answered (feed %v, err %v): it must wait for the whole request", time.Since(start).Round(time.Millisecond), r.feed, r.err)
+	case <-time.After(4 * wait): // well past the page's own give-up
+	}
+	require.EqualValues(t, 1, asked.Load(), "the request is the one in flight, not a new one")
+
+	releaseOnce() // the network answers
+	select {
+	case r := <-done:
+		require.NoError(t, r.err)
+		require.NotNil(t, r.feed)
+		assert.Equal(t, "8.8.8", r.feed.Offer.Version, "the refresh answered with the feed it waited for")
+	case <-time.After(5 * time.Second):
+		t.Fatal("the refresh never returned after the feed answered")
+	}
 }
