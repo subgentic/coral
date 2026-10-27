@@ -1,11 +1,10 @@
 /* Automations' runs (#9296, audit #9255 item 3): every run of every job and every workflow as one newest-first list, with an unread mark until a person opens it, for the Recent runs folder
  * (automations.js) and for the Inbox's Needs you rows (a failed run nobody has opened). The two reads already exist (GET /api/scheduled/runs/recent, GET /api/workflows/runs/recent): no route is
- * added. A job that runs a workflow makes two records (its own run and the workflow's run, which says so in its trigger context): the job's run is the one listed. What a person has opened is kept in
- * this browser; runs from before this browser first looked are not unread (a long history is not a wall of dots). */
-import { browserLocal } from './safe_storage.js';
+ * added. A job that runs a workflow makes two records (its own run and the workflow's run, which says so in its trigger context): the job's run is the one listed. What a person has opened is the server's (seen_at, #9315),
+ * so every screen agrees; a run over when the column was added counts as opened (a long history is not a wall of dots). */
 import { lastWords } from './job_words.js';
 
-const SEEN_KEY = 'coral-automation-runs-seen', FRESH_MS = 30000, LIMIT = 100, KEEP = 500;
+const FRESH_MS = 30000, LIMIT = 100;
 let runs = [], pending = null, lastRead = 0, activated = false;
 const listeners = new Set();
 export const recentRuns = () => runs;
@@ -61,22 +60,21 @@ function resultOf(run) {
 }
 
 // ── What a person has opened ─────────────────────────────────────────────
-function loadSeen() {
-    try { const v = JSON.parse(browserLocal.get(SEEN_KEY) || 'null'); if (v && typeof v.since === 'number' && Array.isArray(v.ids)) return v; } catch { /* a stored value that is not ours: start again */ }
-    return null;
-}
-function saveSeen(v) { try { browserLocal.set(SEEN_KEY, JSON.stringify({ since: v.since, ids: v.ids.slice(-KEEP) })); } catch { /* storage may be blocked: the marks live for this page only */ } }
-let seen = null;
-const seenState = () => { if (!seen) { seen = loadSeen() || { since: Date.now(), ids: [] }; saveSeen(seen); } return seen; };
-/** Whether a finished run is unread: it began after this browser first looked and has not been opened. A run still going is not (its dot comes when it ends). */
-export function isUnread(item, state = seenState()) { return item.over && item.atMs > state.since && !state.ids.includes(item.key); }
-export const unreadCount = () => runs.filter(i => isUnread(i)).length;
+// A run is opened once for every screen: the server keeps when (seen_at, set by POST .../seen) and the two reads carry it, so the phone, a second tab and the Hub agree.
+/** Whether a finished run is unread: it has not been opened. A run still going is not (its dot comes when it ends). */
+export function isUnread(item) { return item.over && !item.run.seen_at; }
+export const unreadCount = () => runs.filter(isUnread).length;
 /** The failed runs nobody has opened: the Inbox's Needs you rows. */
 export const failedUnread = () => runs.filter(i => i.failed && isUnread(i));
+/** A person opened the run: it is read at once on this screen and told to the server (which tells every other); if the server cannot be told the run is unread again. */
+const opened = new Map(); // key -> when, for runs opened here that a read answered before the server had been told: the read must not bring the dot back
 export function markSeen(item) {
-    const s = seenState();
-    if (s.ids.includes(item.key)) return;
-    s.ids.push(item.key); saveSeen(s); fire();
+    if (item.run.seen_at) return Promise.resolve();
+    const at = new Date().toISOString(); opened.set(item.key, at);
+    for (const i of [item, ...runs.filter(r => r.key === item.key)]) i.run.seen_at = at; // the row that was clicked may hold an item from before the last read: the list's own is read too
+    fire();
+    const path = item.kind === 'workflow' ? `/api/workflows/runs/${item.runId}/seen` : `/api/scheduled/runs/${item.runId}/seen`;
+    return fetch(path, { method: 'POST' }).then(r => { if (!r.ok) throw new Error(String(r.status)); }).catch(() => { opened.delete(item.key); for (const i of [item, ...runs.filter(r => r.key === item.key)]) delete i.run.seen_at; fire(); });
 }
 /** Where a run opens (the route handler's shape): a job's run on its job's page, a workflow's run on its run page. */
 export const runRoute = item => (item.kind === 'workflow' ? { view: 'automations', folder: 'workflows', id: item.parentId, run: item.runId } : { view: 'automations', folder: 'jobs', id: item.parentId });
@@ -100,6 +98,7 @@ export function refreshRuns(force = false) {
         if (jobRuns === null && wfRuns === null) return; // neither answered: keep what is drawn
         const old = key => runs.filter(i => i.kind === key).map(i => i.run); // one list that answered and one that did not: the other's runs stay as they were
         runs = mergeRuns(jobRuns ?? old('job'), wfRuns ?? old('workflow'));
+        for (const i of runs) if (opened.has(i.key)) { if (i.run.seen_at) opened.delete(i.key); else i.run.seen_at = opened.get(i.key); }
         fire();
     }).finally(() => { pending = null; });
     return pending;

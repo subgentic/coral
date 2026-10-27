@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite"
@@ -172,6 +173,16 @@ func (d *DB) ensureSchema(ctx context.Context) error {
 	for _, m := range columnMigrations {
 		sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", m.table, m.column, m.definition)
 		d.ExecContext(ctx, sql) // Ignore error — column may already exist
+	}
+
+	// When a person opened a run (#9315): the column is added here, not in columnMigrations, because the runs that are over when it is added are all given the time: nobody is told about a history
+	// they never saw (a run finished after this is unread until it is opened). ALTER succeeds only when the column is new, so the backfill runs once.
+	for _, table := range []string{"scheduled_runs", "workflow_runs"} {
+		if _, err := d.ExecContext(ctx, "ALTER TABLE "+table+" ADD COLUMN seen_at TEXT"); err == nil {
+			if _, err := d.ExecContext(ctx, "UPDATE "+table+" SET seen_at = ? WHERE status NOT IN ('running', 'pending')", time.Now().UTC().Format(ISOFormat)); err != nil {
+				slog.Warn("could not mark the runs that were already over as opened; they show as unread", "table", table, "error", err)
+			}
+		}
 	}
 
 	// A board bookmark belongs to its board's team (#4792); an agent's takes the team it was saved with.
