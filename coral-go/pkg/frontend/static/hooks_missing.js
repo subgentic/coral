@@ -8,7 +8,7 @@ import { redrawLiveList } from './list_hooks.js';
 export function hooksMissingChip(s) {
     if (!s || !state.hooksMissing || !state.hooksMissing.has(s.session_id)) return '';
     const why = "Coral can't reach this agent's hooks, so it can't confirm messages you send it. Reopen Coral or restart the agent.";
-    return `<span class="hooks-missing-chip" role="img" aria-label="${escapeAttr("Hooks can't run. " + why)}" title="${escapeAttr(why)}">Hooks can't run</span>`;
+    return `<span class="chip hooks-missing-chip" role="img" aria-label="${escapeAttr("Hooks can't run. " + why)}" title="${escapeAttr(why)}">Hooks can't run</span>`;
 }
 
 /** The server's list of agents without hooks: the rows are drawn again only when the set changes. */

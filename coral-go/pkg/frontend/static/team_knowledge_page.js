@@ -54,7 +54,7 @@ function factsBlock(f) {
     if (f.type) row('Type', el('dd', null, f.type));
     if (f.title) row('Title', el('dd', null, f.title));
     if (f.description) row('About', el('dd', null, f.description));
-    if (f.tags.length) { const dd = el('dd'), box = el('span', 'knowledge-tags'); for (const t of f.tags) box.append(el('span', 'knowledge-tag', t)); dd.append(box); row('Tags', dd); }
+    if (f.tags.length) { const dd = el('dd'), box = el('span', 'knowledge-tags'); for (const t of f.tags) box.append(el('span', 'chip chip-tag knowledge-tag', t)); dd.append(box); row('Tags', dd); }
     return dl.children.length ? dl : null;
 }
 

@@ -153,7 +153,7 @@ function pageHtml(s) {
            <button type="button" class="btn btn-danger servers-remove" data-action="delete" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Remove</button>`;
     return `<section class="servers-page" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}" aria-labelledby="servers-page-name">
         <button type="button" class="group-back" id="servers-back" data-action="back">&larr; Servers</button>
-        <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="servers-tag" title="Private network addresses are allowed for this server">private network</span>' : ''}</h3>
+        <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="chip chip-tag servers-tag" title="Private network addresses are allowed for this server">private network</span>' : ''}</h3>
         <p class="item-meta">${statusPill(status)}</p>
         <dl class="servers-facts">
             ${factHtml('URL', escHtml(s.url || ''))}

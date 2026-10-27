@@ -138,7 +138,7 @@
 /* Sleeping agent in sidebar — grey out text but keep controls visible */
 .session-group-item.sleeping .session-label,
 .session-group-item.sleeping .session-goal,
-.session-group-item.sleeping .badge {
+.session-group-item.sleeping .chip {
     color: var(--text-muted);
 }
 
@@ -272,9 +272,6 @@
 
 /* Cross-team message: "from <board>" (inbound) or "to <board>" (mirror). */
 .mb-external-badge {
-    font-size: var(--fs-sm, 11px);
-    padding: 0 6px;
-    border-radius: var(--radius-md, 6px);
     border: 1px solid var(--border);
     color: var(--text-secondary);
     background: var(--bg-secondary);
@@ -627,21 +624,32 @@
 
 /* ── Badges ────────────────────────────────────────────────── */
 
-.badge {
-    font-size: var(--fs-sm);
-    padding: 2px 8px;
+/* The chip family (#9095, Goal #84): every small label is a .chip. Three variants: the status chip (11/600: a word, with a dot or an icon), .chip-tag (12/400) and .chip-count (11/600,
+ * a number); one height, one radius. A class of its own may set a colour, a border or a margin, never a size, weight, padding or radius: chip_census.test.mjs. */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-sizing: border-box;
+    height: var(--chip-height, 1.125rem);
+    padding: 0 8px;
     border-radius: var(--radius-xl);
+    font-size: var(--fs-sm);
     font-weight: 600;
-    text-transform: uppercase;
+    line-height: 1.2;
+    white-space: nowrap;
 }
+.chip-tag { font-size: var(--fs-base); font-weight: 400; }
+.chip-count { min-width: var(--chip-height, 1.125rem); justify-content: center; padding: 0 6px; }
+.chip-caps { text-transform: uppercase; }
 
-.badge.claude { background: var(--badge-claude); color: var(--text-on-accent); }
-.badge.agy, .badge.antigravity { background: var(--badge-agy); color: var(--text-on-accent); }
-.badge.gemini { background: var(--badge-gemini); color: var(--text-on-accent); }
-.badge.codex { background: var(--badge-codex); color: var(--text-on-accent); }
-.badge.board-badge { background: var(--success); color: var(--text-on-accent); }
+.chip.claude { background: var(--badge-claude); color: var(--text-on-accent); }
+.chip.agy, .chip.antigravity { background: var(--badge-agy); color: var(--text-on-accent); }
+.chip.gemini { background: var(--badge-gemini); color: var(--text-on-accent); }
+.chip.codex { background: var(--badge-codex); color: var(--text-on-accent); }
+.chip.board-badge { background: var(--success); color: var(--text-on-accent); }
 
-.badge.waiting-badge {
+.chip.waiting-badge {
     background: var(--warning);
     color: #000;
     font-size: var(--fs-xs);
@@ -1643,13 +1651,6 @@
 }
 
 .tag-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 10px;
-    border-radius: var(--radius-xl);
-    font-size: var(--fs-sm);
-    font-weight: 600;
     color: var(--text-on-accent);
     white-space: nowrap;
 }
@@ -2055,7 +2056,7 @@
 .wt-meta, .wt-path { font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
 .wt-path { font-family: var(--font-mono); }
 .wt-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-.wt-badge { font-size: var(--fs-sm); color: var(--text-primary); border: 1px solid var(--warning); border-radius: 999px; padding: 0 8px; line-height: 1.6; }
+.wt-badge { color: var(--text-primary); border: 1px solid var(--warning); }
 .wt-remove { justify-self: start; margin: 4px 0 0; padding: 4px 10px; font-size: var(--fs-sm); } /* the phone's .btn margin (8px 20px) and padding made it 87 px tall at 200% text (#6943) */
 @media (pointer: coarse) { .wt-remove { min-height: 44px; min-width: 44px; } }
 #settings-debug-input-log-status:empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */ /* in the page with nothing to say: no room, still a live region */
@@ -3224,13 +3225,13 @@
 /* ── Servers settings dialog (multi-server hub) ───────────────────── */
 
 .servers-empty { color: var(--text-secondary); font-size: var(--fs-base); margin: 0 0 var(--space-lg); }
-.servers-id, .servers-tag {
+.servers-id {
     font-family: var(--font-mono);
     font-size: var(--fs-sm);
     font-weight: 500;
     color: var(--text-secondary);
 }
-.servers-tag { padding: 0 var(--space-sm); border: 1px solid var(--warning); border-radius: var(--radius-md); font-family: var(--font-sans); }
+.servers-tag { border: 1px solid var(--warning); font-family: var(--font-sans); }
 .servers-row-error { margin-top: var(--space-xs); font-size: var(--fs-base); color: var(--error); overflow-wrap: anywhere; }
 .servers-row-warn { display: flex; align-items: flex-start; gap: var(--space-sm); margin-top: var(--space-xs); font-size: var(--fs-base); font-weight: 400; color: var(--text-primary); overflow-wrap: anywhere; min-width: 0; } /* #4301: icon and words, not only a colour */
 .servers-row-warn .material-icons { flex: none; font-size: 1.15em; color: var(--warning); }
@@ -3281,16 +3282,9 @@ label:has(+ .field-error) { margin-bottom: 0; } /* the line sits after the label
 
 /* Auto-accept (#3182): the AUTO chip (agent row and header), the menu switch's state and the warning dialog. */
 .auto-accept-chip {
-    display: inline-flex;
-    align-items: center;
     flex-shrink: 0;
     margin-left: 4px;
-    padding: 0 5px;
-    border-radius: var(--radius-sm);
-    font-size: var(--fs-xs);
-    font-weight: 700;
     letter-spacing: 0.04em;
-    line-height: 16px;
     color: var(--warning);
     background: rgba(var(--warning-rgb), 0.14);
     border: 1px solid rgba(var(--warning-rgb), 0.45);
@@ -3929,7 +3923,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .cm-id { font-family: var(--font-mono); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .cm-name { color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .cm-levels { display: inline-flex; flex-wrap: wrap; gap: var(--space-xs, 2px) var(--space-sm, 4px); }
-.cm-chip { font-size: var(--fs-sm); padding: 1px var(--space-sm, 4px); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); }
+.cm-chip { border: 1px solid var(--border); color: var(--text-secondary); }
 .cm-form { display: flex; flex-direction: column; gap: var(--space-md, 8px); width: 100%; min-width: 0; }
 .cm-add { align-self: flex-start; }
 .settings-custom-models .btn { margin: 0; }
@@ -4013,7 +4007,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .telemetry-install-id .btn { flex: none; }
 
 /* An agent whose hook programs are gone (#6089): a quiet chip on its row, the fix in its tooltip. */
-.hooks-missing-chip { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: var(--radius-lg); font-size: var(--fs-xs, 0.6875rem); line-height: 16px; color: var(--text-primary); background: color-mix(in srgb, var(--warning) 22%, var(--bg-secondary)); border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--border)); white-space: nowrap; }
+.hooks-missing-chip { margin-left: 6px; color: var(--text-primary); background: color-mix(in srgb, var(--warning) 22%, var(--bg-secondary)); border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--border)); white-space: nowrap; }
 
 /* The agent choice in New Agent's first step (#6199): the label, then a radio group of chips under the folder; 44 px on a phone. */
 .launch-agent-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 4px; }
@@ -4053,7 +4047,7 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 
 /* Settings panes with several parts (#7040): a small heading over each group of rows (Agents: Defaults, Behaviour, Team and board, Tools) */
 /* The Inbox (#7122): a High chip on an urgent task, and the top bar's Saved count left out where the Inbox shows its own counts. */
-.ibx-chip-high { display: inline-block; margin-right: 8px; padding: 0 8px; border: 1px solid var(--warning); border-radius: 999px; color: var(--warning); font-size: var(--fs-sm, 0.6875rem); font-weight: 600; vertical-align: middle; }
+.ibx-chip-high { margin-right: 8px; border: 1px solid var(--warning); color: var(--warning); vertical-align: middle; }
 body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 
 /* New Agent's second step (#7066, UI/UX's #7059): Name is one field above "More options" (the Persona and the sections); a wide window shows the sections open and without the summary, as it always did, a phone has them
@@ -4249,7 +4243,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agent-open:hover { background: var(--bg-hover); }
 .team-agent-open:focus-visible, .team-agent-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .team-agent-role-name { font-size: var(--fs-md); font-weight: 500; color: var(--text-primary); overflow-wrap: anywhere; }
-.team-agent-badge { margin-left: 8px; padding: 1px 8px; border: 1px solid var(--accent); border-radius: var(--radius-lg); color: var(--link-text); font-size: var(--fs-sm); white-space: nowrap; }
+.team-agent-badge { margin-left: 8px; border: 1px solid var(--accent); color: var(--link-text); white-space: nowrap; }
 .team-agent-badge[hidden] { display: none; }
 .team-agent-summary { color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .team-agent-summary b { color: var(--text-primary); font-weight: 600; }

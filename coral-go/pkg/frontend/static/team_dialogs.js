@@ -471,7 +471,7 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
     // A member is one quiet row, read-only: its role and one summary line. The row opens the Edit member dialog; its actions are behind the button at its end. The form that holds the member's values is kept (hidden) in the row.
     row.innerHTML = `
         <button type="button" class="team-agent-open" data-on-click="team-agent-edit">
-            <span class="team-agent-main"><span class="team-agent-role-name">${escapeHtml(defaultName || 'New member')}</span><span class="team-agent-badge" hidden>Gets the first task</span></span>
+            <span class="team-agent-main"><span class="team-agent-role-name">${escapeHtml(defaultName || 'New member')}</span><span class="chip team-agent-badge" hidden>Gets the first task</span></span>
             <span class="team-agent-summary"></span>
             <svg class="team-agent-chev" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
         </button>

@@ -42,7 +42,7 @@
 .ac-headrow { display: flex; align-items: flex-start; gap: 8px; }
 .ac-headrow .ac-meta { flex: 1 1 auto; min-width: 0; }
 .ac-author { color: var(--text-primary); font-weight: 600; }
-.ac-pill { border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.ac-pill { border: 1px solid var(--border); color: var(--text-secondary); }
 .ac-kind { font-size: var(--fs-sm); color: var(--text-muted); } /* who they are, in words after the name: a quiet label, not a chip */
 .ac-pill-resolved { color: var(--success); border-color: color-mix(in srgb, var(--success) 50%, var(--border)); }
 .ac-pill-orphan { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 50%, var(--border)); }

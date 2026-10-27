@@ -25,7 +25,7 @@ function providerBadge(src) {
     const t = String(src || '').toLowerCase();
     if (!t || t === 'claude') return '';
     const word = t === 'gemini' || t === 'antigravity' ? 'agy' : t;
-    return `<span class="badge agy">${escapeHtml(word)}</span>`;
+    return `<span class="chip chip-caps agy">${escapeHtml(word)}</span>`;
 }
 /** How long a chat went on, in words that cannot be taken for an age: "ran 21 min", "ran 2 h 5 min". */
 function ranFor(sec) {
@@ -56,7 +56,7 @@ function chatRowHtml(s) {
         // laid out as a chat row (#6961): the title and its Group badge, then one line of facts: how many messages and members, and when
         const gfacts = [countInfo, subsInfo, gWhenTag].filter(Boolean).join('<span class="chat-sep" aria-hidden="true"> · </span>');
         return `<li class="${escapeAttr(isActive ? 'active' : '')}" data-on-click="board-open" data-board="${escapeAttr(identityKey(historyServer(), projectName))}"><button type="button" class="row-btn"${isActive ? ' aria-current="true"' : ''}>
-            <div class="session-row-mid chat-row-title"><span class="session-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span><span class="badge board-badge">Group</span></div>
+            <div class="session-row-mid chat-row-title"><span class="session-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span><span class="chip chip-caps board-badge">Group</span></div>
             ${gfacts ? `<div class="session-row-bottom chat-row-facts">${gfacts}</div>` : ""}
         </button></li>`;
     }

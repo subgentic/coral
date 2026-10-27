@@ -270,7 +270,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const stateInfo = sessionStateInfo(s);
     const pillKind = stateInfo.attention ? 'waiting-badge session-state-pill session-attention-pill' : 'session-state-pill';
     const waitingBadge = stateInfo.pill
-        ? ` <span class="badge ${pillKind}${stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''}">${stateInfo.pill}</span>`
+        ? ` <span class="chip chip-caps ${pillKind}${stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''}">${stateInfo.pill}</span>`
         : '';
     // Context is secondary: any state pill owns line 1 and the ctx pill
     // collapses to the dot's ring, which survives on every glyph.
@@ -634,5 +634,5 @@ function _renderCtxPill(s) {
     const title = win > 0
         ? `Context: ${formatTokens(Math.round(win * pct / 100))} / ${formatTokens(win)} tokens (${pct}%)`
         : `Context: ${pct}%`;
-    return ` <span class="badge session-ctx-pill${pct >= 100 ? ' ctx-full' : ''}" title="${escapeAttr(title)}">${label}</span>`;
+    return ` <span class="chip chip-caps session-ctx-pill${pct >= 100 ? ' ctx-full' : ''}" title="${escapeAttr(title)}">${label}</span>`;
 }
