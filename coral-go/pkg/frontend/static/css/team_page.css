@@ -301,6 +301,10 @@
 .inbox-page.inbox-item-page { padding: 0; min-height: 0; height: 100%; }
 .inbox-item-page > .inbox-item-body { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .inbox-item-body > .team-task-page { flex: 1; overflow-y: auto; }
+.inbox-item-body > .goal-back-row, .inbox-item-body > .goals-note { margin-inline: 24px; } /* loading and a failed read: the way back, the sentence and the retry sit where the item page's own padding puts them (#8861 round 4) */
+.inbox-item-body > .goal-back-row { margin-block: 16px 8px; }
+.inbox-item-body > .btn { align-self: flex-start; margin-inline: 24px; }
+@media (max-width: 767px) { .inbox-item-body > .goal-back-row, .inbox-item-body > .goals-note { margin-inline: 16px; } .inbox-item-body > .btn { margin-inline: 16px; } }
 .inbox-item-page > .view-list { display: none; }
 .inbox-board-head { padding: 16px 24px 12px; display: flex; flex-direction: column; gap: 12px; }
 .inbox-board-body { padding: 0 24px; }
