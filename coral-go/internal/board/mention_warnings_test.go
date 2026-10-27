@@ -94,3 +94,31 @@ func TestUnknownMentionsKnowsTheOtherBoards(t *testing.T) {
 	assert.Nil(t, s.UnknownMentions(ctx, "team", "@Orchestrator (team) hi"), "its own board's name is no other team")
 	assert.Nil(t, s.UnknownMentions(ctx, "team", "@Orchestrator hi"))
 }
+
+// A name with a letter whose lower-case is shorter in bytes (U+0130) is sliced by its own length, not the lower-cased copy's: no panic, and the name is cut whole (#9068).
+func TestMentionsWithALetterThatLowersToAShorterByteLengthDoNotPanic(t *testing.T) {
+	names := []string{"İstanbul Dev", "Orchestrator"}
+	boards := map[string]string{"coral-hub": "coral-hub"}
+	assert.NotPanics(t, func() {
+		got := crossTeamMentions("@İstanbul Dev (coral-hub) hi, @Orchestrator (coral-hub)", names, boards)
+		require.Len(t, got, 2)
+		assert.Contains(t, got[0], "'İstanbul Dev (coral-hub)'", "the name is shown as written")
+		assert.Nil(t, mentionWarnings("@İstanbul Dev, look at this", names), "a member with that letter is known")
+		assert.Nil(t, mentionWarnings("İİİİİİ @istanbul dev and @Orchestrator", names))
+		assert.Len(t, mentionWarnings("@İİİİ @Orchestrator", names), 1, "an unknown name made of such letters is named whole")
+	})
+	assert.Equal(t, 2, knownLenIn("İ ok", map[string]bool{"i": true}), "the length is of the original text")
+}
+
+func TestOtherBoardNamesIsOneQueryOfIdsAndLabels(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for _, id := range []string{"team", "coral-hub", "other"} {
+		_, err := s.Subscribe(ctx, id, "Member", "Dev", "claude-"+id, nil, "all")
+		require.NoError(t, err)
+	}
+	got := s.otherBoardNames(ctx, "team")
+	assert.Equal(t, "coral-hub", got["coral-hub"])
+	assert.Equal(t, "other", got["other"])
+	assert.NotContains(t, got, "team", "the board itself is no other team")
+}
