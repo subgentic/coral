@@ -20,7 +20,7 @@ const NOT_CHIPS = {
     'goals-chips': 'the row of filter toggles', 'group-chip': 'a button', 'group-chip-count': 'the count inside the group button', 'keys-chip': 'a key button',
     'list-bar-chip': 'a removable filter: a button', 'live-pills': 'a container', 'live-pills-stack': 'a container', 'mb-new-pill-btn': 'a button', 'mb-row-tags-open': 'a container',
     'model-chip-add-err': 'a message in the model menu', 'model-chip-add-form': 'a form in the model menu', 'model-chip-add-row': 'a row in the model menu', 'model-chip-caret': 'an icon',
-    'model-chip-empty': 'a message in the model menu', 'options-chip': 'a toggle button', 'perm-chip': 'a toggle button', 'tag-dropdown': 'a dropdown', 'tag-dropdown-create': 'a dropdown row',
+    'options-chip': 'a toggle button', 'perm-chip': 'a toggle button', 'tag-dropdown': 'a dropdown', 'tag-dropdown-create': 'a dropdown row',
     'tag-dropdown-item': 'a dropdown row', 'terminal-gone-chip': 'a button that restarts the terminal',
     // a count dot over a corner of a tile or a tab (positioned, 14 to 16 px): moves to .chip-count with the tab and rail census
     'nav-tab-badge': 'a count dot over a tab corner', 'rail-tile-badge': 'a count dot over a tile corner (an icon too)',
