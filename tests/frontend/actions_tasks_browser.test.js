@@ -9,7 +9,8 @@
 //  - a bad id does nothing, and no inline handler is left in the list or the dialog.
 'use strict';
 
-const CDP = require('chrome-remote-interface');
+const { connect } = require('./agent_view_harness');
+const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const BASE = require('./test_base').BASE;
 
 const results = [];
@@ -17,7 +18,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 const BOARD = 'tasks-3645';
 
 (async () => {
-    const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
+    const { client, PRELOAD, install } = await connect();
     const { Page, Runtime } = client;
     const ev = async expression => {
         const r = await Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true });
@@ -27,10 +28,11 @@ const BOARD = 'tasks-3645';
     const { waitFor, coralReady } = require('./helpers/wait').bind(ev);
 const { removeBoards } = require('./helpers/board_cleanup');
 const { pinnedBarProbe } = require('./helpers/pinned_bar');
-    const until = (expr, what, ms = 8000) => waitFor(expr, what, { timeout: ms, soft: true });
+    const until = (expr, what, ms = 8000) => waitFor(expr, what, { timeout: ms });
     const MODS = `const tasks = await import((window.__coralStatic||'/static/')+'tasks.js'); const { state } = await import((window.__coralStatic||'/static/')+'state.js');`;
     try {
         await Page.enable();
+        await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => {
             window.__req = [];
             const inner = window.fetch;
@@ -43,7 +45,7 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         const loaded = Page.loadEventFired();
         await Page.navigate({ url: BASE + '/' });
         await loaded;
-        await coralReady();
+        await install(); await coralReady();
 
         // Real tasks: a dependency, an open task blocked by it, a draft, and one a subscriber claims.
         const made = await ev(`(async () => {
@@ -58,14 +60,12 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
             return { dep: dep.id, open: open.id, draft: draft.id, claimed: claimed.id };
         })()`);
         const task = id => ev(`fetch('/api/board/${BOARD}/tasks/${id}').then(r => r.json()).then(j => j.task || j)`);
-        // The team's board view, as board_task_paging sets it: the dialogs act on state.selectedTeam.
-        const load = () => ev(`(async () => { ${MODS} tasks.stopBoardTaskPoll(); state.currentSession = null; state.selectedTeam = ${JSON.stringify(BOARD)};
-            await tasks.loadBoardTasks(${JSON.stringify(BOARD)}); return true; })()`);
-        await load();
+        await openBoardTasksTab({ ev, waitFor }, BOARD, 'actions-worker');
         await until(`document.querySelectorAll('#board-task-list [data-on-click="task-open"]').length >= 3`, 'the task list');
         const row = id => `document.querySelector('#board-task-list [data-on-click="task-open"][data-task-id="${id}"]')`;
         const dlgOpen = () => ev(`(() => { const m = document.getElementById('task-detail-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`);
-        const BAR = "[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')]";
+        let root = '#preview-pane';
+        const BAR = () => `[...document.querySelectorAll('${root} .goals-pinbar .btn')]`;
 
         // ── The list ───────────────────────────────────────────────────────
         const sorted = await ev(`(async () => { ${MODS}
@@ -81,11 +81,11 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         check('the ID header sorts the list and again reverses it; an unknown sort does nothing', sorted.a !== sorted.b && sorted.a.split(',').reverse().join(',') === sorted.b && sorted.after === sorted.b, JSON.stringify(sorted));
 
         // ── The task page: open, edit ──────────────────────────────────────
-        const barBtn = t => `${BAR}.find(b => b.textContent === ${JSON.stringify(t)})`;
-        const onPage = (id) => until(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.startsWith('#${id} ') && ${BAR}.length > 0`, `the page of task ${id}`);
+        const barBtn = t => `${BAR()}.find(b => b.textContent === ${JSON.stringify(t)})`;
+        const onPage = (id) => until(`!!document.querySelector('${root} #team-task-title') && document.querySelector('${root} #team-task-title').textContent.startsWith('#${id} ') && ${BAR()}.length > 0`, `the page of task ${id}`);
         await ev(`${row(made.open)}.click(); true`);
         await onPage(made.open);
-        check('a row opens its task page, and no dialog', !(await dlgOpen()));
+        check('a dock row opens its task preview, and no dialog', !(await dlgOpen()));
         await ev(`${barBtn('Edit')}.click(); true`);
         await until(`!!document.getElementById('task-edit-title')`, 'the edit form');
         await ev(`${barBtn('Cancel')}.click(); true`);
@@ -97,19 +97,19 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         check('Save sends the task', (await ev(`window.__req`)).some(r => new RegExp(`^(PUT|PATCH) .*/tasks/${made.open}$`).test(r)), JSON.stringify(await ev(`window.__req`)));
 
         // A dependency link opens that task.
-        await until(`!!document.querySelector('#team-panel-item .task-dep-link[data-on-click="task-open"]')`, 'the dependency link');
-        await ev(`document.querySelector('#team-panel-item .task-dep-link[data-on-click="task-open"]').click(); true`);
+        await until(`!!document.querySelector('${root} .task-dep-link[data-on-click="task-open"]')`, 'the dependency link');
+        await ev(`document.querySelector('${root} .task-dep-link[data-on-click="task-open"]').click(); true`);
         check('a dependency link opens that task', await onPage(made.dep).then(() => true, () => false));
 
         // The pinned bar follows the one rule (#7684): right-aligned, the primary (Complete) last, Cancel task alone at the left edge and first.
-        const pbar = await ev(pinnedBarProbe('#team-panel-item .goals-pinbar'));
+        const pbar = await ev(pinnedBarProbe(`${root} .goals-pinbar`));
         check('the task page\'s bar: right-aligned, Complete last, Cancel task first at the left edge', pbar && pbar.rightAligned && pbar.primaryLast && pbar.dangerFirst && pbar.dangerAlone && pbar.names[0] === 'Cancel task' && pbar.names.at(-1) === 'Complete', JSON.stringify(pbar));
 
         // ── Cancel through its confirmation (on the dependency) ────────────
         await until(`!!${barBtn('Cancel task')}`, "the dependency's Cancel task");
         await ev(`${barBtn('Cancel task')}.click(); true`);
-        await until(`!!document.querySelector('#team-panel-item .task-confirm-buttons')`, 'the cancel confirmation');
-        const CONF = t => `[...document.querySelectorAll('#team-panel-item .task-confirm-buttons .btn')].find(b => b.textContent === ${JSON.stringify(t)})`;
+        await until(`!!document.querySelector('${root} .task-confirm-buttons')`, 'the cancel confirmation');
+        const CONF = t => `[...document.querySelectorAll('${root} .task-confirm-buttons .btn')].find(b => b.textContent === ${JSON.stringify(t)})`;
         check('Cancel task asks first ("Cancel task" / "Keep task"), and asking sends nothing', !(await ev(`window.__req`)).some(r => r.includes(`/tasks/${made.dep}/cancel`)) && await ev(`!!${CONF('Keep task')}`));
         await ev(`${CONF('Keep task')}.click(); true`);
         check('Keep task restores the bar', await until(`!!${barBtn('Cancel task')}`, 'the bar', 3000).then(() => ev(`!!${barBtn('Cancel task')}`)));
@@ -121,6 +121,9 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         // A cancelled task is stored as skipped.
         await until(`fetch('/api/board/${BOARD}/tasks/${made.dep}').then(r => r.json()).then(j => ['skipped', 'cancelled'].includes((j.task || j).status))`, 'cancelled', 5000);
         check('Cancel task in the question cancels it', ['skipped', 'cancelled'].includes((await task(made.dep)).status), JSON.stringify((await task(made.dep)).status));
+
+        await ev(`document.querySelector('#preview-pane .preview-tab.active .preview-tab-close').click(); true`);
+        root = '#team-panel-item';
 
         // ── Publish a draft ────────────────────────────────────────────────
         await ev(`window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'tasks', item: ${made.draft} }); true`);
@@ -149,7 +152,7 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         check('Complete opens its form, and Back returns', await until(`!!${barBtn('Complete')} && !document.getElementById('task-complete-message')`, 'the bar', 3000).then(() => ev(`!!${barBtn('Complete')}`)));
         await ev(`${barBtn('Complete')}.click(); true`);
         await until(`!!document.getElementById('task-complete-message') && !!${barBtn('Back')}`, 'the completion form again');
-        await ev(`${BAR}.filter(b => b.textContent === 'Complete').pop().click(); true`);
+        await ev(`${BAR()}.filter(b => b.textContent === 'Complete').pop().click(); true`);
         await until(`fetch('/api/board/${BOARD}/tasks/${made.claimed}').then(r => r.json()).then(j => (j.task || j).status === 'completed')`, 'completed', 5000);
         check('Complete completes it', (await task(made.claimed)).status === 'completed', JSON.stringify(await task(made.claimed)));
 
@@ -189,7 +192,7 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
 
         await ev(`window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'tasks', item: ${made.open} }); true`);
         await onPage(made.open);
-        const inline = await ev(`[...document.querySelectorAll('#board-task-list *, #team-panel-item *, #create-task-deps *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.tagName + '.' + el.className + ' ' + a.name))`);
+        const inline = await ev(`[...document.querySelectorAll('#board-task-list *, ${root} *, #create-task-deps *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.tagName + '.' + el.className + ' ' + a.name))`);
         check('no inline handler left in the task list, the task page or the dependency picker', inline.length === 0, JSON.stringify(inline.slice(0, 5)));
     } catch (e) {
         check('the test ran', false, e.stack || String(e));
