@@ -115,6 +115,18 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         await waitFor(`window.__flags.length === ${flagsBefore} + 1`, 'the star is written', 4000);
         assert.deepEqual(await ev(`window.__flags[window.__flags.length - 1][1]`), { starred: true }, 'the PATCH is the star');
         console.log('   ✓');
+        console.log('6. The read marker (#9687): a chat not opened since it changed is unread, opening one marks it read');
+        await ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: Date.now() - 90 * 86400000, items: {} })); true`); // the marker was first used long ago: every chat here changed since
+        for (const [w, mobile] of [[1280, false], [390, true]]) {
+            await open(w, 844, mobile);
+            const un = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; return { n: rows.length, unread: rows.filter(r => r.classList.contains('dt-unread') || !!r.querySelector('.dt-mail-new')).length, dot: rows.filter(r => !!r.querySelector('.dt-mail-new')).length, sr: rows[0].querySelector('.sr-only') ? rows[0].querySelector('.sr-only').textContent : '' }; })()`);
+            assert.ok(un.n >= 50 && un.unread === un.n, `${w}px: every chat changed since the marker began is unread ` + JSON.stringify(un));
+            if (mobile) assert.ok(un.dot === un.n && un.sr === 'Unread', '390px: the accent dot is named Unread ' + JSON.stringify(un));
+            await ev(`document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group) button.dt-primary').click(); true`);
+            await waitFor(`Object.keys(JSON.parse(localStorage.getItem('coral.inbox.read.v1')).items).some(k => /^chat:/.test(k))`, `${w}px: opening a chat stores it as read`, 5000);
+            await ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: Date.now() - 90 * 86400000, items: {} })); true`); // the next width starts as unread again
+        }
+        console.log('   ✓');
         console.log('PASS Mailbox chat folders: counts, the Gmail line, day dividers, reading on, flags, one filter per folder');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
