@@ -343,8 +343,8 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
     if (!msgsEl) return;
     const messages = _boardChatMessages;
     if (!messages.length && _boardChatOffset <= 0) {
-        if (_boardChatScope && _boardChatReader) msgsEl.innerHTML = `<div class="board-chat-empty">${escapeHtml(`Nothing for ${_boardChatReader.name} yet.`)}</div>`; // nothing for this agent yet
-        else msgsEl.innerHTML = `<div class="board-chat-empty">${escapeHtml(_emptyBoardLine())}</div>`;
+        if (_boardChatScope && _boardChatReader) msgsEl.innerHTML = `<div class="empty-state empty-state-tight">${escapeHtml(`Nothing for ${_boardChatReader.name} yet.`)}</div>`; // nothing for this agent yet
+        else msgsEl.innerHTML = `<div class="empty-state empty-state-tight">${escapeHtml(_emptyBoardLine())}</div>`;
         msgsEl.dataset.rendered = '1';
         _syncScopeNote();
         return;
@@ -671,7 +671,7 @@ async function _syncMentionNames(boardName) {
     if (_activeBoardChat !== boardName) return;
     const subs = Array.isArray(_boardSubscribers[boardName]) ? _boardSubscribers[boardName] : [];
     if (setBoardMentionNames(subs.flatMap(s => [s.job_title, s.subscriber_id]))) { highlightMentionsIn(document.getElementById('board-panel-msgs')); retagMentions(document.getElementById('board-panel-msgs')); } // in place: nothing is redrawn
-    const empty = document.querySelector('#board-panel-msgs > .board-chat-empty'); // an empty board names its lead once the members are known
+    const empty = document.querySelector('#board-panel-msgs > .empty-state.empty-state-tight'); // an empty board names its lead once the members are known
     if (empty && empty.textContent !== _emptyBoardLine()) empty.textContent = _emptyBoardLine();
 }
 export async function _boardMentionInput(event, boardName) {

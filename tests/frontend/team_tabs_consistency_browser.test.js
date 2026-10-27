@@ -19,7 +19,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
         const e = [...p.querySelectorAll('input.list-bar-search, .team-chips, .goals-chips-row, .team-agents-top')].find(x => window.__na.vis(x) && x.getBoundingClientRect().height > 0); if (!e) return null;
         const q = e.getBoundingClientRect(); return { left: Math.round(q.left - pr.left), under: Math.round(q.top - strip.bottom), what: e.className }; })()`);
     const chip = sel => ev(`(() => { const e = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) ${sel}')].find(x => (window.__na.vis(x) || x.closest('.team-tb-pills')) && x.getAttribute('aria-pressed') === 'true'); /* the pills are the compact select on a phone (#7717): their own style is still read */ if (!e) return null; const c = getComputedStyle(e); return { bg: c.backgroundColor, border: c.borderTopColor, color: c.color, weight: c.fontWeight }; })()`);
-    const empty = () => ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); const l = p.querySelector('.team-empty-line'); if (!l) return null; const c = getComputedStyle(l), h = p.querySelector('.team-empty-hint'); const boxed = [l, l.parentElement].some(e => getComputedStyle(e).borderTopStyle !== 'none');
+    const empty = () => ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); const l = p.querySelector('.empty-state-line'); if (!l) return null; const c = getComputedStyle(l), h = p.querySelector('.empty-state-hint'); const boxed = [l, l.parentElement].some(e => getComputedStyle(e).borderTopStyle !== 'none');
         return { text: l.textContent.trim(), size: c.fontSize, weight: c.fontWeight, boxed, hint: h && [h.textContent.trim(), getComputedStyle(h).fontSize, getComputedStyle(h).fontWeight] }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -46,9 +46,9 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
                 assert.deepEqual(seen.Agents, seen.Goals, `Agents' chosen chip is Goals': ${JSON.stringify(seen)}`); assert.deepEqual(seen.Tasks, seen.Goals, 'and Tasks\'');
             });
             await S.run(`${label}: item 5, Artifacts and Knowledge draw the one empty line (14/400, an optional 12/400 hint, no box)`, async () => {
-                await goTab(ev, settle, 'Artifacts'); await waitFor(`!!document.querySelector('[role=tabpanel]:not([hidden]) .team-empty-line')`, 'the Artifacts empty line', 8000);
+                await goTab(ev, settle, 'Artifacts'); await waitFor(`!!document.querySelector('[role=tabpanel]:not([hidden]) .empty-state-line')`, 'the Artifacts empty line', 8000);
                 const art = await empty(); assert.deepEqual([art.text, art.size, art.weight, art.boxed], ['No artifacts yet.', '14px', '400', false], 'Artifacts: ' + JSON.stringify(art)); await shot(`${label}-artifacts-empty`);
-                await goTab(ev, settle, 'Knowledge'); await waitFor(`!!document.querySelector('[role=tabpanel]:not([hidden]) .team-empty-line')`, 'the Knowledge empty line', 8000);
+                await goTab(ev, settle, 'Knowledge'); await waitFor(`!!document.querySelector('[role=tabpanel]:not([hidden]) .empty-state-line')`, 'the Knowledge empty line', 8000);
                 const kn = await empty(); assert.deepEqual([kn.text, kn.size, kn.weight, kn.boxed], ['No knowledge yet.', '14px', '400', false], 'Knowledge: ' + JSON.stringify(kn));
                 assert.deepEqual(kn.hint && kn.hint.slice(1), ['12px', '400'], 'its hint is 12/400: ' + JSON.stringify(kn.hint)); await shot(`${label}-knowledge-empty`);
             });
@@ -57,7 +57,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
                     await goTab(ev, settle, tab); await settle(400);
                     const clicked = await ev(`(() => { const c = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) .goals-chip')].find(x => /\\b0$/.test(x.textContent.trim())); if (!c) return false; c.click(); return true; })()`); // (a phone shows the compact select: the pill is pressed through the DOM)
                     assert.ok(clicked, `${tab} has a filter with nothing in it`); await settle(400);
-                    const e = await ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden]) .goals-empty'); if (!p) return null; const c = getComputedStyle(p); return { size: c.fontSize, weight: c.fontWeight, boxed: c.borderTopStyle !== 'none', color: c.color, primary: (() => { const t = document.createElement('i'); t.style.color = 'var(--text-primary)'; document.body.append(t); const v = getComputedStyle(t).color; t.remove(); return v; })() }; })()`);
+                    const e = await ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden]) .empty-state'); if (!p) return null; const c = getComputedStyle(p); return { size: c.fontSize, weight: c.fontWeight, boxed: c.borderTopStyle !== 'none', color: c.color, primary: (() => { const t = document.createElement('i'); t.style.color = 'var(--text-primary)'; document.body.append(t); const v = getComputedStyle(t).color; t.remove(); return v; })() }; })()`);
                     assert.ok(e, `${tab}: its empty line is there`); assert.deepEqual([e.size, e.weight, e.boxed, e.color], ['14px', '400', false, e.primary], `${tab}: ` + JSON.stringify(e));
                     if (tab === 'Tasks') await shot(`${label}-tasks-empty`);
                     await ev(`(() => { const c = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) .goals-chip')].find(x => /^All\\b/.test(x.textContent.trim())); if (c) c.click(); return true; })()`);

@@ -31,8 +31,6 @@
 
 
 .goals-failed { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border: 1px dashed var(--border-light); border-radius: var(--radius-lg); color: var(--text-secondary); }
-.goals-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; padding: 0; color: var(--text-primary); font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; } /* the one empty line (14/400, no box; UI/UX 170 consistency pass 2): Goals, Tasks, Agents, as Artifacts and Knowledge */
-.goals-empty p { margin: 0; }
 .goals-failed { flex-direction: row; flex-wrap: wrap; align-items: center; border-style: solid; border-color: var(--error); }
 
 .goals-dialog { margin: auto; /* the base reset gives every dialog margin 0, which pinned it to the corner */ border: 1px solid var(--border-light); border-radius: var(--dlg-radius); background: var(--bg-secondary); color: var(--text-primary); padding: 16px; width: min(var(--dlg-w-confirm), calc(100vw - 32px)); }
@@ -49,7 +47,7 @@
     .goals-page { padding: 10px 12px; }
     .goals-detail-col { border: none; padding: 0; background: none; }
     .goals-back { display: inline-flex; align-items: center; min-width: 44px; }
-    .goals-chip, .goals-dialog .btn, .goals-new, .goals-failed .btn, .goals-empty .btn { min-height: var(--control-touch-height, 44px); }
+    .goals-chip, .goals-dialog .btn, .goals-new, .goals-failed .btn, .empty-state .btn { min-height: var(--control-touch-height, 44px); }
     .goals-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border-radius: 0; margin: 0; }
     .goals-field input, .goals-field select { min-height: var(--control-touch-height, 44px); }
     .goals-page.goals-open .goals-require { display: none; } /* an open goal is a screen of its own, the back row first (UI/UX #7113) */

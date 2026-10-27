@@ -70,10 +70,10 @@ export async function showTemplateBrowser(type, onSelect) {
                     <div class="template-browser-loading">Loading...</div>
                 </div>
                 <div class="template-browser-list">
-                    <div class="template-browser-empty">Select a category</div>
+                    <div class="empty-state empty-state-tight">Select a category</div>
                 </div>
                 <div class="template-browser-preview">
-                    <div class="template-browser-empty">Select a template to preview</div>
+                    <div class="empty-state empty-state-tight">Select a template to preview</div>
                 </div>
             </div>
         </div>
@@ -90,7 +90,7 @@ export async function showTemplateBrowser(type, onSelect) {
     const rawData = await fetchCategories(type);
     const categories = categoriesOf(rawData);
     if (!categories.length) {
-        catPanel.innerHTML = '<div class="template-browser-empty">No categories found</div>';
+        catPanel.innerHTML = '<div class="empty-state empty-state-tight">No categories found</div>';
         return;
     }
 
@@ -104,7 +104,7 @@ export async function showTemplateBrowser(type, onSelect) {
             const display = displayName(name);
             const active = activeCategory === name ? ' active' : '';
             return `<button class="template-cat-btn${active}" data-cat="${escapeAttr(name)}">${escapeHtml(display)}</button>`;
-        }).join('') || '<div class="template-browser-empty">No matches</div>';
+        }).join('') || '<div class="empty-state empty-state-tight">No matches</div>';
 
         catPanel.querySelectorAll('.template-cat-btn').forEach(btn => {
             btn.addEventListener('click', () => selectCategory(btn.dataset.cat));
@@ -115,7 +115,7 @@ export async function showTemplateBrowser(type, onSelect) {
         activeCategory = catName;
         renderCategories(searchInput.value);
         listPanel.innerHTML = '<div class="template-browser-loading">Loading...</div>';
-        previewPanel.innerHTML = '<div class="template-browser-empty">Select a template to preview</div>';
+        previewPanel.innerHTML = '<div class="empty-state empty-state-tight">Select a template to preview</div>';
 
         const rawTemplates = await fetchTemplatesInCategory(type, catName);
         const templates = templatesOf(rawTemplates);
@@ -125,7 +125,7 @@ export async function showTemplateBrowser(type, onSelect) {
     function renderTemplateList(templates, filter) {
         const filtered = filterTemplates(templates, filter);
         if (!filtered.length) {
-            listPanel.innerHTML = '<div class="template-browser-empty">No templates found</div>';
+            listPanel.innerHTML = '<div class="empty-state empty-state-tight">No templates found</div>';
             return;
         }
         listPanel.innerHTML = filtered.map(t => {
@@ -146,7 +146,7 @@ export async function showTemplateBrowser(type, onSelect) {
         previewPanel.innerHTML = '<div class="template-browser-loading">Loading...</div>';
         const template = await fetchTemplate(type, cat, name);
         if (!template) {
-            previewPanel.innerHTML = '<div class="template-browser-empty">Failed to load template</div>';
+            previewPanel.innerHTML = '<div class="empty-state empty-state-tight">Failed to load template</div>';
             return;
         }
 

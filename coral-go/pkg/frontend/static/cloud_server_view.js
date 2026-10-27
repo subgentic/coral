@@ -304,7 +304,7 @@ function render() {
     const shown = servers.filter(serverVisible).sort((a, b) => String(a.label || '').toLowerCase().localeCompare(String(b.label || '').toLowerCase()) || String(a.id).localeCompare(String(b.id)));
     const table = shown.length
         ? serversTable(shown)
-        : h('p', { className: 'servers-empty', text: loadError ? '' : serversFiltered() ? 'No computers match this search.' : 'No computers connected yet.' });
+        : h('p', { className: 'empty-state empty-state-tight', text: loadError ? '' : serversFiltered() ? 'No computers match this search.' : 'No computers connected yet.' });
     // replaceChildren() would render a null as the text "null": leave it out.
     const restoreFocus = rememberFocus(host); // a control the redraw replaced gets focus back (#4882)
     host.replaceChildren(...[

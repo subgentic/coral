@@ -95,8 +95,8 @@ async function run() {
         previousDay.setDate(previousDay.getDate() - 1);
         const today = day(now), yesterday = day(previousDay);
         await ev(`document.querySelector('#hev-to').value = ${JSON.stringify(yesterday)}; document.querySelector('#hev-to').dispatchEvent(new Event('change', { bubbles: true })); true`);
-        await settle(`document.querySelector('#history-events-list .event-empty')?.textContent === 'No events match'`, 'nothing until yesterday');
-        check('Until yesterday leaves nothing, and says so', (await count()) === '0 events' && (await ev(`document.querySelector('#history-events-list .event-empty').textContent`)) === 'No events match', await count());
+        await settle(`document.querySelector('#history-events-list .empty-state.empty-state-tight')?.textContent === 'No events match'`, 'nothing until yesterday');
+        check('Until yesterday leaves nothing, and says so', (await count()) === '0 events' && (await ev(`document.querySelector('#history-events-list .empty-state.empty-state-tight').textContent`)) === 'No events match', await count());
         await ev(`document.querySelector('#hev-to').value = ${JSON.stringify(today)}; document.querySelector('#hev-to').dispatchEvent(new Event('change', { bubbles: true })); true`);
         await settle(`document.querySelectorAll('#history-events-list .event-item').length === 10`, 'until today');
         check('Until today includes today (the last day picked is included)', (await count()) === '10 events', await count());
@@ -114,7 +114,7 @@ async function run() {
         await ev(`(() => { const real = window.fetch; window.__slow = real; window.fetch = async (u, o) => { if (/\\/events\\?/.test(String(u)) && /[?&]q=/.test(String(u))) await new Promise(r => setTimeout(r, 1300)); return real(u, o); }; return true; })()`); // sleep-ok: the answer must come later than the region's settle (500 ms)
         await ev(`window.__writes = 0; new MutationObserver(m => { window.__writes += m.length; }).observe(document.querySelector('#history-event-search-bar .list-bar-live'), { childList: true, characterData: true, subtree: true }); true`);
         await type('#hev-search', 'heads up');
-        await settle(`document.querySelector('#history-events-list .event-empty')?.textContent === 'Searching…'`, 'the search under way');
+        await settle(`document.querySelector('#history-events-list .empty-state.empty-state-tight')?.textContent === 'Searching…'`, 'the search under way');
         await ev(`new Promise(r => setTimeout(r, 800))`); // sleep-ok: longer than the region's settle, shorter than the answer: the region has been asked to speak with no count yet
         check('while the answer is awaited there is no count and the region is not written (not with an empty count)', (await count()) === '' && (await ev(`window.__writes`)) === 0, JSON.stringify([await count(), await ev(`window.__writes`)]));
         await settle(`document.querySelector('#history-event-search-bar .list-bar-live').textContent === '10 events'`, 'the region says the count once it is known');
@@ -131,7 +131,7 @@ async function run() {
         check('a chip names it, the filters icon counts it, and the page keeps it in its Set', (await ev(`[...document.querySelectorAll('#history-event-search-bar .list-bar-chip-text')].map(e => e.textContent).join()`)) === 'Hidden: Read' && (await ev(`document.querySelector('#history-event-search-bar .list-bar-toggle').getAttribute('aria-label')`)) === 'Filters and sort, 1 on' && (await ev(`[...window.__coral.historyFilterHidden].join()`)) === 'read');
         await type('#hev-search', 'read notes');
         await settle(`document.querySelector('#history-event-search-bar .list-bar-count').textContent === '30 events'`, 'the 30 reads');
-        check('a search with Read hidden: the server counts 30, the rows are filtered out, and it says so', (await ev(`document.querySelector('#history-events-list .event-empty')?.textContent`)) === 'All events filtered out', await count());
+        check('a search with Read hidden: the server counts 30, the rows are filtered out, and it says so', (await ev(`document.querySelector('#history-events-list .empty-state.empty-state-tight')?.textContent`)) === 'All events filtered out', await count());
         await ev(`window.__evReqs = 0; document.getElementById('hev-g-read').click(); true`);
         await settle(`document.querySelectorAll('#history-events-list .event-item').length === 30`, 'the reads back');
         check('ticking Read again shows the 30 matches, with no new request (the search is not run again)', (await rows()).every(s => s.startsWith('Read notes')) && (await count()) === '30 events' && (await ev(`window.__evReqs`)) === 0, String(await ev(`window.__evReqs`)));

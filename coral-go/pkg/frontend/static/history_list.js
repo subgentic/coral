@@ -200,7 +200,7 @@ export function renderHistorySessions(sessions, total, page, pageSize) {
 
     if (!sessions || !sessions.length) {
         drawn = [];
-        list.innerHTML = '<li class="empty-state">No history found</li>';
+        list.innerHTML = '<li class="empty-state empty-state-tight">No history found</li>';
         syncPaneGroupToggle('history');
         refreshGroupTable('history');
         renderPaginationControls(0, 1, 50);

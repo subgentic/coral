@@ -393,8 +393,8 @@ export function dataTable(cfg) {
 
     drawHead(); drawBody(); syncSelectMode(); applyWidths();
     if (!rows.length && cfg.empty) {
-        const e = el('div', 'dt-empty'); e.append(el('p', 'dt-empty-line', cfg.empty.line));
-        if (cfg.empty.hint) e.append(el('p', 'dt-empty-hint', cfg.empty.hint));
+        const e = el('div', 'empty-state'); e.append(el('p', 'empty-state-line', cfg.empty.line));
+        if (cfg.empty.hint) e.append(el('p', 'empty-state-hint', cfg.empty.hint));
         if (cfg.empty.action) e.append(button('btn', cfg.empty.action.label, cfg.empty.action.run));
         box.replaceChildren(e);
     } else if (cfg.footer && !(cfg.footer.auto && !cfg.footer.more)) { // footer.auto (#7937): a count line that says all rows are shown says nothing, so with nothing more to load the footer is not drawn

@@ -53,11 +53,11 @@ export function createEventSearch(cfg) {
 
     /** What the person sees in the events list while searching. */
     function resultsHtml() {
-        if (list.error) return `<div class="event-empty">${escapeHtml(list.error)}</div>`;
-        if (list.busy && !list.events.length) return '<div class="event-empty">Searching…</div>';
-        if (!list.events.length) return '<div class="event-empty">No events match</div>';
+        if (list.error) return `<div class="empty-state empty-state-tight">${escapeHtml(list.error)}</div>`;
+        if (list.busy && !list.events.length) return '<div class="empty-state empty-state-tight">Searching…</div>';
+        if (!list.events.length) return '<div class="empty-state empty-state-tight">No events match</div>';
         const visible = list.events.filter(e => eventVisible(e, cfg.hidden()));
-        if (!visible.length) return '<div class="event-empty">All events filtered out</div>';
+        if (!visible.length) return '<div class="empty-state empty-state-tight">All events filtered out</div>';
         const more = list.next ? `<button class="btn btn-small event-more" type="button" data-on-click="event-search-more" data-search="${escapeAttr(cfg.idp)}"${list.more ? ' disabled' : ''}>${list.more ? 'Loading…' : 'Load more'}</button>` : '';
         return visible.map(eventRowHtml).join('') + more;
     }

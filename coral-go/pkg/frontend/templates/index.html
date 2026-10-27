@@ -343,9 +343,9 @@
             <!-- Chats tab with no chat open (#3152): not the Agents home -->
             <div id="chats-empty-view" class="welcome" style="display:none">
                 <div id="mobile-history-list"></div>
-                <div class="empty-pane">
-                    <p class="empty-line">No chats yet.</p>
-                    <p class="empty-hint">A chat is listed here once an agent has talked.</p>
+                <div class="empty-state">
+                    <p class="empty-state-line">No chats yet.</p>
+                    <p class="empty-state-hint">A chat is listed here once an agent has talked.</p>
                 </div>
             </div>
 
@@ -361,7 +361,7 @@
                 <div class="sched-view-header" id="sched-view-header">
                     <h2>Automations</h2>
                 </div>
-                <div id="scheduler-detail"><div class="empty-pane sched-empty-hint"><p class="empty-line">Choose a job in the list.</p><p class="empty-hint">It shows what the job does and how its runs went.</p></div></div>
+                <div id="scheduler-detail"><div class="empty-state sched-empty-hint"><p class="empty-state-line">Choose a job in the list.</p><p class="empty-state-hint">It shows what the job does and how its runs went.</p></div></div>
             </div>
 
             {{ template "includes/views/message_board.html" . }}

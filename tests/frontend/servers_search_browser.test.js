@@ -38,7 +38,7 @@ const hubRows = n => remotes(n).map(s => ({ id: s.id, label: s.label, online: s.
     const view = (rowSel) => ev(`(() => { const bar = document.getElementById('servers-bar'); const rows = [...document.querySelectorAll(${JSON.stringify(rowSel)})].map(r => r.id);
         const list = document.querySelector('#servers-view .dt-table, #servers-view .cs-table'); const add = document.querySelector('#servers-view [data-action="add"]');
         return { shown: !!bar && !bar.hidden && bar.getClientRects().length > 0, hasBox: !!document.getElementById('sb-search'), count: (bar.querySelector('.list-bar-count') || {}).textContent || '', rows,
-            empty: (document.querySelector('#servers-view .servers-empty') || {}).textContent || null, above: !!(list && bar.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING), filtersBtn: !!bar.querySelector('.list-bar-filter-btn'), chips: bar.querySelectorAll('.list-bar-chip').length,
+            empty: (document.querySelector('#servers-view .empty-state.empty-state-tight') || {}).textContent || null, above: !!(list && bar.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING), filtersBtn: !!bar.querySelector('.list-bar-filter-btn'), chips: bar.querySelectorAll('.list-bar-chip').length,
             addVisible: !!add && add.getClientRects().length > 0, over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
             focus: document.activeElement && document.activeElement.id }; })()`);
 
@@ -87,7 +87,7 @@ const hubRows = n => remotes(n).map(s => ({ id: s.id, label: s.label, online: s.
         await typeInto('build');
         await settle(`!!document.getElementById('server-row-m7') && document.querySelectorAll('${ROWS}').length === 1`, 'the search by a word of the name');
         await typeInto('zzz-nothing');
-        await settle(`!!document.querySelector('#servers-view .servers-empty')`, 'the empty line');
+        await settle(`!!document.querySelector('#servers-view .empty-state.empty-state-tight')`, 'the empty line');
         v = await view(ROWS);
         check('nothing matching says so, the list is the local machine only, and Add server is still there', /No servers match this search/.test(v.empty || '') && v.rows.length === 0 && v.addVisible && v.count === '0 of 8 servers', JSON.stringify([v.empty, v.rows.length, v.addVisible, v.count]));
         await typeInto('machine-1');
@@ -153,7 +153,7 @@ const hubRows = n => remotes(n).map(s => ({ id: s.id, label: s.label, online: s.
         v = await view(CS);
         check('Coral Hub: a refresh keeps the search, the count and the focus in the box', v.rows.length === 1 && v.count === '1 of 9 machines' && v.focus === 'sb-search', JSON.stringify([v.rows, v.count, v.focus]));
         await typeInto('zzz-nothing');
-        await settle(`!!document.querySelector('#servers-view .servers-empty')`, 'the empty line');
+        await settle(`!!document.querySelector('#servers-view .empty-state.empty-state-tight')`, 'the empty line');
         v = await view(CS);
         check('Coral Hub: nothing matching says "No computers match this search."', /No computers match this search/.test(v.empty || ''), JSON.stringify(v.empty));
         await ev(`document.querySelector('#servers-bar .list-bar-clear-q').click(); true`);

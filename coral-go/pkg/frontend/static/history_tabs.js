@@ -52,13 +52,13 @@ function renderHistoryEventTimeline() {
     if (syncHistoryEventSearch(renderHistoryEventTimeline)) return;
 
     if (historyEvents.length === 0) {
-        container.innerHTML = '<div class="event-empty">No activity recorded</div>';
+        container.innerHTML = '<div class="empty-state empty-state-tight">No activity recorded</div>';
         return;
     }
 
     const visible = historyEvents.filter(isEventVisible);
     if (visible.length === 0) {
-        container.innerHTML = '<div class="event-empty">All events filtered out</div>';
+        container.innerHTML = '<div class="empty-state empty-state-tight">All events filtered out</div>';
         return;
     }
 
@@ -91,7 +91,7 @@ function renderHistoryTaskList() {
     if (!list) return;
 
     if (historyTasks.length === 0) {
-        list.innerHTML = '<div class="task-empty">No tasks recorded</div>';
+        list.innerHTML = '<div class="empty-state empty-state-tight">No tasks recorded</div>';
         return;
     }
 

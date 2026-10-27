@@ -467,7 +467,7 @@ export async function refreshChangedFiles() {
     if (_notGit) { // no comparison to choose and no count to give (#6072)
         if (titleEl) { titleEl.textContent = 'Not a git folder'; titleEl._html = ''; }
         if (countEl) countEl.textContent = '';
-        list.innerHTML = '<div class="file-empty">Changes show once the folder is a git repository.</div>';
+        list.innerHTML = '<div class="empty-state empty-state-tight">Changes show once the folder is a git repository.</div>';
         return;
     }
 
@@ -499,8 +499,8 @@ export async function refreshChangedFiles() {
     if (files.length === 0) {
         // The comparison choice is in the header above, with the count: not drawn a second time under "No changed files" (#5991).
         list.innerHTML = _filesRefused
-            ? '<div class="file-empty">Too many changed files to show through Coral Hub; open the agent on the computer.</div>'
-            : `<div class="file-empty">No changed files</div>`;
+            ? '<div class="empty-state empty-state-tight">Too many changed files to show through Coral Hub; open the agent on the computer.</div>'
+            : `<div class="empty-state empty-state-tight">No changed files</div>`;
         return;
     }
 

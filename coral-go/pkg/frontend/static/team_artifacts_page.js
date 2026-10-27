@@ -286,7 +286,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         for (const c of [...body.children]) if (c !== bar.node) c.remove();
         if (!external && bar.node.parentElement !== body) body.prepend(bar.node);
         const counting = !model.error && !model.loading && model.items.length > 0; // the count is not a line above the table: a screen reader hears it (sr-only), and "Showing 100 of 163" is under the table with Load more (#7729)
-        const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' team-empty-line' : ''}`, statusLine());
+        const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' empty-state-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {

@@ -95,7 +95,7 @@ function _syncTeamMembers() {
         if (down) down.disabled = i === rows.length - 1;
         if (rm) rm.hidden = orch; // and is not removed: renaming its role is the way out
     });
-    const empty = document.querySelector('#team-panel-members .team-agents-empty'); if (empty) empty.hidden = rows.length > 0;
+    const empty = document.querySelector('#team-panel-members .empty-state.empty-state-tight'); if (empty) empty.hidden = rows.length > 0;
     const count = document.getElementById('team-agents-count');
     if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it.` : '';
     const line = document.getElementById('team-orchestrator-line'); if (line) line.hidden = hasOrchestrator();

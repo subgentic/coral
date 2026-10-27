@@ -1967,9 +1967,6 @@
 
 .dir-browser-list li.empty-state {
     cursor: default;
-    color: var(--text-muted);
-    font-style: italic;
-    justify-content: center;
     padding: 16px 12px;
 }
 
@@ -2602,7 +2599,6 @@
     color: var(--text-on-accent);
 }
 
-.template-browser-empty,
 .template-browser-loading {
     padding: 20px;
     text-align: center;
@@ -3188,7 +3184,6 @@
 
 /* ── Servers settings dialog (multi-server hub) ───────────────────── */
 
-.servers-empty { color: var(--text-secondary); font-size: var(--fs-base); margin: 0 0 var(--space-lg); }
 .servers-id {
     font-family: var(--font-mono);
     font-size: var(--fs-sm);
@@ -3620,7 +3615,6 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 /* The task's conversation on its page (#7703, UI/UX's layout): a 14/600 heading with the count, entries oldest first with a hairline between, no bubbles, the box under it. */
 .ibx-thread { margin: 16px 0 12px; min-width: 0; }
 .ibx-thread-head { margin: 0 0 8px; font-size: var(--fs-lg); font-weight: 600; }
-.ibx-thread-none { margin: 0 0 8px; font-size: var(--fs-lg); font-weight: 400; color: var(--text-secondary); }
 .ibx-thread-list { list-style: none; margin: 0; padding: 0; }
 .ibx-thread-item { padding: 10px 0; border-top: 1px solid var(--border); min-width: 0; }
 .ibx-thread-who { margin: 0 0 4px; font-size: var(--fs-base); color: var(--text-secondary); }
@@ -3631,7 +3625,7 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 /* "Read the whole message" in a saved list: a quiet link, not a second row of bordered buttons above the card's real actions (Open, Done, Remove). */
 
 .ibx-task-facts { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
-.ibx-loading, .ibx-why, .ibx-note, .ibx-empty { margin: 4px 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
+.ibx-loading, .ibx-why, .ibx-note { margin: 4px 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
 .ibx-error { margin: 4px 0; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); }
 .ibx-reply { display: flex; flex-direction: column; gap: 6px; margin: 0; }
 .ibx-reply-label { font-weight: 600; font-size: var(--fs-sm, 0.8125rem); }
@@ -4219,8 +4213,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-menu-item:hover, .team-menu-item:focus-visible { background: var(--bg-hover); outline: none; }
 .team-menu-item[disabled] { color: var(--text-muted); cursor: default; }
 .team-menu-item[hidden] { display: none; }
-.team-agents-empty { margin: 8px 0; color: var(--text-secondary); font-size: var(--fs-sm); }
-.team-agents-empty[hidden] { display: none; }
 .team-orchestrator-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: var(--fs-sm); }
 .team-orchestrator-line p { margin: 0; }
 .team-orchestrator-line[hidden] { display: none; }

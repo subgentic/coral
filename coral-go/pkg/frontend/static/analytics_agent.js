@@ -60,7 +60,7 @@ async function loadBiggest() {
     } catch { if (my === st.seq) { st.biggest = null; st.error.biggest = true; } }
 }
 
-const msg = text => { const p = el('p', 'cost-empty', text); p.setAttribute('role', 'status'); return p; };
+const msg = text => { const p = el('p', 'empty-state', text); p.setAttribute('role', 'status'); return p; };
 const card = (title, hint) => { const c = el('section', 'viz-card viz-card-stack'); c.append(el('h4', 'viz-title', title)); if (hint) c.append(el('p', 'viz-hint', hint)); return c; };
 const tile = (label, value, sub) => { const t = el('div', 'viz-tile'); t.append(el('div', 'viz-tile-label', label), el('div', 'viz-tile-value', value)); if (sub) t.append(el('div', 'viz-tile-sub', sub)); return t; };
 

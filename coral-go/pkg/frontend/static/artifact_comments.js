@@ -180,7 +180,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             d.addEventListener('toggle', () => { st.groupOpen[g] = d.open; });
             li.append(d); wrap.append(li);
         }
-        if (!shownAll.length) wrap.append(el('p', 'ac-empty', 'No open comments. Select some text to add one.'));
+        if (!shownAll.length) wrap.append(el('p', 'empty-state empty-state-tight', 'No open comments. Select some text to add one.'));
         panel.append(wrap);
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (d.canComment && !d.locked) {

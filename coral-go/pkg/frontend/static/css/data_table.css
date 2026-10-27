@@ -140,9 +140,6 @@
 .dt-sortbar, .dt-select-toggle[hidden] { display: none; }
 .dt-box.dt-folded .dt-sortbar[hidden] { display: none; }
 .dt-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px var(--table-pad-x); border-top: 1px solid var(--table-outer); font-size: var(--table-tertiary-size); color: var(--table-tertiary-color); }
-.dt-empty { padding: 24px var(--table-pad-x); text-align: center; color: var(--table-secondary-color); }
-.dt-empty-line { margin: 0 0 8px; font-size: var(--table-secondary-size); }
-.dt-empty-hint { margin: 0 0 8px; font-size: var(--table-tertiary-size); color: var(--table-tertiary-color); }
 
 /* folded: the table's own box narrower than 40 rem (data_table.js sets the class dt-folded), a phone or 200% text. The header row is gone: the cells carry their labels, and a Sort by select takes its place. */
 .dt-box.dt-folded .dt-sortbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px var(--table-pad-x); border-bottom: 1px solid var(--table-outer); font-size: var(--table-secondary-size); color: var(--table-secondary-color); }

@@ -41,7 +41,7 @@ const STUB = `(() => { const real = window.fetch; const J = (b, s) => Promise.re
         const order = await ev(`(() => { const t = document.querySelector('#qa-thread-host .ibx-task-body').children; return [...t].map(e => e.className.split(' ')[0]); })()`);
         assert.ok(order.indexOf('ibx-panel') < order.indexOf('ibx-thread') && order.indexOf('ibx-thread') < order.indexOf('ibx-reply'), 'the text, then the thread, then the reply box: ' + order.join());
         assert.equal(await ev(`document.querySelector('#qa-thread-host .ibx-thread-head').textContent`), 'Messages');
-        assert.equal(await ev(`document.querySelector('#qa-thread-host .ibx-thread-none').textContent`), 'No messages about this task yet.');
+        assert.equal(await ev(`document.querySelector('#qa-thread-host .empty-state.empty-state-tight').textContent`), 'No messages about this task yet.');
         assert.equal(await ev(`(() => { const e = document.querySelector('#qa-thread-host .ibx-thread-head'), c = getComputedStyle(e); return c.fontSize + '/' + c.fontWeight; })()`), '14px/600', 'the heading is 14/600');
 
         console.log('the person replies: their message joins the thread at once, as You, without the creator\'s mention');

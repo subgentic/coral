@@ -1331,7 +1331,6 @@
     body #mobile-session-list .session-goal,
     body #mobile-session-list .session-status-chip,
     body #mobile-session-list .session-mobile-meta-pill,
-    body .servers-empty,
     body .machine-health-title, body .machine-health-status, body .machine-health-grid { font-size: var(--fs-md); }
     /* the goal's box was a fixed 14px, which cut a 13px line (that base rule is for 12px on a desktop row): on a phone it is as high as its lines, up to the two this list's clamp allows */
     body #mobile-session-list .session-goal { height: auto; }
@@ -1362,7 +1361,7 @@
 .mobile-history-back { display: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     #chats-empty-view { padding: 0; align-items: stretch; text-align: left; }
-    #chats-empty-view > .empty-pane { display: none; } /* the phone's list is the page */
+    #chats-empty-view > .empty-state { display: none; } /* the phone's list is the page */
     #mobile-history-list { display: block; width: 100%; margin: 0; min-height: 0; }
     #mobile-history-list .sidebar-section { padding: 16px 12px; }
     #mobile-history-list input,

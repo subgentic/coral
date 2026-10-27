@@ -31,7 +31,7 @@ async function run() {
     // the Open and Done totals are read from the pills of the page toolbar (#8602)
     const snap = () => ev(`(() => { const bar = document.getElementById('inbox-saved-bar'), t = document.getElementById('group-table-view'), rows = [...t.querySelectorAll('tbody tr')], n = c => c && c.textContent !== '0' ? '(' + c.textContent + ')' : '';
         return { shown: !!bar.firstChild, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent), titles: rows.map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 80)),
-            empty: (t.querySelector('.empty-line') || {}).textContent || null, note: (t.querySelector('.group-table-note') || {}).textContent || '', tabs: [...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].map(b => { const m = b.textContent.match(/\\d+/); return m && m[0] !== '0' ? '(' + m[0] + ')' : ''; }), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+            empty: (t.querySelector('.empty-state-line') || {}).textContent || null, note: (t.querySelector('.group-table-note') || {}).textContent || '', tabs: [...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].map(b => { const m = b.textContent.match(/\\d+/); return m && m[0] !== '0' ? '(' + m[0] + ')' : ''; }), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
     const chip = async i => { await settle(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip').length > ${i}`, `pill ${i}`); return ev(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')[${i}].click(); true`); }; // Open (0) and Done (1): the pills of the page toolbar (#8602)
     const setQuery = text => ev(`(() => { const e = document.getElementById('inbox-search'); e.value = ${JSON.stringify(text)}; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
     let phone = false; // a phone's table fills the screen and its search box is on the list screen behind it, so the text is set in the box without typing
@@ -86,7 +86,7 @@ async function run() {
             check(`${dev}: the Done tab has its own match (1 of 2: the Backend Dev note)`, s.titles.length === 1 && /Backend Dev/.test(s.titles[0]), JSON.stringify(s.titles));
             await ev(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')[0].click(); true`);
             await type('zzz-nothing');
-            await settle(`!!document.querySelector('#group-table-view .empty-line')`, 'the empty line');
+            await settle(`!!document.querySelector('#group-table-view .empty-state-line')`, 'the empty line');
             s = await snap();
             check(`${dev}: nothing matching says so`, s.empty === 'No saved messages match this search.' && s.shown, JSON.stringify([s.empty, s.count]));
             await ev(`document.getElementById('inbox-search').value = ''; document.getElementById('inbox-search').dispatchEvent(new Event('input', { bubbles: true })); true`);

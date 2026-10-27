@@ -216,11 +216,11 @@ function markedLine(mark, words) { const b = el('b'), m = el('span', null, mark)
 export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     host.replaceChildren();
     const st = seriesState(view);
-    if (st.error) { const e = el('p', 'cost-empty', st.error); e.setAttribute('role', 'status'); host.append(e); return; }
-    if (!st.data) { host.append(el('p', 'cost-empty', 'Loading the chart…')); return; }
+    if (st.error) { const e = el('p', 'empty-state', st.error); e.setAttribute('role', 'status'); host.append(e); return; }
+    if (!st.data) { host.append(el('p', 'empty-state', 'Loading the chart…')); return; }
     const { buckets, interval, sinceMs, untilMs } = st.data;
     const times = axis(sinceMs, untilMs, interval);
-    if (!buckets.length || !st.ranked.length) { host.append(el('p', 'cost-empty', 'No usage over time in this range yet.')); return; }
+    if (!buckets.length || !st.ranked.length) { host.append(el('p', 'empty-state', 'No usage over time in this range yet.')); return; }
     const again = () => { drawPanel(host, view, { tableTotal, redraw, phone }); redraw?.(); };
     const picked = METRICS.filter(x => st.metrics.includes(x.key));
     const tools = el('div', 'viz-tools');
@@ -325,7 +325,7 @@ function drawArea(host, { times, lines, metric, interval, hi, phone }) {
 export function drawOverviewPanel(host, { phone }) {
     host.replaceChildren();
     const st = seriesState('overview');
-    if (st.error) { const e = el('p', 'cost-empty', st.error); e.setAttribute('role', 'status'); host.append(e); return; }
+    if (st.error) { const e = el('p', 'empty-state', st.error); e.setAttribute('role', 'status'); host.append(e); return; }
     if (!st.data) return;
     const { buckets, interval, sinceMs, untilMs } = st.data;
     if (!buckets.length || !st.ranked.length) return;

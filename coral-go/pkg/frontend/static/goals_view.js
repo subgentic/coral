@@ -141,11 +141,11 @@ function drawTableRaw(col) {
         col.append(f);
     }
     if (model.loading) { col.append(el('p', 'goals-note', 'Loading goals…')); return; }
-    if (!model.goals.length) { if (!model.failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, W.noGoalsText)); col.append(e); } return; }
+    if (!model.goals.length) { if (!model.failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', W.noGoalsText)); col.append(e); } return; }
     const shown = visible();
     if (!shown.length && !goalsTableState.selected.size) {
         const fe = W.filteredEmpty(model.filter, model.goals.length);
-        const e = el('div', 'goals-empty'); e.append(el('p', null, fe.text), btn('btn', fe.action, () => { model.filter = 'all'; say(W.filterAnnouncement('all', model.goals.length)); drawList(); }));
+        const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', fe.text), btn('btn empty-state-action', fe.action, () => { model.filter = 'all'; say(W.filterAnnouncement('all', model.goals.length)); drawList(); }));
         col.append(e);
         return;
     }

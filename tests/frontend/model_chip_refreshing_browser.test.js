@@ -30,7 +30,7 @@ const STUB = answers => `(() => { const R = window.fetch; window.__asks = 0; win
             // While the agent was on Default for a moment the chip asked the list once for its type's levels (#6221): that ask is not what this suite counts. The menu's own asks start from the scripted answers again.
             await ev(`window.__answers = ${JSON.stringify(answers)}; window.__asks = 0; true`);
         };
-        const menu = () => ev(`(() => { const m = document.getElementById('model-chip-menu'); const e = m.querySelector('.model-chip-empty'); return { open: !m.hidden, items: [...m.querySelectorAll('.model-chip-item[data-model] .model-chip-item-label')].map(i => i.textContent.trim()), empty: e ? e.textContent : '', role: e ? e.getAttribute('role') : null }; })()`);
+        const menu = () => ev(`(() => { const m = document.getElementById('model-chip-menu'); const e = m.querySelector('.empty-state.empty-state-tight'); return { open: !m.hidden, items: [...m.querySelectorAll('.model-chip-item[data-model] .model-chip-item-label')].map(i => i.textContent.trim()), empty: e ? e.textContent : '', role: e ? e.getAttribute('role') : null }; })()`);
         const openIt = () => ev(`document.getElementById('model-chip').click(); true`);
         const closeIt = () => ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
         const LIST = { models: [{ value: 'gpt-x', display_name: 'GPT X' }, { value: 'gpt-y', display_name: 'GPT Y' }], refreshing: false };
@@ -41,14 +41,14 @@ const STUB = answers => `(() => { const R = window.fetch; window.__asks = 0; win
             // 1. refreshing and empty twice, then the list: Loading models… while it waits, then the list, no reload
             await fresh(tag, theme, [{ models: [], refreshing: true }, { models: [], refreshing: true }, LIST]);
             await openIt();
-            await waitFor(`/Loading models/.test((document.querySelector('#model-chip-menu .model-chip-empty') || {}).textContent || '')`, `${tag}: Loading models… is said`, 5000);
+            await waitFor(`/Loading models/.test((document.querySelector('#model-chip-menu .empty-state.empty-state-tight') || {}).textContent || '')`, `${tag}: Loading models… is said`, 5000);
             let m = await menu();
             assert.equal(m.role, 'status', `${tag}: the loading line is a status`);
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/model-chip-loading-${w}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             const au = await auditRegion(ev, ['#model-chip-menu']);
             assert.ok(au.checked > 0 && !au.fails.length, `${tag}: the loading words hold 4.5:1: ` + JSON.stringify(au.fails).slice(0, 200));
-            await ev(`window.__loadingNode = document.querySelector('#model-chip-menu .model-chip-empty'); T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ ...window.__m.entry(window.__m.agents['rf-codex-id']), agent_type: 'codex', model: 'gpt-x', thinking_actual: 'low' }] }); true`);
-            assert.ok(await ev(`window.__loadingNode === document.querySelector('#model-chip-menu .model-chip-empty')`), `${tag}: a feed tick does not redraw the loading line (it is announced once)`);
+            await ev(`window.__loadingNode = document.querySelector('#model-chip-menu .empty-state.empty-state-tight'); T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ ...window.__m.entry(window.__m.agents['rf-codex-id']), agent_type: 'codex', model: 'gpt-x', thinking_actual: 'low' }] }); true`);
+            assert.ok(await ev(`window.__loadingNode === document.querySelector('#model-chip-menu .empty-state.empty-state-tight')`), `${tag}: a feed tick does not redraw the loading line (it is announced once)`);
             await waitFor(`document.querySelectorAll('#model-chip-menu .model-chip-item[data-model]').length === 2`, `${tag}: the list arrives without a reload`, 12000);
             m = await menu();
             assert.deepEqual(m.items, ['GPT X', 'GPT Y'], `${tag}: the list`);
@@ -60,7 +60,7 @@ const STUB = answers => `(() => { const R = window.fetch; window.__asks = 0; win
             // 2. a final empty answer: says there are no models, is not kept, and the next open asks again
             await fresh(tag, theme, [{ models: [], refreshing: false, error: 'the CLI listed nothing' }]);
             await openIt();
-            await waitFor(`/No models to choose from/.test((document.querySelector('#model-chip-menu .model-chip-empty') || {}).textContent || '')`, `${tag}: a final empty says so`, 5000);
+            await waitFor(`/No models to choose from/.test((document.querySelector('#model-chip-menu .empty-state.empty-state-tight') || {}).textContent || '')`, `${tag}: a final empty says so`, 5000);
             assert.equal(await ev(`window.__asks`), 1);
             await closeIt();
             await ev(`window.__answers = [{ models: [{ value: 'gpt-z', display_name: 'GPT Z' }], refreshing: false }]; true`);

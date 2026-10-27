@@ -232,11 +232,11 @@ function draw() {
     if (query && L.total != null && L.total > all.length && all.length && !model.loading) body.append(el('p', 'goals-note team-count-line', `Showing ${all.length} of ${L.total}${L.truncated ? '+' : ''}`));
     if (failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, failed), btn('btn btn-small', 'Try again', loadTasks)); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
-    else if (!all.length) { if (!failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : 'No tasks yet')); body.append(e); } }
+    else if (!all.length) { if (!failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : 'No tasks yet')); body.append(e); } }
     else {
         const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'needs_review' ? needsReview(t) : model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter)));
         if (!shown.length) {
-            const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
+            const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', 'No tasks match this filter.'), btn('btn empty-state-action', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
             const row = bar.node.querySelector('.list-bar-search-row');
             const t = TV.tasksTable('team', shown, { ctx: rowCtx(), label: `Tasks, ${shown.length}`, open: (task) => hooks.openTask?.(task), state: model.dt,

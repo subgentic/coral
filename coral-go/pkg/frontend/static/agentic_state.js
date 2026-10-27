@@ -58,13 +58,13 @@ export function renderEventTimeline() {
     const events = state.currentAgentEvents || [];
 
     if (events.length === 0) {
-        morphHtml(container, '<div class="event-empty">No activity yet</div>');
+        morphHtml(container, '<div class="empty-state empty-state-tight">No activity yet</div>');
         return;
     }
 
     const visible = events.filter(isEventVisible);
     if (visible.length === 0) {
-        morphHtml(container, '<div class="event-empty">All events filtered out</div>');
+        morphHtml(container, '<div class="empty-state empty-state-tight">All events filtered out</div>');
         return;
     }
 

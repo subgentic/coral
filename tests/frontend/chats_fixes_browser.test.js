@@ -38,7 +38,7 @@ const S = `(window.__coralStatic || '/static/')`;
                 await ev(`(async () => { const u = await import(${S} + 'utils.js'); u.showView('chats-empty-view'); return true; })()`);
             }
             // the empty pane
-            const empty = await ev(`(() => { const v = document.getElementById('chats-empty-view'); const h = v && v.querySelector('.empty-line'); if (!h || !h.getClientRects().length) return null; const c = getComputedStyle(h); return { text: h.textContent, size: c.fontSize, weight: c.fontWeight, color: c.color, primary: getComputedStyle(document.body).color }; })()`);
+            const empty = await ev(`(() => { const v = document.getElementById('chats-empty-view'); const h = v && v.querySelector('.empty-state-line'); if (!h || !h.getClientRects().length) return null; const c = getComputedStyle(h); return { text: h.textContent, size: c.fontSize, weight: c.fontWeight, color: c.color, primary: getComputedStyle(document.body).color }; })()`);
             if (!mobile) { assert.ok(empty && empty.text === 'No chats yet.' && empty.size === '14px' && empty.weight === '400' && empty.color === empty.primary, `${tag}: the empty pane is one 14/400 line in the primary colour: ` + JSON.stringify(empty)); }
             // the long title wraps with the badge below it (a phone)
             if (mobile) {

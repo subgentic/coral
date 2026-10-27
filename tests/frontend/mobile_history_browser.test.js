@@ -32,7 +32,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             {
                 assert.ok(await ev(`document.getElementById('history-search').checkVisibility()`), 'Search reachable on phone Chats');
                 assert.ok(await ev(`document.getElementById('history-sessions-list').checkVisibility()`), 'chat list reachable');
-                assert.equal(await ev(`document.querySelector('#chats-empty-view .empty-pane').checkVisibility()`), false, 'desktop instruction hidden on phone');
+                assert.equal(await ev(`document.querySelector('#chats-empty-view .empty-state').checkVisibility()`), false, 'desktop instruction hidden on phone');
                 assert.equal(await ev(`document.documentElement.scrollWidth<=innerWidth`), true, 'no horizontal page overflow');
                 const c = await auditRegion(ev, ['#mobile-history-list']);
                 assert.ok(c.checked && !c.fails.length, theme+' text contrast '+JSON.stringify(c.fails));
@@ -50,7 +50,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         for (const theme of ['dark','light']) { await setTheme(ev,theme); await shot(`${theme}-390-search`); }
         await size(1280);
         assert.ok(await ev(`document.querySelector('.sidebar').contains(window.__historySection) && window.__historySection===document.querySelector('[data-section="history"]') && document.getElementById('history-search').value==='needle' && document.querySelector('[data-chat-type="agent"]').classList.contains('active')`), 'desktop restores same controls with filter/query state');
-        assert.ok(await ev(`!!document.querySelector('#chats-empty-view > .empty-pane') && document.querySelector('#chats-empty-view > .empty-pane .empty-line').textContent === 'No chats yet.'`), 'desktop Chats has its one empty line beside the sidebar');
+        assert.ok(await ev(`!!document.querySelector('#chats-empty-view > .empty-state') && document.querySelector('#chats-empty-view > .empty-state .empty-state-line').textContent === 'No chats yet.'`), 'desktop Chats has its one empty line beside the sidebar');
         await shot('light-1280-search');
         await size(390);
         assert.ok(await ev(`document.querySelector('#mobile-history-list').contains(window.__historySection) && document.getElementById('hf-advanced').checkVisibility()`), 'phone restores same expanded filters');

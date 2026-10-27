@@ -40,7 +40,7 @@ function drawViews() {
     const held = list.contains(document.activeElement) ? document.activeElement.dataset.view : null; // the list is drawn again: the keyboard stays on its row
     const rows = shown(), on = current === 'agent-detail' ? 'agent' : current; // an agent's page is under By agent
     list.innerHTML = rows.map(v => `<li class="session-list-item${escapeAttr(v.key === on ? ' active' : '')}"><button type="button" class="row-btn"${v.key === on ? ' aria-current="true"' : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`).join('')
-        || '<li class="empty-state">No view matches the search.</li>';
+        || '<li class="empty-state empty-state-tight">No view matches the search.</li>';
     if (held) list.querySelector(`.row-btn[data-view="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
 }
 

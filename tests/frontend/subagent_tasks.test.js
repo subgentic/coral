@@ -80,7 +80,7 @@ async function run() {
 
   const open = async (sid) => { await ev(`window.__currentIsA = ${JSON.stringify(sid)} === ${JSON.stringify(A)}; true`); await ev(`Promise.resolve(window.selectLiveSession('coral-go', 'claude', ${JSON.stringify(sid)})).then(() => { window.switchAgenticTab('tasks', 'top'); return true; })`);
     // The agent's task list (rows, or the empty state) has loaded and stopped changing.
-    await until(`!!document.querySelector('#board-task-list .board-task-item:not(.board-task-header), #board-task-list .board-task-empty')`, 'the task list');
+    await until(`!!document.querySelector('#board-task-list .board-task-item:not(.board-task-header), #board-task-list .empty-state.empty-state-tight')`, 'the task list');
     await settledHtml('#board-task-list', 'the task list'); };
   const rows = () => ev(`Array.from(document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')).map(el => { const q = s => el.querySelector(s); const cs = getComputedStyle(el);
     return { sub: el.classList.contains('board-task-subagent'), classes: el.className, subagentId: el.dataset.subagentId || null,
@@ -239,7 +239,7 @@ async function run() {
   check("another agent does not inherit the previous agent's subagents", rs.filter(r => r.sub).length === 0, `sub rows=${rs.filter(r => r.sub).length}`);
   // A live agent with no tasks keeps the section (empty state + "+ Task") and none of A's rows
   check('an agent with nothing to show gets the empty state, with + Task, and no stale rows', await ev(`(() => { const sec = document.getElementById('board-tasks-section'); const list = document.getElementById('board-task-list');
-    return sec.style.display !== 'none' && !!sec.querySelector('.btn-create-task') && !!list.querySelector('.board-task-empty') && list.querySelectorAll('.board-task-item').length === 0; })()`));
+    return sec.style.display !== 'none' && !!sec.querySelector('.btn-create-task') && !!list.querySelector('.empty-state.empty-state-tight') && list.querySelectorAll('.board-task-item').length === 0; })()`));
   check('subagents fetched by session id, not agent name', (await ev(`window.__subagentFetches`)).includes(B));
 
   await open(A);

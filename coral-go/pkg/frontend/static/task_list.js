@@ -491,8 +491,8 @@ function _renderEmptyTaskList(container, section) {
     if (section) section.style.display = '';
     _syncHideDone(0, true);
     morphHtml(container, _boardList.busy
-        ? `<div class="board-task-empty board-task-busy" role="status">${escapeHtml(_boardList.busy)}</div>`
-        : '<div class="board-task-empty">No tasks yet</div>');
+        ? `<div class="empty-state empty-state-tight board-task-busy" role="status">${escapeHtml(_boardList.busy)}</div>`
+        : '<div class="empty-state empty-state-tight">No tasks yet</div>');
     return;
 }
 
@@ -623,7 +623,7 @@ export function renderBoardTaskList() {
         _renderTaskListChrome(section, 0, true);
         _syncTaskBar(true, barCounts);
         const ownDefault = scope && !isQuery(_taskFilters);
-        morphHtml(container, `<div class="board-task-empty" role="status">${escapeHtml(_filteredList.error || (_filteredList.busy ? (ownDefault ? 'Loading tasks…' : 'Searching tasks…') : (ownDefault ? 'No tasks assigned to this agent.' : 'No tasks match this search.')))}</div>`);
+        morphHtml(container, `<div class="empty-state empty-state-tight" role="status">${escapeHtml(_filteredList.error || (_filteredList.busy ? (ownDefault ? 'Loading tasks…' : 'Searching tasks…') : (ownDefault ? 'No tasks assigned to this agent.' : 'No tasks match this search.')))}</div>`);
         return;
     }
     if (allTasks.length === 0) {

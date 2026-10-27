@@ -250,10 +250,10 @@ async function _refreshCallMetrics(period, hours) {
         const data = await response.json();
         const rows = shownCallMetrics(data.rows || []);
         // Metrics past the raw-row cap are not stored (#5359): say so, so a gap after a burst is not read as quiet (#5368).
-        const dropped = data.cap_dropped > 0 ? `<p class="cost-empty">${Number(data.cap_dropped)} calls were not recorded since Coral started: the call metrics table was full.</p>` : '';
+        const dropped = data.cap_dropped > 0 ? `<p class="empty-state">${Number(data.cap_dropped)} calls were not recorded since Coral started: the call metrics table was full.</p>` : '';
         // The server keeps calls for a limited time (#3261) and answers with the window it used: a longer range says so.
-        const kept = data.hours > 0 && data.hours < hours ? `<p class="cost-empty">Calls are kept for ${Math.round(data.hours / 24)} days, so this shows the last ${Math.round(data.hours / 24)} days.</p>` : '';
-        if (!rows.length) { emptyState(el, `No tool calls in the ${label} yet. They appear once an agent has used a tool.`, 'cost-empty'); if (kept + dropped) el.insertAdjacentHTML('beforeend', kept + dropped); return; }
+        const kept = data.hours > 0 && data.hours < hours ? `<p class="empty-state">Calls are kept for ${Math.round(data.hours / 24)} days, so this shows the last ${Math.round(data.hours / 24)} days.</p>` : '';
+        if (!rows.length) { emptyState(el, `No tool calls in the ${label} yet. They appear once an agent has used a tool.`, 'empty-state'); if (kept + dropped) el.insertAdjacentHTML('beforeend', kept + dropped); return; }
         el.innerHTML = kept + dropped;
         const st = _tables.calls || (_tables.calls = tableState());
         if (!st.sort) st.sort = { key: 'calls', dir: 'desc' };
@@ -268,7 +268,7 @@ async function _refreshCallMetrics(period, hours) {
             _numCol('errors', 'Errors', r => r.errors || 0, String, { foldFirst: true }),
             _numCol('avg_ms', 'Avg ms', r => Math.round(r.avg_duration_ms || 0), String, { foldFirst: true }),
         ], ['calls']) }).el);
-    } catch { emptyState(el, 'Call metrics unavailable', 'cost-empty'); }
+    } catch { emptyState(el, 'Call metrics unavailable', 'empty-state'); }
 }
 
 export function stopCostDashboard() {
@@ -519,7 +519,7 @@ function _drawTable(container, table, columns, rows, empty, extra) {
     const st = _tables[table] || (_tables[table] = tableState());
     if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
     _drawn[table] = { container, columns, rows, empty, extra, phone: isPhoneLayout() };
-    if (!rows.length) { emptyState(container, empty || NO_DATA, 'cost-empty'); return; }
+    if (!rows.length) { emptyState(container, empty || NO_DATA, 'empty-state'); return; }
     const t = dataTable({ label: TABLE_TITLES[table], rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...phoneOneLine(columns, ['cost_usd'], PHONE_LEAD[table]), rows, ...extra }); // a phone: one line a row, the name and Cost (#8982)
     container.replaceChildren(t.el);
     if (SERIES_VIEWS[table]) _drawSeries(table); // the line under the chart compares its total with these rows
@@ -681,7 +681,7 @@ function _renderSpendChart(buckets) {
     _watchSpendChart(container);
 
     if (buckets.length < 2) {
-        emptyState(container, 'Not enough data', 'cost-empty');
+        emptyState(container, 'Not enough data', 'empty-state');
         return;
     }
 

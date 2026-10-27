@@ -66,8 +66,6 @@
 
 .session-list li.empty-state {
     cursor: default;
-    color: var(--text-muted);
-    font-style: italic;
 }
 
 .session-list li.empty-welcome { display: none; font-style: normal; color: var(--text-secondary); padding: 20px 12px; }
@@ -1293,12 +1291,6 @@
 
 /* The team view's group chat uses the board's soft cards (components.css). */
 
-.board-chat-empty {
-    color: var(--text-muted);
-    font-style: italic;
-    text-align: center;
-    padding: 8px;
-}
 
 /* The board's composer card is the chat's (command-pane.css, #6239): this keeps what is the board's own. */
 .board-chat-input-pane {
@@ -1965,8 +1957,6 @@
 .group-chevron[aria-expanded="false"] svg { transform: rotate(-90deg); }
 @media (pointer: coarse) { .group-chevron { width: 44px; height: 44px; margin-left: -12px; } }
 @media (prefers-reduced-motion: reduce) { .group-chevron svg { transition: none; } }
-.team-agents-container:has(#team-agents-list:not(:empty)) .team-agents-empty { display: none; }
-.team-agents-empty { margin: .6rem 0; color: var(--text-secondary); font-size: var(--fs-base); }
 #team-goal { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; }
 .group-chevron-deco { pointer-events: none; margin-left: -8px; height: 16px; } /* decorative: the whole header is the control, so it does not set the header's height */
 .session-group-header[aria-expanded="false"] > .group-chevron-deco svg { transform: rotate(-90deg); }

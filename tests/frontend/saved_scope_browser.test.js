@@ -20,7 +20,7 @@ const hex = i => i.toString(16).padStart(20, '0');
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const settle = (cond, label) => waitFor(cond, label, 8000);
     // the sidebar slides open: a picture is taken once it has its width, with the Saved tab showing
-    const shotSaved = async name => { if (await ev(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`)) return shot(name); await settle(`(() => { const ui = document.getElementById('saved-ui'); if (!ui || !ui.getClientRects().length) return false; const dock = document.getElementById('agentic-state'); if (dock && dock.contains(ui) && dock.getBoundingClientRect().width < Math.min(300, innerWidth - 40)) return false; const h = document.getElementById('saved-bar').getBoundingClientRect(), li = document.querySelector('#saved-table tbody tr, #saved-table .empty-line'); return (document.body.dataset.savedScope === 'all' || (h.width > 0 && h.top >= 0 && h.top < innerHeight / 2)) && !!li && li.getBoundingClientRect().top < innerHeight; })() /* in the Inbox the "All saved" heading is not drawn (the tab says it, #6300) */`, 'the Saved list on screen (the page on home, the sidebar for an agent or a team)'); await waitFor(`true`, 'a frame', 2000); await shot(name); };
+    const shotSaved = async name => { if (await ev(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`)) return shot(name); await settle(`(() => { const ui = document.getElementById('saved-ui'); if (!ui || !ui.getClientRects().length) return false; const dock = document.getElementById('agentic-state'); if (dock && dock.contains(ui) && dock.getBoundingClientRect().width < Math.min(300, innerWidth - 40)) return false; const h = document.getElementById('saved-bar').getBoundingClientRect(), li = document.querySelector('#saved-table tbody tr, #saved-table .empty-state-line'); return (document.body.dataset.savedScope === 'all' || (h.width > 0 && h.top >= 0 && h.top < innerHeight / 2)) && !!li && li.getBoundingClientRect().top < innerHeight; })() /* in the Inbox the "All saved" heading is not drawn (the tab says it, #6300) */`, 'the Saved list on screen (the page on home, the sidebar for an agent or a team)'); await waitFor(`true`, 'a frame', 2000); await shot(name); };
     // what is on top at the middle of the panel's bar is the Saved panel's own (a team's chat once covered the side panel on a phone)
     const onTop = () => ev(`(() => { const h = document.getElementById('saved-bar').getBoundingClientRect(); const e = document.elementFromPoint(h.left + Math.min(h.width, 40) / 2, h.top + h.height / 2); return !!e && !!e.closest('#agentic-panel-saved'); })()`);
     // Home is the Inbox's Saved table (everything's list: its title says Saved, its chips the counts); an agent's or a team's is the dock's list.
@@ -28,7 +28,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         return {
         heading: inbox ? 'All saved' : (document.getElementById('saved-ui')?.getAttribute('aria-label') || ''),
         rows: inbox ? [...t.querySelectorAll('tbody .dt-primary')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort() : [...document.querySelectorAll('#saved-table tbody .dt-primary')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort(),
-        empty: (document.querySelector(inbox ? '#group-table-view .empty-line' : '#saved-table .empty-line') || {}).textContent || null,
+        empty: (document.querySelector(inbox ? '#group-table-view .empty-state-line' : '#saved-table .empty-state-line') || {}).textContent || null,
         tabs: inbox ? [...t.querySelectorAll('.team-tb-pills .goals-chip')].map(b => { const m = b.textContent.match(/\\d+/); return m && m[0] !== '0' ? '(' + m[0] + ')' : ''; }) : [...document.querySelectorAll('#saved-table .group-chip .group-chip-count')].map(c => n(c)),
         badge: (document.getElementById('saved-tab-count') || {}).textContent || '',
         over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -131,7 +131,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`window.__m.add('Lonely', 'L', 2, { sleeping: false, board_project: null, session_id: 'lonely-id' }); true`);
         await select({ name: 'Lonely', sid: 'lonely-id' });
         await openSaved();
-        await settle(`!!document.querySelector('#saved-table .empty-line')`, 'the empty line');
+        await settle(`!!document.querySelector('#saved-table .empty-state-line')`, 'the empty line');
         const s = await snap();
         check('an agent with nothing saved says whom it is empty for', s.heading === 'Saved: Lonely' && /Nothing saved from Lonely yet/.test(s.empty || ''), JSON.stringify([s.heading, s.empty]));
     } catch (e) {

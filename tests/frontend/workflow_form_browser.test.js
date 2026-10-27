@@ -128,7 +128,7 @@ const STUB = `(() => {
         }
         // the Workflows page behind the dialog: with no workflow, one empty line and no count pill (the page has no header of its own, #7471)
         await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); window.openAutomationsFolder('workflows'); true`);
-        await waitFor(`!!document.querySelector('#group-table-view .empty-line') && document.querySelector('#group-table-view .empty-line').checkVisibility()`, 'the Workflows page', 8000);
+        await waitFor(`!!document.querySelector('#group-table-view .empty-state-line') && document.querySelector('#group-table-view .empty-state-line').checkVisibility()`, 'the Workflows page', 8000);
         assert.equal(await ev(`document.getElementById('wf-count-badge')`), null, 'the page draws no count badge');
         console.log('PASS workflow form: Name, Steps first, the rest behind More options; errors in words');
     } finally { await client.close(); }

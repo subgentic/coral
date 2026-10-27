@@ -344,13 +344,6 @@ body.panel-dragging .agentic-state {
     min-height: 0;
 }
 
-.event-empty {
-    color: var(--text-muted);
-    font-style: italic;
-    font-size: var(--fs-base);
-    text-align: center;
-    padding: 20px 14px;
-}
 
 .event-item {
     display: flex;
@@ -641,13 +634,6 @@ body.panel-dragging .agentic-state {
     padding: 6px 0;
 }
 
-.task-empty {
-    color: var(--text-muted);
-    font-style: italic;
-    font-size: var(--fs-base);
-    text-align: center;
-    padding: 20px 14px;
-}
 
 .task-item {
     display: flex;
@@ -1109,12 +1095,6 @@ body.panel-dragging .agentic-state {
     cursor: pointer;
 }
 
-.dep-picker-empty {
-    font-size: var(--fs-base);
-    color: var(--text-muted);
-    padding: 8px;
-    text-align: center;
-}
 
 .task-detail-section {
     margin-bottom: 16px;
@@ -1310,13 +1290,6 @@ body.panel-dragging .agentic-state {
     max-height: 40%;
     overflow-y: auto;
     border-bottom: 1px solid var(--border);
-}
-
-.file-empty {
-    text-align: center;
-    padding: 20px 0;
-    color: var(--text-muted);
-    font-size: var(--fs-base);
 }
 
 .file-item {
@@ -1839,13 +1812,6 @@ body.panel-dragging .agentic-state {
    any diff is open. */
 .refresh-files-btn.active { color: var(--accent); }
 
-/* Tasks panel: empty state for a live agent (the + Task button stays reachable) */
-.board-task-empty {
-    padding: 14px 12px;
-    color: var(--text-muted);
-    font-size: 0.7812rem;
-    text-align: center;
-}
 
 /* Title and close button on one line */
 #create-task-modal .modal-header {

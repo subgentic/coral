@@ -83,8 +83,8 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => { const DT = await import(${MOD} + 'data_table.js'); document.getElementById('dt-host')?.remove(); const host = document.createElement('div'); host.id = 'dt-host'; document.body.append(host);
             window.__log = []; host.append(DT.dataTable({ label: 'None', columns: [{ key: 'a', label: 'A', field: 'a' }], rows: [], rowKey: r => r.a, empty: { line: 'Nothing here', hint: 'Make one', action: { label: 'Make', run: () => window.__log.push('made') } } }).el);
             const h2 = document.createElement('div'); h2.id = 'dt-host2'; document.body.append(h2); h2.append(DT.dataTable({ label: 'Paged', columns: [{ key: 'a', label: 'A', field: 'a' }], rows: [{ a: 1 }], rowKey: r => r.a, footer: { text: 'Showing 1 of 5', more: { label: 'Load more', run: () => window.__log.push('more') } } }).el); return true; })()`);
-        assert.equal(await ev(`document.querySelector('#dt-host .dt-empty-line').textContent`), 'Nothing here');
-        await ev(`document.querySelector('#dt-host .dt-empty .btn').click(); document.querySelector('#dt-host2 .dt-more').click(); true`);
+        assert.equal(await ev(`document.querySelector('#dt-host .empty-state-line').textContent`), 'Nothing here');
+        await ev(`document.querySelector('#dt-host .empty-state .btn').click(); document.querySelector('#dt-host2 .dt-more').click(); true`);
         assert.deepEqual(await ev(`window.__log`), ['made', 'more']); assert.equal(await ev(`document.querySelector('#dt-host2 .dt-foot-text').textContent`), 'Showing 1 of 5');
         // footer.auto (#7937): no footer when there is nothing more to load; with more to load, the same footer as before
         await ev(`(async () => { const DT = await import(${MOD} + 'data_table.js'); const mk = (id, footer) => { const h = document.createElement('div'); h.id = id; document.body.append(h); h.append(DT.dataTable({ label: id, columns: [{ key: 'a', label: 'A', field: 'a' }], rows: [{ a: 1 }, { a: 2 }], rowKey: r => r.a, footer }).el); };

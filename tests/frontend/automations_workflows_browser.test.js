@@ -154,7 +154,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             // no workflow on a phone: the same one line, its hint and the toolbar's actions (a shot for UI/UX)
             if (mobile) {
                 await ev(`window.__wfEmpty = true; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
-                await waitFor(`!!document.querySelector('#group-table-view .empty-pane .empty-line') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 0`, at + 'the empty folder on a phone', 8000);
+                await waitFor(`!!document.querySelector('#group-table-view .empty-state .empty-state-line') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 0`, at + 'the empty folder on a phone', 8000);
                 for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await shot(`automations-workflows-empty-${theme}-${w}`); }
                 await setTheme(ev, 'dark');
                 await ev(`window.__wfEmpty = false; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
@@ -162,8 +162,8 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             // no workflow: one empty line with its hint (the toolbar keeps the create actions)
             if (w === 1280) {
                 await ev(`window.__wfEmpty = true; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
-                await waitFor(`!!document.querySelector('#group-table-view .empty-pane .empty-line') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 0`, at + 'the empty folder', 8000);
-                assert.equal(await ev(`document.querySelector('#group-table-view .empty-pane .empty-line').textContent`), 'No workflows yet.', at + 'one empty line');
+                await waitFor(`!!document.querySelector('#group-table-view .empty-state .empty-state-line') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 0`, at + 'the empty folder', 8000);
+                assert.equal(await ev(`document.querySelector('#group-table-view .empty-state .empty-state-line').textContent`), 'No workflows yet.', at + 'one empty line');
                 assert.equal(await ev(`[...document.querySelectorAll('#group-table-view [data-on-click="wf-build-agent"]')].some(b => b.getClientRects().length > 0)`), true, at + 'Build with Agent is on the toolbar');
                 await shot(`automations-workflows-empty-${w}`);
                 await ev(`window.__wfEmpty = false; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);

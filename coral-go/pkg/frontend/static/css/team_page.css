@@ -91,9 +91,6 @@
 .goals-table-page .goals-back, .inbox-board-head .goals-back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 4px 0; min-height: 36px; }
 .goals-table-page .goals-back:hover, .inbox-board-head .goals-back:hover { text-decoration: underline; }
 .team-count-line { margin: 0; }
-.team-empty { display: flex; flex-direction: column; gap: 2px; } /* the one empty line of the team page's tabs: the sentence at 14/400, an optional hint at 12/400, no box (UI/UX 170 consistency, item 5) */
-.goals-note.team-empty-line, .team-empty-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
-.team-empty-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.5; color: var(--text-secondary); }
 .team-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .team-link { background: none; border: 0; padding: 0; color: var(--link-text, var(--accent)); font: inherit; text-align: left; cursor: pointer; }
 .team-link:hover { text-decoration: underline; }

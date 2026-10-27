@@ -137,7 +137,7 @@ function draw() {
     if (model.loading) { body.append(el('p', 'goals-note', 'Checking agents…')); return; }
     const data = model.data;
     if (!data) return;
-    if (!data.agents.length) { body.append(el('div', 'goals-empty', 'No agents on this board yet.')); return; }
+    if (!data.agents.length) { body.append(el('div', 'empty-state empty-state-tight', 'No agents on this board yet.')); return; }
     drawChips(body);
     const ended = data.agents.filter(a => a.availability === 'offline').length; // the tab lists every member, the sidebar only the live ones: this says why they differ (#8271)
     body.append(el('p', 'goals-note team-agents-count', `${data.agents.length} agent${data.agents.length === 1 ? '' : 's'}${ended ? `, ${ended} ended` : ''}`));

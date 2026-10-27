@@ -75,7 +75,7 @@ const STUB = `(() => {
         if (${JSON.stringify(kind)} === 'tasks') {
             const region = panel.parentElement, meta = region.querySelector('.ibx-task-metarow'), ta = region.querySelector('.ibx-reply-input'), open = region.querySelector('.ibx-open'), head = region.closest('.ibx-task').querySelector('.ibx-task-title');
             const rr = region.getBoundingClientRect();
-            out.onlyBody = [...panel.children].every(c => c.classList.contains('md') || c.classList.contains('ibx-empty')) && !panel.querySelector('textarea, .ibx-open, .ibx-task-facts, .ibx-reply');
+            out.onlyBody = [...panel.children].every(c => c.classList.contains('md') || c.classList.contains('empty-state-tight')) && !panel.querySelector('textarea, .ibx-open, .ibx-task-facts, .ibx-reply');
             out.openIsLink = !!open && !panel.contains(open) && meta.contains(open) && parseFloat(getComputedStyle(open).fontSize) <= 14.5 && getComputedStyle(open).textTransform === 'none';
             out.edges = { panelVsReply: ta ? [Math.round(rect.left - ta.getBoundingClientRect().left), Math.round(ta.getBoundingClientRect().right - rect.right)] : null, panelVsTitle: Math.round(rect.left - head.getBoundingClientRect().left) };
             out.above = meta ? Math.round(rect.top - meta.getBoundingClientRect().bottom) : null;

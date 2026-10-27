@@ -766,7 +766,7 @@ body.cloud-mode:not(.hub-no-machine) .welcome-connect-another { display: block; 
 body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-footer { display: none; }
 .hub-connect-short { display: none; }
 @media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) { .hub-connect-none > :not(.hub-connect-short) { display: none; } .hub-connect-none > .hub-connect-short { display: block; color: var(--text-secondary); } }
-.hub-connect-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 12px; font-style: normal; }
+.empty-state.hub-connect-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 12px; font-style: normal; }
 .hub-connect-empty strong { color: var(--text-primary); font-size: var(--fs-md); }
 .session-list li.hub-connect-empty { font-style: normal; }
 .session-list li.hub-connect-empty .btn { margin: 0; } /* in line with the text above it */
@@ -938,11 +938,15 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-table-head .session-group-count { font-weight: 600; }
 .group-table-head .group-table-extra { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 0 auto; }
 .group-table-head .group-table-extra .material-icons { font-size: var(--fs-xl); }
-/* One empty line on every tab: 14/400 in the primary colour, with an optional 12/400 hint under it; what to do is the sidebar's pinned action */
-.empty-pane { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-2xl); }
-.welcome > .empty-pane { margin: 0; align-self: stretch; }
-.empty-pane .empty-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
-.empty-pane .empty-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
+/* The one empty state (#9097, Goal #84): a line (14/400, the primary colour), an optional hint under it (12/400, secondary) and an optional action; no box. A line can sit straight in the element or in .empty-state-line. -tight is the density
+ * for a dock panel, a menu, a picker or a list: less padding, the same type. What to do on a tab is the sidebar's pinned action. */
+.empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); margin: 0; padding: var(--space-2xl); color: var(--text-primary); font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; }
+.empty-state[hidden] { display: none; }
+.empty-state-tight { padding: var(--space-md); }
+.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
+.empty-state-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
+.empty-state-action { margin-top: var(--space-sm); }
+.welcome > .empty-state { margin: 0; align-self: stretch; }
 /* The line under an item page's title: who, when, how long */
 .item-meta { margin: 2px 0 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
 .group-table-back { margin-bottom: var(--space-lg); }

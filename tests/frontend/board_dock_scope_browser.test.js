@@ -19,7 +19,7 @@ const BASE = require('./test_base').BASE;
     const AGENT = { subscriber: 'Backend Dev', orchestrator: false, name: 'Backend Dev' };
     const show = agent => ev(`import(${S} + 'render.js').then(m => { m.showBoardChatTab(${JSON.stringify(B)}, ${JSON.stringify(agent)}); return true; })`);
     const rows = () => ev(`[...document.querySelectorAll('#board-panel-msgs > .mb-message .mb-row-snippet, #board-panel-msgs > .mb-message .mb-message-body')].map(e => e.textContent.trim().slice(0, 40))`);
-    const state = () => ev(`(() => { const bar = document.querySelector('#agentic-panel-board > .board-chat-scope'), note = document.getElementById('board-chat-scope-note'); return { bar: !!bar, switches: document.querySelectorAll('#agentic-panel-board .mb-view-btn[data-scope], #agentic-panel-board .board-chat-scope button, #agentic-panel-board .board-scope-link, #agentic-panel-board .mb-search-link').length, note: note && !note.hidden ? note.textContent.replace(/\\u00a0/g, ' ') : '', rows: document.querySelectorAll('#board-panel-msgs > .mb-message').length, empty: (document.querySelector('#board-panel-msgs .board-chat-empty') || {}).textContent || '' }; })()`);
+    const state = () => ev(`(() => { const bar = document.querySelector('#agentic-panel-board > .board-chat-scope'), note = document.getElementById('board-chat-scope-note'); return { bar: !!bar, switches: document.querySelectorAll('#agentic-panel-board .mb-view-btn[data-scope], #agentic-panel-board .board-chat-scope button, #agentic-panel-board .board-scope-link, #agentic-panel-board .mb-search-link').length, note: note && !note.hidden ? note.textContent.replace(/\\u00a0/g, ' ') : '', rows: document.querySelectorAll('#board-panel-msgs > .mb-message').length, empty: (document.querySelector('#board-panel-msgs .empty-state.empty-state-tight') || {}).textContent || '' }; })()`);
     const mount = async (w, h, mobile, dockPx) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
@@ -84,7 +84,7 @@ const BASE = require('./test_base').BASE;
 
             console.log(`${at}4. An agent that has read nothing yet (@all reaches every member, so it is one with no seat on the board): the empty line, and no way to the whole board`);
             await show({ subscriber: 'Newcomer', orchestrator: false, name: 'Newcomer' });
-            await waitFor(`/Nothing for Newcomer yet/.test((document.querySelector('#board-panel-msgs .board-chat-empty') || {}).textContent || '')`, 'the empty state', 15000);
+            await waitFor(`/Nothing for Newcomer yet/.test((document.querySelector('#board-panel-msgs .empty-state.empty-state-tight') || {}).textContent || '')`, 'the empty state', 15000);
             st = await state(); assert.equal(st.empty, 'Nothing for Newcomer yet.'); assert.equal(st.rows, 0); assert.equal(st.switches, 0, at + 'no link to the whole board');
             await shot(`dock-scope-empty-${w}`);
             await lightShot(`dock-scope-empty-${w}`);

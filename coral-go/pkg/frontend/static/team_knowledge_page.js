@@ -154,7 +154,7 @@ async function distill() {
 }
 
 /** The tabs' one empty line: the sentence, and an optional hint under it. */
-function emptyLine(text, hint) { const e = el('div', 'team-empty'); e.append(el('p', 'team-empty-line', text)); if (hint) e.append(el('p', 'team-empty-hint', hint)); return e; }
+function emptyLine(text, hint) { const e = el('div', 'empty-state'); e.append(el('p', 'empty-state-line', text)); if (hint) e.append(el('p', 'empty-state-hint', hint)); return e; }
 
 function draw() {
     const body = root && root.querySelector('.team-knowledge-body'); if (!body) return;

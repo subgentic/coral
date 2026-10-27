@@ -213,8 +213,8 @@ function _renderMenu(kind) {
     }
     if (!html) {
         // Loading says so once (a status the screen reader reads when it appears); the same words are not drawn again by the feed's updates (below)
-        html = _loading ? `<div class="model-chip-empty" role="status">${kind === 'model' ? 'Loading models…' : 'Loading thinking levels…'}</div>`
-            : `<div class="model-chip-empty">${kind === 'model' ? 'No models to choose from for this agent.' : 'No thinking levels to choose from for this model.'}</div>`;
+        html = _loading ? `<div class="empty-state empty-state-tight" role="status">${kind === 'model' ? 'Loading models…' : 'Loading thinking levels…'}</div>`
+            : `<div class="empty-state empty-state-tight">${kind === 'model' ? 'No models to choose from for this agent.' : 'No thinking levels to choose from for this model.'}</div>`;
     }
     if (kind === 'model') html += _addHtml(s);
     const sig = html.replace(/ value="[^"]*"/g, ''); // what is typed in the form is not part of the shape

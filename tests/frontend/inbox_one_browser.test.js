@@ -208,8 +208,8 @@ const AGENTS = (waiting) => waiting ? [
             // nothing waiting: one empty line
             await setAgents(false);
             await ev(`document.querySelector('${pane} .view-list-item[data-key="needs"]').click(); true`);
-            await waitFor(`document.querySelector('#group-table-title').textContent === 'Needs you' && !!document.querySelector('#group-table-view .empty-line')`, at + 'the empty Needs you', 8000);
-            assert.deepEqual(await ev(`(() => { const l = document.querySelector('#group-table-view .empty-line'), c = getComputedStyle(l); return [l.textContent, c.fontSize, c.fontWeight]; })()`), ['Nothing needs your input.', '14px', '400'], at + 'one empty line, 14/400');
+            await waitFor(`document.querySelector('#group-table-title').textContent === 'Needs you' && !!document.querySelector('#group-table-view .empty-state-line')`, at + 'the empty Needs you', 8000);
+            assert.deepEqual(await ev(`(() => { const l = document.querySelector('#group-table-view .empty-state-line'), c = getComputedStyle(l); return [l.textContent, c.fontSize, c.fontWeight]; })()`), ['Nothing needs your input.', '14px', '400'], at + 'one empty line, 14/400');
             await shot(`inbox-one-empty-${w}`);
             await setAgents(true);
 

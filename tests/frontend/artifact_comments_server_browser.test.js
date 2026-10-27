@@ -37,8 +37,8 @@ const DATA = process.env.CORAL_TEST_DATA_DIR || '';
         await ev(`window.__coralReady.then(() => true)`);
         const open = async () => { await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', { filename: 'plan.md', mediaType: 'text/markdown' })); true`); await waitFor(`!!document.querySelector('#artifact-viewer:not([hidden]) .artifact-viewer-markdown') && !!document.querySelector('.ac-panel')`, 'the viewer with its panel', 8000); };
         await open();
-        await waitFor(`document.querySelector('.ac-panel .ac-empty') || document.querySelector('.ac-panel .ac-card')`, 'the panel to load', 8000);
-        check('a fresh artifact has no comments, and the panel says how to add one', (await ev(`document.querySelector('.ac-panel .ac-empty') && document.querySelector('.ac-panel .ac-empty').textContent`)) !== null);
+        await waitFor(`document.querySelector('.ac-panel .empty-state.empty-state-tight') || document.querySelector('.ac-panel .ac-card')`, 'the panel to load', 8000);
+        check('a fresh artifact has no comments, and the panel says how to add one', (await ev(`document.querySelector('.ac-panel .empty-state.empty-state-tight') && document.querySelector('.ac-panel .empty-state.empty-state-tight').textContent`)) !== null);
 
         // A comment from a selection, through the panel
         await ev(`(() => { const w = document.createTreeWalker(document.querySelector('.artifact-viewer-body'), NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { const i = n.nodeValue.indexOf('backfill in batches of 500 rows'); if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 'backfill in batches of 500 rows'.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new Event('selectionchange')); return true; } } return false; })()`);

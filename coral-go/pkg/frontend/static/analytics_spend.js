@@ -186,12 +186,12 @@ function drawSpend() {
     const body = root && root.querySelector('.spend-body'); if (!body) return;
     body.replaceChildren();
     body.setAttribute('aria-busy', String(model.loading));
-    if (!model.team) { body.append(el('p', 'cost-empty', 'Open a team to see how many tokens its commits take.')); return; }
+    if (!model.team) { body.append(el('p', 'empty-state', 'Open a team to see how many tokens its commits take.')); return; }
     if (model.error) {
-        const e = el('div', 'cost-empty spend-error'); e.setAttribute('role', 'alert'); e.append(el('span', null, model.error + ' '));
+        const e = el('div', 'empty-state spend-error'); e.setAttribute('role', 'alert'); e.append(el('span', null, model.error + ' '));
         const b = el('button', 'btn btn-small', 'Try again'); b.type = 'button'; b.addEventListener('click', () => loadSpend()); e.append(b); body.append(e); return;
     }
-    if (model.loading && !model.data) { body.append(el('p', 'cost-empty', 'Loading…')); return; }
+    if (model.loading && !model.data) { body.append(el('p', 'empty-state', 'Loading…')); return; }
     const data = model.data; if (!data) return;
     const f = figures(data, model.range);
     const cards = el('div', 'cost-summary-cards spend-cards');
@@ -224,8 +224,8 @@ function drawTime() {
     const body = timeRoot && timeRoot.querySelector('.time-body'); if (!body) return;
     body.replaceChildren();
     const tt = model.data && model.data.task_time;
-    if (!model.team) { body.append(el('p', 'cost-empty', 'Open a team to see how long its tasks take.')); return; } // the view is in the list for every team: with none, it says so
-    if (!tt || model.error) { if (!model.loading) body.append(el('p', 'cost-empty', model.error || 'No task time for this team yet.')); return; }
+    if (!model.team) { body.append(el('p', 'empty-state', 'Open a team to see how long its tasks take.')); return; } // the view is in the list for every team: with none, it says so
+    if (!tt || model.error) { if (!model.loading) body.append(el('p', 'empty-state', model.error || 'No task time for this team yet.')); return; }
     const w = tt.window || {}, u = tt.usual || {};
     const word = model.range === '7d' ? 'last 7 days' : 'last 24 h';
     const cards = el('div', 'cost-summary-cards spend-cards');

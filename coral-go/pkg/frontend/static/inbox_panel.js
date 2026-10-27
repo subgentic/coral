@@ -94,7 +94,7 @@ export function mountInbox(host, adapter, options) {
     if (named) root.setAttribute('aria-label', 'Tasks for you');
     const live = el('div', 'ibx-live'); live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');
     const list = el('ul', 'ibx-tasks');
-    const empty = el('p', 'ibx-empty'); empty.hidden = true;
+    const empty = el('p', 'empty-state empty-state-tight'); empty.hidden = true;
     root.append(live, list, empty);
     host.append(root);
     let liveFlip = false;
@@ -184,7 +184,7 @@ export function mountInbox(host, adapter, options) {
         }
         if (!options?.conversationOnly && metaRow.childNodes.length) out.push(metaRow);
         const text = full.body == null ? '' : String(full.body);
-        if (!options?.conversationOnly) out.push(inset(text ? await renderBody(text, adapter) : el('p', 'ibx-empty', 'This task has no text.')));
+        if (!options?.conversationOnly) out.push(inset(text ? await renderBody(text, adapter) : el('p', 'empty-state empty-state-tight', 'This task has no text.')));
         else if (reviewNote) out.push(reviewNote);
         const thread = only && typeof adapter.listTaskMessages === 'function' ? threadSection(task, from) : null; // the conversation under the text, above the box (#7703)
         if (thread) out.push(thread.node);
@@ -201,7 +201,7 @@ export function mountInbox(host, adapter, options) {
         node.setAttribute('aria-labelledby', headId);
         const head = el('h3', 'ibx-thread-head', 'Messages'); head.id = headId;
         const list = el('ol', 'ibx-thread-list');
-        const none = el('p', 'ibx-thread-none', 'No messages about this task yet.');
+        const none = el('p', 'empty-state empty-state-tight', 'No messages about this task yet.');
         const earlier = el('button', 'btn btn-small ibx-thread-earlier'); earlier.type = 'button'; earlier.hidden = true;
         const fresh = el('button', 'btn btn-small ibx-thread-new'); fresh.type = 'button'; fresh.hidden = true;
         node.append(head, none, earlier, list, fresh);

@@ -14,7 +14,7 @@ export function _renderDepPicker(containerId, selectedIds = [], excludeTaskId = 
     html += `<div class="dep-picker-toggle"><button type="button" class="dep-picker-add-link" data-on-click="dep-picker-toggle" data-container="${escapeAttr(containerId)}" aria-expanded="false" aria-controls="${escapeAttr(containerId)}-list">+ Add dependency</button></div>`;
     html += `<div class="dep-picker-list" id="${escapeAttr(containerId)}-list" style="display:none">`;
     if (tasks.length === 0) {
-        html += `<div class="dep-picker-empty">No eligible tasks</div>`;
+        html += `<div class="empty-state empty-state-tight">No eligible tasks</div>`;
     } else {
         tasks.forEach(t => {
             const checked = selected.has(t.id) ? ' checked' : '';

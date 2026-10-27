@@ -227,7 +227,7 @@ function render() {
         ? (_editing === _open ? `<section class="servers-page" id="server-row-${escHtml(_open)}" tabindex="-1" data-id="${escHtml(_open)}">${back}${formHtml()}</section>` : pageHtml(page))
         : `${many && _editing === null ? topBar : ''}
             ${table}
-            ${!remotes.length && !_loadError ? `<p class="servers-empty">${serversFiltered() ? 'No servers match this search.' : 'No remote servers yet.'}</p>` : ''}
+            ${!remotes.length && !_loadError ? `<p class="empty-state empty-state-tight">${serversFiltered() ? 'No servers match this search.' : 'No remote servers yet.'}</p>` : ''}
             ${_editing !== null ? formHtml() : many ? '' : '<div class="servers-form-actions"><button type="button" class="btn btn-primary" data-action="add">Add server</button></div>'}`;
     m.innerHTML = `${_open && page ? '' : '<p class="servers-intro">Servers whose agents and teams appear in this hub. The hub stores each server\'s API key (encrypted); a key grants full control of that server.</p>'}
             ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}

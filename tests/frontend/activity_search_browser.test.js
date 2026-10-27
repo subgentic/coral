@@ -112,8 +112,8 @@ async function run() {
         check('Type: Prompts shows the 10 prompts', r.length === 10 && r.every(s => s.startsWith('Fix the login bug')), r.join(' | '));
         check('and a chip names it', (await ev(`[...document.querySelectorAll('#event-search-bar .list-bar-chip-text')].map(e => e.textContent).join()`)) === 'Type: Prompts');
         await pick('#ev-type', 'permission');
-        await settle(`document.querySelector('#agentic-state-events .event-empty')?.textContent === 'No events match'`, 'no stop events');
-        check('a type with no events (no permission request was made) says so, and the count is 0 events', (await ev(`document.querySelector('#agentic-state-events .event-empty').textContent`)) === 'No events match' && (await count()) === '0 events', await count());
+        await settle(`document.querySelector('#agentic-state-events .empty-state.empty-state-tight')?.textContent === 'No events match'`, 'no stop events');
+        check('a type with no events (no permission request was made) says so, and the count is 0 events', (await ev(`document.querySelector('#agentic-state-events .empty-state.empty-state-tight').textContent`)) === 'No events match' && (await count()) === '0 events', await count());
         await pick('#ev-type', 'prompt');
         await pick('#ev-sort', 'oldest');
         await settle(`document.querySelector('#agentic-state-events .event-summary')?.textContent === 'Fix the login bug 0'`, 'oldest first');
@@ -124,7 +124,7 @@ async function run() {
         previousDay.setDate(previousDay.getDate() - 1);
         const today = day(now), yesterday = day(previousDay);
         await ev(`document.querySelector('#ev-to').value = ${JSON.stringify(yesterday)}; document.querySelector('#ev-to').dispatchEvent(new Event('change', { bubbles: true })); true`);
-        await settle(`document.querySelector('#agentic-state-events .event-empty')?.textContent === 'No events match'`, 'nothing until yesterday');
+        await settle(`document.querySelector('#agentic-state-events .empty-state.empty-state-tight')?.textContent === 'No events match'`, 'nothing until yesterday');
         check('Until yesterday leaves nothing (the events are from today)', (await count()) === '0 events', await count());
         await ev(`document.querySelector('#ev-to').value = ${JSON.stringify(today)}; document.querySelector('#ev-to').dispatchEvent(new Event('change', { bubbles: true })); true`);
         await settle(`document.querySelectorAll('#agentic-state-events .event-item').length === 10`, 'until today');
@@ -156,7 +156,7 @@ async function run() {
         check('the page keeps the hidden group in its Set', (await ev(`[...T.state.eventFiltersHidden].join()`)) === 'read');
         await type('#ev-search', 'read notes');
         await settle(`document.querySelector('#event-search-bar .list-bar-count').textContent === '30 events'`, 'the 30 reads');
-        check('a search with Read hidden: the server counts 30, the rows are filtered out, and it says so', (await ev(`document.querySelector('#agentic-state-events .event-empty')?.textContent`)) === 'All events filtered out', await count());
+        check('a search with Read hidden: the server counts 30, the rows are filtered out, and it says so', (await ev(`document.querySelector('#agentic-state-events .empty-state.empty-state-tight')?.textContent`)) === 'All events filtered out', await count());
         await ev(`window.__evReqs = 0; document.getElementById('ev-g-read').click(); true`);
         await settle(`document.querySelectorAll('#agentic-state-events .event-item').length === 30`, 'the reads back');
         check('ticking Read again shows the 30 matches, with no new request for it (the search is not run again)', (await rows()).every(s => s.startsWith('Read notes')) && (await count()) === '30 events' && (await ev(`window.__evReqs`)) === 0, String(await ev(`window.__evReqs`)));
@@ -182,8 +182,8 @@ async function run() {
         console.log('A search with an error');
         await ev(`(() => { const real = window.fetch; window.__real2 = real; window.fetch = async (u, o) => (/\\/events\\?/.test(String(u)) ? new Response(JSON.stringify({ error: 'q can\\'t contain a secret' }), { status: 400, headers: { 'content-type': 'application/json' } }) : real(u, o)); return true; })()`);
         await type('#ev-search', 'anything');
-        await settle(`/secret/.test(document.querySelector('#agentic-state-events .event-empty')?.textContent || '')`, 'the error');
-        check('the server\'s refusal is shown in the list, not swallowed', true, await ev(`document.querySelector('#agentic-state-events .event-empty').textContent`));
+        await settle(`/secret/.test(document.querySelector('#agentic-state-events .empty-state.empty-state-tight')?.textContent || '')`, 'the error');
+        check('the server\'s refusal is shown in the list, not swallowed', true, await ev(`document.querySelector('#agentic-state-events .empty-state.empty-state-tight').textContent`));
         await ev(`window.fetch = window.__real2; true`);
     } finally { if (standIn) await standIn.stop().catch(() => {}); await client.close(); }
     const failed = results.filter(r => r === 'FAIL').length;

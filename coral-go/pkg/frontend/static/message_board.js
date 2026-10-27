@@ -44,7 +44,7 @@ function renderBoardSidebar(projects) {
     const list = document.getElementById('messageboard-sidebar-list');
     if (!list) return;
     if (!projects.length) {
-        emptyState(list, 'No projects', 'empty-state', 'li');
+        emptyState(list, 'No projects', 'empty-state empty-state-tight', 'li');
         return;
     }
     list.innerHTML = projects.map(p => {

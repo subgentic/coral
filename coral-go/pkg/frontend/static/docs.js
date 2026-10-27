@@ -63,7 +63,7 @@ registerGroupSource('docs', {
 onViewShown(id => { if (id === 'group-table-view' && document.body.getAttribute('data-nav-tab') === 'docs' && selectedDoc) { selectedDoc = null; renderDocNav(); } });
 
 /** One empty, loading or error line, the same size on every tab (14/400, with an optional hint). */
-const emptyHtml = (line, hint = '') => `<div class="empty-pane"><p class="empty-line">${esc(line)}</p>${hint ? `<p class="empty-hint">${esc(hint)}</p>` : ''}</div>`;
+const emptyHtml = (line, hint = '') => `<div class="empty-state"><p class="empty-state-line">${esc(line)}</p>${hint ? `<p class="empty-state-hint">${esc(hint)}</p>` : ''}</div>`;
 
 // ── Initialization ─────────────────────────────────────────────────────
 
@@ -121,10 +121,10 @@ function showDocsError(message, retry) {
     const content = document.getElementById('docs-content');
     if (!content) return;
     const box = document.createElement('div');
-    box.className = 'empty-pane docs-error';
+    box.className = 'empty-state docs-error';
     box.setAttribute('role', 'alert');
     const p = document.createElement('p');
-    p.className = 'empty-line';
+    p.className = 'empty-state-line';
     p.textContent = message;
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -171,7 +171,7 @@ function renderDocNav() {
     const stop = shown.some(d => d.name === selectedDoc) ? selectedDoc : (shown[0] || {}).name;
     const row = d => `<li class="session-list-item${escapeAttr(selectedDoc === d.name ? ' active' : '')}"><button type="button" class="row-btn" tabindex="${Number(d.name === stop ? 0 : -1)}"${selectedDoc === d.name ? ' aria-current="true"' : ''} data-on-click="doc-open" data-doc="${escapeAttr(d.name)}" data-on-keydown="doc-open-key">${esc(titleOf(d))}</button></li>`;
     list.innerHTML = groups.map(g => groupHeaderHtml('docs', g.key, g.label, g.docs.length) + (isGroupFolded('docs', g.key) ? '' : g.docs.map(row).join(''))).join('')
-        || (docsList.length ? '<li class="empty-state">No topic matches the search.</li>' : '');
+        || (docsList.length ? '<li class="empty-state empty-state-tight">No topic matches the search.</li>' : '');
     syncPaneGroupToggle('docs');
     refreshGroupTable('docs');
 }

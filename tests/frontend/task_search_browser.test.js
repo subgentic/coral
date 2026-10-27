@@ -34,7 +34,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const bar = document.getElementById('board-task-bar');
         return { shown: !!bar.firstChild && bar.getClientRects().length > 0, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent),
             titles: rows.map(r => (r.querySelector('.board-task-desc') || {}).textContent.trim()), statuses: rows.map(r => (r.querySelector('.board-task-status-wrap') || {}).textContent), ids: rows.map(r => Number(r.dataset.taskId)),
-            more: (l.querySelector('.dt-foot') || {}).textContent || null, empty: (l.querySelector('.board-task-empty') || {}).textContent || null, hide: (() => { const e = document.querySelector('.board-task-hide-toggle'); return !!e && !e.hidden; })() }; })()`);
+            more: (l.querySelector('.dt-foot') || {}).textContent || null, empty: (l.querySelector('.empty-state.empty-state-tight') || {}).textContent || null, hide: (() => { const e = document.querySelector('.board-task-hide-toggle'); return !!e && !e.hidden; })() }; })()`);
     const load = () => ev(`(async () => { ${MODS} await tasks.loadBoardTasks(${JSON.stringify(BOARD)}); return true; })()`);
     const type = async (text) => { await ev(`document.getElementById('tk-search').focus(); true`); await Input.insertText({ text }); };
     const pick = (id, value) => ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -109,7 +109,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('"alpha" finds its two tasks of the whole board (2 of 66), with a chip', s.titles.length === 2 && s.titles.every(t => /alpha/.test(t)) && s.chips.join() === 'Search: alpha', JSON.stringify([s.count, s.titles, s.chips]));
         check('a search has no Hide done and no Load more when everything is shown', !s.hide && s.more === null, JSON.stringify([s.hide, s.more]));
         await type('x-never');
-        await settle(`document.querySelector('#board-task-list .board-task-empty')?.textContent === 'No tasks match this search.' && document.querySelector('#board-task-bar .list-bar-count').textContent === '0 of 66'`, 'the empty line and its count (the "Searching tasks..." placeholder is a .board-task-empty too)');
+        await settle(`document.querySelector('#board-task-list .empty-state.empty-state-tight')?.textContent === 'No tasks match this search.' && document.querySelector('#board-task-bar .list-bar-count').textContent === '0 of 66'`, 'the empty line and its count (the "Searching tasks..." placeholder is a .empty-state.empty-state-tight too)');
         s = await snap();
         check('nothing matching says so (0 of 66) and the bar stays', s.empty === 'No tasks match this search.' && s.count === '0 of 66' && s.shown, JSON.stringify([s.empty, s.count]));
         await ev(`document.querySelector('#board-task-bar .list-bar-clear-q').click(); true`);

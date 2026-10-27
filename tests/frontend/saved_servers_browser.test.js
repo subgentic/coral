@@ -90,7 +90,7 @@ const REMOTE = `(() => {
     const openSaved = async () => {
         if (await ev(`document.getElementById('nav-tab-hub-inbox').classList.contains('active')`)) { await ev(`window.switchNavTab('agents'); true`); await waitFor(`document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'the page left', 4000); }
         await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.showSaved()).then(() => { window.toggleAgenticPanel(true); window.switchAgenticTab('saved', 'top'); return true; })`);
-        await waitFor(`document.getElementById('saved-ui').getClientRects().length > 0 && document.querySelectorAll('#saved-table tbody tr, #saved-table .empty-line, #saved-table .group-table-note').length > 0`, 'the Saved list', 8000);
+        await waitFor(`document.getElementById('saved-ui').getClientRects().length > 0 && document.querySelectorAll('#saved-table tbody tr, #saved-table .empty-state-line, #saved-table .group-table-note').length > 0`, 'the Saved list', 8000);
     };
     const refresh = async () => { await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.showSaved()).then(() => true)`); await sleep(300); }; // sleep-ok: item checks draw their chips as each answer arrives (the refresh reads the page on home, the sidebar's tab for an agent)
 
