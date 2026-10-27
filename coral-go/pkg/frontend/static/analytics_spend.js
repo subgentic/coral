@@ -4,7 +4,8 @@
  *  - task time: tasks done, median and slowest 1 in 10 from claimed to done, the wait before claimed, review time (assignment to approval), sent back 2 or more times, tasks done a day or an hour, and by agent. A measure the endpoint does not return is left out.
  * One read feeds both: GET /api/board/<team>/spend?range=24h|7d sends counts and seconds, not ratios; the page divides. Everything is built with the DOM and textContent: agent names are written by agents. Lazy: cost_dashboard.js imports it. */
 import { state } from './state.js';
-import { boardFetch, isCloud, keyLabel, spendTeamKeys } from './server_base.js';
+import { boardFetch, isCloud, spendTeamKeys } from './server_base.js';
+import { teamLabel } from './server_status.js';
 import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 
@@ -42,7 +43,7 @@ const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 /** The teams the person can look at, on this computer or through a hub: those with an agent on the list, then the one chosen last. */
 function teams() {
-    return spendTeamKeys(state.liveSessions, isCloud()).sort((a, b) => keyLabel(a).localeCompare(keyLabel(b)));
+    return spendTeamKeys(state.liveSessions, isCloud()).sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
 }
 
 const ratio = (n, den) => (den > 0 && n != null ? n / den : null);
@@ -180,7 +181,7 @@ function drawSpend() {
     const who = el('section', 'spend-who'); who.append(el('h4', 'spend-box-title', 'Who spends'));
     who.append(table(data));
     if (data.measured_agents != null && data.of_agents != null && data.measured_agents < data.of_agents) who.append(el('p', 'spend-note', `${data.measured_agents} of ${data.of_agents} agents measured.`));
-    shape(body, { sub: `Team ${keyLabel(model.team)} · last ${f.windowWord} against the 7 days before`, headline: headline(f), cards, chart: chartBox, how, table: who });
+    shape(body, { sub: `Team ${teamLabel(model.team)} · last ${f.windowWord} against the 7 days before`, headline: headline(f), cards, chart: chartBox, how, table: who });
 }
 
 // ── task time ────────────────────────────────────────────────────────────
@@ -236,7 +237,7 @@ function drawTime() {
             { key: 'sent_back', label: 'Sent back', numeric: true, cell: a => (num(a.sent_back) != null ? String(a.sent_back) : '—') },
         ] }).el);
     }
-    shape(body, { sub: `Team ${keyLabel(model.team)} · ${word} against the 7 days before`, headline: timeHeadline(w, u, word), cards, chart: box, how: SHAPE_HOW(TIME_HOW), table: sec });
+    shape(body, { sub: `Team ${teamLabel(model.team)} · ${word} against the 7 days before`, headline: timeHeadline(w, u, word), cards, chart: box, how: SHAPE_HOW(TIME_HOW), table: sec });
 }
 
 function draw() { drawSpend(); drawTime(); }
@@ -280,7 +281,7 @@ export function showSpend(host, period, timeHost) {
     root = host;
     if (timeHost) { if (!timeHost.dataset.built) { timeHost.dataset.built = '1'; timeHost.replaceChildren(el('div', 'time-body')); } timeRoot = timeHost; }
     const sel = host.querySelector('.spend-team-select');
-    sel.replaceChildren(...list.map(t => new Option(keyLabel(t), t)));
+    sel.replaceChildren(...list.map(t => new Option(teamLabel(t), t)));
     sel.value = team;
     host.querySelector('.spend-head').hidden = list.length < 2;
     if (changed) model.data = null;

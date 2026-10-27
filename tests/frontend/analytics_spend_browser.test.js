@@ -155,6 +155,16 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             const paths = await ev(`window.__spendPaths`);
             assert.deepEqual([...new Set(paths)], ['/api/remote/box-2/api/board/remote-team/spend'], 'the read goes through the hub to box-2: ' + JSON.stringify(paths));
         });
+        await run('two teams called alpha on two computers are two options in the Team picker, told apart by their computer (#8774)', async () => {
+            await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.hub = true; st.servers = [{ id: 'box-2', label: 'Box Two', status: 'online' }];
+                window._coralSetLiveSessions([{ session_id: 'a-l', name: 'a-l', agent_type: 'claude', board_project: 'alpha', display_name: 'Local Dev', working_directory: '/tmp/x' }, { session_id: 'a-r', name: 'a-r', agent_type: 'claude', server: 'box-2', board_project: 'alpha', display_name: 'Remote Dev', working_directory: '/tmp/x' }]);
+                const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await waitFor(`document.querySelectorAll('#cost-spend select option').length >= 2`, 'the picker with two teams', 8000);
+            const opts = await ev(`[...document.querySelectorAll('#cost-spend select option')].map(o => [o.value, o.textContent])`);
+            assert.equal(opts.length, 2, JSON.stringify(opts));
+            assert.notEqual(opts[0][1], opts[1][1], 'the two labels differ: ' + JSON.stringify(opts));
+            assert.ok(opts.some(([v, t]) => v === 'alpha' && /This computer/.test(t)) && opts.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)), JSON.stringify(opts));
+        });
     } finally { await client.close(); }
     const bad = results.filter(r => r[1]); console.log(`${results.length - bad.length}/${results.length} scenarios pass`); if (bad.length) { console.error('FAIL: ' + bad.map(r => r[0]).join('; ')); process.exit(1); }
 })().catch(e => { console.error(e); process.exit(1); });
