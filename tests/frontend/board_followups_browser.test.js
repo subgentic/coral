@@ -67,6 +67,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
         add(1, { content: 'by an unusual sender', who: 'A Sender With A Rather Long Unbroken-Name' + 'N'.repeat(60) });
         { const id = nextId++; model.push({ id, subscriber_id: 'Coral Task Queue', is_system: true, job_title: 'Coral Task Queue', content: `[Task #9 claimed by QA Engineer] ${'T'.repeat(90)}END6`, created_at: new Date(Date.UTC(2026, 9, 17, 8, 0, 0) + id * 1000).toISOString() }); }
         await Promise.all([Page.enable(), Runtime.enable()]); await Page.addScriptToEvaluateOnNewDocument({ source: "try { localStorage.setItem('coral.board.view', 'chat'); } catch (e) {}" }); // the chat rows: the team page's Board tab is the table by default (#8129)
+        // The message pages are synthetic, but the team must exist: the team page checks
+        // /artifacts for board_not_found before showing its panels (#8848).
+        const homeLoaded = Page.loadEventFired();
+        await Page.navigate({ url: BASE + '/' });
+        await homeLoaded;
+        await coralReady();
+        assert.equal(await ev(`fetch('/api/board/${B}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'scroll-fixture', job_title: 'Scroll fixture' }) }).then(r => r.status)`), 200, 'the isolated board exists before opening its message panel');
         await Emulation.setDeviceMetricsOverride({ width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
         await Fetch.enable({ patterns: [{ urlPattern: `*/api/board/${B}/messages/all*` }] });
         safePaused(client, ({ requestId, request }) => {

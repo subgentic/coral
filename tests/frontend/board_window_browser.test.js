@@ -71,6 +71,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
     try {
         add(997); add(3, { queue: true }); // the newest rows are a task-queue run
         await Promise.all([Page.enable(), Runtime.enable()]);
+        // The message pages are synthetic, but the team must exist: the team page checks
+        // /artifacts for board_not_found before showing its panels (#8848).
+        const homeLoaded = Page.loadEventFired();
+        await Page.navigate({ url: BASE + '/' });
+        await homeLoaded;
+        await coralReady();
+        assert.equal(await ev(`fetch('/api/board/${B}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'scroll-fixture', job_title: 'Scroll fixture' }) }).then(r => r.status)`), 200, 'the isolated board exists before opening its message panel');
         await Emulation.setDeviceMetricsOverride({ width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
         await Fetch.enable({ patterns: [{ urlPattern: `*/api/board/${B}/messages/all*` }] });
         safePaused(client, ({ requestId, request }) => {
