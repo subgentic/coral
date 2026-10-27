@@ -349,6 +349,12 @@
       "type": "table"
     },
     {
+      "name": "board_derivations",
+      "sql": "CREATE TABLE board_derivations (name TEXT PRIMARY KEY, version TEXT NOT NULL) WITHOUT ROWID",
+      "tbl_name": "board_derivations",
+      "type": "table"
+    },
+    {
       "name": "board_goal_events",
       "sql": "CREATE TABLE board_goal_events (\n\t\t\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\tgoal_id  INTEGER NOT NULL,\n\t\t\tkind     TEXT NOT NULL,\n\t\t\tseq      INTEGER NOT NULL,\n\t\t\tat       TEXT NOT NULL\n\t\t)",
       "tbl_name": "board_goal_events",
@@ -880,6 +886,55 @@
           "partial": 0,
           "seq": 0,
           "unique": 0
+        }
+      ]
+    },
+    "board_derivations": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "name",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "version",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "name",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": "version",
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_board_derivations_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
         }
       ]
     },
