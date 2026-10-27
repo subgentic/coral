@@ -16,7 +16,7 @@ const TV = await importOnce('./tasks_view.js');
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
-export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
+export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals' }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
     const root = host;
     const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', screen: 'goal', creating: false };
     let current = goal;
@@ -118,7 +118,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     }
 
     function drawGoalMain(main, g) {
-        main.append(backButton('Goals', () => closeGoal()));
+        main.append(backButton(backLabel, () => closeGoal())); // says where it goes: the Inbox passes the screen it was opened from (#8861)
         if (teamLink) {
             const link = el('a', 'goal-team-link', 'Open on team page'); link.href = teamLink;
             link.setAttribute('aria-label', `Open ${keyLabel(team)} on team page`);
@@ -374,7 +374,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             if (disposed) return;
             const problem = el('div', 'goals-failed'); problem.setAttribute('role', 'alert');
             problem.append(el('span', null, W.failedText(e.message)), btn('btn btn-small', 'Try again', reload));
-            if (!current) { root.replaceChildren(backButton('Goals', back), problem); }
+            if (!current) { root.replaceChildren(backButton(backLabel, back), problem); }
             else { root.querySelector(':scope > .goals-failed')?.remove(); root.prepend(problem); }
         } finally { reading = false; if (again && !disposed) { again = false; reload(); } }
     }
@@ -382,7 +382,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     let stop = null, timer = null;
     if (goal) update(goal);
     else {
-        root.replaceChildren(backButton('Goals', back), el('p', 'goals-note', 'Loading goal…'));
+        root.replaceChildren(backButton(backLabel, back), el('p', 'goals-note', 'Loading goal…'));
         reload();
         stop = onGoalsSeq(board => { if (board === team) visibleRefresh(); });
         timer = pollEvery(visibleRefresh, 30000);

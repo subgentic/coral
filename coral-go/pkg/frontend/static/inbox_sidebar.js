@@ -11,6 +11,7 @@ import { needsInputAttention } from './display_activity_hint.js';
 import { state } from './state.js';
 import { reviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed } from './inbox_reviews.js';
 import { go, note, backIs, currentRoute } from './nav.js';
+
 import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
 import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey } from './server_base.js';
 import { teamLabel } from './server_status.js';
@@ -26,6 +27,7 @@ import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('./inbox_coral.js');
+const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 const TF = await importOnce('./task_filters.js');
@@ -713,9 +715,10 @@ export async function openInboxGoal(team, id) {
     host.append(VL.build({ id: 'inbox-goal-folders', label: 'Inbox views', sections: folderSections(), current: 'goals', onPick: pickFolder }));
     const view = el('div', 'goals-page goals-table-page goals-open');
     const body = el('div', 'goals-body'); view.append(body); host.append(view);
+    const before = String(history.state?.prev || '');
     goalMount = mountGoal(body, { team, id, status: sayLive,
-        teamLink: build(keyRoute('team', team, 'goals', id)), focusOnOpen: false,
-        onTask: task => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: task.id }), // a task of the goal opens in the Inbox, never on the team page (#8861)
+        teamLink: build(keyRoute('team', team, 'goals', id)), focusOnOpen: false, backLabel: backLabelFor('goal', before, openedFrom()),
+        onTask: (task, g) => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: task.id }, { from: g && g.title }), // a task of the goal opens in the Inbox, never on the team page (#8861); its Back says the goal
         back: () => { if (backIs(folderRoute) || cameFromInbox()) history.back(); else go(folderRoute); }, // to the Inbox screen it was opened from (a task's Goal line), else the folder
     });
     renderInboxNav(true);
@@ -737,7 +740,8 @@ export async function openInboxItem(kind, team, id) {
     showView('inbox-view'); $('inbox-view')?.setAttribute('data-phone-item', '');
     host.append(VL.build({ id: 'inbox-item-folders', label: 'Inbox views', sections: folderSections(), current: key, onPick: pickFolder }));
     const body = el('div', 'inbox-item-body'); host.append(body);
-    itemMount = mountInboxItem(body, { kind, team, id, onChanged: refreshTasks, back: () => { if (backIs(route) || cameFromInbox()) history.back(); else go(route); } }); // Back returns to the Inbox screen it was opened from (a goal, another task), else to the folder
+    const before = String(history.state?.prev || '');
+    itemMount = mountInboxItem(body, { kind, team, id, onChanged: refreshTasks, backLabel: kind === 'tasks' ? backLabelFor('task', before, openedFrom()) : '', back: () => { if (backIs(route) || cameFromInbox()) history.back(); else go(route); } }); // Back returns to the Inbox screen it was opened from (a goal, another task), else to the folder
     renderInboxNav(true);
 }
 

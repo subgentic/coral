@@ -10,7 +10,7 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const B = 'bt-' + Date.now().toString(36), TASK = 'Referenced from the board';
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
-    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = require('./helpers/scene_shots')(Page); // the gate's uploaded output in CI, CORAL_SCREENSHOT_DIR locally
     const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -30,6 +30,7 @@ const BASE = require('./test_base').BASE;
             await ev(`(() => { const row = [...document.querySelectorAll('#inbox-page .mb-message')].find(r => r.textContent.includes('See task #${T}')); row.querySelector('.mb-row-toggle').click(); row.querySelector('.mb-task-link').click(); return true; })()`);
             await waitFor(`location.pathname === ${JSON.stringify(taskUrl)} && document.querySelector('#inbox-page .team-task-page')?.textContent.includes(${JSON.stringify(TASK)})`, 'the task in the Inbox at ' + taskUrl, 15000);
             assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none'`), true, at + 'the team page is not on screen');
+            assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`), '\u2190 Board history', at + 'the task opened from Board history says Board history');
             await shot(`inbox-board-task-landing-${w}`);
             await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
             await waitFor(`location.pathname === ${JSON.stringify(boardUrl)} && !!document.querySelector('#inbox-page .mb-message')`, 'Back returns to the board', 15000);

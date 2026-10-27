@@ -18,14 +18,14 @@ export function currentRoute() { return current; }
 
 // Each entry also records the URL of the entry it was pushed from (prev), so a "back" control
 // can go back in history when that is where it leads, instead of pushing a copy of it.
-function write(route, replace) {
+function write(route, replace, from) {
     const url = build(route);
     const here = location.pathname + location.search;
     if (replace || url === here) {
         const prev = history.state && typeof history.state.prev === 'string' ? history.state.prev : null;
         history.replaceState({ coralRoute: route, prev }, '', url);
     } else {
-        history.pushState({ coralRoute: route, prev: here }, '', url);
+        history.pushState({ coralRoute: route, prev: here, ...(from ? { from: String(from) } : {}) }, '', url); // from: the title of the goal or task this was opened from, so its Back says where it goes (#8861)
     }
     current = route;
 }
@@ -38,9 +38,9 @@ export function backIs(route) {
 
 /** Go to a route: write it to history (a push unless replace) and show it. An invalid route
  *  goes home. */
-export function go(route, { replace = false } = {}) {
+export function go(route, { replace = false, from = '' } = {}) {
     route = normalize(route) || { view: 'agents' };
-    write(route, replace);
+    write(route, replace, from);
     return show(route, { fromHistory: false }).finally(routeChanged);
 }
 
