@@ -28,7 +28,7 @@ export function tableSortOf(word) {
 }
 export function artifactTable(cfg) {
     const state = cfg.state || DT.tableState();
-    if (cfg.groupBy && !state.sortTouched) state.sort = null; // a grouped list keeps its groups (a head per task or goal, its files together) until a header is pressed: DataTable draws heads only while it is unsorted
+    if (cfg.groupBy && !state.sortTouched) state.sort = null; // a grouped list (the goal's, the team's by Task or Goal) keeps its groups, a head per task or goal with its files together, until a header is pressed on it: DataTable draws heads only while it is unsorted. The remembered sort applies to the ungrouped lists.
     else state.sort ||= artifactSort();
     const columns = [
         { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: readableName, cell: item => {
