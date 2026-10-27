@@ -3,15 +3,13 @@
 //   - identity chain display_name -> auto_name -> board_job_title -> Agent on
 //     row label, avatar initials, header, terminal label and Sending-to
 //     placeholder (summary and first_prompt are goal text only, never names or
-//     initials); passive "No goal yet" label, sparkle-only
-//     goal trigger; generic spread-merge of WS diffs (omitted preserves,
+//     initials); generic spread-merge of WS diffs (omitted preserves,
 //     explicit null/empty/value overwrites)
-//   - mobile-only banner/meta rows hidden on desktop
-//   - context bar labelled "ctx N%" / "ctx full"; informational only, no
-//     clickable Compact control at any level (users type /compact in chat)
+//   - a row is one line, a dot, the name and at most one chip (#9686: the goal line, the sparkle, the banner, the meta row and the context pill moved off it)
+//   - no clickable Compact control at any level (users type /compact in chat)
 //   - Mode quick action shows Default/Plan/Accept (or "Mode" when unknown)
 //   - Agents nav badge counts rows needing attention without reordering rows
-//   - density sizes and the Transcript tab rename
+//   - the Transcript tab rename
 //
 // Drives a running Coral server via headless Chrome + Chrome DevTools Protocol.
 //
@@ -154,15 +152,6 @@ async function run() {
         // Switch to Agents tab / desktop layout and render our fixture.
         check('fetch stub is installed before app start', await evalInPage(`typeof window.__origFetch === 'function' && Array.isArray(window.__fixture)`));
         await evalInPage(`localStorage.setItem('coral-group-by-team', 'false'); window.switchNavTab('agents'); true`);
-        // Agent summaries are off by default (server-side setting); these checks are about the goal line.
-        // Toggle only after the app's startup loadSettings() has landed: it replaces state.settings
-        // wholesale, so a late response would switch the summary back off (seen under parallel CDP shards).
-        await until(`(async () => (await import((window.__coralStatic||'/static/')+'state.js')).state.settings.file_search_mode !== undefined)()`, 'the startup settings', 10000);
-        // Even after that, a second startup load can land and switch it back off: turn it on until it stays on.
-        await waitStable(`(async () => { const r = await import((window.__coralStatic||'/static/')+'render.js'); if (!r.isSessionSummaryShown()) window.toggleSessionSummary(); return r.isSessionSummaryShown(); })()`,
-            'the session summary', 500, { timeout: 5000, accept: v => v === true }).catch(() => {});
-        check('session summary is shown before the goal-line checks',
-            await evalInPage(`(async () => (await import((window.__coralStatic||'/static/')+'render.js')).isSessionSummaryShown())()`));
         await setFixture(SESSIONS);
         // A startup-style reload through the real API path must keep the fixture.
         await evalInPage(`window._coralLoadLiveSessions()`);
@@ -231,49 +220,31 @@ async function run() {
         // D5 badge-only: ordering preserved exactly (folders are grouped by
         // insertion order; within a folder the payload order is kept).
         const order = rows.map(r => r.sid).join(',');
+        check('every row is one line, 36 px (#9686)', rows.every(r => r.height >= 34 && r.height <= 38), JSON.stringify(rows.map(r => r.height)));
         check('session ordering preserved (no attention sort)',
             order === ORDER, order);
 
         // D1 identity
-        check('summary shown on non-active row', bySid['sid-a'].goalText === 'Refactoring the store layer', bySid['sid-a'].goalText);
-        check('first_prompt fallback is one-line', bySid['sid-b'].goalText === 'Please fix the flaky websocket reconnect test in xterm_renderer.js', bySid['sid-b'].goalText);
-        check('empty goal shows "No goal yet"', bySid['sid-c'].goalEmpty && /No goal yet/.test(bySid['sid-c'].goalText), bySid['sid-c'].goalText);
-        check('generate-goal button is always visible when no goal', bySid['sid-c'].goalBtnVisible);
-        check('terminal without goal shows no goal affordance', !bySid['sid-d'].hasGoal);
         // Screenshot cases (task #85): a sentence or a path in first_prompt is
         // goal text, never a name or initials.
         check('sentence prompt is not the row label (Agent)', bySid['sid-b'].label === 'coral-go · Claude', bySid['sid-b'].label);
-        check('sentence prompt still shows on the goal line', bySid['sid-b'].goalText.startsWith('Please fix the flaky websocket'), bySid['sid-b'].goalText);
         check('row label carries a title with the resolved identity', bySid['sid-b'].labelTitle === 'coral-go · Claude' && bySid['sid-g'].labelTitle === 'Release Wrangler', `${bySid['sid-b'].labelTitle} / ${bySid['sid-g'].labelTitle}`);
         check('path prompt with board_job_title uses the job title as label', bySid['sid-g'].label === 'Release Wrangler', bySid['sid-g'].label);
-        check('path prompt shows on the goal line', bySid['sid-g'].goalText === '/Users/me/Software/coral/coral-go fix the release workflow', bySid['sid-g'].goalText);
         check('identity from board_job_title, not path words (aria-label)', /^Release Wrangler, /.test(bySid['sid-g'].ariaLabel || ''), bySid['sid-g'].ariaLabel);
         check('row label with no identity falls back to Agent', bySid['sid-c'].label === 'coral-go · Claude', bySid['sid-c'].label);
         check('summary is goal text only, never the row label', bySid['sid-f'].label === 'other-proj · Claude', bySid['sid-f'].label);
         check('terminal row label falls back to Terminal', bySid['sid-d'].label === 'Terminal', bySid['sid-d'].label);
         // Passive "No goal yet" label: no click handler, no action title, no pointer.
-        check('"No goal yet" label has no onclick', bySid['sid-c'].emptyLabelOnclick === null, bySid['sid-c'].emptyLabelOnclick);
-        check('"No goal yet" label has no action title', bySid['sid-c'].emptyLabelTitle === null, bySid['sid-c'].emptyLabelTitle);
-        check('"No goal yet" label has no cursor styling of its own (inherits the row)', bySid['sid-c'].emptyLabelCursor === bySid['sid-c'].rowCursor, `${bySid['sid-c'].emptyLabelCursor} vs row ${bySid['sid-c'].rowCursor}`);
-        check('sparkle hit target is at least 24x24', bySid['sid-c'].sparkleW >= 24 && bySid['sid-c'].sparkleH >= 24, `${bySid['sid-c'].sparkleW}x${bySid['sid-c'].sparkleH}`);
-        check('sparkle has an aria-label naming the agent', bySid['sid-c'].sparkleAria === 'Generate goal for coral-go', bySid['sid-c'].sparkleAria);
         check('identity never derives from prompt words (aria-label Agent)', /^coral-go, Claude, /.test(bySid['sid-b'].ariaLabel || ''), bySid['sid-b'].ariaLabel);
         // AGENT_LIST_COMPACT supersedes D1 avatars in the list: no avatar element in any row.
         check('no avatar element in list rows (AGENT_LIST_COMPACT)', rows.every(r => r.avatarW === null && r.initials === null && r.avatarEmoji === null), JSON.stringify(rows.map(r => [r.avatarW, r.initials])));
         check('identity never derives from mutable summary (aria-label Agent)', /^other-proj, Claude, /.test(bySid['sid-f'].ariaLabel || ''), bySid['sid-f'].ariaLabel);
-        check('summary-only row still shows summary as goal', bySid['sid-f'].goalText === 'Investigate slow startup on Windows', bySid['sid-f'].goalText);
         check('identity from display_name when present (aria-label)', /^Zed, /.test(bySid['sid-e'].ariaLabel || ''), bySid['sid-e'].ariaLabel);
         check('named agent aria-label carries identity + state (+ context suffix at >= 80%)', /^Lead Dev, (Working|Idle)(, context (87%|full))?$/.test(bySid['sid-a'].ariaLabel || ''), bySid['sid-a'].ariaLabel);
 
         // D2 desktop hides mobile-only rows
-        check('mobile banner row hidden on desktop', bySid['sid-c'].bannerDisplay === 'none', bySid['sid-c'].bannerDisplay);
-        check('mobile meta row hidden on desktop', bySid['sid-c'].metaDisplay === 'none', bySid['sid-c'].metaDisplay);
-        check('banner markup still emitted for mobile clone', bySid['sid-c'].bannerText === 'Nothing yet — open the terminal', bySid['sid-c'].bannerText);
 
         // D3 context bar
-        check('no ctx pill below 80% (42%)', bySid['sid-b'].ctxPill === null, String(bySid['sid-b'].ctxPill));
-        check('ctx pill at >= 80% reads "ctx 87%" on line 1', bySid['sid-a'].ctxPill === 'ctx 87%', String(bySid['sid-a'].ctxPill));
-        check('attention pill wins over the ctx pill (100% + not_started -> Check terminal only)', bySid['sid-c'].attnPill === 'Check terminal' && bySid['sid-c'].ctxPill === null, JSON.stringify([bySid['sid-c'].attnPill, bySid['sid-c'].ctxPill]));
         check('needs-input row shows exactly the Needs input pill', bySid['sid-b'].attnPill === 'Needs input', String(bySid['sid-b'].attnPill));
         // Operator decision (task #75): the context bar is informational only.
         check('no Compact control at >= 80%', !bySid['sid-a'].compactBtn && bySid['sid-a'].ctxClickables === 0 && !bySid['sid-a'].ctxHasOnclick);
@@ -284,10 +255,6 @@ async function run() {
         check('compactSession plumbing removed', await evalInPage(`typeof window.compactSession`) === 'undefined');
 
         // D6 density
-        check('row with goal is 40px ±1 (AGENT_LIST_COMPACT)', Math.abs(bySid['sid-a'].height - 40) <= 1, `${bySid['sid-a'].height}`);
-        check('row vertical padding is 5px', bySid['sid-a'].padTop === '5px', bySid['sid-a'].padTop);
-        check('terminal row without goal is 36px ±1', Math.abs(bySid['sid-d'].height - 36) <= 1, `${bySid['sid-d'].height}`);
-        check('sleeping/attention/empty rows never exceed 41px', rows.every(r => r.height <= 41), JSON.stringify(rows.map(r => r.height)));
 
         // D5: the Agents nav attention badge was removed; rows still carry needs-attention
         check('no Agents nav badge', await evalInPage(`document.getElementById('nav-tab-agents-badge')`) == null);
@@ -391,7 +358,6 @@ async function run() {
         const afterDiff = await evalInPage(`(() => {
             const li = document.querySelector('#live-sessions-list [data-session-id="sid-b"]');
             return {
-                goal: li ? li.querySelector('.session-goal').textContent.replace(/\\s+/g, ' ').trim() : null,
                 aria: li ? li.getAttribute('aria-label') : null,
                 ctx: (window._coralGetLiveSessions().find(s => s.session_id === 'sid-b') || {}).context_pct,
                 header: document.getElementById('session-name').textContent,
@@ -400,7 +366,6 @@ async function run() {
                 order: Array.from(document.querySelectorAll('#live-sessions-list .session-group-item')).map(li => li.dataset.sessionId).join(','),
             };
         })()`);
-        check('diff without first_prompt keeps row goal', afterDiff.goal === 'Please fix the flaky websocket reconnect test in xterm_renderer.js', afterDiff.goal);
         check('diff without first_prompt keeps Agent identity (aria-label)', /^coral-go, Claude, /.test(afterDiff.aria || ''), afterDiff.aria);
         check('diff still applies changed fields (context_pct 45 in state)', afterDiff.ctx === 45, String(afterDiff.ctx));
         check('diff without first_prompt keeps header identity', afterDiff.header === 'coral-go', afterDiff.header);
@@ -419,38 +384,15 @@ async function run() {
         await nextFrame();
         const afterRename = await evalInPage(`(() => {
             const li = document.querySelector('#live-sessions-list [data-session-id="sid-b"]');
-            return { label: li.querySelector('.session-label').textContent.trim(), goal: li.querySelector('.session-goal').textContent.trim(),
+            return { label: li.querySelector('.session-label').textContent.trim(),
                      aria: li.getAttribute('aria-label'), header: document.getElementById('session-name').textContent,
                      placeholder: document.getElementById('command-input').placeholder };
         })()`);
         check('diff display_name update applies to row + header', afterRename.label === 'Renamed Bot' && afterRename.header === 'Renamed Bot', JSON.stringify(afterRename));
-        check('diff summary update applies to goal line', afterRename.goal === 'Now writing tests', afterRename.goal);
         check('aria-label follows display_name after rename', /^Renamed Bot, /.test(afterRename.aria || ''), afterRename.aria);
         check('placeholder follows display_name after rename', /^Message Renamed Bot/.test(afterRename.placeholder), afterRename.placeholder);
         await setFixture(SESSIONS);
 
-        // ── Passive label vs sparkle ──────────────────────────────────────
-        // With sid-a active, clicking "No goal yet" on sid-c must select sid-c
-        // and issue no /send and no requestGoal.
-        await evalInPage(`window.selectLiveSession('coral-go', 'claude', 'sid-a'); true`);
-        await selected('sid-a');
-        await evalInPage(`window.__goalCalls = 0; const _rg = window.requestGoal; window.__origRequestGoal = _rg; window.requestGoal = (...a) => { window.__goalCalls++; return _rg(...a); }; window.__sendCalls = []; true`);
-        await evalInPage(`document.querySelector('#live-sessions-list [data-session-id="sid-c"] .session-goal-empty-label').click(); true`);
-        await selected('sid-c');
-        const afterLabel = await evalInPage(`({ active: document.querySelector('#live-sessions-list .session-group-item.active')?.dataset.sessionId, sends: window.__sendCalls.length, goals: window.__goalCalls, header: document.getElementById('session-name').textContent })`);
-        check('passive label click selects the row', afterLabel.active === 'sid-c' && afterLabel.header === 'coral-go', JSON.stringify(afterLabel));
-        check('passive label click sends zero requests', afterLabel.sends === 0, `${afterLabel.sends}`);
-        check('passive label click does not request a goal', afterLabel.goals === 0, `${afterLabel.goals}`);
-        // Sparkle is the sole trigger, and it does not change the selection.
-        await evalInPage(`window.selectLiveSession('coral-go', 'claude', 'sid-a'); true`);
-        await selected('sid-a');
-        await evalInPage(`window.__sendCalls = []; document.querySelector('#live-sessions-list [data-session-id="sid-c"] .sidebar-goal-btn-inline').click(); true`);
-        await until(`window.__goalCalls >= 1`, 'the sparkle goal request');
-        const afterSparkle = await evalInPage(`({ active: document.querySelector('#live-sessions-list .session-group-item.active')?.dataset.sessionId, goals: window.__goalCalls, sends: window.__sendCalls.map(c => c.url) })`);
-        check('sparkle is the sole goal trigger', afterSparkle.goals === 1, `${afterSparkle.goals}`);
-        check('sparkle click does not change the active session', afterSparkle.active === 'sid-a', afterSparkle.active);
-        check('sparkle request targets the clicked row, not the active one', afterSparkle.sends.every(u => /\/api\/sessions\/live\/coral-go\//.test(u)) && afterSparkle.sends.length <= 1, JSON.stringify(afterSparkle.sends));
-        await evalInPage(`window.__sendCalls = null; window.requestGoal = window.__origRequestGoal; true`);
 
         // ── auto_name precedence + generic merge semantics ────────────────
         check('live-sessions read hook exposed', await evalInPage(`typeof window._coralGetLiveSessions === 'function'`));
@@ -462,15 +404,13 @@ async function run() {
         await nextFrame();
         const rowF = () => evalInPage(`(() => {
             const li = document.querySelector('#live-sessions-list [data-session-id="sid-f"]');
-            const g = li.querySelector('.session-goal');
             return { label: li.querySelector('.session-label').textContent.trim(), aria: li.getAttribute('aria-label'),
-                     goal: g ? g.textContent.replace(/\\s+/g, ' ').trim() : null, ctx: (window._coralGetLiveSessions().find(s => s.session_id === 'sid-f') || {}).context_pct,
+                     ctx: (window._coralGetLiveSessions().find(s => s.session_id === 'sid-f') || {}).context_pct,
                      order: Array.from(document.querySelectorAll('#live-sessions-list .session-group-item')).map(li => li.dataset.sessionId).join(',') };
         })()`);
         let f = await rowF();
         check('auto_name becomes the row label when no display_name', f.label === 'Store Refactorer', f.label);
         check('auto_name drives the aria-label identity', /^Store Refactorer, /.test(f.aria || ''), f.aria);
-        check('auto_name diff keeps omitted summary as goal', f.goal === 'Investigate slow startup on Windows', f.goal);
         check('auto_name diff keeps omitted context_pct', f.ctx === 63, String(f.ctx));
         check('auto_name diff does not reorder', f.order === ORDER, f.order);
         const mergedF = JSON.parse(await evalInPage(`JSON.stringify(window._coralGetLiveSessions().find(s => s.session_id === 'sid-f'))`));
@@ -494,7 +434,6 @@ async function run() {
         await nextFrame();
         f = await rowF();
         const hdrF2 = await evalInPage(`({ name: document.getElementById('session-name').textContent, ph: document.getElementById('command-input').placeholder })`);
-        check('summary-only diff updates the goal line', f.goal === 'Now profiling startup', f.goal);
         check('summary-only diff leaves label + aria identity unchanged', f.label === 'Store Refactorer' && /^Store Refactorer, /.test(f.aria || ''), JSON.stringify(f));
         check('summary-only diff leaves header + placeholder unchanged', hdrF2.name === 'Store Refactorer' && /^Message Store Refactorer/.test(hdrF2.ph), JSON.stringify(hdrF2));
 
@@ -507,7 +446,6 @@ async function run() {
         const hdrF3 = await evalInPage(`({ name: document.getElementById('session-name').textContent, ph: document.getElementById('command-input').placeholder })`);
         check('explicit null auto_name falls back to Agent', f.label === 'other-proj · Claude' && hdrF3.name === 'other-proj' && /^Message other-proj/.test(hdrF3.ph), JSON.stringify({ f, hdrF3 }));
         check('aria identity falls back to Agent after auto_name cleared', /^other-proj, Claude, /.test(f.aria || ''), f.aria);
-        check('explicit empty summary clears the goal line', /No goal yet/.test(f.goal || ''), f.goal);
         check('explicit context_pct value overwrites', f.ctx === 71, String(f.ctx));
 
         // display_name always beats auto_name.
@@ -601,17 +539,16 @@ async function run() {
         check('header falls back to "Agent" with no identity', bare.name === 'coral-go', bare.name);
         check('placeholder falls back to "Agent"', /^Message coral-go,/.test(bare.ph), bare.ph);
 
-        // Clicking the high-context bar itself must not send anything: the
-        // context display is informational only. (It still bubbles to the row
-        // click, which selects that session like any other click on the row.)
+        // Clicking a high-context agent's row must not send anything: the context is informational only
+        // (the row's context pill moved to the agent's page with #9686; the click selects the session like any other click on the row).
         await evalInPage(`window.__sendCalls = []; true`);
-        await evalInPage(`document.querySelector('#live-sessions-list [data-session-id="sid-a"] .session-ctx-pill').click(); true`);
+        await evalInPage(`document.querySelector('#live-sessions-list [data-session-id="sid-a"]').click(); true`);
         await sleep(200); // sleep-ok: nothing may be sent within this window
         const calls = await evalInPage(`window.__sendCalls`);
         await evalInPage(`window.__sendCalls = null; true`);
-        check('clicking the ctx pill sends no /send request', calls.length === 0, JSON.stringify(calls));
+        check('clicking a high-context row sends no /send request', calls.length === 0, JSON.stringify(calls));
         const toast = await evalInPage(`Array.from(document.querySelectorAll('.toast')).map(t => t.textContent).join(' | ')`);
-        check('clicking the ctx pill shows no compact toast', !/compact/i.test(toast), toast);
+        check('clicking a high-context row shows no compact toast', !/compact/i.test(toast), toast);
 
         // ── Top nav copy: "Tokens" tab is labelled "Analytics" (id/route/view unchanged) ──
         const navBefore = await evalInPage(`(() => {
@@ -637,7 +574,7 @@ async function run() {
         await until(`document.querySelector('.top-nav-tab.active')?.id === 'nav-tab-agents'`, 'the Agents tab');
         check('switching back restores the Agents tab', await evalInPage(`document.querySelector('.top-nav-tab.active')?.id`) === 'nav-tab-agents');
 
-        // ── 390px mobile: empty-goal affordance stays one line; banner/meta visible ──
+        // ── 390px mobile: an agent card is one line (#9686): the dot, the name and at most one chip; no banner, no meta row ──
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: false });
         await evalInPage(`window.dispatchEvent(new Event('resize')); true`);
         await until(`innerWidth === 390`, 'the 390px viewport');
@@ -649,27 +586,17 @@ async function run() {
             const list = document.getElementById('mobile-session-list');
             if (!list) return { list: false };
             const li = list.querySelector('[data-session-id="sid-c"]');
-            const empty = li.querySelector('.session-goal-empty');
-            const btn = li.querySelector('.sidebar-goal-btn-inline');
-            const lbl = li.querySelector('.session-goal-empty-label');
-            const br = btn.getBoundingClientRect(), lr = lbl.getBoundingClientRect(), er = empty.getBoundingClientRect();
-            const banner = li.querySelector('.session-mobile-banner-row'), meta = li.querySelector('.session-mobile-meta');
-            return { list: true, emptyDisplay: getComputedStyle(empty).display, emptyHeight: er.height, labelHeight: lr.height,
-                     centerDelta: Math.abs((br.top + br.height / 2) - (lr.top + lr.height / 2)), sideBySide: br.right <= lr.left + 1,
-                     sparkle: [br.width, br.height], bannerDisplay: getComputedStyle(banner).display, bannerText: (li.querySelector('.session-mobile-banner') || {}).textContent || '',
-                     metaDisplay: getComputedStyle(meta).display, metaVisibleH: meta.getBoundingClientRect().height, viewport: innerWidth };
+            const chips = [...li.querySelectorAll('.chip')].filter(c => c.getClientRects().length > 0).map(c => c.textContent.trim());
+            return { list: true, height: Math.round(li.getBoundingClientRect().height), chips, extra: [...li.querySelectorAll('.session-goal, .session-goal-empty, .session-mobile-banner-row, .session-mobile-meta, .session-ctx-pill')].map(e => e.className), viewport: innerWidth,
+                     over: list.scrollWidth - list.clientWidth };
         })()`);
         check('mobile clone list rendered at 390px', mobile.list && mobile.viewport === 390, JSON.stringify(mobile));
-        check('mobile empty-goal affordance is a flex row (clamp overridden)', mobile.emptyDisplay === 'flex', mobile.emptyDisplay);
-        check('mobile sparkle + label sit on one line', mobile.sideBySide && mobile.centerDelta <= 6 && mobile.labelHeight <= 26 && mobile.emptyHeight <= 30, JSON.stringify(mobile));
-        check('mobile sparkle hit target is at least 24x24', mobile.sparkle[0] >= 24 && mobile.sparkle[1] >= 24, JSON.stringify(mobile.sparkle));
-        check('mobile banner row visible', mobile.bannerDisplay === 'block' && mobile.bannerText === 'Nothing yet — open the terminal', JSON.stringify([mobile.bannerDisplay, mobile.bannerText]));
-        check('mobile: a Check terminal card is its banner alone, the state chip row is empty and not drawn (one chip per state, #9464)', mobile.metaDisplay === 'none' && mobile.metaVisibleH === 0, JSON.stringify([mobile.metaDisplay, mobile.metaVisibleH]));
+        check('mobile card is one 44 px line, nothing sideways', mobile.height >= 43 && mobile.height <= 46 && mobile.over <= 1, JSON.stringify(mobile));
+        check('mobile card: a Check terminal agent has its one chip drawn, and no goal, banner, meta or context pill', mobile.chips.length === 1 && /Check terminal/.test(mobile.chips[0]) && mobile.extra.length === 0, JSON.stringify(mobile));
         // Back to desktop; the desktop rules must still hide the mobile rows.
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await evalInPage(`window.dispatchEvent(new Event('resize')); true`);
         await setFixture(SESSIONS);
-        check('desktop still hides mobile rows after switching back', await evalInPage(`getComputedStyle(document.querySelector('#live-sessions-list [data-session-id="sid-c"] .session-mobile-meta')).display`) === 'none');
     } finally {
         await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message)));
         await client.close();
