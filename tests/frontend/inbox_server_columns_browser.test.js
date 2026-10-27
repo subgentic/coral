@@ -47,11 +47,10 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
    })()`);
    for(const folder of folders){try{
     await open(folder);
-    // Artifacts (#8839): the Team column's words carry the computer ("alpha · Remote box"), so there is no Server column while Team shows; the Server filter stays in the panel
-    const artifacts=folder==='artifacts',col=artifacts?'team':'server',is=t=>artifacts?`e.textContent.includes('${t}')`:`e.textContent==='${t}'`;
-    if(!artifacts)await waitFor(`!!document.querySelector('#group-table-view th[data-key="server"]')`,'Server column in '+folder,5000);
-    else await waitFor(`!!document.querySelector('#group-table-view th[data-key="team"]')`,'Team column in '+folder,5000);
-    if(artifacts)assert.ok(await ev(`!document.querySelector('#group-table-view th[data-key="server"]')`),'no Server column while the Team column says the computer');
+    // Artifacts (#9408): a Computer column of its own (th data-key server) beside the plain Team, one line each; the row's hover and preview name it where a narrow list drops both; the Server filter stays in the panel
+    const artifacts=folder==='artifacts',col='server',is=t=>`e.textContent==='${t}'`;
+    await waitFor(`!!document.querySelector('#group-table-view th[data-key="server"]')`,'Server column in '+folder,5000);
+    if(artifacts)assert.ok(await ev(`[...document.querySelectorAll('#group-table-view th[data-key="server"]')].every(h=>h.textContent.trim().startsWith('Computer'))&&[...document.querySelectorAll('#group-table-view td[data-key="team"]')].every(e=>!/This computer|Remote box/.test(e.textContent))`),'the column is called Computer and Team is the plain team name');
     if(['tasks','goals','needs'].includes(folder))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('server')>0&&keys.indexOf('server')===keys.indexOf('team')-1;})()`),'Server immediately precedes Team');
     if(folder.startsWith('chats'))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('when')>=0&&keys.indexOf('server')===keys.indexOf('when')+1;})()`),'Server follows When (#8961: one line a chat, Title, Agent, When, then Server; Server and then Agent drop first)');
     const cells=`[...document.querySelectorAll('#group-table-view td[data-key="${col}"]')]`;
@@ -89,7 +88,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
      await ev(`(()=>{const s=document.querySelector('#group-table-view .dt-sortbar select');if(s&&s.getClientRects().length)document.querySelector('#group-table-view .dt-sortbar-dir').click();else document.querySelector('#group-table-view th[data-key="server"] button.dt-sort').click();return true;})()`);
      await waitFor(`document.querySelector('#group-table-view th[data-key="server"]')?.getAttribute('aria-sort')==='descending'`,'selected team Server descending sort');
      await ev(`(()=>{const s=${team};s.value='';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
-     await waitFor(`!!document.querySelector('#group-table-view th[data-key="team"]')&&!document.querySelector('#group-table-view th[data-key="server"]')`,'clearing team restores Team without Server');
+     await waitFor(`!!document.querySelector('#group-table-view th[data-key="team"]')&&!!document.querySelector('#group-table-view th[data-key="server"]')`,'clearing team restores Team and its Computer column (#9408)');
      await waitFor(`${cells}.length===2&&${cells}.some(e=>e.textContent.includes('This computer'))&&${cells}.some(e=>e.textContent.includes('Remote box'))`,'clearing team restores both sources');
      assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-sortbar select option')].some(o=>o.value==='server')`),false,'clearing team also removes Server from Sort by');
      console.log('PASS Artifacts team/Server column and sort round trip '+width);
