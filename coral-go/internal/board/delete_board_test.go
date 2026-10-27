@@ -244,6 +244,7 @@ func TestDeleteProjectIfUnusedTakesABoardNobodyUsed(t *testing.T) {
 // Every table of the board database that has a board key column is either cleaned by DeleteProject (boardOwnedRows), an audit trail that stays (auditRows), or named here with the reason it is neither: a new
 // per-board table that is none of these fails this test, so it cannot be left behind by a deleted board (#7355: board_goal_events was, until Security's probe).
 var notCleanedWithTheBoard = map[string]string{
+	"board_message_counts":  "derived from board_messages by triggers (message_counts.go): DeleteProject deletes the board's messages and each delete takes its count down, so the row goes with them (checked in message_counts_test.go)",
 	"cross_team_switch_log": "an audit trail of what the cross-team switches did, like the audit rows above: a record of what happened, not part of the board",
 }
 

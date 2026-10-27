@@ -385,6 +385,12 @@
       "type": "table"
     },
     {
+      "name": "board_message_counts",
+      "sql": "CREATE TABLE board_message_counts (project TEXT PRIMARY KEY, n INTEGER NOT NULL) WITHOUT ROWID",
+      "tbl_name": "board_message_counts",
+      "type": "table"
+    },
+    {
       "name": "board_message_mentions",
       "sql": "CREATE TABLE board_message_mentions (\n\t\t\ttoken      TEXT NOT NULL,\n\t\t\tmessage_id INTEGER NOT NULL,\n\t\t\tPRIMARY KEY (token, message_id)\n\t\t) WITHOUT ROWID",
       "tbl_name": "board_message_mentions",
@@ -604,6 +610,24 @@
       "name": "board_goals_uid_immutable",
       "sql": "CREATE TRIGGER board_goals_uid_immutable BEFORE UPDATE OF goal_uid ON board_goals WHEN OLD.goal_uid IS NOT NEW.goal_uid\n\t\t\tBEGIN SELECT RAISE(ABORT, 'a goal uid is never changed'); END",
       "tbl_name": "board_goals",
+      "type": "trigger"
+    },
+    {
+      "name": "board_message_counts_ad",
+      "sql": "CREATE TRIGGER board_message_counts_ad AFTER DELETE ON board_messages BEGIN\n\tUPDATE board_message_counts SET n = n - 1 WHERE project = OLD.project;\n\tDELETE FROM board_message_counts WHERE project = OLD.project AND n \u003c= 0;\nEND",
+      "tbl_name": "board_messages",
+      "type": "trigger"
+    },
+    {
+      "name": "board_message_counts_ai",
+      "sql": "CREATE TRIGGER board_message_counts_ai AFTER INSERT ON board_messages BEGIN\n\tINSERT INTO board_message_counts (project, n) VALUES (NEW.project, 1) ON CONFLICT (project) DO UPDATE SET n = n + 1;\nEND",
+      "tbl_name": "board_messages",
+      "type": "trigger"
+    },
+    {
+      "name": "board_message_counts_au",
+      "sql": "CREATE TRIGGER board_message_counts_au AFTER UPDATE OF project ON board_messages WHEN OLD.project IS NOT NEW.project BEGIN\n\tUPDATE board_message_counts SET n = n - 1 WHERE project = OLD.project;\n\tDELETE FROM board_message_counts WHERE project = OLD.project AND n \u003c= 0;\n\tINSERT INTO board_message_counts (project, n) VALUES (NEW.project, 1) ON CONFLICT (project) DO UPDATE SET n = n + 1;\nEND",
+      "tbl_name": "board_messages",
       "type": "trigger"
     },
     {
@@ -1788,6 +1812,55 @@
         }
       ],
       "indexes": []
+    },
+    "board_message_counts": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "n",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": "n",
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_board_message_counts_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
     },
     "board_message_mentions": {
       "columns": [

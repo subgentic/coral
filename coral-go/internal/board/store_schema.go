@@ -20,6 +20,9 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 	s.migrateBoardColumns(ctx)
 	s.backfillBoardSubscriberIDs(ctx)
 	s.createBoardLookupIndexes(ctx)
+	if err := s.ensureMessageCounts(ctx); err != nil {
+		return err
+	}
 
 	// Migrate CHECK constraint to include 'blocked' status for existing databases.
 	// SQLite doesn't support ALTER CONSTRAINT, so we recreate the table.
