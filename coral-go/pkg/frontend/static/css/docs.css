@@ -34,36 +34,12 @@
 
 .docs-content {
     padding: 24px 32px;
-    max-width: 800px;
+    font-size: var(--fs-lg); /* the prose scale is em of a 14 px body: 20, 16, 14 and 13 px headings */
 }
+.docs-content > * { max-width: 800px; } /* the text keeps a reading measure; a table may take the pane's width (#9478 item 3) */
+.docs-content > .docs-table-wrap { max-width: 100%; }
 
 /* ── Markdown rendering ───────────────────────────────────── */
-
-.docs-content h1 {
-    font-size: var(--type-page-size);
-    font-weight: var(--fw-title);
-    margin: 0 0 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-}
-
-.docs-content h2 {
-    font-size: var(--fs-xl); /* the document keeps its reading scale: headings 20/700 and 17/700 (#7443) */
-    font-weight: var(--fw-strong);
-    margin: 24px 0 8px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--border);
-}
-
-.docs-content h3 {
-    font-size: var(--fs-lg);
-    margin: 20px 0 6px;
-}
-
-.docs-content h4 {
-    font-size: var(--fs-lg);
-    margin: 16px 0 4px;
-}
 
 /* A screenshot in a page (#5038): as wide as the page allows, never wider. */
 .docs-content img {

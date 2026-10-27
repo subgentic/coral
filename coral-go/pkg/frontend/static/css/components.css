@@ -3485,22 +3485,22 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .ibx .md, .ibx-saved-body .md { overflow-wrap: anywhere; line-height: var(--lh-body); font-size: var(--fs-md, 0.875rem); color: var(--text-primary); }
 /* The one rendered-markdown look (#9477): chat, the preview pane and a .md (Coral Hub's renderer) wear .prose; their own classes say where the text sits and how it is themed, never how a heading, list, quote or code looks.
  * The sizes are em, so the prose follows the size of the text around it; the heading scale is the three tokens. prose_census.test.mjs fails a heading rule for rendered markdown outside this block. */
-.prose { --prose-h1: 1.4286em; --prose-h2: 1.1429em; --prose-h3: 1em; --prose-h4: 0.9286em; line-height: var(--lh-body); overflow-wrap: break-word; } /* 20, 16, 14 and 13 px on a 14 px body, and a user-set chat size scales them (UI/UX #9477) */
+.prose { --prose-h1: 1.4285714286em; --prose-h2: 1.1428571429em; --prose-h3: 1em; --prose-h4: 0.9285714286em; line-height: var(--lh-body); overflow-wrap: break-word; } /* 20, 16, 14 and 13 px on a 14 px body, and a user-set chat size scales them (UI/UX #9477) */
 .prose > :first-child { margin-top: 0; }
 .prose > :last-child { margin-bottom: 0; }
 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6, .prose .md-h { font-weight: var(--fw-strong); line-height: var(--lh-label); color: var(--text-primary); } /* the label ratio (1.2): UI/UX's 1.3 is not one of the three */
-.prose h1 { margin: 1.2em 0 0.4em; font-size: var(--prose-h1); font-weight: var(--fw-title); }
-.prose h2 { margin: 1.25em 0 0.375em; font-size: var(--prose-h2); }
-.prose h3 { margin: 1.143em 0 0.286em; font-size: var(--prose-h3); }
-.prose h4, .prose h5, .prose h6, .prose .md-h { margin: 0.923em 0 0.31em; font-size: var(--prose-h4); }
-.prose-doc h1, .prose-doc h2 { padding-bottom: 0.3em; border-bottom: 1px solid var(--border); } /* a document's two titles carry a hairline; chat and the narrow panes do not */
+.prose h1, .prose .md-h1 { margin: 1.2em 0 0.4em; font-size: var(--prose-h1); font-weight: var(--fw-title); }
+.prose h2, .prose .md-h2 { margin: 1.25em 0 0.375em; font-size: var(--prose-h2); }
+.prose h3, .prose .md-h3 { margin: 1.143em 0 0.286em; font-size: var(--prose-h3); }
+.prose h4, .prose h5, .prose h6, .prose .md-h4, .prose .md-h5, .prose .md-h6 { margin: 0.923em 0 0.31em; font-size: var(--prose-h4); } /* the Hub renderer draws a heading as div.md-h.md-hN */
+.prose-doc h1, .prose-doc h2, .prose-doc .md-h1, .prose-doc .md-h2 { padding-bottom: 0.3em; border-bottom: 1px solid var(--border); } /* a document's two titles carry a hairline; chat and the narrow panes do not */
 .prose p, .prose ul, .prose ol, .prose blockquote, .prose pre { margin: 0 0 0.857em; }
 .prose ul, .prose ol { padding-left: 1.43em; }
 .prose li { margin: 0.286em 0; }
 .prose li > ul, .prose li > ol { margin: 0.286em 0 0; }
 .prose blockquote { padding: 0.1em 0 0.1em 0.857em; border-left: 3px solid var(--border-light); color: var(--text-secondary); }
 .prose a { color: var(--link-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
-.prose code { padding: 0.1em 0.35em; border-radius: var(--radius-sm); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: 0.9286em; }
+.prose code { padding: 0.1em 0.35em; border-radius: var(--radius-sm); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: 0.9285714286em; }
 .prose pre { padding: 0.8em 1em; overflow-x: auto; border-radius: var(--radius-md); background: var(--bg-tertiary); }
 .prose pre code { padding: 0; background: none; font-size: inherit; }
 .prose hr { margin: 1.6em 0; border: 0; border-top: 1px solid var(--border); }

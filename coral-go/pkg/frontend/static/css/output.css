@@ -758,6 +758,7 @@ body.panel-dragging .xterm-container {
     margin: 0 auto;
     padding: 24px 32px 48px;
 } /* a .prose (components.css): where it sits is all this says */
+@media (max-width: 600px) { .preview-pane-markdown { padding: 16px 16px 32px; } } /* a phone's markdown uses the width: the viewer's text was 245 px of 390 (#9478 item 10) */
 
 /* Current folder in the terminal header bar */
 .terminal-folder {
