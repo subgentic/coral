@@ -20,7 +20,8 @@ const BASE = require('./test_base').BASE;
         await ev(`window.selectLiveSession('Orchestrator', 'claude', 'Orchestrator-id', 'local'); true`);
         await waitFor(`!!document.getElementById('command-input') && document.getElementById('command-input').getClientRects().length > 0`, 'the composer', 12000);
     };
-    const press = async (key, vk) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key, code: key, windowsVirtualKeyCode: vk }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key, code: key, windowsVirtualKeyCode: vk }); await settle(120); };
+    // an Enter keyDown without its text does not activate a button: it carries '\r' (#9116)
+    const press = async (key, vk) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key, code: key, windowsVirtualKeyCode: vk, ...(key === 'Enter' ? { text: '\r', unmodifiedText: '\r' } : {}) }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key, code: key, windowsVirtualKeyCode: vk }); await settle(120); };
     const KEYS = { ArrowDown: 40, ArrowUp: 38, Home: 36, End: 35, Escape: 27 };
     const active = () => ev(`(() => { const a = document.activeElement; return a ? (a.id || (a.lastElementChild && a.lastElementChild.textContent.trim()) || a.textContent.trim().slice(0, 30)) : ''; })()`);
     try {
