@@ -323,14 +323,14 @@ const _mdCache = new Map();
 
 // { breaks: true } to keep single newlines as line breaks. links: the link policy for
 // agent-written text, 'board' or 'chat' (applyLinkPolicy, #3542); omit it only for Coral's own text.
-export function renderMarkdown(content, options, links) {
+export function renderMarkdown(content, options, links, headings) { // headings: the base of the headings' aria-level (sanitizeHtml), an input of the cached result like the link policy
     if (!content) return '';
     if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined' && content.length <= MD_CACHE_MAX_LENGTH
         && (typeof hljs !== 'undefined' || !FENCED_WITH_LANG.test(content))) {
-        const key = (links || '') + '\u0001' + (options ? JSON.stringify(options) : '') + '\u0001' + content;
+        const key = (links || '') + '\u0001' + (headings === undefined ? '' : headings) + '\u0001' + (options ? JSON.stringify(options) : '') + '\u0001' + content;
         let html = _mdCache.get(key);
         if (html === undefined) {
-            html = _renderMarkdownUncached(content, options, links);
+            html = _renderMarkdownUncached(content, options, links, headings);
             _mdCache.set(key, html);
             if (_mdCache.size > MD_CACHE_MAX) _mdCache.delete(_mdCache.keys().next().value);
         } else {
@@ -338,10 +338,10 @@ export function renderMarkdown(content, options, links) {
         }
         return html;
     }
-    return _renderMarkdownUncached(content, options, links);
+    return _renderMarkdownUncached(content, options, links, headings);
 }
 
-export function _renderMarkdownUncached(content, options, links) {
+export function _renderMarkdownUncached(content, options, links, headings) {
     if (!content) return '';
     if (typeof marked !== 'undefined') {
         try {
@@ -367,7 +367,7 @@ export function _renderMarkdownUncached(content, options, links) {
                 marked._hljsConfigured = true;
             }
             const html = options ? marked.parse(content, options) : marked.parse(content);
-            return sanitizeHtml(html, DOMPURIFY_CONFIG, links ? { links } : undefined);
+            return sanitizeHtml(html, DOMPURIFY_CONFIG, links || headings !== undefined ? { links, headings } : undefined);
         } catch { /* fall through */ }
     }
     return escapeHtml(content);
