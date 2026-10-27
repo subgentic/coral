@@ -70,9 +70,8 @@ const STUB = `(() => {
     await ev(`(async()=>{const S=window.__coralStatic||'/static/';document.getElementById('artifact-surfaces-test')?.remove();const host=document.createElement('div');host.id='artifact-surfaces-test';host.style.cssText='position:fixed;inset:0;background:var(--bg-primary);z-index:1000;overflow:auto';document.body.append(host);
      if(${JSON.stringify(surface)}==='team'){const m=await import(S+'team_artifacts_page.js');await m.createArtifactsList().showArtifacts(host,${JSON.stringify(TEAM)});}
      if(${JSON.stringify(surface)}==='task'){const m=await import(S+'team_task_artifacts.js');host.append(await m.taskArtifactsSection(${JSON.stringify(TEAM)},{id:101}));}
-     if(${JSON.stringify(surface)}==='goal'){const m=await import(S+'goal_artifacts.js');m.mountGoalArtifacts(host,{team:${JSON.stringify(TEAM)},goalId:1});}
+     if(${JSON.stringify(surface)}==='goal'){const m=await import(S+'goal_artifacts.js');m.mountGoalArtifactsList(host,{team:${JSON.stringify(TEAM)},goalId:1});}
      return true;})()`);
-    if(surface==='goal'){await waitFor(`!document.querySelector('#artifact-surfaces-test details').hidden`,'goal artifact count');await ev(`document.querySelector('#artifact-surfaces-test details').open=true;true`);}
     await waitFor(`document.querySelectorAll('#artifact-surfaces-test tbody .dt-row').length===3`,surface+' artifact rows');
     assert.equal(await ev(`document.querySelector('#artifact-surfaces-test .dt-box').classList.contains('dt-one-line')`),true,surface);
     assert.equal(await ev(`document.querySelector('#artifact-surfaces-test th[data-key=name]').getAttribute('aria-sort')`),surface==='goal'?'none':'descending',surface==='goal'?'the goal list is grouped by task: its heads stay until a header is pressed on it':'sort remembered across '+surface);
