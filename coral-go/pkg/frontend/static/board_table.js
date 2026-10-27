@@ -352,7 +352,7 @@ const surfaceOf = (el) => surfaces.find(s => el.closest(s.box));
 
 // The head's press and a reply's jump: the same on every surface that draws the table (the team page's Board tab, the agent dock's).
 registerActions({
-    'mb-task-open': el => withId(el.dataset.taskId, id => surfaceOf(el)?.task(id)),
+    'mb-task-open': el => withId(el.dataset.taskId, id => surfaceOf(el)?.task(id, el)), // el: where the click was, so the Inbox opens the task in the Inbox (#8861)
     'mb-row-toggle': el => { const row = el.closest('.mb-message'); if (!row) return; toggleRow(row); if (row.classList.contains('mb-open')) keepBelowDay(row); },
     'mb-msg-reply': el => withId(el.dataset.msgId, id => { const n = textOf(el.dataset.sender), s = surfaceOf(el); if (n && s) s.reply(id, n); }),
     'mb-msg-copy-link': el => withId(el.dataset.msgId, id => surfaceOf(el)?.link(id)),
