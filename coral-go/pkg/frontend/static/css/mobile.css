@@ -51,7 +51,7 @@
     color: var(--text-muted);
     cursor: pointer;
     flex: 1;
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
     font-family: inherit;
     transition: color 0.15s;
     -webkit-tap-highlight-color: transparent;
@@ -885,7 +885,7 @@
         align-items: center;
         border-radius: 999px;
         padding: 3px 8px;
-        font-size: var(--fs-xs);
+        font-size: var(--fs-sm);
         font-weight: var(--fw-strong);
         letter-spacing: 0.02em;
         text-transform: uppercase;
@@ -1131,7 +1131,7 @@
     }
 
     .modal-header h3 {
-        font-size: 0.9375rem;
+        font-size: var(--fs-lg);
     }
 
     /* Session header: extra compact */

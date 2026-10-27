@@ -146,9 +146,9 @@
 
 .sched-header h2 {
     margin: 0;
-    font-size: 1.0625rem; /* an item's page title: 17/700 (#7443) */
-    font-weight: var(--fw-strong);
-}
+    font-size: var(--fs-2xl); /* an item's page title: 17/700 (#7443) */
+    font-weight: 700;
+ }
 
 /* The job's page fills the view, so its bar is at the foot of the screen and, on a long page, stays there; the view's padding is taken back so the page does not show under it */
 @media (min-width: 768px) and (min-height: 501px), (min-width: 951px) {
@@ -231,7 +231,7 @@
 
 /* A job's page answers first (#6515, #6521). */
 .sched-header { flex-wrap: wrap; gap: 8px; }
-.sched-header h2 { margin-right: auto; overflow-wrap: anywhere; min-width: 0; }
+.sched-header h2 { margin-right: auto; overflow-wrap: anywhere; min-width: 0; font-weight: 700;}
 .sched-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0 12px; font-size: var(--fs-md); font-weight: var(--fw-regular); } /* labels 13/500, values 13/400 */
 .sched-facts dt { color: var(--text-secondary); font-weight: var(--fw-medium); }
 .sched-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
