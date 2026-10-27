@@ -137,7 +137,12 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 	}
 	items := make([]teamhealth.Item, 0, len(pending))
 	var ids []offBooksShown
+	var dropped []int64
 	for _, p := range pending {
+		if p.Kind == board.OffBooksBusy && m.subscriberBlocked(ctx, subs, bySession, p.Agent) { // noted before the limit was seen: it is not working now
+			dropped = append(dropped, p.ID)
+			continue
+		}
 		if boardOwnLine(p.Kind) { // a line about the board's own goal, branch, release or tasks: no agent, and what to do is in it
 			items = append(items, teamhealth.Item{Rank: 3, Agent: "Board", Problem: p.Detail})
 			ids = append(ids, offBooksShown{id: p.ID, needle: "Board: " + p.Detail})
@@ -148,6 +153,9 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 			Evidence: "Seen " + teamhealth.Age(now.Sub(at)) + " ago, off the board's tasks", Suggest: "ask what it is for, or put it on a task"})
 		ids = append(ids, offBooksShown{id: p.ID, needle: teamhealth.Name(p.Agent) + ": " + p.Detail})
 	}
+	if len(dropped) > 0 {
+		_ = m.store.MarkOffBooksShown(ctx, project, dropped, now) // said to no one, and not said later
+	}
 	m.mu.Lock()
 	if m.offShown == nil {
 		m.offShown = map[string][]offBooksShown{}
@@ -155,6 +163,20 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 	m.offShown[project] = ids
 	m.mu.Unlock()
 	return items
+}
+
+// subscriberBlocked says whether the member's live agent is stopped by a usage limit.
+func (m *BoardHealthMonitor) subscriberBlocked(ctx context.Context, subs []board.Subscriber, bySession map[string]AgentInfo, subscriberID string) bool {
+	for _, sub := range subs {
+		if !board.SameIdentity(sub.SubscriberID, subscriberID) {
+			continue
+		}
+		if a, live := bySession[sub.SessionName]; live {
+			_, blocked := m.blockedByLimit(ctx, a)
+			return blocked
+		}
+	}
+	return false
 }
 
 // offBooksShown is an occurrence a check was composed with, and the words that show it in the check's text.
@@ -191,6 +213,9 @@ func (m *BoardHealthMonitor) noteBusyNoTask(ctx context.Context, project, orch s
 		sig, known := m.signal(ctx, a.SessionID)
 		if !known || !sig.InTurn || sig.Since.IsZero() || now.Sub(sig.Since) < after {
 			continue
+		}
+		if _, blocked := m.blockedByLimit(ctx, a); blocked {
+			continue // its turn was cut short by a usage limit: it is not working, the check says it is blocked (#9361)
 		}
 		detail := fmt.Sprintf("has been working for %s with no task in progress", teamhealth.Age(now.Sub(sig.Since)))
 		_ = m.store.AddOffBooks(ctx, project, board.OffBooksBusy, sub.SubscriberID, sub.SubscriberID+"|"+sig.Since.UTC().Format(time.RFC3339), detail, now)

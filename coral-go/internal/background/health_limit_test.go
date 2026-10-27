@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/board"
 )
 
 // #5229: an agent whose CLI says its quota is used up is BLOCKED in the check, with the reset time, not "idle" (it was counted idle, and named as an
@@ -129,4 +131,34 @@ func TestStaleCodexNoticeDoesNotStopTheNudges(t *testing.T) {
 		require.NoError(t, sendUnlessBlocked(context.Background(), limit, deliver, a, "k", "x"), name)
 		assert.Equal(t, before+1, sent, name)
 	}
+}
+
+// #9361: an agent stopped by a usage limit is in a turn by its hooks (the limit cut it short with no Stop), but it is not "working with no task": the check
+// says BLOCKED and the busy-with-no-task finding leaves it out, and one noted before the limit was seen is dropped, not said later.
+func TestABlockedAgentIsNotWorkingWithNoTask(t *testing.T) {
+	h := newCheckHarness(t)
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 0)
+	h.member("Codex", "Developer", 3, 0)
+	devSID, codexSID := h.sid(2), h.sid(3)
+	h.sig[devSID] = agentSignal{InTurn: true, Since: h.now.Add(-15 * time.Minute)}
+	h.sig[codexSID] = agentSignal{InTurn: true, Since: h.now.Add(-15 * time.Minute)}
+	h.m.limit = func(_ context.Context, a AgentInfo) (time.Duration, bool) {
+		return 134 * time.Hour, a.SessionID == codexSID
+	}
+	out := h.checkTo("Orchestrator")
+	assert.Contains(t, out, "Dev: has been working for 15 min with no task in progress", "an agent that really works is still named")
+	assert.NotContains(t, out, "Codex: has been working", "a blocked agent is not working")
+	assert.Contains(t, out, "1 BLOCKED by a usage limit")
+	assert.Contains(t, out, "Codex (resets in 134 h)")
+
+	// an occurrence noted before the limit was seen (a check ran while the screen showed no notice) is dropped when the limit shows, and not said when it lifts
+	require.NoError(t, h.s.AddOffBooks(context.Background(), "team", board.OffBooksBusy, "Codex", "Codex|early", "has been working for 20 min with no task in progress", h.now))
+	h.now = h.now.Add(11 * time.Minute)
+	out = h.scanOut()
+	assert.NotContains(t, out, "Codex: has been working")
+	h.m.limit = nil // the limit lifts
+	h.now = h.now.Add(11 * time.Minute)
+	h.sig[codexSID] = agentSignal{Since: h.now.Add(-time.Minute)} // idle again
+	assert.NotContains(t, h.scanOut(), "Codex: has been working", "the dropped occurrence is gone")
 }
