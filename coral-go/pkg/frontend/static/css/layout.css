@@ -324,9 +324,8 @@ body.panel-dragging .sidebar {
     .sidebar-rail-item:hover .rail-tile { background: var(--bg-hover, rgba(var(--white-rgb), 0.045)); }
     .sidebar-rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-lg); }
     /* Selected: the selected row's soft accent tile, and its name's primary colour */
-    .sidebar-rail-item.active .rail-tile { background: rgba(var(--accent-rgb), 0.14); }
+    .sidebar-rail-item.active .rail-tile { background: var(--bg-hover); } /* the selected row's surface (.list-row-current, #9311) */
     .sidebar-rail-item.active .rail-tile:not([style]) { color: var(--text-primary); }
-    .sidebar-rail-item.active:hover .rail-tile { background: rgba(var(--accent-rgb), 0.17); }
     .rail-tile .rail-tile-icon { font-size: var(--fs-xs) !important; width: 10px; height: 10px; line-height: 10px; }
     .rail-tile-emoji { font-size: 0.5625rem; line-height: 1; }
     .rail-tile-badge {
