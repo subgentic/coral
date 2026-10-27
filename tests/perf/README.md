@@ -82,3 +82,17 @@ what was allocated during the CPU profile (`allocs-start.pprof` and `allocs-end.
 start, so the steady state is not hidden under the first scan. `load.json` has `slow`: every request of 0.5 s or more with its
 start in seconds from the load's start, to line a stall up with `server.log`. A stall on a loaded epoch is the machine's:
 `machine.txt` has its load average, and a stall seen once at a load of 12 did not come back at a load of 1.
+
+## Goal #85 baseline harness (#9086): `run_baseline.sh`, `seed/`, `routes.py`, `browser.js`, `report.py`
+
+Opt-in and epoch-sized: it seeds a BIG isolated Coral (5,000 tasks, 50,000 board messages, 2,000 artifacts, 30 agents on one team, 40 goals, 40,000 usage rows and 3,000 commits over 30 days, and a second small
+team), then measures its hot routes (`routes.py`, one connection, p50/p95/p99/max, server CPU and memory) and its dashboard (`browser.js`: first load and screen switches over CDP, with the main thread's
+task, script and layout time, long tasks and the requests each screen makes). It measures; it asserts nothing, and it is not part of any suite.
+
+```bash
+PERF_RUN=1 WORK=/sd2/$USER/coralgo-perf9086 REPO=/path/to/worktree GO=/path/to/go CHROME=/path/to/chrome NODE=/path/to/node bash tests/perf/run_baseline.sh all
+```
+
+`run_baseline.sh` has phases (build, seed, serve, routes, browser, stop, clean) so a pause can resume with the seeded data kept. It starts only processes whose pids it records and kills only those; the server is a dev
+build on a free port with `--cloud-url off`, its own HOME and `CORAL_DATA_DIR`, no agent CLIs on its PATH and auto-wake off, so the seeded agents are not started. It never touches `~/.coral`. The seeder
+(`seed/`) is built inside the coral-go module for the build only, as `tests/latency` does.
