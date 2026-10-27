@@ -51,6 +51,10 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(subs.sort(), ['Agent prompt (Claude)', 'Agent prompt (Claude)', 'Workflow nightly-build'], `${at}a row says what the job runs under its name`);
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search jobs', `${at}the search is named for the folder`);
             assert.equal(await ev(`/New job/.test((document.querySelector('#group-table-view .team-tb-action') || {}).textContent || '')`), true, `${at}New job is at the row's right`);
+            const act = await ev(`(() => { const b = document.querySelector('#group-table-view .team-tb-action'), r = b.getBoundingClientRect(); return { name: b.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height), text: [...b.querySelectorAll('.automations-act-text')].some(e => e.getClientRects().length > 0) }; })()`);
+            assert.equal(act.name, 'New job', `${at}the create action is named whole: ${JSON.stringify(act)}`);
+            if (mobile) assert.ok(act.w >= 44 && act.h >= 44 && !act.text, `${at}on a phone it is one 44 px "+", the words only for assistive technology: ${JSON.stringify(act)}`);
+            else assert.ok(act.text, `${at}at 1280 it has its words: ${JSON.stringify(act)}`);
             if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['All 3', 'Active 2', 'Paused 1'], `${at}the pills have the table's counts`);
 
             // the Filters panel
