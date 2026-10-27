@@ -332,7 +332,7 @@ export function drawOverviewPanel(host, { phone }) {
     const chart = el('div', 'viz-chart'); card.append(chart);
     const ul = el('ul', 'viz-legend');
     lines.forEach((l, k) => {
-        const li = el('li'), b = el('button', 'viz-legend-btn'); b.type = 'button'; b.setAttribute('aria-pressed', String(st.hi === l.key)); b.setAttribute('aria-label', `Highlight ${l.label}'s line, ${METRICS[0].fmt(l.total)}`); // the name and the figure read apart (they were "coral-go-team$13.50")
+        const li = el('li'), b = el('button', 'btn btn-quiet viz-legend-btn'); b.type = 'button'; b.setAttribute('aria-pressed', String(st.hi === l.key)); b.setAttribute('aria-label', `Highlight ${l.label}'s line, ${METRICS[0].fmt(l.total)}`); // the name and the figure read apart (they were "coral-go-team$13.50")
         const sw = el('i', 'cost-swatch'); sw.style.background = colorOf(l); sw.setAttribute('aria-hidden', 'true');
         b.append(sw, el('span', 'viz-legend-name', l.label), el('span', 'viz-legend-value', METRICS[0].fmt(l.total)));
         b.addEventListener('click', () => { st.hi = st.hi === l.key ? '' : l.key; drawOverviewPanel(host, { phone }); });
