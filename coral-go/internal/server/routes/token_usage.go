@@ -255,17 +255,40 @@ func (h *TokenUsageHandler) UsageTurns(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"turns": turns})
 }
 
+// timeseriesHourlySpan is the longest range that is read in hourly buckets when the caller names no interval (#9113): a week is 168 of them.
+const timeseriesHourlySpan = 7 * 24 * time.Hour
+
+// defaultTimeseriesInterval is the bucket size of a timeseries read that names none: hourly for a range of up to a week, daily for a longer one, so the reply is bounded by the
+// range (365 buckets for a year, not 8,760). No since is all history, which is a long range. The range stays what the caller asked for: the line still ends at the summary's total.
+// A since that is not a time keeps the old default (the read answers it as it always did).
+func defaultTimeseriesInterval(since, until string, now time.Time) string {
+	if since == "" {
+		return "1d"
+	}
+	from, err := time.Parse(time.RFC3339Nano, since)
+	if err != nil {
+		return "1h"
+	}
+	to := now
+	if until != "" {
+		if t, err := time.Parse(time.RFC3339Nano, until); err == nil {
+			to = t
+		}
+	}
+	if to.Sub(from) > timeseriesHourlySpan {
+		return "1d"
+	}
+	return "1h"
+}
+
 // UsageTimeSeries returns bucketed time-series cost data.
 // GET /api/token-usage/timeseries?since=...&until=...&interval=5m|1h|1d&board=...&group_by=team|agent|provider|model
+// interval defaults to 1h for a range of up to 7 days and to 1d for a longer one (no since is all history: 1d); an interval that is named is used as named.
 // until is exclusive (an RFC 3339 time: the prior period is since=A&until=B beside since=B); group_by adds, to each bucket, the series that had usage in it (the bucket's own
 // figures stay the sum of all of them). The agent's token is not given group_by=agent (it names the agents of every board, as by_agent does).
 func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	since := q.Get("since")
-	interval := q.Get("interval")
-	if interval == "" {
-		interval = "1h"
-	}
 	until := q.Get("until")
 	if until != "" {
 		t, err := time.Parse(time.RFC3339Nano, until)
@@ -274,6 +297,10 @@ func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		until = t.UTC().Format("2006-01-02T15:04:05.000Z")
+	}
+	interval := q.Get("interval")
+	if interval == "" {
+		interval = defaultTimeseriesInterval(since, until, time.Now())
 	}
 	groupBy := q.Get("group_by")
 	if !store.ValidUsageGroup(groupBy) {

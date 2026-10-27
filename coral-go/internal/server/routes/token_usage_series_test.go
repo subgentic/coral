@@ -240,3 +240,56 @@ func TestListUsageAnswersRecordsAndTotalsForATeam(t *testing.T) {
 	require.NotEmpty(t, recs)
 	assert.Equal(t, "alpha", recs[0].AgentName)
 }
+
+// #9113: with no interval named, a range of up to a week is hourly and a longer one (no since is all history) is daily, so the reply is bounded by the range; a named interval is used as named.
+func TestDefaultTimeseriesIntervalIsDailyForALongRange(t *testing.T) {
+	now := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
+	rfc := func(d time.Duration) string { return now.Add(-d).Format(time.RFC3339) }
+	for _, c := range []struct {
+		name, since, until, want string
+	}{
+		{"no since is all history", "", "", "1d"},
+		{"a day", rfc(24 * time.Hour), "", "1h"},
+		{"exactly a week", rfc(7 * 24 * time.Hour), "", "1h"},
+		{"a week and a second", rfc(7*24*time.Hour + time.Second), "", "1d"},
+		{"a year", rfc(365 * 24 * time.Hour), "", "1d"},
+		{"an old week is a week", rfc(400 * 24 * time.Hour), rfc(393 * 24 * time.Hour), "1h"},
+		{"until alone is all history up to it", "", rfc(24 * time.Hour), "1d"},
+		{"a since that is not a time keeps the old default", "yesterday", "", "1h"},
+	} {
+		assert.Equal(t, c.want, defaultTimeseriesInterval(c.since, c.until, now), c.name)
+	}
+}
+
+func TestTimeseriesReplyIsBoundedByTheRangeAndANamedIntervalIsHonoured(t *testing.T) {
+	ts, r, _ := seriesRouter(t)
+	base := time.Now().UTC().Truncate(time.Hour).Add(-20 * 24 * time.Hour)
+	for i := 0; i < 20*24; i++ { // one row an hour for twenty days
+		require.NoError(t, ts.RecordUsage(t.Context(), &store.TokenUsage{SessionID: "s1", AgentName: "alpha", AgentType: "claude", Model: "opus", Source: "jsonl", InputTokens: 10, OutputTokens: 1, TotalTokens: 11, CostUSD: 1,
+			RecordedAt: base.Add(time.Duration(i)*time.Hour + time.Minute).Format("2006-01-02T15:04:05.000Z")}))
+	}
+	type reply struct {
+		Interval string                      `json:"interval"`
+		Buckets  []struct{ CostUSD float64 } `json:"buckets"`
+	}
+	read := func(q string) reply {
+		var out reply
+		require.Equal(t, 200, seriesGet(t, r, "/api/token-usage/timeseries"+q, false, &out), q)
+		return out
+	}
+	all := read("")
+	assert.Equal(t, "1d", all.Interval)
+	assert.LessOrEqual(t, len(all.Buckets), 22, "twenty days of hourly rows are about twenty daily buckets, not 480 hourly ones")
+	hourly := read("?interval=1h")
+	assert.Equal(t, "1h", hourly.Interval, "a named interval is used as named")
+	assert.Len(t, hourly.Buckets, 480)
+	week := read("?since=" + url.QueryEscape(time.Now().UTC().Add(-48*time.Hour).Format(time.RFC3339)))
+	assert.Equal(t, "1h", week.Interval, "a short range stays hourly")
+	sum := func(b reply) (c float64) {
+		for _, x := range b.Buckets {
+			c += x.CostUSD
+		}
+		return
+	}
+	assert.InDelta(t, sum(hourly), sum(all), 1e-9, "the coarser bucket loses no cost: the line still ends at the same total")
+}
