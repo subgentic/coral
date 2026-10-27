@@ -56,11 +56,14 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     if(folder.startsWith('chats'))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('when')>=0&&keys.indexOf('server')===keys.indexOf('when')+1;})()`),'Server follows When (#8961: one line a chat, Title, Agent, When, then Server; Server and then Agent drop first)');
     const cells=`[...document.querySelectorAll('#group-table-view td[data-key="${col}"]')]`;
     await waitFor(`${cells}.some(e=>${is('This computer')})&&${cells}.some(e=>${is('Remote box')})`,'both origins in '+folder,8000);
-    if(width===390)assert.ok(await ev(`${cells}.every(e=>e.getClientRects().length>0)`),(artifacts?'Team':'Server')+' visible on phone');
+    // one line a row on a phone (#8961, #8981, #8931): a chat, a Saved item and an artifact row drop their Server or Team column, and the computer stays on the row's hover (the title of its name); Needs you, Goals and Tasks keep Server
+    const lean=artifacts||folder.startsWith('chats')||folder==='saved';
+    if(width===390&&!lean)assert.ok(await ev(`${cells}.every(e=>e.getClientRects().length>0)`),'Server visible on phone');
+    if(width===390&&lean)assert.ok(await ev(`${cells}.every(e=>e.getClientRects().length===0)&&[...document.querySelectorAll('#group-table-view tbody .dt-primary')].some(b=>/This computer|Remote box/.test(b.title))`),folder+': the column is dropped on a phone and the computer is on the row\'s hover');
     assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
     const sortable=await ev(`(() => {const s=[...document.querySelectorAll('#group-table-view .dt-sortbar select')].find(s=>[...s.options].some(o=>o.value==='server'));if(s&&s.getClientRects().length){s.value='server';s.dispatchEvent(new Event('change',{bubbles:true}));return true;}const h=document.querySelector('#group-table-view th[data-key="server"]');const b=h?.querySelector('button');if(b){b.click();return true;}return false;})()`);
     if(!artifacts&&!folder.startsWith('chats'))assert.ok(sortable,'Server sort control in '+folder); // a chat row is one line with no sort controls (#8961): its order is the newest first
-    if(!artifacts)await waitFor(`(()=>{const values=${cells}.map(e=>e.textContent);return values.length>1&&values.every((v,i)=>!i||values[i-1].localeCompare(v)<=0);})()`,'Server ascending order in '+folder);
+    if(!artifacts&&!folder.startsWith('chats'))await waitFor(`(()=>{const values=${cells}.map(e=>e.textContent);return values.length>1&&values.every((v,i)=>!i||values[i-1].localeCompare(v)<=0);})()`,'Server ascending order in '+folder);
     const shotDir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
     if(shotDir){fs.mkdirSync(shotDir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(shotDir,`inbox-server-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
     await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);

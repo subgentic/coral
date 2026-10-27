@@ -1,4 +1,4 @@
-import { inboxSources, serverColumns, multipleServers } from './inbox_servers.js';
+import { inboxSources, serverColumns, multipleServers, serverLabel, serverOf } from './inbox_servers.js';
 import { serverFetch, isCloud } from './server_base.js';
 /* The mailbox's chat folders (#7776, UI/UX's mock #7773): All chats, Board history, With notes, Starred, Active now and Archived; by CLI (Claude, Codex, Antigravity, Pi); and the chat tags. One chat is one line of
  * the one table (data_table.js): the chat's title, the agent, when it last spoke (and the server with more than one): one line per chat (#8961); the days are its dividers, the list grows as it is read (the footer scrolls into view),
@@ -143,7 +143,7 @@ export function chatsSpec(key, ctx) {
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, extra, ctx.redraw) } },
             oneLine: true, resize: false, sortBar: false, // one line per chat, never folded (#8961, the shared one-row table of #8931): Server, then Agent drop as the box narrows; the role and the first message are in the chat that opens
             columns: [
-                { key: 'title', label: key === 'chats-group' ? 'Board' : 'Title', primary: true, width: 'grow', cell: s => { const group = isGroup(s), n = group ? (name(s) || 'Board') : historyLabel(s), who = group ? '' : name(s); const b = DT.primaryButton(n, group ? `Open the chat of the board ${n}` : `Open the chat ${n}${who ? ` of ${who}` : ''}`); b.dataset.sessionId = s.session_id;
+                { key: 'title', label: key === 'chats-group' ? 'Board' : 'Title', primary: true, width: 'grow', cell: s => { const group = isGroup(s), n = group ? (name(s) || 'Board') : historyLabel(s), who = group ? '' : name(s); const b = DT.primaryButton(n, group ? `Open the chat of the board ${n}` : `Open the chat ${n}${who ? ` of ${who}` : ''}`); b.dataset.sessionId = s.session_id; if (multipleServers()) b.title = `${n} · ${serverLabel(serverOf(s))}`; // the Server column goes first on a narrow row (#8961): the computer stays on the hover
                     const marks = []; if (group) marks.push(DT.tag('Board')); if (s.active) marks.push(DT.tag('Active now')); /* an archived board stays in Board history, marked */ if (s.archived && key !== 'chats-archived') marks.push(DT.tag('Archived'));
                     if (!marks.length) return b; const w = DT.el('span', 'dt-title-cell'); w.append(b, ...marks); return w; } },
                 ...(key === 'chats-group' ? [] : [{ key: 'agent', label: 'Agent', width: '9rem', dropAt: 36, cell: s => name(s) }]),
