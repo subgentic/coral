@@ -58,7 +58,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.ok(m.ta.b <= m.chip.t + 1 && m.ta.b <= m.send.t + 1, `${where}: chip and Send are in a row below the text`);
         assert.ok(m.chip.l < m.send.l && m.chip.l - m.pane.l < 40, `${where}: @all at the left, Send at the right`);
         assert.ok(m.pane.r - m.send.r < 24 && m.send.b <= m.pane.b, `${where}: Send is at the bottom right of the card`);
-        assert.ok(Math.abs(m.send.w - m.send.h) < 1 && parseFloat(m.sendRadius) >= m.send.w / 2 - 1, `${where}: Send is round (${m.send.w}x${m.send.h})`);
+        assert.ok(Math.abs(m.send.w - m.send.h) < 1 && parseFloat(m.sendRadius) > 0 && parseFloat(m.sendRadius) < m.send.w / 2 - 1, `${where}: Send is the family's square primary icon button, a rounded square (${m.send.w}x${m.send.h}, radius ${m.sendRadius})`); // the composer family moved to the button family (#9570): not the old circle
         assert.equal(m.chipText, '@all', `${where}: the @all chip`);
         assert.equal(m.sendName, 'Send message', `${where}: Send keeps its name`);
         assert.equal(m.handle, false, `${where}: no fixed-height resize handle`);
