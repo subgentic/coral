@@ -4,7 +4,7 @@
 #
 #   PERF_RUN=1 WORK=/sd2/$USER/coralgo-perf9086 REPO=/path/to/worktree GO=$HOME/go-install/go/bin/go bash tests/perf/run_baseline.sh all
 #
-# Phases (each can be run on its own, so a pause can resume): build, seed, serve, routes, browser, stop, clean. "all" is build seed serve routes browser stop. The server, Chrome and every other process are
+# Phases (each can be run on its own, so a pause can resume): build, seed, serve, routes, browser, profile, stop, clean. "all" is build seed serve routes browser profile stop. The server, Chrome and every other process are
 # started with their pids recorded in $WORK/pids and only those are killed. The server is a dev build (it has the loopback profiler, CORAL_PPROF_ADDR) on a free port, --cloud-url off, no browser, an
 # empty PATH of agent CLIs, its own HOME and CORAL_DATA_DIR. Env: CHROME (required for the browser phase: the Chrome binary), PORT (default 23450), CDP_PORT (23451), PPROF_PORT (23452), N (routes samples, 30), RUNS (browser runs, 5), NODE, SEEDARGS, CRI.
 set -u
@@ -70,11 +70,16 @@ phase_browser() {
   }
   CORAL_TEST_URL="http://127.0.0.1:$PORT" CDP_PORT="$CDP_PORT" TARGETS="$OUT/targets.json" RUNS="$RUNS" OUT="$OUT/browser.json" CRI="${CRI:-}" "$NODE" "$REPO/tests/perf/browser.js" | tee "$OUT/browser.txt"
 }
+phase_profile() {
+  have_pid server || { echo "no server running (serve and routes first)"; return 2; }
+  [[ -f "$OUT/routes.json" ]] || { echo "no $OUT/routes.json: run the routes phase first"; return 2; }
+  python3 "$REPO/tests/perf/profile_routes.py" --base "http://127.0.0.1:$PORT" --pprof "127.0.0.1:$PPROF_PORT" --routes "$OUT/routes.json" --out "$OUT/profile" --k "${PROFILE_K:-6}" --seconds "${PROFILE_SECONDS:-15}" --key "$(cat "$DATA/api_key" 2>/dev/null)" --go "$GO" | tee "$OUT/profile.txt"
+}
 phase_clean() { stop; rm -rf "$WORK/data" "$WORK/projects" "$WORK/home" "$WORK/chrome-profile" "$WORK/tmp" "$WORK/bin" "$WORK/pids" "$WORK/server.pid"; echo "cleaned the folders under $WORK (out/ kept)"; }
 
 case "$PHASE" in
-  all) phase_build && phase_seed && phase_serve && phase_routes && phase_browser; rc=$?; stop; exit $rc ;;
-  build) phase_build ;; seed) phase_seed ;; serve) phase_serve ;; routes) phase_routes ;; browser) phase_browser ;;
+  all) phase_build && phase_seed && phase_serve && phase_routes && phase_browser && phase_profile; rc=$?; stop; exit $rc ;;
+  build) phase_build ;; seed) phase_seed ;; serve) phase_serve ;; routes) phase_routes ;; browser) phase_browser ;; profile) phase_profile ;;
   stop) stop ;; clean) phase_clean ;;
-  *) echo "phase: build|seed|serve|routes|browser|stop|clean|all"; exit 2 ;;
+  *) echo "phase: build|seed|serve|routes|browser|profile|stop|clean|all"; exit 2 ;;
 esac
