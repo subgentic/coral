@@ -423,12 +423,14 @@ func queryGit(ctx context.Context, workdir string) (*gitInfo, error) {
 
 	// Get latest commit
 	t1 := time.Now()
-	out, err = gitutil.Command(ctx, workdir, "log", "-1", "--format=%H%x1f%s%x1f%aI%x1f%an%x1f%ae").Output()
+	// NUL separates the fields (-z, %x00): git refuses a NUL in a commit message and in an author name, so no field can hold the separator
+	// (a 0x1f in a name or a subject used to shift the fields, #9046).
+	out, err = gitutil.Command(ctx, workdir, "log", "-1", "-z", "--format=%H%x00%s%x00%aI%x00%an%x00%ae").Output()
 	logger.Debug("git log", "duration_ms", time.Since(t1).Milliseconds())
 	if err != nil {
 		return nil, err
 	}
-	parts := strings.Split(strings.TrimSpace(string(out)), "\x1f")
+	parts := strings.Split(strings.Trim(string(out), "\x00\r\n "), "\x00")
 	if len(parts) < 3 {
 		return nil, fmt.Errorf("unexpected git log format")
 	}
