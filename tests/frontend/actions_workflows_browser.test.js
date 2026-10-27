@@ -164,7 +164,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         check('the Workflows view and its dialog have no inline handler left', wfInline.length === 0, JSON.stringify(wfInline.slice(0, 5)));
 
         // ── Scheduled jobs ─────────────────────────────────────────────────
-        await ev(`window.switchNavTab('automations'); true`);
+        await ev(`window.openAutomationsFolder('jobs'); true`);
         await until(`!!document.querySelector('#group-table-view button.dt-primary')`, 'the jobs list');
         await clear();
         await click('#group-table-view button.dt-primary');

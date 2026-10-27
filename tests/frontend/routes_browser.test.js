@@ -158,8 +158,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         for (const [path, list, re] of [
             ['/agents/00000000-0000-4000-8000-000000000000', '/agents', '/not running here/'],
             ['/chats/no-such-chat-3532', '/inbox/chats/all', '/chat was not found/'],
-            ['/workflows/987654321', '/workflows', '/workflow was not found/'],
-            ['/workflows/987654321/runs/987654321', '/workflows', '/workflow run was not found/'],
+            ['/workflows/987654321', '/automations/workflows', '/workflow was not found/'],
+            ['/workflows/987654321/runs/987654321', '/automations/workflows', '/workflow run was not found/'],
             ['/docs/no-such-doc', '/docs', '/document was not found/'],
         ]) {
             await open(path);
