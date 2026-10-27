@@ -71,6 +71,7 @@ func names(items []teamArtifact) []string {
 }
 
 func TestAllTeamArtifactsMergesTeamsNewestFirstAndNamesTheTeam(t *testing.T) {
+	t.Parallel() // its own store and server; the 4 x 1.1 s of waiting for the one-second grain overlaps (#9432)
 	srv, h := allTeamArtifactsServer(t)
 	twoTeamsFourResults(t, h)
 	got := getAllTeamArtifacts(t, srv, "", http.StatusOK)
@@ -87,6 +88,7 @@ func TestAllTeamArtifactsMergesTeamsNewestFirstAndNamesTheTeam(t *testing.T) {
 }
 
 func TestAllTeamArtifactsOneCursorAcrossPages(t *testing.T) {
+	t.Parallel() // its own store and server; the 4 x 1.1 s of waiting for the one-second grain overlaps (#9432)
 	srv, h := allTeamArtifactsServer(t)
 	twoTeamsFourResults(t, h)
 	first := getAllTeamArtifacts(t, srv, "?limit=3", http.StatusOK)
@@ -101,6 +103,7 @@ func TestAllTeamArtifactsOneCursorAcrossPages(t *testing.T) {
 }
 
 func TestAllTeamArtifactsTeamFilterByIdOrName(t *testing.T) {
+	t.Parallel() // its own store and server; the 4 x 1.1 s of waiting for the one-second grain overlaps (#9432)
 	srv, h := allTeamArtifactsServer(t)
 	twoTeamsFourResults(t, h)
 	only := getAllTeamArtifacts(t, srv, "?team=alpha", http.StatusOK)
@@ -118,6 +121,7 @@ func TestAllTeamArtifactsTeamFilterByIdOrName(t *testing.T) {
 }
 
 func TestAllTeamArtifactsQueryAcrossTeamsAndRefusedParameters(t *testing.T) {
+	t.Parallel() // its own store and server; the 4 x 1.1 s of waiting for the one-second grain overlaps (#9432)
 	srv, h := allTeamArtifactsServer(t)
 	twoTeamsFourResults(t, h)
 	hit := getAllTeamArtifacts(t, srv, "?q=-2", http.StatusOK)
@@ -133,6 +137,7 @@ func TestAllTeamArtifactsQueryAcrossTeamsAndRefusedParameters(t *testing.T) {
 }
 
 func TestAllTeamArtifactsOneDigestInTwoTeamsIsTwoRows(t *testing.T) {
+	t.Parallel() // its own store and server; the 4 x 1.1 s of waiting for the one-second grain overlaps (#9432)
 	srv, h := allTeamArtifactsServer(t)
 	subscribeSession(t, h, "alpha", "Alice", "00000000-0000-4000-8000-0000000000a1")
 	subscribeSession(t, h, "beta", "Bob", "00000000-0000-4000-8000-0000000000b2")
@@ -148,6 +153,7 @@ func TestAllTeamArtifactsOneDigestInTwoTeamsIsTwoRows(t *testing.T) {
 }
 
 func TestAllTeamArtifactsSortKeyTellsTwoTeamsApart(t *testing.T) {
+	t.Parallel() // its own store and server; the 4 x 1.1 s of waiting for the one-second grain overlaps (#9432)
 	a := teamArtifact{ID: "same", CreatedAt: "2026-10-26T10:00:00Z", TaskID: 1, Source: "task", BoardID: "alpha"}
 	b := a
 	b.BoardID = "beta"
@@ -158,6 +164,7 @@ func TestAllTeamArtifactsSortKeyTellsTwoTeamsApart(t *testing.T) {
 }
 
 func TestAllTeamArtifactsCursorsDoNotCrossRoutes(t *testing.T) {
+	t.Parallel() // its own store and server; the 4 x 1.1 s of waiting for the one-second grain overlaps (#9432)
 	srv, h := allTeamArtifactsServer(t)
 	twoTeamsFourResults(t, h)
 	// the team route's cursor is refused by the cross-team list, and the cross-team list's by the team route
