@@ -63,7 +63,7 @@ const AGENTS = [
             assert.equal(await ev(`window.__pwn`), undefined, at + 'a title is text, never markup');
             await shot(`inbox-mail-tasks-${w}`);
             // a tap on the avatar selects (no gesture): the row takes the tint, the avatar is a check, the bar says how many; a tap on a row while selecting toggles it; the last one off ends selecting
-            const sel = () => ev(`(() => { const trs = [...document.querySelectorAll('${T} tr.dt-mailed')]; const tick = e => e && getComputedStyle(e).display !== 'none'; return { on: trs.map(t => t.classList.contains('dt-selected')), pressed: trs.map(t => t.querySelector('button.dt-mail-lead').getAttribute('aria-pressed')), tick: trs.map(t => tick(t.querySelector('.dt-mail-tick'))), bar: (document.querySelector('.team-tb-selection .dt-bar-count') || {}).textContent || '', lead: Math.round(trs[0].querySelector('button.dt-mail-lead').getBoundingClientRect().height), page: getComputedStyle(document.getElementById('inbox-page')).display }; })()`);
+            const sel = () => ev(`(() => { const trs = [...document.querySelectorAll('${T} tr.dt-mailed')]; const tick = e => e && getComputedStyle(e).display !== 'none'; return { on: trs.map(t => t.classList.contains('dt-selected')), pressed: trs.map(t => t.querySelector('button.dt-mail-lead').getAttribute('aria-checked')), tick: trs.map(t => tick(t.querySelector('.dt-mail-tick'))), bar: (document.querySelector('.team-tb-selection .dt-bar-count') || {}).textContent || '', lead: Math.round(trs[0].querySelector('button.dt-mail-lead').getBoundingClientRect().height), page: getComputedStyle(document.getElementById('inbox-page')).display }; })()`);
             await ev(`document.querySelectorAll('${T} tr.dt-mailed button.dt-mail-lead')[0].click(); true`);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed.dt-selected').length === 1`, at + 'the avatar selects a task', 4000);
             let q = await sel();
@@ -73,7 +73,7 @@ const AGENTS = [
             await shot(`inbox-mail-selected-${w}`);
             await ev(`document.querySelectorAll('${T} tr.dt-mailed button.dt-mail-open')[1].click(); true`);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed.dt-selected').length === 2`, at + 'a tap on a row while selecting toggles it', 4000);
-            await ev(`for (const b of document.querySelectorAll('${T} tr.dt-mailed button.dt-mail-lead')) if (b.getAttribute('aria-pressed') === 'true') b.click(); true`);
+            await ev(`for (const b of document.querySelectorAll('${T} tr.dt-mailed button.dt-mail-lead')) if (b.getAttribute('aria-checked') === 'true') b.click(); true`);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed.dt-selected').length === 0 && !document.querySelector('.team-tb-selection')`, at + 'unselecting the last ends selecting', 4000);
             await ev(`document.querySelector('${T} tr.dt-mailed button.dt-mail-open').click(); true`);
             await waitFor(`document.getElementById('inbox-page').getClientRects().length > 0 && !!document.querySelector('#inbox-page .ibx-reply-input')`, at + 'a tap opens the task', 10000);
