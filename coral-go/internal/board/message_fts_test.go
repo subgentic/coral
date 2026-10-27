@@ -1,0 +1,312 @@
+package board
+
+import (
+	"context"
+	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// #9451: the message search index. It narrows a text search and never changes its answer: every case below is compared with the Go scan
+// (queryBoth in message_query_sql_test.go forces the scan with an identity Shown), and the index's own counter says it did the work.
+
+func ftsStoreWithMessages(t *testing.T, texts []string, n int) *Store {
+	t.Helper()
+	s := testStore(t)
+	ctx := context.Background()
+	_, err := sub(s, ctx, "proj", "dev", "Backend Dev")
+	require.NoError(t, err)
+	for i := 0; i < n; i++ {
+		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", texts[i%len(texts)], i), nil)
+		require.NoError(t, err)
+	}
+	return s
+}
+
+var ftsTexts = []string{"Progress report", "no match here", "PROGRESS again", "100% done_ok", "back\\slash 100%", "a_b", "axb", "Pro-gress", "progress",
+	"ünï progress", "École normale ÉCOLE", `she said "hi" there`, `quote " alone`, "x", "ab", "Zürich zürich ZÜRICH", "tab\tsep and new\nline", "the quick brown fox"}
+
+var ftsNeedles = []string{"progress", "PROGRESS", "Progress rep", "100%", "a_b", "\\", "%", "x", "ab", "#1", "no match", "zzz", "report", "école", "ÉCOLE", "zürich",
+	`"hi"`, `"`, `said "hi" th`, "quick brown", "the", "own fox", "Pro-g", "_ok", "slash 1", "ünï", "ïn", "d_ok"}
+
+func answered(s *Store) int64 { return s.msgIndexAnswers.Load() }
+
+func isASCII(s string) bool {
+	for _, r := range s {
+		if r > 127 {
+			return false
+		}
+	}
+	return true
+}
+
+func TestMessageSearchIndexAnswersLikeTheScan(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 150)
+	ctx := context.Background()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	require.Equal(t, "ready", s.MessageSearchIndexState())
+	via, short := 0, 0
+	for _, needle := range ftsNeedles {
+		for _, sort := range []string{"newest", "oldest"} {
+			p := MessageQueryParams{Q: []string{needle}, Sort: []string{sort}, Limit: []string{"7"}}
+			before := answered(s)
+			a, b := queryBoth(t, s, p)
+			require.Equal(t, b, a, "%q %s", needle, sort)
+			if len([]rune(needle)) >= 3 && isASCII(needle) {
+				require.Greater(t, answered(s), before, "the index answers %q", needle)
+				via++
+			} else { // under three characters there is no trigram; a non-ASCII needle was always the Go scan's
+				require.Equal(t, before, answered(s), "%q is answered as before", needle)
+				short++
+			}
+			for pages, cur := 0, a.NextCursor; cur != "" && pages < 30; pages++ { // every page of the walk, forward and back
+				p.Cursor = []string{cur}
+				a, b = queryBoth(t, s, p)
+				require.Equal(t, b, a, "%q %s forward", needle, sort)
+				cur = a.NextCursor
+				if a.PrevCursor != "" {
+					pp := p
+					pp.Cursor = []string{a.PrevCursor}
+					pa, pb := queryBoth(t, s, pp)
+					require.Equal(t, pb, pa, "%q %s back", needle, sort)
+				}
+			}
+		}
+	}
+	require.Greater(t, via, 20)
+	require.Greater(t, short, 2)
+}
+
+func TestMessageSearchIndexLeavesCommonNeedlesToTheScan(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 120)
+	require.NoError(t, s.BuildMessageSearchIndex(context.Background()))
+	old := messageFTSMaxCandidates
+	messageFTSMaxCandidates = 10
+	defer func() { messageFTSMaxCandidates = old }()
+	before := answered(s)
+	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"progress"}, Limit: []string{"50"}})
+	require.Equal(t, b, a)
+	require.Greater(t, a.Total, 10)
+	require.Equal(t, before, answered(s), "a needle that most messages hold is answered without the index")
+	a, b = queryBoth(t, s, MessageQueryParams{Q: []string{"quick brown"}})
+	require.Equal(t, b, a)
+	require.Greater(t, answered(s), before, "a selective one is not")
+}
+
+func TestMessageSearchIndexGuardsFallBackToTheScan(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 40)
+	ctx := context.Background()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	run := func(needle string) (hit bool) {
+		before := answered(s)
+		a, b := queryBoth(t, s, MessageQueryParams{Q: []string{needle}, Limit: []string{"50"}})
+		require.Equal(t, b, a, needle)
+		return answered(s) > before
+	}
+	require.True(t, run("progress"))
+	res, err := s.db.ExecContext(ctx, `INSERT INTO board_messages(project, session_id, subscriber_id, content, created_at) VALUES ('proj', 'dev', 'dev', ?, '2026-10-27T00:00:00Z')`, "before\x00progress after") // LIKE stops at a NUL: the scan answers
+	require.NoError(t, err)
+	nulID, _ := res.LastInsertId()
+	assert.False(t, run("progress"), "a message with a NUL byte: the scan answers")
+	ok, err := s.DeleteMessage(ctx, "proj", nulID)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.True(t, run("progress"), "the NUL message is gone: the index answers again")
+	k, err := s.PostMessage(ctx, "proj", "dev", "İstanbul progress", nil) // U+0130: Go folds it to i, LIKE does not
+	require.NoError(t, err)
+	assert.False(t, run("istanbul"), "a needle with an i and a message with U+0130: the scan answers")
+	assert.True(t, run("progress"), "a needle with no i or k is not affected by U+0130 ... ")
+	_, err = s.DeleteMessage(ctx, "proj", k.ID)
+	require.NoError(t, err)
+	assert.True(t, run("istanbul"))
+}
+
+func TestMessageSearchIndexTriggersKeepItInStep(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 30)
+	ctx := context.Background()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	m, err := s.PostMessage(ctx, "proj", "dev", "a brand new marker-aardvark message", nil)
+	require.NoError(t, err)
+	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"aardvark"}})
+	require.Equal(t, b, a)
+	require.Equal(t, 1, a.Total, "a message posted after the build is found")
+	ok, err := s.DeleteMessage(ctx, "proj", m.ID)
+	require.NoError(t, err)
+	require.True(t, ok)
+	a, b = queryBoth(t, s, MessageQueryParams{Q: []string{"aardvark"}})
+	require.Equal(t, b, a)
+	require.Equal(t, 0, a.Total, "a deleted message is gone from the answer")
+	_, err = s.db.ExecContext(ctx, `UPDATE board_messages SET content = 'edited zebra text' WHERE id = (SELECT MIN(id) FROM board_messages)`)
+	require.NoError(t, err)
+	a, b = queryBoth(t, s, MessageQueryParams{Q: []string{"zebra"}})
+	require.Equal(t, b, a)
+	require.Equal(t, 1, a.Total, "an edited message is found by its new text")
+	a, b = queryBoth(t, s, MessageQueryParams{Q: []string{"Progress report #0"}})
+	require.Equal(t, b, a)
+	require.Equal(t, 0, a.Total, "and not by the old")
+	require.NoError(t, s.DeleteProject(ctx, "proj"))
+	var rows int
+	require.NoError(t, s.db.GetContext(ctx, &rows, `SELECT COUNT(*) FROM `+messageFTSTable+` WHERE `+messageFTSTable+` MATCH '"pro"'`))
+	require.Zero(t, rows, "a deleted project leaves nothing in the index")
+	_, err = s.db.ExecContext(ctx, `INSERT INTO `+messageFTSTable+`(`+messageFTSTable+`, rank) VALUES ('integrity-check', 1)`)
+	require.NoError(t, err, "the index equals its content table")
+}
+
+func TestMessageSearchIndexBuildsWhileMessagesArePosted(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 400)
+	ctx := context.Background()
+	old := messageFTSChunkForTest(50) // many chunks, so the posts land between them
+	defer old()
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			_, _ = s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("late arrival number %d progress", i), nil)
+			time.Sleep(time.Millisecond)
+		}
+	}()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	close(stop)
+	wg.Wait()
+	_, err := s.db.ExecContext(ctx, `INSERT INTO `+messageFTSTable+`(`+messageFTSTable+`, rank) VALUES ('integrity-check', 1)`)
+	require.NoError(t, err, "every message, the ones posted during the build too, is indexed once")
+	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"late arrival"}, Limit: []string{"200"}})
+	require.Equal(t, b, a)
+	require.Greater(t, a.Total, 0)
+	var nul, ik int64
+	require.NoError(t, s.db.QueryRowxContext(ctx, `SELECT nul, ik FROM `+messageFTSMeta).Scan(&nul, &ik))
+	require.Zero(t, nul+ik)
+}
+
+func TestMessageSearchIndexDisableDropsIt(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 300)
+	ctx := context.Background()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	freed, err := s.DisableMessageSearchIndex(ctx, false)
+	require.NoError(t, err)
+	require.Greater(t, freed, int64(0), "the index's pages are free")
+	require.Equal(t, "off", s.MessageSearchIndexState())
+	require.False(t, s.messageIndexExists(ctx))
+	var n int
+	require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'board_messages_fts_%'`))
+	require.Zero(t, n, "its triggers are gone: a post does not touch a missing table")
+	_, err = s.PostMessage(ctx, "proj", "dev", "posted after the drop", nil)
+	require.NoError(t, err)
+	before := answered(s)
+	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"after the drop"}})
+	require.Equal(t, b, a)
+	require.Equal(t, 1, a.Total)
+	require.Equal(t, before, answered(s))
+	_, err = s.DisableMessageSearchIndex(ctx, true) // again, with a vacuum: nothing to drop, no error
+	require.NoError(t, err)
+}
+
+func TestMessageSearchIndexSettingAtOpen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "board.db")
+	open := func() *Store {
+		s, err := NewStoreWithKey(path, "")
+		require.NoError(t, err)
+		t.Cleanup(func() { s.Close() })
+		return s
+	}
+	wait := func(s *Store, want string) {
+		require.Eventually(t, func() bool { return s.MessageSearchIndexState() == want }, 10*time.Second, 5*time.Millisecond, "state %s", want)
+	}
+	s := open()
+	require.Equal(t, "off", s.MessageSearchIndexState(), "off by default")
+	ctx := context.Background()
+	_, err := sub(s, ctx, "proj", "dev", "Dev")
+	require.NoError(t, err)
+	for i := 0; i < 40; i++ {
+		_, err = s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s %d", ftsTexts[i%len(ftsTexts)], i), nil)
+		require.NoError(t, err)
+	}
+	require.NoError(t, s.Close())
+	t.Setenv(messageSearchIndexEnv, "on")
+	s = open()
+	wait(s, "ready") // built in the background at open
+	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"progress"}})
+	require.Equal(t, b, a)
+	require.NoError(t, s.Close())
+	s = open()
+	require.Equal(t, "ready", s.MessageSearchIndexState(), "a complete index is found at the next open, not built again")
+	require.NoError(t, s.Close())
+	t.Setenv(messageSearchIndexEnv, "")
+	s = open()
+	require.Eventually(t, func() bool { return !s.messageIndexExists(ctx) }, 10*time.Second, 5*time.Millisecond, "the setting off drops it")
+	require.Equal(t, "off", s.MessageSearchIndexState())
+}
+
+// BenchmarkMessageSearchIndex prints what the index costs and saves on a board of -benchtime-independent size (messageFTSBenchRows messages):
+// go test ./internal/board -run xxx -bench MessageSearchIndex -benchtime 3x
+func BenchmarkMessageSearchIndex(b *testing.B) {
+	rows := 30000
+	s, err := NewStoreWithKey(filepath.Join(b.TempDir(), "board_bench.db"), "")
+	require.NoError(b, err)
+	b.Cleanup(func() { s.Close() })
+	ctx := context.Background()
+	words := strings.Fields("progress review task commit branch landing agent team message board goal release notes tests golden census batch frontend backend security hub tunnel")
+	tx, err := s.db.BeginTxx(ctx, nil)
+	require.NoError(b, err)
+	textBytes := 0
+	for i := 0; i < rows; i++ {
+		var sb strings.Builder
+		for j := 0; j < 30+i%50; j++ {
+			sb.WriteString(words[(i*7+j*13)%len(words)])
+			sb.WriteByte(' ')
+		}
+		if i%500 == 7 {
+			sb.WriteString("zuerichunique")
+		}
+		textBytes += sb.Len()
+		_, err := tx.ExecContext(ctx, `INSERT INTO board_messages(project, session_id, subscriber_id, content, created_at) VALUES ('proj','dev','dev',?,?)`, sb.String(), "2026-10-27T00:00:00Z")
+		require.NoError(b, err)
+	}
+	require.NoError(b, tx.Commit())
+	query := func(needle string) *MessageQuery {
+		q, err := ParseMessageQuery(MessageQueryParams{Q: []string{needle}})
+		require.NoError(b, err)
+		q.Project = "proj"
+		return q
+	}
+	for _, needle := range []string{"zuerichunique", "tests golden census", "progress"} {
+		b.Run("without/"+needle, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, err := s.QueryMessages(ctx, query(needle))
+				require.NoError(b, err)
+			}
+		})
+	}
+	t0 := time.Now()
+	require.NoError(b, s.BuildMessageSearchIndex(ctx))
+	var pages int64
+	require.NoError(b, s.db.GetContext(ctx, &pages, `SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name LIKE 'board_messages_fts%'`))
+	b.Logf("%d messages, %.1f MB of text: build %v, index %.1f MB (%.2f x the text)", rows, float64(textBytes)/1e6, time.Since(t0).Round(time.Millisecond), float64(pages)/1e6, float64(pages)/float64(textBytes))
+	for _, needle := range []string{"zuerichunique", "tests golden census", "progress"} {
+		b.Run("with/"+needle, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, err := s.QueryMessages(ctx, query(needle))
+				require.NoError(b, err)
+			}
+		})
+	}
+}
+
+func messageFTSChunkForTest(n int) func() {
+	old := messageFTSChunk
+	messageFTSChunk = n
+	return func() { messageFTSChunk = old }
+}

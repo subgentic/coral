@@ -365,6 +365,9 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 // matches reach Go; the page's rows are read after. ok is false when the Go scan must answer instead: the scan caps would truncate the
 // board, a message holds a NUL byte, or the needle has an i or k and a message holds U+0130 or U+212A (which Go's ToLower folds to i and k; LIKE does not).
 func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []string, args []any, dir string) (*MessageQueryResult, bool, error) {
+	if res, ok, err := s.queryTextViaIndex(ctx, q, where, args, dir); err != nil || ok {
+		return res, ok, err
+	}
 	w := " WHERE " + strings.Join(where, " AND ")
 	var n, bytes int64
 	if err := s.reader().QueryRowxContext(ctx, "SELECT COUNT(*), COALESCE(SUM(LENGTH(CAST(m.content AS BLOB))), 0) FROM board_messages m"+w, args...).Scan(&n, &bytes); err != nil {
@@ -388,6 +391,16 @@ func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []str
 	if err := s.reader().SelectContext(ctx, &ids, "SELECT m.id FROM board_messages m"+w+` AND m.content LIKE ? ESCAPE '\' ORDER BY m.id `+dir, likeArgs...); err != nil {
 		return nil, false, err
 	}
+	res, err := s.pageOfIDs(ctx, q, ids)
+	if err != nil {
+		return nil, false, err
+	}
+	return res, true, nil
+}
+
+// pageOfIDs makes the reply of a search from the ids of the messages that match, in the query's order: the page's rows are read and the
+// totals and cursors come from the ids.
+func (s *Store) pageOfIDs(ctx context.Context, q *MessageQuery, ids []int64) (*MessageQueryResult, error) {
 	pg := q.pager()
 	for _, id := range ids {
 		pg.Add(Message{ID: id})
@@ -401,7 +414,7 @@ func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []str
 		}
 		var rows []Message
 		if err := s.reader().SelectContext(ctx, &rows, listMessagesSelect+" WHERE m.id IN ("+strings.Join(marks, ",")+")", in...); err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		for _, m := range rows {
 			byID[m.ID] = m
@@ -412,7 +425,7 @@ func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []str
 	}
 	res := &MessageQueryResult{}
 	q.fill(res, pg)
-	return res, true, nil
+	return res, nil
 }
 
 // matches reports whether m passes every filter: the sender, the member it tags, and the text, each as a viewer sees it.
