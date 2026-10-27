@@ -1,6 +1,6 @@
 /* What the message board asks the server for (moved out of message_board.js, #5065; no behaviour change). */
 import { state } from './state.js';
-import { identityKey, noteBoardLabels, serverFetch, boardFetch, sessionServer, isCloud } from './server_base.js';
+import { identityKey, noteBoardLabels, serverFetch, serverRead, boardFetch, sessionServer, isCloud } from './server_base.js';
 
 export const PAGE_SIZE = 50;
 
@@ -23,7 +23,7 @@ export async function fetchProjects() {
     const remotes = !state.hub ? [] : (state.servers || []).filter(s => s.id !== 'local' && s.status === 'online');
     const lists = await Promise.all(remotes.map(async srv => {
         try {
-            const r = await serverFetch(srv.id, '/api/board/projects');
+            const r = await serverRead(srv.id, '/api/board/projects'); // a hung computer is given up on after the limit, not waited for (#8904)
             if (!r.ok) return [];
             const rows = await r.json();
             noteBoardLabels(rows, 'project', srv.id);
