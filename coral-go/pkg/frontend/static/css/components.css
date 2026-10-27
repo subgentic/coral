@@ -4189,7 +4189,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-field-hint:empty { display: none; }
 #team-panel-team #btn-browse-team, #launch-step-agent #btn-browse { width: auto; justify-self: start; align-self: flex-start; } /* Browse is its own size under the folder, not the field's width */
 .launch-wizard > .modal-actions #launch-team-cancel { margin-right: auto; }
-.launch-wizard > .modal-actions .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 #launch-modal[data-team-stage="members"] .launch-server-row, #launch-modal[data-team-stage="start"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice */
 .launch-recap.launch-recap-warn { color: var(--warning-text, var(--warning)); }
 .launch-recap.launch-recap-error { color: var(--sv-error-color); }
