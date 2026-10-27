@@ -327,7 +327,7 @@ func (s *Store) ListOpenTaskStates(ctx context.Context, project string) ([]Task,
 	if err != nil {
 		return nil, err
 	}
-	s.loadBlockedBy(ctx, tasks)
+	s.loadOpenBlockedBy(ctx, tasks, project)
 	return tasks, nil
 }
 
@@ -407,21 +407,36 @@ func (s *Store) loadBlockedBy(ctx context.Context, tasks []Task) {
 		 LEFT JOIN board_tasks bt ON bt.id = td.blocked_by_task_id
 		 WHERE td.task_id IN (%s)`, strings.Join(placeholders, ","))
 
-	var rows []struct {
-		TaskID           int64   `db:"task_id"`
-		BlockedByTaskID  int64   `db:"blocked_by_task_id"`
-		BlockedByBoardID string  `db:"blocked_by_board_id"`
-		Title            *string `db:"title"`
-		Status           *string `db:"status"`
-	}
+	var rows []blockedByRow
 	if err := s.reader().SelectContext(ctx, &rows, query, args...); err != nil {
 		return
 	}
+	s.attachBlockedBy(ctx, idMap, rows)
+}
+
+// blockedByRow is one dependency of a task as loadBlockedBy reads it: the upstream task's id and board, and its title and status when it is still there.
+type blockedByRow struct {
+	TaskID           int64   `db:"task_id"`
+	BlockedByTaskID  int64   `db:"blocked_by_task_id"`
+	BlockedByBoardID string  `db:"blocked_by_board_id"`
+	Title            *string `db:"title"`
+	Status           *string `db:"status"`
+}
+
+// attachBlockedBy puts the dependencies on their tasks, each task's in the order the rows come (by upstream id), with the rules evaluated as loadDependencyRules gives them; on a rules
+// error the dependencies are listed without rule evaluation, as before.
+func (s *Store) attachBlockedBy(ctx context.Context, idMap map[int64]*Task, rows []blockedByRow) {
 	if len(rows) == 0 {
 		return
 	}
-	// Like loadDependencyRule per dependency, but batched; on error the
-	// dependencies are listed without rule evaluation, as before.
+	ids := make([]int64, 0, len(idMap))
+	seen := make(map[int64]bool, len(rows))
+	for _, r := range rows {
+		if !seen[r.TaskID] {
+			seen[r.TaskID] = true
+			ids = append(ids, r.TaskID)
+		}
+	}
 	rules, rulesErr := s.loadDependencyRules(ctx, ids)
 	for _, r := range rows {
 		t := idMap[r.TaskID]
@@ -440,6 +455,31 @@ func (s *Store) loadBlockedBy(ctx context.Context, tasks []Task) {
 		}
 		t.BlockedBy = append(t.BlockedBy, dep)
 	}
+}
+
+// openBlockedBySQL reads the dependencies of a board's open tasks with one join, on the board and the statuses ListOpenTaskStates reads, in place of an IN list of every open task's id
+// (#9475: 1,700 placeholders built, bound and parsed on every poll of the board status). The order is loadBlockedBy's: by task, then by upstream id.
+const openBlockedBySQL = `SELECT td.task_id, td.blocked_by_task_id, td.blocked_by_board_id, bt.title, bt.status
+	 FROM board_tasks t
+	 JOIN task_dependencies td ON td.task_id = t.id
+	 LEFT JOIN board_tasks bt ON bt.id = td.blocked_by_task_id
+	 WHERE t.board_id = ? AND t.status IN ('pending', 'in_progress', 'blocked', 'draft')
+	 ORDER BY td.task_id, td.blocked_by_task_id`
+
+// loadOpenBlockedBy is loadBlockedBy for the tasks ListOpenTaskStates read: the whole open set of a board.
+func (s *Store) loadOpenBlockedBy(ctx context.Context, tasks []Task, project string) {
+	if len(tasks) == 0 {
+		return
+	}
+	idMap := make(map[int64]*Task, len(tasks))
+	for i := range tasks {
+		idMap[tasks[i].ID] = &tasks[i]
+	}
+	var rows []blockedByRow
+	if err := s.reader().SelectContext(ctx, &rows, openBlockedBySQL, project); err != nil {
+		return
+	}
+	s.attachBlockedBy(ctx, idMap, rows)
 }
 
 // HasActiveTaskForAssignee returns true when the assignee already has another
