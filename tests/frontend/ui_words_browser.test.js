@@ -1,5 +1,5 @@
 // The visual audit's words and chrome (#9456, items 4, 8 and 16), on the real pages at 1280 and 390 px: the create buttons are the verb and the thing ("New agent" in the sidebar, "New" in the phone's
-// list, "New task" on the Tasks tab, no plus sign); a dialog has no Close X and Cancel closes it; and the phone agent card's status chip is sentence case ("Idle"), not upper case. The job chips' words
+// list, "New task" on the Tasks tab, no plus sign); a dialog has no Close X and Cancel closes it; and the agent row's one chip ("Needs input") is sentence case, not upper case (#9686: an agent row is the dot, the name and at most one chip; "Idle" is the dot's now). The job chips' words
 // (Passed, Failed) are pinned in jobs_screen, jobs_audit_fixes and job_exit_reason. Isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -48,14 +48,14 @@ const BASE = require('./test_base').BASE;
             await shot(`words-confirm-${w}`);
             await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
         }
-        // the phone agent card's status chip: sentence case
+        // the agent row's one chip on the phone's list: sentence case (an agent that needs you; the other states are the dot's)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
-        await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions([{ session_id: 'i1', name: 'idle-1', agent_type: 'claude', working_directory: '/tmp/x', sleeping: false, display_name: 'Idle One', model: 'claude-opus-5-5', summary: 'Waiting for work' }]); true`);
-        await waitFor(`!!document.querySelector('#mobile-session-list .session-status-chip')`, 'the phone card chip', 8000);
-        const chip = await ev(`(() => { const c = document.querySelector('#mobile-session-list .session-status-chip'); return { text: c.textContent.trim(), transform: getComputedStyle(c).textTransform }; })()`);
-        assert.equal(chip.transform, 'none', 'the status chip is not upper-cased: ' + JSON.stringify(chip));
+        await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions([{ session_id: 'i1', name: 'idle-1', agent_type: 'claude', working_directory: '/tmp/x', sleeping: false, display_name: 'Idle One', model: 'claude-opus-5-5', summary: 'Waiting for work', waiting_for_input: true }]); true`);
+        await waitFor(`!!document.querySelector('#mobile-session-list .session-state-pill')`, 'the phone row chip', 8000);
+        const chip = await ev(`(() => { const c = document.querySelector('#mobile-session-list .session-state-pill'); return { text: c.textContent.trim(), transform: getComputedStyle(c).textTransform }; })()`);
+        assert.equal(chip.transform, 'none', 'the row chip is not upper-cased: ' + JSON.stringify(chip));
         assert.match(chip.text, /^[A-Z][a-z]/, 'its words are sentence case: ' + JSON.stringify(chip));
         await shot('words-phone-card-390');
-        console.log('PASS ui words: create buttons without a plus, no Close X and Cancel closes, a sentence-case confirm title and phone status chip');
+        console.log('PASS ui words: create buttons without a plus, no Close X and Cancel closes, a sentence-case confirm title and phone row chip');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
