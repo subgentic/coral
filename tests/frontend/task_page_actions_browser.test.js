@@ -146,7 +146,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!!document.querySelector('${ownRow} .board-task-name') && document.querySelectorAll('#board-task-list .board-task-item[data-kind="board"]').length === 1`, 'the worker\'s assigned board task', 12000);
         assert.deepEqual(await ev(`[...document.querySelectorAll('#board-task-list .board-task-item[data-kind="board"]')].map(r => r.dataset.taskId)`), [String(open1)], 'the worker dock contains only its assigned board task');
         await ev(`document.querySelector('${ownRow} .board-task-name').click(); true`);
-        await waitFor(`document.querySelector('#team-panel-item #team-task-title')?.textContent === '#${open1} Build the task page'`, 'the assigned task page from the worker dock', 12000);
-        check('a task name in the dock opens the team page\'s task page and no dialog', await ev(`getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`));
+        await waitFor(`document.querySelector('#preview-pane #team-task-title')?.textContent === '#${open1} Build the task page'`, 'the assigned task from the worker dock, in the shared preview (#8788)', 12000);
+        check('a task name in the dock opens its detail in the shared preview pane and no dialog', await ev(`getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`));
     } finally { await api('DELETE', `/api/board/${B}`).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
