@@ -1370,6 +1370,7 @@
 
 /* A Hub page framed in the Inbox (Needs you, Tasks, Saved for later: #9542) runs edge to edge on a phone: no gutter round it and no panel fill, the Hub's own page is the page (#9660). */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .group-table-view:has(> .inbox-frame) { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .group-table-view:has(> .inbox-frame) { position: relative; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .group-table-view:has(> .inbox-frame) > .group-table-head { position: absolute; width: 1px; height: 1px; min-height: 0; max-height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* the folder button names the page, so no heading is drawn under it; the heading stays in the page for a screen reader (#9660, as #9631) */
     .group-table-view > .inbox-frame { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; border-radius: 0; }
 }
