@@ -159,11 +159,14 @@ func (s *TokenUsageStore) GetUsageTimeSeriesGrouped(ctx context.Context, q TimeS
 		return nil, fmt.Errorf("unknown group_by %q", q.GroupBy)
 	}
 
-	// 5-minute buckets need the rows themselves; the hour and day buckets are made from the hourly aggregate.
+	// 5-minute buckets need the rows themselves; the hour and day buckets are made from the hourly aggregate. A day bucket over a window with no end does not need the hour of
+	// the rolled-up hourly rows, so it reads them through the day aggregate (#9447); a day's recorded_at there is the day's start, which is the same bucket.
 	var rel string
 	var args []interface{}
 	if q.Interval == "5m" {
 		rel, args = `(SELECT `+usageCols+`, n_rows, recorded_at FROM token_usage_all`+sinceWhere(q.Since)+`)`, sinceArgs(q.Since)
+	} else if q.Interval == "1d" && q.Until == "" {
+		rel, args = usageCoarseRelation(ctx, s.db.Reader(), q.Since)
 	} else {
 		rel, args = usageRelation(ctx, s.db.Reader(), q.Since, q.Until)
 	}

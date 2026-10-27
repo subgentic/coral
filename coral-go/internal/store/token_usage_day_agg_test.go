@@ -196,4 +196,20 @@ func TestUsageSummariesAt30kHourlyRows(t *testing.T) {
 		}
 	}
 	require.Less(t, coarse*3, fine, "the day aggregate is at least three times faster")
+
+	// the day-bucket series (#9447) reads the rolled-up hours through the aggregate too, and gives the same buckets
+	series := func(on bool) time.Duration {
+		tokenUsageDayAggOn = on
+		d := time.Hour
+		for i := 0; i < 3; i++ {
+			t0 := time.Now()
+			_, err := s.GetUsageTimeSeriesGrouped(ctx, TimeSeriesQuery{Since: since, Interval: "1d", GroupBy: "model"})
+			require.NoError(t, err)
+			d = min(d, time.Since(t0))
+		}
+		return d
+	}
+	sFine, sCoarse := series(false), series(true)
+	t.Logf("%d hourly rows, the 30-day series by day and model: hourly rows %v, day aggregate %v", n, sFine, sCoarse)
+	require.Less(t, sCoarse*3, sFine, "the day-bucket series is at least three times faster through the aggregate")
 }
