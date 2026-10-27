@@ -99,7 +99,7 @@ function _renderTabs() {
         html += `<div class="preview-tab${active}${preview}" data-tab-id="${escapeAttr(tab.id)}" title="${tab.pinned ? '' : 'Preview — double-click to keep open'}">
             <span class="preview-tab-icon">${_fileIcon(tab)}</span>
             <span class="preview-tab-name" title="${escapeAttr(title)}">${escapeHtml(_tabTitle(tab))}${_isDirty(tab) ? ' •' : ''}</span>
-            ${tab.pinned ? '' : `<button class="preview-tab-keep" data-tab-id="${escapeAttr(tab.id)}" aria-label="Keep ${escapeAttr(_tabTitle(tab))} open" title="Keep open">Keep</button>`}
+            ${tab.pinned ? '' : `<button class="preview-tab-keep" data-tab-id="${escapeAttr(tab.id)}" aria-label="Keep open: ${escapeAttr(_tabTitle(tab))}" aria-describedby="preview-keep-note-${escapeAttr(tab.id)}" title="Keep open">Keep open</button><span class="sr-only" id="preview-keep-note-${escapeAttr(tab.id)}">This tab is shown in italics because it is a preview: the next one you open replaces it, unless you keep it open.</span>`}
             <button class="preview-tab-close" aria-label="Close ${escapeAttr(_tabTitle(tab))}" data-tab-id="${escapeAttr(tab.id)}" title="Close">&times;</button>
         </div>`;
     }
