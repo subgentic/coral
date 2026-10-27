@@ -220,7 +220,7 @@ async function run() {
   check('poll refreshes the row without user action', flipped && !flipped.spinner && flipped.icon === 'Done', flipped && `${flipped.icon}`);
   await until(`/The design is done\\./.test(document.getElementById('task-detail-content').textContent)`, 'the finished result in the open modal');
   m = await modal();
-  check('open modal follows: completed, final cost, duration', m.open && m.status === 'Completed' && m.cost === '$1.25' && !m.costLive && m.fields['Duration'] === '5m 30s', JSON.stringify([m.status, m.cost, m.fields['Duration']]));
+  check('open modal follows: completed, final cost, duration', m.open && m.status === 'Completed' && m.cost === '$1.25' && !m.costLive && m.fields['Duration'] === '6 min', JSON.stringify([m.status, m.cost, m.fields['Duration']]));
   check('open modal fetches the result once the subagent finishes', (await ev(`window.__detailFetches`)).includes('b7running00000000') && /The design is done\./.test(m.sections['Result']), m.sections['Result']);
 
   // ── The overlay is shared with the agent's own tasks (a board's task is the team page's page since #7644) ──

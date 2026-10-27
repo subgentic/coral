@@ -3,8 +3,10 @@ import { historyFetch } from './history_source.js';
 import { serverFetch, serverForSession, teamFetch, keyLabel } from './server_base.js';
 import { formatTokens } from './format.js';
 import { formatCost } from './format.js';
-import { formatDurationSec as formatDuration } from './utils.js';
+import { compactDuration } from './format.js';
 import { importOnce } from './import_once.js';
+
+const formatDuration = sec => (sec > 0 ? compactDuration(sec) : ''); // execution time: nothing for none or zero
 
 export async function updateTokenUsage(sessionId) {
     const el = document.getElementById('session-token-usage');

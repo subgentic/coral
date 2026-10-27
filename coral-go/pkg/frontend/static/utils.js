@@ -5,7 +5,6 @@ import './vendor_loader.js';
 import './agent_view.js';
 import { browserLocal } from './safe_storage.js';
 import './dock_page.js';
-import { formatDuration } from './format.js';
 import { showToast } from './notifications.js';
 export { MORE_DOTS_SVG, escapeAttr, escapeHtml, tagColor } from './html_escape.js';
 export { notificationLinkTarget, showAlertNotification, showNotificationToast, showToast, showWorkflowNotification } from './notifications.js';
@@ -66,13 +65,6 @@ export function dbg(...args) {
 
 
 
-
-/** A duration in seconds as "45s", "12m", "1h" or "69h 59m". Minutes are
- *  rounded on the total, so they carry into the hour: 3599s is "1h", never
- *  "60m", and nothing reads "69h 60m" (#3152). Empty for none or zero. */
-export function formatDurationSec(sec) {
-    return formatDuration(sec, { shape: 'rounded' });
-}
 
 /** The dashboard's board identity: the reserved Operator subscriber that task
  *  actions already use (agent_docs/board.md). Team chat posted as "dashboard"
