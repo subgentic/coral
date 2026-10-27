@@ -554,7 +554,7 @@
     },
     {
       "name": "task_workflows",
-      "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL, has_artifacts INTEGER NOT NULL DEFAULT 0)",
+      "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL, has_artifacts INTEGER NOT NULL DEFAULT 0, eff_state INTEGER NOT NULL DEFAULT 0, eff_review_of INTEGER NOT NULL DEFAULT 0, eff_author TEXT NOT NULL DEFAULT '', eff_submitted TEXT NOT NULL DEFAULT '', eff_rejected INTEGER NOT NULL DEFAULT 0)",
       "tbl_name": "task_workflows",
       "type": "table"
     },
@@ -5114,6 +5114,51 @@
           "dflt_value": "0",
           "hidden": 0,
           "name": "has_artifacts",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "eff_state",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 4,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "eff_review_of",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 5,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "eff_author",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "eff_submitted",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "eff_rejected",
           "notnull": 1,
           "pk": 0,
           "type": "INTEGER"

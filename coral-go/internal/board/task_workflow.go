@@ -117,7 +117,10 @@ func (s *Store) initTaskWorkflows(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return s.ensureWorkflowArtifactFlag(ctx)
+	if err := s.ensureWorkflowArtifactFlag(ctx); err != nil {
+		return err
+	}
+	return s.ensureWorkflowEfficiencyFacts(ctx)
 }
 
 // artifactsMark is the text a workflow's JSON holds when any result of the task (its completion's, its review's) lists an artifact: the team artifacts read used to find those tasks by a LIKE over every
@@ -143,6 +146,47 @@ func (s *Store) ensureWorkflowArtifactFlag(ctx context.Context) error {
 	}
 	_, err := s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_task_workflows_artifacts ON task_workflows(task_id) WHERE has_artifacts = 1`)
 	return err
+}
+
+// The efficiency read (#9288) needs four facts of every completed task's workflow in its window: whether it is a review task (review_of), the original author, when the work was handed in (the completion review's
+// submission) and whether a round sent it back. It used to read and decode the whole document of each (kilobytes: instructions, amendments, artifacts, rounds), 5,000 tasks at 165 to 190 ms a read; the four
+// facts are columns now, kept by saveWorkflow, and the read does not touch the document. eff_state: 0 not derived yet, 1 derived, 2 the stored text is not valid JSON, 3 it is empty.
+// ensureWorkflowEfficiencyFacts adds the columns and derives them for every row that has none yet (all of them on the first open: one pass over the stored documents, as ensureWorkflowArtifactFlag does for
+// has_artifacts); a row that fails to parse is state 2, and the read leaves its facts out as it always has.
+func (s *Store) ensureWorkflowEfficiencyFacts(ctx context.Context) error {
+	for _, col := range []string{"eff_state INTEGER NOT NULL DEFAULT 0", "eff_review_of INTEGER NOT NULL DEFAULT 0", "eff_author TEXT NOT NULL DEFAULT ''", "eff_submitted TEXT NOT NULL DEFAULT ''", "eff_rejected INTEGER NOT NULL DEFAULT 0"} {
+		name := strings.Fields(col)[0]
+		var n int
+		if err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM pragma_table_info('task_workflows') WHERE name = ?`, name); err != nil {
+			return err
+		}
+		if n == 0 {
+			if _, err := s.db.ExecContext(ctx, `ALTER TABLE task_workflows ADD COLUMN `+col); err != nil {
+				return err
+			}
+		}
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE task_workflows SET
+		eff_state = CASE WHEN data = '' THEN 3 WHEN NOT json_valid(data) THEN 2 ELSE 1 END,
+		eff_review_of = CASE WHEN json_valid(data) THEN COALESCE(json_extract(data, '$.review_of'), 0) ELSE 0 END,
+		eff_author = CASE WHEN json_valid(data) THEN COALESCE(json_extract(data, '$.original_author'), '') ELSE '' END,
+		eff_submitted = CASE WHEN json_valid(data) THEN COALESCE(json_extract(data, '$.completion_review.submitted_at'), '') ELSE '' END,
+		eff_rejected = CASE WHEN json_valid(data) AND EXISTS (SELECT 1 FROM json_each(data, '$.review_rounds') r WHERE json_extract(r.value, '$.result') = 'rejected') THEN 1 ELSE 0 END
+		WHERE eff_state = 0`)
+	return err
+}
+
+// efficiencyFactsOf is the four facts of a workflow as saveWorkflow keeps them (what the efficiency read used to take from the decoded document).
+func efficiencyFactsOf(w TaskWorkflow) (reviewOf int64, author, submitted string, rejected int) {
+	for _, r := range w.ReviewRounds {
+		if r.Result == "rejected" {
+			rejected = 1
+		}
+	}
+	if w.CompletionReview != nil {
+		submitted = w.CompletionReview.SubmittedAt
+	}
+	return w.ReviewOf, w.OriginalAuthor, submitted, rejected
 }
 
 // resolveReadyTasks runs inside the same transaction as prerequisite completion.
@@ -325,8 +369,10 @@ func saveWorkflow(ctx context.Context, db sqlx.ExecerContext, id int64, w TaskWo
 	if strings.Contains(string(data), artifactsMark) {
 		has = 1
 	}
-	_, err = db.ExecContext(ctx, `INSERT INTO task_workflows(task_id, data, has_artifacts) VALUES (?, ?, ?)
-	 ON CONFLICT(task_id) DO UPDATE SET data = excluded.data, has_artifacts = excluded.has_artifacts`, id, string(data), has)
+	reviewOf, author, submitted, rejected := efficiencyFactsOf(w)
+	_, err = db.ExecContext(ctx, `INSERT INTO task_workflows(task_id, data, has_artifacts, eff_state, eff_review_of, eff_author, eff_submitted, eff_rejected) VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+	 ON CONFLICT(task_id) DO UPDATE SET data = excluded.data, has_artifacts = excluded.has_artifacts, eff_state = 1, eff_review_of = excluded.eff_review_of, eff_author = excluded.eff_author,
+	 eff_submitted = excluded.eff_submitted, eff_rejected = excluded.eff_rejected`, id, string(data), has, reviewOf, author, submitted, rejected)
 	return err
 }
 
