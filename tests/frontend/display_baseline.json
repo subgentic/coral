@@ -60,6 +60,6 @@
   "theme_config.js": 2,
   "token_usage_ui.js": 12,
   "view_switch.js": 1,
-  "workflows.js": 10,
+  "workflows.js": 4,
   "xterm_renderer.js": 10
 }

@@ -29,9 +29,9 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'settings')`);
-            await ev(`window.switchNavTab('workflows'); true`);
-            await waitFor(`document.querySelectorAll('#wf-nav-list .row-btn').length === 1`, 'the workflow row', 8000).catch(async e => { throw new Error(e.message + ' at ' + w + ': ' + await ev(`JSON.stringify([document.getElementById('workflows-view')?.style.display, document.getElementById('workflows-view')?.innerText.slice(0, 200), location.hash])`)); });
-            await ev(`document.querySelector('#wf-nav-list .row-btn').click(); true`);
+            await ev(`window.openAutomationsFolder('workflows'); true`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-primary').length === 1`, 'the workflow row', 8000).catch(async e => { throw new Error(e.message + ' at ' + w + ': ' + await ev(`JSON.stringify([document.getElementById('workflows-view')?.style.display, document.getElementById('workflows-view')?.innerText.slice(0, 200), location.hash])`)); });
+            await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click(); true`);
             await waitFor(`document.querySelectorAll('#wf-detail .wf-runs-table tbody tr').length === 3`, 'the runs', 8000);
             const at = `at ${w}px: `;
             const page = await ev(`(() => { const t = document.getElementById('workflows-view').innerText; return { text: t, count: t.split('nightly-build').length - 1, badge: document.getElementById('wf-count-badge') === null ? 'none' : 'drawn',

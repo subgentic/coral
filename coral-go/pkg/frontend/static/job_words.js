@@ -168,11 +168,3 @@ export function limitWords(s) {
     if (n % 60 === 0) return `${n / 60} minute${n === 60 ? '' : 's'}`;
     return `${n} seconds`;
 }
-
-/** The dot of a job's or a workflow's row, one look for one state (UI/UX's #7588 item 2): the css class suffix (sched-dot-ok, -bad, -run, none) and the words that say it, from the last run's status. */
-export function runDot(lastRun) {
-    const status = lastRun ? lastRun.status : '';
-    const dot = status === 'completed' ? 'ok' : status === 'running' ? 'run' : status === 'failed' || status === 'killed' ? 'bad' : 'none';
-    const words = status ? `Last run ${{ completed: 'passed', killed: 'stopped' }[status] || status}` : 'Not run yet';
-    return { dot, words };
-}

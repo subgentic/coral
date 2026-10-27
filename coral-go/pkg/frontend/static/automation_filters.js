@@ -11,6 +11,8 @@ export const RESULTS = ['passed', 'failed', 'running', 'never'];
 export const RESULT_LABEL = { passed: 'Passed', failed: 'Failed', running: 'Running', never: 'Never run' };
 export const RUNS = ['workflow', 'prompt'];
 export const RUNS_LABEL = { workflow: 'A workflow', prompt: 'An agent prompt' };
+export const STEP_TYPES = ['shell', 'agent'];
+export const STEP_LABEL = { shell: 'Shell', agent: 'Agent' };
 export const AGENTS = ['claude', 'agy', 'codex', 'pi'];
 export const AGENT_LABEL = { claude: 'Claude', agy: 'Antigravity', codex: 'Codex', pi: 'Pi' };
 export const SORTS = ['next', 'name', 'last'];
@@ -23,6 +25,7 @@ const model = defineFilters({
     result: { type: 'choice', values: RESULTS, chip: v => `Result: ${RESULT_LABEL[v]}` },
     runs: { type: 'choice', values: RUNS, chip: v => `Runs: ${RUNS_LABEL[v]}` },
     agent: { type: 'choice', values: AGENTS, chip: v => `Agent: ${AGENT_LABEL[v]}` },
+    step: { type: 'choice', values: STEP_TYPES, chip: v => `Step type: ${STEP_LABEL[v]}` },
     sort: { type: 'order', values: SORTS, default: 'next' },
 });
 export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
@@ -49,6 +52,14 @@ export function jobItem(job, workflowName = () => '') {
         at: Date.parse(job.next_fire_at || '') || 0, last: Date.parse((job.last_run && (job.last_run.started_at || job.last_run.finished_at)) || '') || 0, job };
 }
 
+/** A workflow as one item of a folder. `usedBy` is how many jobs run it. A step with no type is a shell step, as the editor and the runner read it. */
+export function workflowItem(wf, usedBy = 0) {
+    const steps = Array.isArray(wf.steps) ? wf.steps : [];
+    return { kind: 'workflow', id: Number(wf.id), name: String(wf.name || ''), enabled: !!wf.enabled, run: wf.last_run || null, result: resultOf(wf.last_run), runs: '', agent: '',
+        does: String(wf.description || ''), stepTypes: [...new Set(steps.map(s => (s && s.type) || 'shell'))], stepCount: Number(wf.step_count || steps.length || 0), usedBy: Number(usedBy) || 0,
+        at: 0, last: Date.parse((wf.last_run && (wf.last_run.started_at || wf.last_run.finished_at)) || '') || 0, wf };
+}
+
 /** Whether an item passes the filters (the pill's state is a filter here too). The search covers the name and what the item runs. */
 export function matches(item, f) {
     const c = clean(f);
@@ -57,6 +68,7 @@ export function matches(item, f) {
     if (c.result && item.result !== c.result) return false;
     if (c.runs && item.runs !== c.runs) return false;
     if (c.agent && item.agent !== c.agent) return false;
+    if (c.step && !(item.stepTypes || []).includes(c.step)) return false;
     return true;
 }
 
