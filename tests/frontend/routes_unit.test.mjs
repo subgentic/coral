@@ -56,6 +56,8 @@ assert.deepEqual(inboxRouteFor(parse('/chats/@m2')), { view: 'inbox-folder', fol
 assert.deepEqual(inboxRouteFor(parse('/chats', '?type=group')), { view: 'inbox-boards', sub: 'boards' }, 'type=group is the Boards folder');
 assert.deepEqual(inboxRouteFor(parse('/chats', '?q=build&page=3&type=agent')), { view: 'inbox-folder', folder: 'chats' }, 'any other filter is dropped and the address still lands on All chats');
 assert.deepEqual(inboxRouteFor({ view: 'chats', query: 'starred=1' }), { view: 'inbox-folder', folder: 'chats-starred' });
+assert.deepEqual(inboxRouteFor(parse('/chats', '?starred=1')), { view: 'inbox-folder', folder: 'chats-starred' }, 'a /chats route drops the flag, the old address\'s own query still names the folder');
+assert.deepEqual(inboxRouteFor(parse('/chats', '?with_notes=1&q=x')), { view: 'inbox-folder', folder: 'chats-notes' });
 assert.deepEqual(inboxRouteFor({ view: 'chats', query: 'archived=1' }), { view: 'inbox-folder', folder: 'chats-archived' });
 assert.deepEqual(inboxRouteFor({ view: 'chats', query: 'active=1' }), { view: 'inbox-folder', folder: 'chats-active' });
 assert.deepEqual(inboxRouteFor({ view: 'chats', query: 'with_notes=1' }), { view: 'inbox-folder', folder: 'chats-notes' });

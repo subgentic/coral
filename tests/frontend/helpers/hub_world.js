@@ -7,7 +7,7 @@ const HOST = new URL(BASE).host;
 const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "style-src-attr 'unsafe-inline'", "font-src 'self'", "img-src 'self' data: blob:", `connect-src 'self' ws://${HOST}`, "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
 
 /** Set the page up as the Hub's before the first navigation: the viewport, the cloud boot flag with the hub's CSP, and the stubbed API. */
-async function setupHubWorld({ client, Page, Emulation, width, height, mobile }) {
+async function setupHubWorld({ client, Page, Emulation, width, height, mobile, native = false }) { // native: the boot value inbox:'native' too (Goal #100: the Hub's own Inbox, no Chats or Board tab)
     const { Fetch, Network } = client;
     await Promise.all([Page.enable(), Network.enable()]);
     await Network.setBypassServiceWorker({ bypass: true });
@@ -16,7 +16,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile })
         safePaused(client, async e => {
             if (e.responseStatusCode !== 200) return Fetch.continueRequest({ requestId: e.requestId });
             const b = await Fetch.getResponseBody({ requestId: e.requestId });
-            const html = (b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf8') : b.body).replace('"mode":"local"', '"mode":"cloud"');
+            const html = (b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf8') : b.body).replace('"mode":"local"', native ? '"mode":"cloud","inbox":"native"' : '"mode":"cloud"');
             await Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: (e.responseHeaders || []).filter(h => !/^content-(security-policy|length)$/i.test(h.name)).concat([{ name: 'Content-Security-Policy', value: CSP }]), body: Buffer.from(html).toString('base64') });
         });
   await Page.addScriptToEvaluateOnNewDocument({source:`(() => {
@@ -39,6 +39,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile })
     if(path==='/api/sessions/history')return json({sessions:[{session_id:'same-chat',title:server==='m1'?'Laptop conversation':'Desktop conversation',source_type:'claude'},{session_id:'chat-2',title:'Second conversation on '+server,source_type:'claude'},{session_id:'chat-3',title:'Third conversation on '+server,source_type:'codex'}],total:3,page:1,page_size:50});
     if(path==='/api/sessions/history/search'&&/[?&]q=zzz/.test(p.search))return json({status:'complete',results:[]});
     if(path==='/api/sessions/history/search')return json({status:'complete',results:[{session_id:'same-chat',type:'agent',hits:[{role:'user',excerpt:'needle from '+server,locator:{session_id:'same-chat',message_index:0}}]}]});
+    if(path==='/api/sessions/history/no-such-chat')return Promise.resolve(new Response('{"error":"not found"}',{status:404,headers:{'content-type':'application/json'}}));
     if(path==='/api/sessions/history/same-chat')return json({agent_type:'claude',messages:[{type:'user',content:'needle from '+server},{type:'assistant',text:'Scoped to this computer.'}],total:2,start:0});
     if(path.endsWith('/notes'))return json({notes_md:'Notes from '+server});
     if(path==='/api/token-usage')return json({totals:{}});

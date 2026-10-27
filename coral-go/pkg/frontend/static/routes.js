@@ -112,7 +112,7 @@ export function parse(pathname, search = '') {
             const t = take();
             if (t.bad) return null;
             const source = t.server ? { server: t.server } : {};
-            if (!rest.length) return { view: 'chats', ...source, query: chatsQuery(search) };
+            if (!rest.length) { const f = oldFolderFlag(search); return { view: 'chats', ...source, query: chatsQuery(search), ...(f ? { flag: f } : {}) }; } // flag: the folder an old address names (?starred=1), kept for inboxRouteFor: the page rewrites the address before its handler runs
             if (rest.length !== 1) return null;
             const id = decode(rest[0]);
             return id !== null && HISTORY_ID_RE.test(id) ? { view: 'chats', ...source, id } : null;
@@ -186,6 +186,12 @@ function terminalQuery(search) {
     return v.length === 1 && v[0] === 'terminal';
 }
 
+const OLD_FOLDER_FLAGS = ['starred', 'archived', 'active', 'with_notes'];
+function oldFolderFlag(search) {
+    const p = new URLSearchParams(search || '');
+    return OLD_FOLDER_FLAGS.find(k => p.get(k) === '1') || '';
+}
+
 /** Where an old Chats address goes when the Inbox is the Hub's native one (Goal #100, #9549): the same chat or list as an Inbox route, never a not-found page. A chat is the chat on screen in the Inbox, under
  *  All chats (an old address does not say its folder); a list is the folder its filter names (starred, archived, active, with_notes; type=group is the Boards folder), else All chats: every other filter is dropped and the
  *  address still lands on a page. The computer (/chats/@<server>) is dropped from a list (the Inbox folders read every online computer) and kept on a chat. Any other route is returned as it is. */
@@ -193,9 +199,8 @@ export function inboxRouteFor(route) {
     if (!route || route.view !== 'chats') return route;
     if (route.id) return { view: 'inbox-folder', folder: 'chats', ...(route.server ? { server: route.server } : {}), id: route.id };
     const q = new URLSearchParams(route.query || '');
-    const on = k => q.get(k) === '1';
     if (q.get('type') === 'group') return { view: 'inbox-boards', sub: 'boards' };
-    const folder = on('starred') ? 'chats-starred' : on('archived') ? 'chats-archived' : on('active') ? 'chats-active' : on('with_notes') ? 'chats-notes' : 'chats';
+    const folder = { starred: 'chats-starred', archived: 'chats-archived', active: 'chats-active', with_notes: 'chats-notes' }[route.flag || oldFolderFlag(route.query)] || 'chats';
     return { view: 'inbox-folder', folder };
 }
 
