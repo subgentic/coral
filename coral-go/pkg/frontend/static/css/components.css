@@ -68,33 +68,19 @@
     color: var(--error);
 }
 
-.btn-success {
-    border-color: var(--success);
-    color: var(--success-text); /* --success is 4.3:1 on the light panel (#5814) */
-    background: transparent;
-}
-
-.btn-success:hover {
-    background: rgba(var(--fx-green-rgb), 0.15);
-}
-
-.btn-danger-text {
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    padding: 6px 12px;
-}
-
-.btn-danger-text:hover {
-    color: var(--error);
-}
-
 .btn-small {
     padding: var(--space-xs) var(--space-md);
     font-size: var(--fs-md);
     margin: 8px 20px;
     min-height: var(--control-compact-height);
 }
+
+/* The family's other variants (Goal #84, #9096): quiet is a button with no box (an icon or a word in a toolbar), and a chosen button of any choice wears the one selected style, the accent fill (a text tab strip keeps
+   its underline and does not use .btn). The square icon-only variant comes with the first icon buttons that move onto it. */
+.btn-quiet { border-color: transparent; background: transparent; color: var(--text-secondary); }
+.btn-quiet:hover { background: var(--bg-hover); color: var(--text-primary); }
+.btn-quiet.btn-danger:hover { background: rgba(var(--fx-red-rgb), 0.15); color: var(--error-text); }
+.btn[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
 
 .mb-project-count, .mb-project-meta {
     font-size: var(--fs-base);
@@ -2477,21 +2463,6 @@
     padding: 0 0 12px 0;
     border-bottom: 1px solid var(--border-light);
     margin-bottom: 12px;
-}
-
-.btn-subtle {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--control-border);
-    color: var(--text-secondary);
-    font-size: var(--fs-md);
-    font-weight: 500;
-    padding: 5px 12px;
-}
-
-.btn-subtle:hover {
-    color: var(--text-primary);
-    border-color: var(--accent);
-    background: var(--bg-hover);
 }
 
 .launch-back-btn {
