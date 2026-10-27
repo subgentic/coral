@@ -1732,11 +1732,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     margin-top: 0 !important;
 }
 
-.dir-input-row .btn {
-    flex-shrink: 0;
-    padding: 8px 12px;
-    font-size: var(--fs-md);
-}
+.dir-input-row .btn { flex-shrink: 0; } /* the family's button size: Browse is a plain .btn in the wizards and in Open folder (#9489) */
 
 .flag-shortcuts {
     display: flex;

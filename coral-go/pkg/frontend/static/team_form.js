@@ -2,6 +2,7 @@
  * the address of another computer, and a git worktree with its base branch. The pieces other modules fill (the name's notice, Browse, the recent folders, the folder list) stay in the page
  * under their ids and are moved under their field (field.live); the fields keep their ids, so the rest of the dialog reads them as before. Step 3 is its own page (team_launch_settings.js). */
 import { mountSettingsView } from './settings_view.js';
+import { joinBrowse } from './dir_row.js';
 import { boardNameProblem } from './utils.js';
 import { onBuilt } from './lazy_dom.js';
 
@@ -64,6 +65,7 @@ function mount(modal) {
         { key: 'base', type: 'text', id: 'launch-team-base-branch', label: 'Base branch', placeholder: "the repo's current branch", visibleWhen: v => !!v.worktree },
     ];
     _view = mountSettingsView(host, { mode: 'form', fields });
+    joinBrowse('launch-team-dir', 'btn-browse-team'); // Browse at the input's right, as Open folder has it (#9489)
     const server = document.getElementById('team-board-server'); if (server) server.disabled = true; // the machine's own entry reveals it (launch_dialog.js _syncTeamAddress)
     showTeamAddress(false);
     showTeamWorktree(false);
