@@ -95,17 +95,21 @@ export function showToast(message, isError = false, duration, opts = {}) {
     return toast;
 }
 
-/** A page's pinned bar can appear after a toast does (a job that was just created opens its page, whose Edit, Pause and More are the bar at the foot): while a notice is on screen the page is watched, and the column is placed again when it changes, so a toast is never over the bar (#9298). It stops watching when the column is empty. */
-let _pinWatch = null;
+/** A page's pinned bar can appear after a toast does (a job that was just created opens its page, whose Edit, Pause and More are the bar at the foot): for a few seconds after a toast shows, the page is watched, and only a pinned bar being added places the column again (a layout read, once per frame it appears), never every change of the page (#9298). */
+let _pinWatch = null, _pinStop = 0;
+const PIN_WATCH_MS = 12000;
 function watchPinnedBar() {
-    if (_pinWatch || typeof MutationObserver !== "function") return;
+    if (typeof MutationObserver !== "function") return;
+    clearTimeout(_pinStop);
+    _pinStop = setTimeout(() => { if (_pinWatch) _pinWatch.disconnect(); _pinWatch = null; }, PIN_WATCH_MS);
+    if (_pinWatch) return;
     let frame = 0;
-    const check = () => {
-        const col = document.getElementById("notices");
-        if (!col || !col.querySelector(".toast, #warning-toasts > *")) { _pinWatch.disconnect(); _pinWatch = null; return; }
-        placeNotices();
-    };
-    _pinWatch = new MutationObserver(() => { cancelAnimationFrame(frame); frame = requestAnimationFrame(check); });
+    const adds = n => n.nodeType === 1 && (n.matches(".item-bar") || !!n.querySelector(".item-bar"));
+    _pinWatch = new MutationObserver(records => {
+        if (!records.some(r => [...r.addedNodes].some(adds))) return;
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(placeNotices);
+    });
     _pinWatch.observe(document.body, { childList: true, subtree: true });
 }
 

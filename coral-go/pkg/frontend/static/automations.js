@@ -184,13 +184,19 @@ function attentionTable(key, rows, narrowed) {
             ],
         }).el };
 }
+let _gone = '', _goneTimer = 0; // 'Deleted greet-hourly.': the Jobs page says a job it returns from was deleted, for a while, in place of a toast that would cover its first control (#9298)
+/** The Jobs page says a job was deleted, under its title, for twelve seconds. */
+export function noteJobDeleted(name) {
+    _gone = `Deleted ${name}.`; clearTimeout(_goneTimer);
+    _goneTimer = setTimeout(() => { _gone = ''; renderNav(true); }, 12000);
+}
 function folderTable(key) {
     const f = folderOf(key), rows = rowsOf(key), filt = filtersOf(key), narrowed = AF.isFiltered(filt) || filt.q;
     if (f.attention) return attentionTable(key, rows, narrowed);
-    const base = { title: f.label, noun: f.noun, rows,
+    const base = { title: f.label, noun: f.noun, rows, status: key === 'jobs' ? _gone : '',
         empty: { line: narrowed ? `No ${f.noun[0]} matches the search and filters.` : `No ${f.noun[1]} yet.`, hint: narrowed ? '' : key === 'jobs' ? 'New job schedules one.' : 'Build with Agent starts an agent that builds one with you; New workflow opens an empty form. A workflow runs when you press Run, when a job schedules it, or through the API.' } };
     if (key === 'jobs') {
-        return { ...base, signature: JSON.stringify(rows.map(i => [i.job, lastWords(i.run), nextOf(i.job), runsWords(i)])),
+        return { ...base, signature: JSON.stringify([_gone, rows.map(i => [i.job, lastWords(i.run), nextOf(i.job), runsWords(i)])]),
             node: () => DT.dataTable({
                 label: `Jobs, ${rows.length}`, rows, oneLine: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
                 columns: [ // one line a row (Goal #79): what the job runs is the name's tooltip and its page's; a narrow list drops Schedule, then Next (dropAt, #8931)

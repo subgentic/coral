@@ -128,9 +128,10 @@ function tableHtml(t, n = 0, lead = '', bar = false) {
     // An Inbox folder page (t.noun, with its component toolbar): the title and the count are the first thing of the toolbar's one row (folderHead), not a row of their own (#8700)
     const inRow = !!(t.noun && bar && !n);
     const top = (t.headless || inRow ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2>${count == null ? '' : `<span class="session-group-count">${count}</span>`}${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
+    const status = t.status ? `<p class="item-meta group-table-status" role="status">${escapeHtml(t.status)}</p>` : ''; // one line under the title for what just happened (a job deleted: the page it returns to says so, #9298)
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
-    if (!t.rows.length && t.empty) return top + `<div class="empty-state"><p class="empty-state-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-state-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
-    return top + '<div class="group-table-node"></div>' + (t.note ? `<p class="empty-state-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
+    if (!t.rows.length && t.empty) return top + status + `<div class="empty-state"><p class="empty-state-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-state-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
+    return top + status + '<div class="group-table-node"></div>' + (t.note ? `<p class="empty-state-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
 }
 
 /** An Inbox folder page's title and count, the first thing of its toolbar's one row (#8700): the h2 keeps the page's title id (the focus target when nothing else takes it). Drawn again only when its words change. */
