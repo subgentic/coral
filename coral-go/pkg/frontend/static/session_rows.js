@@ -113,7 +113,9 @@ function splitLabel(name) {
 /** What the phone's row shows besides the name (the sidebar hides these): the state chip, the unread count, and the banner for an agent that needs the person. */
 function _mobileRowParts(s, stateInfo) {
     const mobileStatus = getMobileStatusChip(s);
-    const mobileStatusChip = mobileStatus.className
+    // One chip per state on a phone card: Needs input keeps its state chip (no banner); Check terminal and Stuck keep their banner, which says what to do, and drop the chip that only repeated the state (#9464).
+    const bannerStates = ['check_terminal', 'stuck'];
+    const mobileStatusChip = mobileStatus.className && !bannerStates.includes(stateInfo.key)
         ? `<span class="chip session-status-chip ${escapeAttr(mobileStatus.className)}">${escapeHtml(mobileStatus.label)}</span>`
         : '';
     const mobileUnread = sessionUnreadCount(s);
