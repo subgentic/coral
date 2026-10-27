@@ -10,7 +10,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FE = path.join(HERE, '..', '..', 'coral-go', 'pkg', 'frontend');
 const walk = (d, ext, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p, ext, out); else if (p.endsWith(ext)) out.push(p); } return out; };
 export const ALLOW = new Map([
-    ['+ Tag', 'adds a tag to the file or the session in front of it: an adder inside the chips, not a page\'s create action'],
     ['+ Add dependency', 'opens the dependency list inside the task dialog: an adder inside a form'],
 ]);
 const LABEL = [/<button\b[^>]*>\s*(\+ [A-Za-z][^<{]*?)\s*</g, /textContent\s*=\s*(['"`])(\+ [A-Za-z][^'"`]*)\1/g, /\bmk\(\s*'button'\s*,\s*'[^']*'\s*,\s*(['"])(\+ [A-Za-z][^'"]*)\1/g];
@@ -25,6 +24,6 @@ const problems = []; let seen = 0;
 for (const f of [...walk(path.join(FE, 'templates'), '.html'), ...walk(path.join(FE, 'static'), '.js')]) {
     for (const l of labels(fs.readFileSync(f, 'utf8'))) { seen++; if (!ALLOW.has(l)) problems.push(`${path.relative(FE, f)}: the button "${l}" starts with a plus sign: name it "${l.replace(/^\+ /, 'New ')}" or the verb and the thing, with no plus`); }
 }
-assert.ok(seen >= 3, `the scan saw only ${seen} plus labels: it is broken (the inline adders are three)`);
+assert.ok(seen >= 1, `the scan saw only ${seen} plus labels: it is broken (the inline adder is one; the tags' is "Add tag" since #9571)`);
 assert.deepEqual(problems, [], problems.join('\n'));
 console.log(`create_button_census: ok (${seen} plus-sign adders, all inline and listed; every create button is the verb and the thing)`);

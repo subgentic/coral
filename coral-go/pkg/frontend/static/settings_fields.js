@@ -135,7 +135,7 @@ export const CLEANUP_FIELDS = [
     { key: 'worktrees_list', type: 'notice', render: slot => { slot.id = 'settings-worktrees-row'; const el = document.getElementById('settings-worktrees-live'); if (el) slot.append(el); } },
 ];
 
-// The API key's line (#8460): the key (masked, read only; security_settings.js and settings_machine.js fill it) on a line of its own, and Show, Copy and the Mobile QR under it. Drawn here, with the component's own line class.
+// The API key's line (#8460): the key (masked, read only; security_settings.js and settings_machine.js fill it) with Show, Copy and the Mobile QR beside it (under it where the panel is narrow). Drawn here, with the component's own line class.
 const apiKeyLine = slot => {
     const mk = (tag, cls, attrs = {}, text = '') => { const e = document.createElement(tag); if (cls) e.className = cls; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text) e.textContent = text; return e; };
     const line = mk('div', 'sv-ctl-line', { id: 'settings-api-key-live' });

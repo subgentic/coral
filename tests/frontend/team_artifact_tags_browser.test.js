@@ -1,4 +1,4 @@
-// Artifact tags on the team's Artifacts tab (#8594, Goal #61, UI/UX's spec 7): the sheet has the tags as outlined chips with an x each and a "+ Tag" button (the starter set, the team's own tags and a box); a row says at
+// Artifact tags on the team's Artifacts tab (#8594, Goal #61, UI/UX's spec 7): the sheet has the tags as outlined chips with an x each and a "Add tag" button (the starter set, the team's own tags and a box); a row says at
 // most two tags, then +N; the filter menu has a Tag select with counts, and a "For review N" pill sits in the toolbar; the selection bar tags or untags every selected file. Real stored files uploaded by a stood-in
 // terminal session of a real board on the isolated dev server (removed again).
 const assert = require('node:assert/strict');
@@ -38,9 +38,11 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`!!document.querySelector('#team-panel-artifacts .team-tb-pills')`), false, 'no For review pill while the team has no such tag');
         console.log('   ✓');
 
-        console.log('2. The sheet: + Tag offers the starter set; a tag is added and removed');
+        console.log('2. The sheet: Add tag offers the starter set; a tag is added and removed');
         await ev(`[...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => b.textContent === 'plan.txt').click(); true`);
-        await waitFor(`!!document.querySelector('.detail-head .artifact-tag-add')`, '+ Tag in the sheet', 10000);
+        await waitFor(`!!document.querySelector('.detail-head .artifact-tag-add')`, 'Add tag in the sheet', 10000);
+        const look = await ev(`(() => { const b = document.querySelector('.detail-head .artifact-tag-add'), c = getComputedStyle(b); return { text: b.textContent, cls: b.className, border: c.borderStyle, family: ['btn', 'btn-quiet', 'btn-small'].every(k => b.classList.contains(k)) }; })()`);
+        assert.ok(look.family && look.text === 'Add tag' && look.border !== 'dashed', 'Add tag is a quiet small button of the family, not a dashed outline: ' + JSON.stringify(look));
         await ev(`document.querySelector('.detail-head .artifact-tag-add').click(); true`);
         const offers = await ev(`[...document.querySelectorAll('.detail-head .artifact-tag-offer')].map(b => b.textContent)`);
         assert.deepEqual(offers, ['for review', 'internal', 'final', 'draft']);
@@ -81,9 +83,9 @@ const BASE = require('./test_base').BASE;
         await shot('artifact-tags-bulk');
         console.log('   ✓');
 
-        console.log('6. The preview\'s head has the same chips and + Tag');
+        console.log('6. The preview\'s head has the same chips and Add tag');
         await ev(`import((window.__coralStatic || '/static/') + 'preview_pane.js').then(m => m.openArtifactTab('coral://artifacts/${files[0]}', { filename: 'plan.txt', mediaType: 'text/plain', tagging: { project: ${JSON.stringify(B)}, tags: ['for review'], editable: true, offer: () => [], onChange: () => {} } })).then(() => true)`);
-        await waitFor(`!!document.querySelector('#preview-toolbar .artifact-tag-add')`, '+ Tag in the preview head', 10000);
+        await waitFor(`!!document.querySelector('#preview-toolbar .artifact-tag-add')`, 'Add tag in the preview head', 10000);
         assert.equal(await ev(`[...document.querySelectorAll('#preview-toolbar .artifact-tag-list .artifact-tag')].map(t => t.firstChild.textContent).join()`), 'for review');
         await ev(`document.querySelector('#preview-toolbar .artifact-tag-add').click(); [...document.querySelectorAll('#preview-toolbar .artifact-tag-offer')].find(b => b.textContent === 'final').click(); true`);
         await waitFor(`[...document.querySelectorAll('#preview-toolbar .artifact-tag-list .artifact-tag')].some(t => t.textContent.startsWith('final'))`, 'final added from the preview', 8000);
@@ -107,10 +109,10 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(two, { n: 2, more: false }, 'two tags: no +N');
         console.log('   ✓');
 
-        console.log('8. Five tags: no + Tag; the box offers the starters, then the team\'s tags with counts; a refused word is said and the box stays');
+        console.log('8. Five tags: no Add tag; the box offers the starters, then the team\'s tags with counts; a refused word is said and the box stays');
         await sheet('draft.txt');
         assert.equal(await ev(`document.querySelectorAll('.detail-head .artifact-tag-list .artifact-tag').length`), 5);
-        assert.equal(await ev(`document.querySelector('.detail-head .artifact-tag-add').hidden`), true, 'five is the most: no + Tag');
+        assert.equal(await ev(`document.querySelector('.detail-head .artifact-tag-add').hidden`), true, 'five is the most: no Add tag');
         await sheet('log.txt');
         await ev(`document.querySelector('.detail-head .artifact-tag-add').click(); true`);
         const offers2 = await ev(`[...document.querySelectorAll('.detail-head .artifact-tag-offer')].map(b => b.textContent)`);
@@ -177,7 +179,7 @@ const BASE = require('./test_base').BASE;
         await sheet('plan.txt');
         assert.equal(await ev(`document.querySelectorAll('.detail-head .artifact-tag-list .artifact-tag').length`), 2, 'the chips are there');
         assert.equal(await ev(`document.querySelectorAll('.detail-head .artifact-tag-remove').length`), 0, 'no x');
-        assert.equal(await ev(`document.querySelector('.detail-head .artifact-tag-add').hidden`), true, 'no + Tag');
+        assert.equal(await ev(`document.querySelector('.detail-head .artifact-tag-add').hidden`), true, 'no Add tag');
         await select(['plan.txt']);
         await waitFor(`!![...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].length`, 'the selection bar', 8000);
         assert.deepEqual(await ev(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].map(b => b.textContent).filter(t => /^(Tag|Untag)$/.test(t))`), [], 'no Tag or Untag');
@@ -200,7 +202,7 @@ const BASE = require('./test_base').BASE;
         await shot('artifact-tags-sheet-box-390');
         console.log('   ✓');
 
-        console.log('PASS artifact tags: chips and + Tag in the sheet, row chips, the For review pill and Tag filter, Tag and Untag in the selection bar');
+        console.log('PASS artifact tags: chips and Add tag in the sheet, row chips, the For review pill and Tag filter, Tag and Untag in the selection bar');
     } finally {
         if (sid) await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`).catch(() => {});
         await removeBoards(ev, [B]).catch(() => {}); await client.close();

@@ -1,5 +1,5 @@
 /* Artifact tags (#8594, Goal #61, UI/UX's spec 7): the team's words on its stored files ("for review", "internal"). The rules are the server's (internal/board/artifact_tags.go): lowercase letters, digits, spaces and
- * hyphens, 1 to 24 characters, at most 5 on a file. This module draws them: the chips of a row (two, then +N), the editor of the sheet and the preview (a chip with an x each, a "+ Tag" button that opens the
+ * hyphens, 1 to 24 characters, at most 5 on a file. This module draws them: the chips of a row (two, then +N), the editor of the sheet and the preview (a chip with an x each, an "Add tag" button that opens the
  * starter set, the team's own tags and a box), and the one call that changes them (the Operator's and the team owner's: PUT /api/board/<team>/artifacts/<id>/tags). Tag words are agents' and people's text:
  * everything is built with textContent. Lazy: the Artifacts page, the preview pane and the Inbox import it. */
 import { boardFetch } from './server_base.js';
@@ -38,7 +38,7 @@ export function tagEditor({ project, hex, tags, editable, offer = () => [], onCh
     const root = mk('div', 'artifact-tags');
     const list = mk('ul', 'artifact-tag-list'); list.setAttribute('aria-label', 'Tags');
     const status = mk('p', 'artifact-tag-status sr-only'); status.setAttribute('role', 'status');
-    const add = mk('button', 'artifact-tag-add', '+ Tag'); add.type = 'button'; add.setAttribute('aria-expanded', 'false');
+    const add = mk('button', 'btn btn-quiet btn-small artifact-tag-add', 'Add tag'); add.type = 'button'; add.setAttribute('aria-expanded', 'false');
     const box = mk('div', 'artifact-tag-box'); box.hidden = true;
     let busy = false;
 
