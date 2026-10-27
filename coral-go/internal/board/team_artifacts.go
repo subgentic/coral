@@ -171,7 +171,7 @@ func (s *Store) ListTeamArtifactTasksQuery(ctx context.Context, q TeamArtifactQu
 	// Prefilter in SQL so tasks without any artifacts are not read at all: has_artifacts is kept by saveWorkflow and indexed (#9114).
 	// The flagged rows lead (CROSS JOIN fixes the order of the loops, INDEXED BY the index): the walk is down the partial index of tasks that have artifacts, joining each to its task and keeping this board's,
 	// not over every task of the board with a lookup of its workflow blob each.
-	query := `SELECT t.id, t.title, t.created_at, t.completed_at, t.assigned_to, t.completed_by, t.session_id, t.goal_id, COALESCE(g.title, '') AS goal_title, w.data
+	query := `SELECT t.id, t.title, t.created_at, t.completed_at, t.assigned_to, t.completed_by, t.session_id, t.goal_id, COALESCE(g.title, '') AS goal_title, w.lst_art_refs AS data
 		FROM task_workflows w INDEXED BY idx_task_workflows_artifacts CROSS JOIN board_tasks t ON t.id = w.task_id
 		LEFT JOIN board_goals g ON g.board_id = t.board_id AND g.id = t.goal_id
 		WHERE t.board_id = ? AND w.has_artifacts = 1`
@@ -202,7 +202,11 @@ func (s *Store) ListTeamArtifactTasksQuery(ctx context.Context, q TeamArtifactQu
 		rows = rows[:limit]
 	}
 	for _, row := range rows {
-		var w TaskWorkflow
+		// the column holds only what this list reads of the workflow (lst_art_refs, #9594), not the whole document
+		var w struct {
+			Artifacts        []TaskArtifact    `json:"artifacts"`
+			CompletionReview *CompletionReview `json:"completion_review"`
+		}
 		if json.Unmarshal([]byte(row.Data), &w) != nil {
 			continue
 		}
