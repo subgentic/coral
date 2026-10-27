@@ -77,13 +77,14 @@ function warningHtml(text, cls = '') {
 
 function agentsText(n) { return `${n} agent${n === 1 ? '' : 's'}`; }
 
-/** The status as the table's chip (a dot and the word; the hint is its tooltip): the tone is a data_table token class. */
-const STATUS_TONE = { online: 'goal-state-done', unreachable: 'goal-state-blocked', unauthorized: 'goal-state-failed' }; // the chip hues (goals.css)
-function statusChip(status) {
+/** The status in the table: a dot and one word, no pill (UI/UX #9679): the dot is the only colour, Offline and the rest are secondary text; the hint is its tooltip. */
+function statusDotWord(status) {
     const m = statusMeta(status);
-    const c = DT.chip(m.label, STATUS_TONE[m.cls] || '');
-    if (m.hint) c.title = m.hint;
-    return c;
+    const wrap = DT.el('span', `servers-status servers-status-${m.cls || 'offline'}`);
+    const dot = DT.el('i', 'servers-status-dot'); dot.setAttribute('aria-hidden', 'true');
+    wrap.append(dot, DT.el('span', 'servers-status-word', m.label));
+    if (m.hint) wrap.title = m.hint;
+    return wrap;
 }
 
 const isLocal = s => !!(s.local || s.id === 'local');
@@ -92,7 +93,7 @@ function serverCell(s) {
     if (isLocal(s)) return DT.el('span', 'dt-name-text', s.label || 'This computer');
     const b = DT.primaryButton(s.label || s.id, `Open ${s.label || s.id}`);
     const wrap = DT.el('span', 'servers-name'); wrap.append(DT.el('span', 'dt-name-text servers-name-text', s.label || s.id)); b.replaceChildren(wrap);
-    if (!isLocal(s) && s.warning) { const t = DT.tag('warning'); t.classList.add('servers-warn'); t.title = String(s.warning); const g = DT.el('span', 'material-icons servers-warn-icon', 'warning'); g.setAttribute('aria-hidden', 'true'); t.prepend(g); wrap.append(t); b.setAttribute('aria-label', `Open ${s.label || s.id}, warning: ${s.warning}`); } // the unencrypted-key warning stays on the row at every width (the Orchestrator's call, #9679): it is by the name, not in a column a narrow list drops
+    if (!isLocal(s) && s.warning) { const t = DT.tag('warning'); t.classList.add('servers-warn'); t.title = String(s.warning); const g = DT.el('span', 'material-icons servers-warn-icon', 'warning'); g.setAttribute('aria-hidden', 'true'); t.textContent = ''; t.append(g, DT.el('span', 'servers-warn-word', 'warning')); wrap.append(t); b.setAttribute('aria-label', `Open ${s.label || s.id}, warning: ${s.warning}`); } // the unencrypted-key warning stays on the row at every width (#9679), by the name, not in a column a narrow list drops; a narrow list keeps its glyph and drops the word (the name wins the width), the sentence is the tag's tooltip and the button's name
     b.title = s.label || s.id;
     b.dataset.action = 'open'; b.dataset.id = s.id; // the tab's click handler opens the server's page
     return b;
@@ -123,8 +124,8 @@ function serversTable(local, remotes) {
         columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); Needs you and the name's warning never go
             { key: 'server', label: 'Server', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: serverCell, title: s => s.label || s.id },
             { key: 'tags', label: 'Tags', width: '11rem', dropAt: 36, cell: tagsCell },
-            { key: 'status', label: 'Status', width: '9rem', sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusChip(live(s).status || s.status) },
-            { key: 'agents', label: 'Agents', width: '5rem', dropAt: 28, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => agentsText(serverAgentCount(live(s))) },
+            { key: 'status', label: 'Status', width: '9rem', sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusDotWord(live(s).status || s.status) },
+            { key: 'agents', label: 'Agents', width: '5rem', dropAt: 28, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => { const n = serverAgentCount(live(s)); return n ? String(n) : ''; } }, // the count alone under its header, nothing at zero (UI/UX #9679)
             { key: 'needs', label: 'Needs you', width: '6rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
             { key: 'seen', label: 'Last seen', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: s => seenValue(s, live(s)), cell: s => seenWords(s, live(s)) },
             { key: 'version', label: 'Version', width: '7.5rem', dropAt: 52, tone: 'tertiary', sort: true, sortValue: s => versionWords(s, live(s)), cell: s => versionWords(s, live(s)) || '\u2014' },
@@ -242,7 +243,7 @@ function render() {
             ${table}
             ${!remotes.length && !_loadError ? `<p class="empty-state empty-state-tight">${serversFiltered() ? 'No servers match this search.' : 'No remote servers yet.'}</p>` : ''}
             ${_editing !== null ? formHtml() : many ? '' : '<div class="servers-form-actions"><button type="button" class="btn btn-primary" data-action="add">Add server</button></div>'}`;
-    m.innerHTML = `${_open && page ? '' : '<p class="servers-intro">Servers whose agents and teams appear in this hub. The hub stores each server\'s API key (encrypted); a key grants full control of that server.</p>'}
+    m.innerHTML = `${_open && page ? '' : '<div class="servers-intro"><p class="servers-intro-line">Servers whose agents and teams appear in this hub.</p><details class="servers-intro-more"><summary>About API keys</summary><p>The hub stores each server\'s API key (encrypted); a key grants full control of that server.</p></details></div>'}
             ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
             ${body}`;
     const slot = m.querySelector('#servers-table-slot');
