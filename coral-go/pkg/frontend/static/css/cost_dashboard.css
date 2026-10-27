@@ -109,7 +109,7 @@
 .cost-header h2 {
     font-size: var(--type-page-size);
     font-weight: 700;
-    line-height: 1.3;
+    line-height: var(--lh-label);
     margin: 0;
     color: var(--text-primary);
 }
@@ -189,7 +189,7 @@
 #cost-dashboard-view:not([data-view="overview"]) > .cost-page > .cost-section > .cost-section-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 [data-cview][hidden] { display: none !important; }
 
-.cost-note { margin: 0 0 12px; font-size: var(--fs-md); line-height: 1.45; color: var(--text-secondary); max-width: 70ch; }
+.cost-note { margin: 0 0 12px; font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); max-width: 70ch; }
 .cost-help { margin: 0 0 12px; }
 .cost-help .cost-note { margin: 8px 0 0; }
 
@@ -398,7 +398,7 @@
     .viz-line-4 { stroke-dasharray: 6 2; } .viz-line-5 { stroke-dasharray: 1 3; } .viz-line-6 { stroke-dasharray: 16 6; } .viz-line-o { stroke-dasharray: 3 3; }
     .cost-swatch { forced-color-adjust: none; border-color: CanvasText; }
 }
-.cost-card-change { margin-top: 2px; font-size: var(--fs-base); line-height: 1.3; color: var(--text-muted); }
+.cost-card-change { margin-top: 2px; font-size: var(--fs-base); line-height: var(--lh-label); color: var(--text-muted); }
 .cost-card-change:empty { display: none; }
 .viz-fill { stroke: var(--bg-primary); stroke-width: 2; stroke-linejoin: round; }
 .viz-legend { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 12px; }

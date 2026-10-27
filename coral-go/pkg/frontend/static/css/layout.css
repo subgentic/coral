@@ -745,7 +745,7 @@ body.panel-dragging .sidebar {
 .welcome-shell { width: min(640px, 100%); margin: 0 auto; }
 .welcome-header { margin-bottom: 30px; }
 .welcome-eyebrow { display: block; margin-bottom: 10px; color: var(--accent); font-size: var(--fs-sm); font-weight: var(--fw-strong); letter-spacing: .1em; text-transform: uppercase; }
-.welcome-header h1 { margin: 0 0 8px; color: var(--text-primary); font-size: var(--fs-display); line-height: 1.15; letter-spacing: -.035em; }
+.welcome-header h1 { margin: 0 0 8px; color: var(--text-primary); font-size: var(--fs-display); line-height: var(--lh-label); letter-spacing: -.035em; }
 .welcome-header p { margin: 0; color: var(--text-secondary); font-size: var(--fs-lg); }
 .welcome-launch:hover { border-color: var(--border-light); background: var(--bg-tertiary); } /* --bg-hover takes the muted line under 4.5:1 (#4218) */
 .welcome-connect { display: none; align-items: center; flex-wrap: wrap; gap: 14px 16px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
@@ -756,7 +756,7 @@ body.hub-no-machine .welcome-launch-list, body.hub-no-machine .welcome-header p,
 .welcome-connect-copy { flex: 1 1 14rem; min-width: 0; }
 .welcome-connect-copy h2 { margin: 0 0 4px; font-size: var(--fs-lg); color: var(--text-primary); }
 .welcome-connect-copy p + p { margin-top: 4px; }
-.welcome-connect-copy p { margin: 0; font-size: var(--fs-md); line-height: 1.45; color: var(--text-secondary); }
+.welcome-connect-copy p { margin: 0; font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); }
 .welcome-connect-another { display: none; justify-self: start; font-size: var(--fs-md); color: var(--link-text, var(--accent)); text-decoration: underline; }
 body.cloud-mode:not(.hub-no-machine) .welcome-connect-another { display: block; width: max-content; margin-top: 16px; } /* its own line, after the three cards */
 @media (pointer: coarse), (max-width: 767px) { body.cloud-mode:not(.hub-no-machine) .welcome-connect-another { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); } }
@@ -776,7 +776,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .welcome-launch .welcome-launch-icon { display: flex; align-items: center; justify-content: center; width: 2.625rem; height: 2.625rem; border-radius: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 1.3125rem; line-height: 1; }
 .welcome-launch-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .welcome-launch-copy strong { color: var(--text-primary); font-size: var(--fs-lg); }
-.welcome-launch-copy span { color: var(--text-muted); font-size: var(--fs-base); line-height: 1.45; }
+.welcome-launch-copy span { color: var(--text-muted); font-size: var(--fs-base); line-height: var(--lh-ui); }
 .welcome-launch .welcome-launch-arrow { position: absolute; top: 20px; right: 20px; color: var(--text-muted); font-size: 1.1875rem; }
 .welcome-launch:hover .welcome-launch-arrow { color: var(--accent); }
 /* Home: one obvious start (#6042). Launch agent, the first card, carries the accent (border, tint, a filled icon); Launch team and Open folder stay as they were. */
@@ -810,17 +810,17 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .editions-home-icon { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-2xl); }
 .editions-home-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .editions-home-copy strong { color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-strong); }
-.editions-home-copy span { color: var(--text-muted); font-size: var(--fs-base); line-height: 1.45; }
+.editions-home-copy span { color: var(--text-muted); font-size: var(--fs-base); line-height: var(--lh-ui); }
 .editions-home-copy code, .editions-content code { white-space: nowrap; padding: 0 4px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: .95em; }
 .editions-home-arrow { position: absolute; top: 14px; right: 14px; color: var(--text-muted); font-size: var(--icon-size); }
 .editions-home-item:hover .editions-home-arrow { color: var(--accent); }
 
 /* The first-launch "Connect to Coral Hub" screen */
 .editions-modal .editions-content { gap: 0; }
-.editions-title { margin: 0 0 6px; color: var(--text-primary); font-size: var(--fs-2xl); line-height: 1.25; }
-.editions-sub { margin: 0 0 18px; color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.5; }
+.editions-title { margin: 0 0 6px; color: var(--text-primary); font-size: var(--fs-2xl); line-height: var(--lh-label); }
+.editions-sub { margin: 0 0 18px; color: var(--text-secondary); font-size: var(--fs-md); line-height: var(--lh-body); }
 .editions-cloud { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--bg-primary); }
-.editions-status { color: var(--text-primary); font-size: var(--fs-lg); line-height: 1.45; }
+.editions-status { color: var(--text-primary); font-size: var(--fs-lg); line-height: var(--lh-ui); }
 .editions-code { color: var(--text-secondary); font-size: var(--fs-md); }
 .editions-code[hidden], .editions-cloud [hidden] { display: none; }
 .editions-code a { color: var(--accent); word-break: break-all; }
@@ -844,14 +844,14 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .editions-ask div.editions-ask-desc { margin: 0 0 0 26px; }
 .editions-ask-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .editions-ask-name { color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-medium); }
-.editions-ask-desc { color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.4; }
+.editions-ask-desc { color: var(--text-secondary); font-size: var(--fs-md); line-height: var(--lh-ui); }
 .editions-ask-note { color: var(--text-secondary); font-size: var(--fs-md); }
 .editions-auto-accept { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: var(--fs-md); }
 .editions-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .editions-actions-spacer { flex: 1; }
 .editions-actions .btn.editions-own { padding-left: 0; padding-right: 0; background: none; border-color: transparent; box-shadow: none; color: var(--link-text); /* the accent is 4.44:1 on the light panel */ }
 .editions-actions .btn.editions-own:hover, .editions-actions .btn.editions-own:focus-visible { background: none; text-decoration: underline; }
-.editions-steps { margin: 0 0 16px; padding-left: 20px; color: var(--text-secondary); font-size: var(--fs-lg); line-height: 1.55; }
+.editions-steps { margin: 0 0 16px; padding-left: 20px; color: var(--text-secondary); font-size: var(--fs-lg); line-height: var(--lh-body); }
 .editions-steps li + li { margin-top: 8px; }
 .editions-guide { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; color: var(--accent); font-size: var(--fs-md); text-decoration: none; }
 .editions-guide:hover { text-decoration: underline; }
@@ -909,7 +909,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 }
 
 /* Through the Coral Hub, a launch the machine's access level refuses says so as the form opens (#4586). */
-.launch-access-note { margin: 0 0 12px; padding: 8px 10px; border-radius: var(--radius-md); border: 1px solid var(--warning, var(--fx-amber)); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-md); line-height: 1.4; }
+.launch-access-note { margin: 0 0 12px; padding: 8px 10px; border-radius: var(--radius-md); border: 1px solid var(--warning, var(--fx-amber)); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-md); line-height: var(--lh-ui); }
 .launch-access-note:empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */ /* in the page with nothing to say: no room, still a live region */
 
 /* ── A sidebar group opened as a table in the centre (sidebar_groups.js, #7443) ── */
@@ -932,7 +932,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 }
 .group-table-head { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl); min-height: 36px; } /* one fixed row on every tab, with a header button or without: the title does not move between tabs (UI/UX #7588 item 8) */
 @media (pointer: coarse), (max-width: 767px) { .group-table-head { min-height: var(--control-touch-height, 44px); } }
-.group-table-head h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
+.group-table-head h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
 #group-table-title:focus { outline: none; } /* it takes the focus by script when a group opens: a mouse click on a group header shows no box, a keyboard start does (QA Reviewer 2's #7577 note) */
 #group-table-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
 .group-table-head .session-group-count { font-weight: var(--fw-strong); }
@@ -940,15 +940,15 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-table-head .group-table-extra .material-icons { font-size: var(--fs-xl); }
 /* The one empty state (#9097, Goal #84): a line (14/400, the secondary colour), an optional hint under it (12/400, muted) and an optional action; no box. A line can sit straight in the element or in .empty-state-line. -tight is the density
  * for a dock panel, a menu, a picker or a list: less padding, the same type. What to do on a tab is the sidebar's pinned action. */
-.empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); margin: 0; padding: var(--space-2xl); color: var(--text-secondary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: 1.5; }
+.empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); margin: 0; padding: var(--space-2xl); color: var(--text-secondary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-body); }
 .empty-state[hidden] { display: none; }
 .empty-state-tight { padding: var(--space-md); }
-.empty-state-line, .goals-note.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: 1.5; color: var(--text-secondary); } /* the line is the secondary colour: an empty message is never as loud as the rows on the other screens */
-.empty-state-hint { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-regular); line-height: 1.4; color: var(--text-muted); }
+.empty-state-line, .goals-note.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-body); color: var(--text-secondary); } /* the line is the secondary colour: an empty message is never as loud as the rows on the other screens */
+.empty-state-hint { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-regular); line-height: var(--lh-ui); color: var(--text-muted); }
 .empty-state-action { margin-top: var(--space-sm); }
 .welcome > .empty-state { margin: 0; align-self: stretch; }
 /* The line under an item page's title: who, when, how long */
-.item-meta { margin: 2px 0 0; font-size: var(--fs-base); font-weight: var(--fw-regular); line-height: 1.4; color: var(--text-secondary); }
+.item-meta { margin: 2px 0 0; font-size: var(--fs-base); font-weight: var(--fw-regular); line-height: var(--lh-ui); color: var(--text-secondary); }
 .group-table-back { margin-bottom: var(--space-lg); }
 .group-table-head .group-table-back { margin: 0; flex: 0 0 auto; } /* a phone's way back sits in the title row (#7722) */
 @media (max-width: 760px) { .group-table-head:has(.group-table-back) { flex-wrap: wrap; row-gap: 0; } }
@@ -1003,7 +1003,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .inbox-page > * { flex-shrink: 0; }
 .inbox-page .item-bar { margin-top: auto; bottom: -20px; margin-bottom: -20px; padding-bottom: calc(var(--space-lg) + 20px); }
 .inbox-task-mount { margin-top: var(--space-lg); }
-.inbox-saved-snippet { margin: 0 0 var(--space-lg); font-size: var(--fs-lg); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.inbox-saved-snippet { margin: 0 0 var(--space-lg); font-size: var(--fs-lg); line-height: var(--lh-body); white-space: pre-wrap; overflow-wrap: anywhere; }
 .inbox-saved-why { margin: 0 0 var(--space-lg); font-size: var(--fs-md); color: var(--text-secondary); }
 #inbox-page .ibx-why, .dock-detail-pane .ibx-why { font-size: var(--fs-md); } /* the reason a message cannot be shown is read at the page's text size, not the component's 11 px hint (UI/UX, #7660) */
 .inbox-phone-back { display: none; }
