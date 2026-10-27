@@ -25,6 +25,7 @@
 .sv-settings .sv-row-toggle, .sv-form .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } /* a switch sits beside its label in a form too */
 .sv-settings .sv-row-heading, .sv-settings .sv-row-notice { grid-template-columns: minmax(0, 1fr); }
 .sv-text { min-width: 0; }
+@media (min-width: 761px) { .sv-settings .sv-row[data-key="api_key"] > .sv-text, .sv-settings .sv-row[data-key="install_id"] > .sv-text { min-height: 36px; display: flex; align-items: center; } } /* the label sits level with the first line of its control: the key and its value are a 36 px line, with Copy and Mobile QR wrapping under it in the control column (#9490) */
 .sv .sv-label { display: inline; margin: 0; font-size: var(--sv-label-size); font-weight: var(--sv-label-weight); color: var(--sv-label-color); }
 .sv-required, .sv-optional { margin-left: .5rem; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-required-color); }
 .sv-help { margin: 2px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-help-weight); line-height: var(--lh-ui); color: var(--sv-help-color); }

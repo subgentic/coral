@@ -44,9 +44,15 @@ const OS_NOTE = {
 };
 const osNote = () => (`${navigator.userAgentData?.platform || navigator.platform || ''}`.toLowerCase().includes('linux') ? OS_NOTE.linux : OS_NOTE.mac);
 export const TERMINAL_BACKEND_IDS = ['tb-choice', 'tb-fixed', 'tb-now', 'tb-pending', 'tb-autowake-on', 'tb-autowake-cap']; // the ids of the rows that start hidden
+// The one line under the backend choice says what the chosen backend does (#9490): it follows the select, and the pty sentence says they wake next time only while Wake agents after a restart is on (#6263).
+const BACKEND_HINT = { tmux: "Agents keep running when you quit Coral, and can reach each other's terminals.", ptyWake: 'Agents stop when you quit Coral and wake next time.', pty: 'Agents stop when you quit Coral.' };
+export const backendHint = () => {
+    const sel = document.getElementById('tb-choice'), wake = document.getElementById('tb-autowake-on');
+    return !sel || sel.value === 'tmux' ? BACKEND_HINT.tmux : (wake && wake.checked ? BACKEND_HINT.ptyWake : BACKEND_HINT.pty);
+};
 const TERMINAL_BACKEND_FIELDS = [
     { key: 'terminal-backend', type: 'select', id: 'tb-choice', labelId: 'tb-choice-label', label: 'Terminal backend',
-        help: { text: 'tmux keeps agents running when Coral restarts; pty stops them, and they wake next time.', about: 'the terminal backends', more: [
+        helpTextClass: 'tb-hint', helpOf: backendHint, help: { text: "Agents keep running when you quit Coral, and can reach each other's terminals.", about: 'the terminal backends', more: [
             "tmux: Agents keep running when Coral restarts, upgrades or crashes, and Coral picks them up again afterwards. Coral keeps its terminals in a tmux server whose socket sits in your Coral data folder. Any agent, and any other program running as you, can find that socket and read or type into other agents' terminals. Choose this if you restart or upgrade Coral often.",
             'pty: Coral holds each terminal itself, so there is no shared socket for an agent to use against another agent. The price: agents end whenever Coral restarts, upgrades or crashes (Coral puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash). When Coral starts again it wakes them one at a time (not if Coral has restarted several times in a row; up to the number set below; more after you confirm; you can turn this off), and they resume their conversation, but a tool that was running is not continued.',
             osNote()].join('\n\n') },
