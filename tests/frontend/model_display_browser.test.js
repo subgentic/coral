@@ -28,7 +28,7 @@ const SUMMARY = {
 
         console.log('1. The hover: a Model row under Agent, the friendly name, the id behind it; no row while unknown');
         const tips = await ev(`(async () => { const { buildSessionTooltip } = await import(${MOD} + 'session_state.js'); const base = { session_id: 'x', agent_type: 'claude', staleness_seconds: 5 };
-            const rows = h => { const d = document.createElement('div'); d.innerHTML = h; return [...d.querySelectorAll('tr')].map(r => [r.children[0].textContent, r.children[1].textContent, r.children[1].getAttribute('title')]); };
+            const rows = h => { const d = document.createElement('div'); d.innerHTML = h; return [...d.querySelectorAll('.facts-row')].map(r => [r.children[0].textContent, r.children[1].textContent, r.children[1].getAttribute('title')]); };
             return { known: rows(buildSessionTooltip({ ...base, model: 'claude-opus-5-5' })), named: rows(buildSessionTooltip({ ...base, model: 'claude-x-9', model_display: 'Server Named' })),
                 none: rows(buildSessionTooltip(base)), empty: rows(buildSessionTooltip({ ...base, model: '' })), blank: rows(buildSessionTooltip({ ...base, model: '  ' })), markup: rows(buildSessionTooltip({ ...base, model: '<b>x</b>' })) }; })()`);
         const labels = r => r.map(x => x[0]);
