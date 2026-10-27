@@ -144,7 +144,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     labelTimer = setTimeout(() => {
                         if (pendingBoard !== pending || gen !== model.gen || key !== model.key) return;
                         clearPendingBoard(); retryLabels = true;
-                        model.error = 'Unable to load artifacts: unexpected response scope.';
+                        model.error = "Couldn't check which team this is. Try again.";
                         draw();
                     }, 10000); // an offline/failed board list must not leave a cold name link Loading forever (#8825)
                     return;
