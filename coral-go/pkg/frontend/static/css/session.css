@@ -358,6 +358,9 @@
     opacity: 0;
     transition: opacity 0.1s;
 }
+/* The machine menu's kebab is a <summary>: no disclosure marker in any engine (WebKit draws one unless the pseudo-element is hidden). */
+summary.sidebar-kebab-btn { list-style: none; }
+summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 /* Target size (#5713, WCAG 2.5.8): the sidebar's kebab and open buttons and the Launch dialog's Back are 12 to 22 px across, which at 125 or 150% display scaling is a
    small target to hit. An invisible 24 px square around each is part of the button, so the row does not change. */
