@@ -17,6 +17,7 @@ import { messageTimeHtml } from './message_time.js';
 import { keyRoute, build } from './routes.js';
 import { browserLocal } from './safe_storage.js';
 import { createBoardSearch } from './board_search.js';
+import { menuMove } from './menu_keys.js';
 
 // ── Board (right-panel tab) ──────────────────────────────────────
 let _boardChatTimer = null;
@@ -736,7 +737,7 @@ export function _boardMentionKey(event) {
     if (!items.length) return false;
     const at = Math.max(0, items.findIndex(i => i.classList.contains('active')));
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        const next = (at + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
+        const next = menuMove(event.key, items.length, at);
         items.forEach((it, i) => { it.classList.toggle('active', i === next); it.setAttribute('aria-selected', String(i === next)); });
         items[next].scrollIntoView?.({ block: 'nearest' });
         _syncBoardMentions();

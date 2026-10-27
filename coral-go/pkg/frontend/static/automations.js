@@ -108,8 +108,8 @@ function newMenu() {
     const box = document.createElement('span'); box.className = 'automations-create gt-menu';
     const toggle = button('New', ''); toggle.id = 'automations-new-btn'; toggle.setAttribute('data-on-click', 'automations-new-toggle'); // the action's name is spelled out where the markup is made (action_census)
     toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', 'automations-new-menu');
-    const menu = document.createElement('div'); menu.id = 'automations-new-menu'; menu.className = 'team-more-menu list-bar-more-menu'; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'New'); menu.hidden = true;
-    for (const [label, action] of [['New job', 'job-new'], ['New workflow', 'wf-create']]) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('data-on-click', action); b.setAttribute('role', 'menuitem'); menu.append(b); }
+    const menu = document.createElement('div'); menu.id = 'automations-new-menu'; menu.className = 'menu team-more-menu list-bar-more-menu'; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'New'); menu.hidden = true;
+    for (const [label, action] of [['New job', 'job-new'], ['New workflow', 'wf-create']]) { const b = document.createElement('button'); b.type = 'button'; b.className = 'menu-item'; b.textContent = label; b.setAttribute('data-on-click', action); b.setAttribute('role', 'menuitem'); menu.append(b); }
     box.append(toggle, menu);
     return box;
 }

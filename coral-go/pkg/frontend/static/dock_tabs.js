@@ -5,6 +5,7 @@
 import { registerActions } from './actions.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 import { setText, setHidden, setAttr, setTitle, setHtml } from './dom_write.js';
+import { menuMove } from './menu_keys.js';
 
 const RARE = ['browse', 'activity', 'agent-ui'];
 const WIDE = window.matchMedia('(min-width: 1280px)');
@@ -84,10 +85,7 @@ registerActions({
     'dock-more-key': (el, event) => {
         const list = items(), i = list.indexOf(el);
         if (event.key === 'Escape') { event.preventDefault(); closeMore(true); }
-        else if (event.key === 'ArrowDown') { event.preventDefault(); list[(i + 1) % list.length].focus(); }
-        else if (event.key === 'ArrowUp') { event.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
-        else if (event.key === 'Home') { event.preventDefault(); list[0].focus(); }
-        else if (event.key === 'End') { event.preventDefault(); list[list.length - 1].focus(); }
+        else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { event.preventDefault(); list[menuMove(event.key, list.length, i)]?.focus(); }
         else if (event.key === 'Tab') closeMore(false);
     },
     'dock-more-open-key': (el, event) => { if (event.key === 'ArrowDown') { event.preventDefault(); openMore(); } else if (event.key === 'ArrowUp') { event.preventDefault(); openMore('last'); } else if (event.key === 'Escape' && menuOpen) { event.preventDefault(); closeMore(true); } },

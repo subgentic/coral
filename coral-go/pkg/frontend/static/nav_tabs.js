@@ -9,6 +9,7 @@
 import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
 import { isHub } from './server_base.js';
+import { MENU_KEYS, menuMove } from './menu_keys.js';
 
 const ICONS = { agents: 'smart_toy', history: 'chat_bubble_outline', workflows: 'account_tree', jobs: 'schedule', tokens: 'insights',
     docs: 'menu_book', servers: 'dns', 'hub-inbox': 'notifications', board: 'forum', artifacts: 'inventory_2' };
@@ -223,15 +224,15 @@ if (typeof document !== 'undefined') {
         });
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape' && _menuFor) { const b = _menuFor; closeMenu(); b.focus(); return; }
-            if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
-            // the menu keyboard (#9116): the arrows and Home/End move among the entries; on the button, ArrowDown and ArrowUp open the menu on its first or last entry
+            if (!MENU_KEYS.has(e.key)) return;
+            // the menu keyboard (#9116, one function: menu_keys.js): the arrows and Home/End move among the entries; on the button, ArrowDown and ArrowUp open the menu on its first or last entry
             const menu = document.getElementById('nav-more-menu');
             const entries = () => [...(menu ? menu.querySelectorAll('.nav-more-item') : [])].filter(x => x.getClientRects().length);
             if (menu && !menu.hidden && menu.contains(e.target)) {
                 const items = entries(), at = items.indexOf(document.activeElement);
                 if (!items.length) return;
                 e.preventDefault();
-                items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : e.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length].focus();
+                items[menuMove(e.key, items.length, at)].focus();
                 return;
             }
             const button = e.target.closest?.('[data-on-click="m-top-menu"], [data-on-click="m-nav-more"]');
@@ -239,7 +240,7 @@ if (typeof document !== 'undefined') {
             e.preventDefault();
             if (_menuFor !== button) { closeMenu(); openMenu(button); }
             const items = entries();
-            (e.key === 'ArrowUp' ? items[items.length - 1] : items[0])?.focus();
+            items[menuMove(e.key, items.length, -1)]?.focus();
         });
         syncNav();
     };

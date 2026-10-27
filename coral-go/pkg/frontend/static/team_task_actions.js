@@ -47,9 +47,9 @@ export function taskButtons(task, ctx) {
 function moreMenu(id, items) {
     const wrap = el('span', 'task-more');
     const toggle = btn('btn task-more-btn', 'More'); toggle.id = id; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `${id}-menu`);
-    const menu = el('div', 'team-more-menu task-more-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More task actions');
+    const menu = el('div', 'menu team-more-menu task-more-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More task actions');
     for (const it of items) {
-        const b = btn(it.danger ? 'mb-action-danger' : '', it.label, async () => { (await importOnce('./menu_button.js')).closeMenus(); it.run(); });
+        const b = btn(it.danger ? 'menu-item menu-item-danger mb-action-danger' : 'menu-item', it.label, async () => { (await importOnce('./menu_button.js')).closeMenus(); it.run(); });
         b.setAttribute('role', 'menuitem'); if (it.title) b.title = it.title; if (it.className) b.classList.add(it.className);
         menu.append(b);
     }

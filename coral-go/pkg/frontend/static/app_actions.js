@@ -38,6 +38,7 @@ import { closeSidebarKebabs, closeTopBarSettings, toggleSidebarKebab, toggleTopB
 import { loadHistoryPage } from './history_filters.js';
 import { switchNavTab } from './app_navigation.js';
 import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, showResumeModal, hideResumeModal, resumeLaunchNew, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
+import { MENU_KEYS, menuMove } from './menu_keys.js';
 
 registerActions({
     'mb-select-mode': () => toggleSelectMode(),
@@ -349,7 +350,7 @@ window.closeSendMenu = function() {
 };
 // The chevron's menu keyboard (#9116): the arrows and Home/End move among its entries; ArrowDown and ArrowUp on the chevron open it on its first or last entry.
 document.addEventListener('keydown', e => {
-    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    if (!MENU_KEYS.has(e.key)) return;
     const menu = e.target.closest?.('.send-btn-menu'), chevron = e.target.closest?.('[data-on-click="cmd-send-menu"]');
     if (!menu && !(chevron && e.key !== 'Home' && e.key !== 'End')) return;
     const host = (menu || chevron).parentElement, panel = host.querySelector('.send-btn-menu');
@@ -359,7 +360,7 @@ document.addEventListener('keydown', e => {
     const items = [...panel.querySelectorAll('.send-menu-item')].filter(x => x.getClientRects().length);
     if (!items.length) return;
     const at = items.indexOf(document.activeElement);
-    items[chevron && !menu ? (e.key === 'ArrowUp' ? items.length - 1 : 0) : e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : e.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length].focus();
+    items[menuMove(e.key, items.length, chevron && !menu ? -1 : at)].focus();
 });
 // Escape closes the chevron's menu and the focus goes back to the chevron (#9021)
 document.addEventListener('keydown', e => {
@@ -375,8 +376,8 @@ document.addEventListener('keydown', e => {
     if (!menu) return;
     const items = [...menu.querySelectorAll('.overflow-menu-item')];
     const at = items.indexOf(document.activeElement);
-    const to = e.key === 'ArrowDown' ? (at + 1) % items.length : e.key === 'ArrowUp' ? (at <= 0 ? items.length - 1 : at - 1) : e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : -1;
-    if (to >= 0 && items.length) { e.preventDefault(); items[to].focus(); }
+    const to = menuMove(e.key, items.length, at);
+    if (to >= 0) { e.preventDefault(); items[to].focus(); }
 }, true);
 
 document.addEventListener('focusout', e => {

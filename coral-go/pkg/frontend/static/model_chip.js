@@ -10,6 +10,7 @@ import { importOnce } from './import_once.js';
 import { familyOf, addCustomModel, probeCanAdd, peekCanAdd } from './custom_model_add.js';
 import { modelLabel, readModelsCache, writeModelsCache, clearModelsCache, levelName } from './model_labels.js';
 import { setText, setHidden, setTitle, setData, setAttr } from './dom_write.js';
+import { menuMove } from './menu_keys.js';
 
 /** The agent types whose CLI takes /model and /effort in a running session (the server's liveSwitchTypes). */
 const LIVE_SWITCH_TYPES = new Set(['claude']);
@@ -407,7 +408,7 @@ function wireModelChip() {
             if (e.key === 'Tab' && o.menu.contains(document.activeElement)) { _closeOptions(); return; }
             if (items.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End')) {
                 const i = items.indexOf(document.activeElement);
-                items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+                items[menuMove(e.key, items.length, i)].focus();
                 e.preventDefault();
             }
             return;
@@ -421,7 +422,7 @@ function wireModelChip() {
             const items = [...menu.querySelectorAll('.model-chip-item')];
             if (!items.length) return;
             const i = items.indexOf(document.activeElement);
-            const to = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
+            const to = menuMove(e.key, items.length, i);
             items[to].focus();
             e.preventDefault();
         }
