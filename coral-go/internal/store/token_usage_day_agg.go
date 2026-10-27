@@ -139,12 +139,24 @@ var tokenUsageDayAggOn = true
 // hourlyBranches are the parts of usageRelation that read token_usage_hourly, from since on ("" is no lower bound). With coarse set they read
 // the day aggregate where it covers whole clean days and the hourly rows elsewhere; otherwise (or when the aggregate cannot answer: not built,
 // since not canonical) they are the hourly rows from since on.
-func hourlyBranches(ctx context.Context, db sqlGetter, since, bound string, coarse bool) (parts []string, args []any) {
+//
+// With coarse set and an until (#9442), the rows from until on are not read: the aggregate answers for the clean days that end at or before the day until falls in (the day itself is not whole inside the
+// window), and the hourly rows of everything after the last such day are read up to until. Without an until, as before.
+func hourlyBranches(ctx context.Context, db sqlGetter, since, bound string, coarse bool, until string) (parts []string, args []any) {
+	untilBound := windowBound(until)
 	plain := func() ([]string, []any) {
-		if since == "" {
-			return []string{hourlyRel}, nil
+		switch {
+		case since == "" && until == "" || !coarse:
+			if since == "" {
+				return []string{hourlyRel}, nil
+			}
+			return []string{hourlyRel + ` WHERE recorded_at >= ?`}, []any{bound}
+		case since == "":
+			return []string{hourlyRel + ` WHERE recorded_at < ?`}, []any{untilBound}
+		case until == "":
+			return []string{hourlyRel + ` WHERE recorded_at >= ?`}, []any{bound}
 		}
-		return []string{hourlyRel + ` WHERE recorded_at >= ?`}, []any{bound}
+		return []string{hourlyRel + ` WHERE recorded_at >= ? AND recorded_at < ?`}, []any{bound, untilBound}
 	}
 	if !coarse || !tokenUsageDayAggOn || (since != "" && !canonicalSince.MatchString(since)) {
 		return plain()
@@ -164,6 +176,24 @@ func hourlyBranches(ctx context.Context, db sqlGetter, since, bound string, coar
 			return plain()
 		}
 	}
+	if until != "" { // the aggregate's days stop before the day until falls in: that day is read from its hourly rows, up to until
+		var untilAt time.Time
+		for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05", "2006-01-02 15:04:05"} {
+			if t, err := time.Parse(layout, until); err == nil {
+				untilAt = t.UTC()
+				break
+			}
+		}
+		if untilAt.IsZero() {
+			return plain()
+		}
+		if before := untilAt.Truncate(24 * time.Hour).Add(-24 * time.Hour).Format("2006-01-02"); before < last {
+			last = before
+		}
+		if from != "" && from > last { // no whole day of the aggregate is inside the window
+			return plain()
+		}
+	}
 	skip := `(SELECT day FROM token_usage_day_dirty UNION SELECT day FROM token_usage_day_odd)`
 	parts = []string{
 		`SELECT ` + usageCols + `, n_rows, day || 'T00:00:00.000Z' AS recorded_at, min_at, max_at
@@ -178,9 +208,14 @@ func hourlyBranches(ctx context.Context, db sqlGetter, since, bound string, coar
 	parts = append(parts, `SELECT `+usageCols+`, n_rows, r.recorded_at, r.recorded_at AS min_at, r.recorded_at AS max_at
 		 FROM `+skip+` s JOIN token_usage_hourly r ON r.recorded_at >= s.day AND r.recorded_at < s.day || '~' WHERE s.day >= ? AND s.day <= ?`)
 	args = append(args, from, last)
-	// the hourly rows after the last aggregated day
-	parts = append(parts, hourlyRel+` WHERE recorded_at >= ?`)
-	args = append(args, last+"~")
+	// the hourly rows after the last aggregated day (up to until)
+	if until != "" {
+		parts = append(parts, hourlyRel+` WHERE recorded_at >= ? AND recorded_at < ?`)
+		args = append(args, last+"~", untilBound)
+	} else {
+		parts = append(parts, hourlyRel+` WHERE recorded_at >= ?`)
+		args = append(args, last+"~")
+	}
 	return parts, args
 }
 

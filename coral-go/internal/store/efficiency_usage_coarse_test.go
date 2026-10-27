@@ -89,6 +89,53 @@ func TestEfficiencyUsageCoarseEqualsTheFullRead(t *testing.T) {
 		require.NotZero(t, future)
 	}
 	assert.Greater(t, usedDay, 0, "the day aggregate answered some of the windows")
+	// windows that end before now, as the usual window (the seven days before a window) does: whole days from the aggregate inside, the days at both ends from their rows
+	midnight := aggNow.Truncate(24 * time.Hour)
+	untilDay := 0
+	for _, w := range [][2]time.Time{
+		{aggNow.Add(-250 * time.Hour), aggNow.Add(-100 * time.Hour)},
+		{aggNow.Add(-200 * time.Hour), aggNow.Add(-24*time.Hour + 37*time.Minute)},
+		{aggNow.Add(-288 * time.Hour), aggNow.Add(-5 * 24 * time.Hour)},
+		{midnight.Add(-9 * 24 * time.Hour), midnight.Add(-2 * 24 * time.Hour)},           // on day boundaries
+		{midnight.Add(-9*24*time.Hour + 3*time.Hour), midnight.Add(-2*24*time.Hour - 1)}, // a nanosecond before one
+		{aggNow.Add(-30 * time.Hour), aggNow.Add(-27 * time.Hour)},                       // inside one day: nothing of the aggregate
+		{aggNow.Add(-400 * time.Hour), aggNow.Add(-300 * time.Hour)},                     // before the data
+		{aggNow.Add(-250 * time.Hour), aggNow.Add(-2 * time.Hour)},                       // until inside the day that has no aggregate yet
+	} {
+		s, u := w[0].Format(time.RFC3339), w[1].Format(time.RFC3339)
+		full, err := ts.EfficiencyUsage(ctx, s, u, false)
+		require.NoError(t, err)
+		coarse, err := ts.EfficiencyUsage(ctx, s, u, true)
+		require.NoError(t, err)
+		want, got := collapse(full), collapse(coarse)
+		require.Equal(t, len(want), len(got), "[%s, %s): the same groups", s, u)
+		for k, wv := range want {
+			g, ok := got[k]
+			require.True(t, ok, "[%s, %s): group %v is missing", s, u, k)
+			assert.Equal(t, wv.tokens, g.tokens, "[%s, %s): tokens of %v", s, u, k)
+			assert.InDelta(t, wv.cost, g.cost, 1e-6, "[%s, %s): cost of %v", s, u, k)
+		}
+		if frag, _ := usageCoarseRelationUntil(ctx, db, s, u); strings.Contains(frag, "token_usage_day_agg") {
+			untilDay++
+		}
+	}
+	assert.Greater(t, untilDay, 2, "the day aggregate answered several windows that end before now")
+	// a day whose hourly rows changed after it was aggregated is dirty: it is read from its rows, whole, until the refresh runs again
+	_, err = db.ExecContext(ctx, `INSERT INTO token_usage_hourly(hour, id, session_id, agent_name, agent_type, team_id, board_name, input_tokens, output_tokens, total_tokens, cost_usd, num_turns, recorded_at, cache_read_tokens, cache_write_tokens, session_start_at, last_activity_at, source, model, n_rows, ctx_tokens, thinking)
+		VALUES (?, 99999, 's3', 'late', 'claude', NULL, 'alpha', 7, 8, 15, 0.5, 1, ?, 0, 0, NULL, NULL, 'jsonl', 'opus', 1, 15, 'high')`, midnight.Add(-5*24*time.Hour+4*time.Hour).Format("2006-01-02T15"), storeLayout(midnight.Add(-5*24*time.Hour+4*time.Hour)))
+	require.NoError(t, err)
+	for _, w := range [][2]time.Time{{aggNow.Add(-250 * time.Hour), aggNow.Add(-100 * time.Hour)}, {midnight.Add(-9 * 24 * time.Hour), midnight.Add(-2 * 24 * time.Hour)}, {midnight.Add(-6 * 24 * time.Hour), midnight.Add(-4*24*time.Hour + time.Hour)}} {
+		s, u := w[0].Format(time.RFC3339), w[1].Format(time.RFC3339)
+		full, err := ts.EfficiencyUsage(ctx, s, u, false)
+		require.NoError(t, err)
+		coarse, err := ts.EfficiencyUsage(ctx, s, u, true)
+		require.NoError(t, err)
+		want, got := collapse(full), collapse(coarse)
+		require.Equal(t, len(want), len(got), "dirty day, [%s, %s): the same groups", s, u)
+		for k, wv := range want {
+			assert.Equal(t, wv.tokens, got[k].tokens, "dirty day, [%s, %s): tokens of %v", s, u, k)
+		}
+	}
 	// the future row is in neither read; with no end it is in both
 	for _, coarse := range []bool{false, true} {
 		open, err := ts.EfficiencyUsage(ctx, aggNow.Add(-24*time.Hour).Format(time.RFC3339), "", coarse)
