@@ -22,9 +22,11 @@ const NOTIFICATIONS_FIELDS = [
 ];
 
 const FILES_FIELDS = [
+    { key: 'files_search_title', type: 'heading', id: 'settings-files-search-title', label: 'File search' },
     { key: 'file_search_mode', type: 'select', id: 'settings-file-search-mode', label: 'File search mode', help: 'How @ mentions and file browser search for files', options: [{ value: 'directory', label: 'Directory Browsing' }, { value: 'fuzzy', label: 'Fuzzy Matching' }] },
     { key: 'file_search_limit', type: 'select', id: 'settings-file-search-limit', label: 'File search limit', help: 'Max number of files returned in search results', default: '500',
         options: [{ value: '50', label: '50' }, { value: '100', label: '100' }, { value: '200', label: '200' }, { value: '500', label: '500' }, { value: '1000', label: '1,000' }] },
+    { key: 'git_title', type: 'heading', id: 'settings-git-title', label: 'Git' },
     { key: 'git_diff_mode', type: 'select', id: 'settings-git-diff-mode', label: 'Git diff mode', help: 'What to compare changed files against',
         options: [{ value: 'branch_point', label: 'Branch Point (merge-base)' }, { value: 'previous_commit', label: 'Previous Commit (HEAD~1)' }, { value: 'main_head', label: 'Main Branch (vs main)' }] },
     { key: 'git_poll_interval', type: 'select', id: 'settings-git-poll-interval', label: 'Git scan interval', help: { text: '', more: 'How often Coral rescans git for changed files. Scanning a large repository is slow \u2014 stretch this out, or turn it off and use the refresh button.' },
@@ -43,12 +45,12 @@ const OS_NOTE = {
 const osNote = () => (`${navigator.userAgentData?.platform || navigator.platform || ''}`.toLowerCase().includes('linux') ? OS_NOTE.linux : OS_NOTE.mac);
 export const TERMINAL_BACKEND_IDS = ['tb-choice', 'tb-fixed', 'tb-now', 'tb-pending', 'tb-autowake-on', 'tb-autowake-cap']; // the ids of the rows that start hidden
 const TERMINAL_BACKEND_FIELDS = [
-    { key: 'terminal-backend', type: 'radio', id: 'tb-choice', wide: true, label: 'Terminal backend',
-        help: { text: '', about: 'the terminal backends', more: [
+    { key: 'terminal-backend', type: 'select', id: 'tb-choice', labelId: 'tb-choice-label', label: 'Terminal backend',
+        help: { text: 'tmux keeps agents running when Coral restarts; pty stops them, and they wake next time.', about: 'the terminal backends', more: [
             "tmux: Agents keep running when Coral restarts, upgrades or crashes, and Coral picks them up again afterwards. Coral keeps its terminals in a tmux server whose socket sits in your Coral data folder. Any agent, and any other program running as you, can find that socket and read or type into other agents' terminals. Choose this if you restart or upgrade Coral often.",
             'pty: Coral holds each terminal itself, so there is no shared socket for an agent to use against another agent. The price: agents end whenever Coral restarts, upgrades or crashes (Coral puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash). When Coral starts again it wakes them one at a time (not if Coral has restarted several times in a row; up to the number set below; more after you confirm; you can turn this off), and they resume their conversation, but a tool that was running is not continued.',
             osNote()].join('\n\n') },
-        options: [{ value: 'tmux', id: 'tb-opt-tmux', label: 'tmux', help: "Agents keep running when you quit Coral, and can reach each other's terminals." }, { value: 'pty', id: 'tb-opt-pty', label: 'pty (default)', help: 'Agents stop when you quit Coral and wake next time.' }] },
+        options: [{ value: 'tmux', label: 'tmux (agents keep running)' }, { value: 'pty', label: 'pty (default)' }] },
     { key: 'tb_fixed', type: 'custom', id: 'tb-fixed', label: 'Terminal backend', render: slot => slot.append("Agents run in Coral's own terminals (pty), the only backend here. They stop when Coral quits and wake next time."),
         help: { text: '', more: 'This Coral runs agents in its own terminals (pty), the only backend here (no tmux on this system). Agents end when Coral restarts or upgrades; when it starts again Coral wakes them (up to the number set below; more after you confirm; you can turn this off), and they resume their conversation.' } },
     { key: 'tb_now', type: 'custom', id: 'tb-now', label: 'Running now', render: () => {} },
@@ -58,10 +60,12 @@ const TERMINAL_BACKEND_FIELDS = [
     { key: 'auto_wake_cap', type: 'number', id: 'tb-autowake-cap', label: 'Wake up to', unit: 'agents without asking', min: 1, max: 50, step: 1, default: 8, attrs: { inputmode: 'numeric' } },
 ];
 const TERMINAL_FIELDS = [
+    { key: 'terminal_display_title', type: 'heading', id: 'settings-terminal-display-title', label: 'Display' },
     { key: 'terminal_font_size', type: 'select', id: 'settings-terminal-font-size', labelId: 'settings-terminal-font-size-label', label: 'Terminal font size', default: '13', options: [10, 11, 12, 13, 14, 16, 18].map(px) },
     { key: 'terminal_scrollback', type: 'select', id: 'settings-terminal-scrollback', labelId: 'settings-terminal-scrollback-label', label: 'Terminal scrollback', default: '20000',
         options: [{ value: '1000', label: '1,000 lines' }, { value: '5000', label: '5,000 lines' }, { value: '10000', label: '10,000 lines' }, { value: '20000', label: '20,000 lines' }, { value: '50000', label: '50,000 lines' }, { value: '100000', label: 'Unlimited (100k)' }] },
     { key: 'fit_pane_width', type: 'toggle', id: 'settings-fit-pane-width', label: 'Fit pane width', help: { text: '', more: 'With the tmux backend, the terminal takes the size of this browser window.' } },
+    { key: 'terminal_backend_title', type: 'heading', id: 'settings-terminal-backend-title', label: 'Backend' },
     ...TERMINAL_BACKEND_FIELDS,
     live('settings-tools-folder-dl'), live('settings-engine-more'),
 ];
@@ -139,8 +143,10 @@ const apiKeyLine = slot => {
 };
 
 export const SECURITY_FIELDS = [
+    { key: 'security_access_title', type: 'heading', id: 'settings-security-access-title', label: 'Access' },
     { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'API key', render: slot => apiKeyLine(slot) },
     live('settings-security'),
+    { key: 'security_data_title', type: 'heading', id: 'settings-security-data-title', label: 'Data and privacy' },
     { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },
         help: { text: 'Applies after restart.', more: 'Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.' },
         options: [{ value: 'disabled', label: 'Off (plaintext database)' }, { value: 'key_file', label: 'Local key file (~/.coral/.db_key)' }, { value: 'password', label: 'Password at startup' }] },

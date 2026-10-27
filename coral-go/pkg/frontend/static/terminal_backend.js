@@ -18,12 +18,6 @@ import { TERMINAL_BACKEND_IDS } from './settings_fields.js';
 let _status = null; // GET /api/system/terminal-backend
 let _autoWakeShown = null; // the auto-wake values as the dialog opened (#3636)
 const show = (id, on) => { const r = document.getElementById(id)?.closest('.sv-row'); if (r) r.hidden = !on; };
-// The pty choice says its agents wake next time only while Wake agents after a restart is on (it follows the box as it is ticked).
-function syncPtyWakes() {
-    const help = document.getElementById('tb-opt-pty')?.closest('label')?.querySelector('.sv-choice-help'), box = document.getElementById('tb-autowake-on');
-    if (help && box) help.textContent = box.checked ? 'Agents stop when you quit Coral and wake next time.' : 'Agents stop when you quit Coral.';
-}
-
 const $ = id => document.getElementById(id);
 
 async function fetchStatus() {
@@ -40,8 +34,8 @@ function nextBackend(st) {
 }
 
 function picked() {
-    const r = document.querySelector('input[name="terminal-backend"]:checked');
-    return r ? r.value : null;
+    const sel = $('tb-choice');
+    return sel && sel.value ? sel.value : null;
 }
 
 function renderPending() {
@@ -80,14 +74,12 @@ export async function loadTerminalBackendRow() {
     $('tb-autowake-cap').value = cap >= 1 && cap <= 50 ? cap : 8;
     show('tb-autowake-on', pty); show('tb-autowake-cap', pty);
     _autoWakeShown = pty ? { on, cap: Number($('tb-autowake-cap').value) } : null;
-    syncPtyWakes();
-    const box = $('tb-autowake-on');
-    if (!box._tbWakes) { box._tbWakes = true; box.addEventListener('change', syncPtyWakes); }
     if (_status.choice) {
         const next = nextBackend(_status);
-        for (const r of document.querySelectorAll('input[name="terminal-backend"]')) {
-            r.checked = r.value === next;
-            if (!r._tbWired) { r._tbWired = true; r.addEventListener('change', renderPending); }
+        const sel = $('tb-choice');
+        if (sel) {
+            sel.value = next;
+            if (!sel._tbWired) { sel._tbWired = true; sel.addEventListener('change', renderPending); }
         }
         renderPending();
     }
