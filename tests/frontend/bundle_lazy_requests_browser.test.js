@@ -40,7 +40,7 @@ const BASE = require('./test_base').BASE;
         };
 
         console.log('1. A first visit is one file for a tab family, and no stub');
-        await visit('workflows', ['workflows.js']);
+        await visit('automations', ['automations.js', 'inbox_toolbar.js', 'team_toolbar.js', 'view_list.js']);
         await visit('tokens', ['cost_dashboard.js']);
         await visit('docs', ['docs.js']);
 
@@ -49,7 +49,7 @@ const BASE = require('./test_base').BASE;
             const [ed, edUrl] = [await importOnce('./workflow_editor.js'), await import(base + 'workflow_editor.js')];
             const [av, avUrl] = [await importOnce('./analytics_views.js'), await import(base + 'analytics_views.js')];
             const wf = await importOnce('./workflows.js');
-            return { editor: ed.saveWorkflow === edUrl.saveWorkflow && typeof ed.saveWorkflow === 'function', views: av.showViews === avUrl.showViews && typeof av.showViews === 'function', main: typeof wf.showWorkflowsTab === 'function' }; })()`);
+            return { editor: ed.saveWorkflow === edUrl.saveWorkflow && typeof ed.saveWorkflow === 'function', views: av.showViews === avUrl.showViews && typeof av.showViews === 'function', main: typeof wf.selectWorkflow === 'function' }; })()`);
         assert.deepEqual(same, { editor: true, views: true, main: true }, JSON.stringify(same));
         console.log('   ✓ the same functions by importOnce and by URL');
 

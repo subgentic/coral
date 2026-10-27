@@ -1,7 +1,7 @@
 // #3816: the top navigation at every width (the operator's pick: today's text tabs, spaced; a dropdown on phones).
 //  - 1440, 1024, 900 and 768 px: one row of plain text tabs with their normal 24 px gap, never wrapped, never touching, clear of
 //    the brand and the action buttons, the active tab marked by its underline (no pill, no icons); when the row is too tight
-//    (large text, eight tabs) the last tabs, never the active one, go under a More menu and stay reachable.
+//    (large text, seven tabs since Workflows and Jobs became Automations) the last tabs, never the active one, go under a More menu and stay reachable.
 //  - 640 to 767 px (the phone dropdown; under 640 px the top row is one hamburger, phone_top_menu, #9021): no tab row and no bottom bar; one 44 px dropdown in the top bar names the current view, opens the list of all views,
 //    switches the view, and closes on Escape and on a click outside; the page opened by a link shows its view; no sideways scroll.
 //  - Nothing here carries an inline handler.
@@ -25,8 +25,8 @@ const BASE = require('./test_base').BASE;
         await install();
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('nv-a', 'A', 3, { sleeping: false }); true`);
         if (extraTabs) await ev(`document.getElementById('nav-tab-servers').hidden = false; if (${extraTabs !== 'servers'}) { const b = document.getElementById('nav-tab-board'); b.style.display = ''; } true`); // 'servers': a hub, on no board page
-        // Large text (a browser zoom or a bigger font setting) is what makes eight tabs too wide for 768 px.
-        if (bigText) await ev(`const st = document.createElement('style'); st.textContent = '.top-nav-tab { font-size: 19px !important; }'; document.head.appendChild(st); window.dispatchEvent(new Event('resize')); true`);
+        // Large text (a browser zoom or a bigger font setting) is what makes seven tabs too wide for 768 px.
+        if (bigText) await ev(`const st = document.createElement('style'); st.textContent = '.top-nav-tab { font-size: 22px !important; }'; document.head.appendChild(st); window.dispatchEvent(new Event('resize')); true`);
         await waitFor(`!!document.querySelector('.top-nav-tab.active')`, 'the nav', 8000);
         await waitStable(`document.querySelectorAll('.top-nav-tab.nav-overflowed').length + ':' + document.getElementById('nav-select-label').textContent`, 'the nav layout', 300).catch(() => {});
     };
@@ -121,7 +121,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the list', 3000);
         assert.equal(await ev(`document.getElementById('nav-select').getAttribute('aria-expanded')`), 'true');
         const items = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].map(n => [n.dataset.arg, Math.round(n.getBoundingClientRect().height), n.classList.contains('active'), n.getAttribute('aria-current')])`);
-        assert.deepEqual(items.map(i => i[0]), ['agents', 'hub-inbox', 'workflows', 'jobs', 'tokens', 'docs'], 'every view is listed (Chats are the Inbox\'s folders on a local Coral, #7776)');
+        assert.deepEqual(items.map(i => i[0]), ['agents', 'hub-inbox', 'automations', 'tokens', 'docs'], 'every view is listed (Chats are the Inbox\'s folders on a local Coral, #7776)');
         assert.ok(items.every(i => i[1] >= 44), 'every item is at least 44 px tall');
         assert.deepEqual(items.filter(i => i[2]).map(i => i[0]), ['agents'], 'the current view is marked');
         const box = await ev(`(() => { const m = document.getElementById('nav-more-menu').getBoundingClientRect(), b = document.getElementById('nav-select').getBoundingClientRect(); return { top: m.top, bottom: m.bottom, left: m.left, right: m.right, btnBottom: b.bottom, h: innerHeight }; })()`);

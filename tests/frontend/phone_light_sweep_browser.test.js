@@ -68,7 +68,7 @@ const TASKS = ['Fix the lock taken twice in the update path of the store', 'Writ
         await scan('agent chat'); await picker('agent chat');
         await ev(`document.querySelector('.code-block') && document.querySelector('.code-block').scrollIntoView({ block: 'center' }); true`); await settle(500); await scan('agent chat, code block');
         await ev(`window.setLiveViewMode('terminal'); true`); await settle(1500); await scan('agent terminal'); await picker('agent terminal'); await ev(`window.setLiveViewMode('chat'); true`); await settle(500);
-        for (const tab of ['history', 'workflows', 'jobs', 'tokens', 'docs', 'board', 'hub-inbox']) { await ev(`window.switchNavTab('${tab}'); true`).catch(() => {}); await settle(1500); await scan('tab ' + tab); await picker('tab ' + tab); }
+        for (const tab of ['history', 'automations', 'tokens', 'docs', 'board', 'hub-inbox']) { await ev(`window.switchNavTab('${tab}'); true`).catch(() => {}); await settle(1500); await scan('tab ' + tab); await picker('tab ' + tab); }
         await ev(`window.switchNavTab('agents'); true`); await settle(500);
         await ev(`window.switchNavTab('agents'); true`); await settle(500);
         // the side panel: Tasks, Board, Files, Notes
