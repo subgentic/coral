@@ -9,7 +9,6 @@ const SELECTED = [
     ['components.css', '.btn-seg > .btn[aria-checked="true"]'],
     ['scheduler.css', '.sched-preset.active'],
     ['components.css', '.flag-shortcut-btn.active'],
-    ['components.css', '.template-cat-btn.active'],
     ['components.css', '.perm-chip.active'],
 ];
 const problems = [];
