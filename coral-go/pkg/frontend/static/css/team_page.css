@@ -2,7 +2,7 @@
 #team-page-view { flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
 
 .team-page-head { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 12px 24px 0; min-height: 48px; box-sizing: border-box; }
-.team-page-title { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; min-width: 0; }
+.team-page-title { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); overflow-wrap: anywhere; min-width: 0; }
 .team-page-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .team-page-machine { font-weight: var(--fw-regular); font-size: var(--fs-lg); color: var(--text-secondary); }
 .team-page-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
@@ -292,7 +292,7 @@
 .inbox-folder-toolbar .inbox-pill-field { display: none; }
 .inbox-folder-toolbar .inbox-pill-field .team-tb-select { display: block; max-width: none; }
 .inbox-folder-head { display: flex; align-items: baseline; gap: var(--space-md, 8px); flex: 0 1 auto; min-width: 0; max-width: 40%; margin-right: 4px; }
-.inbox-folder-head h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; color: var(--text-primary); }
+.inbox-folder-head h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); color: var(--text-primary); }
 .inbox-folder-head h2:focus { outline: none; }
 .inbox-folder-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
 .inbox-folder-head .session-group-count { flex: none; font-weight: var(--fw-strong); }
@@ -355,7 +355,7 @@
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {
     .inbox-review-actions button { min-height: 44px; }
-    .inbox-review-team { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); line-height: 1.3; color: var(--table-tertiary-color); }
+    .inbox-review-team { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); line-height: var(--lh-label); color: var(--table-tertiary-color); }
 }
 /* A team no board has (#8848): its name and the way back, none of a team's tabs, panels or actions */
 .team-page-missing { padding: 16px 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }

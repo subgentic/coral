@@ -186,7 +186,7 @@
 .dt-warning { border-color: var(--table-warning); color: var(--table-primary-color); }
 .dt-row:has(.dt-subtitle) td { height: var(--table-row-description-h); }
 .dt-box.dt-folded .dt-row:has(.dt-subtitle) td { height: auto; }
-.dt-box.dt-folded .dt-primary { display: block; min-height: var(--table-touch); min-width: var(--table-touch); line-height: 1.3; } /* a block, not a flex box: text-overflow does nothing on a flex box, so a long name was cut off mid-letter instead of ending in an ellipsis (#8149); the line height and the minimum width keep it a 44 px target, also for a short name such as "#31" (the run table's row button was 43 px wide, #8171) */
+.dt-box.dt-folded .dt-primary { display: block; min-height: var(--table-touch); min-width: var(--table-touch); line-height: var(--lh-label); } /* a block, not a flex box: text-overflow does nothing on a flex box, so a long name was cut off mid-letter instead of ending in an ellipsis (#8149); the line height and the minimum width keep it a 44 px target, also for a short name such as "#31" (the run table's row button was 43 px wide, #8171) */
 
 
 .dt-primary:focus-visible { outline: var(--table-focus-w) solid var(--table-focus-color); outline-offset: calc(-1 * var(--table-focus-w)); }
@@ -251,7 +251,7 @@
 .dt-box:not(.dt-folded) .dt-title-cell > .dt-primary:has(.dt-name-text) { min-width: 0; }
 .dt-name-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 32rem; }
 .dt-box.dt-folded .dt-primary:has(.dt-name-text) { display: flex; align-items: center; }
-.dt-box.dt-folded .dt-name-text { line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; max-inline-size: 100%; }
+.dt-box.dt-folded .dt-name-text { line-height: var(--lh-ui); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; max-inline-size: 100%; }
 
 /* A table that asks for it (cfg.compact: the Tasks lists and the dock's Artifacts, #8496) keeps a folded column row to its two compact lines. Other folded tables keep their names and descriptions at two lines (a failed run's reason, a long server name). The title still has a 44px
  * hit area, centered over its 24px text line; the row itself opens across both lines. */
@@ -266,7 +266,7 @@
 /* A name with its description under it stacks: the description is not a second flex item squeezing the name to ellipsis at a large text size (#8541) */
 .dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-1:has(> .dt-subtitle) { flex-direction: column; align-items: flex-start; height: auto; }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell { align-items: center; width: 100%; }
-.dt-box.dt-compact.dt-fold-column.dt-folded .dt-primary { box-sizing: border-box; padding: 0; margin-block: calc((var(--table-fold-line-h) - var(--table-touch)) / 2); line-height: 1.3; font-weight: var(--table-fold-primary-weight); }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-primary { box-sizing: border-box; padding: 0; margin-block: calc((var(--table-fold-line-h) - var(--table-touch)) / 2); line-height: var(--lh-label); font-weight: var(--table-fold-primary-weight); }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { min-width: 0; flex: 1; }
 .dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-2 { min-height: var(--table-fold-meta-h); line-height: var(--table-fold-meta-h); }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-name-text { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

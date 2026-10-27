@@ -15,7 +15,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
     background: var(--bg-primary, var(--fx-navy-ink)); color: var(--text-primary, #e6edf3); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .cloud-card { width: 100%; max-width: 440px; padding: var(--card-pad-roomy); border-radius: var(--card-radius); background: var(--bg-secondary, #151a22); border: var(--card-border); }
 .cloud-card h1 { font-size: var(--fs-2xl); margin: 0 0 6px; }
-.cloud-card p { margin: 0 0 14px; line-height: 1.5; opacity: .85; }
+.cloud-card p { margin: 0 0 14px; line-height: var(--lh-body); opacity: .85; }
 .cloud-card label { display: block; font-size: var(--fs-md); margin: 12px 0 4px; }
 .cloud-card input[type=email], .cloud-card input[type=text] { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: var(--radius-lg);
     border: 1px solid var(--control-border, var(--border, var(--fx-navy-line))); background: var(--bg-primary, var(--fx-navy-ink)); color: inherit; font-size: var(--fs-lg); min-height: var(--control-touch-height, 44px); } /* a 44px target on every pointer: the sign-in page is used from a phone (#5637) */
@@ -29,7 +29,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cloud-status { margin-top: 12px; min-height: 1.4em; font-size: var(--fs-md); }
 .cloud-status.error { color: #ff7b72; }
 .cloud-status.ok { color: var(--fx-green); }
-.cloud-warn { margin: 12px 0; padding: 10px 12px; border-radius: var(--radius-lg); background: rgba(var(--fx-amber-rgb), .12); border: 1px solid rgba(var(--fx-amber-rgb), .5); font-size: var(--fs-md); line-height: 1.5; }
+.cloud-warn { margin: 12px 0; padding: 10px 12px; border-radius: var(--radius-lg); background: rgba(var(--fx-amber-rgb), .12); border: 1px solid rgba(var(--fx-amber-rgb), .5); font-size: var(--fs-md); line-height: var(--lh-body); }
 .cloud-facts { margin: 12px 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: var(--fs-lg); }
 .cloud-facts dt { opacity: .65; } .cloud-facts dd { margin: 0; word-break: break-all; }
 
@@ -47,7 +47,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cs-meta.cs-access-help { opacity: 1; color: var(--text-secondary); }
 .cs-access-info { display: inline-flex; align-items: center; gap: var(--space-xs); margin-top: var(--space-xs); color: var(--text-secondary); }
 .cs-access-info .material-icons { font-size: var(--fs-xl); }
-.cs-access-matrix { color: var(--text-secondary); font-size: var(--fs-base); line-height: 1.5; }
+.cs-access-matrix { color: var(--text-secondary); font-size: var(--fs-base); line-height: var(--lh-body); }
 .cs-access-matrix p { margin: var(--space-sm) 0; }
 @media (pointer: coarse) { .cs-relink, .cs-access-info, #cs-enroll-toggle { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
 
@@ -64,7 +64,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cs-enroll { margin: 0 0 18px; padding: 14px; border-radius: var(--radius-lg); border: 1px dashed var(--border, var(--fx-navy-line)); }
 .cs-enroll.cs-enroll-closed { padding: 0; border: 0; } .cs-enroll-title #cs-enroll-toggle { margin-left: 0; } /* closed it is only the Add a computer button, not a dashed box around one button (#6359) */
 .cs-enroll-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 220px); gap: 16px; align-items: start; }
-.cs-enroll ol { margin: 8px 0 12px 18px; padding: 0; line-height: 1.6; font-size: var(--fs-md); }
+.cs-enroll ol { margin: 8px 0 12px 18px; padding: 0; line-height: var(--lh-body); font-size: var(--fs-md); }
 .cs-enroll ol li a { display: block; margin-top: 2px; color: var(--link-text, var(--accent)); overflow-wrap: anywhere; } /* the install link: on its own line (#4586) */
 .cs-shots { min-width: 0; }
 .cs-shot { display: block; width: 100%; height: auto; border: 1px solid var(--border, var(--fx-navy-line)); border-radius: var(--radius-lg); }
