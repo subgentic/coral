@@ -121,8 +121,8 @@ function serversTable(local, remotes) {
         label: 'Registered servers', state: _dt, rows, oneLine: true, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
         columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); Needs you and the name's warning never go
             { key: 'server', label: 'Server', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: serverCell, title: s => s.label || s.id },
-            { key: 'tags', label: 'Tags', width: '12rem', dropAt: 36, cell: tagsCell },
-            { key: 'status', label: 'Status', width: '7rem', sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusChip(live(s).status || s.status) },
+            { key: 'tags', label: 'Tags', width: '11rem', dropAt: 36, cell: tagsCell },
+            { key: 'status', label: 'Status', width: '9rem', sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusChip(live(s).status || s.status) },
             { key: 'agents', label: 'Agents', width: '5rem', dropAt: 28, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => agentsText(serverAgentCount(live(s))) },
             { key: 'needs', label: 'Needs you', width: '6rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
             { key: 'seen', label: 'Last seen', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: s => seenValue(s, live(s)), cell: s => seenWords(s, live(s)) },
