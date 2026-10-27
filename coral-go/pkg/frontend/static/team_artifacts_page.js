@@ -289,6 +289,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' empty-state-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
+        if (!model.error && !model.loading && !model.items.length && !F.isFiltered(model.filters)) status.append(el('span', 'empty-state-hint', 'Files an agent shares from a task are listed here.')); // inside the line's own element: one block, the family's gap
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
             // A label timeout needs another board-list read, not only the same artifact answer. Do not await a possibly offline list: the fresh artifact read has its own bounded label wait.
             if (retryLabels) importOnce('./board_fetch.js').then(m => m.fetchProjects()).catch(() => {});

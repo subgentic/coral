@@ -1694,6 +1694,7 @@ body.panel-dragging .agentic-state {
 
 /* The Team Artifacts search, filter menu, sort and chips (#4573). The search is on its own row; the filters are a menu; at a narrow width (a phone, 200% text) everything wraps. */
 .list-bar-bar { padding: 4px 12px 8px; display: flex; flex-direction: column; gap: 8px; position: relative; }
+.group-table-view .list-bar-bar { padding-left: 0; padding-right: 0; } /* a folder page's bar and title start where its table does, the page's content edge (#9452 item 2) */
 
 /* The agent list's bar (agent_list_bar.js, #4744): under the list's search box, in the sidebar and on the phone's Agents page; touch targets are 44px there. */
 .agent-list-bar { flex: none; }

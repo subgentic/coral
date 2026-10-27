@@ -834,10 +834,12 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
  * for a dock panel, a menu, a picker or a list: less padding, the same type. What to do on a tab is the sidebar's pinned action. */
 .empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); margin: 0; padding: var(--space-2xl); color: var(--text-secondary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-body); }
 .empty-state[hidden] { display: none; }
+.group-table-view .empty-state, .team-panel .empty-state { padding-left: 0; padding-right: 0; } /* a page's empty state starts at the page's content edge, like the line the artifacts page draws and the table under a title (#9452 item 3) */
 .empty-state-tight { padding: var(--space-md); }
 .empty-state-line, .goals-note.empty-state-line, .welcome p.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-body); color: var(--text-secondary); } /* the line is the secondary colour: an empty message is never as loud as the rows on the other screens */
 .empty-state-hint, .welcome p.empty-state-hint { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-regular); line-height: var(--lh-ui); color: var(--text-muted); }
 .empty-state-action { margin-top: var(--space-sm); }
+.empty-state-line > .empty-state-hint { display: block; margin-top: var(--space-xs); } /* the artifacts page's line is one element: its hint is a block under it at the family's gap */
 .start-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-md); align-self: stretch; margin-top: var(--space-sm); max-width: 44rem; }
 .start-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); text-align: left; font: inherit; color: var(--text-primary); background: var(--bg-secondary); border: var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad); cursor: pointer; }
 .start-card:hover { background: var(--bg-hover); }
