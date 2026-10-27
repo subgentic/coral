@@ -1,7 +1,7 @@
-// A literal font size or font family (Goal #84, the type scale): the page has seven sizes (--fs-sm ... --fs-display in variables.css) and three families (--font-sans, --font-mono, the icon
+// A literal font size, weight, line height or font family (Goal #84, the type scale): the page has seven sizes (--fs-sm ... --fs-display in variables.css) and three families (--font-sans, --font-mono, the icon
 // font). A `font-size` written as a number in a stylesheet, in a script's inline style (`style="font-size:..."`, `style.fontSize = '...'`) or in a template, and a `font-family` that is not
 // a var(), `inherit` or the icon font, is the same size or face in every place that copies it, and is how the page came to have 43 different sizes. Write var(--fs-*) (and add a
-// token when a size is needed in three places). What is here already is in fixtures/font_literals_allowlist.json, per file and declaration, with the count: the count may not go up,
+// token when a size is needed in three places), var(--fw-*) for the three weights (700 only on a 20 or 32 px title) and var(--lh-*) for the three line heights (1, a length, or inherit are not ratios). What is here already is in fixtures/font_literals_allowlist.json, per file and declaration, with the count: the count may not go up,
 // and it must come down when a use is fixed (the message says "lower it"), so the list only shrinks. CORAL_UPDATE_ALLOWLIST=1 rewrites it (review the diff: a new entry is a new literal).
 // Not counted: a size or family that is a var(), `inherit`/`initial`/`unset`, and a `--name: value` line (a token definition). A standalone export document (board_export_render.js) and the
 // terminal's own options (xterm's fontSize) are in the list or out of the scan, each for its reason.
@@ -22,7 +22,12 @@ const blank = s => s.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
 const SIZE = /(?<![\w-])font-size\s*:\s*([^;}"'`{]+?)\s*(?:!important)?\s*(?=[;}"'`]|$)/g;
 const FAMILY = /(?<![\w-])font-family\s*:\s*([^;}"`{]+?)\s*(?:!important)?\s*(?=[;}"`]|$)/g;
 const STYLE_SIZE = /\.style\.fontSize\s*=\s*['"`]([^'"`]+)['"`]/g;
+const WEIGHT = /(?<![\w-])font-weight\s*:\s*([^;}"'`{]+?)\s*(?:!important)?\s*(?=[;}"'`]|$)/g;
+const LINE = /(?<![\w-])line-height\s*:\s*([^;}"'`{]+?)\s*(?:!important)?\s*(?=[;}"'`]|$)/g;
 const STYLE_FAMILY = /\.style\.fontFamily\s*=\s*['"`]([^'"`]+)['"`]/g;
+// a line height that is a length (a control's fixed height), 1 or 0 (an icon's), or inherited is not one of the three ratios
+const okLine = (v) => ok(v) || /^(1|0)$/.test(v.trim()) || /^[0-9.]+(px|rem|em)$/.test(v.trim()) || /^normal$/i.test(v.trim());
+const okWeight = (v) => ok(v);
 const ok = (v) => /^(var\(|inherit$|initial$|unset$|revert)/i.test(v.trim()) || /\$\{/.test(v);
 
 export function scan() {
@@ -38,6 +43,8 @@ export function scan() {
             if (/^\s*--[\w-]+\s*:/.test(line)) return; // a token definition
             for (const m of line.matchAll(SIZE)) if (!ok(m[1])) add(rel, 'font-size', m[1]);
             for (const m of line.matchAll(FAMILY)) if (!ok(m[1])) add(rel, 'font-family', m[1]);
+            for (const m of line.matchAll(WEIGHT)) if (!okWeight(m[1])) add(rel, 'font-weight', m[1]);
+            for (const m of line.matchAll(LINE)) if (!okLine(m[1])) add(rel, 'line-height', m[1]);
             for (const m of line.matchAll(STYLE_SIZE)) if (!ok(m[1])) add(rel, 'style.fontSize', m[1]);
             for (const m of line.matchAll(STYLE_FAMILY)) if (!ok(m[1])) add(rel, 'style.fontFamily', m[1]);
         });
