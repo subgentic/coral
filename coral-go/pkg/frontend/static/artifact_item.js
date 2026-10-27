@@ -49,7 +49,7 @@ export const taskText = (item) => (item.task_id ? `#${item.task_id}${item.task_t
 
 /** The artifact's text: Markdown through the strict renderer (raw HTML shown as text, then the sanitizer), anything else as plain text. */
 export function renderText(host, content, path) {
-    if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); }
+    if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="prose preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); }
     else host.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;
 }
 

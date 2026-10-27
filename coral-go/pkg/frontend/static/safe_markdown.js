@@ -9,10 +9,14 @@
 export function renderSafe(text, opts) {
     const m = globalThis.AccountMarkdown;
     if (m && typeof m.render === 'function') {
-        try { return m.render(String(text == null ? '' : text), opts); } catch { /* falls through to the plain text below */ }
+        try {
+            const r = m.render(String(text == null ? '' : text), opts);
+            if (r && r.node && r.node.classList) r.node.classList.add('prose'); // the shared markdown look; the renderer's own class stays .md
+            return r;
+        } catch { /* falls through to the plain text below */ }
     }
     const node = document.createElement('div');
-    node.className = 'md md-plain';
+    node.className = 'md md-plain prose';
     node.textContent = String(text == null ? '' : text);
     return { node, partial: true };
 }

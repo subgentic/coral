@@ -757,52 +757,7 @@ body.panel-dragging .xterm-container {
     max-width: 820px;
     margin: 0 auto;
     padding: 24px 32px 48px;
-    line-height: var(--lh-body);
-    overflow-wrap: break-word;
-}
-.preview-pane-markdown h1,
-.preview-pane-markdown h2 {
-    margin: 1.6em 0 0.6em;
-    padding-bottom: 0.3em;
-    border-bottom: 1px solid var(--border);
-    line-height: var(--lh-label);
-}
-.preview-pane-markdown h1 { font-size: 1.9em; margin-top: 0; }
-.preview-pane-markdown h2 { font-size: 1.45em; }
-.preview-pane-markdown h3 { font-size: 1.2em; margin: 1.4em 0 0.5em; }
-.preview-pane-markdown h4,
-.preview-pane-markdown h5 { margin: 1.2em 0 0.4em; }
-.preview-pane-markdown p,
-.preview-pane-markdown ul,
-.preview-pane-markdown ol,
-.preview-pane-markdown blockquote,
-.preview-pane-markdown pre { margin: 0 0 1em; }
-.preview-pane-markdown ul,
-.preview-pane-markdown ol { padding-left: 2em; }
-.preview-pane-markdown li { margin: 0.25em 0; }
-.preview-pane-markdown li > ul,
-.preview-pane-markdown li > ol { margin: 0.25em 0 0; }
-.preview-pane-markdown blockquote {
-    padding: 0 1em;
-    color: var(--text-secondary);
-    border-left: 3px solid var(--border);
-}
-.preview-pane-markdown code {
-    font-family: var(--font-mono);
-    font-size: 0.88em;
-    padding: 0.15em 0.4em;
-    border-radius: var(--radius-sm);
-    background: var(--bg-tertiary);
-}
-.preview-pane-markdown pre {
-    padding: 12px 14px;
-    overflow-x: auto;
-    border-radius: var(--radius-md);
-    background: var(--bg-tertiary);
-}
-.preview-pane-markdown pre code { padding: 0; background: none; }
-.preview-pane-markdown hr { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; }
-.preview-pane-markdown img { max-width: 100%; }
+} /* a .prose (components.css): where it sits is all this says */
 
 /* Current folder in the terminal header bar */
 .terminal-folder {
