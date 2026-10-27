@@ -101,7 +101,6 @@ const STUB = `(() => {
             // nothing running or failed: one line and its hint
             await ev(`window.__jobs = window.__jobs.map(j => ({ ...j, last_run: j.last_run && { ...j.last_run, status: 'completed' } })); window.__wfs = window.__wfs.map(x => ({ ...x, last_run: x.last_run && { ...x.last_run, status: 'completed' } })); window.openAutomationsFolder('failed'); true`);
             await waitFor(`document.querySelector('#group-table-title') && document.querySelector('#group-table-title').textContent === 'Failed'`, `${at}the Failed folder again`, 8000);
-            await settle(1100); // the page keeps a read for 1 s (#9111), and this mock changed behind its back: ask after that
             await ev(`import((window.__coralStatic || '/static/') + 'scheduler.js').then(m => m.refreshJobs()).then(() => import((window.__coralStatic || '/static/') + 'workflows.js')).then(m => m.refreshWorkflows()).then(() => true)`);
             await waitFor(`!!document.querySelector('#group-table-view .empty-pane .empty-line')`, `${at}the empty Failed folder`, 8000);
             assert.equal(await ev(`document.querySelector('#group-table-view .empty-pane .empty-line').textContent`), 'Nothing has failed.', `${at}one empty line`);
