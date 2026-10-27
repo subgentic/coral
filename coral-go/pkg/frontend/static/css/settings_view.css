@@ -13,6 +13,8 @@
 /* a row: the label and its help at the left, the control at the right (settings mode); label above, control full width (form mode) */
 .sv-row { display: grid; gap: 4px var(--sv-row-gap); align-items: start; padding: var(--sv-row-pad-y) 0; border-top: 1px solid var(--sv-row-divider); }
 .sv-row[hidden] { display: none; }
+.sv-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; } /* a group of rows for a screen reader: no box of its own */
+.sv-legend { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; } /* named, not drawn: the rule's heading and toggle already say it */
 .sv-heading { margin: 8px 0 0; font-size: var(--sv-label-size); font-weight: 600; color: var(--sv-label-color); }
 #settings-modal .sv .sv-heading { font: var(--dlg-section); } /* inside the dialog a heading is the dialog's section type (settings_dialog_stable: one scale) */
 .sv-notice { min-width: 0; }

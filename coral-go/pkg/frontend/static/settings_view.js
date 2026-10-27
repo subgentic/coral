@@ -236,11 +236,14 @@ export function mountSettingsView(host, spec) {
         const p = node('section', 'settings-pane sv-pane');
         p.dataset.section = group.id; p.dataset.title = group.label; p.dataset.icon = group.icon || 'tune'; p.dataset.desc = group.hint || '';
         if (group.render) { group.render(p, view); return p; }
+        let set = null; // a field with fieldset: 'Name' starts a group (a fieldset with its legend, visually hidden: the screen's look is the rows) that holds the rows after it, up to the next heading or fieldset
         for (const field of group.fields) {
             if (!field.key) continue;
+            if (field.type === 'heading') set = null;
+            if (field.fieldset) { set = node('fieldset', 'sv-fieldset'); set.append(node('legend', 'sv-legend', field.fieldset)); p.append(set); }
             const rec = buildRow(field, group);
             fields.set(field.key, rec);
-            p.append(rec.row);
+            (set || p).append(rec.row);
         }
         return p;
     }
@@ -248,12 +251,14 @@ export function mountSettingsView(host, spec) {
     if (flat) {
         root.classList.add('sv-flat'); // rows only (no nav, no bar): folded by the pane's own width
         const body = node('div', 'sv-body');
+        let set = null; // see pane(): a field with fieldset: 'Name' starts a group
         let fold = null; // a heading with fold: true starts a disclosure (closed) that holds the rows after it, up to the next heading: a form's optional part
         for (const g of groups) for (const field of g.fields || []) {
             if (!field.key) continue;
             if (field.type === 'heading' && field.fold) { fold = node('details', 'disclosure sv-fold'); if (field.id) fold.id = field.id; fold.append(node('summary', '', field.label)); folds.push(fold); body.append(fold); continue; }
-            if (field.type === 'heading') fold = null;
-            const rec = buildRow(field, g); fields.set(field.key, rec); (fold || body).append(rec.row);
+            if (field.type === 'heading') { fold = null; set = null; }
+            if (field.fieldset) { set = node('fieldset', 'sv-fieldset'); set.append(node('legend', 'sv-legend', field.fieldset)); (fold || body).append(set); }
+            const rec = buildRow(field, g); fields.set(field.key, rec); (set || fold || body).append(rec.row);
         }
         inner.append(body);
     } else {

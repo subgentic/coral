@@ -132,9 +132,9 @@ export function healthFields(ctx) {
         minutes('ask_reminder_after_min', 'Remind the member after', 'minutes', 'ask_reminder_on'),
         { key: 'health_defaults', type: 'custom', label: 'Defaults', help: 'Put every health setting back to the defaults. Save to apply them.', action: { label: 'Reset to defaults', run: view => ctx.onReset(view) } },
     ];
-    // The alert rules repeat the words Branch, Wait and Also tell under their own headings: each field is named with its rule ("Release: Wait") for a person who tabs from field to field; the words on the screen stay the same (#9117)
-    const RULE = { landing: 'Landing', release: 'Release', goals_ready: 'Goals ready to close', unowned_tasks: 'Open tasks with no goal or assignee' };
-    return fields.map(f => { const m = /^(landing|release|goals_ready|unowned_tasks)_(?:branch|tag_pattern|wait_min|nudge)$/.exec(f.key); return m && f.label ? { ...f, attrs: { ...(f.attrs || {}), 'aria-label': `${RULE[m[1]]}: ${f.label}` } } : f; });
+    // The alert rules repeat the words Branch, Wait and Also tell under their own headings: each rule is a group named by its legend (a fieldset), so a screen reader's forms list says which rule a "Wait" belongs to; the screen looks the same (#9173)
+    const RULE = { landing_on: 'Landing', release_on: 'Release', goals_ready_on: 'Goals ready to close', unowned_tasks_on: 'Open tasks with no goal or assignee' };
+    return fields.map(f => RULE[f.key] ? { ...f, fieldset: RULE[f.key] } : f);
 }
 
 /** The server's own words for a refused setting start with the API path ("health.unowned_tasks.nudge: ..."): the field's label stands there instead ("Also tell: ..."), and a path no field has is left out, so no API name reaches the screen (#9016). */
