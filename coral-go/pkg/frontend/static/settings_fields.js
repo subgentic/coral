@@ -22,11 +22,9 @@ const NOTIFICATIONS_FIELDS = [
 ];
 
 const FILES_FIELDS = [
-    { key: 'files_search_title', type: 'heading', id: 'settings-files-search-title', label: 'File search' },
     { key: 'file_search_mode', type: 'select', id: 'settings-file-search-mode', label: 'File search mode', help: 'How @ mentions and file browser search for files', options: [{ value: 'directory', label: 'Directory Browsing' }, { value: 'fuzzy', label: 'Fuzzy Matching' }] },
     { key: 'file_search_limit', type: 'select', id: 'settings-file-search-limit', label: 'File search limit', help: 'Max number of files returned in search results', default: '500',
         options: [{ value: '50', label: '50' }, { value: '100', label: '100' }, { value: '200', label: '200' }, { value: '500', label: '500' }, { value: '1000', label: '1,000' }] },
-    { key: 'git_title', type: 'heading', id: 'settings-git-title', label: 'Git' },
     { key: 'git_diff_mode', type: 'select', id: 'settings-git-diff-mode', label: 'Git diff mode', help: 'What to compare changed files against',
         options: [{ value: 'branch_point', label: 'Branch Point (merge-base)' }, { value: 'previous_commit', label: 'Previous Commit (HEAD~1)' }, { value: 'main_head', label: 'Main Branch (vs main)' }] },
     { key: 'git_poll_interval', type: 'select', id: 'settings-git-poll-interval', label: 'Git scan interval', help: { text: '', more: 'How often Coral rescans git for changed files. Scanning a large repository is slow \u2014 stretch this out, or turn it off and use the refresh button.' },
