@@ -156,7 +156,7 @@ Every workflow step (shell and agent) receives the following environment variabl
 | `CORAL_DIR` | Coral data directory | `~/.coral` |
 | `CORAL_DATA_DIR` | Alias for `CORAL_DIR` | `~/.coral` |
 
-Use `coral-agent` to talk to Coral from a workflow step; it signs the request as the Operator, so it works with [strict local auth](auth.md#strict-local-auth-the-default), where a bare `curl` to the API is refused (401 `dashboard_auth_required`):
+To send a notification from a workflow step, use `coral-agent notify`; it is signed as the Operator, so it works with [strict local auth](auth.md#strict-local-auth-the-default), where a bare `curl` is refused:
 ```bash
 coral-agent notify --title "Step done" --message "All tests passed" --level success
 ```
