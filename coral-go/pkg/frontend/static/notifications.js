@@ -101,7 +101,7 @@ const PIN_WATCH_MS = 12000;
 function watchPinnedBar() {
     if (typeof MutationObserver !== "function") return;
     clearTimeout(_pinStop);
-    _pinStop = setTimeout(() => { if (_pinWatch) _pinWatch.disconnect(); _pinWatch = null; }, PIN_WATCH_MS);
+    _pinStop = setTimeout(() => { if (_pinWatch) _pinWatch.disconnect(); _pinWatch = null; }, PIN_WATCH_MS, "pin-watch"); // the marker argument (ignored by the callback) lets a test tell this timer from a toast's dismiss timer
     if (_pinWatch) return;
     let frame = 0;
     const adds = n => n.nodeType === 1 && (n.matches(".item-bar") || !!n.querySelector(".item-bar"));

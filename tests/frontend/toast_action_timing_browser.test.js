@@ -17,9 +17,9 @@ const BASE = require('./test_base').BASE;
         await ev(`window.__coralReady.then(() => true)`);
         const out = await ev(`(async () => { const n = await import(${S} + 'notifications.js');
             const realSet = window.setTimeout; const delays = [];
-            window.setTimeout = (fn, ms, ...a) => { delays.push(ms); return realSet(() => {}, 1e9, ...a); };   // never fires: only the delays matter
+            window.setTimeout = (fn, ms, ...a) => { if (a[0] !== 'pin-watch') delays.push(ms);   /* the pinned-bar watch's own stop timer is not a toast's (#9298) */ return realSet(() => {}, 1e9, ...a); };   // never fires: only the delays matter
             const res = {};
-            const made = (msg, err, ms, action) => { delays.length = 0; n.showToast(msg, err, ms, action ? { action: { label: action, onClick() {} } } : {}); const t = [...document.querySelectorAll('.toast')].pop(); const mine = delays.filter(d => ![0, 100, 900, 12000].includes(d)); /* the notices' own announcement timers and the pinned-bar watch's 12 s stop (#9298) are not the toast's */ return { t, timers: mine.length, ms: mine[0] }; };
+            const made = (msg, err, ms, action) => { delays.length = 0; n.showToast(msg, err, ms, action ? { action: { label: action, onClick() {} } } : {}); const t = [...document.querySelectorAll('.toast')].pop(); const mine = delays.filter(d => ![0, 100, 900].includes(d)); /* the notices' own announcement timers are not the toast's */ return { t, timers: mine.length, ms: mine[0] }; };
             const retry = made('Upload stalled', true, 10000, 'Retry'); res.retry = { timers: retry.timers, hasAction: retry.t.classList.contains('has-action'), button: !!retry.t.querySelector('.toast-action') };
             const undo = made('Removed from saved.', false, 6000, 'Undo'); res.undo = { timers: undo.timers, hasAction: undo.t.classList.contains('has-action') };
             const plain = made('Sent: hi', false); res.plain = { timers: plain.timers, ms: plain.ms, hasAction: plain.t.classList.contains('has-action') };
