@@ -123,27 +123,21 @@ func (s *Store) initTaskWorkflows(ctx context.Context) error {
 const artifactsMark = `"artifacts":[`
 
 // ensureWorkflowArtifactFlag adds task_workflows.has_artifacts, set when the workflow's JSON holds artifactsMark, and an index of the flagged rows, so the team artifacts read walks only the tasks that have
-// artifacts. A database that has no such column gets it and one backfill (a single pass over the blobs, in one transaction); saveWorkflow keeps it after that.
+// artifacts. The backfill runs at EVERY open, over the rows that are not flagged: a task saved by an older Coral (after a rollback to the version before the flag, and a second upgrade) has no flag and would
+// vanish from the Team Artifacts list otherwise (#9138). It is one pass over the blobs of the unflagged rows (about 7 ms per 3,000 tasks); saveWorkflow keeps the flag after that. A flag left on by an older
+// Coral that rewrote the result without artifacts is harmless: the read decodes the workflow and finds none.
 func (s *Store) ensureWorkflowArtifactFlag(ctx context.Context) error {
 	var n int
 	if err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM pragma_table_info('task_workflows') WHERE name = 'has_artifacts'`); err != nil {
 		return err
 	}
 	if n == 0 {
-		tx, err := s.db.BeginTxx(ctx, nil)
-		if err != nil {
+		if _, err := s.db.ExecContext(ctx, `ALTER TABLE task_workflows ADD COLUMN has_artifacts INTEGER NOT NULL DEFAULT 0`); err != nil {
 			return err
 		}
-		defer tx.Rollback()
-		if _, err := tx.ExecContext(ctx, `ALTER TABLE task_workflows ADD COLUMN has_artifacts INTEGER NOT NULL DEFAULT 0`); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE task_workflows SET has_artifacts = 1 WHERE data LIKE '%`+artifactsMark+`%'`); err != nil {
-			return err
-		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE task_workflows SET has_artifacts = 1 WHERE has_artifacts = 0 AND data LIKE '%`+artifactsMark+`%'`); err != nil {
+		return err
 	}
 	_, err := s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_task_workflows_artifacts ON task_workflows(task_id) WHERE has_artifacts = 1`)
 	return err
