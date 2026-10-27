@@ -162,7 +162,9 @@ export function buildListBar(spec, onChange, hooks = {}) {
 
     const chipList = make('ul', 'list-bar-chips'); chipList.setAttribute('aria-label', 'Active filters'); chipList.hidden = true;
     if (noSearch) node.classList.add('list-bar-nosearch');
-    node.append(...(noSearch ? [] : [searchRow]), ...(controls.children.length ? [controls] : []), ...(hasFilters ? [menu] : []), ...(inline ? [] : [chipList]), live);
+    node.append(...(noSearch ? [] : [searchRow]), ...(controls.children.length ? [controls] : []), ...(hasFilters ? [menu] : []), ...(inline || (collapsible && !noSearch) ? [] : [chipList]), live);
+    // a collapsible bar's chips sit IN its search row, after the pills and before the Filters icon (#9078): the row keeps one height with and without a filter on; what does not fit is cut with an ellipsis (the Filters panel has them all)
+    if (collapsible && !noSearch && !inline) { chipList.classList.add('list-bar-chips-inrow'); searchRow.insertBefore(chipList, searchRow.querySelector('.list-bar-toggle, .list-bar-more')); }
     if (collapsible) node.classList.add('list-bar-collapsible');
     if (lead) node.classList.add('list-bar-has-header');
 
