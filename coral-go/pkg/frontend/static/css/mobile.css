@@ -1367,3 +1367,9 @@
 
 /* The phone already places the state below; attention names use the same end ellipsis as the sidebar. */
 #mobile-session-list .session-name-row:has(.session-attention-pill) .session-label { flex-basis: calc(100% - 76px); white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+
+/* A Hub page framed in the Inbox (Needs you, Tasks, Saved for later: #9542) runs edge to edge on a phone: no gutter round it and no panel fill, the Hub's own page is the page (#9660). */
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .group-table-view:has(> .inbox-frame) { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .group-table-view > .inbox-frame { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; border-radius: 0; }
+}

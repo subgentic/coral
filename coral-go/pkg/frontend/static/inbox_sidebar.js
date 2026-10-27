@@ -490,7 +490,7 @@ async function openChat(c) {
 const hubFrames = new Map();
 function hubFrameTable(key) {
     const meta = GROUPS.find(g => g.key === key);
-    return { title: meta.label, count: null, noun: ['item', 'items'], rows: [{}], signature: `hub-frame:${key}`, node: () => {
+    return { title: meta.label, headless: isPhoneLayout(), /* on a phone the folder button names the page: no second heading under it (#9660) */ count: null, noun: ['item', 'items'], rows: [{}], signature: `hub-frame:${key}:${isPhoneLayout() ? 1 : 0}`, node: () => {
         if (!hubFrames.has(key)) {
             const f = document.createElement('iframe');
             f.className = 'inbox-frame'; f.title = meta.label;
