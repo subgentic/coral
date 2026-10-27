@@ -10,13 +10,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'coral-go', 'pkg', 'frontend');
 const walk = (dir, ext, out = []) => { for (const e of fs.readdirSync(dir, { withFileTypes: true })) { const p = path.join(dir, e.name); if (e.isDirectory()) { if (e.name !== 'vendor') walk(p, ext, out); } else if (ext.some(x => p.endsWith(x))) out.push(p); } return out; };
 
-// the containers of rendered text that still have heading rules of their own, each for its reason: moving one onto .prose is a change to what it looks like, taken one at a time
-export const BASELINE = {
-    'notes-rendered': 'the history notes: three heading sizes from the type scale',
-    'subagent-detail-md': 'a sub-agent\'s detail pane: small headings from the type scale',
-    'cni-plan': 'the plan inside a needs-input card: small headings',
-    'mb-message-body': 'a board message: headings no bigger than the text, a heading colour from the board theme',
-};
+// the containers of rendered text that still have heading rules of their own, each for its reason: none (every container of rendered text wears .prose)
+export const BASELINE = {};
 const LOOK = /^(font-size|font-weight|margin(-[a-z]+)?|padding-bottom|border-bottom)$/;
 const css = walk(path.join(root, 'static', 'css'), ['.css']).map(f => fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');
 const problems = [], found = new Set();
@@ -42,7 +37,8 @@ for (const cls of Object.keys(BASELINE)) if (!found.has(cls)) problems.push(`bas
 for (const f of [...walk(path.join(root, 'static'), ['.js']), ...walk(path.join(root, 'templates'), ['.html'])]) {
     const text = fs.readFileSync(f, 'utf8');
     for (const m of text.matchAll(/class="([^"]*\bpreview-pane-markdown\b[^"]*)"/g)) if (!/(^|\s)prose(\s|$)/.test(m[1])) problems.push(`${path.relative(root, f)}: "${m[1]}" draws markdown without .prose`);
-    for (const m of text.matchAll(/class="([^"]*\bmessage-text\b[^"]*)">\$\{renderMarkdown\(/g)) if (!/(^|\s)(prose|cni-plan)(\s|$)/.test(m[1])) problems.push(`${path.relative(root, f)}: a chat message's markdown ("${m[1]}") has no .prose`);
+    for (const m of text.matchAll(/(?:class="|el\('div', ')([^"']*\b(?:notes-rendered|subagent-detail-md|cni-plan|mb-message-body)\b[^"']*)["']/g)) if (!/(^|\s)prose(\s|$)/.test(m[1])) problems.push(`${path.relative(root, f)}: "${m[1]}" draws markdown without .prose`);
+    for (const m of text.matchAll(/class="([^"]*\bmessage-text\b[^"]*)">\$\{renderMarkdown\(/g)) if (!/(^|\s)prose(\s|$)/.test(m[1])) problems.push(`${path.relative(root, f)}: a chat message's markdown ("${m[1]}") has no .prose`);
 }
 if (!/\.prose h1(, \.prose \.md-h1)? \{[^}]*font-size: var\(--prose-h1\)/.test(css)) problems.push('css: the .prose heading scale is missing');
 if (problems.length) { console.error('prose_census: FAIL\n  ' + [...new Set(problems)].join('\n  ')); process.exit(1); }

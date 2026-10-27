@@ -201,7 +201,7 @@ function needsInputHtml(info, session) {
         }
     } else if (info.kind === "plan") {
         question = screenQuestion ? "Ready to proceed with this plan?" : `${name} has a plan ready`;
-        if (inp.plan) context = `<div class="cni-plan message-text">${renderMarkdown(inp.plan, undefined, 'chat')}</div>`;
+        if (inp.plan) context = `<div class="prose cni-plan message-text">${renderMarkdown(inp.plan, undefined, 'chat')}</div>`;
     } else if (info.kind === "permission") {
         const tool = info.tool && info.tool.tool_name;
         if (tool) kicker = `Permission needed · ${escapeHtml(tool)}`;

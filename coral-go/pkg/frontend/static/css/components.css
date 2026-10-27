@@ -474,36 +474,12 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     text-decoration: underline;
 }
 
-.mb-message-body p {
-    margin: 0 0 10px;
-}
 
-.mb-message-body p:last-child {
-    margin-bottom: 0;
-}
 
-.mb-message-body h1, .mb-message-body h2, .mb-message-body h3,
-.mb-message-body h4, .mb-message-body h5, .mb-message-body h6 {
-    margin: 8px 0 4px;
-    font-size: var(--fs-md);
-    font-weight: var(--fw-strong);
-}
 
-.mb-message-body h2 { font-size: var(--fs-lg); }
-.mb-message-body h3 { font-size: var(--fs-md); color: var(--mb-heading); }
 
-.mb-message-body ul, .mb-message-body ol {
-    margin: 6px 0 10px;
-    padding-left: 22px;
-}
 
-.mb-message-body li {
-    margin: 4px 0;
-}
 
-.mb-message-body > :last-child {
-    margin-bottom: 0;
-}
 
 .mb-message-body code {
     background: var(--mb-code-bg);
@@ -534,12 +510,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     color: var(--mb-text-bright);
 }
 
-.mb-message-body blockquote {
-    border-left: 3px solid var(--border);
-    margin: 6px 0;
-    padding: 2px 10px;
-    color: var(--text-muted);
-}
 
 /* Keyboard-key style buttons */
 .btn-nav {

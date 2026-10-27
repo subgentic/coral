@@ -780,30 +780,9 @@ body.panel-dragging .agentic-state {
     max-height: 420px;
 }
 
-.subagent-detail-md > :first-child { margin-top: 0; }
-.subagent-detail-md > :last-child { margin-bottom: 0; }
 
-.subagent-detail-md h1,
-.subagent-detail-md h2,
-.subagent-detail-md h3,
-.subagent-detail-md h4 {
-    margin: 14px 0 6px;
-    line-height: var(--lh-label);
-    color: var(--text-primary);
-}
-.subagent-detail-md h1 { font-size: var(--fs-xl); }
-.subagent-detail-md h2 { font-size: var(--fs-lg); }
-.subagent-detail-md h3 { font-size: var(--fs-lg); }
-.subagent-detail-md h4 { font-size: var(--fs-md); }
 
-.subagent-detail-md p { margin: 6px 0; }
 
-.subagent-detail-md ul,
-.subagent-detail-md ol {
-    margin: 6px 0;
-    padding-left: 22px;
-}
-.subagent-detail-md li { margin: 3px 0; }
 
 .subagent-detail-md code {
     background: var(--bg-tertiary, rgba(var(--white-rgb), 0.06));
@@ -825,20 +804,9 @@ body.panel-dragging .agentic-state {
     white-space: pre;
 }
 
-.subagent-detail-md blockquote {
-    border-left: 3px solid var(--border, rgba(var(--white-rgb), 0.15));
-    padding-left: 10px;
-    margin: 6px 0;
-    color: var(--text-muted);
-}
 
 
 .subagent-detail-md a { color: var(--subagent-accent); }
-.subagent-detail-md hr {
-    border: none;
-    border-top: 1px solid var(--border, rgba(var(--white-rgb), 0.12));
-    margin: 10px 0;
-}
 
 .subagent-detail-note {
     font-size: var(--fs-base);

@@ -69,7 +69,7 @@ function renderNotes() {
         card.dataset.noteId = String(note.id);
         const w = when(note);
         const head = el('div', 'note-card-time', w.text); head.title = w.title;
-        const body = el('div', 'note-md-rendered note-card-body notes-rendered');
+        const body = el('div', 'prose note-md-rendered note-card-body notes-rendered');
         body.setAttribute('role', 'button'); body.tabIndex = 0; body.setAttribute('aria-label', `Edit the note from ${w.title || 'this agent'}`);
         if (typeof marked !== 'undefined') body.innerHTML = sanitizeMarkdown(note.content || '', undefined, 'board'); else body.textContent = note.content || '';
         body.addEventListener('click', () => startEdit(note.id));

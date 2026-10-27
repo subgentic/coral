@@ -119,7 +119,7 @@ function _subagentMarkdown(text) {
         FORBID_TAGS: ['img', 'picture', 'source', 'video', 'audio', 'track', 'svg', 'math', 'style', 'link', 'form', 'input', 'button', 'textarea', 'select'],
         FORBID_ATTR: ['style', 'srcset', 'background', 'poster'],
     });
-    return `<div class="task-detail-body subagent-detail-text subagent-detail-md">${html}</div>`;
+    return `<div class="prose task-detail-body subagent-detail-text subagent-detail-md">${html}</div>`;
 }
 
 function _subagentConversationHtml(sa) {

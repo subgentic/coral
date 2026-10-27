@@ -175,7 +175,7 @@ function renderBoardItem(item, prev) {
                 <button type="button" class="mb-msg-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}">&hellip;</button>
             </div>
             ${parts.tagsOpen}
-            <div class="mb-message-body" id="mbd-${Number(m.id)}">${renderBoardMessageBody(m)}</div>
+            <div class="prose mb-message-body" id="mbd-${Number(m.id)}">${renderBoardMessageBody(m)}</div>
             ${messageAttachmentsHtml(m)}
             ${replyWithHtml(m)}
             ${parts.actions}
