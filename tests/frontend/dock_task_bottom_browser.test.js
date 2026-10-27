@@ -11,7 +11,7 @@ const board = 'task-bottom-' + Date.now().toString(36);
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const errors = [];
     const shot = async name => {
-        const dir = process.env.CORAL_SCREENSHOT_DIR;
+        const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out'));
         if (!dir) return;
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
