@@ -429,7 +429,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         }
         const editor = hex ? Tags.tagEditor({ project: inbox ? item.board_id : model.project, hex, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(hex, tags) }) : null; // a stored file's tags (#8594)
         openDetailPane({
-            key, opener, title: name, host: hooks.detailHost || null, extra: editor, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox,
+            key, opener, title: name, host: hooks.detailHost || null, extra: editor, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox, resizable: inbox,
             sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words
             facts: facts.filter(([, v]) => v != null && v !== ''),
             details: link && link.preview && hex ? (h, { isStale }) => { // the Operator's "Who can read this" (#5577) is behind Details with the facts, for a stored artifact

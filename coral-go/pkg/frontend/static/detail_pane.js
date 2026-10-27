@@ -15,6 +15,7 @@ const { foldWayBack } = await importOnce('./way_back.js');
 const { makeDetails } = await importOnce('./details_disclosure.js'); // the facts and more behind one Details button (#7775)
 import { trapTab } from './dialog_focus.js';
 
+const INBOX_MAIN_MIN = 480; // the Inbox Artifacts list keeps this much beside its sidebar (it folds its columns under the name below this)
 let current = null; // { key, opener, onClose, abort, gen }
 let gen = 0;
 let railed = false; // the left sidebar is drawn as its 56 px rail because the pane is open (and was not already)
@@ -41,13 +42,14 @@ function modalOpen() {
 
 /** The resize handle on the pane's left edge: the goal page's handle (goals_view.js) for this pane, with the same limits, keys and double click. */
 function addResizeHandle(aside) {
-    const row = document.getElementById('team-page-row');
+    const row = aside.closest('.inbox-artifacts-row') || document.getElementById('team-page-row'); // the Inbox's Artifacts folder has its own row: the pane is its right sidebar (#8925)
     if (!row) return;
+    const mainMin = aside.classList.contains('inbox-detail-pane') ? INBOX_MAIN_MIN : undefined;
     const grip = el('div', 'detail-grip');
     grip.setAttribute('role', 'separator'); grip.setAttribute('aria-orientation', 'vertical'); grip.setAttribute('aria-label', 'Resize the details'); grip.tabIndex = 0; grip.title = 'Drag to resize, double click to reset';
-    const value = () => { grip.setAttribute('aria-valuemin', String(DOCK_MIN_WIDTH)); grip.setAttribute('aria-valuemax', String(dockMaxWidth(row))); grip.setAttribute('aria-valuenow', String(Math.round(aside.getBoundingClientRect().width))); };
+    const value = () => { grip.setAttribute('aria-valuemin', String(DOCK_MIN_WIDTH)); grip.setAttribute('aria-valuemax', String(dockMaxWidth(row, mainMin))); grip.setAttribute('aria-valuenow', String(Math.round(aside.getBoundingClientRect().width))); };
     aside.append(grip);
-    attachDockResize(grip, { panel: aside, row, key: 'coral-detail-width', apply: (w) => { aside.style.setProperty('--detail-w', w ? `${w}px` : ''); value(); } }).restore();
+    attachDockResize(grip, { panel: aside, row, mainMin, key: 'coral-detail-width', apply: (w) => { aside.style.setProperty('--detail-w', w ? `${w}px` : ''); value(); } }).restore();
 }
 
 export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true, focusClose = false, subTitle = '', details = null, extra = null }) {
@@ -108,7 +110,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     }
     aside.append(head, more.panel, main);
     if (actions.length) aside.append(foot);
-    if (resizable && !host) addResizeHandle(aside); else aside.style.removeProperty('--detail-w'); // a pane that is not resizable has its own width, not the last one's
+    if (resizable && (!host || host.classList.contains('inbox-detail-pane'))) addResizeHandle(aside); else aside.style.removeProperty('--detail-w'); // a pane that is not resizable has its own width, not the last one's
     aside.hidden = false;
     if (!host) {
         page()?.classList.add('detail-open');
