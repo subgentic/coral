@@ -34,7 +34,7 @@ const open = [
                 if (/\\/api\\/board\\/[^/]+\\/tasks$/.test(p.pathname)) return Promise.resolve(new Response(JSON.stringify({ tasks: all, next_cursor: '', total_open: 5, total_completed: 40 }), { status: 200, headers: { 'content-type': 'application/json' } }));
                 return real(u, o); };
             await T.tasks.loadBoardTasks('team-a'); return true; })()`);
-        const ids = () => ev(`[...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')].map(r => Number(r.querySelector('.board-task-id').textContent.replace('#', '')))`);
+        const ids = () => ev(`[...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')].map(r => Number(r.dataset.taskId))`);
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 45`, 'the 45 rows');
 
         console.log('Columns put Status and the primary Task before the facts');
@@ -42,11 +42,11 @@ const open = [
             ['State', 'Task', 'Who']); // the dock is the Tasks view's agent-team scope: State, Task and Who (#7962, #8060)
         assert.deepEqual(await ev(`[...document.querySelector('#board-task-list tbody tr').cells].map(c => c.dataset.key)`),
             ['state', 'task', 'who']);
-        assert.equal(await ev(`(() => { const row = document.querySelector('#board-task-list tbody tr'); const primary = row.cells[1].querySelector('.dt-primary'); return row.querySelectorAll('.dt-primary').length === 1 && row.cells[1].querySelector('.board-task-id')?.textContent === '#5' && !!(row.cells[1].querySelector('.board-task-id').compareDocumentPosition(primary) & Node.DOCUMENT_POSITION_FOLLOWING) && primary?.textContent === 'Draft'; })()`), true,
-            'the second cell has one primary action, with ID before the title');
+        assert.equal(await ev(`(() => { const row = document.querySelector('#board-task-list tbody tr'); const primary = row.cells[1].querySelector('.dt-primary'); return row.querySelectorAll('.dt-primary').length === 1 && row.dataset.taskId === '5' && !row.querySelector('.dt-id') && primary?.textContent === 'Draft'; })()`), true,
+            'the second cell has one primary action, with the ID retained in row data and omitted visually');
 
         console.log('Who is circles, as on the Tasks tab (#8507): the person solid, the reviewers outlined (two, then +N), the whole named and shown on hover, no name beside them');
-        const who = await ev(`(() => { const row = [...document.querySelectorAll('#board-task-list tbody tr')].find(r => r.querySelector('.board-task-id')?.textContent === '#3'); const c = row.querySelector('td[data-key="who"]'), i = c.querySelector('[role=img]'); return { label: i && i.getAttribute('aria-label'), title: i && i.title, solid: c.querySelectorAll('.dt-avatar:not(.dt-avatar-review)').length, outlined: c.querySelectorAll('.dt-avatar-review').length, more: (c.querySelector('.dt-avatars-more') || {}).textContent, words: !!c.querySelector('.dt-person-name, .board-task-assignee'), w: Math.round(c.getBoundingClientRect().width) }; })()`);
+        const who = await ev(`(() => { const row = [...document.querySelectorAll('#board-task-list tbody tr')].find(r => r.dataset.taskId === '3'); const c = row.querySelector('td[data-key="who"]'), i = c.querySelector('[role=img]'); return { label: i && i.getAttribute('aria-label'), title: i && i.title, solid: c.querySelectorAll('.dt-avatar:not(.dt-avatar-review)').length, outlined: c.querySelectorAll('.dt-avatar-review').length, more: (c.querySelector('.dt-avatars-more') || {}).textContent, words: !!c.querySelector('.dt-person-name, .board-task-assignee'), w: Math.round(c.getBoundingClientRect().width) }; })()`);
         assert.deepEqual({ ...who, w: undefined }, { label: 'Dev, review by QA, UX, Sec', title: 'Dev, review by QA, UX, Sec', solid: 1, outlined: 2, more: '+1', words: false, w: undefined }, JSON.stringify(who));
         assert.ok(who.w <= 110, `the column is as narrow as its circles (${who.w} px)`);
         console.log('  ok');

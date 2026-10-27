@@ -81,26 +81,17 @@ const ADD = `(() => {
         await openBoardTasksTab({ ev, waitFor }, BOARD); // the board's tasks are an agent's Tasks tab (#7457)
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 8`, 'eight task rows', 10000, `JSON.stringify({ n: document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length, txt: document.getElementById('board-task-list').textContent.slice(0, 160), tab: document.getElementById('agentic-panel-tasks').className, bt: (T.state.currentBoardTasks || []).length, page: document.getElementById('agentic-state').dataset.page, proj: T.state.boardPageProject })`);
 
-        console.log('1. Quiet: no chip, no words, no filter in the list; a small muted icon after the title only for evidence attached (the words are its tooltip and accessible name); nothing for a verified task, an unverified one, an open one, or one the server sent no state for');
-        const norm = r => r.title.replace(/[a-z_]*$/, '').trim();
-        const r1 = Object.fromEntries((await rows()).map(r => [r.title.match(/(?:v|e|u|n)-[\w-]+|open-one/)[0].replace(/(help_outline|description|verified_user)$/, ''), r.mark]));
-        assert.equal(r1['v-one'], null, 'a verified task shows nothing'); assert.equal(r1['v-two'], null);
-        assert.equal(r1['n-one'], null, 'no state from the server, nothing shown'); assert.equal(r1['open-one'], null, 'an open task has none');
-        assert.equal(r1['e-one'].cls, 'evidence'); assert.equal(r1['e-one'].title, 'Evidence attached; no reviewer or check has confirmed it'); assert.equal(r1['e-one'].aria, r1['e-one'].title); assert.equal(r1['e-one'].role, 'img');
-        assert.equal(r1['e-gate'].title, 'Evidence attached (gate:report); no reviewer or check has confirmed it');
-        assert.equal(r1['u-one'], null, 'an unverified task shows nothing in the list'); assert.equal(r1['u-two'], null);
-        assert.deepEqual(await ev(`({ chips: document.querySelectorAll('#board-task-list .board-task-verify').length, filter: document.querySelectorAll('.board-task-verify-select, .board-task-verify-filter').length,
-            marks: [...document.querySelectorAll('#board-task-list .board-task-verify-mark')].map(m => m.textContent.trim().length > 0 && /^[a-z_]+$/.test(m.textContent.trim())).every(Boolean) })`), { chips: 0, filter: 0, marks: true }, 'no chip, no filter, and a mark is an icon with no words');
+        assert.ok((await rows()).every(r => r.mark === null), 'verification stays in the detail, not the one-line row');
         await shot('verify-list-dark');
 
         console.log('2. The task page has one plain muted line (no chip)');
         const detailLine = async title => {
             await ev(`[...document.querySelectorAll('#board-task-list .board-task-item')].find(r => r.textContent.includes(${JSON.stringify(title)})).click(); true`);
-            await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.includes(${JSON.stringify(title)}) && !!document.querySelector('#team-panel-item .goals-pinbar')`, 'the page of ' + title, 12000);
+            await waitFor(`!!document.querySelector('#preview-pane #team-task-title') && document.querySelector('#team-task-title').textContent.includes(${JSON.stringify(title)}) && !!document.querySelector('#preview-pane .goals-pinbar')`, 'the page of ' + title, 12000);
             await sleep(250); // sleep-ok: the page's other sections are added when their module is there; an absent line has no event
             if (title === 'e-one') await shot('verify-detail');
-            const out = await ev(`({ line: (document.querySelector('#team-panel-item .task-detail-verification') || {}).textContent || null, chip: !!document.querySelector('#team-panel-item .board-task-verify, #team-panel-item .board-task-verify-mark') })`);
-            await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); window.selectLiveSession('bt-agent', 'claude', 'bt-agent-id', 'local'); true`);
+            const out = await ev(`({ line: (document.querySelector('#preview-pane .task-detail-verification') || {}).textContent || null, chip: !!document.querySelector('#preview-pane .board-task-verify, #preview-pane .board-task-verify-mark') })`);
+            await ev(`document.querySelector('#preview-pane .preview-tab-close').click(); true`);
             await waitFor(`document.querySelectorAll('#board-task-list .board-task-item').length > 0 && document.getElementById('board-task-list').getClientRects().length > 0`, 'the list again', 8000);
             return out;
         };

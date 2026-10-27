@@ -32,7 +32,7 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         for (const width of [420, 680, 980]) {
             await ev(`(() => { const d = document.getElementById('agentic-state'); d.style.transition = 'none'; d.style.width = '${width}px'; return d.offsetWidth; })()`);
             // #7800: the same columns must start at the same edge, regardless of header/row element types.
-            await waitFor(`document.querySelector('#board-task-list .dt-box').classList.contains('dt-folded') === ${width < 640}`, 'responsive table layout');
+            await waitFor(`document.querySelector('#board-task-list .dt-box').classList.contains('dt-folded') === false`, 'responsive table layout');
             const edges = await ev(`(() => {
                 const head = document.querySelector('#board-task-list thead tr');
                 const rows = [...document.querySelectorAll('#board-task-list tbody tr')];
@@ -59,7 +59,7 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         assert.deepEqual([head.weight, head.size], ['600', '11px'], 'shared header typography');
         assert.deepEqual(head.texts, ['State', 'Task', 'Who'], 'the words as written: the dock shows State, Task and Assigned to only (#7962, #8060)');
         const row = await ev(`(() => { const r = document.querySelector('#board-task-list .board-task-item:not(.board-task-header)'); const b = [...r.querySelectorAll('button')]; return { buttons: b.length, name: b[0] && b[0].getAttribute('aria-label'), inDesc: !!(b[0] && b[0].closest('.board-task-desc')), idIsButton: !!r.querySelector('button.board-task-id') }; })()`);
-        assert.equal(row.buttons, 1, 'one real button on the row: ' + JSON.stringify(row)); assert.ok(row.inDesc && !row.idIsButton, 'it is the name, and the id is text');
+        assert.equal(row.buttons, 1, 'one real button on the row: ' + JSON.stringify(row)); assert.ok(row.inDesc && !row.idIsButton, 'the name is the only row action');
         assert.ok(/^Open task #\d+: [A-Z]/.test(row.name), 'its name says what it opens: ' + row.name);
         await ev(`document.querySelector('#board-task-list .board-task-item:not(.board-task-header) .board-task-desc').click(); true`);
         await waitFor(`!!document.querySelector('#preview-pane #team-task-title') && document.getElementById('task-detail-modal') && getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`, 'the task opens in the shared preview pane (#8788)', 12000);

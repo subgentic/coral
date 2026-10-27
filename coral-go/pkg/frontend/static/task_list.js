@@ -13,7 +13,6 @@ import { loadPanelOpen, savePanelOpen } from './list_bar.js';
 import { _agentTaskStatus } from './task_format.js';
 import { reviewRequested, taskStatus, defaultSort, nextSort, filterAndSortTasks } from './task_list_data.js';
 import { morphHtml } from './dom_morph.js';
-import { _verifyMark } from './task_verify_marks.js';
 import { goalTitle, refreshGoalTitles } from './task_goals.js';
 import * as DT from './data_table.js';
 import * as TV from './tasks_view.js';
@@ -497,11 +496,7 @@ function _renderTaskListChrome(section, completedCount, querying = false) {
 function _taskTable(tasks, footer) {
     const span = (cls, value) => DT.el('span', cls, value);
     const key = t => `${t._source}:${t.subagent_id || t.id}`;
-    const details = t => [t._source === 'subagent' ? t.subagent_type : '',
-        t._source === 'board' ? _claimedFor(t) : '',
-        t._source === 'board' && t.goal_id ? `Goal: ${goalTitle(_goalBoard, t.goal_id)}` : ''].filter(Boolean).join(' · ');
-    // The dock is the Tasks view scoped to an agent (#8060): the shared columns (State, Task, and Assigned to when the list spans agents), with the dock's own words on them: the state's detail as its tooltip, the verify mark, the subagent
-    // tooltip and the second line. A column's sort field is the server's name for it.
+    // The dock keeps one line: state, ellipsized title, and assigned agent.
     const FIELD = { task: 'id', who: 'assignee' }, COLUMN = { id: 'task', assignee: 'who' };
     dockTaskTableState.sort = _sort.explicit ? { key: COLUMN[_sort.field] || _sort.field, dir: _sort.asc ? 'asc' : 'desc' } : null;
     const tweak = columns => {
@@ -509,7 +504,7 @@ function _taskTable(tasks, footer) {
         stateCol.sort = false;
         stateCol.width = 'content'; // the dock knows a review is asked for from the task's workflow, which the shared word reads from review_requested
         stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip; };
-        taskCol.firstDir = 'desc'; taskCol.subtitle = details;
+        taskCol.firstDir = 'desc';
         taskCol.cell = t => {
             const cell = DT.el('span', 'dt-title-cell'), description = span('board-task-desc dt-title-content');
             const name = t.title || t.description || '';
@@ -518,13 +513,12 @@ function _taskTable(tasks, footer) {
             cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
             description.title = cell.title;
             description.append(b);
-            cell.append(span('board-task-id dt-id', t.id != null ? `#${t.id}` : '—'), description);
-            if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
+            cell.append(description);
             return cell;
         };
-        if (whoCol) { whoCol.firstDir = 'desc'; whoCol.when = t => !!TV.doerOf(t); whoCol.cell = t => (TV.doerOf(t) ? TV.whoCell(t) : ''); } // the same circles as the Tasks tab (#8507); an empty Who is an empty cell, not a dash (#8003)
+        if (whoCol) { whoCol.width = 'content'; whoCol.firstDir = 'desc'; whoCol.when = t => !!TV.doerOf(t); whoCol.cell = t => (TV.doerOf(t) ? TV.whoCell(t) : ''); } // the same circles as the Tasks tab (#8507); an empty Who is an empty cell, not a dash (#8003)
     };
-    const table = TV.tasksTable(agentTaskScope() ? 'agent' : 'agent-team', tasks, { label: 'Agent tasks', tweak, rowKey: key, rowName: t => t.title || t.description || '',
+    const table = TV.tasksTable(agentTaskScope() ? 'agent' : 'agent-team', tasks, { label: 'Agent tasks', fold: 'none', tweak, rowKey: key, rowName: t => t.title || t.description || '',
         footer, current: previewTask?.project === _currentBoardKey() ? previewTask.key : null, state: dockTaskTableState, onSort: field => _toggleTaskSort(FIELD[field] || field), bare: true, sortBar: false, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first' });
     // Keep the existing action dispatcher and identifiers: opening a board task,
     // personal task or subagent retains its own detail action.
