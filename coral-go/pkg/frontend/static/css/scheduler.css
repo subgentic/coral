@@ -204,12 +204,8 @@
 }
 
 .sched-runs-section h3,
-.sched-prompt-shown h3,
-.sched-prompt-section > summary {
-    font-size: var(--fs-lg); /* a section heading: 14/600 */
-    font-weight: var(--fw-strong);
-    margin-bottom: 8px;
-}
+.sched-prompt-shown h3 { margin-bottom: 8px; } /* the heading's look is .group-head-lg's (#9458) */
+
 
 .sched-fail-banner { margin: 0 0 14px; }
 .sched-fail-text { flex: 1 1 auto; min-width: 0; } /* the headline and its words are one flex child of the notice: they stack inside it */ /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
@@ -224,7 +220,7 @@
 .run-failure-text { font-weight: var(--fw-strong); }
 .run-failure-hint { color: var(--text-secondary); }
 
-.sched-prompt-section > summary { display: flex; align-items: center; gap: 4px; list-style: none; }
+.sched-prompt-section > summary { display: flex; align-items: center; gap: 4px; list-style: none; font-size: var(--fs-lg); /* a section heading: 14/600 */ font-weight: var(--fw-strong); margin-bottom: 8px; }
 .sched-prompt-section > summary::-webkit-details-marker { display: none; }
 .sched-prompt-section > summary::before { content: '▸' / ''; }
 .sched-prompt-section[open] > summary::before { content: '▾' / ''; }
