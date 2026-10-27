@@ -75,9 +75,20 @@ const BASE = require('./test_base').BASE;
         assert.equal(pick.disabled, false, 'the provider can be changed'); assert.equal(pick.fixedLine, false, 'no "launch a new agent" line');
         await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="codex"]').click(); true`);
         assert.equal(await ev(`window.getAgentConfig('restart-acf').agentType`), 'codex', 'the restart carries the new provider');
-        // a provider has its own levels: Thinking goes back to Default (not sent) after a switch (#8990). A model the person typed or the catalog does not know stays in its field (it is theirs): if it is wrong for the
+        // a provider has its own levels: Thinking goes back to Default (not sent) after a switch (#8990). A model the catalog does not know stays in its field (it is the person's own): if it is wrong for the
         // new provider the server answers 400 naming it (restart_board_test.go) and the restart's toast says so (restart_flow.js shows result.error).
         assert.equal(await ev(`window.getAgentConfig('restart-acf').thinking`), undefined, 'Thinking is back to Default after a switch');
+        // and a model the catalog DOES know (Claude's default) is replaced, not carried: back on Claude, put its default model in the field as the classifier does for a known one, then switch again (#9003)
+        const known = await ev(`(async () => { const S = window.__coralStatic || '/static/'; const m = await import(S + 'launch_models.js'); const d = await m._getDefaultModels(m._effectiveServer()), l = await m._getAgentModels(m._effectiveServer()); const c = document.getElementById('restart-acf'); const claude = (d && d.claude) || (l && l.claude && l.claude[0]); if (!claude) return ''; c.querySelector('.acf-agent-pick input[value="claude"]').click(); const inp = c.querySelector('.acf-model'); inp.value = claude; c.dataset.acfModelDirty = 'false'; c.dataset.acfModelClassifying = 'false'; return claude; })()`);
+        assert.ok(known, 'the world has a Claude model the catalog knows (the check below needs it)');
+        if (known) {
+            await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="codex"]').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the default model of the new provider is read asynchronously
+            assert.notEqual(await ev(`document.querySelector('#restart-acf .acf-model').value`), known, 'a known model of the old provider is not carried to the new one');
+        }
+        // the Flags field: cleared on a switch away, as it was when the agent's own provider is chosen again (#9003)
+        const flagsOrigin = await ev(`document.getElementById('restart-acf')._acfRestartOrigin.flags`);
+        await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="claude"]').click(); true`);
+        assert.equal(await ev(`document.querySelector('#restart-acf .acf-flags').value`).then(v => v.trim()), String(flagsOrigin).trim(), 'back on the agent\'s own provider the flags are as they were');
         await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="claude"]').click(); true`);
         await shot('restart-agent-desktop');
         await go('#restart-modal', 'permissions'); await shot('restart-permissions-desktop');
