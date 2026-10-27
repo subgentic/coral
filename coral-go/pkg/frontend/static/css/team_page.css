@@ -92,7 +92,7 @@
 /* a goal's page and a task's page: facts side by side, tasks as a table, the actions pinned at the bottom */
 .goals-facts { max-width: 70ch; }
 .goals-facts dd { white-space: pre-line; }
-.goals-tasks-head { margin: 8px 0 0; font-size: 0.9375rem; }
+.goals-tasks-head { margin: 8px 0 0; font-size: var(--fs-lg); }
 .goals-updating { min-height: 1.2em; margin: 0; } /* its slot keeps its height whether or not it says Updating */
 .team-task-md { overflow-wrap: anywhere; font-size: var(--fs-lg); max-width: 80ch; }
 .team-task-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: var(--fs-lg); margin: 0; max-width: 80ch; }
@@ -103,7 +103,7 @@
 .detail-pane { position: relative; flex: none; width: var(--detail-w, 460px); max-width: 100%; } /* where it sits and how wide; what it looks like is the one pane's (.pane, layout.css) */
 .detail-pane[hidden] { display: none; }
 .detail-title, .goals-table-page .goals-detail-title { width: fit-content; max-width: 100%; }
-.detail-title { margin: 0; font-size: 1.0625rem; font-weight: var(--fw-strong); overflow-wrap: anywhere; }
+.detail-title { margin: 0; font-size: var(--fs-2xl); font-weight: 700; overflow-wrap: anywhere; }
 .detail-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .detail-sub { margin: 2px 0 0; font-size: var(--fs-base); color: var(--text-secondary); }
 .detail-close { flex: none; width: 36px; height: 36px; display: inline-grid; place-items: center; border: 0; background: none; border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; }
@@ -135,7 +135,7 @@
     #team-panel-messages { padding: 12px 16px 0; }
     .team-page-head, .team-tabs { padding-left: 16px; padding-right: 16px; }
     .team-page-head { flex-wrap: nowrap; padding-top: 8px; min-height: 0; gap: 2px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
-    .team-page-title { font-size: 1.0625rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* 17/700, one line: at 200% text the header and the tabs stay near a quarter of the screen */
+    .team-page-title { font-size: var(--fs-2xl); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; } /* 17/700, one line: at 200% text the header and the tabs stay near a quarter of the screen */
     .team-page-status { grid-column: 1; }
     .team-page-actions { grid-column: 2; grid-row: 1 / span 2; }
     #team-page-add-agent, #team-page-settings { display: none; }
@@ -361,7 +361,7 @@
 .team-page-missing { padding: 16px 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 .team-page-missing[hidden] { display: none; }
 @media (max-width: 760px) { .team-page-missing { padding-left: 16px; padding-right: 16px; } } /* the header's left edge on a phone */
-.team-page-missing-line { margin: 0; color: var(--text-secondary); font-size: 0.9375rem; }
+.team-page-missing-line { margin: 0; color: var(--text-secondary); font-size: var(--fs-lg); }
 .team-page-no-team .team-tabs-row, .team-page-no-team .team-tabs, .team-page-no-team .team-page-row, .team-page-no-team .team-page-actions, .team-page-no-team .team-page-health, .team-page-no-team .team-page-status { display: none !important; }
 
 /* Team settings in a popout (#8853): a wide dialog over the page, its body scrolls under a fixed head; on a phone it fills the screen */
