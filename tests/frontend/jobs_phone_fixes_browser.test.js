@@ -31,14 +31,13 @@ const S = `(window.__coralStatic || '/static/')`;
                     return real(u, o); };
                 return true; })()`);
             await ev(`import(${S} + 'scheduler.js').then(m => { window.__sched = m; return true; })`);
-            await ev(`window.switchNavTab('jobs'); window.__sched.refreshJobs().then(() => true)`);
-            await waitFor(`document.querySelectorAll('#scheduled-jobs-list .sched-row').length === 2`, 'two job rows', 10000);
-            // the failure line and the badge's tip count the runs without "all"
-            await ev(`document.querySelectorAll('#scheduled-jobs-list .sched-row')[0].querySelector('.row-btn').click(); true`);
+            await ev(`window.switchNavTab('automations'); window.__sched.refreshJobs().then(() => true)`);
+            await waitFor(`window.__sched.jobList().length === 2`, 'two jobs', 10000);
+            // the failure line counts the runs without "all"
+            await ev(`window.__sched.selectScheduledJob(1).then(() => true)`);
             await waitFor(`!!document.querySelector('#scheduler-detail .sched-fail-banner')`, 'the failure banner', 8000);
-            const words = await ev(`({ banner: document.querySelector('#scheduler-detail .sched-fail-banner strong').textContent, tip: document.querySelector('#scheduled-jobs-list .sched-fail-badge').title })`);
+            const words = await ev(`({ banner: document.querySelector('#scheduler-detail .sched-fail-banner strong').textContent })`);
             assert.equal(words.banner, 'The last 2 runs failed', `${tag}: the banner: ` + words.banner);
-            assert.equal(words.tip, 'The last 2 runs failed', `${tag}: the badge's tip: ` + words.tip);
             assert.equal(await ev(`document.querySelector('.sched-runs-section h3').textContent`), 'Workflow runs', `${tag}: history comes from the workflow runs route`);
             // a run's When is a link to the run; a click anywhere on its row opens it
             const run = await ev(`(() => { const b = document.querySelector('.sched-runs-table .dt-primary'); const cs = getComputedStyle(b); window.__opened = []; window.selectWorkflowRun = id => window.__opened.push(id); const tr = b.closest('tr'); const took = tr.children[2]; const r = took.getBoundingClientRect(); took.scrollIntoView({ block: 'center' }); const r2 = took.getBoundingClientRect(); const hit = document.elementFromPoint(r2.left + 4, r2.top + r2.height / 2); hit.click(); return { compact: !!b.closest('.dt-box.dt-compact.dt-folded'), primary: b.classList.contains('dt-primary'), weight: cs.fontWeight, color: cs.color, accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(), opened: window.__opened.length }; })()`);
@@ -49,8 +48,9 @@ const S = `(window.__coralStatic || '/static/')`;
                 const back = await ev(`(() => { const b = document.querySelector('#scheduler-detail .sched-back'); return b ? { shown: b.getClientRects().length > 0, text: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height) } : null; })()`);
                 assert.ok(back && back.shown && /\u2190 Jobs/.test(back.text) && back.h >= 44, `${tag}: a "\u2190 Jobs" way back, 44 px high, is on the job: ` + JSON.stringify(back));
                 await ev(`document.querySelector('#scheduler-detail .sched-back').click(); true`); await sleep(500); // sleep-ok: the page scrolls back to the list
-                const list = await ev(`(() => { const r = document.getElementById('scheduled-jobs-list').getBoundingClientRect(); const a = document.activeElement; return { top: Math.round(r.top), inView: r.top >= -2 && r.top < innerHeight, focusInList: !!(a && a.closest && a.closest('#scheduled-jobs-list')) }; })()`);
-                assert.ok(list.inView && list.focusInList, `${tag}: the back row shows the list and focuses the open job: ` + JSON.stringify(list));
+                await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0`, 'the folder table', 8000);
+                const list = await ev(`(() => { const r = document.getElementById('group-table-view').getBoundingClientRect(); const a = document.activeElement; return { top: Math.round(r.top), inView: r.top >= -2 && r.top < innerHeight, focusOnJob: !!(a && a.closest && a.closest('tr[data-key="1"]')) }; })()`);
+                assert.ok(list.inView && list.focusOnJob, `${tag}: the back row shows the folder's table and focuses the open job: ` + JSON.stringify(list));
             } else assert.equal(await ev(`(() => { const b = document.querySelector('#scheduler-detail .sched-back'); return !b || b.getClientRects().length === 0; })()`), true, `${tag}: no back row beside the list on a wide window`);
             // New job: the agent form
             await ev(`window.showJobModal(); true`);

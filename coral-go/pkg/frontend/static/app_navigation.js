@@ -12,7 +12,7 @@ import { showMessageBoardProjects } from './message_board.js';
 import { syncMobileAgentList } from './mobile.js';
 import { sessionServer } from './server_base.js';
 import { refreshGroupTable } from './sidebar_groups.js';
-import { loadWorkflows, loadCostDashboard, loadDocs } from './lazy_panels.js';
+import { loadWorkflows, loadAutomations, loadCostDashboard, loadDocs } from './lazy_panels.js';
 import { isCloud } from './server_base.js';
 import { getHistoryPage } from './history_state.js';
 import { loadHistoryFiltered } from './history_filters.js';
@@ -38,7 +38,7 @@ export function switchNavTab(tab, opts = {}) {
     if (tab !== 'servers') importOnce('./servers_tab.js').then(m => m.leaveServersTab());
     // The URL follows the tab (#3532): a tab the user chose is a history entry. Servers writes its
     // own (it can carry a server); the board tab names no board, so it keeps the URL.
-    const TAB_ROUTE = { agents: 'agents', history: 'chats', workflows: 'workflows', jobs: 'jobs', tokens: 'analytics', docs: 'docs' };
+    const TAB_ROUTE = { agents: 'agents', history: 'chats', workflows: 'workflows', automations: 'automations', tokens: 'analytics', docs: 'docs' };
     if (!opts.fromHistory && TAB_ROUTE[routeTab]) {
         const cur = currentRoute();
         const route = tabRoute(routeTab, TAB_ROUTE[routeTab]);
@@ -62,9 +62,11 @@ export function switchNavTab(tab, opts = {}) {
     // Switch main view based on tab
     if (tab === 'board') {
         showMessageBoardProjects();
-    } else if (tab === 'jobs') {
-        document.getElementById('scheduler-view')?.removeAttribute('data-phone-item'); // a phone opens Jobs on its list
+    } else if (tab === 'automations') {
+        document.getElementById('scheduler-view')?.removeAttribute('data-phone-item'); // a phone opens Automations on its list
         showView('scheduler-view');
+        if (loadAutomations.module) loadAutomations.module.showAutomationsTab();
+        else { const views = viewChanges(); loadAutomations().then(m => { if (generation === _navGeneration && views === viewChanges()) m.showAutomationsTab(); }, () => {}); }
     } else if (tab === 'workflows') {
         showWhenLoaded(loadWorkflows, 'showWorkflowsTab');
     } else if (tab === 'docs') {
@@ -106,7 +108,7 @@ export function switchNavTab(tab, opts = {}) {
         }
     }
     // A tab with groups that shows its empty page opens on its first group's table (sidebar_groups.js)
-    if (tab === 'jobs' || tab === 'history') refreshGroupTable(tab);
+    if (tab === 'history') refreshGroupTable(tab); // Automations opens its folder itself (automations.js)
 }
 
 function tabRoute(tab, view) {

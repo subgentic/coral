@@ -15,7 +15,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 
 const sources = new Map();
-const TAB_NAME = { 'hub-inbox': 'Inbox', history: 'Chats', workflows: 'Workflows', jobs: 'Jobs', docs: 'Docs' }; // what a phone's way back from a table is named for (#7734)
+const TAB_NAME = { 'hub-inbox': 'Inbox', history: 'Chats', workflows: 'Workflows', automations: 'Automations', docs: 'Docs' }; // what a phone's way back from a table is named for (#7734)
 const LAZY_SOURCES = { 'hub-inbox': './inbox_sidebar.js' }; // the module that registers a source this file may be asked to open before it has loaded
 const LANDING = '*'; // the key of the page that lists every group (a source with landing: true)
 const KEY = kind => `coral-sidebar-groups-${kind}`;
