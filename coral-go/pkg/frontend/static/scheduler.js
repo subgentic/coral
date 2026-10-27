@@ -216,16 +216,17 @@ function renderRunsTable(page) {
         footer: runs.length < page.total ? { text: `Showing the newest ${runs.length} of ${page.total} runs`, more: { label: 'Show older runs', busy: page.busy, run: () => readOlderRuns(page) } } : undefined,
         open: workflowHistory ? open : undefined, empty: { line: 'No runs yet.' },
         columns: [
-            { key: 'started', label: 'Started', primary: true, width: '12rem', cell: r => {
+            { key: 'started', label: 'Started', primary: true, width: '9.5rem', cell: r => {
                 const time = DT.timeCell(workflowHistory ? r.started_at || r.created_at : r.scheduled_at || r.started_at);
                 if (!workflowHistory) return time;
                 const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b;
             } },
             { key: 'result', label: 'Result', width: 'grow', cell: resultCell },
-            { key: 'duration', label: 'Duration', width: '7rem', dropAt: 36, tone: 'tertiary', cell: tookOf },
-            ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, width: '8rem', when: r => !!r.session_id, cell: r => {
+            { key: 'duration', label: 'Duration', width: '6rem', dropAt: 36, tone: 'tertiary', cell: tookOf },
+            ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, width: '5rem', when: r => !!r.session_id, cell: r => {
                 if (!r.session_id) return '';
-                const b = DT.link('Conversation'); b.setAttribute('aria-label', 'Open the conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
+                // short, so the Result keeps its room at 390 (Started 9.5 rem, Chat 5 rem)
+                const b = DT.link('Chat'); b.setAttribute('aria-label', 'Open the conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
             } }] : []),
         ],
     });
