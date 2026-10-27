@@ -242,7 +242,6 @@ body.panel-dragging .sidebar {
     align-items: center;
 }
 
-.sidebar-collapse-btn,
 .sidebar-rail-btn {
     background: none;
     border: none;
@@ -255,10 +254,9 @@ body.panel-dragging .sidebar {
     flex-shrink: 0;
 }
 
-.sidebar-collapse-btn { width: var(--ctl-h, 36px); height: var(--ctl-h, 36px); }
 .sidebar-rail-btn { width: 40px; height: 40px; }
-.sidebar-collapse-btn:hover,
 .sidebar-rail-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+/* The sidebar's toolbar buttons are quiet .btn-icons (#9332): the height of the header's controls is the family's (36, 44 on touch), as --ctl-h is. */
 
 /* Collapsed icon rail (desktop only) */
 .sidebar-rail { display: none; }

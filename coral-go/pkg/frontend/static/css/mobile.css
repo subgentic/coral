@@ -1237,7 +1237,6 @@
 @media (max-width: 767px), (pointer: coarse) {
     .btn,
 .btn-small,
-.modal-close-btn,
 .mb-action-btn,
 .agent-ui-card button,
 .agent-ui-send,
@@ -1280,7 +1279,7 @@
 /* Close buttons and the Details button are 44px targets on a phone-width window on any pointer (the touch rule covers a coarse pointer only) (#5681, #7796). The pane's Details button ends the title's small line:
    its text stays small and it is drawn over the line's edges (negative margins) so the header does not grow. */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .modal-close-btn, .artifact-viewer-close, .details-toggle { min-width: 44px; min-height: 44px; }
+    .artifact-viewer-close, .details-toggle { min-width: 44px; min-height: 44px; }
     .detail-sub-row .details-toggle { min-width: 44px; min-height: 44px; margin: -14px 0 -14px -6px; } /* the pane's own rule (a line's height) is more specific than the one above */
 }
 
@@ -1331,7 +1330,7 @@
    that does not report a coarse pointer) had the header's Fit width, Open Agent Tab and side-panel buttons at 22 to 30 px and the composer's Add image and Send at 32 and 36 px. */
 @media (max-width: 767px) {
     .live-view-toggle-btn, .terminal-header-actions .terminal-header-btn, .terminal-header-actions .terminal-header-btn.terminal-fit-width-btn, .terminal-header-actions .terminal-header-btn.terminal-copy-screen-btn, #terminal-open-window-link, #popout-panel-toggle-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); justify-content: center; }
-    .attach-image-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); right: 2px; top: 0; }
+    .attach-image-btn { right: 2px; top: 0; }
     .command-editor:has(> .attach-image-btn) textarea { padding-right: 50px !important; }
     .mobile-send-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); }
     .mobile-send-options-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); }

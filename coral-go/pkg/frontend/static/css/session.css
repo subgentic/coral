@@ -1513,7 +1513,6 @@
     .xt-row-actions .btn, .xt-reach .btn, .xt-how .btn { min-height: var(--control-touch-height, 44px); }
 }
 
-.team-availability-dialog .modal-close-btn { padding: 0; background: transparent; border-color: transparent; }
 .preset-editor select, .preset-editor input[name="preset_name"] { min-height: var(--control-height); }
 
 /* Knowledge distillation */

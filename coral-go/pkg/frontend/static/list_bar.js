@@ -28,7 +28,7 @@ function make(tag, className, text) {
 export function buildMoreMenu(id, items, noun = '') {
     const name = noun ? `More ${noun} actions` : 'More actions'; // the tab's own noun (UI/UX, #7717): "More message actions", "More artifact actions"; the page's header keeps its plain "More"
     const wrap = make('span', 'list-bar-more');
-    const btn = make('button', 'sidebar-collapse-btn list-bar-more-btn'); btn.type = 'button'; btn.id = `${id}-more`;
+    const btn = make('button', 'btn btn-quiet btn-icon sidebar-collapse-btn list-bar-more-btn'); btn.type = 'button'; btn.id = `${id}-more`;
     // named "More actions", not "More": a page's header has a More button too, and the team page's Board tab shows both at 390 px (#7713)
     btn.title = name; btn.setAttribute('aria-label', name); btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', `${id}-more-menu`);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -112,13 +112,13 @@ export function buildListBar(spec, onChange, hooks = {}) {
     // the icon and the panel are named for what the panel holds (#8251): "Filters and sort" where it has a Sort, "Filters" where it has not
     const panelName = spec.sorts ? 'Filters and sort' : 'Filters';
     if (collapsible) {
-        tog = make('button', 'sidebar-collapse-btn list-bar-toggle'); tog.type = 'button'; tog.id = `${p}-toggle`;
+        tog = make('button', 'btn btn-quiet btn-icon sidebar-collapse-btn list-bar-toggle'); tog.type = 'button'; tog.id = `${p}-toggle`;
         tog.setAttribute('aria-expanded', 'false'); tog.setAttribute('aria-controls', `${p}-menu`); tog.title = panelName; tog.setAttribute('aria-label', panelName);
         const icon = make('span', 'material-icons', 'notes'); icon.setAttribute('aria-hidden', 'true');
         badge = make('span', 'chip chip-count display-badge'); badge.hidden = true;
         tog.append(icon, badge);
         if (spec.expandAll) {
-            chev = make('button', 'sidebar-collapse-btn group-toggle-btn list-bar-expand-all'); chev.type = 'button'; chev.dataset.next = 'expand';
+            chev = make('button', 'btn btn-quiet btn-icon sidebar-collapse-btn group-toggle-btn list-bar-expand-all'); chev.type = 'button'; chev.dataset.next = 'expand';
             chev.innerHTML = '<svg class="group-toggle-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg><svg class="group-toggle-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>';
             chev.title = spec.expandAll.expand; chev.setAttribute('aria-label', spec.expandAll.expand);
         }

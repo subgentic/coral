@@ -650,7 +650,7 @@ function showEmojiPicker(onSelect) {
         <div class="emoji-picker-grid">
             ${EMOJI_CATEGORIES.map(cat => `
                 <div class="emoji-picker-category">${escapeHtml(cat.name)}</div>
-                <div class="emoji-picker-row">${cat.emojis.map(e => `<button class="emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")}</div>
+                <div class="emoji-picker-row">${cat.emojis.map(e => `<button class="btn btn-quiet btn-icon emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")}</div>
             `).join("")}
         </div>
     `;
@@ -666,14 +666,14 @@ function showEmojiPicker(onSelect) {
         if (!q) {
             grid.innerHTML = EMOJI_CATEGORIES.map(cat => `
                 <div class="emoji-picker-category">${escapeHtml(cat.name)}</div>
-                <div class="emoji-picker-row">${cat.emojis.map(e => `<button class="emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")}</div>
+                <div class="emoji-picker-row">${cat.emojis.map(e => `<button class="btn btn-quiet btn-icon emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")}</div>
             `).join("");
         } else {
             // Filter emojis or allow direct paste
             const filtered = allEmojis.filter(e => e.includes(q));
             grid.innerHTML = filtered.length
-                ? `<div class="emoji-picker-row">${filtered.map(e => `<button class="emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")}</div>`
-                : `<div class="emoji-picker-row"><button class="emoji-picker-btn" data-emoji="${escapeAttr(q)}">${escapeHtml(q)}</button></div>`;
+                ? `<div class="emoji-picker-row">${filtered.map(e => `<button class="btn btn-quiet btn-icon emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")}</div>`
+                : `<div class="emoji-picker-row"><button class="btn btn-quiet btn-icon emoji-picker-btn" data-emoji="${escapeAttr(q)}">${escapeHtml(q)}</button></div>`;
         }
         // Re-attach click handlers
         grid.querySelectorAll(".emoji-picker-btn").forEach(btn => {
