@@ -41,7 +41,7 @@ function modalOpen() {
 
 /** The resize handle on the pane's left edge: the goal page's handle (goals_view.js) for this pane, with the same limits, keys and double click. */
 function addResizeHandle(aside) {
-    const row = document.getElementById('team-page-row');
+    const row = aside.closest('.goal-split') || document.getElementById('team-page-row'); // a goal screen's preview resizes within its own split (#8952)
     if (!row) return;
     const grip = el('div', 'detail-grip');
     grip.setAttribute('role', 'separator'); grip.setAttribute('aria-orientation', 'vertical'); grip.setAttribute('aria-label', 'Resize the details'); grip.tabIndex = 0; grip.title = 'Drag to resize, double click to reset';
@@ -108,7 +108,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     }
     aside.append(head, more.panel, main);
     if (actions.length) aside.append(foot);
-    if (resizable && !host) addResizeHandle(aside); else aside.style.removeProperty('--detail-w'); // a pane that is not resizable has its own width, not the last one's
+    if (resizable && (!host || host.classList.contains('goal-detail-pane'))) addResizeHandle(aside); else aside.style.removeProperty('--detail-w'); // a pane that is not resizable has its own width, not the last one's
     aside.hidden = false;
     if (!host) {
         page()?.classList.add('detail-open');

@@ -190,10 +190,20 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     /** What closing the pane does: the list has the whole width again, the row is no longer current, and the keyboard is back on the row that opened it (#8830). */
     const paneClosed = opener => () => {
         const rowKey = preview.rowKey; preview.key = ''; preview.rowKey = '';
-        splitEl()?.classList.remove('goal-split-open'); markPreviewRow();
+        splitEl()?.classList.remove('goal-split-open'); markPreviewRow(); queueMicrotask(namePane); // the pane is put away after this runs
         (opener && opener.isConnected ? opener : root.querySelector(`.goal-list tr[data-key="${CSS.escape(rowKey)}"] .dt-primary`))?.focus?.({ preventScroll: true });
     };
+    // The pane is named for what it shows, and where it is the whole screen (a narrow one) it is a dialog, not a region beside the list (#8952).
+    const narrowQuery = typeof matchMedia === 'function' ? matchMedia('(max-width: 900px)') : null;
+    function namePane() {
+        previewEl.setAttribute('aria-labelledby', 'detail-pane-title'); previewEl.removeAttribute('aria-label');
+        if (previewEl.hidden) { previewEl.removeAttribute('role'); return; }
+        if (narrowQuery && narrowQuery.matches) { previewEl.setAttribute('role', 'dialog'); }
+        else previewEl.setAttribute('role', 'complementary');
+    }
+    narrowQuery?.addEventListener?.('change', namePane);
     function opened(opener, key) {
+        namePane();
         const tr = opener && opener.closest && opener.closest('tr');
         preview.key = key; preview.rowKey = tr ? tr.dataset.key || '' : '';
         splitEl()?.classList.add('goal-split-open'); markPreviewRow();
@@ -202,7 +212,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const g = goalById(model.openId);
         const shown = openDetailPane({
             key: `task:${task.id}`, opener, host: previewEl, onClose: paneClosed(opener),
-            title: `#${task.id} ${task.title}`, backLabel: 'Tasks', focusClose: true,
+            title: `#${task.id} ${task.title}`, backLabel: 'Tasks', focusClose: true, resizable: true,
             body: (body, { isStale }) => importOnce('./task_preview.js').then(m => m.mountTaskPreview(body, { project: model.project, taskId: task.id }, { current: () => !isStale(), title: () => {}, close: () => closePreview(true) })),
             actions: [{ label: 'Open task page', primary: true, run: () => (onTask ? onTask(task, g) : openTask(model.project, task.id, null, { from: g && g.title })) }],
         });
@@ -283,7 +293,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const b = btn('goal-tab', null, () => { if (model.tab === key) return; model.tab = key; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${key}`)?.focus({ preventScroll: true }); });
             b.id = `goal-tab-${key}`; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(model.tab === key)); b.setAttribute('aria-controls', 'goal-list'); b.tabIndex = model.tab === key ? 0 : -1;
             b.append(el('span', 'goal-tab-label', label), el('span', 'goal-tab-count', n == null ? '' : ` ${n}`));
-            b.addEventListener('keydown', e => { if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return; e.preventDefault(); const i = tabs.findIndex(t => t[0] === key), next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length][0]; model.tab = next; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${next}`)?.focus({ preventScroll: true }); });
+            b.addEventListener('keydown', e => { if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return; e.preventDefault(); const i = tabs.findIndex(t => t[0] === key), next = (e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length])[0]; model.tab = next; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${next}`)?.focus({ preventScroll: true }); });
             strip.append(b);
         }
         const list = el('div', 'goal-list'); list.id = 'goal-list'; list.setAttribute('role', 'tabpanel'); list.setAttribute('aria-labelledby', `goal-tab-${model.tab}`);
@@ -418,6 +428,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         window.addEventListener('focus', visibleRefresh);
     }
     return { update, refreshTasks: () => loadTasks(id), dispose: () => {
-        disposed = true; if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
+        disposed = true; narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
     }, focus: focusDetail };
 }
