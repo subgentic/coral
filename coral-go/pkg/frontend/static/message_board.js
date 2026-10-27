@@ -257,7 +257,7 @@ export function deleteMessageBoardProject() {
             console.error('Failed to delete project:', e);
             showToast('Could not reach Coral to delete the board.', true);
         }
-    }, undefined, { danger: true });
+    }, undefined, { label: 'Delete board', danger: true });
 }
 
 // ── Polling ──────────────────────────────────────────────────────────────

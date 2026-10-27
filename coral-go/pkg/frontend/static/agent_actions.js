@@ -44,7 +44,7 @@ export function killSessionDirect(name, agentType, sessionId) {
         }
     } catch (e) {
         showToast("Failed to kill session", true);
-    } }, undefined, { danger: true });
+    } }, undefined, { label: 'Kill session', danger: true });
 }
 
 export async function showInfoDirect(name, agentType, sessionId) {

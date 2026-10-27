@@ -217,7 +217,7 @@ export async function refreshAgentUI() {
                     remove.disabled = false;
                     status.textContent = error.message;
                 }
-            }, undefined, { danger: true });
+            }, undefined, { label: 'Delete panel', danger: true });
             popout.onclick = () => window.open(new URL(contentPath, location.href).href, '_blank', 'noopener,noreferrer');
             if (isCloud()) {
                 // Publishing and removing panels is the agent's own action on its machine (the hub never forwards PUT/DELETE), and a

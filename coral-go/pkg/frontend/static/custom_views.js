@@ -251,7 +251,7 @@ async function _deleteView(viewId) {
         } catch (e) {
             window.showAlertModal?.('Unable to Delete View', `Failed to delete view: ${e.message}`);
         }
-    }, undefined, { danger: true });
+    }, undefined, { label: 'Delete view', danger: true });
 };
 
 // A custom view's tab, its context menu and the menu's Edit / Delete (#3645). The view id is checked;

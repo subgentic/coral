@@ -369,7 +369,7 @@ function sayStarted(text) { const s = document.getElementById('wf-status'); if (
     const name = shownRun && Number(shownRun.id) === runId && shownRun.workflow_name ? ` of workflow "${shownRun.workflow_name}"` : '';
     // Kill Run stops the step that is running; an agent step goes through the same kill as Kill Session, which keeps its terminal log (#4399, #4437).
     const agentRunning = !!shownRun && Number(shownRun.id) === runId && (shownRun.steps || []).some(s => s.type === 'agent' && s.status === 'running');
-    window.showConfirmModal('Kill Run', `Stop run #${runId}${name}? Its steps stop where they are and the run cannot be resumed.${agentRunning ? ' ' + KILL_LOG_NOTE : ''}`, () => killWorkflowRun(runId), undefined, { danger: true });
+    window.showConfirmModal('Kill Run', `Stop run #${runId}${name}? Its steps stop where they are and the run cannot be resumed.${agentRunning ? ' ' + KILL_LOG_NOTE : ''}`, () => killWorkflowRun(runId), undefined, { label: 'Kill run', danger: true });
 }
 
 export async function killWorkflowRun(runId) {
@@ -396,7 +396,7 @@ export function deleteWorkflow(id, name) {
         } catch (e) {
             showToast('Failed to delete: ' + e.message, true);
         }
-    }, undefined, { danger: true });
+    }, undefined, { label: 'Delete workflow', danger: true });
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────

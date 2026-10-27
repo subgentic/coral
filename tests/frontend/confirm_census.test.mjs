@@ -1,6 +1,7 @@
 // Every confirm dialog names its choice (#9318): a question that loses something (a delete, a kill, a discard) passes { danger: true } and gets the danger button; one that loses nothing
 // (a sleep, an archive, a paste, a restart) passes { danger: false } and gets the primary. The dialog's default is the primary, so a caller that forgets would be a destructive question in the
-// plain style: this census reads every call of showConfirmModal (and the wrappers confirmWith and this.confirm) and fails on one with no `danger` in its arguments.
+// plain style: this census reads every call of showConfirmModal (and the wrappers confirmWith and this.confirm) and fails on one with no `danger` in its arguments. A danger question's button
+// says what it does (Delete panel, Kill session, Paste and run), never Yes: a call with danger: true must also pass a label (confirmWith takes its label as the third argument).
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -50,12 +51,14 @@ export function calls(text) {
 // the scan catches a call with no choice, and passes the forms that name one
 assert.equal(calls("window.showConfirmModal('Delete x', 'sure?', () => go());").filter(c => !/\bdanger\b/.test(c.args)).length, 1);
 assert.equal(calls("showConfirmModal('Delete x', `a ${b(')')} (c)`, () => { go(); }, undefined, { danger: true });").filter(c => !/\bdanger\b/.test(c.args)).length, 0);
+assert.equal(calls("showConfirmModal('Delete x', 'sure?', go, undefined, { danger: true });").filter(c => /\bdanger:\s*true\b/.test(c.args) && !/\blabel\b/.test(c.args)).length, 1);
 assert.equal(calls("function confirmWith(t, m) { return 1; }\nexport { showConfirmModal } from './confirm_dialog.js';\nconst f = x => confirm(1);").length, 0);
 
 const problems = []; let n = 0;
 for (const f of fs.readdirSync(STATIC).filter(f => f.endsWith('.js')).sort()) {
     for (const c of calls(fs.readFileSync(path.join(STATIC, f), 'utf8'))) {
         n++;
+        if (/\bdanger:\s*true\b/.test(c.args) && c.name !== 'confirmWith' && !/\blabel\b/.test(c.args)) problems.push(`${f}:${c.line}: ${c.name}( is a danger question whose button would say Yes: pass a label ("Delete panel", "Kill session")`);
         if (!/\bdanger\b/.test(c.args)) problems.push(`${f}:${c.line}: ${c.name}( names no choice: pass { danger: true } for a question that loses something, { danger: false } for one that loses nothing`);
     }
 }

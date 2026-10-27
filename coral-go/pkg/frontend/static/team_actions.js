@@ -45,7 +45,7 @@ export async function killGroup(groupName) {
                 }
             }
             dropKilledRows(groupSessions);
-        }, undefined, { danger: true }
+        }, undefined, { label: 'Kill all', danger: true }
     );
 }
 
@@ -79,7 +79,7 @@ export async function killBoard(boardName) {
             }
             showWorktreeNotice(worktree); // an error is an alert, the rest a status; a kept one stays on screen with its path (#6818)
             dropKilledRows(boardSessions);
-        }, undefined, { danger: true }
+        }, undefined, { label: 'Kill team', danger: true }
     );
 }
 

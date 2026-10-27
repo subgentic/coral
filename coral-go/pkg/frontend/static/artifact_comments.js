@@ -264,7 +264,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     const act = (text, label, fn) => { if (typeof label === 'function') { fn = label; label = ''; } const b = btn('ac-act', text, label); b.addEventListener('click', fn); return b; };
 
     const { canAsk, openAsk, askBlock } = createAsk({ st, panel, render, announce, refresh, ownHex });
-    function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { danger: true }); else fn(); }
+    function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { label: 'Delete comment', danger: true }); else fn(); }
     async function run(fn, said) {
         if (st.busy) return;
         st.busy = true;

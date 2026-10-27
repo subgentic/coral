@@ -110,7 +110,7 @@ function confirmDeleteEndedLogs() {
                 else showToast(`Couldn't delete the terminal logs: ${e.message}`, true);
             }
             loadTerminalLogs();
-        }, undefined, { danger: true });
+        }, undefined, { label: 'Delete logs', danger: true });
     requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
 }
 
@@ -277,7 +277,7 @@ export function wireStorageActions() {
                     return;
                 }
                 loadStorageDetail();
-            }, undefined, { danger: true });
+            }, undefined, { label: 'Start cleanup', danger: true });
         requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
     });
 }
@@ -349,7 +349,7 @@ function confirmDeleteUnlisted() {
             const left = (d.skipped || []).length;
             showToast(`Deleted ${Number(d.deleted || 0).toLocaleString()} received file${d.deleted === 1 ? '' : 's'}, ${_gib(d.bytes)} freed.${left ? ` ${left} left alone: something lists or links ${left === 1 ? 'it' : 'them'}.` : ''}`, false, 8000);
             loadArtifactStoreSize();
-        }, undefined, { danger: true });
+        }, undefined, { label: 'Delete files', danger: true });
     requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
 }
 

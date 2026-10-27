@@ -442,7 +442,7 @@ function _onPaste(e) {
     const lines = clean.replace(/(\r\n|\r|\n)$/, '').split(/\r\n|\r|\n/).length;
     if (typeof window.showConfirmModal !== 'function') return; // no way to ask: don't paste blind
     window.showConfirmModal(`Paste ${lines} line${lines === 1 ? '' : 's'}?`,
-        'This terminal isn\u2019t in paste mode, so each line is sent as if typed and runs on its own.', go, undefined, { danger: false });
+        'This terminal isn\u2019t in paste mode, so each line is sent as if typed and runs on its own.', go, undefined, { label: 'Paste and run', danger: true });
 }
 
 /** The terminal already built, for the next agent: its socket let go and a full reset queued behind what it still has to draw. */
