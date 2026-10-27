@@ -12,18 +12,28 @@ const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on th
 const KEY = '@inbox'; // the key the folder keeps its filters under, beside the teams' own (the team page's showArtifacts takes it as its project)
 const list = createArtifactsList({ inbox: true });
 let count = null; // every artifact of every team (the unfiltered total), or null until the first answer
+let countAt = 0;  // when it was read or last told by the list; a screen switch does not ask again within COUNT_FRESH_MS (#9251: every Inbox screen re-asked a count-sized read, 36 to 74 ms)
+let counting = null; // the read in flight: a second ask waits for it
+const COUNT_FRESH_MS = 30000;
 let onCount = () => {};
 
 /** The folder's count in the sidebar: what the teams hold before any filter. */
 export const artifactCount = () => count;
 
-/** Read the count without drawing the page (the Inbox was opened): a request for one row. */
-export async function refreshArtifactCount(done) {
+/** Read the count without drawing the page (the Inbox was opened): a request for one row, at most one in 30 seconds and one at a time; `force` asks now (the person pressed refresh). The Artifacts list tells the
+ *  folder its own count whenever it reads (hooks below), which is the "refreshed on change". */
+export function refreshArtifactCount(done, { force = false } = {}) {
     if (done) onCount = done;
-    try {
-        const d = await readInboxArtifacts(new URLSearchParams({limit:'1'}));
-        if (Number.isSafeInteger(d.all) && d.all !== count) { count = d.all; onCount(); }
-    } catch { /* the count stays as it was */ }
+    if (!force && count !== null && Date.now() - countAt < COUNT_FRESH_MS) return counting || Promise.resolve();
+    if (counting) return counting;
+    counting = (async () => {
+        try {
+            const d = await readInboxArtifacts(new URLSearchParams({limit:'1'}));
+            countAt = Date.now();
+            if (Number.isSafeInteger(d.all) && d.all !== count) { count = d.all; onCount(); }
+        } catch { /* the count stays as it was */ }
+    })().finally(() => { counting = null; });
+    return counting;
 }
 
 /** The search of the sidebar's box: it is the folder's search too (the page's own search box shows the same text). */
@@ -34,7 +44,7 @@ export function setArtifactSearch(text) {
 }
 
 let pageHost = null;
-const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { count = n; onCount(); const c = pageHost && pageHost.querySelector('.inbox-artifacts-count'); if (c) c.textContent = String(n); } });
+const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { count = n; countAt = Date.now(); onCount(); const c = pageHost && pageHost.querySelector('.inbox-artifacts-count'); if (c) c.textContent = String(n); } });
 
 let folderBar = null;
 /** The folder's toolbar (the shared one every Inbox folder has): the search, the Filters icon beside it (Team, Type, Origin, Uploaded by, Kept only, dates, Sort), the chips of what is on. The list uses this bar as its own. */
