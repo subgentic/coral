@@ -38,7 +38,7 @@
 
 .chat-row-title { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; } /* the row, not the title's own length, sets the width: a long title was 720 px in a 300 px row and the agent badge went off its edge (#6961) */
 .chat-row-title .session-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-row-title .badge, .chat-row-title .agent-reminder-icon { flex: none; }
+.chat-row-title .chip, .chat-row-title .agent-reminder-icon { flex: none; }
 .session-row-bottom.chat-row-facts { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 0; font-size: var(--fs-base); color: var(--text-secondary); }
 .chat-row-facts .sidebar-agent-name, .chat-row-facts .sidebar-branch, .chat-row-facts .session-time { display: inline; margin: 0; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
 .chat-sep { padding: 0 4px; color: var(--text-muted); }
@@ -680,12 +680,7 @@
 }
 
 .folder-tag-full {
-    font-size: var(--fs-base);
-    font-weight: 500;
     color: var(--text-secondary);
-    padding: 1px 6px;
-    border-radius: var(--radius-lg);
-    line-height: 14px;
     white-space: nowrap;
     text-transform: none;
     letter-spacing: 0;
@@ -826,16 +821,12 @@
 
 .session-state-pill,
 .session-ctx-pill {
-    font-size: var(--fs-sm);
-    line-height: 14px;
-    padding: 0 6px;
     flex-shrink: 0;
-    white-space: nowrap;
 }
 
 /* Sentence-case labels ("Needs input" / "Check terminal" / "Stuck"), quiet (#5123): the shape and weight of the neutral pill below, with only the text in the
-   warm colour (>= 4.5:1), no amber fill and no amber ring; the words, not the colour, say which state it is. The higher-specificity selector outranks `.badge.waiting-badge`. */
-.session-group-item .badge.session-state-pill {
+   warm colour (>= 4.5:1), no amber fill and no amber ring; the words, not the colour, say which state it is. The higher-specificity selector outranks `.chip.waiting-badge`. */
+.session-group-item .chip.session-state-pill {
     text-transform: none;
     letter-spacing: 0;
     font-weight: 500;
@@ -844,7 +835,7 @@
     box-shadow: inset 0 0 0 1px var(--border);
 }
 
-.session-group-item .badge.session-state-pill.stuck {
+.session-group-item .chip.session-state-pill.stuck {
     background: var(--bg-tertiary);
     /* Lifted toward the primary text colour: plain --error is only ~3.6:1 on a dark surface. */
     color: color-mix(in srgb, var(--error) 62%, var(--text-primary));
@@ -852,19 +843,19 @@
 }
 
 
-[data-theme="light"] .session-group-item .badge.session-state-pill {
+[data-theme="light"] .session-group-item .chip.session-state-pill {
     color: var(--warning);
 }
 
 /* Neutral state pill (Task assigned · idle): informational, never a warning. */
-.session-group-item .badge.session-state-pill.neutral,
-[data-theme="light"] .session-group-item .badge.session-state-pill.neutral {
+.session-group-item .chip.session-state-pill.neutral,
+[data-theme="light"] .session-group-item .chip.session-state-pill.neutral {
     font-weight: 500;
     background: var(--bg-tertiary);
     color: var(--text-secondary);
     box-shadow: inset 0 0 0 1px var(--border);
 }
-[data-theme="light"] .session-group-item .badge.session-state-pill.stuck {
+[data-theme="light"] .session-group-item .chip.session-state-pill.stuck {
     color: color-mix(in srgb, var(--error) 80%, black); /* plain --error is 4.2:1 on the neutral surface in the light theme */
 }
 
@@ -1079,14 +1070,8 @@
 }
 
 .branch-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 10px;
     background: rgba(var(--accent-rgb), 0.1);
     border: 1px solid rgba(var(--accent-rgb), 0.2);
-    border-radius: var(--radius-xl);
-    font-size: var(--fs-base);
     color: var(--accent);
     font-family: var(--font-mono);
 }
@@ -1554,7 +1539,7 @@
 .availability-agent { display:grid; grid-template-columns:minmax(150px,1fr) minmax(180px,2fr) auto; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-lg); overflow-wrap:anywhere; }
 .availability-agent > p { margin:0; }
 .availability-agent-heading small, .availability-agent li span, .availability-unassigned li span { display: block; margin: 4px 0; }
-.availability-badge { white-space: nowrap; border-radius: var(--radius-xl); padding: 4px 8px; background: var(--bg-tertiary); font-size: var(--fs-base); color: var(--text-secondary); }
+.availability-badge { white-space: nowrap; background: var(--bg-tertiary); color: var(--text-secondary); }
 .availability-badge.is-free { color: var(--success-text); }
 .availability-task_idle .availability-badge, .availability-summary-task_idle { color: var(--text-secondary); }
 .availability-waiting .availability-badge, .availability-summary-waiting { color: var(--accent); }
@@ -1634,7 +1619,7 @@
 .knowledge-link:hover { border-bottom-style: solid; }
 .knowledge-link-dead { color: var(--text-muted); }
 /* The team header while its knowledge is being distilled */
-.team-distill-chip { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 0 6px; border-radius: var(--radius-lg); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); font-weight: 500; line-height: 16px; white-space: nowrap; }
+.team-distill-chip { margin-left: 6px; background: var(--bg-tertiary); color: var(--text-secondary); white-space: nowrap; }
 .team-distill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse-working 1.5s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .team-distill-dot { animation: none; } }
 
@@ -1713,19 +1698,11 @@
 .server-unknown .server-dot      { background: var(--text-muted); }
 
 .server-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
     max-width: 9em;
     margin-left: var(--space-sm);
-    padding: 1px var(--space-sm);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
     background: var(--bg-tertiary);
     color: var(--text-secondary);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    line-height: 1.3;
     vertical-align: middle;
     white-space: nowrap;
     overflow: hidden;
@@ -1781,10 +1758,6 @@
 /* Cloud Hub update notice (#3059): a link, nothing is disabled. */
 .server-update-badge {
     margin-left: var(--space-xs);
-    padding: 0 var(--space-sm);
-    border-radius: var(--radius-sm, 4px);
-    font-size: var(--fs-sm, 11px);
-    font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
     color: var(--accent);
@@ -1794,7 +1767,7 @@
 .server-update-badge:hover { text-decoration: underline; }
 .cs-update-required { color: var(--warning); }
 /* The hub relaunch's "Updating" badge (#5355): read-only, a word, not a link or a control; the row keeps its height. */
-.server-relaunch-badge { margin-left: var(--space-xs); padding: 0 var(--space-sm); border-radius: var(--radius-sm, 4px); font-size: var(--fs-sm, 11px); font-weight: 600; white-space: nowrap; color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--border); cursor: default; }
+.server-relaunch-badge { margin-left: var(--space-xs); white-space: nowrap; color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--border); cursor: default; }
 
 /* Agents on an unreachable server: last-known data, not actionable. */
 .session-group-item.session-stale {
@@ -1809,15 +1782,9 @@
 
 /* Cloud Hub: this server only allows viewing (#3068). Text, not colour alone. */
 .hub-readonly-chip {
-    display: inline-flex;
-    align-items: center;
     margin-left: var(--space-sm);
-    padding: 0 var(--space-sm);
     border: 1px solid var(--warning);
-    border-radius: var(--radius-sm, 4px);
     color: var(--warning);
-    font-size: var(--fs-sm, 11px);
-    font-weight: 600;
     white-space: nowrap;
     /* On a narrow header it shrinks and ends in "…"; the full reason is its title, and a tap shows it (#3411). */
     min-width: 0;
@@ -2064,7 +2031,7 @@
     .copy-branch-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
     #history-sessions-list .chat-row-title { flex-wrap: nowrap; align-items: flex-start; column-gap: 6px; } /* the badge stays beside the title, also when the title wraps to two lines (#7722) */
     #history-sessions-list .chat-row-title .session-label { flex: 0 1 auto; min-width: 0; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    #history-sessions-list .chat-row-title .badge { flex: 0 0 auto; }
+    #history-sessions-list .chat-row-title .chip { flex: 0 0 auto; }
 }
 
 /* Waiting names keep their beginning; reserve a fixed tag slot and put it below in narrow rows. */

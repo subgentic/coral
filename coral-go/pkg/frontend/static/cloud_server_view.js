@@ -92,7 +92,7 @@ async function call(id, method, body) {
 /** The row's update badge (a link to the releases page), or null. */
 function updateBadge(e) {
     const n = updateNotice(e);
-    return n ? h('a', { className: `server-update-badge server-update-${n.level}`, href: RELEASES_URL, target: '_blank', rel: 'noopener noreferrer',
+    return n ? h('a', { className: `chip server-update-badge server-update-${n.level}`, href: RELEASES_URL, target: '_blank', rel: 'noopener noreferrer',
         title: n.text, 'aria-label': n.text, text: n.label }) : null;
 }
 

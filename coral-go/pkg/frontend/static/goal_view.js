@@ -85,7 +85,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const taskTotal = (goal, t) => Math.max(t.rows.length, goal ? goal.rollup.done + goal.rollup.active + goal.rollup.blocked + goal.rollup.queued : 0);
 
     function stateChip(goal) {
-        const chip = el('span', `goal-chip goal-state-${goal.state || 'unknown'}`);
+        const chip = el('span', `chip goal-chip goal-state-${goal.state || 'unknown'}`);
         chip.append(el('span', 'goal-dot'), document.createTextNode(W.stateWord(goal)));
         return chip;
     }

@@ -453,15 +453,7 @@
 
 /* ── Status badge (reused) ────────────────────────────────── */
 
-.wf-status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--fs-base);
-    padding: 2px 8px;
-    border-radius: var(--radius-ml);
-    font-weight: 500;
-}
+.wf-status-badge {}
 
 .wf-status-badge.completed { background: rgba(var(--fx-green-deep-rgb), 0.15); color: var(--success-text, var(--success)); }
 .wf-status-badge.running { background: rgba(var(--accent-rgb), 0.15); color: var(--accent); }

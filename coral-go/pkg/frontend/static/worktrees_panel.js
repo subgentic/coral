@@ -38,7 +38,7 @@ function item(w, canRemove) {
     const where = document.createElement('div'); where.className = 'wt-path'; where.textContent = w.path || '';
     const badges = worktreeBadges(w);
     const bs = document.createElement('div'); bs.className = 'wt-badges';
-    for (const b of badges) { const s = document.createElement('span'); s.className = 'wt-badge'; s.textContent = b.text; s.title = b.why; bs.append(s); }
+    for (const b of badges) { const s = document.createElement('span'); s.className = 'chip wt-badge'; s.textContent = b.text; s.title = b.why; bs.append(s); }
     li.append(head, meta, where);
     if (badges.length) li.append(bs);
     if (canRemove && !w.in_use) {

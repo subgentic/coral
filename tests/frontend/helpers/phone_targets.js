@@ -34,7 +34,7 @@ const ICON_ALIGN = `(() => {
     const vis = e => { if (!e.getClientRects().length) return false; if (e.checkVisibility && !e.checkVisibility({ checkVisibilityCSS: true, contentVisibilityAuto: true })) return false; const cs = getComputedStyle(e); return cs.visibility !== 'hidden' && Number(cs.opacity) !== 0; };
     const nm = e => (e.getAttribute('aria-label') || e.title || '').replace(/\\s+/g, ' ').trim();
     const d = e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/)[0] : '');
-    const ownWords = e => { const c = e.cloneNode(true); c.querySelectorAll('.material-icons, svg, img, [aria-hidden=true], .sr-only, .badge, .count').forEach(x => x.remove()); return (c.textContent || '').replace(/\\s+/g, ' ').trim(); };
+    const ownWords = e => { const c = e.cloneNode(true); c.querySelectorAll('.material-icons, svg, img, [aria-hidden=true], .sr-only, .chip, .count').forEach(x => x.remove()); return (c.textContent || '').replace(/\\s+/g, ' ').trim(); };
     const bad = []; let n = 0, labelled = 0, infos = 0;
     const lim = Math.max(24.5, 1.55 * parseFloat(getComputedStyle(document.documentElement).fontSize)); // 1.5rem: the (i) and the icons grow with the text size on purpose, so does the limit (24 px at the base size)
     for (const e of document.querySelectorAll('button, a[href], summary, [role=button]')) {

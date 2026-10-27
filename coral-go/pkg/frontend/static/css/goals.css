@@ -12,7 +12,7 @@
 
 .goal-card-meta { color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 
-.goal-chip { --goal-hue: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--goal-hue); border-radius: 999px; font-size: var(--fs-base); white-space: nowrap; color: var(--text-primary); }
+.goal-chip { --goal-hue: var(--text-muted); border: 1px solid var(--goal-hue); white-space: nowrap; color: var(--text-primary); }
 .goal-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--goal-hue); flex: none; }
 /* the word stays in the page's text colour (the accent as text was 4.44:1 on the light theme's panel); the dot and the border carry the state's colour, and the word says it */
 .goal-state-active, .goal-state-task-active { --goal-hue: var(--accent); }

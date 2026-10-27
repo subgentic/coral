@@ -27,7 +27,7 @@ const { layoutChips, chipsOf } = await importUi('board_table');
 const many = chipsOf({ content: '@Backend Dev @QA Engineer please look at #7790', ask: { open: ['Backend Dev'] } }, tagsOf({ content: '@Backend Dev @QA Engineer please look at #7790', ask: { open: ['Backend Dev'] } }, { replyName: 'Lead Developer' }));
 assert.deepEqual(many.map(c => c.t), ['Reply to Lead Developer', '@Backend Dev', '@QA Engineer', '#7790', 'Question']);
 const head = layoutChips(many), full = layoutChips(many, { all: true });
-assert.equal((head.match(/class="mb-row-tag /g) || []).length + (head.match(/mb-ask-badge/g) || []).length, 3, 'more than three marks: the first mention, the Question badge and a +N pill');
+assert.equal((head.match(/class="chip chip-tag mb-row-tag /g) || []).length + (head.match(/mb-ask-badge/g) || []).length, 3, 'more than three marks: the first mention, the Question badge and a +N pill');
 assert.ok(head.includes('>+3</span>') && head.includes('title="Reply to Lead Developer, @QA Engineer, #7790"') && head.includes('aria-label="3 more: Reply to Lead Developer, @QA Engineer, #7790"') && head.includes('@Backend Dev') && head.includes('Question'), head);
 assert.ok(['Reply to Lead Developer', '@Backend Dev', '@QA Engineer', '#7790', 'Question'].every(w => full.includes(w)) && !full.includes('more-tag'), 'the open message draws every mark');
 assert.ok(!layoutChips(many.slice(0, 3)).includes('more-tag'), 'three marks fit: no pill');

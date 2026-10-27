@@ -109,7 +109,7 @@ export function updateNotice(e) {
 export function updateBadgeHtml(e) {
     const n = updateNotice(e);
     if (!n) return '';
-    return `<a class="server-update-badge server-update-${n.level}" href="${escHtml(RELEASES_URL)}" target="_blank" rel="noopener noreferrer"`
+    return `<a class="chip server-update-badge server-update-${n.level}" href="${escHtml(RELEASES_URL)}" target="_blank" rel="noopener noreferrer"`
         + ` title="${escHtml(n.text)}" aria-label="${escHtml(n.text)}">${escHtml(n.label)}</a>`;
 }
 
@@ -147,7 +147,7 @@ export function serverBadgeHtml(id, extraClass) {
     if (!showServerLabels()) return '';
     const e = serverEntry(id);
     const m = statusMeta(e.status);
-    return `<span class="server-badge server-${m.cls}${extraClass ? ' ' + extraClass : ''}" data-server="${escHtml(e.id)}" title="${escHtml(serverHoverText(e.id))}">`
+    return `<span class="chip chip-tag server-badge server-${m.cls}${extraClass ? ' ' + extraClass : ''}" data-server="${escHtml(e.id)}" title="${escHtml(serverHoverText(e.id))}">`
         + `<span class="server-dot" aria-hidden="true"></span>${escHtml(e.label || e.id)}`
         + `<span class="sr-only"> (${escHtml(m.label)})</span></span>`;
 }

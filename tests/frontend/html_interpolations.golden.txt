@@ -171,7 +171,7 @@
 1	folder_tags.js	availableHtml
 1	folder_tags.js	createHtml
 1	folder_tags.js	currentHtml
-1	folder_tags.js	currentTags.map(t => `<span class="tag-pill" style="background:${escapeAttr(tagColor(t.color))}"> ${escapeHtml
+1	folder_tags.js	currentTags.map(t => `<span class="chip tag-pill" style="background:${escapeAttr(tagColor(t.color))}"> ${escap
 1	folder_tags.js	tags.map(t => `<span class="sidebar-tag-pill" style="background:${escapeAttr(tagColor(t.color))}" title="${esc
 3	group_cards.js	CHEVRON_DECO
 2	group_cards.js	FOLDER_GROUP_ICON

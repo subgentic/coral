@@ -136,7 +136,7 @@
 .knowledge-facts dt, .knowledge-facts dd { font-size: var(--fs-base); }
 .knowledge-facts dd { color: var(--text-primary); }
 .knowledge-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-.knowledge-tag { padding: 1px 8px; border-radius: 999px; background: var(--bg-tertiary); border: 1px solid var(--border); font-size: var(--fs-base); color: var(--text-secondary); overflow-wrap: anywhere; }
+.knowledge-tag { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-secondary); overflow-wrap: anywhere; }
 .knowledge-md { overflow-wrap: anywhere; font-size: var(--fs-lg); } /* the entry's text, rendered by the safe renderer (.md rules in components.css) */
 
 .detail-doc pre { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -9,7 +9,7 @@ export function rowFocusTarget(root, key) {
 
 /** A state as a dot and a word (the dot is decoration: the word says it). */
 export function stateChip(word, cls) {
-    const chip = el('span', `goal-chip ${cls || ''}`.trim());
+    const chip = el('span', `chip goal-chip ${cls || ''}`.trim());
     chip.append(el('span', 'goal-dot'), document.createTextNode(word));
     return chip;
 }
