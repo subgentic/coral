@@ -33,7 +33,7 @@
     --table-tertiary-color: var(--text-muted);
     --table-check-w: 44px; /* the select column holds the box, its 44 px target and its focus ring whole (#9073) */
     --table-control-border: var(--control-border);
-    --table-control-radius: var(--radius-md);
+    --table-control-radius: var(--radius-lg);
     --table-control-bg: var(--bg-primary);
     --table-value-width: 14rem;
     --table-value-gap: 8px;
