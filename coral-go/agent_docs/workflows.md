@@ -156,11 +156,9 @@ Every workflow step (shell and agent) receives the following environment variabl
 | `CORAL_DIR` | Coral data directory | `~/.coral` |
 | `CORAL_DATA_DIR` | Alias for `CORAL_DIR` | `~/.coral` |
 
-Use these to make API calls from within workflow steps. A bare `curl` is refused with [strict local auth](auth.md#strict-local-auth-the-default) (401 `dashboard_auth_required`) and `coral-agent` has no session token in a step, so send the API key from the data folder:
+Use `coral-agent` to talk to Coral from a workflow step; it signs the request as the Operator, so it works with [strict local auth](auth.md#strict-local-auth-the-default), where a bare `curl` to the API is refused (401 `dashboard_auth_required`):
 ```bash
-curl -X POST ${CORAL_URL}/api/notifications -H "Authorization: Bearer $(cat "$CORAL_DATA_DIR/api_key")" \
-  -H 'Content-Type: application/json' \
-  -d '{"title": "Step done", "message": "All tests passed", "level": "success"}'
+coral-agent notify --title "Step done" --message "All tests passed" --level success
 ```
 
 **Workflow variables** — set per run and step:
