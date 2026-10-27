@@ -60,6 +60,12 @@
        so one does not change size (and move what is beside it) when it is pressed; only the colour changes. */
     button[aria-pressed] { border-width: 2px; border-style: solid; border-color: ButtonBorder; }
     button[aria-pressed="true"] { border-color: Highlight; }
+    /* The button family's hover and keyboard focus are fills (--bg-hover), which forced colors drop: a quiet button, a dense icon button and a segment would show neither. Hover is a Highlight border (an outline where the
+       box has no border: the dense icon button and the segments), keyboard focus the 2 px Highlight ring (#9544). */
+    .btn:hover, .btn-quiet:hover { border-color: Highlight; }
+    .btn-icon.btn-xs:hover, .btn-seg > .btn:hover { outline: 1px solid Highlight; outline-offset: -1px; }
+    .btn:focus-visible, .btn-icon.btn-xs:focus-visible, .btn-seg > .btn:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
+    .btn-icon.btn-xs:focus-visible, .btn-seg > .btn:focus-visible { outline-offset: -2px; }
     .group-chip[aria-pressed="true"] { border-color: Highlight; } /* the Inbox's Open and Done chips: their own pressed border is a theme colour, forced colours would turn it into text */
     /* Comments (#5711): the current card is raised by a shadow and the hovered one is tinted, both gone here, and each avatar is a coloured circle whose initials are all that is left.
        The current card gets a Highlight border and an inner outline, the hovered one a Highlight border, and the avatar a ring. */
