@@ -80,7 +80,7 @@ const visible = () => model.goals.filter(g => W.keepsGoal(model.filter, g) && (!
 // ── drawing ──────────────────────────────────────────────────────────────
 
 /** Focus goes to the detail as a whole when a goal opens (its name is read: the goal's title), not to a heading that cannot be typed in: no ring is drawn round words (#7404). */
-function focusDetail() { root?.querySelector(layout === 'page' ? '#goals-detail-title' : '.goals-detail-col')?.focus({ preventScroll: true }); }
+function focusDetail() { root?.querySelector(layout === 'page' ? '.goal-main .goals-back, #goals-detail-title' : '.goals-detail-col')?.focus({ preventScroll: true }); } // a goal's page starts the keyboard at its way back, not its heading: no ring round plain words (#7404)
 
 /** Redraw a column and give the keyboard its place back: the control that had focus (a chip by its filter, a card by its goal, anything else by its class and words) is found again in the new draw; when it is gone ("Show all" and "Try again" go when they work) focus goes to the pressed chip, never to the page. */
 function keepFocus(col, redraw) {
