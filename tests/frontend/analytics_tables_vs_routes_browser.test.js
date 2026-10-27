@@ -1,5 +1,5 @@
 // The Analytics By agent and Efficiency tables, cell by cell against the JSON of their routes (#9516, #9511 part 2): every figure is the route's number in the one Analytics format (K, M and B with no space, one decimal at
-// most and no trailing zero; durations as 38 s, 2 min, 1 h 02 min; cost in cents, "<$0.01" under a cent, "no cost" for a zero, "—" for none), a count is whole, a share is a rounded percent, an empty cell is "—". The routes are stubbed
+// most and no trailing zero; durations as 38 s, 2 min, 1 h 02 min; cost in cents, "<$0.01" under a cent, $0.00 for a zero, "—" for none), a count is whole, a share is a rounded percent, an empty cell is "—". The routes are stubbed
 // with fixed JSON that has the edges (999 and 1,000, 999,949 and 999,960, a zero, a null, a low sample). 1280 px. Drives Chrome over CDP.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -65,22 +65,22 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         assert.deepEqual(noIcon(dump.agent.heads), ['Agent', 'Cost', 'Team', 'Folder', 'Launched', 'Duration', 'Requests', 'Input', 'Output', 'Details'], 'By agent: the columns a desktop draws');
         const strip = rows => rows.map(r => r.map((c, i) => (i === 4 ? (/^[A-Z][a-z]{2} \d+, 2026 \d\d:\d\d:\d\d [AP]M$/.test(c) ? 'time' : c) : c)));
         assert.deepEqual(strip(dump.agent.rows), [
-            ['Backend Dev', '$12.35', 'team-x', 'coral', 'time', '2h 5m', '1234', '1.2M', '999', 'Charts'],
-            ['Tiny', '$0.0040', 'team-x', 'docs', 'time', '2m 0s', '3', '1K', '1K', 'Charts'],
-            ['Idle Agent', '$0.00', '—', '—', 'time', '38s', '0', '0', '0', 'Charts']], 'By agent: cost (cents; four places under a cent; $0.00), tokens (1,234,567 is 1.2M, 999 is 999, 1,000 and 1,049 are 1K), whole counts, durations, and an empty team or folder is a dash');
+            ['Backend Dev', '$12.35', 'team-x', 'coral', 'time', '2 h 05 min', '1234', '1.2M', '999', 'Charts'],
+            ['Tiny', '$0.0040', 'team-x', 'docs', 'time', '2 min', '3', '1K', '1K', 'Charts'],
+            ['Idle Agent', '$0.00', '—', '—', 'time', '38 s', '0', '0', '0', 'Charts']], 'By agent: cost (cents; four places under a cent; $0.00), tokens (1,234,567 is 1.2M, 999 is 999, 1,000 and 1,049 are 1K), whole counts, durations, and an empty team or folder is a dash');
         // Tokens per commit by model
         assert.deepEqual(dump.tpc.heads, ['Model', 'Tokens per commit', 'vs average', 'Commits', 'Tokens', 'Cost per commit'], 'Tokens per commit: the columns');
         assert.deepEqual(dump.tpc.rows, [
             ['claude-haiku-5-5most efficient', '141K', '-53%', '51', '7.2M', '$0.42'],
             ['claude-opus-5-5', '516.7K', '+72%', '12', '6.2M', '$12.35'],
             ['gpt-5', '1M', '+233%', '10', '999', '<$0.01'],
-            ['three-commitsfew', '1K', '-100%', '3', '3.1K', 'no cost'],
-            ['no-commitsno data', '—', '—', '0', '1.5K', '—']], 'Tokens per commit: each figure is the route\'s in the one format (999,960 is 1M), the percent against the average of 300K, cents, "<$0.01", "no cost" for a zero and a dash for none');
+            ['three-commitsfew', '1K', '-100%', '3', '3.1K', '$0.00'],
+            ['no-commitsno data', '—', '—', '0', '1.5K', '—']], 'Tokens per commit: each figure is the route\'s in the one format (999,960 is 1M), the percent against the average of 300K, cents, "<$0.01", $0.00 for a zero and a dash for none');
         // Task time by thinking level
         assert.deepEqual(dump.tt.heads, ['Thinking level', 'Median time', 'vs median', 'Tasks', 'Sent back', 'Cost per task'], 'Task time: the columns');
         assert.deepEqual(dump.tt.rows, [
             ['Lowfastest', '38 s', '-96%', '57', '29%', '$1.40'],
-            ['High', '2 min', '-88%', '88', '0%', 'no cost'],
+            ['High', '2 min', '-88%', '88', '0%', '$0.00'],
             ['Maxfew', '1 h 02 min', '+245%', '5', '100%', '$10.00']], 'Task time: 38 s, 2 min, 1 h 02 min; a share of 0.285 is 29% (halves up, not the float 28%); cost to the cent');
         console.log('analytics_tables_vs_routes: ok');
         process.exit(0);

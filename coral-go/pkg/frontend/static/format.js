@@ -24,13 +24,25 @@ export function compactFigure(n) {
     const v = Number(n);
     if (!Number.isFinite(v)) return String(n);
     const a = Math.abs(v), sign = v < 0 ? '-' : '';
-    const unit = (x, u) => { const t = x.toFixed(1); return sign + (t.endsWith('.0') ? t.slice(0, -2) : t) + u; };
-    if (a >= 999.95e9) return unit(a / 1e12, 'T');
-    if (a >= 999.95e6) return unit(a / 1e9, 'B');
-    if (a >= 999950) return unit(a / 1e6, 'M');
-    if (a >= 1000) return unit(a / 1e3, 'K');
-    const r = a >= 100 ? Math.round(v) : Math.round(v * 10) / 10;
-    return Math.abs(r) >= 1000 ? unit(Math.abs(r) / 1e3, 'K') : String(r);
+    const tenths = x => Math.round(Number(x.toFixed(6))); // halves up: 1.15 is a tie for 1.2, whatever the float 1.1499999999999999 says (#9540)
+    const unit = (div, u) => { const t = tenths(a / (div / 10)); const s = (t / 10).toFixed(1); return sign + (s.endsWith('.0') ? s.slice(0, -2) : s) + u; };
+    if (a >= 999.95e9) return unit(1e12, 'T');
+    if (a >= 999.95e6) return unit(1e9, 'B');
+    if (a >= 999950) return unit(1e6, 'M');
+    if (a >= 1000) return unit(1e3, 'K');
+    const r = a >= 100 ? Math.round(v) : tenths(Math.abs(v) * 10) / 10 * (v < 0 ? -1 : 1); // a count is whole; a figure that is not (an average) has at most one decimal
+    return Math.abs(r) >= 1000 ? unit(1e3, 'K') : String(r);
+}
+
+/** The one duration format of the Analytics pages (UI/UX, #9540): 38 s, 2 min, 1 h 02 min: two parts at most, the minutes zero-padded only after an hour. Seconds in; '' for a figure that is not a number. */
+export function compactDuration(seconds) {
+    const v = Number(seconds);
+    if (!Number.isFinite(v)) return '';
+    const s = Math.round(Math.max(v, 0));
+    if (s < 60) return `${s} s`;
+    const m = Math.round(s / 60);
+    if (m < 60) return `${m} min`;
+    return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
 }
 
 /** An ISO timestamp as the local clock time (hh:mm:ss), or '' for none or a bad one. */

@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
 import { keyLabel } from './server_base.js';
-import { compactFigure, formatDuration, formatCost } from './format.js';
+import { compactFigure, compactDuration, formatCost } from './format.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 const { dataTable, tableState, link: dtLink, chip, tag, avatar } = await importOnce('./data_table.js'); // the shared table (#7743)
@@ -35,7 +35,7 @@ function _formatDuration(startStr, endStr) {
         const end = endStr ? new Date(endStr) : new Date();
         const diffMs = end - start;
         if (diffMs < 0) return '\u2014';
-        return formatDuration(diffMs);
+        return compactDuration(diffMs / 1000); // the Analytics duration format (#9540)
     } catch { return '\u2014'; }
 }
 

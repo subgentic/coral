@@ -23,8 +23,8 @@ const RANGE_WORDS = { '24h': 'in the last 24 hours', '7d': 'in the last 7 days',
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const money = v => (num(v) == null ? '' : v > 0 && v < 0.01 ? '<$0.01' : `$${v >= 100 ? Math.round(v) : v.toFixed(2)}`);
-/** A cost per commit or task: a group with no recorded cost says so (a $0.00 would read as free); under a cent is "<$0.01". */
-const costWords = (v, unit) => (num(v) == null ? '' : v > 0 ? `${money(v)} per ${unit}` : 'no cost');
+/** A cost per commit or task: under a cent is "<$0.01", a zero is $0.00 like every cost on the Analytics pages (#9540). */
+const costWords = (v, unit) => (num(v) == null ? '' : `${money(v)} per ${unit}`);
 const rangeOf = period => (period === 'week' ? '7d' : period === 'month' ? '30d' : '24h');
 const groupLabel = g => (GROUPS.find(x => x[0] === g) || [g, g])[1];
 
@@ -120,7 +120,7 @@ function drawTaskList(view, cfg, d, groups) {
         { key: 'value', label: 'Tokens per commit', numeric: true, cell: g => cfg.value(g.value) },
         { key: 'n', label: 'Commits', numeric: true, cell: g => String(g.n) },
         { key: 'tokens', label: 'Tokens', numeric: true, cell: g => (num(g.tokens) == null ? '—' : fmtTokens(g.tokens)) },
-        { key: 'cost', label: 'Cost per commit', numeric: true, cell: g => (num(g.cost_usd_per_unit) == null ? '—' : g.cost_usd_per_unit > 0 ? money(g.cost_usd_per_unit) : 'no cost') },
+        { key: 'cost', label: 'Cost per commit', numeric: true, cell: g => (num(g.cost_usd_per_unit) == null ? '—' : money(g.cost_usd_per_unit)) },
     ];
     view.append(dataTable({ label: 'Tokens per commit by task', fold: 'labeled', rows, rowKey: g => g.key || g.label, columns }).el);
 }
@@ -180,7 +180,7 @@ function draw(key) {
         cfg.metric === 'task_time'
             ? { key: 'sent_back_share', label: 'Sent back', numeric: true, cell: g => (num(g.sent_back_share) == null ? '—' : `${pct(g.sent_back_share)}%`) }
             : { key: 'tokens', label: 'Tokens', numeric: true, cell: g => (num(g.tokens) == null ? '—' : fmtTokens(g.tokens)) },
-        { key: 'cost', label: cfg.metric === 'task_time' ? 'Cost per task' : 'Cost per commit', numeric: true, cell: g => (num(g.cost_usd_per_unit) == null ? '—' : g.cost_usd_per_unit > 0 ? money(g.cost_usd_per_unit) : 'no cost') },
+        { key: 'cost', label: cfg.metric === 'task_time' ? 'Cost per task' : 'Cost per commit', numeric: true, cell: g => (num(g.cost_usd_per_unit) == null ? '—' : money(g.cost_usd_per_unit)) },
     ];
     view.append(dataTable({ label: `${cfg.metric === 'task_time' ? 'Task time' : 'Tokens per commit'} by ${groupLabel(s.group).toLowerCase()}`, fold: 'labeled', rows: [...order, ...empty], rowKey: g => g.key || g.label, columns }).el);
 }
