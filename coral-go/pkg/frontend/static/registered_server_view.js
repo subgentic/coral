@@ -157,7 +157,7 @@ function pageHtml(s) {
         <button type="button" class="back-link" id="servers-back" data-action="back">&larr; Servers</button>
         <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="chip chip-tag servers-tag" title="Private network addresses are allowed for this server">private network</span>' : ''}</h3>
         <p class="item-meta">${statusPill(status)}</p>
-        <dl class="servers-facts">
+        <dl class="facts servers-facts">
             ${factHtml('URL', escHtml(s.url || ''))}
             ${factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${badge ? ' ' + badge : ''}`)}
             ${factHtml('Agents', escHtml(agentsText(agents)))}

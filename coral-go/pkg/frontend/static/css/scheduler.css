@@ -232,9 +232,7 @@
 /* A job's page answers first (#6515, #6521). */
 .sched-header { flex-wrap: wrap; gap: 8px; }
 .sched-header h2 { margin-right: auto; overflow-wrap: anywhere; min-width: 0; }
-.sched-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0 12px; font-size: var(--fs-md); font-weight: 400; } /* labels 13/500, values 13/400 */
-.sched-facts dt { color: var(--text-secondary); font-weight: 500; }
-.sched-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.sched-facts { margin: 8px 0 12px; }
 .sched-path { font-family: var(--font-mono, monospace); font-size: var(--fs-md); }
 .sched-link { color: var(--accent); }
 .sched-settings { margin: 6px 0 12px; }

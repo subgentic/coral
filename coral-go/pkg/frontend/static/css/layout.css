@@ -972,6 +972,11 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .pane-stack { display: flex; flex-direction: column; gap: 12px; padding: 12px; } /* pictures or players one under another (side by side when compared), inside a body that scrolls */
 .pane-frame { display: flex; align-items: center; justify-content: center; min-height: 56px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-primary); }
 .pane-frame.pane-frame-checker { min-height: 80px; padding: 8px; background-color: var(--bg-primary); background-image: linear-gradient(45deg, var(--bg-tertiary) 25%, transparent 25%), linear-gradient(-45deg, var(--bg-tertiary) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--bg-tertiary) 75%), linear-gradient(-45deg, transparent 75%, var(--bg-tertiary) 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; }
+/* The facts list (#9245, Goal #88 slice 5): label and value pairs of a task, a job, a goal, a member or a server, as a definition list. The label is 12/500 in the secondary colour, the value 13/400 in the primary one; the label
+ * column is as wide as its longest label unless the page sets --facts-label; a page's own class says only the gap, the margin, the label column and whether it stacks on a phone. */
+.facts { display: grid; grid-template-columns: var(--facts-label, max-content) minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: var(--fs-md); font-weight: 400; color: var(--text-primary); }
+.facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 500; padding-top: 1px; }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 /* A phone's way back and the page's title are one row, the title dropping under the link only when less than 10 rem would be left beside it (#7734; the way #7721 did Analytics); elsewhere the row is not a box */
 .phone-title-row { display: contents; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {

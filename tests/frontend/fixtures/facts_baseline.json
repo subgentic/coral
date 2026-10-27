@@ -1,0 +1,9 @@
+{
+  "about": "*-facts and *-fact classes outside the .facts family that still set their own type look, each with why. facts_census.test.mjs fails on a new one and on one listed here that no longer sets a look: the list only goes down.",
+  "classes": {
+    "cloud-facts": "the enroll page of Coral Hub, a standalone page that does not load layout.css",
+    "chat-row-facts": "a line of a chat row in the sidebar (slice 4's list rows), not a definition list",
+    "ibx-task-facts": "a note under an Inbox task, a paragraph",
+    "update-fact": "a settings field's slot (slice 2's fields)"
+  }
+}

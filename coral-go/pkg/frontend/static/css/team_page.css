@@ -90,9 +90,8 @@
 @media (pointer: coarse), (max-width: 767px) { .team-task-page .team-link { min-height: var(--control-touch-height, 44px); } }
 
 /* a goal's page and a task's page: facts side by side, tasks as a table, the actions pinned at the bottom */
-.goals-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: var(--fs-lg); max-width: 70ch; }
-.goals-facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 500; padding-top: 2px; }
-.goals-facts dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
+.goals-facts { max-width: 70ch; }
+.goals-facts dd { white-space: pre-line; }
 .goals-tasks-head { margin: 8px 0 0; font-size: 0.9375rem; }
 .goals-updating { min-height: 1.2em; margin: 0; } /* its slot keeps its height whether or not it says Updating */
 .team-task-md { overflow-wrap: anywhere; font-size: var(--fs-lg); max-width: 80ch; }
@@ -110,17 +109,12 @@
 .detail-close { flex: none; width: 36px; height: 36px; display: inline-grid; place-items: center; border: 0; background: none; border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; }
 .detail-close:hover { background: var(--bg-hover); color: var(--text-primary); }
 .detail-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.detail-facts { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 12px; font-size: var(--fs-md); margin: 0; }
-.detail-facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 500; padding-top: 1px; }
-.detail-facts dd { margin: 0; overflow-wrap: anywhere; }
+.detail-facts { --facts-label: 110px; gap: 6px 12px; }
 .detail-doc { min-width: 0; }
 .detail-grip { position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; outline: none; } /* the goal page column's handle (#7702) on the pane's left edge: an 8 px target, the 2 px line drawn in the middle */
 .detail-back { min-height: 36px; align-items: center; }
 .team-page.detail-sheet .detail-back { display: inline-flex; min-height: 44px; min-width: 44px; }
 .detail-head-text > .phone-title-row > .detail-back { flex: 0 0 auto; margin: 0; }
-.knowledge-facts { font-size: var(--fs-base); } /* the entry's front matter: a quiet block of facts, behind the pane's Details button */
-.knowledge-facts dt, .knowledge-facts dd { font-size: var(--fs-base); }
-.knowledge-facts dd { color: var(--text-primary); }
 .knowledge-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .knowledge-tag { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-secondary); overflow-wrap: anywhere; }
 .knowledge-md { overflow-wrap: anywhere; font-size: var(--fs-lg); } /* the entry's text, rendered by the safe renderer (.md rules in components.css) */
