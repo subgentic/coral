@@ -16,8 +16,8 @@ const BASE = require('./test_base').BASE;
         return result.result.value;
     };
     const { waitFor } = require('./helpers/wait').bind(ev);
-    const bar = () => ev(`[...document.querySelectorAll('#tp-host .goals-pinbar .btn')].map(b => b.textContent)`);
-    const click = async text => { await waitFor(`[...document.querySelectorAll('#tp-host .goals-pinbar .btn')].some(b => b.textContent === ${JSON.stringify(text)})`, 'the ' + text + ' button'); await ev(`[...document.querySelectorAll('#tp-host .goals-pinbar .btn')].find(b => b.textContent === ${JSON.stringify(text)}).click(); true`); };
+    const bar = () => ev(`[...document.querySelectorAll('#tp-host .goals-pinbar .btn, #tp-host .goals-pinbar [role=menuitem]')].map(b => b.textContent)`);
+    const click = async text => { await waitFor(`[...document.querySelectorAll('#tp-host .goals-pinbar .btn, #tp-host .goals-pinbar [role=menuitem]')].some(b => b.textContent === ${JSON.stringify(text)})`, 'the ' + text + ' button'); await ev(`[...document.querySelectorAll('#tp-host .goals-pinbar .btn, #tp-host .goals-pinbar [role=menuitem]')].find(b => b.textContent === ${JSON.stringify(text)}).click(); true`); };
     const show = async task => { await ev(`window.__task = ${JSON.stringify(task)}; testState.currentBoardTasks = [window.__task]; document.getElementById('tp-host').replaceChildren(); testPage.renderTaskPage(document.getElementById('tp-host'), window.__task, { project: 'amendment-fixture', backLabel: 'Tasks', onBack() {}, openGoal() {} }); true`); await waitFor(`!!document.querySelector('#tp-host #team-task-title')`, 'the page'); };
     try {
         await Promise.all([Page.enable(), Runtime.enable()]);

@@ -108,12 +108,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
             .then(() => check('the task page shows the full task, fetched on open', true))
             .catch(e => check('the task page shows the full task, fetched on open', false, e.message));
         await ev(`window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'tasks', item: ${openIds[1]} }); true`);
-        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.startsWith('#${openIds[1]} ') && [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].some(b => b.textContent === 'Edit')`, 'the second task page', { timeout: 8000 });
-        await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Edit').click(); true`);
+        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.startsWith('#${openIds[1]} ') && [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn, #team-panel-item .goals-pinbar [role=menuitem]')].some(b => b.textContent === 'Edit')`, 'the second task page', { timeout: 8000 });
+        await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn, #team-panel-item .goals-pinbar [role=menuitem]')].find(b => b.textContent === 'Edit').click(); true`);
         await waitFor(`!!document.getElementById('task-edit-body')`, 'the edit form', { timeout: 8000 });
         const editBody = await ev(`document.getElementById('task-edit-body')?.value || ''`);
         check('Edit on a task never opened edits the full body, never the preview', editBody === LONG_BODY, `${editBody.length} chars`);
-        await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Cancel').click(); true`);
+        await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn, #team-panel-item .goals-pinbar [role=menuitem]')].find(b => b.textContent === 'Cancel').click(); true`);
 
         // ── A fetch that never answers ends at the timeout; a failed refresh keeps the list ──
         await ev(`(async () => { ${MODS} tasks.boardTaskFetchHooks.timeoutMs = 300; window.__hang.add(${JSON.stringify(BOARD)}); return true; })()`);

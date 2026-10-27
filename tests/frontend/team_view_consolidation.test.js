@@ -184,7 +184,7 @@ const BASE = require('./test_base').BASE;
     const groups = await ev(`Array.from(document.querySelectorAll('#team-settings-workspace .settings-tab .settings-tab-name')).map(t => t.textContent)`);
     assert.ok(groups.includes('Workflow') && groups.includes('Messaging') && groups.includes('Prompts') && !groups.includes('Global'), 'the page has team groups only: no Global settings: ' + groups.join(', '));
     const headings = await ev(`Array.from(document.querySelectorAll('#team-settings-health .sv-heading')).map(l => l.textContent)`);
-    assert.deepEqual(headings, ['Reviews', 'Automatic rules', 'Work done off the books', 'Questions'], 'the Health check has its four sections (Work done off the books: #7793; Questions: the reminder of an unanswered question, #7794)');
+    assert.deepEqual(headings, ['Reviews', 'Automatic rules', 'Work done off the books', 'Landing', 'Goals and open tasks', 'Release', 'Questions'], 'the Health check has its seven sections (Work done off the books: #7793; Landing, Goals and open tasks and Release: Goal #80; Questions: the reminder of an unanswered question, #7794)');
     console.log('\u2713 Groups verified (no Global settings)');
 
     // A failed working-mode save says so

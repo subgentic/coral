@@ -54,11 +54,11 @@ const BASE = require('./test_base').BASE;
 
         console.log('4. Edit: the Goal select moves the task to another goal and back to none');
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks', item: ${t2.json.id} }); true`);
-        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].some(b => b.textContent === 'Edit')`, 'Edit', 12000);
-        await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Edit').click(); true`);
+        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn, #team-panel-item .goals-pinbar [role=menuitem]')].some(b => b.textContent === 'Edit')`, 'Edit', 12000);
+        await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn, #team-panel-item .goals-pinbar [role=menuitem]')].find(b => b.textContent === 'Edit').click(); true`);
         await waitFor(`!!document.getElementById('task-edit-goal') && document.getElementById('task-edit-goal').options.length === 3`, 'the Goal select in Edit', 8000);
         assert.equal(await ev(`document.getElementById('task-edit-goal').value`), '', 'a task with no goal starts on No goal');
-        await ev(`document.getElementById('task-edit-goal').value = '${g1}'; [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Save').click(); true`);
+        await ev(`document.getElementById('task-edit-goal').value = '${g1}'; [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn, #team-panel-item .goals-pinbar [role=menuitem]')].find(b => b.textContent === 'Save').click(); true`);
         for (let n = 0; n < 40 && (await taskOf(t2.json.id)).goal_id !== g1; n++) await ev(`new Promise(r => setTimeout(r, 150))`); // sleep-ok: the save goes over the network
         assert.equal((await taskOf(t2.json.id)).goal_id, g1, 'Save moved the task to the chosen goal');
         await waitFor(`!document.getElementById('task-edit-goal') && [...document.querySelectorAll('#team-panel-item .goals-facts dd button.team-link')].some(b => b.textContent === 'Ship the new installer')`, 'the page naming the new goal', 8000);
