@@ -166,11 +166,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 	// Sessions joined through the board API may have no board_name in the
 	// session store. Resolve their subscription before renaming the terminal.
 	if h.bs != nil && req.SessionID != "" {
-		oldAgentType := p.agentType
-		if p.stored != nil {
-			oldAgentType = p.stored.AgentType
-		}
-		sub, err := h.bs.GetSubscriptionBySessionName(ctx, naming.SessionName(oldAgentType, req.SessionID))
+		sub, err := h.bs.GetSubscriptionBySessionName(ctx, naming.SessionName(p.oldAgentType(), req.SessionID))
 		if err != nil {
 			return nil, func(w http.ResponseWriter) { errInternalServer(w, err.Error()) }
 		}
@@ -210,7 +206,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 	// (#3213; before, the restart answered terminal_gone until the agent showed asleep).
 	p.fresh = p.sleeping
 	if p.fresh == nil && p.stored != nil && p.stored.WorkingDir != "" {
-		if pane, err := h.terminal.FindSession(ctx, name, p.agentType, req.SessionID); err == nil && pane == nil {
+		if pane, err := h.terminal.FindSession(ctx, name, p.oldAgentType(), req.SessionID); err == nil && pane == nil {
 			p.fresh = p.stored
 		}
 	}
@@ -225,7 +221,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 		p.usePTY = h.restartsOnPTY(p.fresh)
 		return p, nil
 	}
-	pane, err := h.terminal.FindSession(ctx, name, p.agentType, req.SessionID)
+	pane, err := h.terminal.FindSession(ctx, name, p.oldAgentType(), req.SessionID) // the terminal it runs in now: named by the provider it runs on, not the one it is going to run on (#8973)
 	if err == nil && pane == nil && req.SessionID != "" {
 		return nil, func(w http.ResponseWriter) { writeTerminalError(w, ptymanager.ErrTerminalGone) }
 	}
@@ -237,6 +233,14 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 	// tmux-style "<name>:0.0" target names no pty session, #4767).
 	p.usePTY = h.restartsOnPTY(p.stored)
 	return p, nil
+}
+
+// oldAgentType is the provider the agent runs on now: its terminal and board subscription are named by it. A restart may switch the provider (agentType is the one it starts with, #8973).
+func (p *restartPlan) oldAgentType() string {
+	if p.stored != nil && p.stored.AgentType != "" {
+		return p.stored.AgentType
+	}
+	return p.agentType
 }
 
 // restartsOnPTY reports whether a restart runs the pty way: on a pty Coral every agent does (#3634); otherwise an
