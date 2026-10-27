@@ -46,6 +46,18 @@ export function scan(css) {
 // the scan itself, on fixtures
 assert.deepEqual([...scan('.a-tag { padding: 2px; } .b-pill { color: red; } .c-badge, .d-chip { font-size: 11px } .e-chip:hover { padding: 0 } /* .f-tag { padding: 1px } */ .parent .g-tag { padding: 0 }')].sort(), ['a-tag', 'c-badge', 'd-chip']);
 
+// 2. one chip height at every width (#9230): no rule other than the family's own gives a chip (.chip, .dt-chip, .goal-chip) a height, line height, padding or radius of its own, a table's folded rows included
+const chipRules = [];
+for (const f of fs.readdirSync(CSS).filter(f => f.endsWith('.css'))) {
+    const css = fs.readFileSync(path.join(CSS, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) for (const raw of m[1].split(',')) {
+        const sel = raw.trim().replace(/\s+/g, ' '), last = sel.split(/[ >]+/).pop();
+        if (!/(^|\.)(?:chip|dt-chip|goal-chip)(?![\w-])/.test(last) || /^\.chip(?:-(?:tag|count|caps))?$/.test(sel) || /^\.goal-chip$/.test(sel)) continue;
+        if (/(?:^|;)\s*(?:height|min-height|max-height|line-height|padding(?:-[a-z]+)?|border-radius)\s*:/.test(';' + m[2])) chipRules.push(`${f}: "${sel}" sets a chip's own height, padding or radius`);
+    }
+}
+assert.deepEqual(chipRules, [], 'one chip height at every width:\n  ' + chipRules.join('\n  '));
+
 const found = new Set();
 for (const f of fs.readdirSync(CSS).filter(f => f.endsWith('.css'))) for (const c of scan(fs.readFileSync(path.join(CSS, f), 'utf8'))) found.add(c);
 const bad = [];

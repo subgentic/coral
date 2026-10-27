@@ -274,7 +274,7 @@
 .dt-title-content { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-content { overflow: visible; }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-id { min-width: 0; }
-.dt-box.dt-compact.dt-fold-column.dt-folded .dt-chip { box-sizing: border-box; height: var(--table-fold-meta-h); padding-block: 0; font-size: var(--table-head-size); font-weight: var(--table-head-weight); }
+/* a status chip in a folded row is the chip family's height like everywhere else (--chip-height): a rule here that set it to the row's meta height made it 20 px at 390 and 16 at 1280 (#9230) */
 
 /* The hover/current background is stronger than the panel. Quiet text still
  * needs 4.5:1 on that background in either theme. */
