@@ -53,7 +53,6 @@
   "mobile.css: @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) | .command-pane .command-pane-body": 2,
   "mobile.css: @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) | #messageboard-view": 2,
   "mobile.css: @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) | #mobile-session-list .session-group-item": 2,
-  "mobile.css: @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) | #mobile-session-list .sidebar-kebab-btn": 2,
   "mobile.css: @media (hover: none) and (pointer: coarse) | .file-item": 2,
   "mobile.css: @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) | #mobile-history-list .hf-label": 2,
   "output.css:  | .preview-pane-markdown": 2,
