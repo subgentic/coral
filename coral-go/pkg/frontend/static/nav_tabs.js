@@ -173,9 +173,11 @@ function layoutSelect() {
     const label = document.getElementById('nav-select-label');
     if (!label) return;
     const cur = availableTabs().find(t => t.active);
-    label.textContent = cur ? cur.label : '';
-    const top = document.getElementById('top-menu-label'); if (top) top.textContent = cur ? cur.label : '';
-    const hamburger = document.getElementById('top-menu-btn'); if (hamburger) hamburger.setAttribute('aria-label', cur ? `${cur.label}, menu` : 'Menu'); // its name has the words it shows: the open view first (#9116)
+    const hiddenOn = cur ? null : document.querySelector('.top-nav-tabs > .top-nav-tab.active[data-arg]'); // a view whose tab is not in the bar (Servers on a local Coral's hub page) is still the view on screen: the bar names it, never blank (#9683)
+    const words = cur ? cur.label : (hiddenOn ? (hiddenOn.dataset.label || hiddenOn.textContent).trim() : '');
+    label.textContent = words;
+    const top = document.getElementById('top-menu-label'); if (top) top.textContent = words;
+    const hamburger = document.getElementById('top-menu-btn'); if (hamburger) hamburger.setAttribute('aria-label', words ? `${words}, menu` : 'Menu'); // its name has the words it shows: the open view first (#9116)
     if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || _menuFor.id === 'top-menu-btn' && !window.matchMedia('(max-width: 639px)').matches)) closeMenu();
 }
 
