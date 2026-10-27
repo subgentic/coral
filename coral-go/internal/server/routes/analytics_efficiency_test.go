@@ -448,3 +448,35 @@ func TestEfficiencyOnASeededBoardAnswersBothWindowsAndLogsItsTime(t *testing.T) 
 	assert.NotNil(t, avg["usual"], "and so has the usual one, from the same read")
 	assert.Greater(t, body["total"].(map[string]any)["n"], float64(1000))
 }
+
+// #9151 (Security Reviewer's SHOULD): what the one shared read rests on. A commit only the usual window has must reach the usual figure, though it is older than the current window's reach; and the current
+// window takes commits only from its own slack (a task open longer than that has the last 14 days of its commits), not from the usual window's.
+func TestEfficiencyTheSharedCommitReadServesTheUsualWindowAndKeepsEachWindowsSlack(t *testing.T) {
+	e := newEffEnv(t)
+	ctx := context.Background()
+	db, err := storetest.Open(t, e.storePath)
+	require.NoError(t, err)
+	gs := store.NewGitStore(db)
+	day := 24 * time.Hour
+	commit := func(hash string, ago time.Duration) {
+		at := e.now.Add(-ago).Format(time.RFC3339)
+		sid := effSessA
+		require.NoError(t, gs.UpsertGitSnapshot(ctx, &store.GitSnapshot{AgentName: "Alpha Dev", AgentType: "claude", WorkingDirectory: "/w", Branch: "feature", CommitHash: hash, CommitTimestamp: &at, SessionID: &sid}))
+	}
+	commit("u1", 24*day)                                                                 // in the usual window's slack, further back than the current window's reach (21 days): only a shared read that reaches 28 days gives it to the usual figure
+	commit("far", 22*day)                                                                // in the usual window's slack, and outside the current window's (a task open that long has only its last 14 days)
+	commit("near", 5*day)                                                                // inside the current window's slack
+	usualTask := e.finishedTask(t, "done in the usual window", effSessA, 25*day, 10*day) // claimed 25 days ago: u1 and far are made while it is open
+	curTask := e.finishedTask(t, "done in the current window", effSessA, 23*day, day)    // claimed 23 days ago: far is outside the slack, near is inside
+	code, body := e.get(t, "metric=tokens_per_commit&group_by=task&range=7d")
+	require.Equal(t, http.StatusOK, code)
+	g := groupsOf(t, body)
+	require.Contains(t, g, fmt.Sprint(curTask))
+	// the fixture's own session-A commits count too: "old" (20 days ago) and "older" (9 days ago) lie in both tasks' windows
+	assert.EqualValues(t, 3, g[fmt.Sprint(curTask)]["n"], "the current window keeps only the commits inside its own slack: old, older and near, not far (22 days: a fourth if the lower bound were dropped)")
+	assert.NotContains(t, g, fmt.Sprint(usualTask), "the usual window's task is not in the current figure")
+	avg := body["average"].(map[string]any)
+	assert.InDelta(t, 100.0/3, avg["value"], 0.001, "the current figure: 100 tokens over old, older and near")
+	require.NotNil(t, avg["usual"], "the usual figure has its commits")
+	assert.InDelta(t, 100.0/3, avg["usual"], 0.001, "the usual window's one task, 100 tokens over u1, far and old (a shared read that stopped at 21 days would lose u1: 50)")
+}
