@@ -51,7 +51,7 @@ const BASE = require('./test_base').BASE;
             // the next run's exact time is text too, not only a tooltip (#9117): the two jobs with a next run say it for a screen reader; the paused one has none
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => (r.querySelector('td[data-key=next] .sr-only') || {}).textContent || '')`).then(a => a.map(t => /^, next run .+ your time$/.test(t))), [true, true, false], `${at}the next run is also text for assistive technology`);
             const folderWords = mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`;
-            assert.deepEqual(await ev(folderWords), mobile ? ['Running now (0)', 'Failed (1)', 'Jobs (3)', 'Workflows (1)'] : ['Running now0', 'Failed1', 'Jobs3', 'Workflows1'], `${at}the folders with their counts, not job rows`);
+            assert.deepEqual(await ev(folderWords), mobile ? ['Running now (0)', 'Failed (1)', 'Recent runs (0)', 'Jobs (3)', 'Workflows (1)'] : ['Running now0', 'Failed1', 'Recent runs0', 'Jobs3', 'Workflows1'], `${at}the folders with their counts, not job rows`);
             assert.equal(await ev(`document.querySelectorAll('#automations-nav-list .sched-row').length`), 0, `${at}no job rows in the sidebar`);
             assert.deepEqual(await names(), ['nightly-build-job', 'summarize-the-day', 'weekly-cleanup'], `${at}by next run (20 h, 30 h), the paused job last`);
             // the Last run chip says its state in words (the old sidebar dot's name, which scheduler_status_dot pinned): the words are the chip's text, the dot is decoration
