@@ -624,7 +624,7 @@ func (h *BoardHandler) ListSessionArtifacts(w http.ResponseWriter, r *http.Reque
 	}
 	page := items[offset:end]
 	for i := range page {
-		enrichTeamArtifact(&page[i], h.artifactObjectDir())
+		enrichSessionArtifact(&page[i], h.artifactObjectDir())
 	}
 	if page == nil {
 		page = []teamArtifact{}
@@ -667,6 +667,9 @@ func (h *BoardHandler) linkUploadTasks(ctx context.Context, project string, item
 		}
 	}
 }
+
+// enrichSessionArtifact is what the standalone list does to each item of its page (a sidecar read and a stat); a test counts its calls to pin that nothing off the page is touched (#9031).
+var enrichSessionArtifact = enrichTeamArtifact
 
 // sizeOfRecord is an upload record's size as the list's size (nil when the record has none), so the size sorts need no stat of the blob.
 func sizeOfRecord(n int64) *int64 {
