@@ -37,7 +37,6 @@ for (const kind of ['css', 'js']) for (const [f, why] of Object.entries(EXEMPT[k
     if (!(exempt[kind][f] > 0)) bad.push(`${kind === 'css' ? 'css/' : ''}${f}: exempt, but it no longer matches anything: remove the exemption`);
 }
 
-if (!exemptRules) bad.push('the session tooltip exemption (selector) no longer matches a rule: remove it');
 if (update) { fs.writeFileSync(BASELINE, JSON.stringify(counts, null, 2) + '\n'); console.log('data_table_census: baseline written'); process.exit(bad.length ? 1 : 0); }
 const base = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
 for (const kind of ['css', 'js']) {

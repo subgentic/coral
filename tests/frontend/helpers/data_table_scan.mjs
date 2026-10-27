@@ -37,7 +37,7 @@ export const jsCount = (src) => (src.match(JS_BUILDER) || []).length;
 // What is not a list the dashboard draws, each with its reason (#7905); the census fails when an entry stops matching anything, and the scan's own test holds that every entry has a reason.
 export const EXEMPT = {
     css: { 'content_table.css': 'tables an author wrote in Markdown (a subagent\'s details, a chat bubble, .md, Docs, the preview): content, not a list the dashboard draws, with one shared style and tokens' },
-    js: { 'session_state.js': 'the agent session tooltip is a list of facts (a name and its value), not a list of items: it is not a data_table' },
+    js: {},
 };
-// the tooltip's own rules, in a stylesheet that has real tables too: exempt by selector, with the same reason
-export const EXEMPT_SELECTORS = [/\.session-tooltip-table/];
+// rules in a stylesheet that has real tables too, exempt by selector with a reason (none now: the session tooltip is a .facts list, facts.js)
+export const EXEMPT_SELECTORS = [];
