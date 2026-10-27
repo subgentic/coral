@@ -39,6 +39,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
     if(path==='/api/sessions/history')return json({sessions:[{session_id:'same-chat',title:server==='m1'?'Laptop conversation':'Desktop conversation',source_type:'claude'},{session_id:'chat-2',title:'Second conversation on '+server,source_type:'claude'},{session_id:'chat-3',title:'Third conversation on '+server,source_type:'codex'}],total:3,page:1,page_size:50});
     if(path==='/api/sessions/history/search'&&/[?&]q=zzz/.test(p.search))return json({status:'complete',results:[]});
     if(path==='/api/sessions/history/search')return json({status:'complete',results:[{session_id:'same-chat',type:'agent',hits:[{role:'user',excerpt:'needle from '+server,locator:{session_id:'same-chat',message_index:0}}]}]});
+    if(path==='/api/sessions/history/no-such-chat')return Promise.resolve(new Response('{"error":"not found"}',{status:404,headers:{'content-type':'application/json'}}));
     if(path==='/api/sessions/history/same-chat')return json({agent_type:'claude',messages:[{type:'user',content:'needle from '+server},{type:'assistant',text:'Scoped to this computer.'}],total:2,start:0});
     if(path.endsWith('/notes'))return json({notes_md:'Notes from '+server});
     if(path==='/api/token-usage')return json({totals:{}});
