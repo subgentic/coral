@@ -17,14 +17,8 @@ import (
 // only the Hub does: no local Coral reads another machine's rows. It answers the stream Coral Hub's own SERVICE stamped (tunnel/hubservice.go: authentic connector stamp, the service flag, and the server
 // and board the request was sent from) and nobody else: an owner, a viewer, an agent and a local program all get 403 service_only. The asker comes from the stamp, never from the query.
 
-// serviceAsker is who the Hub's service says the read is for, when the request is a stream the connector really stamped for the service.
-func serviceAsker(r *http.Request) (tunnel.HubAsker, bool) {
-	if !cloud.TunneledAuthentic(r) || r.Header.Get(tunnel.HubServiceHeader) != "1" {
-		return tunnel.HubAsker{}, false
-	}
-	a := tunnel.HubAsker{Server: r.Header.Get(tunnel.HubAskServerHeader), Board: r.Header.Get(tunnel.HubAskBoardHeader)}
-	return a, tunnel.ValidHubAsker(a)
-}
+// serviceAsker is who the Hub's service says the read is for, when the request is a stream the connector really stamped for the service (cloud.ServiceAsker, which the Guard asks too, #9084).
+func serviceAsker(r *http.Request) (tunnel.HubAsker, bool) { return cloud.ServiceAsker(r) }
 
 // The closed list of answers this read gives (#7411, agreed with coral-hub): the body is the code and nothing else, so no machine text crosses; the detail of a 400 (which parameter, a bad cursor) lives in the tests.
 const (

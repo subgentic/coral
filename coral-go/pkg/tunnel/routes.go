@@ -680,6 +680,15 @@ func AllowRequest(mode func() Mode) func(method, decodedPath, rawQuery string) b
 	}
 }
 
+// AllowServiceRequest is AllowRequest for the Hub's own service stream (hubservice.go): a request is allowed when its service route's tier is known and no higher than the effective mode. It is only ever
+// asked for a request the caller has found authentically service-stamped; every other request is judged by AllowRequest.
+func AllowServiceRequest(mode func() Mode) func(method, decodedPath, rawQuery string) bool {
+	return func(method, decodedPath, rawQuery string) bool {
+		t := ClassifyService(method, decodedPath, rawQuery)
+		return t != TierNever && t <= currentMode(mode)
+	}
+}
+
 func currentMode(mode func() Mode) Mode {
 	if mode == nil {
 		return TierView
