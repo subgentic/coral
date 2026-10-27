@@ -74,10 +74,17 @@ const TEAM = `qa-tsm-${Date.now() % 100000}`;
             check(`${label}: Leave without saving closes it, and focus is back on the button that opened it`, !(await modal()) && (await ev(`document.activeElement === window.__opener || (document.activeElement && document.activeElement.id === window.__opener.id)`)), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className)`));
 
             // with nothing changed, Escape closes it at once
-            // with nothing changed, Cancel closes it too (it is never disabled); with a change it drops the change and the dialog stays
+            // Cancel closes it every time (never disabled); with nothing changed it just closes. (With a change it throws the change away and closes: team_page_settings.)
             await openSettings(ev, settle);
             await ev(`document.querySelector('.team-settings-modal .sv-cancel').click(); true`); await settle(500);
             check(`${label}: with nothing changed Cancel closes the dialog`, !(await modal()));
+            await openSettings(ev, settle);
+            await ev(`(() => { const m = document.querySelector('.team-settings-modal'); const sw = [...m.querySelectorAll('[role=switch], input[type=checkbox]')].find(e => e.getClientRects().length); if (sw) sw.click(); return !!sw; })()`); await settle(300);
+            await ev(`document.querySelector('.team-settings-modal .sv-cancel').click(); true`); await settle(500);
+            check(`${label}: with a change Cancel throws it away and closes the dialog, with no unsaved question`, !(await modal()) && !(await ev(`!!document.getElementById('confirm-modal') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`)));
+            await openSettings(ev, settle);
+            check(`${label}: the next open shows the saved values (nothing unsaved)`, await ev(`!(document.getElementById('team-settings-workspace').hasUnsaved && document.getElementById('team-settings-workspace').hasUnsaved())`));
+            await closeSettings(ev, settle);
             await openSettings(ev, settle);
             await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
             await settle(500);
