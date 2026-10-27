@@ -67,7 +67,7 @@ const { connect } = require('./agent_view_harness');
                     for (const [n, k] of Object.entries(keys)) { const c = cs(chip(k)); out.groups[n] = c && { color: c.color, bg: c.backgroundColor }; }
                     for (const sid of ['sid-p1', 'sid-p2', 'sid-c1']) {
                         const t = cs(document.querySelector('#sidebar-rail-list .sidebar-rail-item[data-session-id="' + sid + '"] .rail-tile'));
-                        out.agents[sid] = t && { color: t.color, bg: t.backgroundColor, border: t.borderTopWidth };
+                        out.agents[sid] = t && { color: t.color, bg: t.backgroundColor, border: t.borderTopWidth, shadow: t.boxShadow, w: t.width };
                     }
                 } else {
                     const head = k => document.querySelector('#live-sessions-list .session-group-header[data-group="' + CSS.escape(k) + '"] .group-name-line');
@@ -96,6 +96,9 @@ const { connect } = require('./agent_view_harness');
             }
             assert.equal(rail.agents['sid-p2'].bg, list.agents['sid-p2'].bg, `${theme}: the selected tile has the selected row's background`);
             assert.equal(rail.agents['sid-p1'].bg, clear, `${theme}: an unselected tile has no fill`);
+            assert.match(rail.agents['sid-p2'].shadow, /inset/, `${theme}: the selected tile has the row's 3 px inset accent bar`);
+            assert.equal(rail.agents['sid-p1'].shadow, 'none', `${theme}: an unselected tile has no bar`);
+            assert.equal(rail.agents['sid-p2'].w, rail.agents['sid-p1'].w, `${theme}: the bar changes no size`);
             assert.notEqual(list.agents['sid-p1'].color, list.agents['sid-c1'].color, `${theme}: the picked name colour differs from the plain one`);
             await ev(`localStorage.removeItem('coral-board-colors'); localStorage.removeItem('coral-group-by-team'); localStorage.removeItem('coral-theme'); true`);
         }
