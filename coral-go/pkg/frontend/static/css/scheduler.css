@@ -208,7 +208,7 @@
     padding: 10px 12px;
     border-radius: var(--radius-md);
     font-size: var(--fs-md);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     color: var(--error, var(--error));
     background: rgba(var(--fx-red-rgb), 0.12);
     border: 1px solid rgba(var(--fx-red-rgb), 0.3);

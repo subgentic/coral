@@ -833,7 +833,7 @@
 
     #mobile-session-list .session-label {
         white-space: normal;
-        line-height: 1.35;
+        line-height: var(--lh-ui);
         font-size: var(--fs-lg);
         font-weight: var(--fw-medium); /* agents are children of the 600-weight group header */
     }
@@ -933,7 +933,7 @@
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 2;
         overflow: hidden;
-        line-height: 1.45;
+        line-height: var(--lh-ui);
     }
 
     /* The empty-goal affordance (sparkle + "No goal yet") must stay a single
