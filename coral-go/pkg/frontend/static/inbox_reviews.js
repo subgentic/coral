@@ -118,7 +118,9 @@ export function markOpenedRead(hex) {
 
 /** Swap the review tag, preserving the remaining tags (the 'read' tag goes: a reviewed artifact is settled); keep the row on failure. */
 export async function markReviewed(row) {
-    const tags = [...new Set((row.tags || []).filter(t => t !== 'for review' && t !== 'read').concat('reviewed'))];
+    const current = await currentTags(row); // as the server has them now, read right before the write (the route replaces the whole list): a tag added since the last refresh is kept (#9299)
+    if (current === null) { revision++; items = items.filter(a => a.reviewKey !== row.reviewKey); changed(); return; } // someone settled it meanwhile: nothing to write
+    const tags = [...new Set(current.filter(t => t !== 'for review' && t !== 'read').concat('reviewed'))];
     const r = await boardFetch(row.team, `/artifacts/${encodeURIComponent(row.id)}/tags`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }),
     });
