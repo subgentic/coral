@@ -92,12 +92,13 @@ type UserSetting struct {
 
 // SessionStore provides session-related database operations.
 type SessionStore struct {
-	db *DB
+	db    *DB
+	facts *sessionFactsCache // the facts of sessions SessionFacts has read (#9359)
 }
 
 // NewSessionStore creates a new SessionStore.
 func NewSessionStore(db *DB) *SessionStore {
-	return &SessionStore{db: db}
+	return &SessionStore{db: db, facts: &sessionFactsCache{now: time.Now}}
 }
 
 // DB returns the underlying database connection.

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -156,8 +157,72 @@ type SessionFacts struct {
 	Provider string    // "" when unknown
 }
 
-// SessionFacts reads the facts of the sessions ids, from the live row, the transcript index and the usage rows (raw and rolled up alike), whichever have them.
+// sessionFactsFresh is how long a session's complete facts are kept (#9359): a session's start and provider do not change once they are known, and the read of them is the slowest part of the Analytics
+// efficiency reads after the tasks (every task's session, a query of its usage rows each: 115 ms for 5,000 sessions of 20 rows). Ten minutes bounds what a rewritten transcript index or a deleted
+// session could still show; facts that are not complete (no start, or no provider) are never kept, so a session that has not recorded anything yet is asked for again.
+const (
+	sessionFactsFresh = 10 * time.Minute
+	sessionFactsMax   = 20000
+)
+
+type sessionFactsCache struct {
+	mu  sync.Mutex
+	now func() time.Time
+	m   map[string]cachedFacts
+}
+
+type cachedFacts struct {
+	facts SessionFacts
+	at    time.Time
+}
+
+// take returns the kept facts of the ids that have fresh ones, and the ids that have none.
+func (c *sessionFactsCache) take(ids []string) (map[string]SessionFacts, []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	hit, miss := make(map[string]SessionFacts), make([]string, 0, len(ids))
+	now := c.now()
+	for _, id := range ids {
+		if e, ok := c.m[id]; ok && now.Sub(e.at) < sessionFactsFresh {
+			hit[id] = e.facts
+		} else {
+			miss = append(miss, id)
+		}
+	}
+	return hit, miss
+}
+
+// keep remembers the complete facts among got.
+func (c *sessionFactsCache) keep(got map[string]SessionFacts) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.m == nil || len(c.m) > sessionFactsMax {
+		c.m = make(map[string]cachedFacts)
+	}
+	now := c.now()
+	for id, f := range got {
+		if !f.Start.IsZero() && f.Provider != "" {
+			c.m[id] = cachedFacts{facts: f, at: now}
+		}
+	}
+}
+
+// SessionFacts reads the facts of the sessions ids, from the live row, the transcript index and the usage rows (raw and rolled up alike), whichever have them. The complete facts of a session are kept for
+// ten minutes (sessionFactsFresh).
 func (s *SessionStore) SessionFacts(ctx context.Context, ids []string) (map[string]SessionFacts, error) {
+	hit, ids := s.facts.take(ids)
+	out, err := s.readSessionFacts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	s.facts.keep(out)
+	for id, f := range hit {
+		out[id] = f
+	}
+	return out, nil
+}
+
+func (s *SessionStore) readSessionFacts(ctx context.Context, ids []string) (map[string]SessionFacts, error) {
 	out := make(map[string]SessionFacts, len(ids))
 	note := func(id, start, provider string) {
 		f := out[id]
