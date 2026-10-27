@@ -1,6 +1,6 @@
 // The team page's Settings tab (#7453, stage 2; UI/UX's doc 7aa984fe item 7, the approved panel design as a tab): sections Workflow, Health check, Messaging and Prompts; each setting a row with its label and hint at
 // the left and its control at the right (a select named "Working mode", switches named "Require a goal", "Send health check", "Post when all is well"); a save bar pinned on a wide view, at the scroll end on a narrow view ("No changes to
-// save."), Cancel at the left and Save settings at the right, Save off until something changes; a change turns the status on and Save on; Cancel puts it back; Save sends the change and the page says it saved.
+// save."), Cancel at the left and Save settings at the right, Save off until something changes; a change turns the status on and Save on; Cancel throws the change away and closes the popout; Save sends the change and the page says it saved.
 // Written failing-first by QA (#7499): by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -56,7 +56,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 const r = await ev(`(() => { const e = ${sw('Require a goal')}; const l = [...window.__tp.page().querySelectorAll('label, span, div, p')].filter(window.__na.vis).find(x => window.__na.text(x).trim() === 'Require a goal'); return e && l ? { label: window.__na.box(l), control: window.__na.box(e) } : null; })()`);
                 assert.ok(r, 'the label and the switch are found'); assert.ok(r.control.x > r.label.x + r.label.w, `the control (x ${r.control.x}) is right of the label (ends ${r.label.x + r.label.w})`);
             });
-            if (!mobile) await S.run(`${label}: the group list is the main Settings' (arrows move and open a group), and Cancel keeps the open group`, async () => {
+            if (!mobile) await S.run(`${label}: the group list is the main Settings' (arrows move and open a group), and Cancel closes the dialog, the group is the same when it opens again`, async () => {
                 await group('Workflow'); await settle(150);
                 const sel = () => ev(`(() => { const t = [...window.__tp.page().querySelectorAll('[role=tab]')].filter(window.__na.vis).find(x => x.getAttribute('aria-selected') === 'true' && ['Workflow', 'Health check', 'Messaging', 'Prompts'].includes(window.__na.name(x))); return t ? window.__na.name(t) : null; })()`);
                 assert.equal(await sel(), 'Workflow', 'Workflow is the open group at first');
@@ -65,9 +65,13 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 assert.equal(await sel(), 'Health check', 'ArrowDown opens the next group');
                 assert.ok(await ev(`[...window.__tp.page().querySelectorAll('h4')].filter(window.__na.vis).some(h => window.__na.text(h).trim() === 'Health check')`), 'its pane is open');
                 await openFor('Send health check');
+                const wasOn = await state('Send health check');
                 await ev(`${sw('Send health check')}.click(); true`); await settle(250);
                 await ev(`window.__tp.find('button', /^Cancel$/i).click(); true`); await settle(500);
-                assert.equal(await sel(), 'Health check', 'Cancel redraws the page on the group that was open');
+                assert.equal(await ev(`!!document.querySelector('.team-settings-modal')`), false, 'Cancel closes the dialog (a deliberate press: no unsaved question)');
+                await goTab(ev, settle, 'Settings'); await settle(500);
+                assert.equal(await sel(), 'Health check', 'the dialog opens again on the group that was open');
+                await openFor('Send health check'); assert.equal(await state('Send health check'), wasOn, 'the change was thrown away');
             });
             if (mobile) await S.run(`${label}: the group selector's word grows with the text size, and Learn more adds no height to the Working mode hint (UI/UX on #7663)`, async () => {
                 await group('Workflow'); await settle(150);
@@ -115,13 +119,16 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                     assert.ok(Math.abs(b2.save.y-b.save.y)<=1,'the wide view save bar does not scroll with its pane');
                 }
             });
-            await S.run(`${label}: a change turns Save on and the status moves on; Cancel puts the switch back and the bar as it was`, async () => {
+            await S.run(`${label}: a change turns Save on and the status moves on; Cancel throws the change away and closes the dialog, which opens again as saved`, async () => {
                 await openFor('Require a goal');
                 const was = await state('Require a goal');
                 await ev(`${sw('Require a goal')}.click(); true`); await settle(250);
                 const b = await bar(); assert.equal(b.save.disabled, false, 'Save settings is on'); assert.match(b.status, /^You have unsaved changes\.$/, `the status says there are unsaved changes (got ${JSON.stringify(b.status)})`);
-                await ev(`window.__tp.find('button', /^Cancel$/i).click(); true`); await settle(250);
-                assert.equal(await state('Require a goal'), was, 'Cancel put the switch back'); const b2 = await bar(); assert.equal(b2.save.disabled, true, 'Save is off again'); assert.match(b2.status, /No changes to save/, 'the status is back');
+                await ev(`window.__tp.find('button', /^Cancel$/i).click(); true`); await settle(500);
+                assert.equal(await ev(`!!document.querySelector('.team-settings-modal')`), false, 'Cancel closes the dialog, with no unsaved question');
+                assert.equal(await ev(`!!document.getElementById('confirm-modal') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`), false, 'no question was asked');
+                await goTab(ev, settle, 'Settings'); await settle(500); await openFor('Require a goal');
+                assert.equal(await state('Require a goal'), was, 'the next open shows the saved value'); const b2 = await bar(); assert.equal(b2.save.disabled, true, 'Save is off'); assert.match(b2.status, /No changes to save/, 'the status says so');
             });
             await S.run(`${label}: Save settings sends the board's settings once and the status says it saved`, async () => {
                 await openFor('Require a goal');
