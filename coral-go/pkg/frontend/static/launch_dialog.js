@@ -508,7 +508,7 @@ async function _loadAgentBoardProjects() {
     select.innerHTML = '<option value="">None</option><option value="__new__">Create new board...</option>';
     // Add agent (#7778): the team is the one it was opened from: it is the select's value, and the field is not shown (nor is anything that would change it).
     const preset = launch.addTo && launch.addTo.board ? bareBoardName(launch.addTo.board) : '';
-    const label = select.closest('label');
+    const label = select.closest('.form-row');
     if (label) label.hidden = !!(launch.addTo && launch.addTo.board) || !!launch.member;
     const serverRowEl = document.getElementById('launch-board-server-row'); if (serverRowEl) serverRowEl.hidden = false; // New Agent shows it as before (its own style decides)
     if (preset) {

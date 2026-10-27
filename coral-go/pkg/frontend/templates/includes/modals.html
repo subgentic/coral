@@ -138,28 +138,28 @@
                         <div class="settings-panes">
                             <div id="launch-agent-acf" class="sd-acf"></div>
                             <div id="launch-advanced-extra" class="sd-extra">
-                            <label>Message Board <span class="text-muted-sm">(optional)</span>:
+                            <div class="form-row">
+                                <label class="form-label" for="launch-board-select">Message Board <span class="launch-optional">optional</span></label>
                                 <select id="launch-board-select" data-on-change="m-on-agent-board-change">
                                     <option value="">None</option>
                                     <option value="__new__">Create new board...</option>
                                 </select>
-                            </label>
-                            <div id="launch-new-board-row" style="display:none">
-                                <label>Board Name:
-                                    <input type="text" id="launch-board-name" placeholder="e.g. auth-feature, sprint-42" maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{0,63}" title="Letters, digits, - and _">
-                                </label>
                             </div>
-                            <div id="launch-board-server-row" style="display:none">
-                                <label>Remote Server <span class="text-muted-sm">(optional)</span>:
-                                    <input type="text" id="launch-board-server" placeholder="e.g. http://remote-machine:8420">
-                                </label>
+                            <div id="launch-new-board-row" class="form-row" style="display:none">
+                                <label class="form-label" for="launch-board-name">Board Name</label>
+                                <input type="text" id="launch-board-name" placeholder="e.g. auth-feature, sprint-42" maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{0,63}" title="Letters, digits, - and _">
                             </div>
-                            <label style="display:none">Backend:
+                            <div id="launch-board-server-row" class="form-row" style="display:none">
+                                <label class="form-label" for="launch-board-server">Remote Server <span class="launch-optional">optional</span></label>
+                                <input type="text" id="launch-board-server" placeholder="e.g. http://remote-machine:8420">
+                            </div>
+                            <div class="form-row" style="display:none">
+                                <label class="form-label" for="launch-backend">Backend</label>
                                 <select id="launch-backend">
                                     <option value="tmux">tmux</option>
                                     <option value="pty">PTY</option>
                                 </select>
-                            </label>
+                            </div>
                             </div>
                         </div>
                     </div>
@@ -183,15 +183,17 @@
                     <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back">&larr;</button>
                     Launch Terminal
                 </h3>
-                <label>Session Name <span class="text-muted-sm">(optional)</span>:
+                <div class="form-row">
+                    <label class="form-label" for="launch-terminal-name">Session Name <span class="launch-optional">optional</span></label>
                     <input type="text" id="launch-terminal-name" placeholder="e.g. build server, test runner">
-                </label>
-                <label>Working Directory:
+                </div>
+                <div class="form-row">
+                    <label class="form-label" for="launch-terminal-dir">Working Directory</label>
                     <div class="dir-input-row">
                         <input type="text" id="launch-terminal-dir" placeholder="/path/to/project" data-coral-root="{{ .CoralRoot }}" value="{{ .CoralRoot }}">
                         <button class="btn" id="btn-browse-terminal" data-on-click="m-toggle-browser" data-browser="launch-terminal-dir dir-browser-terminal browser-list-terminal browser-current-path-terminal">Browse</button>
                     </div>
-                </label>
+                </div>
                 <div id="dir-browser-terminal" class="dir-browser" style="display:none">
                     <div class="dir-browser-header">
                         <button class="btn btn-small dir-browser-up" data-on-click="m-browser-navigate-up" title="Go up">..</button>
@@ -202,12 +204,13 @@
                         <li class="empty-state">Loading...</li>
                     </ul>
                 </div>
-                <label>Backend:
+                <div class="form-row">
+                    <label class="form-label" for="launch-terminal-backend">Backend</label>
                     <select id="launch-terminal-backend">
                         <option value="tmux">tmux</option>
                         <option value="pty">PTY</option>
                     </select>
-                </label>
+                </div>
                 <div class="modal-actions">
                     <button class="btn" data-on-click="m-hide-launch-modal">Cancel</button>
                     <button class="btn btn-primary" data-on-click="m-launch-session">Launch</button>
@@ -531,12 +534,13 @@
             </div>
             <div class="modal-body">
                 <div id="resume-launch-form">
-                    <label class="form-label form-label-block">Working Directory:
-                        <div class="dir-input-row form-control-gap">
+                    <div class="form-row">
+                        <label class="form-label" for="resume-dir">Working Directory</label>
+                        <div class="dir-input-row">
                             <input type="text" id="resume-dir" placeholder="/path/to/project" data-coral-root="{{ .CoralRoot }}" value="{{ .CoralRoot }}">
                             <button class="btn" data-on-click="m-toggle-browser" data-browser="resume-dir resume-dir-browser resume-browser-list resume-browser-current-path">Browse</button>
                         </div>
-                    </label>
+                    </div>
                     <div id="resume-dir-browser" class="dir-browser" style="display:none">
                         <div class="dir-browser-header">
                             <button class="btn btn-small dir-browser-up" data-on-click="m-browser-navigate-up" title="Go up">..</button>
