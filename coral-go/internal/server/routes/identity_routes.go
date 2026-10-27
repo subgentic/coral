@@ -64,6 +64,8 @@ var operatorOnlyRoutes = map[string]string{
 	// cli_path_* (persistent code execution for every later launch), auto-accept, remote access,
 	// cloud and hub-operator keys and the debug input log, and no agent tool sends it).
 	"POST /api/workflows/runs/{runID}/kill":              "stop a workflow run",
+	"POST /api/workflows/runs/{runID}/seen":              "mark a workflow run as opened",
+	"POST /api/scheduled/runs/{runID}/seen":              "mark a scheduled run as opened",
 	"POST /api/tasks/runs/{runID}/kill":                  "stop a task run",
 	"PUT /api/settings":                                  "change Coral's settings",
 	"POST /api/board/{project}/cross-team/disable":       "turn a team's cross-team switch on or off",
