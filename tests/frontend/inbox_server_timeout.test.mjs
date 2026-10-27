@@ -71,6 +71,16 @@ try {
     assert.equal(inflight, 1, 'after Retry the computer is asked again');
     mock.timers.tick(8000);
     assert.equal(await again, 'timed out');
+    // a computer that comes back online is read again (#8933): box-2 is slow now (it ran out its time), then the hub's list says a status changed (coral-servers) and the slow state is forgotten, so the next read is asked, not given up on
+    await assert.rejects(serverRead('box-2', '/api/still'), e => e.timedOut === true, 'still slow: given up on at once');
+    const { updateServersTabVisibility: statusChanged } = await importUi('servers_tab');
+    state.servers = [{ id: 'box-2', label: 'Box Two', status: 'offline' }]; statusChanged(); // a status changed: coral-servers fires (the hub's list moved on)
+    inflight = 0;
+    const back = serverRead('box-2', '/api/back').then(() => 'answered', e => e.timedOut ? 'timed out' : 'failed');
+    await new Promise(r => setImmediate(r));
+    assert.equal(inflight, 1, 'after its status changed the computer is asked again');
+    mock.timers.tick(8000);
+    assert.equal(await back, 'timed out');
     mock.timers.tick(8000); mock.timers.tick(8000);
     assert.ok((await Promise.all(extra)).every(r => r === 'timed out'), 'every Box Two request ends as "did not answer", none hangs');
     mock.timers.reset();
