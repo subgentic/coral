@@ -143,7 +143,7 @@ registerActions({
     'm-mobile-connect-open': (el, event) => { event.preventDefault(); window._showMobileConnectModal(); },
     'm-show-launch-modal-then-select-launch-type': el => { if (["agent", "team"].includes(el.dataset.arg)) { window.showLaunchModal(); window._selectLaunchType(el.dataset.arg); } },
     'm-switch-mobile-tab': el => { if (["agents", "board", "chat"].includes(el.dataset.arg)) { window.switchMobileTab(el.dataset.arg); } },
-    'm-switch-nav-tab': el => { if (["agents", "artifacts", "board", "docs", "history", "hub-inbox", "jobs", "servers", "tokens", "workflows"].includes(el.dataset.arg)) { window.switchNavTab(el.dataset.arg); } },
+    'm-switch-nav-tab': el => { if (["agents", "artifacts", "automations", "board", "docs", "history", "hub-inbox", "servers", "tokens"].includes(el.dataset.arg)) { window.switchNavTab(el.dataset.arg); } },
     'm-tmux-banner-close': () => { const b = document.getElementById('tmux-missing-banner'); if (b) b.style.display = 'none'; },
     'm-toggle-agentic-panel': () => { window.toggleAgenticPanel(); },
     'm-toggle-tablet-sidebar': () => { window.toggleTabletSidebar(); },

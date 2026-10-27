@@ -95,7 +95,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.match(await ev(`document.querySelectorAll('#scheduler-detail .sched-runs-table tbody tr')[1].textContent.replace(/\\s+/g, ' ')`), /Passed/);
 
             await assertPinnedBar(ev, '#scheduler-detail .item-bar', `${at}: the job page`);
-            assert.equal(await ev(`(() => { const b = document.querySelector('#group-table-view .gt-toolbar'); return !b || (!!b.querySelector('.gt-search') && !!b.querySelector('.team-tb-action')); })()`), true, `${at}: the page's toolbar line has the search and New job when the table is on screen (#7723)`);
+            assert.equal(await ev(`(() => { const b = document.querySelector('#group-table-view .gt-toolbar'); return !b || (!!b.querySelector('.list-bar-search') && !!b.querySelector('.team-tb-action')); })()`), true, `${at}: the page's toolbar line has the search and New job when the table is on screen (#7723)`);
             console.log(`${at}: Delete is behind More`);
             assert.equal(await ev(vis('#scheduler-detail .sched-delete')), false, `${at}: Delete is not on the page until More opens`);
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`);

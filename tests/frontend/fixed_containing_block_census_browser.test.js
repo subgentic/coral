@@ -53,7 +53,7 @@ const SCAN = `(() => { const sel = e => (e.id ? '#' + e.id : e.tagName.toLowerCa
                 ['an agent open in the chat', `window.selectLiveSession('solo', 'claude', 'solo-id', 'local'); true`],
                 ['Settings', `window.showSettingsModal('general'); true`],
                 ['New Agent', `window.hideSettingsModal && window.hideSettingsModal(); window.showLaunchModal && window.showLaunchModal(); true`],
-                ['Jobs', `window.hideLaunchModal && window.hideLaunchModal(); window.switchNavTab('automations'); true`],
+                ['Jobs', `window.hideLaunchModal && window.hideLaunchModal(); window.openAutomationsFolder('jobs'); true`],
                 ['Workflows', `window.openAutomationsFolder('workflows'); true`],
                 ['Docs', `window.switchNavTab('docs'); true`],
                 ['the kebab and settings menus', `window.switchNavTab('agents'); document.querySelectorAll('.sidebar-kebab-btn').forEach(b => b.click()); const m = document.querySelector('[aria-controls="top-bar-settings-menu"]'); if (m) m.click(); true`],
