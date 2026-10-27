@@ -421,9 +421,11 @@ function _rowsTotal(view, field, keys) {
     return rows.reduce((a, r) => a + (Number(r[field]) || 0), 0);
 }
 
+const _seriesDraws = {}; // view -> how many times its chart was drawn: a table's draw ends with the chart's, so a caller that draws the table asks this whether the chart was drawn already (#9450)
 function _drawSeries(view) {
     const host = document.getElementById(`cost-series-${view}`);
     if (!host) return;
+    _seriesDraws[view] = (_seriesDraws[view] || 0) + 1;
     series.drawPanel(host, view, { tableTotal: (f, keys) => _rowsTotal(view, f, keys), redraw: () => _refreshSwatches(view), phone: isPhoneLayout() });
 }
 
@@ -439,8 +441,9 @@ async function _refreshSeries(view = _currentView()) {
         const data = await resp.json();
         series.setData(view, { buckets: data.buckets || [], interval, sinceMs, untilMs });
     } catch { series.setData(view, null, 'The chart is unavailable. The table below is complete.'); }
-    _drawSeries(view);
-    _rerender(view); // the swatches
+    const drawn = _seriesDraws[view] || 0;
+    _rerender(view); // the table, whose draw ends with the chart's (and the swatches)
+    if ((_seriesDraws[view] || 0) === drawn) _drawSeries(view); // no table was drawn (no rows, or a filter left none): the chart alone. One draw, not two: each reads the chart's width, a layout of the whole page (#9450: 70 of By agent's 270 ms of long tasks)
 }
 
 /** Paints a row's switch for its view's current lines: filled in its line's colour (pressed), filled grey when it is part of Other (not pressed), an empty ring when rows are chosen and this one is not. */
