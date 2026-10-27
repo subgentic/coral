@@ -10,6 +10,8 @@ const GOALS = { local: [{ id: 1, board_id: 'alpha', title: 'Local goal', outcome
     'box-2': [{ id: 1, board_id: 'alpha', title: 'Remote goal', outcome: 'Ship the remote importer', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-25T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }] };
 const ARTS = { local: [{ id: '1'.repeat(64), name: 'local-report.md', media_type: 'text/markdown', size: 1000, created_at: '2026-10-26T10:00:00Z', task_id: 7, task_title: 'Local task', source: 'task', uri: 'coral://artifacts/' + '1'.repeat(64), available: true, inline: false, reference_count: 1, board_id: 'alpha', team: 'alpha' }],
     'box-2': [{ id: '2'.repeat(64), name: 'remote-report.md', media_type: 'text/markdown', size: 2000, created_at: '2026-10-25T10:00:00Z', task_id: 7, task_title: 'Remote task', source: 'task', uri: 'coral://artifacts/' + '2'.repeat(64), available: true, inline: false, reference_count: 1, board_id: 'alpha', team: 'alpha' }] };
+const SAVED = { local: [{ id: 1, kind: 'board', ref: 'alpha', key: '1001', title: 'alpha board', snippet: 'Local note', saved_at: '2026-10-26T10:00:00Z', team: 'alpha' }],
+    'box-2': [{ id: 1, kind: 'board', ref: 'alpha', key: '1001', title: 'alpha board', snippet: 'Remote note', saved_at: '2026-10-25T10:00:00Z', team: 'alpha' }] };
 const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priority: 'high', status: 'queued', assigned_to: 'Operator', updated_at: '2026-10-26T10:00:00Z' }],
     'box-2': [{ id: 7, board_id: 'alpha', title: 'Remote task', priority: 'medium', status: 'queued', assigned_to: 'Operator', updated_at: '2026-10-25T10:00:00Z' }] };
 
@@ -32,13 +34,14 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'settings')`);
-            await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-inbox-')) localStorage.removeItem(k); } catch {} true`);
+            await ev(`try { for (const k of Object.keys(localStorage)) if ((k.startsWith('coral-inbox-') || k.startsWith('coral-saved-filters'))) localStorage.removeItem(k); } catch {} true`);
             await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.hub = true; st.servers = [{ id: 'box-2', label: 'Box Two', status: 'online' }];
                 const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.href), where = url.pathname.startsWith('/api/remote/box-2/') ? 'box-2' : 'local', path = url.pathname.replace(/^\\/api\\/remote\\/box-2/, '');
                     if (path === '/api/goals') return json({ goals: ${JSON.stringify(GOALS)}[where] });
                     if (path === '/api/board/tasks') return json({ tasks: ${JSON.stringify(TASKS)}[where] });
                     if (path === '/api/team-artifacts') return json({ artifacts: ${JSON.stringify(ARTS)}[where], limit: 100, offset: 0, has_more: false, truncated: false, total: 1, all: 1, teams: [{ board_id: 'alpha', team: 'alpha', all: 1 }] });
+                    if (path === '/api/saved') return json({ items: ${JSON.stringify(SAVED)}[where], open: 1, done: 0 });
                     if (path === '/api/system/artifact-store/kept') return json({ kept: [] });
                     return R(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
@@ -88,6 +91,15 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             await open('needs');
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: two waiting agents`, 10000);
             const nteams = await column('Team');
+            // Saved: a bookmark of each computer's alpha
+            await open('saved');
+            await waitFor(`document.querySelectorAll('#group-table-view .dt-primary, #group-table-view .dt-person').length >= 2 || /Local note/.test(document.getElementById('group-table-view').textContent) && /Remote note/.test(document.getElementById('group-table-view').textContent)`, `${label}: two saved messages`, 10000); await settle(400);
+            await panel();
+            const schoices = await teamChoices();
+            check(`${label}: Saved's Team filter lists the two alpha teams by their computer`, schoices.filter(([v]) => v).length === 2 && schoices.some(([v, t]) => v === '@box-2/alpha' && /alpha · Box Two/.test(t)) && schoices.some(([v, t]) => v === 'alpha' && /alpha · This computer/.test(t)), JSON.stringify(schoices));
+            await ev(`(() => { const s = document.getElementById('inbox-saved-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500);
+            const stext = await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ')`);
+            check(`${label}: choosing the remote one keeps only its bookmark, with a chip that names the computer`, /Remote note/.test(stext) && !/Local note/.test(stext) && /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`)), stext);
             // Artifacts: the files of each computer's alpha
             await open('artifacts');
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: two files`, 10000); await settle(500);

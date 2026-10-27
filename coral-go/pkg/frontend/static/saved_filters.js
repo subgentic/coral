@@ -1,10 +1,17 @@
 import { serverFilter } from './inbox_servers.js';
+import { identityKey } from './server_base.js';
 /* The Saved for later panel's search, filters and order (#4778): what they are and how they become GET /api/saved's parameters (q, sort: #4745; kind and conv were there). Pure (no DOM, no
  * imports) so it can be tested on its own; saved.js draws the bar and reads the list again. The server matches the title and the snippet. The Open and Done tabs stay as they are: they say
  * which half of the matches is shown. */
 
 import { defineFilters, localMidnight, text, SORT_PARAM } from './filter_model.js';
 import { browserLocal } from './safe_storage.js';
+
+/** The Team filter's value for a bookmark: its team's key (a name, or @server/name for another computer), so two computers' teams called alpha are two choices (#8839); '' with no team. */
+export const teamKeyOf = it => (it && it.team ? identityKey(it.server, it.team) : '');
+let teamNames = new Map();
+/** The words the chip says for each team key (the page sets them when it builds the choices). */
+export function setTeamNames(map) { teamNames = map instanceof Map ? map : new Map(); }
 
 export const KINDS = ['agent', 'board'];
 export const KIND_LABEL = { agent: 'Agent chat', board: 'Board message' };
@@ -17,7 +24,7 @@ const filters = convLabel => defineFilters({
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     kind: { type: 'choice', values: KINDS, chip: v => `Type: ${KIND_LABEL[v]}` },
     conv: { type: 'text', max: 300, chip: v => `From: ${convLabel(v)}` },
-    team: { type: 'custom', empty: '', clean: v => text(v, 200), filtered: v => !!v, chip: v => `Team: ${v}`, clear: f => ({ ...f, team: '' }) }, // the Inbox page's (#8602): kept by the page, not asked of the server
+    team: { type: 'custom', empty: '', clean: v => text(v, 200), filtered: v => !!v, chip: v => `Team: ${teamNames.get(v) || v}`, clear: f => ({ ...f, team: '' }) }, // the Inbox page's (#8602): kept by the page, not asked of the server
     from: { type: 'day', chip: v => `Saved since ${v}` },
     sort: { type: 'order', values: SORTS, default: 'newest' },
 });
@@ -38,7 +45,7 @@ export function makeModel({ convLabel = v => v } = {}) {
 /** The filters the page applies to what the server sent (the server's list has no team or saved-since parameter): the bookmark's team, and the day it was saved from. */
 export function keeps(it, f) {
     const c = clean(f);
-    if (c.team && it.team !== c.team) return false;
+    if (c.team && teamKeyOf(it) !== c.team) return false;
     if (c.from && !((Date.parse(it.saved_at || '') || 0) >= Date.parse(localMidnight(c.from)))) return false;
     return true;
 }
