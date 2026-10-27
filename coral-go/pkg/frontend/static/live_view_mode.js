@@ -95,7 +95,7 @@ function slowOrMetered() {
     return !!c && (c.saveData === true || /(^|-)2g$/.test(c.effectiveType || ""));
 }
 function scheduleTerminalPrefetch() {
-    if (xtermReady() || _prefetchTimer || slowOrMetered() || !hasTranscript(state.currentSession)) return;
+    if (xtermReady() || _prefetchTimer || slowOrMetered() || !hasTranscript(state.currentSession) || state.currentSession.sleeping) return; // a sleeping agent has no terminal to show: nothing to fetch ahead (#9101)
     _prefetchTimer = setTimeout(() => {
         _prefetchTimer = null;
         if (effectiveLiveViewMode() === "chat" && !slowOrMetered()) prefetchTerminal();

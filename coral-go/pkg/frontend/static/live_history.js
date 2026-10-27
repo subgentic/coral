@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { platform } from './platform/detect.js';
 import { serverFetch, sessionServer, isCloud } from './server_base.js';
 import { pollEvery, isPaused, afterPause, isBusyStatus, busyRetryingText } from './overload.js';
+import { ticksAfter } from './poll_backoff.js';
 import { rollUpGroups } from './chat_content.js';
 import { CHAT_TRIM, FIRST_PAGE } from './chat_page.js';
 import { INTERRUPT_RE, noteAgentActivity, noteInterrupt, rememberUserMessage } from './pending_messages.js';
@@ -450,11 +451,27 @@ function _updateLoadMoreButton(container) {
 export function startLiveHistoryPoll() {
     stopLiveHistoryPoll();
     const firstLoad = refreshLiveHistory();
-    historyPollInterval = pollEvery(refreshLiveHistory, 1000, { machine: () => state.currentSession && sessionServer(state.currentSession), agentView: true });
+    // The chat is read every second while it changes and less and less often while it does not (poll_backoff.js: 1 s, then up to 10 s); a key press, a click, the window or the agent page coming back puts it
+    // back to every second (#9101: 49 requests in 30 s for one open agent that was saying nothing).
+    let idle = 0, wait = 0;
+    const wake = () => { idle = 0; wait = 0; };
+    const tick = async () => {
+        if (--wait > 0) return;
+        const before = historyMessageCount;
+        await refreshLiveHistory();
+        idle = historyMessageCount !== before ? 0 : idle + 1;
+        wait = ticksAfter(idle);
+    };
+    historyPollInterval = pollEvery(tick, 1000, { machine: () => state.currentSession && sessionServer(state.currentSession), agentView: true });
+    const events = ['keydown', 'pointerdown', 'focus', 'coral:agent-view-shown'];
+    for (const e of events) document.addEventListener(e, wake, true);
+    stopWake = () => { for (const e of events) document.removeEventListener(e, wake, true); stopWake = null; };
     return firstLoad;
 }
+let stopWake = null;
 
 export function stopLiveHistoryPoll() {
+    if (stopWake) stopWake();
     if (historyPollInterval) {
         clearInterval(historyPollInterval);
         historyPollInterval = null;
