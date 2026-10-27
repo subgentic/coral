@@ -91,7 +91,7 @@ function serverCell(s) {
     if (isLocal(s)) return DT.el('span', 'dt-name-text', s.label || 'This computer');
     const b = DT.primaryButton(s.label || s.id, `Open ${s.label || s.id}`);
     const wrap = DT.el('span', 'servers-name'); wrap.append(DT.el('span', 'dt-name-text servers-name-text', s.label || s.id)); b.replaceChildren(wrap);
-    if (s.warning) { const t = DT.tag('warning'); t.classList.add('servers-warn'); t.title = String(s.warning); wrap.append(t); b.setAttribute('aria-label', `Open ${s.label || s.id}, warning: ${s.warning}`); } // the unencrypted-key warning stays on the row at every width (the Orchestrator's call, #9679): it is by the name, not in a column a narrow list drops
+    if (s.warning) { const t = DT.tag('warning'); t.classList.add('servers-warn'); t.title = String(s.warning); const g = DT.el('span', 'material-icons servers-warn-icon', 'warning'); g.setAttribute('aria-hidden', 'true'); t.prepend(g); wrap.append(t); b.setAttribute('aria-label', `Open ${s.label || s.id}, warning: ${s.warning}`); } // the unencrypted-key warning stays on the row at every width (the Orchestrator's call, #9679): it is by the name, not in a column a narrow list drops
     b.title = s.label || s.id;
     b.dataset.action = 'open'; b.dataset.id = s.id; // the tab's click handler opens the server's page
     return b;

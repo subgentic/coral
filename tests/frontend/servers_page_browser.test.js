@@ -42,7 +42,7 @@ const SERVERS = [
 
             // 1. a table: Server, Status, Agents; the name opens the page; no Test, Edit or Remove in the rows
             const t = await ev(`(() => { const tb = document.querySelector('table.dt-table'); return { heads: [...tb.querySelectorAll('thead th')].map(h => (h.querySelector('.dt-sort span') || h.querySelector('.dt-head-text')).textContent.trim()), scopes: [...tb.querySelectorAll('thead th')].map(h => h.getAttribute('scope')), rows: tb.querySelectorAll('tbody tr').length,
-                links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => b.textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open').length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
+                links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => (b.querySelector('.dt-name-text') || b).textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open').length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
             assert.deepEqual(t.heads, ['Server', 'Tags', 'Status', 'Agents', 'Needs you', 'Last seen', 'Version'], at + 'the columns, UI/UX\'s order (Goal #79, #9679): Tags stays by the name, its warning on the row');
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), true, at + 'the table keeps the Servers title');
             assert.deepEqual(t.scopes, ['col', 'col', 'col', 'col', 'col', 'col', 'col']);
@@ -50,14 +50,15 @@ const SERVERS = [
             assert.deepEqual(cols.needs, ['', '', '1'], at + 'Needs you: nothing at zero, the count where an agent waits: ' + JSON.stringify(cols));
             assert.deepEqual(cols.seen.slice(0, 2), ['now', 'now'], at + 'Last seen is "now" while a server is online: ' + JSON.stringify(cols));
             assert.ok(cols.seen[2] && cols.seen[2] !== 'now' && cols.seen[2] !== '\u2014', at + 'and the time of contact for one that is not: ' + JSON.stringify(cols));
-            assert.equal(await ev(`(() => { const t = document.querySelector('#server-row-lan .dt-name-text'); const w = t && t.closest('.servers-name').querySelector('.servers-warn'); return !!w && w.textContent.trim() === 'warning' && w.getClientRects().length > 0; })()`), true, at + 'the unencrypted-key warning is on the row, by the name, at every width');
+            assert.equal(await ev(`(() => { const t = document.querySelector('#server-row-lan .dt-name-text'); const w = t && t.closest('.servers-name').querySelector('.servers-warn'); return !!w && /warning$/.test(w.textContent.trim()) && w.getClientRects().length > 0; })()`), true, at + 'the unencrypted-key warning is on the row, by the name, at every width');
+            assert.deepEqual(await ev(`(() => { const w = document.querySelector('#server-row-lan .servers-warn'), plain = document.querySelector('#server-row-epoch .dt-tag'); return { glyph: !!w.querySelector('.material-icons'), hidden: w.querySelector('.material-icons').getAttribute('aria-hidden'), colour: getComputedStyle(w).color !== getComputedStyle(plain).color }; })()`), { glyph: true, hidden: 'true', colour: true }, at + 'the warning has a glyph and the warning colour, not the plain tag grey');
             const clipped = await ev(`[...document.querySelectorAll('table.dt-table tbody td.dt-td')].filter(td => td.getClientRects().length).filter(td => { const r = td.getBoundingClientRect(), edge = r.right - parseFloat(getComputedStyle(td).paddingRight); return [...td.querySelectorAll('*')].some(x => x.getClientRects().length && x.getBoundingClientRect().right > edge + 1); }).map(td => td.dataset.key + ': ' + td.textContent.trim().slice(0, 20))`); // an element wider than its cell runs into the next column
             assert.deepEqual(clipped, [], at + 'no cell content runs past its column (the longest status word, Unreachable, fits its column): ' + JSON.stringify(clipped));
             assert.deepEqual(cols.sortable, [true, false, true, true, true, true, true], at + 'every header sorts but Tags: ' + JSON.stringify(cols));
             await oneLinePerRow(ev, 'table.dt-table tbody tr[data-key]', `${at}the servers`, assert, { min: 2 }); // Goal #79: a server is one line at both widths; a narrow list drops Tags, Version and Agents
             for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await sceneShot(`servers-list-${theme}-${w}`); } await setTheme(ev, 'dark'); // the scenes UI/UX looks at (written when the gate asks for shots)
             assert.equal(t.rows, 3, at + 'this hub and two servers');
-            assert.deepEqual(t.links, ['epoch', 'LAN boxwarning'], at + 'each remote server\'s name opens its page (LAN box\'s button holds its warning tag too, #9679); this hub has none');
+            assert.deepEqual(t.links, ['epoch', 'LAN box'], at + 'each remote server\'s name opens its page; this hub has none');
             assert.equal(t.rowButtons, 0, at + 'no Test, Edit or Remove buttons in the table');
             assert.ok(t.overflow <= 0, at + 'no sideways scroll');
             await shot(`servers-table-${w}`);

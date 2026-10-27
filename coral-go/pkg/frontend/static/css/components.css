@@ -4006,7 +4006,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .servers-fact { display: contents; }
 .servers-name { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-width: 0; white-space: nowrap; vertical-align: middle; } /* a remote server's name and its warning on one line (#9679) */
 .servers-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.servers-warn { flex: none; }
+.servers-name > .servers-warn { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--warning-text); border-color: var(--warning); } /* the unencrypted-key warning is a security cue: the warning colour and a glyph, not a neutral grey tag (UI/UX, #9679) */
+.servers-warn-icon { font-size: var(--fs-md); line-height: 1; }
 .servers-needs { color: var(--warning-text); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; } /* the Servers list's Needs you count: the one thing that sends a person to the Inbox (#9679) */
 .servers-page .item-bar { margin-top: auto; bottom: calc(-1 * var(--space-lg, 16px)); margin-bottom: calc(-1 * var(--space-lg, 16px)); padding-bottom: calc(var(--space-lg) + var(--space-lg, 16px)); } /* the view's padding is taken back so nothing shows under the bar */
 .servers-view.servers-view-page .servers-tab { min-height: 100%; display: flex; flex-direction: column; }
