@@ -314,6 +314,7 @@
 .mb-reply-with code { font-family: var(--font-mono, monospace); color: var(--text); }
 
 .mb-message-body {
+    --prose-h1: 1.1428571429em; --prose-h2: 1em; --prose-h3: 0.9285714286em; --prose-h4: 0.9285714286em; /* a board message is dense: its headings step 16, 14, 13 and 13 px, not 20, 16, 14 and 13 (UI/UX #9502) */
     font-size: var(--fs-lg);
     color: var(--mb-text);
     line-height: var(--lh-body);
