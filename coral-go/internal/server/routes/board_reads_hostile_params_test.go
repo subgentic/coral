@@ -83,6 +83,11 @@ type readsSeed struct {
 	byPriority      map[string][]int64
 	goalA, goalB    int64
 	goalATasks      []int64
+	goalADone       int // of goalATasks, completed
+	parent          int64
+	followUps       []int64 // the tasks made from parent, oldest first
+	parent2         int64   // another parent, with one follow-up
+	followUps2      []int64
 	artifactTasks   []int64
 }
 
@@ -125,8 +130,27 @@ func (e *readsEnv) seed(project string) readsSeed {
 		s.all = append(s.all, task.ID)
 		if opts.GoalID != nil {
 			s.goalATasks = append(s.goalATasks, task.ID)
+			if i%4 == 1 && !opts.Draft {
+				s.goalADone++
+			}
 		}
 	}
+	// three follow-ups of one task (task add --follow-up): the detail of the parent lists them, oldest first (#9560 reads them from lst_parent)
+	s.parent = s.open[0]
+	for i := 0; i < 3; i++ {
+		f, err := bs.CreateTaskWithOpts(ctx, project, fmt.Sprintf("follow-up %d", i), "", "medium", "lead", &board.CreateTaskOpts{Workflow: board.TaskWorkflow{ParentTaskID: s.parent}})
+		require.NoError(t, err)
+		s.followUps = append(s.followUps, f.ID)
+		s.open = append(s.open, f.ID)
+		s.all = append(s.all, f.ID)
+		s.byPriority["medium"] = append(s.byPriority["medium"], f.ID)
+	}
+	s.parent2 = s.open[1]
+	f2, err := bs.CreateTaskWithOpts(ctx, project, "follow-up of another", "", "medium", "lead", &board.CreateTaskOpts{Workflow: board.TaskWorkflow{ParentTaskID: s.parent2}})
+	require.NoError(t, err)
+	s.followUps2 = []int64{f2.ID}
+	s.open, s.all = append(s.open, f2.ID), append(s.all, f2.ID)
+	s.byPriority["medium"] = append(s.byPriority["medium"], f2.ID)
 	return s
 }
 
@@ -393,10 +417,51 @@ func TestBoardTaskListMatchesTheSeededModel(t *testing.T) {
 		require.NoError(t, json.Unmarshal(body, &d))
 		assert.Equal(t, id, d.ID)
 	}
+	for _, c := range []struct {
+		parent int64
+		want   []int64
+	}{{seed.parent, seed.followUps}, {seed.parent2, seed.followUps2}} {
+		code, body = e.get(tasks+"/"+strconv.FormatInt(c.parent, 10), nil)
+		require.Equal(t, 200, code)
+		var parent struct {
+			FollowUps []struct {
+				ID int64 `json:"id"`
+			} `json:"follow_ups"`
+		}
+		require.NoError(t, json.Unmarshal(body, &parent))
+		var gotFollow []int64
+		for _, f := range parent.FollowUps {
+			gotFollow = append(gotFollow, f.ID)
+		}
+		assert.Equal(t, c.want, gotFollow, "task %d's detail lists its own follow-ups, oldest first", c.parent)
+	}
+	// known (LOW, #9596): GetTask answers 404 "task not found" for ANY store error, not only a missing task, so a damaged database looks like a missing task here, not a 500; fine for now (Orchestrator, 21:26)
 	for _, bad := range []string{"0", "-1", "999999", "x"} {
 		code, _ := e.get(tasks+"/"+bad, nil)
 		assert.GreaterOrEqual(t, code, 400)
 		assert.Less(t, code, 500, bad)
+	}
+}
+
+// checkRollup: the goals list's rollup of Goal A is its tasks by what they are doing, as the seed made them (#9584 counts the page's goals only, on a covering index).
+func checkRollup(t *testing.T, e *readsEnv, goals string, seed readsSeed) {
+	t.Helper()
+	code, body := e.get(goals, nil)
+	require.Equal(t, 200, code)
+	var r struct {
+		Goals []struct {
+			ID     int64            `json:"id"`
+			Rollup board.GoalRollup `json:"rollup"`
+		} `json:"goals"`
+	}
+	require.NoError(t, json.Unmarshal(body, &r))
+	for _, g := range r.Goals {
+		if g.ID == seed.goalA {
+			assert.Equal(t, board.GoalRollup{Done: seed.goalADone, Queued: len(seed.goalATasks) - seed.goalADone, Total: len(seed.goalATasks)}, g.Rollup, "Goal A's rollup is its tasks as seeded")
+		}
+		if g.ID == seed.goalB {
+			assert.Equal(t, board.GoalRollup{}, g.Rollup, "Goal B has no tasks")
+		}
 	}
 }
 
@@ -445,6 +510,7 @@ func TestBoardGoalsAndArtifactsListsMatchTheSeededModel(t *testing.T) {
 		}
 		ids, _ := read(q)
 		assert.Equal(t, []int64{seed.goalA, seed.goalB}, ids, "every goal, by id (limit %q)", limit)
+		checkRollup(t, e, goals, seed)
 		q.Set("state", "active")
 		ids, states := read(q)
 		assert.Equal(t, []int64{seed.goalA}, ids, "state=active: Goal A alone (limit %q)", limit)
@@ -497,6 +563,52 @@ func TestBoardGoalsAndArtifactsListsMatchTheSeededModel(t *testing.T) {
 		}
 	}
 	assert.Len(t, want, len(seed.artifactTasks), "each artifact task has its artifact in the list")
+	// the task query path of the list (any of kind, q, by, task, sort, cursor: #9594 reads the references from lst_art_refs): the same artifacts, found by task and by name, and the cursor walk of the
+	// newest-first and oldest-first lists is the list the offset pages made
+	type artRow struct {
+		Name   string `json:"name"`
+		TaskID int64  `json:"task_id"`
+	}
+	readArts := func(q url.Values) (rows []artRow, next string) {
+		code, body := e.get(arts, q)
+		require.Equal(t, 200, code, "%s: %s", q.Encode(), body)
+		var r struct {
+			Artifacts  []artRow `json:"artifacts"`
+			NextCursor string   `json:"next_cursor"`
+		}
+		require.NoError(t, json.Unmarshal(body, &r))
+		return r.Artifacts, r.NextCursor
+	}
+	for _, id := range seed.artifactTasks {
+		rows, _ := readArts(url.Values{"task": {strconv.FormatInt(id, 10)}})
+		require.Len(t, rows, 1, "task=%d holds one artifact", id)
+		assert.Equal(t, id, rows[0].TaskID)
+		byName, _ := readArts(url.Values{"q": {rows[0].Name}})
+		require.Len(t, byName, 1, "q=%s finds the one artifact", rows[0].Name)
+		assert.Equal(t, id, byName[0].TaskID)
+	}
+	for _, sortBy := range []string{"newest", "oldest"} {
+		for _, limit := range []string{"1", "2", "3"} {
+			var got []string
+			cursor := ""
+			for page := 0; page < 30; page++ {
+				q := url.Values{"by": {"lead"}, "sort": {sortBy}, "limit": {limit}}
+				if cursor != "" {
+					q.Set("cursor", cursor)
+				}
+				rows, next := readArts(q)
+				for _, r := range rows {
+					got = append(got, fmt.Sprintf("%d:%s", r.TaskID, r.Name))
+				}
+				if next == "" {
+					break
+				}
+				cursor = next
+			}
+			assert.ElementsMatch(t, all, got, "sort=%s limit=%s: the cursor walk reads every artifact once", sortBy, limit)
+			assert.Len(t, got, len(all))
+		}
+	}
 }
 
 // A page is at most board.TaskListMaxLimit tasks however large a limit asks for (and the default size when none is asked): a board bigger than a page answers a page and a cursor.
