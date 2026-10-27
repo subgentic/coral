@@ -77,8 +77,8 @@ export const SCOPES = {
     goal: ['state', 'task', 'who', 'priority', 'files'],
     'goal-page': ['task', 'state'],
     'follow-ups': ['state', 'task', 'who'],
-    agent: ['state', 'task', 'files'], // an agent's own dock: every row is that agent's, so no Assigned to
-    'agent-team': ['state', 'task', 'who', 'files'], // the dock of a team lead lists several agents' tasks
+    agent: ['state', 'task', 'who'], // the dock's one-line row keeps the responsible agent's avatar
+    'agent-team': ['state', 'task', 'who'], // the dock of a team lead lists several agents' tasks
 };
 
 /** A task list as the shared table: the scope's columns, the task's own key and name, and everything else (open, state, selectable, bare, sortBar, ...) as the data_table takes it. `tweak(columns)` lets a surface add a column of

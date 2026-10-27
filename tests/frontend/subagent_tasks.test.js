@@ -105,11 +105,11 @@ async function run() {
 
   // Shared table styling; the type tag and subtitle carry the subagent metadata.
   check('a subagent row is the row\'s own kind: no type tag in the dock (it shows Status, Task and Agent only, #7962)', done.sub && !done.typeIsChip && done.type === undefined, done.type);
-  check('subagent-type badge', done.badge === 'Explore' && running.badge === 'Plan', `${done.badge}, ${running.badge}`);
+  check('type stays in the detail and tooltip, not a second row line', !done.badge && !running.badge, `${done.badge}, ${running.badge}`);
   check('ordinary task has none of it', !task.sub && !task.badge && task.boxShadow === 'none', `${task.kind} / ${task.boxShadow}`);
 
   // Layout: the description must survive the default (narrow) panel width.
-  check('description column keeps a readable width', done.descW >= 160 && task.descW >= 160, `sub=${done.descW} task=${task.descW}`);
+  check('one-line title retains a touch-width slot beside status and avatar', done.descW >= 44 && task.descW >= 44, `sub=${done.descW} task=${task.descW}`);
   check('row fits within the full scrollable width (rail and tint are not cut off)', done.rowW <= done.listScrollW + 1, `row=${done.rowW} list=${done.listScrollW}`);
 
   // Content

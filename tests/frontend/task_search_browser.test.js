@@ -33,7 +33,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const snap = () => ev(`(() => { const l = document.getElementById('board-task-list'); const rows = [...l.querySelectorAll('.board-task-item:not(.board-task-header)')];
         const bar = document.getElementById('board-task-bar');
         return { shown: !!bar.firstChild && bar.getClientRects().length > 0, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent),
-            titles: rows.map(r => (r.querySelector('.board-task-desc') || {}).textContent.trim()), statuses: rows.map(r => (r.querySelector('.board-task-status-wrap') || {}).textContent), ids: rows.map(r => Number((r.querySelector('.board-task-id') || {}).textContent.replace('#', ''))),
+            titles: rows.map(r => (r.querySelector('.board-task-desc') || {}).textContent.trim()), statuses: rows.map(r => (r.querySelector('.board-task-status-wrap') || {}).textContent), ids: rows.map(r => Number(r.dataset.taskId)),
             more: (l.querySelector('.dt-foot') || {}).textContent || null, empty: (l.querySelector('.board-task-empty') || {}).textContent || null, hide: (() => { const e = document.querySelector('.board-task-hide-toggle'); return !!e && !e.hidden; })() }; })()`);
     const load = () => ev(`(async () => { ${MODS} await tasks.loadBoardTasks(${JSON.stringify(BOARD)}); return true; })()`);
     const type = async (text) => { await ev(`document.getElementById('tk-search').focus(); true`); await Input.insertText({ text }); };
