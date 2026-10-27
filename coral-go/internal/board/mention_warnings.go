@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // @mentions that name nobody on the board (#4583 rule 5, #9047). A post with one is refused, nothing posted: the refusal names each one
@@ -46,23 +47,42 @@ func (s *Store) UnknownMentions(ctx context.Context, project, content string) []
 	return out
 }
 
-// otherBoardNames are the ids and display names of the boards other than project, lower-cased.
+// otherBoardNames are the ids and labels of the boards other than project, lower-cased, mapped to the board's id: one small query, not the per-board counts of ListProjects.
 func (s *Store) otherBoardNames(ctx context.Context, project string) map[string]string {
-	projects, err := s.ListProjects(ctx)
-	if err != nil {
+	var rows []struct {
+		ID    string `db:"id"`
+		Label string `db:"label"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT id, label FROM boards WHERE id <> ?`, project); err != nil {
 		return nil
 	}
 	boards := map[string]string{}
-	for _, p := range projects {
-		if p.Project == project {
-			continue
-		}
-		boards[strings.ToLower(p.Project)] = p.Project
-		if l := strings.TrimSpace(p.BoardLabel); l != "" {
-			boards[strings.ToLower(l)] = p.Project
+	for _, r := range rows {
+		boards[lowerRunes(r.ID)] = r.ID
+		if l := strings.TrimSpace(r.Label); l != "" {
+			boards[lowerRunes(l)] = r.ID
 		}
 	}
 	return boards
+}
+
+// lowerRunes lower-cases one rune for one rune. strings.ToLower can change a text's length in bytes (U+0130, a two-byte letter, lower-cases to a one-byte "i"), and a length measured on
+// the lower-cased copy is not one of the original: every offset below is taken in runes, so slicing the original never panics or cuts a character.
+func lowerRunes(s string) string { return strings.Map(unicode.ToLower, s) }
+
+// knownLenIn is knownLen for rest as written: the length in bytes of the known name rest starts with (compared lower-cased), measured in rest itself.
+func knownLenIn(rest string, known map[string]bool) int {
+	lower := lowerRunes(rest)
+	n := knownLen(lower, known)
+	if n == 0 {
+		return 0
+	}
+	off := 0
+	for i := utf8.RuneCountInString(lower[:n]); i > 0; i-- {
+		_, size := utf8.DecodeRuneInString(rest[off:])
+		off += size
+	}
+	return off
 }
 
 // crossTeamMentions finds "@Member (team)": a member's name followed by the name of another board in parentheses, the way a message
@@ -73,7 +93,7 @@ func crossTeamMentions(content string, names []string, boards map[string]string)
 	}
 	known := map[string]bool{}
 	for _, n := range names {
-		if l := strings.ToLower(strings.TrimSpace(n)); l != "" {
+		if l := lowerRunes(strings.TrimSpace(n)); l != "" {
 			known[l] = true
 			known[strings.ReplaceAll(l, " ", "")] = true
 		}
@@ -84,7 +104,7 @@ func crossTeamMentions(content string, names []string, boards map[string]string)
 			continue
 		}
 		rest := content[i+1:]
-		n := knownLen(strings.ToLower(rest), known)
+		n := knownLenIn(rest, known)
 		if n == 0 || !strings.HasPrefix(rest[n:], " (") {
 			continue
 		}
@@ -93,7 +113,7 @@ func crossTeamMentions(content string, names []string, boards map[string]string)
 			continue
 		}
 		team := strings.TrimSpace(rest[n+2 : n+end])
-		id, ok := boards[strings.ToLower(team)]
+		id, ok := boards[lowerRunes(team)]
 		if !ok {
 			continue
 		}
@@ -114,7 +134,7 @@ func mentionWarnings(content string, names []string) []string {
 	seen := map[string]bool{}
 	for _, n := range names {
 		n = strings.TrimSpace(n)
-		l := strings.ToLower(n)
+		l := lowerRunes(n)
 		if l == "" {
 			continue
 		}
@@ -143,7 +163,7 @@ func mentionWarnings(content string, names []string) []string {
 			continue
 		}
 		rest := content[i+1:]
-		if n := knownLen(strings.ToLower(rest), known); n > 0 {
+		if n := knownLenIn(rest, known); n > 0 {
 			i += 1 + n
 			continue
 		}
