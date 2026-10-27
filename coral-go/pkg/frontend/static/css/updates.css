@@ -51,15 +51,11 @@
 .update-dismiss { background: none; border: 0; color: var(--text-secondary); }
 
 /* the failure notice: the dashboard's own banner (leftover-tmux-banner), in the error colour, dismissible; on a phone the buttons go under the text */
-.leftover-tmux-banner.update-fail { border-color: color-mix(in srgb, var(--error) 55%, var(--border)); background: color-mix(in srgb, var(--error) 8%, var(--bg-secondary)); }
-.leftover-tmux-banner.update-fail .material-icons { color: var(--error); }
 .leftover-tmux-banner.update-fail .update-fail-acts { display: flex; align-items: center; gap: 8px; flex: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .leftover-tmux-banner.update-fail .leftover-tmux-text { flex: 1 1 calc(100% - 44px); min-width: 0; } .leftover-tmux-banner.update-fail .update-fail-acts { flex: 1 1 100%; justify-content: flex-end; } .leftover-tmux-banner.update-fail .btn { min-height: 44px; } }
 
 /* the ready notice (#6292): the same banner in the accent colour; on a phone the buttons go under the text, 44 px */
-.leftover-tmux-banner.update-ready { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, var(--bg-secondary)); }
-.leftover-tmux-banner.update-ready .material-icons { color: var(--accent); }
-.leftover-tmux-banner.update-ready:has(.update-ready-lead:empty) { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */
+#update-ready-notice:has(.update-ready-lead:empty) { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */
 .leftover-tmux-banner.update-ready .update-ready-acts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex: none; max-width: 100%; } /* "Update and relaunch" and Later wrap at large text instead of one being cut (#7360) */
 .leftover-tmux-banner.update-ready .update-ready-acts .btn { white-space: normal; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .leftover-tmux-banner.update-ready .leftover-tmux-text { flex: 1 1 calc(100% - 44px); min-width: 0; } .leftover-tmux-banner.update-ready .update-ready-acts { flex: 1 1 100%; justify-content: flex-end; } }

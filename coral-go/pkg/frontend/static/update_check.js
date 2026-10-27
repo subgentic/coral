@@ -72,7 +72,7 @@ function showUpdateToast(data) {
 
     const toast = document.createElement("div");
     toast.id = "update-toast";
-    toast.className = "update-toast";
+    toast.className = "notice notice-info notice-float notice-flush update-toast";
     toast.innerHTML = `
         <div class="update-toast-body">
             <div class="update-toast-header">
@@ -115,7 +115,7 @@ function showWarningToast(id, heading, message) {
     if (!message || document.getElementById(id)) return;
     const toast = document.createElement("div");
     toast.id = id;
-    toast.className = "update-toast security-warning-toast";
+    toast.className = "notice notice-warn notice-float notice-flush update-toast security-warning-toast";
     const body = document.createElement("div");
     body.className = "update-toast-body";
     const header = document.createElement("div");

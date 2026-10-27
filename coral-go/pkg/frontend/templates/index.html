@@ -187,7 +187,7 @@
             <div id="update-strip" class="update-strip" hidden></div>
 
             <!-- #5275: an update that was not installed (verification failed, or it was rolled back); update_ui.js -->
-            <div id="update-fail-banner" class="leftover-tmux-banner update-fail" role="alert" hidden>
+            <div id="update-fail-banner" class="notice notice-error leftover-tmux-banner update-fail" role="alert" hidden>
                 <span class="material-icons" aria-hidden="true">error</span>
                 <div class="leftover-tmux-text"><b class="update-fail-lead"></b><span class="update-fail-rest"></span></div>
                 <div class="update-fail-acts">
@@ -198,7 +198,7 @@
             </div>
 
             <!-- #6292: a verified update is ready, said once per version; Review opens the confirmation, Later closes this and changes nothing (update_ui.js) -->
-            <div id="update-ready-notice" class="leftover-tmux-banner update-ready">
+            <div id="update-ready-notice" class="notice notice-info leftover-tmux-banner update-ready">
                 <span class="material-icons" aria-hidden="true">system_update</span>
                 <div class="leftover-tmux-text" role="status"><b class="update-ready-lead"></b><span class="update-ready-rest"></span></div><!-- always in the page: update_ui.js sets its words, so they are read; empty, the notice takes no room -->
                 <div class="update-ready-acts" hidden>
@@ -208,28 +208,28 @@
             </div>
 
             <!-- #3751: this tab loaded before a server update (update_banner.js); an idle tab reloads by itself -->
-            <div id="update-banner" class="leftover-tmux-banner update-banner">
+            <div id="update-banner" class="notice notice-warn leftover-tmux-banner update-banner">
                 <span class="material-icons" aria-hidden="true">system_update</span>
                 <div class="leftover-tmux-text" id="update-banner-text" role="status"></div><!-- always in the page: update_banner.js sets its words, so they are read; empty, the banner takes no room -->
                 <button class="btn btn-primary" type="button" data-on-click="update-reload" hidden>Reload</button>
             </div>
 
             <!-- #3634: under pty, agents still running in Coral's old tmux server (terminal_backend.js) -->
-            <div id="leftover-tmux-banner" class="leftover-tmux-banner" role="alert" hidden>
+            <div id="leftover-tmux-banner" class="notice notice-warn leftover-tmux-banner" role="alert" hidden>
                 <span class="material-icons" aria-hidden="true">warning</span>
                 <div class="leftover-tmux-text"><b id="leftover-tmux-count"></b> Coral now uses pty and can't reach them; they keep using CPU and tokens. End them, then wake the agents here. Waking one of them is refused until they are ended, so no second copy starts.</div>
                 <button class="btn btn-primary" type="button" id="leftover-tmux-end" data-on-click="m-end-leftover-tmux">End them</button>
             </div>
 
             <!-- #6064: the built-in terminal became the default: one line, once, for an install that ran on the old tmux default (terminal_backend.js) -->
-            <div id="default-notice-banner" class="leftover-tmux-banner default-notice-banner" hidden><!-- a one-time notice with its own Dismiss, read when the person reaches it: not a live region (#6656) -->
+            <div id="default-notice-banner" class="notice notice-info leftover-tmux-banner default-notice-banner" hidden><!-- a one-time notice with its own Dismiss, read when the person reaches it: not a live region (#6656) -->
                 <span class="material-icons" aria-hidden="true">info</span>
                 <div class="leftover-tmux-text"><b>Agents now stop when you quit Coral.</b> To keep them running, choose tmux in <button type="button" class="default-notice-link" data-on-click="m-open-terminal-settings">Settings &gt; Terminal</button>.</div>
                 <button class="btn btn-primary" type="button" id="default-notice-dismiss" data-on-click="m-dismiss-default-notice">Got it</button>
             </div>
 
             <!-- #3636: more agents were running when a pty Coral stopped than it wakes by itself -->
-            <div id="auto-wake-banner" class="leftover-tmux-banner" role="alert" hidden>
+            <div id="auto-wake-banner" class="notice notice-warn leftover-tmux-banner" role="alert" hidden>
                 <span class="material-icons" aria-hidden="true">bedtime</span>
                 <div class="leftover-tmux-text"><b id="auto-wake-count"></b> <span id="auto-wake-detail">Wake them? Coral wakes them one at a time and they resume their conversation.</span></div>
                 <button class="btn" type="button" id="auto-wake-dismiss" data-on-click="m-dismiss-auto-wake">Not now</button>
@@ -238,7 +238,7 @@
 
             <!-- #3665: Claude agents on an older hook set (terminal_backend.js wires the buttons). One line by default;
                  the per-agent list opens under it (#3729). -->
-            <div id="hooks-banner" class="leftover-tmux-banner hooks-banner" role="alert" hidden>
+            <div id="hooks-banner" class="notice notice-warn leftover-tmux-banner hooks-banner" role="alert" hidden>
                 <div class="hooks-bar">
                     <span class="material-icons" aria-hidden="true">update</span>
                     <div class="leftover-tmux-text"><b id="hooks-count"></b></div>

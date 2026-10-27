@@ -37,6 +37,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const problems = [];
     for (const [f, keys] of Object.entries(got)) for (const [k, n] of Object.entries(keys)) { const w = (want[f] || {})[k] || 0; if (n > w) problems.push(`${f}: "${k}" declares its own look ${n} times, the list has ${w}: write a .notice (tone, bar, float) and keep only where it sits, or it is a new look`); }
     for (const [f, keys] of Object.entries(want)) for (const [k, w] of Object.entries(keys)) { const n = (got[f] || {})[k] || 0; if (n < w) problems.push(`${f}: "${k}" declares its own look ${n} times, the list still has ${w}: lower it (CORAL_UPDATE_ALLOWLIST=1 rewrites the list; review the diff)`); }
+    // a page class that only places (leftover-tmux-banner) draws nothing: every element that wears it also wears .notice
+    const tpl = path.resolve(here, '../../coral-go/pkg/frontend/templates/index.html');
+    for (const m of fs.readFileSync(tpl, 'utf8').matchAll(/class="([^"]*\bleftover-tmux-banner\b[^"]*)"/g)) if (!/(^|\s)notice(\s|$)/.test(m[1])) problems.push(`templates/index.html: class="${m[1]}" places a banner but has no .notice: it draws nothing`);
     assert.deepEqual(problems, [], problems.join('\n  '));
     const total = Object.values(want).reduce((a, k) => a + Object.values(k).reduce((x, y) => x + y, 0), 0);
     console.log(`notice_census: ok (${total} notice looks still to move, none new)`);

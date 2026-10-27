@@ -98,11 +98,11 @@ export function updateWaitingIndicator(s) {
         // An overlay pill (#5287): no layout space, shown after a delay so a state that comes and goes at once never flashes it, gone at once.
         let text = "";
         if (bannerKey === 'needs_input') {
-            setClassName(banner, "waiting-banner");
+            setClassName(banner, "notice notice-warn notice-float notice-center notice-compact waiting-banner");
             // The card in the chat says this too (needs_input_card.js), and the pill is hidden while that card is on screen (css, #5895): one message; scrolled away from the card, the pill is the cue
             text = s.waiting_kind === 'login' ? "⏳ Agent needs you to sign in (in its terminal)" : "⏳ Agent is waiting for input";
         } else if (bannerKey === 'check_terminal' && !startupSignedOut(s)) { // signed out: the card says so, once
-            setClassName(banner, "waiting-banner waiting-banner-not-started");
+            setClassName(banner, "notice notice-warn notice-float notice-compact waiting-banner waiting-banner-not-started");
             text = "⏳ This agent hasn't done anything yet. Open its terminal: some agents ask to trust the folder, or to sign in, the first time they run.";
         }
         setPill(banner, !!text, text);

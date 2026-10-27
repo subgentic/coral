@@ -119,7 +119,7 @@ export function attachVersions(dialog, hooks) {
             bar.append(cmp);
         }
         if (!latest) {
-            const note = el('p', 'av-notice'); note.append(`v${rows[total - 1].version} is newer. `);
+            const note = el('p', 'av-notice notice notice-info'); note.append(`v${rows[total - 1].version} is newer. `);
             const open = el('button', 'av-link', 'Open the latest'); open.type = 'button'; open.addEventListener('click', () => choose(rows[total - 1]));
             note.append(open); bar.append(note);
         }

@@ -265,7 +265,7 @@ export async function refreshAgentUI() {
     } catch (error) {
         if (token === generation && sid === currentID()) {
             let notice = container.querySelector('.agent-ui-notice');
-            if (!notice) { notice = document.createElement('p'); notice.className = 'agent-ui-notice'; container.append(notice); }
+            if (!notice) { notice = document.createElement('p'); notice.className = 'agent-ui-notice notice-line'; container.append(notice); }
             notice.textContent = error.message;
         }
     } finally {

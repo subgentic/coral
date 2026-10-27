@@ -129,7 +129,7 @@ function _renderSandboxed(body, { url, content, name, isStale }) {
     const wrapper = document.createElement('div');
     wrapper.className = 'artifact-linked-preview';
     const note = document.createElement('p');
-    note.className = 'artifact-linked-notice';
+    note.className = 'artifact-linked-notice notice notice-info notice-bar';
     note.textContent = url
         ? 'Linked preview: scripts and interactive features are disabled. Some sites block embedding; if the preview stays blank, use Open link.'
         : 'HTML preview: scripts and external resources are disabled. Download the file for the original.';

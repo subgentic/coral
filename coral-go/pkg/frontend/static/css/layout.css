@@ -1038,6 +1038,9 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
  * role=alert or status in the markup. notice_census.test.mjs fails a class named *-banner, *-notice or *-toast that declares its own look, with a down-only list of those still to move. */
 .notice { --notice-tone: var(--accent); display: flex; align-items: flex-start; gap: var(--space-md); padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--notice-tone) 45%, var(--border)); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--notice-tone) 12%, var(--bg-secondary)); color: var(--text-primary); font-size: var(--fs-md); font-weight: 400; line-height: 1.5; }
 .notice[hidden] { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .notice-compact { padding: 8px 12px; font-size: var(--fs-base); } }
+@media (max-height: 500px) and (orientation: landscape) { .notice-compact { padding: 4px 10px; font-size: var(--fs-sm); } }
+.notice-flush { padding: 0; } /* a notice whose parts (a body, a header) pad themselves: a toast */
 .notice-info { --notice-tone: var(--accent); }
 .notice-warn { --notice-tone: var(--warning); }
 .notice-error { --notice-tone: var(--error); }

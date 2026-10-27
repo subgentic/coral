@@ -177,7 +177,7 @@ export function showWorkflowNotification(title, message, level = 'info', duratio
     const icons = { success: '✅', warning: '⚠️', error: '❌', info: '💬' };
     const icon = icons[level] || icons.info;
     const toast = document.createElement("div");
-    toast.className = "notification-toast";
+    toast.className = "notice notice-warn notice-float notice-flush notification-toast";
     toast.innerHTML = `<div class="notification-toast-body">
             <div class="notification-toast-header">
                 <span class="notification-toast-title">${icon} ${title ? `<strong>${escapeHtml(title)}</strong>` : 'Notification'}</span>
@@ -264,7 +264,7 @@ export function showAlertNotification(title, message, level = 'info', link = nul
 
 export function showNotificationToast(agentLabel, detail, onClick) {
     const toast = document.createElement("div");
-    toast.className = "notification-toast";
+    toast.className = "notice notice-warn notice-float notice-flush notification-toast";
     const detailHtml = detail
         ? `<span class="notification-toast-detail">${detail}</span>`
         : "";

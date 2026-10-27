@@ -724,12 +724,6 @@
 
     /* Output container full width */
 
-    /* Waiting banner compact */
-    .waiting-banner {
-        font-size: var(--fs-base) !important;
-        padding: 8px 12px !important;
-    }
-
     /* View body for message board */
     .view-body {
         flex-direction: column !important;
@@ -852,23 +846,7 @@
     }
 
     #mobile-session-list .session-mobile-banner {
-        display: inline-flex;
-        align-items: center;
-        margin: 8px 0 0;
-        padding: 4px 8px;
-        border-radius: 999px;
-        /* Quiet (#5123): the neutral pill's surface and hairline, with only the text in the warm colour. */
-        background: var(--bg-tertiary);
-        border: 1px solid var(--border);
-        color: var(--warning);
-        font-size: var(--fs-sm);
-        font-weight: 500;
-    }
-
-    #mobile-session-list .session-mobile-banner.error {
-        background: var(--bg-tertiary);
-        border-color: var(--border);
-        color: color-mix(in srgb, var(--error) 62%, var(--text-primary)); /* plain --error is 4.2:1 on the neutral surface in the dark theme */
+        margin: 8px 0 0; /* where it sits; the look is .chip .chip-attn (components.css) */
     }
 
     #mobile-session-list .session-mobile-meta {
@@ -1177,12 +1155,6 @@
     /* Modal: shorter max height in landscape */
     .modal-content {
         max-height: 85vh;
-    }
-
-    /* Waiting banner: compact */
-    .waiting-banner {
-        font-size: var(--fs-sm) !important;
-        padding: 4px 10px !important;
     }
 
     /* Hide mobile tab bar in landscape to maximize screen space */

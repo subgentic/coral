@@ -1185,25 +1185,13 @@
 /* Over the chat the pill repeated the card that is in the chat (a permission, a question, the startup prompt, a sign-in): one message, the card (#5895). It shows only while no card is on screen. */
 #capture-wrapper.card-in-view .waiting-banner { display: none; } /* only while the card is on screen (needs_input_card.js): scrolled away from it, the pill is the cue again */
 
-.waiting-banner {
-    background: var(--bg-primary);
-    background-image: linear-gradient(rgba(var(--fx-yellow-rgb), 0.15), rgba(var(--fx-yellow-rgb), 0.15));
-    border: 1px solid rgba(var(--fx-yellow-rgb), 0.3);
-    border-radius: var(--radius-md);
-    padding: 6px 12px;
-    font-size: var(--fs-md);
-    color: var(--warning);
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(var(--black-rgb), 0.25);
-}
+/* where it sits; what it looks like is the one notice's (.notice .notice-warn .notice-float .notice-center, layout.css) */
 
 /* A stalled first launch is the most likely moment a new user gives up, so
    this reads as an instruction rather than a status: slightly louder, and
    left-aligned because it is a sentence, not a label. */
 .waiting-banner.waiting-banner-not-started {
     text-align: left;
-    line-height: 1.45;
-    padding: 8px 12px;
 }
 
 /* ── Session ID Label ──────────────────────────────────────── */
