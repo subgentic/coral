@@ -185,7 +185,7 @@ export async function shareAgentTeam(boardName) {
                 <p style="color:var(--text-secondary);font-size:var(--fs-md);margin:6px 0 0">${tmpl.agents.length} agents</p>
             </div>
             <div class="modal-body">
-                <textarea readonly style="width:100%;height:260px;font-family:monospace;font-size:var(--fs-base);resize:vertical;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:12px">${escapeHtml(jsonStr)}</textarea>
+                <textarea readonly class="form-textarea-readonly">${escapeHtml(jsonStr)}</textarea>
             </div>
             <div class="modal-actions modal-footer">
                 <button class="btn" data-action="close">Close</button>

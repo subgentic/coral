@@ -30,7 +30,7 @@ export async function showExportBoardModal() {
     const agentCheckboxes = subs.map(s => {
         const role = escapeHtml(s.job_title || s.subscriber_id);
         const sid = escapeAttr(s.subscriber_id);
-        return `<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer;white-space:nowrap">
+        return `<label class="form-check form-check-compact">
             <input type="checkbox" class="export-agent-cb" value="${escapeAttr(sid)}" data-role="${escapeAttr(s.job_title || s.subscriber_id)}">
             <span style="font-weight:600;font-size:var(--fs-base)">${role}</span>
         </label>`;
@@ -48,7 +48,7 @@ export async function showExportBoardModal() {
         </div>
         <div style="margin-bottom:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <label style="font-weight:600;font-size:var(--fs-md)">Include agent chats:</label>
+                <label class="form-label form-label-strong">Include agent chats:</label>
                 <div style="display:flex;gap:8px">
                     <button class="mb-action-btn" data-on-click="mb-export-agents" data-checked="1" style="font-size:var(--fs-sm);padding:2px 8px">All</button>
                     <button class="mb-action-btn" data-on-click="mb-export-agents" data-checked="0" style="font-size:var(--fs-sm);padding:2px 8px">None</button>
@@ -59,8 +59,8 @@ export async function showExportBoardModal() {
             </div>
         </div>
         <div style="margin-bottom:8px">
-            <label style="font-weight:600;font-size:var(--fs-md);display:block;margin-bottom:4px">Format:</label>
-            <select id="export-format-select" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:var(--fs-md)">
+            <label class="form-label form-label-strong" for="export-format-select">Format:</label>
+            <select id="export-format-select" class="settings-select form-control-auto">
                 <option value="html">HTML (styled, shareable)</option>
                 <option value="json">JSON (canonical data)</option>
                 <option value="markdown">Markdown</option>
