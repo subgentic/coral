@@ -38,10 +38,10 @@ expect_fail() { local name="$1"; shift; local out; if out="$("$@" 2>&1)"; then b
 rel() { printf '{"draft":%s,"prerelease":%s,"immutable":%s,"body":%s}\n' "$2" "$3" "$4" "$(jq -Rn --arg b "$5" '$b')" > "$FIX/repos_subgentic_coral_releases_tags_$1.json"; }
 C="$(printf 'a%.0s' $(seq 40))"   # the commit a tag names
 O="$(printf 'b%.0s' $(seq 40))"   # the tag OBJECT of an annotated tag (git/ref/tags/<tag> answers with this, not the commit)
-# tagsha TAG COMMIT [annotated]: what GitHub answers for a tag. commits/<tag> is the commit either way (it peels); the git ref's object is the commit for a lightweight tag and the tag object
+# tagsha TAG COMMIT [annotated]: what GitHub answers for a tag. commits/refs/tags/<tag> is the commit either way (it peels); the git ref's object is the commit for a lightweight tag and the tag object
 # for an annotated one (#9397). The compare fixtures below exist only for the commit, so a script that read the ref's object for an annotated tag has nothing to compare.
 tagsha() {
-  printf '{"sha":"%s"}\n' "$2" > "$FIX/repos_subgentic_coral_commits_$1.json"
+  printf '{"sha":"%s"}\n' "$2" > "$FIX/repos_subgentic_coral_commits_refs_tags_$1.json"
   if [ "${3:-}" = annotated ]; then printf '{"object":{"type":"tag","sha":"%s"}}\n' "$O" > "$FIX/repos_subgentic_coral_git_ref_tags_$1.json"
   else printf '{"object":{"type":"commit","sha":"%s"}}\n' "$2" > "$FIX/repos_subgentic_coral_git_ref_tags_$1.json"; fi
 }
@@ -63,7 +63,7 @@ good; tagsha v1.4.150 "$C" lightweight
 bash "$SCRIPT" check v1.4.150 >/dev/null 2>&1 && ok "a lightweight tag passes check" || bad "a lightweight tag passes check"
 good; tagsha v1.4.150 "$C" annotated; compare "$C" ahead
 WANT="not on main" expect_fail "an annotated tag whose commit is ahead of main is still refused" bash "$SCRIPT" check v1.4.150
-good; printf '{"sha":"not-a-sha"}\n' > "$FIX/repos_subgentic_coral_commits_v1.4.150.json"
+good; printf '{"sha":"not-a-sha"}\n' > "$FIX/repos_subgentic_coral_commits_refs_tags_v1.4.150.json"
 WANT="not a commit id" expect_fail "an answer that is no commit id is refused" bash "$SCRIPT" check v1.4.150
 
 for t in v1.4 1.4.150 v1.4.150-rc1 'v1.4.150;id' 'v1.4.150 x' '' 'v1.4.150-forDropbox'; do
