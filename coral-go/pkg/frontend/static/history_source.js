@@ -1,7 +1,8 @@
 /* A linked computer's read-only history on Coral Hub. Local dashboards keep
  * their own history; a remote selection is explicit in the picker and URL. */
 import { state } from './state.js';
-import { isCloud, serverFetch, serverUrl, currentServer } from './server_base.js';
+import { isCloud, nativeInbox, serverFetch, serverUrl, currentServer } from './server_base.js';
+import { inboxRouteFor } from './routes.js';
 
 export function historyServer() {
     if (!isCloud()) return state.hub && state.historySourceServer ? state.historySourceServer : 'local';
@@ -24,7 +25,7 @@ export function historyRoute(id, query = '') {
     const route = id ? { view: 'chats', id } : { view: 'chats', query };
     const server = historyServer();
     if (server && (isCloud() || server !== 'local')) route.server = server;
-    return route;
+    return nativeInbox() ? inboxRouteFor(route) : route; // the Hub's native Inbox has no Chats address: a chat is the chat on screen in the Inbox (Goal #100, #9549)
 }
 
 export function historyUrl(url) {

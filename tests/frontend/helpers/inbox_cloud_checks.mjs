@@ -62,7 +62,8 @@ try {
     assert.match(read('static/cloud.js'), /if \(nativeInbox\(\)\) document\.body\.classList\.add\('native-inbox'\)/);
     // the one switch has these readers and no other
     const readers = fs.readdirSync(path.join(root, 'static')).filter(f => f.endsWith('.js') && /\bnativeInbox\b/.test(read('static/' + f))).sort();
-    assert.deepEqual(readers, ['app_actions.js', 'cloud.js', 'inbox_sidebar.js', 'inbox_tab.js', 'mailbox_chats.js', 'nav_tabs.js', 'server_base.js'], 'nativeInbox() is read in the planned places only');
+    // (#9549 adds the entry points of the old Chats and Board addresses: app_navigation.js, app_routes.js and history_source.js)
+    assert.deepEqual(readers, ['app_actions.js', 'app_navigation.js', 'app_routes.js', 'cloud.js', 'history_source.js', 'inbox_sidebar.js', 'inbox_tab.js', 'mailbox_chats.js', 'nav_tabs.js', 'server_base.js'], 'nativeInbox() is read in the planned places only');
     if (native) { // the real Inbox, drawn: the Hub's three pages and the chat folders, only the planned requests, a frame at its constant address
         state.servers = [{ id: 'box-2', status: 'online' }];
         calls.length = 0;

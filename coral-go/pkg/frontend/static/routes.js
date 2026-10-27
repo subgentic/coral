@@ -186,7 +186,7 @@ function terminalQuery(search) {
     return v.length === 1 && v[0] === 'terminal';
 }
 
-/** Where an old Chats address goes when the Inbox is the native one (nativeInbox(), Goal #100, #9549): the same chat or list as an Inbox route, never a not-found page. A chat is the chat on screen in the Inbox, under
+/** Where an old Chats address goes when the Inbox is the Hub's native one (Goal #100, #9549): the same chat or list as an Inbox route, never a not-found page. A chat is the chat on screen in the Inbox, under
  *  All chats (an old address does not say its folder); a list is the folder its filter names (starred, archived, active, with_notes; type=group is the Boards folder), else All chats: every other filter is dropped and the
  *  address still lands on a page. The computer (/chats/@<server>) is dropped from a list (the Inbox folders read every online computer) and kept on a chat. Any other route is returned as it is. */
 export function inboxRouteFor(route) {
