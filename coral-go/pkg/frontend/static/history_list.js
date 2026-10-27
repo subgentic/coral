@@ -8,6 +8,7 @@ import { renderSidebarTagDots } from './tags.js';
 import { updateSectionVisibility } from './sidebar.js';
 import { getCachedAgentAvailability } from './team_availability.js';
 import { whenText } from './when_text.js';
+import { compactDuration } from './format.js';
 import { renderTranscript } from './live_chat.js';
 import { historyLabel } from './history_label.js';
 import { browserLocal } from './safe_storage.js';
@@ -32,7 +33,7 @@ function ranFor(sec) {
     if (sec == null || !(sec >= 0)) return '';
     const m = Math.round(sec / 60);
     if (m < 1) return 'ran under a minute';
-    return m < 60 ? `ran ${m} min` : `ran ${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`;
+    return `ran ${compactDuration(m * 60)}`; // the app's one duration format: "ran 21 min", "ran 2 h 05 min" (#9547)
 }
 /** When a chat last spoke, in words ("today 14:32", "yesterday 17:20", "Oct 17", with the year when it is not this one: when_text.js, the same words as every other list), the full value for a tooltip and the time
  *  element, and "ran 21 min" for how long it went on. */
