@@ -6,6 +6,9 @@ import { boardFetch, isCloud, keyLabel, splitKey } from './server_base.js';
 let items = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
 export const reviewItems = () => items;
+/** A review artifact the operator has opened carries the 'read' tag (#9277): it stays in Needs you, shown as read, but it is not counted (the Inbox badge, the Needs you count). Opening it again, or marking it unread, is the same tags route. */
+export const isRead = a => !!(a.tags && a.tags.includes('read'));
+export const unreadReviewItems = () => items.filter(a => !isRead(a));
 export const reviewErrors = () => errors;
 export function onReviewsChanged(fn) { changed = fn; }
 
@@ -65,9 +68,27 @@ export function refreshReviews(force = false) {
     return pending;
 }
 
-/** Swap the review tag, preserving the remaining tags; keep the row on failure. */
+/** Add or remove the 'read' tag, keeping the other tags; the row stays in the list and the counts follow at once. Throws with the server's words when the save fails (the row keeps its tags). */
+export async function setReviewRead(row, read) {
+    const rest = (row.tags || []).filter(t => t !== 'read');
+    const tags = read ? [...rest, 'read'] : rest;
+    const r = await boardFetch(row.team, `/artifacts/${encodeURIComponent(row.id)}/tags`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }),
+    });
+    if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.error || `Could not mark ${read ? 'read' : 'unread'} (HTTP ${r.status}).`);
+    }
+    revision++;
+    const hit = items.find(a => a.reviewKey === row.reviewKey);
+    if (hit) hit.tags = tags;
+    row.tags = tags;
+    changed();
+}
+
+/** Swap the review tag, preserving the remaining tags (the 'read' tag goes: a reviewed artifact is settled); keep the row on failure. */
 export async function markReviewed(row) {
-    const tags = [...new Set((row.tags || []).filter(t => t !== 'for review').concat('reviewed'))];
+    const tags = [...new Set((row.tags || []).filter(t => t !== 'for review' && t !== 'read').concat('reviewed'))];
     const r = await boardFetch(row.team, `/artifacts/${encodeURIComponent(row.id)}/tags`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }),
     });

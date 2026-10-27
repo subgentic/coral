@@ -9,7 +9,7 @@ import { needsInputAttention } from './display_activity_hint.js';
  * The one search box searches the group on screen: it narrows the rows of Needs you and Tasks, and is the Saved search (the server matches, so it covers every saved message). Saved's Filters and Sort
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
-import { reviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed } from './inbox_reviews.js';
+import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed, setReviewRead, isRead } from './inbox_reviews.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
@@ -136,6 +136,7 @@ const needsState = DT.tableState();
 async function openReview(row) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
     openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name });
+    if (!isRead(row)) setReviewRead(row, true).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); a failed save is said, and the item keeps counting
 }
 function reviewActions(row) {
     const box = DT.el('div', 'inbox-review-actions');
@@ -152,7 +153,18 @@ function reviewActions(row) {
             target?.focus({ preventScroll: true });
         } catch (error) { done.disabled = false; errorText.textContent = error.message; }
     });
-    box.append(open, done, errorText); return box;
+    box.append(open);
+    if (isRead(row)) {
+        box.classList.add('inbox-review-actions-read');
+        const unread = DT.el('button', 'btn btn-small', 'Unread'); unread.type = 'button'; // the word is short so the row stays one line; its name says what it does
+        unread.setAttribute('aria-label', `Mark unread: ${row.name}`);
+        unread.addEventListener('click', async () => {
+            unread.disabled = true; errorText.textContent = '';
+            try { await setReviewRead(row, false); sayLive(`Marked ${row.name} unread.`); } catch (error) { unread.disabled = false; errorText.textContent = error.message; }
+        });
+        box.append(unread);
+    }
+    box.append(done, errorText); return box;
 }
 
 const dockSavedState = DT.tableState();
@@ -293,7 +305,7 @@ function inboxSavedToolbar() {
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
-const countOf = key => key === 'needs' ? allNeeds().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
+const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2',
     chats: 'chat_bubble_outline', 'chats-group': 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
@@ -444,11 +456,11 @@ registerGroupSource('hub-inbox', {
             const goal = rows.some(goalOf);
             const total = filteredNeeds().length;
             return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.' },
-                signature: JSON.stringify([needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s)])]), // the words move on with the clock: they are part of what was drawn
+                signature: JSON.stringify([needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0])]), // the words move on with the clock: they are part of what was drawn
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : resolveSessionIdentity(s),
                     open: s => { if (s.review) { openReview(s.review); return; } window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
                     columns: [
-                        { key: 'agent', label: rows.some(s => s.review) ? 'Item' : 'Agent', primary: true, width: rows.some(s => s.review) ? 'grow' : rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; return name; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                        { key: 'agent', label: rows.some(s => s.review) ? 'Item' : 'Agent', primary: true, width: rows.some(s => s.review) ? 'grow' : rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
                         ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: rows.some(s => s.review) ? 'content' : 'grow', line: 2, cell: s => {
                             if (!s.review) return askOf(s) || '';
                             const metadata = DT.el('span', 'inbox-review-metadata'); metadata.append(DT.el('span', null, 'For review'), DT.el('span', 'inbox-review-team', teamOf(s)));
@@ -468,7 +480,7 @@ registerGroupSource('hub-inbox', {
                             cell.title = [goalOf(s) ? `Goal: ${s.goal.title}` : NO_GOAL, s.task ? `Task: ${s.task.title || `#${s.task.id}`}` : ''].filter(Boolean).join(' \u00b7 ');
                             return cell;
                         } }] : []),
-                        ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', width: '14rem', line: 1, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
+                        ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', width: rows.some(s => s.review && isRead(s.review)) ? '19rem' : '14rem', line: 1, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
                         { key: 'waiting', label: 'Waiting', tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(s => s.review) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
                     ] });
                     wrap.append(table.el);
