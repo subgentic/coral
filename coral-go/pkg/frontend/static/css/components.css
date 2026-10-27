@@ -3449,7 +3449,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .prose a { color: var(--link-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
 .prose code { padding: 0.1em 0.35em; border-radius: var(--radius-sm); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: 0.9285714286em; }
 .prose pre { padding: 0.8em 1em; overflow-x: auto; border-radius: var(--radius-md); background: var(--bg-tertiary); }
-.prose pre code { padding: 0; background: none; font-size: inherit; }
+.prose pre code { padding: 0; background: none; font-size: 0.9285714286em; } /* 13 px of a 14 px body, as inline code is (UI/UX #9502) */
 .prose hr { margin: 1.6em 0; border: 0; border-top: 1px solid var(--border); }
 .prose img { max-width: 100%; }
 .md-plain { white-space: pre-wrap; }
