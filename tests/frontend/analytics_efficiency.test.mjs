@@ -26,6 +26,7 @@ try {
     eff.syncEfficiency('week');
     const sec = id => doc.getElementById(id);
     assert.equal(sec('cost-spend-section').querySelectorAll('.eff-seg-btn').length, 8, 'Group by has All, Provider, Model, Thinking level, Team, Agent, Branch, Task');
+    assert.deepEqual([...sec('cost-task-time-section').querySelectorAll('.eff-seg-btn')].map(b => b.textContent), ['All', 'Provider', 'Model', 'Thinking level', 'Team', 'Agent', 'Branch'], 'Task time has no Task grouping: every task is a group of one');
     assert.equal(sec('cost-spend').hidden, false, 'All shows the section\'s own content');
     assert.equal(sec('cost-eff-per-commit').hidden, true, 'and not the comparison');
     assert.equal(reads.length, 0, 'All reads nothing new');
@@ -54,6 +55,20 @@ try {
     assert.match(t, /Fastest \(at least 10 tasks\)Low/);
     assert.match(t, /Cheapest per taskLow\$1\.40 per task/);
     assert.match(t, /Max5 tasks · 10% sent back · too few to rank/);
+    assert.match(t, /% under the [\d.]+ \w+ median/, 'the line and the cards say median, the answer\'s figure for task time');
+    assert.match(t, /The line is the median across all tasks\./); assert.ok(!/average/.test(t), 'no "average" anywhere on Task time: ' + t.slice(0, 300));
+    assert.ok([...sec('cost-eff-task-time').querySelectorAll('th')].some(h => h.textContent === 'vs median'), 'the table column is vs median');
+    assert.match(text, /The line is the average across all commits\./, 'Tokens per commit keeps the average');
+    // Tokens per commit by Task: a plain list of the tasks that had a commit, cheapest first; a cost under a cent is "<$0.01"
+    globalThis.fetch = window.fetch = async () => Response.json({ metric: 'tokens_per_commit', group_by: 'task', range: '7d', min_sample: 10, total: { n: 3 }, average: { value: 5000 }, groups: [
+        { key: '7', label: '#7 Slow', value: 9000, n: 1, tokens: 9000, cost_usd_per_unit: 0.004, low_sample: true }, { key: '8', label: '#8 Quick', value: 2000, n: 2, tokens: 4000, cost_usd_per_unit: 0, low_sample: true }, { key: '9', label: '#9 Idle', n: 0, tokens: 0, low_sample: true }] });
+    click('cost-spend-section', 'Task'); await settle();
+    const tl = sec('cost-eff-per-commit'), tlText = tl.textContent.replace(/\s+/g, ' ');
+    assert.equal(tl.querySelectorAll('.eff-card, .eff-bar, .eff-tag').length, 0, 'no cards, bars or few tags: nothing to rank');
+    assert.match(tlText, /1 task has no commit and is not listed\./);
+    const trs = [...tl.querySelectorAll('tbody tr')].map(r => r.textContent.replace(/\s+/g, ' '));
+    assert.equal(trs.length, 2, 'only tasks with a commit'); assert.match(trs[0], /#8 Quick/, 'fewest tokens per commit first'); assert.match(trs[1], /#7 Slow/);
+    assert.match(trs[0], /no cost/, 'no recorded cost says so, not $0.00'); assert.match(trs[1], /<\$0\.01/, 'under a cent');
     // back to All
     click('cost-spend-section', 'All'); await settle();
     assert.equal(sec('cost-spend').hidden, false); assert.equal(sec('cost-eff-per-commit').hidden, true);
@@ -64,6 +79,7 @@ try {
     assert.ok(!/NaN|Infinity|undefined/.test(zt), 'no NaN or Infinity in the cards or the table: ' + zt.slice(0, 200));
     assert.ok([...z.querySelectorAll('.eff-fill, .eff-avg')].every(e => /^\d/.test(e.style.width || e.style.left || '0') ), 'no bar or line of NaN width');
     assert.equal(z.querySelectorAll('.eff-bar').length, 2);
+    assert.ok(!/\$0\.00/.test(zt) && /no cost/.test(zt), 'a cost of 0 reads "no cost", never $0.00: ' + zt.slice(0, 300));
     // an error says so and Retry reads again
     globalThis.fetch = window.fetch = async () => new Response('{}', { status: 500 });
     click('cost-spend-section', 'Agent'); await settle();
