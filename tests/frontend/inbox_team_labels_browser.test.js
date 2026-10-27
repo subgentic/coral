@@ -114,6 +114,8 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
                 check(`${label}: Artifacts' Name column has the room (at least 180 px, no file name cut) beside the team, task and goal, and no Server column (the team's words carry the computer)`, cols.name >= 180 && cols.cut.length === 0 && !cols.heads.includes('Server') && cols.heads.includes('Team'), JSON.stringify(cols));
             }
             await panel();
+            const alabels = await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-field-label')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
+            check(`${label}: the Server filter stays in the Artifacts Filters panel while the Server column is hidden (UI/UX's condition on #8839)`, alabels.includes('Server'), JSON.stringify(alabels));
             const achoices = await teamChoices();
             check(`${label}: Artifacts' Team filter lists the two teams by their computer, each with its count`, achoices.filter(([v]) => v).length === 2 && achoices.some(([v, t]) => v === '@box-2/alpha' && /alpha · Box Two \(1\)/.test(t)) && achoices.some(([v, t]) => v === 'alpha' && /alpha · This computer \(1\)/.test(t)), JSON.stringify(achoices));
             check(`${label}: Needs you's Team column tells the two alpha teams apart`, nteams && nteams.length === 2 && nteams[0] !== nteams[1] && nteams.some(t => /alpha.*This computer/.test(t)) && nteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(nteams));
