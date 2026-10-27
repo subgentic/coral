@@ -10,7 +10,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
 const TEAM = `qa-toolbar-${Date.now() % 100000}`;
 // what each tab's row must hold: the pills, the Filters icon, More, and the action's words
-const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['Board', { pills: false, filters: true, more: true }], ['Tasks', { pills: true, filters: true, action: '+ Task' }],
+const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['Board', { pills: false, filters: true, more: true }], ['Tasks', { pills: true, filters: true, action: 'New task' }],
     ['Agents', { pills: true, filters: false }], ['Artifacts', { pills: false, filters: true, more: true }], ['Knowledge', { pills: false, filters: false, action: 'Distill knowledge' }]];
 
 (async () => {

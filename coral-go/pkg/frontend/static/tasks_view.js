@@ -152,10 +152,10 @@ export function tasksToolbar(scope, onChange, hooks = {}) {
     return bar;
 }
 
-/** The one + Task button: the same words, name, tooltip and action on every list of tasks. `small` is the dock's compact size. It opens the create-task dialog (the data-on-click action). */
+/** The one New task button: the same words, name, tooltip and action on every list of tasks. `small` is the dock's compact size. It opens the create-task dialog (the data-on-click action). */
 export function newTaskButton({ small = false } = {}) {
     const b = document.createElement('button');
-    b.type = 'button'; b.className = `btn btn-primary btn-create-task${small ? ' btn-small' : ' goals-new'}`; b.textContent = '+ Task';
+    b.type = 'button'; b.className = `btn btn-primary btn-create-task${small ? ' btn-small' : ' goals-new'}`; b.textContent = 'New task';
     b.title = 'Create task'; b.setAttribute('aria-label', 'New task'); b.setAttribute('data-on-click', 'task-create-show');
     return b;
 }
