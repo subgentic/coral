@@ -307,7 +307,7 @@ body.panel-dragging .preview-pane {
     padding: 12px 16px;
     overflow: auto;
     font-size: var(--fs-base);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     font-family: var(--font-mono);
     background: var(--bg-primary);
     color: var(--text-primary);
@@ -399,7 +399,7 @@ body.panel-dragging .preview-pane {
     padding: 12px 20px;
     font-family: var(--font-mono);
     font-size: var(--fs-base);
-    line-height: 1.6;
+    line-height: var(--lh-body);
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -787,7 +787,7 @@ body.panel-dragging .xterm-container {
     max-width: 820px;
     margin: 0 auto;
     padding: 24px 32px 48px;
-    line-height: 1.7;
+    line-height: var(--lh-body);
     overflow-wrap: break-word;
 }
 .preview-pane-markdown h1,
@@ -795,7 +795,7 @@ body.panel-dragging .xterm-container {
     margin: 1.6em 0 0.6em;
     padding-bottom: 0.3em;
     border-bottom: 1px solid var(--border);
-    line-height: 1.25;
+    line-height: var(--lh-label);
 }
 .preview-pane-markdown h1 { font-size: 1.9em; margin-top: 0; }
 .preview-pane-markdown h2 { font-size: 1.45em; }
