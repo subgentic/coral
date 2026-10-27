@@ -82,6 +82,8 @@ func main() {
 		}
 	case "working-mode":
 		cmdWorkingMode(os.Args[2:])
+	case "reviewer":
+		cmdReviewer(os.Args[2:])
 	case "leave":
 		cmdLeave()
 	case "delete":
@@ -207,9 +209,10 @@ Commands:
   goal add/list/show/update/close  The goals of this board (coral-board goal --help): what the team works toward, with how its tasks stand
   task detail <id>               Read requirements, dependencies and results
   task show <id> [--json]        A task's status, result message and artifact links
-  task claim [id]                Claim a named ready task or next ready work
+  task claim [id]                Claim a named ready task or next ready work (a Reviews only agent: the oldest review in the pool that matches its areas)
   task reassign/cancel/amend     Change ownership, stop work, or revise text
-  task submit-review/release-review  Record a candidate or release capacity
+  task submit-review/release-review  Record a candidate (--areas, --reviewers: who may review it) or release capacity
+  reviewer set <name> [--reviews-only|--no-reviews-only] [--areas ui,go]  An agent's Reviews only setting and review areas (Operator only)
   task complete <id> [--message "note"]  Complete with outcome/evidence
   workflow create --file <path>  Create a workflow from JSON file (Operator only)
   workflow list                  List all workflows (Operator only)

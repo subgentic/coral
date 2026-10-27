@@ -5,6 +5,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -40,6 +41,8 @@ func (h *BoardHandler) ClaimTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err.Error() == "complete your current task before claiming a new one" {
 			errConflict(w, err.Error())
+		} else if errors.Is(err, board.ErrReviewsOnly) { // #8957: an agent set to review only is refused a build task
+			writeError(w, http.StatusConflict, "reviews_only", err.Error())
 		} else {
 			blocked, lookupErr := h.bs.BlockedTasksForSubscriber(r.Context(), project, body.SubscriberID, body.TaskID)
 			if lookupErr != nil {

@@ -50,6 +50,32 @@ func (h *BoardHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		h.listGoalTasks(w, r, project, g)
 		return
 	}
+	if nr := q.Get("needs_review"); nr != "" && nr != "false" { // the tasks whose review is waiting (#8957)
+		if nr != "true" {
+			errBadRequest(w, "needs_review is true or false")
+			return
+		}
+		if q.Get("status") != "" || q.Get("cursor") != "" {
+			errBadRequest(w, "needs_review cannot be combined with status or cursor: it is one page of the reviews that wait")
+			return
+		}
+		limit := 0
+		if l := q.Get("limit"); l != "" {
+			n, err := strconv.Atoi(l)
+			if err != nil || n <= 0 {
+				errBadRequest(w, "limit must be a positive number")
+				return
+			}
+			limit = n
+		}
+		page, err := h.bs.ListNeedsReview(r.Context(), project, limit)
+		if err != nil {
+			errInternalServer(w, err.Error())
+			return
+		}
+		httputil.WriteJSONValidated(w, r, http.StatusOK, page)
+		return
+	}
 	query := board.TaskListQuery{Status: q.Get("status"), Cursor: q.Get("cursor")}
 	if l := q.Get("limit"); l != "" {
 		n, err := strconv.Atoi(l)

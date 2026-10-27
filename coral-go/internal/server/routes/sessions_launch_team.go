@@ -23,6 +23,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/gitutil"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tracking"
 )
@@ -40,6 +41,9 @@ type launchTeamAgent struct {
 	MCPServers   json.RawMessage        `json:"mcpServers"` // refused: not supported (#3644)
 	Hooks        map[string]interface{} `json:"hooks"`
 	Knowledge    string                 `json:"knowledge"`
+	// ReviewsOnly and ReviewAreas (#8957): the member takes review tasks only, and which areas it reviews (empty: every area). Applied when the member subscribes to the team's board.
+	ReviewsOnly bool     `json:"reviews_only"`
+	ReviewAreas []string `json:"review_areas"`
 }
 
 // launchTeamRequest is a team launch's body.
@@ -98,6 +102,16 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		if mcpGiven(a.MCPServers) {
 			errBadRequest(w, fmt.Sprintf("agent %q: %s", a.Name, errMCPNotSupported))
 			return
+		}
+		if a.ReviewsOnly || len(a.ReviewAreas) > 0 {
+			if cloud.Tunneled(r) {
+				errBadRequest(w, fmt.Sprintf("agent %q: the review settings are not offered through Coral Hub", a.Name))
+				return
+			}
+			if _, aerr := board.NormalizeReviewAreas(a.ReviewAreas); aerr != nil {
+				errBadRequest(w, fmt.Sprintf("agent %q: %s", a.Name, strings.TrimPrefix(aerr.Error(), board.ErrReviewArea.Error()+": ")))
+				return
+			}
 		}
 	}
 	// Through the Coral Hub, a team with any member that skips permission prompts needs the owner's local switch, checked
@@ -633,6 +647,13 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 	// Board subscription handled by setupBoardAndPrompt (prompt passed as CLI arg)
 	if body.BoardName != "" {
 		h.setupBoardAndPrompt(sessionID, result["session_name"].(string), agentType, body.BoardName, launchedName(result, def.Name))
+		if (def.ReviewsOnly || len(def.ReviewAreas) > 0) && h.bs != nil { // the member's review settings (#8957), on the subscription the line above made
+			yes := def.ReviewsOnly
+			areas := def.ReviewAreas
+			if _, err := h.bs.SetReviewSettings(ctx, body.BoardName, naming.SubscriberID(launchedName(result, def.Name), agentType), &yes, &areas); err != nil {
+				log.Printf("[launch-team] the review settings of %q were not saved: %v", def.Name, err)
+			}
+		}
 	}
 	entry := map[string]any{"name": launchedName(result, def.Name), "session_id": sessionID, "session_name": result["session_name"]}
 	if worktreePath != "" {

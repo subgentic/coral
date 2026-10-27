@@ -15,6 +15,8 @@ func (s *Store) migrateBoardColumns(ctx context.Context) {
 		"ALTER TABLE board_messages ADD COLUMN target_group_id TEXT",
 		"ALTER TABLE board_subscribers ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
 		"ALTER TABLE board_subscribers ADD COLUMN can_peek INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE board_subscribers ADD COLUMN reviews_only INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE board_subscribers ADD COLUMN review_areas TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE board_subscribers ADD COLUMN subscriber_id TEXT",
 		"ALTER TABLE board_subscribers ADD COLUMN session_name TEXT",
 		"ALTER TABLE board_messages ADD COLUMN subscriber_id TEXT",

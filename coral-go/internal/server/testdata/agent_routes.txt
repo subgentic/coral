@@ -414,6 +414,7 @@ b PUT /api/auth/hub-origins
 b PUT /api/auth/hub-signin
 b PUT /api/board/{project}/artifacts/{id}/tags
 b PUT /api/board/{project}/settings
+b PUT /api/board/{project}/subscribers/{subscriberID}/review-settings
 a PUT /api/board/{project}/tasks/{taskID}/goal
 b PUT /api/board/{project}/working-mode
 b PUT /api/board/{project}/working-mode/presets/{presetID}

@@ -422,7 +422,7 @@
     },
     {
       "name": "board_subscribers",
-      "sql": "CREATE TABLE board_subscribers (\n\t\t\tid            INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject       TEXT NOT NULL,\n\t\t\tsession_id    TEXT NOT NULL,\n\t\t\tjob_title     TEXT NOT NULL,\n\t\t\twebhook_url   TEXT,\n\t\t\torigin_server TEXT,\n\t\t\treceive_mode  TEXT NOT NULL DEFAULT 'mentions',\n\t\t\tlast_read_id  INTEGER NOT NULL DEFAULT 0,\n\t\t\tsubscribed_at TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, can_peek INTEGER NOT NULL DEFAULT 0, subscriber_id TEXT, session_name TEXT, session_joined_at TEXT,\n\t\t\tUNIQUE(project, session_id)\n\t\t)",
+      "sql": "CREATE TABLE board_subscribers (\n\t\t\tid            INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject       TEXT NOT NULL,\n\t\t\tsession_id    TEXT NOT NULL,\n\t\t\tjob_title     TEXT NOT NULL,\n\t\t\twebhook_url   TEXT,\n\t\t\torigin_server TEXT,\n\t\t\treceive_mode  TEXT NOT NULL DEFAULT 'mentions',\n\t\t\tlast_read_id  INTEGER NOT NULL DEFAULT 0,\n\t\t\tsubscribed_at TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, can_peek INTEGER NOT NULL DEFAULT 0, subscriber_id TEXT, session_name TEXT, session_joined_at TEXT, reviews_only INTEGER NOT NULL DEFAULT 0, review_areas TEXT NOT NULL DEFAULT '',\n\t\t\tUNIQUE(project, session_id)\n\t\t)",
       "tbl_name": "board_subscribers",
       "type": "table"
     },
@@ -2646,6 +2646,24 @@
           "hidden": 0,
           "name": "session_joined_at",
           "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 14,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "reviews_only",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 15,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "review_areas",
+          "notnull": 1,
           "pk": 0,
           "type": "TEXT"
         }

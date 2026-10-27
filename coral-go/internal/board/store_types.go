@@ -18,6 +18,9 @@ type Subscriber struct {
 	SubscribedAt string  `db:"subscribed_at" json:"subscribed_at"`
 	IsActive     int     `db:"is_active" json:"is_active"`
 	CanPeek      int     `db:"can_peek" json:"can_peek"`
+	// ReviewsOnly: the agent takes review tasks and nothing else (#8957, Goal #80); ReviewAreas: the areas it reviews, empty for every area. Both are the agent's own setting on this board.
+	ReviewsOnly bool     `db:"reviews_only" json:"reviews_only"`
+	ReviewAreas AreaList `db:"review_areas" json:"review_areas"`
 	// Legacy column — kept for DB compat, mirrors SubscriberID for new rows.
 	SessionID string `db:"session_id" json:"-"`
 	// SessionJoinedAt is when SessionName became this subscription's session (#4379): set when the
