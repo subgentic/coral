@@ -980,23 +980,9 @@
     min-width: 0;
 }
 
-.goal-action-btn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: var(--radius-sm);
-    transition: color 0.15s, background 0.15s;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-}
-
-.goal-action-btn:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-}
+/* The goal line's Refresh and Edit: dense .btn-icon.btn-xs (#9332). */
+.goal-action-btn { flex-shrink: 0; }
+.btn-icon.btn-xs.goal-action-btn { margin-block: -1px; } /* the goal line stays 22 px high (measured, #9332): a 24 px box takes 22 of it */
 
 .goal-edit-input { flex: 1; min-width: 0; border-color: var(--accent); }
 

@@ -258,15 +258,15 @@ function renderDirectory(nodes, path, level) {
             row.append(chevron, createFileIcon(cleanName, isDir, exp), element('span','explorer-name', cleanName));
             if (!isDir) {
                 const actions = element('span', 'explorer-actions');
-                const copyBtn = element('button', 'explorer-action-btn');
+                const copyBtn = element('button', 'btn btn-quiet btn-icon btn-xs explorer-action-btn');
                 copyBtn.type = 'button'; copyBtn.title = 'Copy path'; copyBtn.tabIndex = -1; copyBtn.setAttribute('aria-label', `Copy path ${child}`);
                 copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M5 11H3.5A1.5 1.5 0 0 1 2 9.5v-7A1.5 1.5 0 0 1 3.5 1h7A1.5 1.5 0 0 1 12 2.5V5"/></svg>';
                 copyBtn.addEventListener('click', e => { e.stopPropagation(); copyFilePath(child); });
-                const previewBtn = element('button', 'explorer-action-btn');
+                const previewBtn = element('button', 'btn btn-quiet btn-icon btn-xs explorer-action-btn');
                 previewBtn.type = 'button'; previewBtn.title = 'Preview'; previewBtn.tabIndex = -1; previewBtn.setAttribute('aria-label', `Preview ${child}`);
                 previewBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2.5"/></svg>';
                 previewBtn.addEventListener('click', e => { e.stopPropagation(); openFilePreview(child); });
-                const editBtn = element('button', 'explorer-action-btn');
+                const editBtn = element('button', 'btn btn-quiet btn-icon btn-xs explorer-action-btn');
                 editBtn.type = 'button'; editBtn.title = 'Edit'; editBtn.tabIndex = -1; editBtn.setAttribute('aria-label', `Edit ${child}`);
                 editBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/><path d="M9.5 3.5l3 3"/></svg>';
                 editBtn.addEventListener('click', e => { e.stopPropagation(); openFileEdit(child); });

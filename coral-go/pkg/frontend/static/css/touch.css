@@ -18,7 +18,6 @@
     .agent-ui-card button,
     .agent-ui-home-row,
     .agent-ui-actions .agent-ui-dismiss,
-    .file-action-btn,
     .folder-copy-btn,
     .sidebar-kebab-btn {
         min-width: var(--control-touch-height);
@@ -50,16 +49,7 @@
         height: auto;
     }
 
-    /* Small icon buttons in file rows (favourite stars, Browse row actions):
-       the glyph keeps its size; the button around it is the 44px hit area. */
-    .file-star-btn,
-    .explorer-action-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: var(--control-touch-height);
-        min-height: var(--control-touch-height);
-    }
+    /* Small icon buttons in file rows (favourite stars, Browse row actions) are .btn-icon.btn-xs: the glyph keeps its size and a 44 px hit area comes from the button's ::after (components.css). */
     /* Browse rows reveal their actions on hover, which a touch screen has not got. */
     .explorer-actions {
         opacity: 1;
@@ -72,7 +62,6 @@
     #chat-find-btn,
     .chat-copy-btn,
     .chat-save-btn,
-    .mb-save-btn,
     .job-type-btn,
     .board-chat-toolbar .btn-nav,
     #board-chat-pause-btn,
