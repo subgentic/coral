@@ -31,7 +31,7 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
     const lineProbe = () => ev(`(() => { const box = [...document.querySelectorAll('#cost-dashboard-view .dt-box')].find(b => b.getClientRects().length && b.querySelector('table')); if (!box) return null; const t = box.querySelector('table'), row = t.querySelector('tbody tr');
         const heads = [...t.querySelectorAll('thead th')].filter(h => h.getClientRects().length && getComputedStyle(h).display !== 'none' && !h.classList.contains('dt-check')).map(h => h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim());
         const cells = row ? [...row.querySelectorAll('td:not(.dt-check)')].filter(c => c.getClientRects().length) : [], tops = cells.map(c => Math.round(c.getBoundingClientRect().top)), rr = row ? row.getBoundingClientRect() : { height: 0 };
-        return { sideways: box.scrollWidth > box.clientWidth + 1, pageSw: document.documentElement.scrollWidth > innerWidth + 1, heads, cells: cells.length, sameTop: tops.every(t => Math.abs(t - tops[0]) <= 3), rowH: Math.round(rr.height), folded: box.classList.contains('dt-folded'), rows: t.querySelectorAll('tbody tr').length }; })()`);
+        return { sideways: box.scrollWidth > box.clientWidth + 1, pageSw: document.documentElement.scrollWidth > innerWidth + 1, heads, firstCell: cells[0] ? cells[0].textContent.trim() : '', cells: cells.length, sameTop: tops.every(t => Math.abs(t - tops[0]) <= 3), rowH: Math.round(rr.height), folded: box.classList.contains('dt-folded'), rows: t.querySelectorAll('tbody tr').length }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
         for (const [label, w, h, mobile, big] of [['390 px', 390, 844, true, false], ['1280 px at 200% text', 1280, 800, false, true]]) {
@@ -43,6 +43,8 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
                 assert.equal(p.folded, false, 'not stacked: ' + JSON.stringify(p));
                 assert.ok(p.heads.length >= 2 && p.heads.length <= 3, 'the name, the figure (and a row link): ' + JSON.stringify(p.heads));
                 assert.ok(p.heads.includes(key === 'calls' ? 'Calls' : 'Cost'), 'the figure the table is read for stays: ' + JSON.stringify(p.heads));
+                if (key === 'model') assert.ok(!/^(claude|codex)/i.test(p.firstCell) && p.heads[0].startsWith('Model'), 'By model keeps the Model column, not the Provider: ' + JSON.stringify(p));
+                if (key === 'thinking') assert.ok(p.heads[0].startsWith('Thinking level'), 'By thinking keeps the Thinking level column: ' + JSON.stringify(p));
                 assert.ok(p.sameTop && p.rowH <= 72, 'one line: the cells are level and the row is short: ' + JSON.stringify(p));
             });
             else for (const key of VIEWS) await S.run(`${label}: ${key} folds, no sideways scroll`, async () => {
