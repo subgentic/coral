@@ -76,7 +76,7 @@ const STUB = `(() => {
     await waitFor(`document.querySelectorAll('#artifact-surfaces-test tbody .dt-row').length===3`,surface+' artifact rows');
     assert.equal(await ev(`document.querySelector('#artifact-surfaces-test .dt-box').classList.contains('dt-one-line')`),true,surface);
     assert.equal(await ev(`document.querySelector('#artifact-surfaces-test th[data-key=name]').getAttribute('aria-sort')`),surface==='goal'?'none':'descending',surface==='goal'?'the goal list is grouped by task: its heads stay until a header is pressed on it':'sort remembered across '+surface);
-    assert.equal(await ev(`document.querySelector('#artifact-surfaces-test tbody .dt-primary').textContent`),'charlie.txt');
+    assert.equal(await ev(`document.querySelector('#artifact-surfaces-test tbody .dt-primary').textContent`),surface==='goal'?DATA[0].name:'charlie.txt');
     assert.equal(await ev(`!!document.querySelector('#artifact-surfaces-test .dt-folded')`),false,surface+' never folds');
    }
   }
