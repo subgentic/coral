@@ -26,6 +26,7 @@ const TT = { metric: 'task_time', range: '24h', min_sample: 10, total: { n: 260 
         for (const [label, w, h, mobile] of [['1280', 1280, 900, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await ev(`try { for (const k of Object.keys(localStorage)) if (k.includes('coral-eff-group')) localStorage.removeItem(k); } catch {} true`); // the 1280 pass's choice (Model) is remembered: the 390 pass starts at All
             await ev(`(() => { window.__effReads = []; const R = window.fetch.bind(window);
                 window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
                     if (url.pathname === '/api/analytics/efficiency') { window.__effReads.push(url.search); const m = url.searchParams.get('metric'); return Promise.resolve(new Response(JSON.stringify(m === 'task_time' ? ${JSON.stringify(TT)} : ${JSON.stringify(TPC)}), { status: 200, headers: { 'content-type': 'application/json' } })); }
