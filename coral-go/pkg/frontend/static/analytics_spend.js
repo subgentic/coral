@@ -4,7 +4,7 @@
  *  - task time: tasks done, median and slowest 1 in 10 from claimed to done, the wait before claimed, review time (assignment to approval), sent back 2 or more times, tasks done a day or an hour, and by agent. A measure the endpoint does not return is left out.
  * One read feeds both: GET /api/board/<team>/spend?range=24h|7d sends counts and seconds, not ratios; the page divides. Everything is built with the DOM and textContent: agent names are written by agents. Lazy: cost_dashboard.js imports it. */
 import { state } from './state.js';
-import { boardFetch, isCloud, spendTeamKeys } from './server_base.js';
+import { boardFetch, identityKey, isCloud, noteBoardLabels, serverFetch, spendTeamKeys } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
@@ -41,9 +41,32 @@ function fmtDur(s) {
 const tokensOf = (t) => (typeof t === 'number' ? t : t && typeof t.tokens === 'number' ? t.tokens : t ? (Number(t.input) || 0) + (Number(t.output) || 0) : 0); // input plus output (a day's row has the sum already): the cache is beside it
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-/** The teams the person can look at, on this computer or through a hub: those with an agent on the list, then the one chosen last. */
+/** The teams the person can look at, on this computer or through a hub: those with an agent on the list and every team with a board (#8811), then the one chosen last. */
 function teams() {
-    return spendTeamKeys(state.liveSessions, isCloud()).sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
+    return spendTeamKeys(state.liveSessions, isCloud(), boards.keys).sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
+}
+
+// Every team with a board, on this computer and on each online computer of a hub (GET /api/board/projects), read when the section opens and again after half a minute: a team with spend and no agent running is
+// then in the picker. A computer that does not answer adds none; the Cloud Hub's rule for another computer's teams is spendTeamKeys'.
+const boards = { keys: [], at: 0, sig: '', reading: null };
+function readBoards() {
+    const servers = ['local', ...(state.hub ? (state.servers || []).filter(s => s && s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])], sig = servers.join();
+    if (boards.reading || (sig === boards.sig && Date.now() - boards.at < 30000)) return boards.reading || Promise.resolve(false); // the same computers asked a moment ago: that answer
+    boards.reading = Promise.all(servers.map(async server => {
+        try {
+            const r = await serverFetch(server, '/api/board/projects');
+            const rows = r.ok ? await r.json() : [];
+            if (!Array.isArray(rows)) return [];
+            noteBoardLabels(rows, 'board_id', server);
+            return rows.filter(x => x && x.board_id).map(x => identityKey(server, x.board_id));
+        } catch { return []; }
+    })).then(lists => {
+        const next = [...new Set(lists.flat())].sort();
+        const changed = next.join('\n') !== boards.keys.join('\n');
+        boards.keys = next; boards.at = Date.now(); boards.sig = sig; boards.reading = null;
+        return changed;
+    });
+    return boards.reading;
 }
 
 const ratio = (n, den) => (den > 0 && n != null ? n / den : null);
@@ -285,5 +308,6 @@ export function showSpend(host, period, timeHost) {
     sel.value = team;
     host.querySelector('.spend-head').hidden = list.length < 2;
     if (changed) model.data = null;
+    readBoards().then(more => { if (more && host.isConnected) showSpend(host, period, timeHost); }); // the boards' teams came in: the picker is drawn again with them
     return loadSpend();
 }
