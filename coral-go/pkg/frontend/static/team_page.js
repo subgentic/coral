@@ -14,6 +14,7 @@ import { pollEvery } from './overload.js';
 import { onViewShown } from './view_switch.js';
 import { setPreviewSession } from './preview_pane.js';
 import { renderLiveSessions } from './render.js';
+import { watchScrollCue } from './scroll_cue.js';
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
@@ -58,7 +59,7 @@ function buildOnce() {
         tabs.append(b);
     }
     buildTabsMore(tabs);
-    tabs.addEventListener('scroll', drawTabEdges, { passive: true });
+    drawTabEdges = watchScrollCue(tabs);
     window.addEventListener('resize', () => { syncTabStop(); drawTabEdges(); });
     tabs.addEventListener('keydown', (e) => {
         const list = [...tabs.querySelectorAll('[role=tab]')].filter(b => b.getClientRects().length), i = list.indexOf(document.activeElement); // a phone's tabs behind More are not in the row
@@ -239,12 +240,7 @@ function startCounts() {
 const panel = (t) => $(`team-panel-${t}`);
 
 /** Which edges of the tab strip hide more tabs (it scrolls sideways when the tabs are wider than the window): the fade at that edge says so. */
-function drawTabEdges() {
-    const t = $('team-tabs'); if (!t) return;
-    const start = t.scrollLeft > 1, end = t.scrollLeft + t.clientWidth < t.scrollWidth - 1;
-    const v = start && end ? 'both' : start ? 'start' : end ? 'end' : '';
-    if (v) t.setAttribute('data-more', v); else t.removeAttribute('data-more'); // (the stylesheet's [data-more] rules)
-}
+let drawTabEdges = () => {}; // set when the strip is built: the one scroll cue (scroll_cue.js)
 
 /** The strip is ONE Tab stop: the selected tab, or, when it is behind More on a phone (no box in the row), the row's first tab: otherwise no tab of the row is reachable by Tab and a keyboard user would get past the whole tablist (#8791: Board is behind More now). */
 function syncTabStop() {

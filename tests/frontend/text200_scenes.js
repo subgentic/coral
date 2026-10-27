@@ -84,6 +84,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.selectLiveSession('phone-bot-with-a-long-name', 'claude', 'phone-bot-with-a-long-name-id', 'local'); true`); await settle(900);
             await ev(`(document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); true`); await settle(800);
             for (const tab of ['tasks', 'board', 'files', 'notes', 'activity', 'artifacts']) await probe('drawer ' + tab, () => ev(`window.switchAgenticTab('${tab}', 'top'); true`), '#agentic-state');
+            // #9377: at 200% text the drawer's tabs are wider than the strip: a strip that scrolls says which edge hides more (data-more, drawn again when the text size changes)
+            await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(700);
+            const cue = await ev(`(() => { const s = document.querySelector('.agentic-state-tabs'); return { scrolls: s.scrollWidth > s.clientWidth + 1, more: s.getAttribute('data-more') || '' }; })()`);
+            if (cue.scrolls && !cue.more) problems.push('drawer tabs scroll at 200% with no edge cue (data-more): ' + JSON.stringify(cue));
+            await ev(`document.documentElement.style.fontSize = ''; true`);
             await ev(`(document.getElementById('agentic-mobile-close-btn') || document.createElement('i')).click(); true`);
         }
         if (group === 'dialogs') {

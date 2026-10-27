@@ -145,7 +145,7 @@ body.panel-dragging .agentic-state {
 .agentic-tab[hidden] { display: none; }
 .agentic-tab.tab-more { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); pointer-events: none; }
 .agentic-more { position: relative; display: flex; flex: 0 0 auto; }
-.agentic-more > .agentic-tab, .agentic-state-tabs[data-words] .agentic-more > .agentic-tab { flex: 0 0 auto; padding-inline: 4px; }
+.agentic-more > .agentic-tab, .agentic-state-tabs[data-words] .agentic-more > .agentic-tab { flex: 0 0 auto; padding-inline: 4px; margin-bottom: 0; } /* the tab's -1px overlap of the strip's line would make its box 1 px short of the 44 */
 .agentic-more-menu { position: fixed; top: 100%; right: 0; z-index: 30; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .agentic-more-item.active { color: var(--accent); font-weight: 600; }
 .agentic-more-item .material-icons { font-size: var(--icon-size); }

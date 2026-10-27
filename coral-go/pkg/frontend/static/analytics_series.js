@@ -4,6 +4,7 @@
  * rows add up to where the chart ends. It reads GET /api/token-usage/timeseries?group_by=team|agent|provider|model (each bucket lists its series). Everything is built with the DOM and textContent:
  * names are written by agents. */
 import { compactCount, formatCost } from './format.js';
+import { watchScrollCue } from './scroll_cue.js';
 
 export const METRICS = [
     { key: 'cost_usd', label: 'Cost', fmt: v => formatCost(v, { zeroAsTwo: true }), table: 'cost_usd' },
@@ -198,12 +199,7 @@ function seg(label, items, isOn, onToggle, multi) {
     const wrap = el('div', 'viz-ctl'); wrap.append(el('span', 'viz-ctl-label', label));
     const g = el('div', multi ? 'viz-seg btn-seg viz-multi' : 'viz-seg btn-seg'); g.setAttribute('role', 'group'); g.setAttribute('aria-label', label);
     for (const [k, t] of items) { const b = el('button', 'btn', t); b.type = 'button'; b.setAttribute('aria-pressed', String(isOn(k))); b.addEventListener('click', () => onToggle(k)); g.append(b); }
-    wrap.append(g); watchMore(g); return wrap;
-}
-/** A scrolling row says there is more beyond its edge: data-more (end, start, both) is what the stylesheet fades. */
-function watchMore(g) {
-    const mark = () => { const start = g.scrollLeft > 1, end = g.scrollLeft + g.clientWidth < g.scrollWidth - 1, v = start && end ? 'both' : start ? 'start' : end ? 'end' : ''; if (v) g.setAttribute('data-more', v); else g.removeAttribute('data-more'); };
-    g.addEventListener('scroll', mark, { passive: true }); requestAnimationFrame(mark);
+    wrap.append(g); watchScrollCue(g); return wrap;
 }
 const joinWords = list => (list.length < 2 ? list.join('') : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`);
 

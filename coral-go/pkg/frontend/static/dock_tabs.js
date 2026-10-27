@@ -6,6 +6,7 @@ import { registerActions } from './actions.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 import { setText, setHidden, setAttr, setTitle, setHtml } from './dom_write.js';
 import { menuMove } from './menu_keys.js';
+import { watchScrollCue } from './scroll_cue.js';
 
 const RARE = ['browse', 'activity', 'agent-ui'];
 const WIDE = window.matchMedia('(min-width: 1280px)');
@@ -97,7 +98,7 @@ export function initDockTabs() {
     const state = $('agentic-state');
     if (state) new MutationObserver(syncMore).observe(state, { attributes: true, attributeFilter: ['class', 'data-page'] }); // a page, or the customizer's hidden tabs
     const row = strip();
-    if (row) new ResizeObserver(fitWords).observe(row);
+    if (row) { new ResizeObserver(fitWords).observe(row); watchScrollCue(row); } // the phone's overlay strip scrolls: a fade says which edge hides tabs
     WIDE.addEventListener('change', fitWords);
     document.addEventListener('click', e => { if (menuOpen && !e.target.closest?.('#agentic-more')) closeMore(false); });
     document.addEventListener('focusout', e => { if (menuOpen && e.relatedTarget && !e.relatedTarget.closest?.('#agentic-more')) closeMore(false); });
