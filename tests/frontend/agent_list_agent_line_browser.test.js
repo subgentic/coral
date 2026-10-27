@@ -115,7 +115,7 @@ const LEGACY = 'coral-show-agent-type';
         await ev(`localStorage.setItem(${JSON.stringify(LEGACY)}, 'true'); true`);
         await scene();
         await want(view, ['Claude · Opus 4.1 · High', 'Claude · Opus 4.1 · Medium', 'Claude · Opus 4.1'], 'one who had turned it on has all three on');
-        const tip = await ev(`(async () => { const m = await import(${S} + 'session_state.js'); const t = T.state.liveSessions; const row = x => (/Thinking<\\/td><td class="tt-value">([^<]*)</.exec(m.buildSessionTooltip(x)) || [])[1] || null; return [row(t[0]), row(t[1]), row(t[2])]; })()`);
+        const tip = await ev(`(async () => { const m = await import(${S} + 'session_state.js'); const t = T.state.liveSessions; const row = x => (/Thinking<\\/dt><dd>([^<]*)</.exec(m.buildSessionTooltip(x)) || [])[1] || null; return [row(t[0]), row(t[1]), row(t[2])]; })()`);
         assert.deepEqual(tip, ['High', 'Medium (as started)', null], 'the hover card: the level the newest turn ran at, the one it was started with (as started), and no row for none');
         console.log('agent_list_agent_line: ok');
         await client.close();

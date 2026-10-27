@@ -167,6 +167,9 @@
 1	event_row.js	r.cls
 1	event_row.js	slow
 1	event_row.js	typeCls
+1	facts.js	cls ? ' ' + cls : ''
+1	facts.js	rows.join('')
+1	facts.js	value
 1	folder_tags.js	available.map(t => `<span class="tag-dropdown-item" style="background:${escapeAttr(tagColor(t.color))}" data-o
 1	folder_tags.js	availableHtml
 1	folder_tags.js	createHtml
@@ -334,12 +337,7 @@
 1	session_state.js	gs.ahead
 1	session_state.js	gs.behind
 1	session_state.js	gs.dirty
-1	session_state.js	rows.join("")
-1	session_state.js	s.changed_file_count
-1	session_state.js	stateLabel.toLowerCase().replace(/ /g, '-')
-1	session_state.js	tokenText
 1	session_state.js	ttUnread
-1	session_state.js	unreadBadge
 1	sessions.js	EMOJI_CATEGORIES.map(cat => ` <div class="emoji-picker-category">${escapeHtml(cat.name)}</div> <div class="emo
 2	sessions.js	cat.emojis.map(e => `<button class="emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")
 3	sessions.js	e

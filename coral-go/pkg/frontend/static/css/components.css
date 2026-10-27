@@ -634,6 +634,7 @@
     color: var(--text-on-accent) !important;
 }
 
+
 /* ── Badges ────────────────────────────────────────────────── */
 
 /* The chip family (#9095, Goal #84): every small label is a .chip. Three variants: the status chip (11/600: a word, with a dot or an icon), .chip-tag (12/400) and .chip-count (11/600,

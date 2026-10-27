@@ -29,8 +29,8 @@ assert.equal(css('@media (max-width: 700px) { .group-table td { x: y; } }').n, 1
 assert.deepEqual(cssRules('/* c */ a { x: y; } @media print { b, c { x: y; } }'), ['a', 'b, c'], 'cssRules: the selectors, the at-rule prelude left out');
 // CSS: the component's own class, and exempt selectors
 assert.deepEqual(css('.dt-table td { x: y; }'), { n: 0, own: ['.dt-table td'], exempted: 0 }, 'the dt-* class outside data_table.css is reported, not counted');
-assert.deepEqual(css('.session-tooltip-table td { x: y; } .group-table th { x: y; }', EXEMPT_SELECTORS).n, 1, 'an exempt selector is not counted');
-assert.equal(css('.session-tooltip-table td { x: y; } .group-table th { x: y; }', EXEMPT_SELECTORS).exempted, 1, 'but it is counted apart, so a stale exemption is seen');
+assert.deepEqual(css('.some-table td { x: y; } .group-table th { x: y; }', [/\.some-table/]).n, 1, 'an exempt selector is not counted');
+assert.equal(css('.some-table td { x: y; } .group-table th { x: y; }', [/\.some-table/]).exempted, 1, 'but it is counted apart, so a stale exemption is seen');
 
 // JS: what counts
 assert.equal(jsCount('const t = document.createElement("table"); const r = document.createElement(\'tr\');'), 2, 'createElement');
@@ -51,7 +51,7 @@ for (const [kind, dir] of [['css', path.join(STATIC, 'css')], ['js', STATIC]]) f
     assert.ok(why && why.length >= 20, `${kind}/${f}: an exemption needs its reason`);
     assert.ok(fs.existsSync(path.join(dir, f)), `${kind}/${f}: the exempt file exists`);
 }
-assert.ok(EXEMPT_SELECTORS.length >= 1 && EXEMPT_SELECTORS.every(re => re instanceof RegExp));
+assert.ok(EXEMPT_SELECTORS.every(re => re instanceof RegExp));
 // the shared content style is the one place a Markdown table is styled: no other stylesheet has a rule for one of the content containers' tables
 const owners = ['.subagent-detail-md', '.chat-bubble .message-text', '.md', '.docs-content', '.preview-pane-markdown'];
 for (const f of fs.readdirSync(path.join(STATIC, 'css')).filter(n => n.endsWith('.css') && n !== 'content_table.css')) {
