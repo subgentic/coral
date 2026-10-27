@@ -229,7 +229,7 @@
     list-style: none;
 }
 .mb-queue-summary::-webkit-details-marker { display: none; }
-.mb-queue-summary::before { content: '▸'; font-size: var(--fs-xs); }
+.mb-queue-summary::before { content: '▸'; font-size: var(--fs-sm); }
 .mb-queue-run[open] > .mb-queue-summary::before { content: '▾'; }
 .mb-queue-summary:hover, .mb-queue-summary:focus-visible { background: var(--bg-tertiary); color: var(--text-secondary); }
 .mb-queue-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -651,7 +651,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .chip.waiting-badge {
     background: var(--warning);
     color: #000;
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
 }
 
 /* ── Modal ─────────────────────────────────────────────────── */
@@ -951,7 +951,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .info-value-emphasis {
-    font-size: 0.9375rem;
+    font-size: var(--fs-lg);
     font-weight: var(--fw-strong);
 }
 
@@ -1565,7 +1565,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .emoji-picker-category {
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
     font-weight: var(--fw-strong);
     color: var(--text-muted);
     text-transform: uppercase;
@@ -2101,7 +2101,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 .overflow-menu-note {
     margin-left: auto;
-    font-size: var(--fs-xs, 11px);
+    font-size: var(--fs-sm);
     color: var(--text-muted);
 }
 
@@ -2127,7 +2127,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     display: inline-block;
     padding: 2px 8px;
     border-radius: var(--radius-sm);
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
     font-weight: var(--fw-strong);
     letter-spacing: 0.5px;
 }
@@ -2194,7 +2194,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .launch-type-label {
-    font-size: 0.9375rem;
+    font-size: var(--fs-lg);
     font-weight: var(--fw-strong);
     color: var(--text-primary);
 }
@@ -2897,7 +2897,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     outline: 0;
     background: transparent;
     color: var(--text-primary);
-    font-size: 0.9375rem;
+    font-size: var(--fs-lg);
     resize: none;
     font-family: inherit;
     line-height: 1.5;
@@ -3251,7 +3251,7 @@ button.auto-accept-header-off:focus-visible { outline: 2px solid var(--accent); 
     padding: 0 5px;
     border-radius: var(--radius-sm);
     font: inherit;
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
     font-weight: var(--fw-strong);
     line-height: 16px;
     color: var(--error);
@@ -3468,7 +3468,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .sec-muted { color: var(--text-secondary); font-weight: var(--fw-regular); }
 #settings-modal .sec-switch { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; font-size: var(--fs-md); margin: 6px 0; cursor: pointer; }
 #settings-modal .sec-switch input[type="checkbox"] { width: 16px; height: 16px; flex: none; margin: 2px 0 0; padding: 0; }
-.sec-warn { display: flex; gap: 8px; align-items: flex-start; background: rgba(212, 167, 44, .13); border: 1px solid rgba(212, 167, 44, .55); border-radius: var(--radius-lg); padding: 10px 12px; font-size: 0.7812rem; line-height: 1.5; margin: 8px 0; }
+.sec-warn { display: flex; gap: 8px; align-items: flex-start; background: rgba(212, 167, 44, .13); border: 1px solid rgba(212, 167, 44, .55); border-radius: var(--radius-lg); padding: 10px 12px; font-size: var(--fs-base); line-height: 1.5; margin: 8px 0; }
 .sec-add { display: flex; gap: 8px; align-items: center; }
 .sec-add .btn { margin: 0; }
 #settings-modal .sec-sessions .btn { margin: 0; }   /* .btn-small's 20 px side margin pushed these buttons off their row */
@@ -3615,7 +3615,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* The top bar's Saved button: a bookmark with the number open. */
 .saved-top-btn { position: relative; }
 .saved-top-btn.on { color: var(--accent); }
-.saved-top-btn .saved-count { position: absolute; top: -2px; right: -3px; min-width: 14px; padding: 0 4px; border-radius: var(--radius-lg); background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-xs); font-weight: var(--fw-strong); line-height: 14px; text-align: center; }
+.saved-top-btn .saved-count { position: absolute; top: -2px; right: -3px; min-width: 14px; padding: 0 4px; border-radius: var(--radius-lg); background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 14px; text-align: center; }
 .saved-top-btn .saved-count[hidden] { display: none; }
 /* The jump: a slim bar above the conversation, and the "Saved" tag on the message. */
 .jumpbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: 0.78125rem; color: var(--text-secondary); flex: none; }
@@ -3623,7 +3623,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .jumpbar span { flex: 1; }
 @media (pointer: coarse) { .jumpbar .btn { min-height: 44px; min-width: 44px; } }
 .saved-jump { position: relative; }
-.saved-jump::before { content: "Saved"; position: absolute; left: 0; top: -22px; background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-xs); font-weight: var(--fw-strong); border-radius: var(--radius-lg); padding: 0 7px; line-height: 16px; pointer-events: none; }
+.saved-jump::before { content: "Saved"; position: absolute; left: 0; top: -22px; background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-sm); font-weight: var(--fw-strong); border-radius: var(--radius-lg); padding: 0 7px; line-height: 16px; pointer-events: none; }
 /* Keep the bookmark and the view selector at large text sizes on a phone. */
 .saved-bar-wrap .top-bar { flex-wrap: wrap; row-gap: 4px; }
 .saved-bar-wrap .nav-select { order: 3; flex: 1 1 100%; margin: 0; }
@@ -3653,7 +3653,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-panes { flex: 1; min-width: 0; overflow: auto; padding: 1.1rem 1.6rem 1.5rem; container: settingspane / inline-size; }
 .settings-pane[hidden] { display: none; }
 .settings-pane:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--radius-md); }
-.settings-pane-title { margin: 0 0 .15rem; font-size: 1.0625rem; }
+.settings-pane-title { margin: 0 0 .15rem; font-size: var(--fs-xl); }
 .settings-pane-sub { margin: 0 0 .8rem; color: var(--text-secondary); font-size: var(--fs-md); }
 .settings-modal-body .settings-grid { display: block; }
 .settings-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem); gap: .4rem 1.5rem; align-items: start; padding: .7rem 0; border-top: 1px solid var(--border); }
@@ -4194,7 +4194,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 /* The Servers tab of a self-hosted hub (#7638): a table (Server, Status, Agents), and a server's page with its facts and Test, Edit and Remove in a bar pinned at its foot */
 .servers-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .servers-page > * { flex-shrink: 0; }
-.servers-page-name { margin: 0; font-size: 1.0625rem; font-weight: var(--fw-strong); line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
+.servers-page-name { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-page .item-meta { display: flex; align-items: center; gap: var(--space-md); }
 .servers-facts { gap: 6px var(--space-xl); margin: var(--space-lg) 0; }
 .servers-fact { display: contents; }
