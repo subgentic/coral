@@ -99,6 +99,21 @@ func (s *Store) HadTaskInProgress(ctx context.Context, project, member string, a
 	return n > 0, err
 }
 
+// OffBooksLanding is the kind of a line about the branch work lands on standing still while tasks finish (#8942): the board's own, shown once like a goal's size, a line of the check and nothing else. The ref is the repository, branch, tip and
+// which wait it is (each further wait is a new occurrence).
+const OffBooksLanding = "landing"
+
+// AddOffBooksOnce is AddOffBooks that says whether the occurrence was new: one recorded before, shown or not, is not.
+func (s *Store) AddOffBooksOnce(ctx context.Context, project, kind, agent, ref, detail string, at time.Time) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO health_offbooks (project, kind, agent, ref, detail, at) VALUES (?, ?, ?, ?, ?, ?)`,
+		project, kind, agent, ref, detail, at.UTC().Format(healthTimeFormat))
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 // OffBooksGoalSize is the kind of a line the orchestrator's check says about a goal that has grown past the team's limit (#7808): it shares this queue (shown once, a few lines a check,
 // again if the check did not go out); its ref is the goal, the level and the moment of the crossing, so a goal that crossed, fell back and crossed again is a new line.
 const OffBooksGoalSize = "goalsize"

@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -35,6 +36,48 @@ type HealthSettings struct {
 	// AskReminder reminds a member, once, of a question (post --ask, asks.go) that @mentions them and that they have not answered for AfterMin (#7794). It runs for a team whether or not the
 	// orchestrator's check is on: a reminder to one agent costs the team nothing.
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
+	// Landing puts a line in the health check (off by default, #8942, goal #80) when the branch work lands on (Branch, "main" by default) has not moved for WaitMin although tasks were approved or completed
+	// since it last did (#8942, goal #80): done work that is not landed. It reads the local branch only, never CI or GitHub.
+	Landing HealthLanding `json:"landing"`
+}
+
+// HealthLanding: the branch to watch and how long it may stand still, with tasks finished, before Coral says so (again after each further WaitMin until it moves).
+type HealthLanding struct {
+	On      bool   `json:"on"`
+	Branch  string `json:"branch"`
+	WaitMin int    `json:"wait_min"`
+	// Nudge is the member also told, by a message of its own, when the alert is new; "" tells nobody beyond the check's recipient (the orchestrator, or whom the team set).
+	Nudge string `json:"nudge"`
+}
+
+// LandingWaitMin and LandingWaitMax bound the wait, in minutes.
+const (
+	LandingWaitMin = 15
+	LandingWaitMax = 10080
+)
+
+// Problem is what is wrong with the setting as a user saves it, in words for them, or "". A field a body does not carry (empty branch, wait 0) is the default and is not a problem.
+func (l HealthLanding) Problem() string {
+	if b := strings.TrimSpace(l.Branch); b != "" && !LandingBranchValid(b) {
+		return fmt.Sprintf("landing.branch: %q is not a branch name Coral reads (letters, digits, . _ - /; at most 100 characters)", OneLine(b))
+	}
+	if l.WaitMin != 0 && (l.WaitMin < LandingWaitMin || l.WaitMin > LandingWaitMax) {
+		return fmt.Sprintf("landing.wait_min: %d is outside %d to %d minutes", l.WaitMin, LandingWaitMin, LandingWaitMax)
+	}
+	return ""
+}
+
+// LandingBranchValid says a branch name is one Coral reads: letters, digits and . _ - /, not starting with - or /, no "..", at most 100 bytes. It goes into a git ref name, never a shell.
+func LandingBranchValid(b string) bool {
+	if b == "" || len(b) > 100 || b[0] == '-' || b[0] == '/' || strings.Contains(b, "..") || strings.HasSuffix(b, "/") || strings.HasSuffix(b, ".lock") {
+		return false
+	}
+	for _, r := range b {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-' || r == '/') {
+			return false
+		}
+	}
+	return true
 }
 
 // HealthGoalSize: say it once a goal's tasks pass Limit (then again at 2 x Limit, 3 x Limit ...).
@@ -83,11 +126,12 @@ func DefaultHealthSettings() HealthSettings {
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
+		Landing:        HealthLanding{On: false, Branch: "main", WaitMin: 120},
 	}
 }
 
 // Clamp keeps every value in its range (#4176 rule 7): times at least 5 and at most 1440
-// minutes, nudge counts 1 to 5, at most 8 default reviewers.
+// minutes (the landing wait 15 to 10080), nudge counts 1 to 5, at most 8 default reviewers.
 func (h HealthSettings) Clamp() HealthSettings {
 	h.IntervalMin = min(max(h.IntervalMin, 5), 1440)
 	h.ClaimNudge.AfterMin = min(max(h.ClaimNudge.AfterMin, 5), 1440)
@@ -99,6 +143,15 @@ func (h HealthSettings) Clamp() HealthSettings {
 	h.BusyNoTask.AfterMin = min(max(h.BusyNoTask.AfterMin, 5), 1440)
 	h.GoalSize.Limit = min(max(h.GoalSize.Limit, 5), 500)
 	h.AskReminder.AfterMin = min(max(h.AskReminder.AfterMin, 5), 1440)
+	h.Landing.Branch = strings.TrimSpace(h.Landing.Branch)
+	if !LandingBranchValid(h.Landing.Branch) {
+		h.Landing.Branch = "main"
+	}
+	if h.Landing.WaitMin == 0 { // a body that does not carry the setting: the default wait, not the shortest
+		h.Landing.WaitMin = 120
+	}
+	h.Landing.WaitMin = min(max(h.Landing.WaitMin, LandingWaitMin), LandingWaitMax)
+	h.Landing.Nudge = strings.TrimSpace(h.Landing.Nudge)
 	h.Recipient = strings.TrimSpace(h.Recipient)
 	var revs []string
 	for _, r := range h.DefaultReviewers {
