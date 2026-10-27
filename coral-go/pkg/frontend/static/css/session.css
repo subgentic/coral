@@ -637,8 +637,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     min-width: 0;
 }
 
-.session-state-pill,
-.session-ctx-pill {
+.session-state-pill {
     flex-shrink: 0;
 }
 
@@ -676,11 +675,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     color: color-mix(in srgb, var(--error) 80%, black); /* plain --error is 4.2:1 on the neutral surface in the light theme */
 }
 
-.session-ctx-pill {
-    text-transform: none;
-    background: rgba(var(--error-rgb), 0.15);
-    color: var(--error);
-}
+
 
 @media (max-width: 1023px) {
     /* Tablet overlay is 280px: identity keeps at least ~12 characters */
