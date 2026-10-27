@@ -1,4 +1,5 @@
 import { hasWorkingDisplayHint } from './display_activity_hint.js';
+import { standingOptions } from './standing_option.js';
 /* Moved out of live_chat.js as it was (#3837): no behaviour change. */
 import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, renderMarkdown } from './utils.js';
@@ -126,7 +127,6 @@ function checkOptionButtonHtml(o, desc, fullLabel) {
 // button in the card above it, so a permanent allow costs a deliberate reach (UI/UX's call on #9562, #9583). Same words as the CLI's option; a desktop card is unchanged.
 const BAR_QUERY = '(max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px)';
 const phoneBar = () => typeof matchMedia === 'function' && matchMedia(BAR_QUERY).matches;
-const standingOption = o => /(don['\u2019]?t|do not) ask again|always allow|(during|for) this session/i.test(String(o.label || ''));
 
 function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
     const opts = (info.screen && info.screen.options) || [];
@@ -144,7 +144,7 @@ function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
         const withDesc = selects.some(o => descriptions[fullLabels[o.label] || o.label] || descriptions[o.label]);
         const multi = !!(info.screen && info.screen.multi);
         const button = multi ? checkOptionButtonHtml : optionButtonHtml;
-        const apart = !multi && !withDesc && phoneBar() && selects.length > 1 ? selects.filter(standingOption) : []; // out of the bar, above it
+        const apart = !multi && !withDesc && info.kind === "permission" && phoneBar() && selects.length > 1 ? standingOptions(selects) : []; // out of the bar, above it: every answer that is not plainly one-time (standing_option.js fails closed)
         if (apart.length) body += `<div class="cni-standing">${apart.map(o => optionButtonHtml(o, "", fullLabels[o.label])).join("")}</div>`;
         body += `<div class="cni-options ${withDesc ? "cni-options-cards" : "cni-options-chips"}"${multi ? ` role="group" aria-label="Pick everything that applies"` : ""}>`
             + selects.filter(o => !apart.includes(o)).map(o => button(o, descriptions[fullLabels[o.label] || o.label] || descriptions[o.label], fullLabels[o.label])).join("") + `</div>`;
