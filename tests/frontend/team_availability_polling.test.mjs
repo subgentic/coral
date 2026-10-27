@@ -13,13 +13,19 @@ let calls = 0;
 let release = [];
 let payload = { agents: [{ session_id: 's1', name: 'Dev', availability: 'available' }] };
 let fail = false;
-globalThis.fetch = window.fetch = (url) => {
+let sent = []; // the If-None-Match of each request
+globalThis.fetch = window.fetch = (url, opts = {}) => {
     assert.match(String(url), /\/api\/board\/[^/]+\/status$/);
     calls++;
+    const inm = (opts.headers && opts.headers['If-None-Match']) || '';
+    sent.push(inm);
     const body = structuredClone(payload); // the server state when the request was made
+    const tag = `W/"${JSON.stringify(body).length}-${JSON.stringify(body.agents.map(a => a.availability))}"`; // the server's validator: of the status itself
     return new Promise(resolve => release.push(() => resolve(fail
-        ? { ok: false, status: 503, json: async () => ({}) }
-        : { ok: true, status: 200, json: async () => body })));
+        ? { ok: false, status: 503, json: async () => ({}), headers: new Headers() }
+        : inm === tag
+            ? { ok: false, status: 304, headers: new Headers({ ETag: tag }) }
+            : { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body), headers: new Headers({ ETag: tag }) })));
 };
 const settle = () => { const r = release; release = []; r.forEach(f => f()); return new Promise(res => setTimeout(res, 0)); };
 let hidden = false;
@@ -116,6 +122,26 @@ const forcedFail = assert.rejects(refreshTeamAvailability('alpha', true), /503/)
 await settle();
 await forcedFail;
 
+// 8. An unchanged status (#9337): a background poll sends the last answer's validator and a 304 hands back the data already held, the same object;
+// a forced refresh sends none; a changed status comes back whole.
+now += 60_000;
+fail = false;
+hidden = false;
+payload = { agents: [{ session_id: 's9', name: 'Steady', availability: 'available' }] };
+const w1 = refreshTeamAvailability('delta'); await settle(); const d1 = await w1;
+assert.equal(sent[sent.length - 1], '', 'the first poll has no validator');
+now += 60_000;
+const w2 = refreshTeamAvailability('delta'); await settle(); const d2 = await w2;
+assert.notEqual(sent[sent.length - 1], '', 'the next poll sends the validator');
+assert.equal(d2, d1, 'a 304 hands back the data the poll already had');
+now += 60_000;
+const w3 = refreshTeamAvailability('delta', true); await settle(); await w3;
+assert.equal(sent[sent.length - 1], '', 'a forced refresh asks for the whole status');
+now += 60_000;
+payload = { agents: [{ session_id: 's9', name: 'Steady', availability: 'busy' }] };
+const w4 = refreshTeamAvailability('delta'); await settle(); const d4 = await w4;
+assert.equal(d4.agents[0].availability, 'busy', 'a changed status comes back whole');
+
 Date.now = realNow;
-console.log('PASS team availability polling: in-flight dedupe, completion throttle + backoff, hidden tabs, change detection, errors');
+console.log('PASS team availability polling: in-flight dedupe, completion throttle + backoff, hidden tabs, change detection, errors, 304');
 process.exit(0);

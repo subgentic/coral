@@ -76,7 +76,7 @@ func (s *TokenUsageStore) getBoardUsage(ctx context.Context, boardName string) (
 // GetUsageSummary returns totals grouped by agent_type since a given time.
 func (s *TokenUsageStore) GetUsageSummary(ctx context.Context, since string) ([]UsageSummary, error) {
 	var summaries []UsageSummary
-	rel, args := usageRelation(ctx, s.db.Reader(), since, "")
+	rel, args := usageCoarseRelation(ctx, s.db.Reader(), since)
 	query := `SELECT agent_type,
 	          COALESCE(SUM(input_tokens), 0) as input_tokens,
 	          COALESCE(SUM(output_tokens), 0) as output_tokens,
@@ -98,7 +98,7 @@ func (s *TokenUsageStore) GetUsageSummary(ctx context.Context, since string) ([]
 // model is one bucket with model "".
 func (s *TokenUsageStore) GetUsageSummaryByModel(ctx context.Context, since string) ([]ModelUsageSummary, error) {
 	summaries := []ModelUsageSummary{}
-	rel, args := usageRelation(ctx, s.db.Reader(), since, "")
+	rel, args := usageCoarseRelation(ctx, s.db.Reader(), since)
 	query := `SELECT agent_type, COALESCE(model, '') as model,
 	          COALESCE(SUM(input_tokens), 0) as input_tokens,
 	          COALESCE(SUM(output_tokens), 0) as output_tokens,
@@ -129,6 +129,9 @@ func (s *TokenUsageStore) GetUsageSummaryByAgentBoard(ctx context.Context, since
 func (s *TokenUsageStore) GetUsageSummaryByAgentBoardUntil(ctx context.Context, since, until, board string) ([]AgentUsageSummary, error) {
 	var summaries []AgentUsageSummary
 	rel, args := usageRelation(ctx, s.db.Reader(), since, until)
+	if until == "" { // no end: the summary does not look at when in its window a row was recorded
+		rel, args = usageCoarseRelation(ctx, s.db.Reader(), since)
+	}
 	// Prefer the session's current display name so renames show; unnamed
 	// agents come back empty and the UI labels them "Agent". The folder is
 	// reported separately so those rows can still be told apart.
@@ -198,7 +201,7 @@ type BranchUsageSummary struct {
 // at least one git snapshot are included. Each session is attributed to
 // its most recent branch.
 func (s *TokenUsageStore) GetUsageSummaryByBranch(ctx context.Context, since string, branch string) ([]BranchUsageSummary, error) {
-	rel, args := usageRelation(ctx, s.db.Reader(), since, "")
+	rel, args := usageCoarseRelation(ctx, s.db.Reader(), since)
 	query := `SELECT gs.branch,
 	          COALESCE(MAX(gs.pr_number), 0) as pr_number,
 	          COALESCE(MAX(gs.remote_url), '') as remote_url,
@@ -263,7 +266,7 @@ func mergeCleanedBranches(in []BranchUsageSummary) []BranchUsageSummary {
 
 // GetUsageSummaryByBoard returns per-board (team) usage aggregates since a given time.
 func (s *TokenUsageStore) GetUsageSummaryByBoard(ctx context.Context, since string) ([]BoardUsageSummary, error) {
-	rel, args := usageRelation(ctx, s.db.Reader(), since, "")
+	rel, args := usageCoarseRelation(ctx, s.db.Reader(), since)
 	query := `SELECT COALESCE(NULLIF(t.board_name, ''), ls.board_name, '') as board_name,
 	          COALESCE(SUM(t.input_tokens), 0) as input_tokens,
 	          COALESCE(SUM(t.output_tokens), 0) as output_tokens,

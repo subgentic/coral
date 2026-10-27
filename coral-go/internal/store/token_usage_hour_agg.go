@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -162,14 +163,26 @@ const usageCols = `session_id, agent_name, agent_type, team_id, board_name, inpu
 // until "" is no end. An until inside an hour (not on the hour) is a window that ends in an hour the aggregate holds whole: that hour is read from the raw rows, up to until, so that two
 // adjacent windows do not both count it (#8634). The caller still leaves out the rows at or after until.
 func usageRelation(ctx context.Context, db sqlGetter, since, until string) (frag string, args []any) {
+	return usageRelationOf(ctx, db, since, until, false)
+}
+
+// usageCoarseRelation is usageRelation for a query that groups by session, agent, type, board, team, source and model and does not look at when
+// inside its window a row was recorded (the summaries; not the series): the rolled-up hourly rows come from the day aggregate where it can
+// answer (token_usage_day_agg). A row of the aggregate has the day's start as its recorded_at; min_at and max_at stay the rows' own. until must
+// be "".
+func usageCoarseRelation(ctx context.Context, db sqlGetter, since string) (frag string, args []any) {
+	return usageRelationOf(ctx, db, since, "", true)
+}
+
+func usageRelationOf(ctx context.Context, db sqlGetter, since, until string, coarse bool) (frag string, args []any) {
 	raw := `SELECT ` + usageCols + `, 1 AS n_rows, recorded_at, recorded_at AS min_at, recorded_at AS max_at FROM token_usage`
-	hourly := `SELECT ` + usageCols + `, n_rows, recorded_at, recorded_at AS min_at, recorded_at AS max_at FROM token_usage_hourly`
 	bound := windowBound(since) // what the stamps are compared with; since itself is parsed below
 	plain := func() (string, []any) {
+		hp, ha := hourlyBranches(ctx, db, since, bound, coarse)
 		if since == "" {
-			return `(` + raw + ` UNION ALL ` + hourly + `)`, nil
+			return `(` + raw + ` UNION ALL ` + strings.Join(hp, ` UNION ALL `) + `)`, ha
 		}
-		return `(` + raw + ` WHERE recorded_at >= ? UNION ALL ` + hourly + ` WHERE recorded_at >= ?)`, []any{bound, bound}
+		return `(` + raw + ` WHERE recorded_at >= ? UNION ALL ` + strings.Join(hp, ` UNION ALL `) + `)`, append([]any{bound}, ha...)
 	}
 	var last sql.NullString
 	if !tokenUsageHourAggOn || (since != "" && !canonicalSince.MatchString(since)) {
@@ -219,12 +232,9 @@ func usageRelation(ctx context.Context, db sqlGetter, since, until string) (frag
 	// the raw rows after the last aggregated hour
 	parts = append(parts, raw+` WHERE recorded_at >= ?`)
 	args = append(args, last.String+"~")
-	if since != "" {
-		parts = append(parts, hourly+` WHERE recorded_at >= ?`)
-		args = append(args, bound)
-	} else {
-		parts = append(parts, hourly)
-	}
+	hp, ha := hourlyBranches(ctx, db, since, bound, coarse)
+	parts = append(parts, hp...)
+	args = append(args, ha...)
 	frag = `(`
 	for i, p := range parts {
 		if i > 0 {
