@@ -7,13 +7,19 @@ const HOST = new URL(BASE).host;
 const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "style-src-attr 'unsafe-inline'", "font-src 'self'", "img-src 'self' data: blob:", `connect-src 'self' ws://${HOST}`, "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
 
 /** Set the page up as the Hub's before the first navigation: the viewport, the cloud boot flag with the hub's CSP, and the stubbed API. */
-async function setupHubWorld({ client, Page, Emulation, width, height, mobile, inbox }) {
+async function setupHubWorld({ client, Page, Emulation, width, height, mobile, inbox, hubPages }) {
     const { Fetch, Network } = client;
     await Promise.all([Page.enable(), Network.enable()]);
     await Network.setBypassServiceWorker({ bypass: true });
     await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Fetch.enable({ patterns: [{ urlPattern: `${BASE}/*`, resourceType: 'Document', requestStage: 'Response' }] });
         safePaused(client, async e => {
+            // hubPages: the Hub's own pages the Inbox frames (/inbox/hub/needs, /tasks, /saved) are a stand-in page here (the isolated server has none, and a frame of the dashboard itself would not say what it shows)
+            if (hubPages && /^\/inbox\/hub\//.test(new URL(e.request.url).pathname)) {
+                const what = new URL(e.request.url).pathname.split('/').pop();
+                const page = `<!doctype html><meta charset="utf-8"><title>Coral Hub</title><body style="margin:0;font:16px system-ui;background:#18181c;color:#e8e8ec"><main style="padding:24px"><h1 style="font-size:20px;margin:0 0 4px">Coral Hub: ${what}</h1><p style="color:#a0a0aa;margin:0 0 20px">The Hub's own page, framed by the Inbox (a stand-in for this picture).</p><div style="border:1px solid #34343c;border-radius:8px;padding:12px 16px;margin-bottom:10px">Review agent on Laptop waits for your answer<br><small style="color:#a0a0aa">4 min ago</small></div><div style="border:1px solid #34343c;border-radius:8px;padding:12px 16px">Pick the release date<br><small style="color:#a0a0aa">Task for you, high</small></div></main>`;
+                return Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(page).toString('base64') });
+            }
             if (e.responseStatusCode !== 200) return Fetch.continueRequest({ requestId: e.requestId });
             const b = await Fetch.getResponseBody({ requestId: e.requestId });
             const html = (b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf8') : b.body).replace('"mode":"local"', '"mode":"cloud"' + ((typeof inbox === 'function' ? inbox() : inbox) ? ',"inbox":"native"' : '')); // inbox: the boot value the Hub sets per release pin (#9100 Goal #100); a function is read at each load

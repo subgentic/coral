@@ -5,6 +5,8 @@
 // two-computer world (helpers/hub_world.js), records every request (method, path, query keys) and fails on any route or key that is not the baseline plus those. It also holds the read-only claim (no request but a
 // GET), the "not called in cloud mode" list of the plan, and, once the Inbox stops asking the Hub itself for a Chats history it does not have (the plan's risk 1: inboxSources() lists 'local'), that no unproxied history read is made.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { nextFrame } = require('./helpers/wait');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
 
@@ -58,7 +60,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
     const keysByPath = reqs => { const out = new Map(); for (const r of reqs) { const s = out.get(`${r.m} ${r.p}`) || new Set(); r.keys.forEach(k => s.add(k)); out.set(`${r.m} ${r.p}`, s); } return out; };
     try {
         let bootNative = false; // the Hub's boot value for the Inbox: off while the baseline is recorded (the Chats and Board tabs as the Hub has them), on for the Inbox
-        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: () => bootNative });
+        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: () => bootNative, hubPages: true });
         await Page.addScriptToEvaluateOnNewDocument({ source: RECORDER });
 
         // 1. the baseline: the cloud Chats tab, and the team page's Board tab, as the Hub's dashboard has them
@@ -199,6 +201,23 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         if (driven.nativeInbox !== null) assert.deepEqual(unproxied.map(r => `${r.m} ${r.p}`), [], 'with the native cloud Inbox no history read is made of the Hub itself (the online computers only)');
         else console.log(`   (plan risk 1, until slice 1: ${unproxied.length} history reads went to the Hub itself, not through a computer)`);
         console.log(`   ${inbox.length} Inbox requests: ${proxied.length} through the Hub, in ${new Set(proxied.map(r => r.p)).size} routes; ${chromeSeen.length} of the dashboard's own, in ${new Set(chromeSeen.map(r => r.m + r.p)).size} routes; ${tabbed.join('; ') || 'folders driven through the module'}`);
+        // INBOX_CENSUS_SHOTS=<dir>: a picture of the Hub's Inbox with a framed group open (Needs you, the Hub's own page in the centre) at 1280 and at 390 px; the batch never takes them (UI/UX's #9644)
+        if (process.env.INBOX_CENSUS_SHOTS) {
+            const dir = process.env.INBOX_CENSUS_SHOTS;
+            fs.mkdirSync(dir, { recursive: true });
+            for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
+                await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+                bootNative = true;
+                await open('/');
+                await take();
+                await ev(`window.switchNavTab('hub-inbox'); true`);
+                await ev(`window.__quiet()`);
+                await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('needs')).then(() => true)`);
+                await waitFor(`!!document.querySelector('.inbox-frame') && document.querySelector('.inbox-frame').getClientRects().length > 0`, 'the framed Hub group', 8000);
+                await nextFrame(ev);
+                fs.writeFileSync(`${dir}/hub-inbox-framed-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+            }
+        }
         console.log('   ✓');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
