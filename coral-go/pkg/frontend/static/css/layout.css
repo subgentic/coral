@@ -641,7 +641,7 @@ body.panel-dragging .sidebar {
 .welcome-eyebrow { display: block; margin-bottom: 10px; color: var(--accent); font-size: var(--fs-sm); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .welcome-header h1 { margin: 0 0 8px; color: var(--text-primary); font-size: clamp(1.625rem, 3.4vw, 2.375rem); line-height: 1.15; letter-spacing: -.035em; }
 .welcome-header p { margin: 0; color: var(--text-secondary); font-size: var(--fs-lg); }
-.welcome-launch:hover { border-color: var(--border-light); background: var(--bg-tertiary); } /* --bg-hover takes the muted line under 4.5:1 (#4218) */
+.welcome-launch:hover { border-color: var(--border-light); background: var(--bg-tertiary); transform: translateY(-1px); } /* --bg-hover takes the muted line under 4.5:1 (#4218) */
 .welcome-connect { display: none; align-items: center; flex-wrap: wrap; gap: 14px 16px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
 /* Coral Hub with no machine connected (#4586): the connect card stands in for the launch cards, which have nowhere to launch. */
 body.hub-no-machine .welcome-first-run, body.hub-machines-offline .welcome-offline { display: flex; }
@@ -666,7 +666,6 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .session-list li.hub-connect-empty .btn { margin: 0; } /* in line with the text above it */
 .welcome-launch-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } /* agent, team, Open folder (#3630) */
 .welcome-launch { position: relative; display: flex; border: 1px solid var(--border); font-family: inherit; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .15s ease; flex-direction: column; align-items: flex-start; gap: 14px; min-width: 0; padding: 20px; border-radius: 14px; background: var(--bg-secondary); color: var(--text-secondary); text-align: left; }
-.welcome-launch:hover { transform: translateY(-1px); }
 .welcome-launch .welcome-launch-icon { display: flex; align-items: center; justify-content: center; width: 2.625rem; height: 2.625rem; border-radius: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 1.3125rem; line-height: 1; }
 .welcome-launch-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .welcome-launch-copy strong { color: var(--text-primary); font-size: 0.9375rem; }
@@ -697,9 +696,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .editions-home-hide .material-icons { font-size: var(--icon-size); }
 @media (pointer: coarse), (max-width: 1024px) { .editions-home-hide { width: 44px; height: 44px; margin: -8px -8px -8px 0; } }
 .editions-home-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.editions-home-item { position: relative; display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 14px 40px 14px 14px; border: 1px solid var(--border); border-radius: var(--radius-xl); color: var(--text-secondary); font-family: inherit; text-align: left; text-decoration: none; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.editions-home-item { position: relative; display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 14px 40px 14px 14px; border: 1px solid var(--border); border-radius: var(--radius-xl); color: var(--text-secondary); font-family: inherit; text-align: left; text-decoration: none; cursor: pointer; transition: border-color .15s ease, background .15s ease; border-color: transparent; background: transparent; }
 /* "Use Coral from anywhere" is a quiet row under the launch cards, not two more cards of their weight (#6042); its border returns on hover and focus. */
-.editions-home-item { border-color: transparent; background: transparent; }
 .editions-home-item:hover, .editions-home-item:focus-visible { border-color: var(--border-light); background: var(--bg-tertiary); } /* as .welcome-launch (#4218) */
 .editions-home-icon { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-2xl); }
 .editions-home-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -901,7 +899,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 /* A group header of a tab's list: the name opens the table, so it reads as a link on hover */
 .session-list .sgroup-header { align-items: center; } /* the list's own rule starts the items at the top: a header's chevron sits level with its name */
 .sgroup-header .group-chevron { margin-left: -6px; }
-@media (pointer: coarse) { .back-link { min-height: 44px; } .back-link { min-width: 44px; } } /* a short name ("\2190 Jobs") is still a 44 px target both ways (#7734) */
+@media (pointer: coarse) { .back-link { min-height: 44px; min-width: 44px; }  } /* a short name ("\2190 Jobs") is still a 44 px target both ways (#7734) */
 
 /* ── The Inbox on the shared sidebar (inbox_sidebar.js, #7472) ── */
 /* The chips above a table that show one part of a list (Saved: Open and Done, with their counts) */
