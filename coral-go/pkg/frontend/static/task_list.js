@@ -512,7 +512,7 @@ function _taskTable(tasks, footer) {
         stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', spoken(word, st)); return chip; };
         taskCol.firstDir = 'desc';
         taskCol.cell = t => {
-            const cell = DT.el('span', 'dt-title-cell'), description = span('board-task-desc dt-title-content');
+            const cell = DT.el('span', 'dt-title-cell task-title-cell'), description = span('board-task-desc dt-title-content');
             const name = t.title || t.description || '';
             const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : 'Open task'}: ${name}, ${spoken(taskStatusWord(t.status, reviewRequested(t)), taskStatus(t))}`);
             b.classList.add('board-task-open', 'board-task-name');

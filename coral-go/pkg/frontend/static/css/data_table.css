@@ -367,3 +367,6 @@
 .dt-one-line .team-artifact-badge { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .artifact-name-icon { display: inline-flex; flex: 0 0 16px; }
+
+/* A task list's title is the table's body text, not a bold heading (#9079, the Operator: text too big). */
+.task-title-cell .dt-primary { font-size: var(--table-secondary-size); font-weight: var(--table-secondary-weight); }

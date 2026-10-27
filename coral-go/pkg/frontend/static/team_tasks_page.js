@@ -362,7 +362,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     back.append(arrow, document.createTextNode(` ${ctx.backLabel}`));
     back.addEventListener('click', () => ctx.onBack());
     const page = el('div', 'goals-page goals-table-page team-task-page');
-    const h = el('h2', 'goals-detail-title', `#${task.id} ${task.title}`); h.tabIndex = -1; h.id = 'team-task-title';
+    const h = el('h2', 'goals-detail-title', `#${task.id} ${task.title}`); h.tabIndex = -1; h.id = 'team-task-title'; h.title = `#${task.id} ${task.title}`; // the whole title on hover: a preview clamps it to two lines (#9079)
     const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
     if (ctx.teamLink) {

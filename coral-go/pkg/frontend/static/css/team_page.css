@@ -389,3 +389,6 @@
     .team-settings-dialog-body { padding: 8px 0 0; } /* the form has its own 16px margins: the full 390 px is its width, so it keeps the bar-at-the-foot layout (a container under 24rem scrolls as a whole) */
 }
 
+
+/* A task in a preview or a pane: a smaller heading, two lines at most, the whole title on hover (#9079). */
+#preview-pane .team-task-page .goals-detail-title, .detail-pane .team-task-page .goals-detail-title { font-size: var(--fs-xl); font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
