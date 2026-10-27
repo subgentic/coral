@@ -157,6 +157,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
                 await waitFor(`!!document.querySelector('#group-table-view .empty-pane .empty-line') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 0`, at + 'the empty folder on a phone', 8000);
                 for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await shot(`automations-workflows-empty-${theme}-${w}`); }
                 await setTheme(ev, 'dark');
+                await new Promise(r => setTimeout(r, 1200)); // sleep-ok: the page's own reads of the workflows are one request for a second after an answer (fetch_share.js); this refresh stands for the page asking again after the list changed
                 await ev(`window.__wfEmpty = false; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
             }
             // no workflow: one empty line with its hint (the toolbar keeps the create actions)
@@ -166,6 +167,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
                 assert.equal(await ev(`document.querySelector('#group-table-view .empty-pane .empty-line').textContent`), 'No workflows yet.', at + 'one empty line');
                 assert.equal(await ev(`[...document.querySelectorAll('#group-table-view [data-on-click="wf-build-agent"]')].some(b => b.getClientRects().length > 0)`), true, at + 'Build with Agent is on the toolbar');
                 await shot(`automations-workflows-empty-${w}`);
+                await new Promise(r => setTimeout(r, 1200)); // sleep-ok: the page's own reads of the workflows are one request for a second after an answer (fetch_share.js); this refresh stands for the page asking again after the list changed
                 await ev(`window.__wfEmpty = false; import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.refreshWorkflows()).then(() => true)`);
                 await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'the table is back', 8000);
 
