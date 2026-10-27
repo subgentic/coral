@@ -90,7 +90,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
                 (await import(S + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
             await open('needs');
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: two waiting agents`, 10000);
-            const nteams = await column('Team');
+            const nteams = mobile ? await ev(`[...document.querySelectorAll('#group-table-view tr.dt-mailed')].map(tr => (tr.querySelector('.dt-mail-team') || {}).textContent || '').map(t => t.replace(/^ - /, ''))`) : await column('Team'); // a phone's Needs you row names the team after the agent (UI/UX #9654): the computer joins it where a hub has several
             // Saved: a bookmark of each computer's alpha
             await open('saved');
             await waitFor(`document.querySelectorAll('#group-table-view .dt-primary, #group-table-view .dt-person').length >= 2 || /Local note/.test(document.getElementById('group-table-view').textContent) && /Remote note/.test(document.getElementById('group-table-view').textContent)`, `${label}: two saved messages`, 10000); await settle(400);
@@ -128,7 +128,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             check(`${label}: the Server filter stays in the Artifacts Filters panel while the Server column is hidden (UI/UX's condition on #8839)`, alabels.includes('Server'), JSON.stringify(alabels));
             const achoices = await teamChoices();
             check(`${label}: Artifacts' Team filter lists the two teams by their computer, each with its count`, achoices.filter(([v]) => v).length === 2 && achoices.some(([v, t]) => v === '@box-2/alpha' && /alpha · Box Two \(1\)/.test(t)) && achoices.some(([v, t]) => v === 'alpha' && /alpha · This computer \(1\)/.test(t)), JSON.stringify(achoices));
-            if (!mobile) check(`${label}: Needs you's Team column tells the two alpha teams apart`, nteams && nteams.length === 2 && nteams[0] !== nteams[1] && nteams.some(t => /alpha.*This computer/.test(t)) && nteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(nteams));
+            check(`${label}: Needs you's ${mobile ? 'rows name the team after the agent' : 'Team column'}: the two alpha teams are told apart`, nteams && nteams.length === 2 && nteams[0] !== nteams[1] && nteams.some(t => /alpha.*This computer/.test(t)) && nteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(nteams));
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }

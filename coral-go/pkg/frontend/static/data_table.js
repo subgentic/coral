@@ -107,10 +107,10 @@ const compareBy = (col) => {
 };
 
 /** The phone's mail row (#9545, UI/UX's spec): a 44 px leading target holding a 32 px avatar, the title and the first words of what it says on one line, the time at the right, and under the line (Needs you only) the ask.
- *  A caller opts in with `mail(row) -> { lead: { text, name?, square?, icon? }, title, snippet?, ask?, time?, unread?, mark?, data?, tip? }` (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
+ *  A caller opts in with `mail(row) -> { lead: { text, name?, square?, icon? }, title, snippet?, ask?, time?, unread?, mark?, data?, tip?, team?, teamAlways? }` (team: after the title in tertiary, always when teamAlways, else only for a title two rows share) (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
  *  `unread` makes the title bold and the time primary: a list says it only where a read state exists today. `mark: 'attention'` is the amber dot under the time. Text is set with textContent only. */
 const MAIL_QUERY = '(max-width: 767px)';
-const mailCell = (m, label, open, pick) => { // open: the row opens (a button), pick: a function that selects it, or null
+const mailCell = (m, label, open, pick, showTeam = false) => { // open: the row opens (a button), pick: a function that selects it, or null, showTeam: the team is drawn after the title (always for Needs you, and for a title two rows share)
     const td = el('td', 'dt-mail-cell'); td.setAttribute('role', 'cell');
     const lead = el(pick ? 'button' : 'span', 'dt-mail-lead');
     if (pick) { lead.type = 'button'; lead.setAttribute('role', 'checkbox'); lead.setAttribute('aria-label', `Select ${label}`); lead.setAttribute('aria-checked', 'false'); lead.addEventListener('click', pick); } else lead.setAttribute('aria-hidden', 'true'); // a list that can be selected: the avatar is its checkbox (a tap, no gesture), as the desktop's is
@@ -122,9 +122,11 @@ const mailCell = (m, label, open, pick) => { // open: the row opens (a button), 
     const body = el(open ? 'button' : 'span', `dt-mail-open${m.unread ? ' dt-mail-unread' : ''}${open ? ' dt-primary' : ''}`);
     if (m.tip) body.title = m.tip; // the whole words behind the line's cut or dropped parts (a row's team and computer): its hover
     if (m.data) Object.assign(body.dataset, m.data); // the data-* the row's primary button carried as a column (a task's data-task-id): what finds the row again and what a deep link or a focus return reads
-    if (open) { body.type = 'button'; body.setAttribute('aria-label', label); } // its click is the row's (a .dt-primary button is not interactive to the row's handler: it opens, or toggles while selecting)
+    if (open) { body.type = 'button'; body.setAttribute('aria-label', showTeam && m.team ? `${label}, ${m.team}` : label); } // its click is the row's (a .dt-primary button is not interactive to the row's handler: it opens, or toggles while selecting)
     const text = el('span', 'dt-mail-text'), line = el('span', 'dt-mail-line');
-    line.append(el('span', 'dt-mail-title', m.title || ''), el('span', 'dt-mail-snippet', m.snippet || ''));
+    line.append(el('span', 'dt-mail-title', m.title || ''));
+    if (showTeam && m.team) line.append(el('span', 'dt-mail-team', ` - ${m.team}`)); // who is asking: the team (with its computer when a hub has several) after the title in the tertiary colour, cut before the title is
+    line.append(el('span', 'dt-mail-snippet', m.snippet || ''));
     text.append(line);
     if (m.ask) { text.classList.add('dt-mail-two'); const ask = el('span', 'dt-mail-ask', m.ask); ask.title = m.ask; text.append(ask); } // the whole ask is the line's title, so a cut one can be read (#9495)
     const side = el('span', 'dt-mail-side'); side.append(el('span', 'dt-mail-time', m.time || ''));
@@ -340,7 +342,10 @@ export function dataTable(cfg) {
         return tr;
     }
 
+    // the titles two rows share: those rows say their team after the title (a Goals or Tasks row has no other room for it, UI/UX #9654)
+    let _dups = null; const dupTitles = () => { if (!_dups) { const seen = new Set(); _dups = new Set(); for (const r of rows) { const t = cfg.mail(r).title; if (seen.has(t)) _dups.add(t); seen.add(t); } } return _dups; };
     function drawBody() {
+        _dups = null;
         tbody.replaceChildren();
         const list = sortedRows();
         const cols = columns.length + (sel ? 1 : 0);
@@ -365,9 +370,9 @@ export function dataTable(cfg) {
                 td.append(cb.hidden ? cb : checkHit(cb)); tr.append(td);
             }
             if (mailOn()) {
-                const m = cfg.mail(r);
+                const m = cfg.mail(r), showTeam = !!m.team && (m.teamAlways || dupTitles().has(m.title));
                 const pick = sel && eligible(r) ? () => { const cb = tr.querySelector('.dt-check input'); if (!cb) return; if (!st.select) { st.select = true; st.mailSelect = true; syncSelectMode(); } cb.dispatchEvent(new MouseEvent('click', { bubbles: true })); } : null;
-                tr.classList.add('dt-mailed'); tr.append(mailCell(m, nameOf(r), !!cfg.open, pick));
+                tr.classList.add('dt-mailed'); tr.append(mailCell(m, nameOf(r), !!cfg.open, pick, showTeam));
             } else for (const c of columns) tr.append(cellOf(c, r, tr));
             if (cfg.open) {
                 tr.classList.add('dt-row-open');
