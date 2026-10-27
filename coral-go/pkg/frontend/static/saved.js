@@ -9,7 +9,7 @@ import { teamLabel } from './server_status.js';
 import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
-import { sessionServer, normServer, serverFetch, identityKey, LOCAL_SERVER } from './server_base.js';
+import { sessionServer, normServer, serverFetch, serverRead, identityKey, LOCAL_SERVER } from './server_base.js';
 import { savedChanged, setSavedCount, setScopedCount, wantAllScope, validSavedItem, savedShowing, savedViewShowing, syncSavedButton, currentScope } from './saved_marks.js';
 import { withScope, scopeHeading, scopeEmpty, ALL } from './saved_scope.js';
 import { effectiveLiveViewMode, setLiveViewMode, jumpToLiveMessage } from './live_chat.js';
@@ -70,7 +70,7 @@ async function load() {
     const remotes = scope.kind !== 'all' ? (normServer(scope.server) === LOCAL_SERVER ? [] : [{ id: scope.server, label: serverName(scope.server) }])
         : state.hub ? (state.servers || []).filter(s => s && s.id && s.id !== LOCAL_SERVER && s.status === 'online') : [];
     const read = async (server) => {
-        const r = await serverFetch(server, '/api/saved' + withScope(savedQuery(filters), scope));
+        const r = await serverRead(server, '/api/saved' + withScope(savedQuery(filters), scope)); // a registered computer that does not answer in time is a line saying so (#8904)
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
         return { server, d };
