@@ -428,13 +428,13 @@
 
     /* Compact input body: single row with send button inline */
     .command-pane .command-pane-body {
-        padding: 6px 8px !important;
-        gap: 6px;
-        align-items: flex-end;
-    }
+    padding: 6px 8px !important;
+    gap: 6px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
     /* Pending image chips are their own row above the box (#6137): beside it they left the box a one-character strip. The box and the send buttons stay on one row under them. */
-    .command-pane .command-pane-body { flex-wrap: wrap; }
-    .command-pane .command-pane-body > .image-attachments { flex: 0 0 100%; min-width: 0; box-sizing: border-box; }
+        .command-pane .command-pane-body > .image-attachments { flex: 0 0 100%; min-width: 0; box-sizing: border-box; }
     .command-pane .command-pane-body > .composer-hint { flex: 0 0 100%; min-width: 0; box-sizing: border-box; } /* a line above the box (the hooks question, held messages: #6409, #6473) is a row of its own, not a column beside the box */
     .composer-hint.composer-waiting { gap: 0 12px; } /* no blank line between the sentence's row and the controls' */
     .composer-waiting > button, .composer-waiting-detail summary { min-height: 44px; } /* #7727: What waits, Send now and Show terminal are 44 px high and wrap as a row under the sentence */
@@ -542,13 +542,11 @@
 
     /* Message board full-screen on mobile */
     #messageboard-view {
-        flex-direction: column;
-    }
+    flex-direction: column;
+    padding-inline: var(--space-xl);
+}
 
-    #messageboard-view {
-        padding-inline: var(--space-xl);
-    }
-
+    
     #messageboard-view .session-header {
         flex-wrap: wrap;
         padding-inline: 0 !important;
@@ -748,15 +746,21 @@
     }
 
     #mobile-session-list .session-group-item {
-        padding: 12px 12px 12px 14px !important;
-        margin: 8px 0;
-        border: 1px solid rgba(var(--white-rgb), 0.06);
-        border-radius: var(--radius-xl);
-        background: linear-gradient(180deg, rgba(var(--white-rgb), 0.04), rgba(var(--white-rgb), 0.02));
-        align-items: flex-start;
-        gap: 10px;
-        box-shadow: 0 10px 24px rgba(var(--black-rgb), 0.16);
-    }
+    padding: 12px 12px 12px 14px !important;
+    margin: 8px 0;
+    border: 1px solid rgba(var(--white-rgb), 0.06);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(180deg, rgba(var(--white-rgb), 0.04), rgba(var(--white-rgb), 0.02));
+    align-items: flex-start;
+    gap: 10px;
+    box-shadow: 0 10px 24px rgba(var(--black-rgb), 0.16);
+    min-height: 56px;
+    /* touch target */
+        /* Phone: cards are already inset by their group container; keep the
+           card padding (usable width) and only align line 2 with the name:
+           10px dot + 6px margin + 8px gap. */
+        --row-dot-block: 24px;
+}
 
     #mobile-session-list .session-group-item.active {
         border-left: 1px solid rgba(var(--white-rgb), 0.06);
@@ -771,14 +775,7 @@
         box-shadow: 0 0 0 6px rgba(var(--fx-yellow-rgb), 0.12);
     }
 
-    #mobile-session-list .session-group-item {
-        min-height: 56px; /* touch target */
-        /* Phone: cards are already inset by their group container; keep the
-           card padding (usable width) and only align line 2 with the name:
-           10px dot + 6px margin + 8px gap. */
-        --row-dot-block: 24px;
-    }
-
+    
     #mobile-session-list .session-mobile-banner-row,
     #mobile-session-list .session-mobile-meta {
         margin-left: var(--row-dot-block, 24px);
@@ -1199,13 +1196,13 @@
 
     /* File list items: larger touch targets */
     .file-item {
-        min-height: 44px;
-        padding: 8px 12px;
-    }
+    min-height: 44px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+}
 
     /* A row's Copy, Preview and Edit are behind one More button (#7652): the name keeps the row, they open on a line under it */
-    .file-item { flex-wrap: wrap; }
-    .file-item .file-path-wrap { flex: 1 1 0; min-width: 4em; }
+        .file-item .file-path-wrap { flex: 1 1 0; min-width: 4em; }
     .file-item .file-more-btn { display: inline-flex; }
     .file-item .file-name, .file-item .file-dir { white-space: normal; overflow-wrap: anywhere; } /* a name wraps rather than being cut to a few letters (#7652) */
     .file-item .file-action-btns { display: none; }
@@ -1289,10 +1286,9 @@
     #mobile-history-list select,
     #mobile-history-list button { min-height: 44px; }
     #mobile-history-list button { min-width: 44px; }
-    #mobile-history-list .hf-label { color: var(--text-secondary); }
+    #mobile-history-list .hf-label { color: var(--text-secondary); padding-top: 12px; }
     #mobile-history-list .hf-row { align-items: flex-start; }
-    #mobile-history-list .hf-label { padding-top: 12px; }
-    #mobile-history-list .hf-toggle-group { flex: 1; min-width: 0; }
+        #mobile-history-list .hf-toggle-group { flex: 1; min-width: 0; }
     #mobile-history-list .session-list > li { min-height: 44px; }
     .mobile-history-back { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
 }
