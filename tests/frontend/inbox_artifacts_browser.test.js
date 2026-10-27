@@ -45,7 +45,7 @@ const WORLD = `(() => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
-    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = require('./helpers/scene_shots')(Page); // the gate's uploaded output in CI, CORAL_SCREENSHOT_DIR locally
     const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => (r.querySelector('.dt-primary') || {}).textContent || '')`);
     const pane = () => ev(`(() => { const p = document.querySelector('.inbox-detail-pane'); return p && !p.hidden ? { title: (p.querySelector('.detail-title') || {}).textContent || '', back: (p.querySelector('.detail-back') || {}).textContent || '', fixed: getComputedStyle(p).position, body: p.textContent } : null; })()`);
     try {
@@ -109,9 +109,12 @@ const WORLD = `(() => {
             // a row's Task link opens the task in the Inbox, never the team page (#8861), and Back returns to the folder
             await ev(`document.querySelector('#group-table-view [data-task-link]').click(); true`);
             await waitFor(`/^\\/inbox\\/tasks\\/(alpha|beta)\\/\\d+$/.test(location.pathname)`, `${label}: the Task link opens the task in the Inbox`, 8000);
+            check(`${label}: the task opened from the Artifacts folder says Artifacts on its Back`, (await ev(`document.querySelector('#inbox-page .goals-back')?.textContent.trim()`)) === '\u2190 Artifacts');
+            await shot(`inbox-artifacts-task-landing-${label}`);
             check(`${label}: a row's Task link opens the task inside the Inbox, not the team page`, await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none' && document.body.getAttribute('data-nav-tab') === 'hub-inbox'`));
             await ev(`history.back(); true`);
             await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: Back returns to the Artifacts folder`, 10000);
+            await shot(`inbox-artifacts-task-back-${label}`);
 
             // the sidebar's search is the folder's
             if (!mobile) {
