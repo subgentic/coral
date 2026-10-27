@@ -159,7 +159,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
     const longPrompt = (job.prompt || '').length > 600 || (job.prompt || '').split('\n').length > 10;
     const promptHtml = !isWorkflow && job.prompt
         ? (longPrompt
-            ? `<details class="disclosure sched-prompt-section"><summary>Prompt</summary><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></details>`
+            ? `<details class="disclosure sched-prompt-section"><summary class="group-head group-head-lg">Prompt</summary><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></details>`
             : `<section class="sched-prompt-section sched-prompt-shown"><h3 class="group-head group-head-lg">Prompt</h3><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></section>`)
         : '';
     container.innerHTML = `
