@@ -19,7 +19,8 @@ const LINE = "Coral's docs for agents: run `coral-agent docs` to list the topics
             await Page.navigate({ url: BASE + path });
             await loaded;
             await ev(`window.__coralReady.then(() => true)`);
-            await waitFor(`!!document.getElementById('docs-copy-agent-line') && getComputedStyle(document.getElementById('docs-view')).display !== 'none'`, 'the Docs page', 15000);
+            // on a phone the list is the first screen and the page (with its button) is the one after: the button has no box until the document is open (#docs-view[data-phone-item]), so wait for its box, not only for the view
+            await waitFor(`!!document.getElementById('docs-copy-agent-line') && getComputedStyle(document.getElementById('docs-view')).display !== 'none' && document.getElementById('docs-copy-agent-line').getBoundingClientRect().height > 0`, 'the Docs page and its button laid out', 15000);
         };
         const stubClipboard = (ok) => ev(`window.__copied = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { window.__copied.push(t); return ${ok ? 'Promise.resolve()' : "Promise.reject(new Error('refused'))"}; } } }); true`);
         const toasts = () => ev(`[...document.querySelectorAll('.toast .toast-message')].map(t => t.textContent.trim())`);
