@@ -25,9 +25,10 @@ const S = `(window.__coralStatic || '/static/')`;
 
         console.log('a phone: the box, Send and Options are one row');
         await open(390, 844, true);
-        await waitFor(`document.getElementById('options-chip').getClientRects().length > 0`, 'the Options button', 5000);
+        // Under 640 px the Options button is not drawn (#9021): the Model and thinking choice is an item of the chevron beside Send, which is the "Options" of this row.
+        await waitFor(`!!document.querySelector('.mobile-send-options-btn') && document.querySelector('.mobile-send-options-btn').getBoundingClientRect().height > 0`, 'the send options chevron', 5000);
         const row = await ev(`(() => { const R = e => { const r = e.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right }; }; const pane = document.getElementById('command-pane').getBoundingClientRect();
-            return { pane: pane.height, vh: innerHeight, box: R(document.getElementById('command-input')), send: R(document.getElementById('mobile-send-btn')), options: R(document.getElementById('options-chip')), chat: document.getElementById('command-pane').classList.contains('chat-mode') }; })()`);
+            return { pane: pane.height, vh: innerHeight, box: R(document.getElementById('command-input')), send: R(document.getElementById('mobile-send-btn')), options: R(document.querySelector('.mobile-send-options-btn')), chat: document.getElementById('command-pane').classList.contains('chat-mode') }; })()`);
         assert.equal(row.chat, true, 'the chat view');
         assert.ok(row.pane <= 120, `the composer is about 90 px, not 190 (${Math.round(row.pane)} px of ${row.vh})`);
         const mid = r => (r.t + r.b) / 2;
@@ -40,9 +41,11 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.ok(row.options.b - row.options.t >= 44, 'Options is a 44 px target');
 
         console.log('Options opens a sheet with what each holds; a choice opens that menu; Escape goes back to Options');
-        const o = await ev(`(() => { const b = document.getElementById('options-chip'); return { name: b.textContent.trim(), popup: b.getAttribute('aria-haspopup'), expanded: b.getAttribute('aria-expanded') }; })()`);
-        assert.deepEqual(o, { name: 'Model and thinking', popup: 'menu', expanded: 'false' });
-        await ev(`document.getElementById('options-chip').click(); true`);
+        const o = await ev(`(() => { const b = document.getElementById('options-chip'), i = document.querySelector('.mobile-send-menu [data-on-click=\"send-menu-options\"]'); return { name: b.textContent.trim(), popup: b.getAttribute('aria-haspopup'), expanded: b.getAttribute('aria-expanded'), item: i && i.textContent.replace(/\\s+/g, ' ').trim() }; })()`);
+        assert.equal(o.name, 'Model and thinking'); assert.equal(o.popup, 'menu'); assert.equal(o.expanded, 'false'); assert.match(o.item || '', /Model and thinking/, 'the chevron menu names it');
+        await ev(`document.querySelector('.mobile-send-options-btn').click(); true`);
+        await waitFor(`!!document.querySelector('.mobile-send-menu [data-on-click=\"send-menu-options\"]') && getComputedStyle(document.querySelector('.mobile-send-menu [data-on-click=\"send-menu-options\"]')).display !== 'none'`, 'the chevron menu with its Model and thinking item', 3000);
+        await ev(`document.querySelector('.mobile-send-menu [data-on-click=\"send-menu-options\"]').click(); true`);
         await waitFor(`!document.getElementById('options-chip-menu').hidden`, 'the Options sheet', 3000);
         assert.equal(await ev(`document.getElementById('options-chip').getAttribute('aria-expanded')`), 'true');
         const sheet = await ev(`(() => { const m = document.getElementById('options-chip-menu'), r = m.getBoundingClientRect(); return { items: [...m.querySelectorAll('[role=menuitem]')].map(b => b.textContent.trim()), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, min: Math.min(...[...m.querySelectorAll('[role=menuitem]')].map(b => b.getBoundingClientRect().height)), focus: document.activeElement.dataset.optionsOpen }; })()`);
@@ -62,10 +65,10 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
         assert.equal(await ev(`document.activeElement.id`), 'options-chip', 'Escape from it goes back to Options');
 
-        console.log('at 200% text Options goes under the box, on the screen');
+        console.log('at 200% text the chevron stays on the screen and the box keeps its width');
         await ev(`document.documentElement.style.fontSize = '32px'; true`);
-        await waitFor(`document.getElementById('options-chip').getBoundingClientRect().top >= document.getElementById('command-input').getBoundingClientRect().bottom - 1`, 'Options under the box at 200%', 5000);
-        const big = await rect('#options-chip'); assert.ok(big.l >= 0 && big.r <= 390 && big.b <= 844, 'Options is on the screen at 200%: ' + JSON.stringify(big));
+        await waitFor(`(() => { const r = document.querySelector('.mobile-send-options-btn').getBoundingClientRect(); return r.height > 0 && r.right <= innerWidth && r.bottom <= innerHeight; })()`, 'the chevron on the screen at 200%', 5000);
+        const big = await rect('.mobile-send-options-btn'); assert.ok(big.l >= 0 && big.r <= 390 && big.b <= 844 && big.b - big.t >= 44, 'the chevron is on the screen, 44 px, at 200%: ' + JSON.stringify(big));
         const bigBox = await rect('#command-input'); assert.ok(bigBox.w >= 200, `the box keeps its width at 200% (${Math.round(bigBox.w)} px)`);
         await ev(`document.documentElement.style.fontSize = ''; true`);
 

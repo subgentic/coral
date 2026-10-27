@@ -57,7 +57,7 @@ const { connect } = require('./agent_view_harness');
             const pane = document.getElementById('command-pane'), ta = document.getElementById('command-input'), chip = document.getElementById('model-chip'), tchip = document.getElementById('thinking-chip'), tb = document.getElementById('command-toolbar');
             const note = document.getElementById('model-chip-note'), send = tb.querySelector('.btn-send');
             const cs = getComputedStyle(pane); const bw = parseFloat(cs.borderLeftWidth) || 0;
-            const pr = R(pane); return { pane: { l: pr.l + bw, r: pr.r - bw, t: pr.t + bw, b: pr.b - bw }, ta: R(ta), chip: R(chip), thinking: R(tchip), options: R(document.getElementById('options-chip')), toolbar: R(tb), send: send && R(send).h ? R(send) : null,
+            const pr = R(pane); return { pane: { l: pr.l + bw, r: pr.r - bw, t: pr.t + bw, b: pr.b - bw }, ta: R(ta), chip: R(chip), thinking: R(tchip), options: R(document.getElementById('options-chip')), chevron: (e => e ? R(e) : { l: 0, r: 0, t: 0, b: 0, h: 0 })(document.querySelector('.mobile-send-options-btn')), toolbar: R(tb), send: send && R(send).h ? R(send) : null,
                 note: note.textContent ? R(note) : null, taH: ta.getBoundingClientRect().height, scrollH: ta.scrollHeight, clientH: ta.clientHeight, vw: innerWidth }; })()`);
         const checkLayout = async (label, what = '') => {
             // The geometry is read once it has stopped moving (#5343): a font-size or text change reflows over a few frames (the box sizes itself on the input event, the row wraps or not), and a read taken
@@ -66,12 +66,12 @@ const { connect } = require('./agent_view_harness');
             let g = await geometry();
             for (let i = 0; i < 40; i++) { await new Promise(r => setTimeout(r, 30)); const g2 = await geometry(); if (JSON.stringify(g2) === JSON.stringify(g)) break; g = g2; } // sleep-ok: poll until the layout has settled
             const at = `${label} ${what}: ${JSON.stringify(g)}`; const phone = label !== 'Desktop';
-            // A phone draws one Options button for the two chips (#7623: they are not drawn there, their menus open from its sheet)
-            const shown = phone ? [['Options button', g.options.h ? g.options : null]].filter(x => x[1]) : [['model chip', g.chip], ['thinking chip', g.thinking.h ? g.thinking : null]].filter(x => x[1]);
-            assert.ok(shown.length >= 1, 'the model chip (a phone: the Options button) is showing: ' + at);
+            // A phone draws no chip (#7623, #9021): the two are the chevron's "Model and thinking" item, so the chevron beside Send is what shows
+            const shown = phone ? [['Send options chevron', g.chevron.h ? g.chevron : null]].filter(x => x[1]) : [['model chip', g.chip], ['thinking chip', g.thinking.h ? g.thinking : null]].filter(x => x[1]);
+            assert.ok(shown.length >= 1, 'the model chip (a phone: the chevron that holds it) is showing: ' + at);
             for (const [name, c] of shown) {
                 assert.ok(c.l >= g.pane.l + 8 && c.r <= g.pane.r - 8 && c.t >= g.pane.t && c.b <= g.pane.b, `the ${name} is inside the composer with room to the border: ` + at);
-                assert.ok(c.t >= g.ta.b - 0.5 || c.b <= g.ta.t + 0.5 || c.l >= g.ta.r - 0.5, `the ${name} does not overlap the text box: ` + at); // a phone's Options button is beside the box
+                assert.ok(c.t >= g.ta.b - 0.5 || c.b <= g.ta.t + 0.5 || c.l >= g.ta.r - 0.5, `the ${name} does not overlap the text box: ` + at); // a phone's chevron is beside the box
                 if (!phone) assert.ok(c.t >= g.toolbar.t && c.b <= g.toolbar.b, `the ${name} is in the buttons row: ` + at);
             }
             assert.ok(g.scrollH <= g.clientH + 1 || g.taH >= parseFloat(await ev(`getComputedStyle(document.getElementById('command-input')).maxHeight`)) - 1, 'the box shows all its text (it grows, or scrolls at its cap): ' + at);

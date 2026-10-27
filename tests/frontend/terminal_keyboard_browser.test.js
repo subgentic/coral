@@ -32,7 +32,7 @@ const BASE = require('./test_base').BASE;
             if (!touch) { assert.equal(open.cls, false, at + 'not a phone with a keyboard: nothing changes: ' + JSON.stringify(open)); continue; }
             assert.equal(open.cls, true, at + 'the keyboard is open: the layout is compact: ' + JSON.stringify(open));
             assert.equal(open.banner, null, at + 'the sign-in banner steps aside');
-            assert.equal(open.chips, null, at + 'the model chips step aside');
+            assert.ok(!open.chips, at + 'the model chips step aside (a phone draws none, #9021: its are the chevron menu)');
             assert.equal(open.status, null, at + 'the status bar steps aside');
             assert.ok(open.input && open.input <= 48, at + 'the message box is one line: ' + open.input);
             assert.ok(open.keys >= 44, at + 'the key bar stays: ' + JSON.stringify(open));
@@ -60,7 +60,8 @@ const BASE = require('./test_base').BASE;
             await new Promise(r => setTimeout(r, 700)); // sleep-ok: the viewport change reaches the page's resize listener
             const back = await boxes();
             assert.equal(back.cls, false, at + 'the keyboard closed: the layout is back');
-            assert.ok(back.banner && back.status && back.chips && back.input >= 60, at + 'everything is back: ' + JSON.stringify(back));
+            assert.ok(back.banner && back.status && (w < 640 || back.chips) && back.input >= 60, // under 640 px the chips are items of the send chevron's menu (#9021), the bar has no height
+                at + 'everything is back: ' + JSON.stringify(back));
         }
         console.log('PASS terminal keyboard: the terminal keeps room while the phone keyboard is open');
     } finally { await client.close(); }

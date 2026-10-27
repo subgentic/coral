@@ -23,6 +23,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
     try {
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false });
         const run = async tag => {
+            const ACCOUNT = tag === 'phone' ? '#top-menu-btn' : '[aria-label="Account menu"]'; // under 640 px the account is an entry of the hamburger's menu (#9021): the hamburger is the opener
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await ev(`window.__coralReady.startup('liveList','settings')`);
                 const nav = async tab => { await ev(`window.switchNavTab('${tab}'); true`); };
@@ -46,15 +47,15 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
         await sc(`${tag}: hub: inbox`, async () => { await nav('hub-inbox'); }, { expect: `document.getElementById('nav-select').textContent.includes('Inbox') || !!document.getElementById('nav-tab-hub-inbox')` });
         await sc(`${tag}: hub: artifacts`, async () => { await nav('artifacts'); await waitFor(`!!document.getElementById('artifacts-frame')`, 'artifacts frame'); });
         await sc(`${tag}: hub: docs`, async () => { await nav('docs'); });
-        await sc(`${tag}: hub: account menu`, async () => { await tap('[aria-label="Account menu"]'); }, { expect: `document.querySelector('[aria-label="Account menu"]').getAttribute('aria-expanded') === 'true'` });
+        await sc(`${tag}: hub: account menu`, async () => { await tap(ACCOUNT); }, { expect: `document.querySelector('${ACCOUNT}').getAttribute('aria-expanded') === 'true'` });
         await ev(`document.body.click(); true`);
         await ev(`(async () => { await window.showSettingsModal(); return true; })()`);
         for (const g of await ev(`[...document.querySelectorAll('#settings-group-select option')].filter(o => !o.hidden).map(o => o.value)`).catch(() => [])) await sc(`${tag}: hub: settings ${g}`, async () => { await ev(`(async () => { await window.showSettingsModal(); return true; })()`); await ev(`(() => { const p = document.getElementById('settings-group-select'); p.value = '${g}'; p.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); });
         await ev(`window.hideSettingsModal(); true`);
         const tagVisibleModal = () => ev(`(() => { document.querySelectorAll('[data-census-box]').forEach(e => e.removeAttribute('data-census-box')); const m = [...document.querySelectorAll('dialog[open], .modal')].filter(e => e.getClientRects().length && getComputedStyle(e).display !== 'none').pop(); if (m) m.setAttribute('data-census-box', ''); return !!m; })()`);
         const dlg = async (name, { opener, open }) => { try { const bad = await kb.dialogCheck(ev, client.Input, { opener, box: '[data-census-box]', open: async () => { await open(); for (let i = 0; i < 30 && !(await tagVisibleModal()); i++) await new Promise(r => setTimeout(r, 100)); } }); results.push({ name, stops: 0, path: '' }); found.push(...bad.map(b => `${name}: ${b}`)); } catch (e) { results.push({ name, error: String(e && e.message || e).slice(0, 300) }); } }; // sleep-ok: the dialog appears when its code has loaded
-        await dlg(`${tag}: hub: dialog launch`, { opener: '[aria-label="Account menu"]', open: () => ev(`(async () => { await window.showLaunchModal(); return true; })()`) });
-        await dlg(`${tag}: hub: dialog settings`, { opener: '[aria-label="Account menu"]', open: () => ev(`(async () => { await window.showSettingsModal(); return true; })()`) });
+        await dlg(`${tag}: hub: dialog launch`, { opener: ACCOUNT, open: () => ev(`(async () => { await window.showLaunchModal(); return true; })()`) });
+        await dlg(`${tag}: hub: dialog settings`, { opener: ACCOUNT, open: () => ev(`(async () => { await window.showSettingsModal(); return true; })()`) });
         // no computer connected (#6351): the home is one "Connect your first computer" panel with its link
         const noComputers = await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__noComputers = true;' });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();

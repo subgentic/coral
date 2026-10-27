@@ -56,8 +56,12 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             await ev(`document.querySelector('[aria-label="Terminal view"]').click(); true`);
             await waitFor(`!document.getElementById('command-pane').classList.contains('chat-mode')`, 'the terminal view', 8000);
             // closed by default, the chip
-            const chip = await ev(q('#keys-chip'));
-            assert.ok(chip && chip.h >= 44, at + 'the Keys chip is a 44 px target: ' + JSON.stringify(chip));
+            // under 640 px the chip is not drawn (#9021): Keys is an item of the chevron's menu, a 44 px row, and the chip keeps the state (aria-pressed) behind it
+            await ev(`document.querySelector('.mobile-send-options-btn').click(); true`);
+            await waitFor(`(() => { const e = document.querySelector('.mobile-send-menu .send-menu-keys'); return !!e && e.getClientRects().length > 0; })()`, 'the Keys item in the chevron menu', 4000);
+            const chip = await ev(`(() => { const e = document.querySelector('.mobile-send-menu .send-menu-keys'), r = e.getBoundingClientRect(); return { h: Math.round(r.height), text: e.textContent.trim() }; })()`);
+            assert.ok(chip && chip.h >= 44 && chip.text === 'Keys', at + 'Keys is a 44 px item of the chevron menu: ' + JSON.stringify(chip));
+            await ev(`window.closeSendMenu(); true`);
             assert.equal(await ev(`document.getElementById('keys-chip').getAttribute('aria-pressed')`), 'false');
             assert.equal(await ev(`document.getElementById('keys-chip').getAttribute('aria-label')`), 'Keys');
             assert.equal(await ev(q('#terminal-key-bar')), null, at + 'the strip is closed on arrival');

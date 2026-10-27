@@ -38,7 +38,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: FAKE });
-        for (const [w, h, name] of [[1280, 756, 'desktop 1280x756'], [390, 756, 'phone 390x756']]) {
+        for (const [w, h, name] of [[1280, 756, 'desktop 1280x756'], [390, 720, 'phone 390x720']]) {
             console.log(`${name}: a 60-row pane`);
             await open(w, h);
             const v = await visible('the pane\'s rows arrived');
@@ -56,6 +56,6 @@ const { connect } = require('./agent_view_harness');
             await ev(`window.__term().input('x', true); true`); await sleep(400); // sleep-ok: the scroll runs on an animation frame
             await visible('they typed');
         }
-        console.log('\nPASS terminal follow cursor: the prompt line is in view at 1280x756 and on a phone, left alone when scrolled away, back on typing');
+        console.log('\nPASS terminal follow cursor: the prompt line is in view at 1280x756 and on a phone (390x720), left alone when scrolled away, back on typing');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
