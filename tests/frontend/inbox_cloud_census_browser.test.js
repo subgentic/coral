@@ -131,13 +131,20 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
                 for (const type of ['keyDown', 'keyUp']) await client.Input.dispatchKeyEvent({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined });
                 await ev(`window.__quiet()`);
                 await ev(`window.__census.push({ m: 'MARK', p: 'entered-${i}', keys: [] }); true`);
+                // a held Enter (the key repeats while it is down) is one search, not one per repeat
+                await ev(`window.__census.push({ m: 'MARK', p: 'holding-${i}', keys: [] }); true`);
+                await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+                for (let r = 0; r < 8; r++) { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r', autoRepeat: true }); await new Promise(res => setTimeout(res, 30)); }
+                await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+                await ev(`window.__quiet()`);
+                await ev(`window.__census.push({ m: 'MARK', p: 'held-${i}', keys: [] }); true`);
                 fieldsTyped.push({ label, i });
             }
             tabbed.push('a 6-letter search was typed into the Inbox\'s sidebar box and its toolbar field, each committed with Enter');
         } else console.log('   (the cloud Inbox tab is still the Hub frame: ' + JSON.stringify(ui) + '; the folders were driven through their module)');
         const inboxAll = shape(await take());
         const between = (a, b) => { const from = inboxAll.findIndex(r => r.m === 'MARK' && r.p === a), to = inboxAll.findIndex(r => r.m === 'MARK' && r.p === b); return from >= 0 && to > from ? inboxAll.slice(from + 1, to) : null; };
-        const fieldRuns = fieldsTyped.map(f => ({ ...f, typed: between(`typing-${f.i}`, `typed-${f.i}`), entered: between(`typed-${f.i}`, `entered-${f.i}`) })), typing = between('typing-module', 'typed-module'), inbox = inboxAll.filter(r => r.m !== 'MARK');
+        const fieldRuns = fieldsTyped.map(f => ({ ...f, typed: between(`typing-${f.i}`, `typed-${f.i}`), entered: between(`typed-${f.i}`, `entered-${f.i}`), held: between(`holding-${f.i}`, `held-${f.i}`) })), typing = between('typing-module', 'typed-module'), inbox = inboxAll.filter(r => r.m !== 'MARK');
         assert.ok(typing, 'the typing was bounded by its marks');
         const online = await ev(`window.__computers.filter(c => c.online).length`);
         // then the Inbox is left alone for 30 seconds: no timer of the Inbox asks the computers again (the idle census below)
@@ -182,6 +189,8 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
                 const reads = f.entered.filter(r => r.proxied && withText(r)), local = f.entered.filter(r => !r.proxied && isHistory(r));
                 assert.equal(reads.length, online, `Enter in ${f.label} sends exactly one history read with q per online computer (${reads.length} reads, ${online} computers online): ${JSON.stringify(reads.map(r => r.keys))}`);
                 assert.deepEqual(local.map(r => `${r.m} ${r.p}`), [], `Enter in ${f.label} reads no history from the Hub itself`);
+                const heldReads = f.held.filter(r => r.proxied && withText(r));
+                assert.equal(heldReads.length, online, `a held Enter in ${f.label} (a keydown and eight repeats) is one search: one history read with q per online computer (${heldReads.length} reads, ${online} computers online)`);
                 report.push(`${f.label}: Enter sent ${reads.length} history reads with q (${online} computers)`);
             }
             console.log('   (' + report.join('; ') + ')');
