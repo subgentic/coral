@@ -325,11 +325,16 @@ export function routeKey(route) {
     return route.server ? `@${route.server}/${route.id}` : route.id;
 }
 
+/** The Boards folder has one name in each place it is spelt: its key among the Inbox's folders (the chat folder of group chats) and its page family in the address (/inbox/boards). The pair, and the one
+ *  way from the family to the folder, live here so no other file spells either (#9542). */
+export const BOARDS_FOLDER = 'chats-group', BOARDS_SUB = 'boards';
+export const folderForSub = sub => (sub === BOARDS_SUB ? BOARDS_FOLDER : sub);
+
 /** The path of an Inbox folder by its key (#8652), for the folders whose pages are other families' too (goals #8571, tasks and boards #8633): parse() answers null for a path this build does not know. */
 export function inboxFolderPath(key) {
     if (key === 'goals') return '/inbox/goals';
     if (key === 'tasks') return '/inbox/tasks';
-    if (key === 'chats-group') return '/inbox/boards';
+    if (key === BOARDS_FOLDER) return `/inbox/${BOARDS_SUB}`;
     return INBOX_FOLDER_RE.test(String(key)) ? build({ view: 'inbox-folder', folder: key }) : '';
 }
 
