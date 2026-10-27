@@ -57,11 +57,11 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
         });
         await run('commits that could not be read are said with their reason, not as zero', async () => {
             await ev(`window.__spend = { ...window.__spend, commits: { available: false, reason: 'no repository found for this team', window: null, usual: null, unattributed: 0 } }; true`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/Commits could not be read/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'the reason', 6000);
             assert.equal(await text('#cost-spend .spend-headline'), 'Commits could not be read: no repository found for this team. 3.1 M tokens were spent.');
             await ev(`window.__spend = ${JSON.stringify(FIX)}; true`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/517 K tokens per commit/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'back to normal', 6000);
         });
         await run('the trend toggles: Tool calls changes the chart and its name, Hourly draws 24 hours', async () => {
@@ -101,7 +101,7 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             assert.ok(/^47 min\s*median in review, assignment to approval/.test(cards[4]), cards[4]); assert.ok(/^3 of 14\s*sent back 2 or more times\s*1\.6 rounds on average/.test(cards[5]), cards[5]);
             assert.equal(await ev(`document.querySelectorAll('#cost-task-time .spend-bar').length`), 6, 'the day with no task done has no bar');
             await ev(`window.__spend.task_time.per_day[window.__spend.task_time.per_day.length - 1].done = 99; true`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`document.querySelectorAll('#cost-task-time .spend-bar').length > 0`, 'the chart again', 6000);
             assert.equal(await ev(`document.querySelectorAll('#cost-task-time .spend-bar-high').length`), 0, 'more tasks done than usual is not drawn in the warning colour');
             assert.ok(!/amber/.test(await text('#cost-task-time .spend-box .spend-note')), 'and its caption does not promise amber');
@@ -111,14 +111,14 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             const rows = await ev(`[...document.querySelectorAll('#cost-task-time .dt-table tbody tr')].map(r => [...r.children].map(c => c.textContent.trim()))`);
             assert.deepEqual(rows, [['Frontend Dev', '5', '52 min', '2'], ['Backend Dev', '3', '34 min', '0']]);
             await ev(`delete window.__spend.task_time.window.p90_s; delete window.__spend.task_time.window.wait_median_s; true`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`document.querySelectorAll('#cost-task-time .spend-card').length === 4`, 'two measures left out', 6000);
             assert.ok(!(await ev(`document.getElementById('cost-task-time').textContent`)).match(/slowest|wait before/), 'no slowest and no wait tile, and no 0 or dash in their place');
             await ev(`window.__spend = ${JSON.stringify(FIX)}; true`);
         });
         await run('no commit landed is said, not divided by zero', async () => {
-            await ev(`window.__spend = { ...window.__spend, commits: { window: 0, usual: 25, unattributed: 0 } }; true`); await ev(`window._refreshCostDashboard ? window._refreshCostDashboard() : 0; true`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await ev(`window.__spend = { ...window.__spend, commits: { window: 0, usual: 25, unattributed: 0 } }; true`); await ev(`window._refreshCostDashboard ? window._refreshCostDashboard({ force: true }) : 0; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/No commit landed/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'the no-commit headline', 6000);
             assert.equal(await text('#cost-spend .spend-headline'), 'No commit landed in 24 h. 3.1 M tokens were spent.');
         });
@@ -127,7 +127,7 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await waitFor(`window.__spendReq.some(s => /range=7d/.test(s))`, 'a request with range=7d', 6000);
             await waitFor(`/Hourly is for the last 24 hours\\./.test((document.querySelector('#cost-spend .spend-chart .spend-note') || {}).textContent || '')`, 'the reason in the chart note, not only in a tooltip', 6000);
             assert.match(await text('#cost-task-time .spend-box .spend-note'), /Hourly is for the last 24 hours\./, 'Tasks done says it too');
-            await ev(`window.__spendStatus = 404; true`); await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await ev(`window.__spendStatus = 404; true`); await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/No spend data for this team yet/.test(document.getElementById('cost-spend').textContent)`, 'the no-data line', 6000);
         });
         await run('at 390 px nothing is wider than the screen', async () => {
@@ -136,12 +136,13 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await Emulation.setTouchEmulationEnabled({ enabled: true });
             // The earlier capture visits Task time; this measurement is Tokens per commit.
             await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => { m.selectView('per-commit'); return true; })`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await ev(`(() => { const s = document.querySelector('#cost-spend-section .eff-pick'); if (s && s.value !== 'all') { s.value = 'all'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`); // the tiles are the All grouping's: Tokens per commit opens on Model (#9236)
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`document.querySelectorAll('#cost-spend .spend-card').length >= 5 && document.querySelector('#cost-spend .spend-card')?.getBoundingClientRect().width > 0`, 'Tokens per commit refreshed and visible on the phone', 6000);
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), true);
             // The missing-data headline is words, unlike the numeric tiles: it must remain inside its tile on a phone (#8609).
             await ev(`window.__spend.tool_calls.measured_agents = 0; true`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`document.querySelectorAll('#cost-spend .spend-card .cost-card-value')[1]?.textContent === 'Not measured' && document.querySelectorAll('#cost-spend .spend-card')[1]?.getBoundingClientRect().width > 0`, 'the word headline', 6000);
             const words = await ev(`(() => { const cards = [...document.querySelectorAll('#cost-spend .spend-card')], e = cards[1].querySelector('.cost-card-value'), box = cards[1].getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(e); const rects = [...range.getClientRects()]; return { text: e.textContent, fits: rects.length > 0 && rects.every(r => r.left >= box.left + 10 && r.right <= box.right - 10), overlaps: cards.some((c, i) => cards.slice(i + 1).some(d => { const a = c.getBoundingClientRect(), b = d.getBoundingClientRect(); return a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1; })) }; })()`);
             assert.deepEqual(words, { text: 'Not measured', fits: true, overlaps: false }, 'the whole word headline fits without colliding with another tile');
@@ -150,7 +151,7 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
         await run('through a hub a remote team\'s spend is read on its own machine (/api/remote/<server>/api/board/<team>/spend), never on the hub itself (#8693)', async () => {
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
             await ev(`(() => { window.__spendPaths = []; try { localStorage.removeItem('coral-analytics-spend-team'); } catch {} window._coralSetLiveSessions([{ session_id: 'r-1', name: 'r-1', agent_type: 'claude', server: 'box-2', board_project: 'remote-team', display_name: 'Remote Dev', working_directory: '/tmp/x' }]); return true; })()`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`window.__spendPaths.length > 0`, 'the spend read for the remote team', 8000);
             const paths = await ev(`window.__spendPaths`);
             assert.deepEqual([...new Set(paths)], ['/api/remote/box-2/api/board/remote-team/spend'], 'the read goes through the hub to box-2: ' + JSON.stringify(paths));
@@ -158,7 +159,7 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
         await run('two teams called alpha on two computers are two options in the Team picker, told apart by their computer (#8774)', async () => {
             await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.hub = true; st.servers = [{ id: 'box-2', label: 'Box Two', status: 'online' }];
                 window._coralSetLiveSessions([{ session_id: 'a-l', name: 'a-l', agent_type: 'claude', board_project: 'alpha', display_name: 'Local Dev', working_directory: '/tmp/x' }, { session_id: 'a-r', name: 'a-r', agent_type: 'claude', server: 'box-2', board_project: 'alpha', display_name: 'Remote Dev', working_directory: '/tmp/x' }]);
-                const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+                const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`document.querySelectorAll('#cost-spend select option').length >= 2`, 'the picker with two teams', 8000);
             const opts = await ev(`[...document.querySelectorAll('#cost-spend select option')].map(o => [o.value, o.textContent])`);
             assert.equal(opts.length, 2, JSON.stringify(opts));
@@ -179,7 +180,7 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
                 const R = window.fetch; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin), p = url.pathname.replace(/^\\/api\\/remote\\/box-3/, '');
                     if (p === '/api/board/projects') return Promise.resolve(new Response(JSON.stringify(url.pathname.startsWith('/api/remote/box-3/') ? [{ board_id: 'b-deep000001', board_label: 'Deep team' }] : [{ board_id: 'quiet-team', board_label: 'quiet-team' }]), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                     return R(u, o); };
-                const m = await import(S + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+                const m = await import(S + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`document.querySelectorAll('#cost-spend select option').length >= 2`, 'the picker with the boards\' teams', 8000);
             const opts = await ev(`[...document.querySelectorAll('#cost-spend select option')].map(o => [o.value, o.textContent])`);
             assert.ok(opts.some(([v, t]) => v === 'quiet-team' && /quiet-team · This computer/.test(t)) && opts.some(([v, t]) => v === '@box-3/b-deep000001' && /Deep team · Box Three/.test(t)), JSON.stringify(opts));
