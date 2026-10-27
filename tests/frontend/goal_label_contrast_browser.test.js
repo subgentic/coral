@@ -1,5 +1,5 @@
-// The sidebar's goal line ("No goal yet" here) is at least 4.5:1 on every background its row can
-// have, in both themes (#4209): plain, hovered, keyboard-focused, selected, sleeping, done, needing
+// The sidebar row's text is at least 4.5:1 on every background its row can have, in both themes (#4209). It was the goal line ("No goal yet"); an agent row is one line since #9686 (the dot, the
+// name and at most one chip), so the text that remains to lose contrast is the name: plain, hovered, keyboard-focused, selected, sleeping, done, needing
 // attention and stuck, and each of those hovered. v1.4.71's a11y_dashboard_browser found 4.33:1 in
 // the light theme only when the pointer happened to rest on a row (hover); here each state is forced
 // (CSS.forcePseudoState for :hover and :focus-visible), so the check does not depend on the mouse.
@@ -18,7 +18,7 @@ const RATIO = `(() => {
     const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
     const bgOf = e => { const layers = []; for (let n = e; n && n.nodeType === 1; n = n.parentElement) { const c = parse(getComputedStyle(n).backgroundColor); if (c && c.a > 0) { layers.push(c); if (c.a === 1) break; } }
         let base = parse(getComputedStyle(document.body).backgroundColor) || { r: 255, g: 255, b: 255, a: 1 }; for (let i = layers.length - 1; i >= 0; i--) base = blend(layers[i], base); return base; };
-    const label = document.querySelector('.session-group-item[data-qa-row] .session-goal-empty-label');
+    const label = document.querySelector('.session-group-item[data-qa-row] .session-label');
     if (!label) return null;
     const color = parse(getComputedStyle(label).color);
     if (!color) return 'unparsed ' + getComputedStyle(label).color;
@@ -42,9 +42,9 @@ const RATIO = `(() => {
                 T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'settings_core.js'); m.clearCustomThemeVars(); m.applyTheme('${theme}'); })()`);
             await ev(`(() => { const st = document.createElement('style'); st.textContent = '* { transition: none !important }'; document.head.appendChild(st); return true; })()`);
-            await waitFor(`!!document.querySelector('.session-group-item .session-goal-empty-label')`, 'a row with "No goal yet"', 10000,
+            await waitFor(`!!document.querySelector('.session-group-item .session-label')`, 'an agent row', 10000,
                 `({ rows: document.querySelectorAll('.session-group-item').length, goals: [...document.querySelectorAll('.session-goal')].map(g => g.textContent.trim().slice(0, 30)), live: (window.__qaState && window.__qaState.liveSessions || []).length })`);
-            await ev(`(() => { const li = document.querySelector('.session-group-item .session-goal-empty-label').closest('.session-group-item'); li.setAttribute('data-qa-row', ''); return true; })()`);
+            await ev(`(() => { const li = document.querySelector('.session-group-item .session-label').closest('.session-group-item'); li.setAttribute('data-qa-row', ''); return true; })()`);
             const { root } = await DOM.getDocument({ depth: -1 });
             const { nodeId } = await DOM.querySelector({ nodeId: root.nodeId, selector: '.session-group-item[data-qa-row]' });
             const base = await ev(`document.querySelector('[data-qa-row]').className`);
@@ -53,14 +53,14 @@ const RATIO = `(() => {
                 for (const pseudo of PSEUDO) {
                     await CSS.forcePseudoState({ nodeId, forcedPseudoClasses: pseudo });
                     const ratio = await ev(RATIO);
-                    assert.notEqual(ratio, null, 'the label is there');
+                    assert.notEqual(ratio, null, 'the name is there');
                     checked++;
                     if (typeof ratio !== 'number' || ratio < 4.5) bad.push(`${theme} ${classes.join('+') || 'plain'}${pseudo.length ? ' :' + pseudo.join(':') : ''} ${ratio}`);
                 }
             }
             await CSS.forcePseudoState({ nodeId, forcedPseudoClasses: [] });
         }
-        assert.deepEqual(bad, [], `"No goal yet" under 4.5:1: ${bad.join('; ')}`);
-        console.log(`PASS "No goal yet" is at least 4.5:1 on all ${checked} row backgrounds, both themes`);
+        assert.deepEqual(bad, [], `The agent name under 4.5:1: ${bad.join('; ')}`);
+        console.log(`PASS the agent name is at least 4.5:1 on all ${checked} row backgrounds, both themes`);
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
