@@ -109,6 +109,27 @@ func (h *EfficiencyHandler) Efficiency(w http.ResponseWriter, r *http.Request) {
 	for _, ls := range live {
 		shared.live[ls.SessionID] = ls
 	}
+	// The commits of both windows are one read (the current window's reach back, and the usual's before it), and so are the facts of the sessions that made or saw them; each window then takes its own
+	// from them. Two reads of the commit snapshots (which overlap by the slack's two weeks) were the cost of this route (#9151).
+	shared.commits, err = h.ss.EfficiencyCommits(ctx, since.Add(-efficiencyUsual-efficiencyCommitSlack), now)
+	if err != nil {
+		fail(err)
+		return
+	}
+	var commitSessions []string
+	seenSession := map[string]bool{}
+	for _, c := range shared.commits {
+		for _, sg := range c.Seen {
+			if sg.SessionID != "" && !seenSession[sg.SessionID] {
+				seenSession[sg.SessionID] = true
+				commitSessions = append(commitSessions, sg.SessionID)
+			}
+		}
+	}
+	if shared.facts, err = h.ss.SessionFacts(ctx, commitSessions); err != nil {
+		fail(err)
+		return
+	}
 	in, err := h.input(ctx, since, now, team, shared)
 	if err != nil {
 		fail(err)
@@ -142,6 +163,8 @@ var measuredProviders = map[string]bool{"claude": true, "codex": true, "pi": tru
 type efficiencyShared struct {
 	live     map[string]store.LiveSession
 	branches map[string]string
+	commits  []store.EfficiencyCommit      // every commit of both windows and the slack before them, once
+	facts    map[string]store.SessionFacts // the sessions that made or saw those commits
 }
 
 // foundThere is how long before a session began a commit may be dated and still be the session's own (clock slack): an earlier one was already on the branch when the agent started.
@@ -154,34 +177,35 @@ func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team 
 	if err != nil {
 		return in, err
 	}
-	commits, err := h.ss.EfficiencyCommits(ctx, from.Add(-efficiencyCommitSlack), to)
-	if err != nil {
-		return in, err
+	// this window's commits: those dated from the slack before it up to its end, out of the one read
+	var commits []store.EfficiencyCommit
+	for _, c := range sh.commits {
+		if !c.At.Before(from.Add(-efficiencyCommitSlack)) && c.At.Before(to) {
+			commits = append(commits, c)
+		}
 	}
 	tasks, err := h.bs.EfficiencyTasks(ctx, from.Format(time.RFC3339), to.Format(time.RFC3339))
 	if err != nil {
 		return in, err
 	}
-	// the sessions whose facts are asked of the store: every one that made or saw a commit, or claimed a task, that is not live (a live row has them)
+	// the facts of the commits' sessions are shared; a task's session that is not among them is asked for here (a live row has the facts itself)
+	facts := make(map[string]store.SessionFacts, len(sh.facts))
+	for id, f := range sh.facts {
+		facts[id] = f
+	}
 	var wantFacts []string
-	seenFact := map[string]bool{}
-	want := func(id string) {
-		if id != "" && !seenFact[id] {
-			seenFact[id] = true
-			wantFacts = append(wantFacts, id)
-		}
-	}
-	for _, c := range commits {
-		for _, sg := range c.Seen {
-			want(sg.SessionID)
-		}
-	}
 	for _, t := range tasks {
-		want(t.Session)
+		if _, known := facts[t.Session]; t.Session != "" && !known {
+			wantFacts = append(wantFacts, t.Session)
+			facts[t.Session] = store.SessionFacts{} // asked once, whatever the answer
+		}
 	}
-	facts, err := h.ss.SessionFacts(ctx, wantFacts)
+	more, err := h.ss.SessionFacts(ctx, wantFacts)
 	if err != nil {
 		return in, err
+	}
+	for id, f := range more {
+		facts[id] = f
 	}
 	// every session that shows up (a usage row, a commit, a task's claim) gets its labels from its live row, else from the row that named it
 	addSession := func(id, agent, provider, boardName string) {
