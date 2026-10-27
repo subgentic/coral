@@ -511,11 +511,12 @@ document.addEventListener('cost-view-change', e => {
 let _resizeTimer = null;
 window.addEventListener('resize', () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { const v = _currentView(); if (SERIES_VIEWS[v] && document.getElementById(`cost-series-${v}`)?.firstChild) _drawSeries(v); }, 150); });
 
+const PHONE_LEAD = { model: 'model', thinking: 'level' }; // the column By model and By thinking are about, kept on a phone beside Cost: the Provider column before it is only a filter (#8982)
 function _drawTable(container, table, columns, rows, empty, extra) {
     const st = _tables[table] || (_tables[table] = tableState());
     if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
     if (!rows.length) { emptyState(container, empty || NO_DATA, 'cost-empty'); return; }
-    const t = dataTable({ label: TABLE_TITLES[table], rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...phoneOneLine(columns, ['cost_usd']), rows, ...extra }); // a phone: one line a row, the name and Cost (#8982)
+    const t = dataTable({ label: TABLE_TITLES[table], rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...phoneOneLine(columns, ['cost_usd'], PHONE_LEAD[table]), rows, ...extra }); // a phone: one line a row, the name and Cost (#8982)
     container.replaceChildren(t.el);
     if (SERIES_VIEWS[table]) _drawSeries(table); // the line under the chart compares its total with these rows
 }
