@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
             const c = getComputedStyle(e), px = parseFloat(c.fontSize); const label = e.tagName + '.' + e.className + ' "' + e.textContent.trim().slice(0, 24) + '" ' + c.fontSize + '/' + c.fontWeight;
             if (c.fontFamily !== want) out.push('family ' + label); else if (!sizes.includes(px)) out.push('size ' + label); else if (!['400', '500', '600', '700'].includes(c.fontWeight)) out.push('weight ' + label); }
         return out; }`;
-    const SCALE = '[11, 12, 13, 14, 17, 20]';
+    const SCALE = '[11, 12, 13, 14, 16, 20]'; // the type scale (Goal #84): 17 is retired, 16 is --fs-xl
     const openTab = async tab => {
         await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`);
         await waitFor(`!document.querySelector('${pane(tab)}').hidden`, `the ${tab} pane`, 8000);
@@ -99,7 +99,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.getElementById('docs-view').checkVisibility() && !!document.querySelector('#docs-content h1') && document.getElementById('docs-back').checkVisibility()`, at + 'the topic page', 10000);
             await waitFor(`document.activeElement === document.querySelector('#docs-content h1')`, at + 'opening a table topic focuses its heading', 4000);
             assert.equal(await ev(`document.getElementById('docs-back').textContent`), '← Getting started', at + 'back names the group');
-            assert.deepEqual((await ev(`(() => { const s = sel => { const e = document.querySelector(sel); if (!e) return null; const c = getComputedStyle(e); return c.fontSize + '/' + c.fontWeight; }; return [s('#docs-content h1'), s('#docs-content h2'), s('#docs-content th'), s('#docs-content p strong, #docs-content li strong'), s('#docs-content p')]; })()`)).slice(0, 2), ['20px/700', '17px/700'], at + 'headings 20/700 and 17/700');
+            assert.deepEqual((await ev(`(() => { const s = sel => { const e = document.querySelector(sel); if (!e) return null; const c = getComputedStyle(e); return c.fontSize + '/' + c.fontWeight; }; return [s('#docs-content h1'), s('#docs-content h2'), s('#docs-content th'), s('#docs-content p strong, #docs-content li strong'), s('#docs-content p')]; })()`)).slice(0, 2), ['20px/700', '16px/600'], at + 'headings 20/700 and 16/600 (the type scale, Goal #84)');
             assert.equal(await ev(`(() => { const e = document.querySelector('#docs-content th'); if (!e) return '12px/500'; const c = getComputedStyle(e); return c.fontSize + '/' + c.fontWeight; })()`), '12px/500', at + 'a table header is 12/500');
             assert.equal(await ev(`(() => { const e = document.querySelector('#docs-content p strong, #docs-content li strong'); if (!e) return '14px/600'; const c = getComputedStyle(e); return c.fontSize + '/' + c.fontWeight; })()`), '14px/600', at + 'a bold label is 14/600');
             const copy = await ev(`(() => { const b = document.getElementById('docs-copy-agent-line'); const t = document.querySelector('.docs-toolbar'); const r = b.getBoundingClientRect(); return { inToolbar: t.contains(b), shown: r.width > 0, btn: b.classList.contains('btn') }; })()`);
