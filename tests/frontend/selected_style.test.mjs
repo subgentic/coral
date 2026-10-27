@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 const css = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../coral-go/pkg/frontend/static/css');
 const SELECTED = [
-    ['components.css', '.seg-btn[aria-checked="true"]'],
+    ['components.css', '.btn-seg > .btn[aria-checked="true"]'],
     ['scheduler.css', '.sched-preset.active'],
     ['components.css', '.flag-shortcut-btn.active'],
     ['components.css', '.template-cat-btn.active'],
