@@ -40,7 +40,9 @@ export function adopt(row, { pills = null, chips = [], action = null } = {}) {
     if (pills) { const [group, select] = pillElements(pills); for (const e of [group, select]) { if (first) row.insertBefore(e, first); else row.append(e); } group.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
     // every filter that is on, one removable chip each (#7782), in the row itself after the pills (ellipsis when they do not fit), so the toolbar never changes height
     row.classList.toggle('team-toolbar-chips', chips.length > 0);
-    if (chips.length) { const box = el('div', 'team-tb-chips'); for (const chip of chips) box.append(chipButton(chip)); row.insertBefore(box, row.querySelector('.list-bar-toggle, .list-bar-more, .team-tb-action')); } // in the row, after the pills, never on a line of its own (#9078)
+    if (chips.length) { const box = el('div', 'team-tb-chips'); for (const chip of chips) box.append(chipButton(chip)); // the row shows the first (css); "+N" stands for the rest, which the Filters panel lists
+        if (chips.length > 1) { const more = el('button', 'goals-chip team-tb-chip team-tb-chip-more', `+${chips.length - 1}`); more.type = 'button'; const moreName = `${chips.length - 1} more filters are on: open the filters`; more.title = moreName; more.setAttribute('aria-label', moreName); more.addEventListener('click', () => row.querySelector('.list-bar-toggle, .list-bar-filter-btn')?.click()); box.append(more); }
+        row.insertBefore(box, row.querySelector('.list-bar-toggle, .list-bar-more, .team-tb-action')); } // in the row, after the pills, never on a line of its own (#9078)
     if (action) { action.classList.add('team-tb-action'); row.append(action); }
     return row;
 }

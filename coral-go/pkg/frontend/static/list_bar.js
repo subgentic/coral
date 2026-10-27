@@ -115,7 +115,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
         tog = make('button', 'sidebar-collapse-btn list-bar-toggle'); tog.type = 'button'; tog.id = `${p}-toggle`;
         tog.setAttribute('aria-expanded', 'false'); tog.setAttribute('aria-controls', `${p}-menu`); tog.title = panelName; tog.setAttribute('aria-label', panelName);
         const icon = make('span', 'material-icons', 'notes'); icon.setAttribute('aria-hidden', 'true');
-        badge = make('span', 'display-badge'); badge.hidden = true;
+        badge = make('span', 'display-badge display-badge-count'); badge.hidden = true;
         tog.append(icon, badge);
         if (spec.expandAll) {
             chev = make('button', 'sidebar-collapse-btn group-toggle-btn list-bar-expand-all'); chev.type = 'button'; chev.dataset.next = 'expand';
@@ -175,7 +175,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     function paintBadge() {
         if (!tog) return;
         const on = baseOn + extraOn;
-        badge.hidden = on === 0; tog.classList.toggle('active', on > 0);
+        badge.hidden = on === 0; badge.textContent = on ? String(on) : ''; tog.classList.toggle('active', on > 0); // the number, not a dot (#9078): when the row has no room for the chips it is what says how many filters are on
         const name = on ? `${panelName}, ${on} on` : panelName;
         tog.setAttribute('aria-label', name); tog.title = name;
     }
@@ -238,13 +238,15 @@ export function buildListBar(spec, onChange, hooks = {}) {
             }
             if (sort) sort.input.value = f.sort;
             const list = chips(f);
-            chipList.replaceChildren(...list.map(c => {
+            const inRow = chipList.classList.contains('list-bar-chips-inrow'); // the row shows ONE chip (readable, 8 rem at least) and "+N" for the rest, which opens the Filters panel, where all of them are listed (#9078)
+            chipList.replaceChildren(...list.map(c => { // every chip stays in the list; css shows the first in the row (the others are in the Filters panel)
                 const li = make('li'); const b = make('button', 'list-bar-chip'); b.type = 'button';
                 b.append(make('span', 'list-bar-chip-text', c.label), make('span', 'list-bar-chip-x', '×'));
                 b.setAttribute('aria-label', `Remove filter: ${c.label}`);
                 b.addEventListener('click', () => { clearTimeout(timer); apply(without(f, c.key)); focusSearch(); });
                 li.append(b); return li;
             }));
+            if (inRow && list.length > 1) { const li = make('li', 'list-bar-chips-more-item'); const b = make('button', 'list-bar-chip list-bar-chip-more', `+${list.length - 1}`); b.type = 'button'; b.setAttribute('aria-label', `${list.length - 1} more filters are on: open the filters`); b.title = b.getAttribute('aria-label'); b.addEventListener('click', () => tog && tog.click()); li.append(b); chipList.append(li); }
             if (list.length > 1) { const li = make('li'); const b = make('button', 'list-bar-chip list-bar-chip-all', 'Clear all'); b.type = 'button'; b.addEventListener('click', () => { everything(); focusSearch(); }); li.append(b); chipList.append(li); }
             chipList.hidden = !list.length || !!spec.chipsElsewhere; // spec.chipsElsewhere (#7782): the owner shows the chips itself (the team Tasks tab: on the toolbar line)
             if (inline || collapsible) clearAll.hidden = !isFiltered(f);
