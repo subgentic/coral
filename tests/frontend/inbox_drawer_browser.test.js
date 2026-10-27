@@ -33,7 +33,7 @@ const BASE = require('./test_base').BASE;
                 continue;
             }
             assert.ok(!s.select, at + 'no select on a phone ' + JSON.stringify(s));
-            assert.ok(s.trigger && s.trigger.h >= 44 && /^menu\s*Tasks\s*3$/.test(s.trigger.text) && s.trigger.expanded === 'false', at + 'a 44 px button names the open folder and its count ' + JSON.stringify(s.trigger));
+            assert.ok(s.trigger && s.trigger.h >= 44 && /^Tasks\s*3\s*expand_more$/.test(s.trigger.text) && s.trigger.expanded === 'false', at + 'a 44 px button names the open folder and its count ' + JSON.stringify(s.trigger));
             assert.match(s.trigger.label, /^Tasks, 3\. Open the folders$/, at + 'and says what it does');
             assert.ok(!s.nav && !s.scrim, at + 'closed: no column and no scrim ' + JSON.stringify(s));
             await ev(`document.querySelector('${T} .view-list-trigger').click(); true`);
@@ -56,9 +56,9 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('${T} .view-list-trigger').click(); true`);
             await waitFor(`document.querySelector('${T} .view-list-nav').getClientRects().length > 0`, at + 'open for a folder', 4000);
             await ev(`document.querySelector('${T} .view-list-item[data-key="needs"]').click(); true`);
-            await waitFor(`/^\\s*Needs you/.test((document.querySelector('${T} .view-list-trigger') || {}).textContent.replace(/^menu/, '') || '')`, at + 'a folder opens its list', 8000);
+            await waitFor(`/^\\s*Needs you/.test((document.querySelector('${T} .view-list-trigger') || {}).textContent || '')`, at + 'a folder opens its list', 8000);
             s = await state();
-            assert.ok(!s.nav && !s.scrim && /^menu\s*Needs you/.test(s.trigger.text), at + 'and the drawer is closed, the button names Needs you ' + JSON.stringify(s));
+            assert.ok(!s.nav && !s.scrim && /^Needs you/.test(s.trigger.text), at + 'and the drawer is closed, the button names Needs you ' + JSON.stringify(s));
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
             console.log('PASS ' + at + 'the drawer');
         }

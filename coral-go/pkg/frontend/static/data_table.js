@@ -14,7 +14,7 @@
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; 'fit' measures the unfolded columns; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
  * (the Analytics tables); scroll: a table of many columns scrolls sideways inside its box, shaded where more is to come, rather than being cut off; the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
-import { whenText } from './when_text.js';
+import { whenText, shortWhen } from './when_text.js';
 import { browserLocal } from './safe_storage.js';
 
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -76,6 +76,8 @@ export function timeCell(stamp) {
     if (stamp) s.title = new Date(stamp).toLocaleString();
     return s;
 }
+/** The short time of a phone's mail row ("5m", "2:32 PM", "Yesterday", "Mon", "Oct 17"). */
+export const shortTime = stamp => shortWhen(stamp);
 export function link(text, run) { return button('dt-link', text, run); }
 
 /** Task completion: visible counts remain meaningful without colour or a filled bar. */
