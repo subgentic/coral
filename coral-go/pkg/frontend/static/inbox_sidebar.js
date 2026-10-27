@@ -646,6 +646,8 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
         onInboxHooks({ needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
         saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
         saved.mountInboxSavedBar($('inbox-saved-bar'));
+        // a fresh load reads the lists before the hub's computers and their statuses are known (only this computer, no line): when they arrive, the merged lists are read again (#8922)
+        document.addEventListener('coral-servers', () => { if ($('inbox-local')?.hidden) return; refreshTasks(); refreshGoals(); IA.refreshArtifactCount(() => renderInboxNav(true)); saved.loadSaved(); });
     }
     $('inbox-local').hidden = false;
     if (folder && groupMeta(folder)) { closePage(false); page = null; $('inbox-page') && ($('inbox-page').hidden = true); group = folder; } // a link to a folder: the folder, not the page that was open
