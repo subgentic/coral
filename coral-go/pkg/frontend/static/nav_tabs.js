@@ -88,7 +88,7 @@ function entry(icon, label, { action, href, onClick } = {}) {
 }
 
 /** What the gear and the account buttons hold, as entries (#9021): the settings, the themes, the update check, the servers; on the Hub the account's pages and Sign out, by clicking the account menu's own items. */
-function menuEntries() {
+function menuEntries(viewLabels = new Set()) {
     const cloud = document.body.classList.contains('cloud-mode');
     const out = [entry('home', 'Home', { action: 'm-go-home' })];
     if (!cloud) {
@@ -98,7 +98,7 @@ function menuEntries() {
     }
     out.push(entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }), entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
-    if (isHub() || cloud) out.push(entry('dns', 'Servers', { action: 'm-close-top-bar-settings-then-show-servers-modal' }));
+    if ((isHub() || cloud) && !viewLabels.has('Servers')) out.push(entry('dns', 'Servers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
     const account = document.getElementById('cloud-account-menu');
     if (account) for (const item of account.querySelectorAll('a.overflow-menu-item, button.overflow-menu-item')) {
         const label = item.textContent.trim();
@@ -129,7 +129,7 @@ function openMenu(btn) {
     menu.classList.toggle('nav-hamburger', hamburger);
     if (hamburger) {
         const sep = document.createElement('div'); sep.className = 'nav-more-sep'; sep.setAttribute('role', 'separator');
-        menu.replaceChildren(...items.map(makeItem), sep, ...menuEntries());
+        menu.replaceChildren(...items.map(makeItem), sep, ...menuEntries(new Set(items.map(t => t.label))));
         for (const v of menu.querySelectorAll('.nav-more-item:not([role])')) v.setAttribute('role', 'menuitem');
     } else menu.replaceChildren(...items.map(makeItem));
     menu.hidden = false;
