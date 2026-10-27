@@ -1038,4 +1038,6 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .menu-item:hover, .menu-item:focus-visible { background: var(--bg-hover); }
 .menu-item[hidden] { display: none; }
 .menu-item-danger { color: var(--error-text); }
-@media (pointer: coarse) { .menu-item { min-height: var(--control-touch-height, 44px); } }
+/* a pinned bar is at the foot of the screen: its menus open upward, whole (the job page's More was cut by the window) */
+.item-bar .menu { top: auto; bottom: calc(100% + 4px); }
+@media (max-width: 767px), (pointer: coarse) { .menu-item { min-height: var(--control-touch-height, 44px); } } /* 44 px on a touch screen and in a narrow window, like .field (#9312) */
