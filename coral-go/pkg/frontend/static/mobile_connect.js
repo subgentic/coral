@@ -29,9 +29,11 @@ function renderState(message, actions = [], error = false) {
     status.textContent = message;
     status.setAttribute('role', error ? 'alert' : 'status');
     const controls = byId('mobile-connect-actions');
-    const hadFocus = controls.contains(document.activeElement);
+    const content = byId('mobile-connect-modal').querySelector('.modal-content');
+    // The dialog's own box holds the focus until it has an action (opening it, a state with none): the first action takes it.
+    const hadFocus = controls.contains(document.activeElement) || document.activeElement === content;
     controls.replaceChildren(...actions);
-    if (hadFocus) (actions[0] || byId('mobile-connect-modal').querySelector('.modal-content')).focus();
+    if (hadFocus) (actions[0] || content).focus();
 }
 
 function failure(message) {
