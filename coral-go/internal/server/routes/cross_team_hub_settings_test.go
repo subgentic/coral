@@ -17,7 +17,7 @@ import (
 
 // #7329 (the operator's decision of 2026-10-24: Coral Hub is the authority for cross-team settings): through the Hub the OWNER of this computer sets cross_team_messaging, cross_team_servers,
 // cross_team_allowed and cross_team_artifacts on PUT /api/board/{project}/settings, under the local lock, the rate limit, a record that names the hub user and a notice on the board. Everyone else is refused, and
-// require_goal stays local. These replace the tests that pinned local_only for the owner (#3377, #4379).
+// require_goal is the owner's through the Hub too. These replace the tests that pinned local_only for the owner (#3377, #4379).
 
 func hubSettingsEnv(t *testing.T, lockOn bool) (*BoardHandler, string) {
 	t.Helper()

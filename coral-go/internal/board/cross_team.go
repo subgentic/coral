@@ -61,7 +61,7 @@ type BoardSettings struct {
 	CrossTeamAllowed []AllowedSender `json:"cross_team_allowed"`
 	// Health is the team's health check configuration (#4175).
 	Health HealthSettings `json:"health"`
-	// RequireGoal: every new task of this board needs a goal, and none is moved to no goal (#7116). Off by default; only the Operator on this computer may change it, never through Coral Hub.
+	// RequireGoal: every new task of this board needs a goal, and none is moved to no goal (#7116). Off by default; the Operator on this computer or the owner through Coral Hub may change it (the operator, 2026-10-24, #7329), never an agent.
 	RequireGoal bool `json:"require_goal"`
 	// GoalRequests: other teams may ask this one to create a task for one of their goals (#7361, the goal-requests note). Off by default, even with a team link: a link grants messaging, and being asked to create work is a separate grant. The Operator on this computer or the Hub owner sets it, never an agent.
 	GoalRequests bool `json:"goal_requests"`
