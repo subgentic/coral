@@ -1,19 +1,19 @@
 {
   "about": "what refreshLiveHistory showed and asked for at each step, for live_history_golden_browser.test.js: sha256 of the chat html, the requests and the load-more state, and the readable lines. CORAL_UPDATE_GOLDEN=1 rewrites it.",
   "hashes": {
-    "first load with messages and older ones": "1b4a0073353d31db03d26533fbad2965a29e9462a9fbc59447df900503a64f71",
-    "a poll that brings new messages": "8a4280207c6a35ef0bd6c53376dce991114875f233cacaec30a5e3eb4a3f0e99",
-    "a poll with nothing new": "8a4280207c6a35ef0bd6c53376dce991114875f233cacaec30a5e3eb4a3f0e99",
+    "first load with messages and older ones": "62a3e527b755c92bb0e12ae14301b667cc83086efe8ccbd047ec9323cda7fe8d",
+    "a poll that brings new messages": "adbfa4fafc0d9cef77f5cef6e965c549882c546b9fd3de253b82e28c7403841d",
+    "a poll with nothing new": "adbfa4fafc0d9cef77f5cef6e965c549882c546b9fd3de253b82e28c7403841d",
     "an empty conversation": "5ad26599969c297b8bf100d162373315614c9b16aa8813bd0a916188e3f204b4",
-    "the transcript got shorter: loaded again from its start": "01c2327cb2c558082ee9db4814b37a8ad3625c848f5868f0737a25a7f1003c4c",
+    "the transcript got shorter: loaded again from its start": "d419faa9b82b645be6c346ccc5973e54b91f7536bc886766301b73bce28ce9a7",
     "the first load fails with the server error": "a983b123856d22c1a633ed2d0b788162ad1e15d6b0d39eb179bca81d0f135843",
     "the first load fails with a reply that is not JSON": "a983b123856d22c1a633ed2d0b788162ad1e15d6b0d39eb179bca81d0f135843",
-    "Retry after a failure loads again": "21fa82880665443359868bfea0b2a209cab35804289fb03b68836df001bd7c9f",
+    "Retry after a failure loads again": "10260b805612aa2fbb38bba7935a5256c979d454435518e3bc54873f32a64714",
     "the first load is refused as busy": "70014237fe0afc90abf9c142713bf57db474cd262ce34a841e0dd2e41ba6ac29",
-    "an open prompt, a login notice and a usage limit ride on the reply": "54a5ff8a1bbdb08aca83be901cbeb3828c86949071a7acc66082802e965f73bb",
-    "the kept page of an agent seen a moment ago shows at once": "63ea0c23a0045f0134247c1ccb0085f49aa12bdfa6c9f4f67f24490530ac30c0",
+    "an open prompt, a login notice and a usage limit ride on the reply": "9fa91742ce8da1d872182f82aa5bb65f8344289dbdef5e7ef91322a4baa2e968",
+    "the kept page of an agent seen a moment ago shows at once": "96dfdb9366993ccd683b2f4d82f4cd5a95e544ef128d8cc5d9b358d092f2b8f3",
     "a kept page: the agent is switched while it builds": "79afd4a5aad80465b273dc8181911bdaa9bd80110f176be3acbf36325479933c",
-    "a kept page: its build throws, so the first page is loaded as for an agent not seen before": "4bb4bdac6f2ab9ba1a2b81fb813c891b5f2da2da1e37ac2700add3f61fa076be",
+    "a kept page: its build throws, so the first page is loaded as for an agent not seen before": "f05e7bca4be3e9f79c2cf1885e2e3121c70cdeb5762e99285a6c3a98f6a303d1",
     "a switch while the answer is on its way renders nothing": "e77e46bb3d6bfcd46e15c1a7e534af8ca4f1f70d3f6a594e1ace034537a7e3cb"
   },
   "lines": {

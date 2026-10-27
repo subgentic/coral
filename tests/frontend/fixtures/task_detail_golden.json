@@ -2,8 +2,8 @@
   "about": "what the task detail shows for each task, for task_detail_golden_browser.test.js: sha256 of the detail html, footer and title, and the readable text. CORAL_UPDATE_GOLDEN=1 rewrites it.",
   "hashes": {
     "a new task": "4526061ef15be250f4c7667eba9b670ace03e44592f04d015fd74a776aaaf28e",
-    "a draft": "aeb19a8517565447c7fb721d3dab98dbecc70e1de81cca617d0b2fcd62580443",
-    "in progress, claimed": "cb209191124beb9b42c3d196447e0b8a806746d1cadc116be76e1ae2273efec2",
+    "a draft": "f769155f10d662dfc275b86217ad71577668acefd0547a1039f55cca052b051f",
+    "in progress, claimed": "efb5749e0ae09399c9ffebc07f5c1119af5e957b5cb5e4de59f1c58dd7452335",
     "blocked, every kind of dependency": "0bf789bf083ce892f1f799b19666524edc73a71fc0475f418568f510991391aa",
     "completed with a message and a cost": "0da492ae10c081a223934824b528bf4857fb95b0a3b3fed4d20af2436de717f0",
     "completed over a dollar": "fb888a4ec75e2a7948586d10438367b67dee5dce68da3510ef55d05185e4aca0",
@@ -13,8 +13,8 @@
     "review pending, slot released": "207a2c1d8795d014306cfbb5465cb56769ad69d98ffd1ad97324e086c7de3874",
     "completion review, slot occupied": "01ed2f745575934003a1288b91c842e689ed6af8627ab95e747b8d23e34b2c82",
     "a workflow with everything": "8f9aa97bb026af65de7c6bd2250a45e0a2492eca00a6d378c70235d4f1d1b670",
-    "amended twice": "e3750c7b4f98704217739232096fafd2bec39f60b73d302513555819d457b2db",
-    "markup in every text": "1714232fe7f7b69bfdb52f02d86e97a0182781ab04acdebccdeed3219582a0aa",
+    "amended twice": "d288b252ebeb3200734b2e385d65a555b99d1d12723add56bb8e39c4009cdd89",
+    "markup in every text": "355fed5764ba651bdbbf9802a31e2d896089883e728bb4719c9cffc2c3c4be6d",
     "running, with a live cost": "9c7746651e128cc1e5ec12c5cafe52961f4576076b140c888991742183e051be",
     "an agent task": "7139f18120470f0ed4e6ba62e9706fc7ae870ede9418cb6e39f07f3999663159"
   },
