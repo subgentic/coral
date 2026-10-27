@@ -141,3 +141,7 @@
 /* inside the team settings dialog (#8853): the foot is always in view, also when a narrow or large-text form scrolls as a whole; on a phone the dialog has no margins of its own, so the lead keeps its 16 px edge */
 .team-settings-modal .sv-bar { position: sticky; bottom: 0; }
 @media (max-width: 760px) { .team-settings-modal .sv-lead { padding: 0 16px; } }
+
+/* A folder field's row (.dir-input-row: the input and its Browse button, the one row of New agent, New team and Open folder, #9489) fills the control's column; the input takes what Browse leaves. */
+.sv-control .dir-input-row { width: 100%; }
+.sv-control .dir-input-row input { width: auto; min-width: 0; }
