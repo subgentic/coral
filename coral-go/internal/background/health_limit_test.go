@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/naming"
 )
 
 // #5229: an agent whose CLI says its quota is used up is BLOCKED in the check, with the reset time, not "idle" (it was counted idle, and named as an
@@ -161,4 +162,39 @@ func TestABlockedAgentIsNotWorkingWithNoTask(t *testing.T) {
 	h.now = h.now.Add(11 * time.Minute)
 	h.sig[codexSID] = agentSignal{Since: h.now.Add(-time.Minute)} // idle again
 	assert.NotContains(t, h.scanOut(), "Codex: has been working", "the dropped occurrence is gone")
+}
+
+// #9492: end to end with the real screen reader and a Codex agent (the earlier tests set the limit by hand on a "claude" member, so the agent-type filter and the screen parse were not
+// in them): a Codex agent whose turn the limit cut short, 12 minutes in a turn by its hooks with no task, is BLOCKED and is NOT "working with no task", in the check, in a second
+// check, and when the finding was noted before the screen showed the notice.
+func TestACodexAgentAtItsLimitIsNeverWorkingWithNoTaskEndToEnd(t *testing.T) {
+	h := newCheckHarness(t)
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 0)
+	sid := h.sid(3)
+	_, err := h.s.Subscribe(context.Background(), "team", "Codex Dev", "Developer", naming.SessionName("codex", sid), nil, "all")
+	require.NoError(t, err)
+	h.agents = append(h.agents, AgentInfo{AgentType: "codex", SessionID: sid, DisplayName: "Codex Dev"})
+	h.sig[h.sid(2)] = agentSignal{InTurn: true, Since: h.now.Add(-12 * time.Minute)}
+	h.sig[sid] = agentSignal{InTurn: true, Since: h.now.Add(-12 * time.Minute)}
+
+	// the real limit reader over the real notice (Codex's own text, with the screen under it)
+	const notice = "■ You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro) or try again at Nov 1st, 2030 10:07 PM.\n\n› Ask Codex to do anything\n\n  gpt-5.5 high · ~/work\n"
+	h.m.limit = screenLimit(screenRT{screen: notice})
+
+	out := h.checkTo("Orchestrator")
+	assert.Contains(t, out, "Dev: has been working for 12 min with no task in progress", "an agent that really works is named")
+	assert.NotContains(t, out, "Codex Dev: has been working", "a Codex agent at its limit is not working")
+	assert.Contains(t, out, "1 BLOCKED by a usage limit")
+	assert.Contains(t, out, "Codex Dev (resets in ")
+
+	// a second check, later, with the same screen: still not named, and the finding is not noted behind the person's back
+	h.now = h.now.Add(11 * time.Minute)
+	out = h.scanOut()
+	assert.NotContains(t, out, "Codex Dev: has been working")
+	pending, err := h.s.PendingOffBooks(context.Background(), "team", h.now, map[string]bool{board.OffBooksBusy: true})
+	require.NoError(t, err)
+	for _, p := range pending {
+		assert.NotContains(t, p.Agent, "Codex", "no busy-with-no-task occurrence is kept for it")
+	}
 }
