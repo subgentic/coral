@@ -52,6 +52,7 @@ type ScheduledRun struct {
 	TriggerType       *string `db:"trigger_type" json:"trigger_type"`
 	WebhookURL        *string `db:"webhook_url" json:"-"` // unused: webhooks were removed (#3646); kept for SELECT *, wiped at start
 	DisplayName       *string `db:"display_name" json:"display_name"`
+	SeenAt            *string `db:"seen_at" json:"seen_at,omitempty"` // when a person first opened the run (POST .../seen, #9315); NULL while it has not been, and on a run that is still going
 	CreatedAt         string  `db:"created_at" json:"created_at"`
 	JobName           *string `db:"job_name" json:"job_name,omitempty"` // populated by JOIN queries
 	ProxyCostUSD      float64 `db:"-" json:"proxy_cost_usd"`
@@ -293,6 +294,16 @@ func (s *ScheduleStore) ListAllRecentRuns(ctx context.Context, limit int) ([]Sch
 		 FROM scheduled_runs r JOIN scheduled_jobs j ON j.id = r.job_id
 		 ORDER BY r.scheduled_at DESC, r.id DESC LIMIT ?`, limit)
 	return runs, err
+}
+
+// MarkScheduledRunSeen records that a person opened a run (#9315): the first time only, so a later open keeps the first time. found is false when there is no such run.
+func (s *ScheduleStore) MarkScheduledRunSeen(ctx context.Context, runID int64, at string) (found bool, err error) {
+	if _, err = s.db.ExecContext(ctx, `UPDATE scheduled_runs SET seen_at = ? WHERE id = ? AND seen_at IS NULL`, at, runID); err != nil {
+		return false, err
+	}
+	var n int
+	err = s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM scheduled_runs WHERE id = ?`, runID)
+	return n > 0, err
 }
 
 // GetScheduledRun returns a single run by ID.

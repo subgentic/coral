@@ -61,6 +61,8 @@ type WorkflowRun struct {
 	ErrorCode *string `db:"error_code" json:"error_code,omitempty"`
 	AgentType *string `db:"agent_type" json:"agent_type,omitempty"`
 	CreatedAt string  `db:"created_at" json:"created_at"`
+	// SeenAt is when a person first opened the run (POST /api/workflows/runs/{runID}/seen, #9315); NULL while it has not been, and on a run that is still going.
+	SeenAt *string `db:"seen_at" json:"seen_at,omitempty"`
 
 	// Computed fields populated by queries
 	WorkflowName *string           `db:"workflow_name" json:"workflow_name,omitempty"`
@@ -351,6 +353,16 @@ func (s *WorkflowStore) UpdateWorkflowRun(ctx context.Context, runID int64, fiel
 		"worktree_path": true, "started_at": true, "finished_at": true,
 		"error_msg": true, "error_code": true, "agent_type": true,
 	}, nil, false)
+}
+
+// MarkWorkflowRunSeen records that a person opened a run (#9315): the first time only. found is false when there is no such run.
+func (s *WorkflowStore) MarkWorkflowRunSeen(ctx context.Context, runID int64, at string) (found bool, err error) {
+	if _, err = s.db.ExecContext(ctx, `UPDATE workflow_runs SET seen_at = ? WHERE id = ? AND seen_at IS NULL`, at, runID); err != nil {
+		return false, err
+	}
+	var n int
+	err = s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM workflow_runs WHERE id = ?`, runID)
+	return n > 0, err
 }
 
 // ListRunsForWorkflow returns runs for a specific workflow with optional filtering.
