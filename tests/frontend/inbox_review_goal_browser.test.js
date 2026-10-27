@@ -81,6 +81,14 @@ const BASE = require('./test_base').BASE;
                 await ev(`(() => { const x = [...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip')].find(c => /Goal/.test(c.textContent)); if (x) x.click(); return true; })()`);
                 await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length >= 12`, 'the filter cleared', 8000);
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`); fs.writeFileSync(path.join(dir, `inbox-review-goal-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
+                if (width === 1280) {
+                    // the task link opens the task in the Inbox, in place (a phone's folded row does not draw it)
+                    await ev(`(${row('Review file 01.txt')}).querySelector('[data-task-link]').click(); true`);
+                    await waitFor(`location.pathname.startsWith('/inbox/tasks/') && location.pathname.endsWith('/11')`, 'the task opens in the Inbox, in place: ' + await ev('location.pathname'), 8000);
+                    assert.equal(await ev(`document.body.dataset.navTab`), 'hub-inbox', 'the Inbox stays for the task');
+                    await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`); // back to Needs you for the goal link
+                    await waitFor(`!!(${row('Review file 01.txt')}) && !!(${row('Review file 01.txt')}).querySelector('[data-goal-link]')`, 'Needs you again', 10000);
+                }
                 await ev(`(${row('Review file 01.txt')}).querySelector('[data-goal-link]').click(); true`);
                 await waitFor(`location.pathname.startsWith('/inbox/goals/') && location.pathname.endsWith('/7')`, 'the goal opens in the Inbox, in place', 8000);
                 assert.equal(await ev(`document.body.dataset.navTab`), 'hub-inbox', 'the Inbox stays');
