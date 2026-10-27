@@ -56,6 +56,14 @@ const AGENTS = [
                 assert.ok(x.bold <= 500, at + 'no unread bold where nothing is unread ' + JSON.stringify(x));
             }
             assert.deepEqual(r.map(x => x.snippet), ['Queued', 'In progress', 'In review'], at + 'the state is the first words');
+            // at 200% text the title and the first words stack (a line each), neither cut to a few letters, and the time keeps its space (#9646)
+            await ev(`document.documentElement.style.fontSize = '200%'; true`);
+            await waitFor(`document.querySelector('${T} .dt-mail-line') && getComputedStyle(document.querySelector('${T} .dt-mail-line')).flexDirection === 'column'`, at + 'the line stacks at 200% text', 4000);
+            const big = await ev(`(() => [...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const t = tr.querySelector('.dt-mail-title').getBoundingClientRect(), n = tr.querySelector('.dt-mail-snippet').getBoundingClientRect(), tm = tr.querySelector('.dt-mail-time').getBoundingClientRect(); return { stacked: n.top >= t.bottom - 1, titleW: Math.round(t.width), snippetW: Math.round(n.width), timeIn: tm.right <= innerWidth - 11 && tm.left >= 0, over: document.documentElement.scrollWidth - innerWidth }; }))()`);
+            assert.ok(big.every(x => x.stacked && x.titleW >= 120 && x.snippetW >= 120 && x.timeIn && x.over <= 1), at + 'title and snippet stack and keep room, the time keeps its space ' + JSON.stringify(big));
+            await shot(`inbox-mail-tasks-${w}-200`);
+            await ev(`document.documentElement.style.fontSize = ''; true`);
+            await waitFor(`getComputedStyle(document.querySelector('${T} .dt-mail-line')).flexDirection === 'row'`, at + 'and back to one line at 100%', 4000);
             const edge = await ev(`(() => { const b = document.querySelector('${T} .dt-box').getBoundingClientRect(), tr = document.querySelector('${T} tr.dt-mailed').getBoundingClientRect(), sb = document.querySelector('${T} .dt-sortbar'); return { left: Math.round(b.left), right: Math.round(innerWidth - b.right), tr: [Math.round(tr.left), Math.round(tr.right)], sort: !!sb && getComputedStyle(sb).display !== 'none', border: getComputedStyle(document.querySelector('${T} .dt-box')).borderLeftWidth }; })()`);
             const CLIP = `(() => [...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const t = tr.querySelector('.dt-mail-time').getBoundingClientRect(), r = tr.getBoundingClientRect(), w = tr.querySelector('.dt-mail-time').scrollWidth; return { gap: Math.round(innerWidth - t.right), rowRight: Math.round(r.right), clipped: w > Math.ceil(t.width) }; }))()`;
             const clip = await ev(CLIP);
