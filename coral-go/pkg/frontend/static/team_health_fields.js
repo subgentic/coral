@@ -117,6 +117,14 @@ export function healthFields(ctx) {
     ];
 }
 
+/** The server's own words for a refused setting start with the API path ("health.unowned_tasks.nudge: ..."): the field's label stands there instead ("Also tell: ..."), and a path no field has is left out, so no API name reaches the screen (#9016). */
+export function plainRefusal(words) {
+    const hit = /^(?:health\.)?([a-z]+(?:_[a-z]+)*(?:\.[a-z_]+)?):\s+([\s\S]+)$/.exec(String(words || ''));
+    if (!hit) return words;
+    const field = healthFields({}).find(f => f.key === hit[1].replace('.', '_') && f.label && f.type !== 'heading');
+    return field ? `${field.label}: ${hit[2]}` : hit[2];
+}
+
 /** Saves the health values: the whole object, read again first, with only what the person changed (resolves to the object the server kept; throws the reason in words). */
 export async function saveHealth(team, base, values) {
     const now = await boardFetch(team, '/settings');
@@ -125,7 +133,7 @@ export async function saveHealth(team, base, values) {
     const health = rebaseChanges(base, valuesToHealth(values, base), fresh);
     const resp = await boardFetch(team, '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', health }) });
     if (!resp.ok) {
-        const local = answeredLocally(team), words = await refusalOf(resp.clone(), local);
+        const local = answeredLocally(team), words = plainRefusal(await refusalOf(resp.clone(), local));
         // this computer's own refusal of a landing field ("landing.nudge: ... is not a member of this team") is shown at that field as well as in the bar (#8967; the same for goals_ready and unowned_tasks, #9006)
         const body = local ? await resp.json().catch(() => null) : null, hit = body && typeof body.error === 'string' ? /^(?:health\.)?(landing|goals_ready|unowned_tasks)\.(branch|wait_min|nudge):\s*(.+)$/.exec(body.error) : null;
         throw Object.assign(new Error(`Could not save the health check. ${words}`), hit ? { fields: { [`${hit[1]}_${hit[2]}`]: hit[3].slice(0, 200) } } : {}); // the refusal in our words, never the server's (#5323)
