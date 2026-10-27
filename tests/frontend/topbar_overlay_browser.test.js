@@ -96,13 +96,21 @@ const HIT = id => `(() => {
         assert.deepEqual(await ev(UNDER_BAR), [], 'phone: no fixed element starts under the top bar');
         console.log(`PASS phone 390 coarse: bar bottom ${bar}px, overlay below it, Files and Artifacts tappable`);
 
-        // The bar's height changes (fine pointer: smaller buttons): the overlay follows.
-        await coarse(false); await sleep(400);
+        // The bar's height changes (fine pointer: smaller buttons): the overlay follows. At 390 the top row is one hamburger whatever the pointer (#9021), so the scene runs at 700 px, a phone layout
+        // that still has the full row (the views dropdown and the buttons), where the bar is taller with a coarse pointer.
+        await coarse(true);
+        await open(700, 844, true);
+        await ev(`toggleAgenticPanel(true)`);
+        await ev(`new Promise(r => { const t = Date.now(); const w = () => document.getElementById('agentic-state').classList.contains('mobile-panel-overlay') || Date.now() - t > 4000 ? r() : setTimeout(w, 50); w(); })`);
+        assert.ok(await ev(`document.getElementById('agentic-state').classList.contains('mobile-panel-overlay')`), 'the side panel is open as the phone overlay at 700 px');
+        const coarse700 = await barBottom();
+        await coarse(false);
+        await ev(`new Promise(r => { const t = Date.now(); const w = () => document.querySelector('header.top-bar').getBoundingClientRect().bottom < ${coarse700} || Date.now() - t > 4000 ? r() : setTimeout(w, 50); w(); })`);
         const fine = await barBottom();
-        assert.ok(fine < bar, `the fine-pointer bar is shorter (${fine} < ${bar})`);
+        assert.ok(fine < coarse700, `the fine-pointer bar is shorter (${fine} < ${coarse700})`);
         assert.ok(Math.abs(await panelTop() - fine) <= 1, `the overlay follows the bar (${await panelTop()} vs ${fine})`);
         assert.deepEqual(await ev(UNDER_BAR), [], 'phone fine: no fixed element starts under the top bar');
-        console.log(`PASS phone 390 fine: overlay follows the bar to ${fine}px`);
+        console.log(`PASS phone 700 fine: overlay follows the bar to ${fine}px`);
 
         // iPad with touch: the tablet sidebar and its backdrop start below the bar.
         await coarse(true);

@@ -107,17 +107,28 @@ const UNDERSIZED = `(() => {
         await ev(`window.hideLaunchModal(); true`);
         console.log('PASS phone 390 coarse: Agent Team dialog member cards and Back arrow');
 
-        // Round 3 (#3131): the top-bar settings dropdown's rows.
+        // Round 3 (#3131): the top-bar settings dropdown's rows. Under 640 px Settings is an item of the hamburger's menu (#9021), so there the rows measured are the hamburger's; the gear's dropdown is measured at 700 px.
         const menuRows = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].map(e => e.getBoundingClientRect()).filter(r => r.width && r.height).map(r => [Math.round(r.width), Math.round(r.height)])`);
+        await ev(`document.getElementById('top-menu-btn').click(); true`);
+        await waitFor(`[...document.querySelectorAll('#nav-more-menu:not([hidden]) .nav-more-item')].filter(e => e.getBoundingClientRect().height).length >= 4`, 'the hamburger menu', { soft: true });
+        const hamburgerRows = await menuRows('#nav-more-menu:not([hidden]) .nav-more-item');
+        assert.ok(hamburgerRows.length >= 4 && await ev(`!!document.querySelector('#nav-more-menu [data-on-click="m-close-top-bar-settings-then-show-settings-modal"]')`), 'the hamburger menu is open with its rows, Settings among them: ' + JSON.stringify(hamburgerRows));
+        for (const [w, h] of hamburgerRows) assert.ok(w >= 44 && h >= 44, `hamburger menu row ${w}x${h} under 44px`);
+        const hamburgerSmall = await ev(UNDERSIZED);
+        assert.deepEqual(hamburgerSmall, [], 'phone 390 with the hamburger menu open: every control is at least 44x44: ' + JSON.stringify(hamburgerSmall));
+        await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+        console.log(`PASS phone 390 coarse: hamburger menu rows at least 44px (${hamburgerRows.length} rows)`);
+        await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: true });
         await ev(`window.__coral.toggleTopBarSettings()`);
         await waitFor(`[...document.querySelectorAll('#top-bar-settings-menu .overflow-menu-item')].filter(e => e.getBoundingClientRect().height).length >= 2`, 'the settings dropdown', { soft: true });
         const settingsRows = await menuRows('#top-bar-settings-menu .overflow-menu-item');
         assert.ok(settingsRows.length >= 2, 'the settings dropdown is open with its rows: ' + JSON.stringify(settingsRows));
         for (const [w, h] of settingsRows) assert.ok(w >= 44 && h >= 44, `settings dropdown row ${w}x${h} under 44px`);
         const settingsSmall = await ev(UNDERSIZED);
-        assert.deepEqual(settingsSmall, [], 'phone 390 with the settings dropdown open: every control is at least 44x44: ' + JSON.stringify(settingsSmall));
+        assert.deepEqual(settingsSmall, [], 'phone 700 with the settings dropdown open: every control is at least 44x44: ' + JSON.stringify(settingsSmall));
         await ev(`window.__coral.closeTopBarSettings()`);
-        console.log(`PASS phone 390 coarse: settings dropdown rows at least 44px (${settingsRows.length} rows)`);
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        console.log(`PASS phone 700 coarse: settings dropdown rows at least 44px (${settingsRows.length} rows)`);
 
         // Round 2 (#3098, Coral Hub v1.4.6 re-check): the side panel's tabs, the
         // Files list (favourite stars) and Browse (row icons) on the phone overlay.

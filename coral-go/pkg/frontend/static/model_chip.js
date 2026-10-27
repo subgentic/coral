@@ -259,9 +259,15 @@ function _openOptions() {
 }
 
 /** Where the keyboard goes back to when a menu closes: the chip itself, or on a phone, where it is not drawn, the Options button. */
+/** Focus goes back to the control that opened a menu: the Options button, or on a phone under 640 px (#9021, where that button is not drawn) the send chevron whose menu holds Model and thinking. */
+function _optionsFocus() {
+    const c = parts().options.chip;
+    if (c && c.getClientRects().length) c.focus(); else document.querySelector('.mobile-send-options-btn')?.focus();
+}
+
 function _chipFocus(kind) {
     const c = parts()[kind] && parts()[kind].chip;
-    if (c && c.getClientRects().length) c.focus(); else parts().options.chip?.focus();
+    if (c && c.getClientRects().length) c.focus(); else _optionsFocus();
 }
 
 async function _openMenu(kind) {
@@ -397,7 +403,7 @@ function wireModelChip() {
     document.addEventListener('keydown', e => {
         if (_optionsOpen()) { // the Options sheet: Escape closes it back to its button, the arrows move between its two rows, Tab leaves it
             const items = [...o.menu.querySelectorAll('.model-chip-item')];
-            if (e.key === 'Escape') { _closeOptions(); o.chip.focus(); return; }
+            if (e.key === 'Escape') { _closeOptions(); _optionsFocus(); return; }
             if (e.key === 'Tab' && o.menu.contains(document.activeElement)) { _closeOptions(); return; }
             if (items.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End')) {
                 const i = items.indexOf(document.activeElement);

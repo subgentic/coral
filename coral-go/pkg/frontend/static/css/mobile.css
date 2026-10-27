@@ -115,7 +115,7 @@
     #command-pane:not(.chat-mode) .send-menu-chip.send-menu-keys { display: block; }
     .mobile-send-menu .send-menu-item { min-height: 44px; }
     /* the chips are not drawn (their menus are fixed sheets that the chevron's items open): the box gets the room */
-    .model-chip-bar .options-chip, .model-chip-bar .keys-chip { position: absolute; width: 0; min-width: 0; height: 0; min-height: 0; padding: 0; border: 0; overflow: hidden; opacity: 0; pointer-events: none; }
+    .model-chip-bar .options-chip, .model-chip-bar .keys-chip { display: none; } /* the chevron's items click them (a click on a hidden button still runs its handler): no tab stop, no label to wrap in a 0 px box */
     .model-chip-bar { width: 0; min-width: 0; margin: 0; gap: 0; }
 }
 

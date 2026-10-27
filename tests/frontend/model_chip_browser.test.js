@@ -189,7 +189,7 @@ const { connect } = require('./agent_view_harness');
             await shot('model-chip-menu-' + label.split(' ')[0].toLowerCase());
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             assert.equal((await menu()).open, false, 'Escape closes it');
-            assert.equal(await ev(`document.activeElement.id`), label === 'Desktop' ? 'model-chip' : 'options-chip', 'Escape gives focus back to its own chip (a phone: the Options button the chips are behind, #7623)');
+            assert.equal(await ev(`document.activeElement.id || (document.activeElement.matches('.mobile-send-options-btn') ? 'send-chevron' : '')`), label === 'Desktop' ? 'model-chip' : 'send-chevron', 'Escape gives focus back to its own chip (a phone: the send chevron whose menu holds the chips, #9021)');
             await openMenu('thinking');
             m = await menu('thinking');
             assert.equal(m.label, 'Thinking level');
@@ -200,7 +200,7 @@ const { connect } = require('./agent_view_harness');
             else { const g = await geometry(); assert.ok(m.rect.l >= g.thinking.l - 1 && m.rect.l <= g.thinking.l + 1, 'the desktop menu opens from its own chip: ' + JSON.stringify({ menu: m.rect, chip: g.thinking })); }
             await shot('thinking-chip-menu-' + label.split(' ')[0].toLowerCase());
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
-            assert.equal(await ev(`document.activeElement.id`), label === 'Desktop' ? 'thinking-chip' : 'options-chip', 'Escape gives focus back to its own chip (a phone: the Options button)');
+            assert.equal(await ev(`document.activeElement.id || (document.activeElement.matches('.mobile-send-options-btn') ? 'send-chevron' : '')`), label === 'Desktop' ? 'thinking-chip' : 'send-chevron', 'Escape gives focus back to its own chip (a phone: the send chevron)');
             // Opening one menu from the other chip closes the first.
             await openMenu('model'); await openMenu('thinking');
             assert.equal((await menu('model')).open, false, 'the model menu closed when the thinking menu opened');

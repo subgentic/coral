@@ -53,7 +53,7 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.ok(sheet.inside && sheet.min >= 44 && sheet.focus === 'model', 'on the screen, 44 px rows, the first has the keyboard: ' + JSON.stringify(sheet));
         await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
         assert.equal(await ev(`document.getElementById('options-chip-menu').hidden`), true, 'Escape closes it');
-        assert.equal(await ev(`document.activeElement.id`), 'options-chip', 'and the keyboard is on Options');
+        assert.equal(await ev(`document.activeElement.matches('.mobile-send-options-btn')`), true, 'and the keyboard is on the chevron (the Options button is not drawn, #9021)');
         await ev(`document.getElementById('options-chip').click(); true`);
         await waitFor(`!document.getElementById('options-chip-menu').hidden`, 'the sheet again', 3000);
         await ev(`document.querySelector('#options-chip-menu [data-options-open="thinking"]').click(); true`);
@@ -63,7 +63,7 @@ const S = `(window.__coralStatic || '/static/')`;
         const sheet2 = await ev(`(() => { const r = document.getElementById('thinking-chip-menu').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && r.height > 0; })()`);
         assert.equal(sheet2, true, 'its sheet is on the screen though its chip is not drawn');
         await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
-        assert.equal(await ev(`document.activeElement.id`), 'options-chip', 'Escape from it goes back to Options');
+        assert.equal(await ev(`document.activeElement.matches('.mobile-send-options-btn')`), true, 'Escape from it goes back to the chevron');
 
         console.log('at 200% text the chevron stays on the screen and the box keeps its width');
         await ev(`document.documentElement.style.fontSize = '32px'; true`);
