@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // How to answer a message from another board (#9054): built here, by the server, so every place that shows a message (coral-board read, its --json, the board nudge, the
@@ -28,6 +29,13 @@ func CrossReplyLine(external RawJSON, id int64) string {
 	if json.Unmarshal(external, &o) != nil || o.Direction != "inbound" || o.Board == "" {
 		return ""
 	}
+	// The line is typed into terminals (the nudge) and printed: a board name with a control character in it (the sender chose it) is never put in it.
+	if strings.IndexFunc(o.Board, unicode.IsControl) >= 0 {
+		if !o.remote() {
+			return fmt.Sprintf("Reply with: coral-board send --board <team> --reply-to %d \"...\" (the board it came from is named in the message)", id)
+		}
+		return fmt.Sprintf("Reply with: coral-board send --address <server>/<team> --reply-to %d \"...\" (the sender's address is in coral-board targets)", id)
+	}
 	if !o.remote() {
 		return fmt.Sprintf("Reply with: coral-board send --board %s --reply-to %d \"...\"", shellWord(o.Board), id)
 	}
@@ -35,7 +43,7 @@ func CrossReplyLine(external RawJSON, id int64) string {
 	// address takes "id-" and the first 12 hex digits of that id (the form `coral-board targets` lists when the hub has no name for it).
 	hex := strings.ToLower(strings.ReplaceAll(o.ServerID, "-", ""))
 	if len(hex) < 12 || !hexOnly.MatchString(hex[:12]) || !plainTeamRe.MatchString(o.Board) {
-		return fmt.Sprintf("Reply with: coral-board send --address <server>/<team> --reply-to %d \"...\" (the sender's address is in  coral-board targets)", id)
+		return fmt.Sprintf("Reply with: coral-board send --address <server>/<team> --reply-to %d \"...\" (the sender's address is in coral-board targets)", id)
 	}
 	return fmt.Sprintf("Reply with: coral-board send --address id-%s/%s --reply-to %d \"...\"", hex[:12], o.Board, id)
 }
