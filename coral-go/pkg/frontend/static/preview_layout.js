@@ -215,8 +215,15 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
             if (_fullOverlay) { const id = _fullOverlay; _fullOverlay = 0; if (!popped) popOverlay(id); }
         }
         _paintMaxButton();
-        if (on) document.getElementById('preview-full-back')?.focus();
+        if (on) { document.getElementById('preview-full-back')?.focus(); revealActiveTab(); }
         else { const o = _fullOpener, back = o && o.isConnected && o !== document.body ? o : _rowFor(_fullOpenerPath); _fullOpener = null; _fullOpenerPath = ''; if (back) back.focus({ preventScroll: true }); }
+    }
+
+    // Replacing tab DOM (for example, a fetched task title) or showing Back changes the strip's geometry.
+    // Reveal after those changes too, not only when moving the pane between columns.
+    function revealActiveTab() {
+        const tab = document.querySelector('#preview-tabs .preview-tab.active');
+        if (tab?.getClientRects().length) tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
 
     /** Move the pane between the side panel (bottom) and its own column, then show it if it has tabs. */
@@ -251,7 +258,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         const maxBtn = document.getElementById('preview-max-btn');
         if (maxBtn) { maxBtn.hidden = _isMobile() ? !visible : !(visible && (dock === 'column' || isTaskPreview())); _paintMaxButton(); }
 
-        if (visible) document.querySelector('#preview-tabs .preview-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        if (visible) revealActiveTab();
 
         const btn = document.getElementById('preview-dock-btn');
         if (btn) {
@@ -278,5 +285,5 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         if (!_isMobile()) _paneHeight = Math.round((document.getElementById('agentic-state')?.getBoundingClientRect().height || window.innerHeight) / 2);
         _placePane();
     }
-    return { showBottom, initPreviewPane, _setMaximised, _setPhoneFull, _placePane, _showPane, _isMobile };
+    return { showBottom, revealActiveTab, initPreviewPane, _setMaximised, _setPhoneFull, _placePane, _showPane, _isMobile };
 }
