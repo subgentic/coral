@@ -95,9 +95,8 @@ const BASE = require('./test_base').BASE;
         await ev(`document.getElementById('task-complete-message').value = 'Done from the task page'; [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Complete').click(); true`);
         await waitFor(`!document.getElementById('task-complete-message')`, 'completion saved');
         await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
-        // A refresh may remove the now-completed row from Open after Back focuses it.
-        // The list then restores focus to its selected filter; both are valid return targets.
-        await waitFor(`location.pathname === '/team/${B}/tasks' && !!document.activeElement?.getClientRects().length && (document.activeElement?.dataset.taskId === '${second}' || document.activeElement?.id === 'team-tab-tasks' || document.activeElement?.matches('#team-panel-tasks .goals-chip[aria-pressed="true"]'))`, 'back at Tasks with row, tab or selected-filter focus', 8000);
+        // Back returns to the goal the task was opened from (#8898), with the goal page and its task list drawn again
+        await waitFor(`location.pathname === '/team/${B}/goals/${goal}' && !!document.querySelector('#team-panel-goals #goals-detail-title') && !!document.querySelector('.goal-split')`, 'back at the goal the task was opened from', 12000);
         await openGoal(goal);
         await waitFor(`document.querySelector('.goal-side-head').textContent.replace(/\\s+/g, ' ').includes('1 open, 2 done')`, 'goal reflects the completed task', 15000);
         // The goal rollup arrives before its separate task-list request. Wait for the
@@ -128,7 +127,7 @@ const BASE = require('./test_base').BASE;
         check('a phone task opens the same Tasks page and URL', await ev(`location.pathname === '/team/${B}/tasks/${third}' && document.querySelector('#team-tab-tasks').getAttribute('aria-selected') === 'true'`));
         await shot('goal-phone-task');
         await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
-        await waitFor(`location.pathname === '/team/${B}/tasks'`, 'back on the team task list');
+        await waitFor(`location.pathname === '/team/${B}/goals/${goal}'`, 'back on the goal the phone task was opened from (#8898)');
         await openGoal(goal);
         check('the goal again, nothing wider than the screen', await ev(`document.documentElement.scrollWidth - innerWidth <= 0`));
     } finally { await api('DELETE', `/api/board/${B}`).catch(() => {}); await client.close(); }
