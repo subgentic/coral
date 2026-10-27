@@ -1,7 +1,7 @@
 import { inboxSources, serverColumns, multipleServers } from './inbox_servers.js';
 import { serverFetch, isCloud } from './server_base.js';
 /* The mailbox's chat folders (#7776, UI/UX's mock #7773): All chats, Board history, With notes, Starred, Active now and Archived; by CLI (Claude, Codex, Antigravity, Pi); and the chat tags. One chat is one line of
- * the one table (data_table.js): the agent, the chat's title with a snippet after it, when it last spoke and how long it ran; the days are its dividers, the list grows as it is read (the footer scrolls into view),
+ * the one table (data_table.js): the chat's title, the agent, when it last spoke (and the server with more than one): one line per chat (#8961); the days are its dividers, the list grows as it is read (the footer scrolls into view),
  * and the folders' counts come from one grouped read (GET /api/sessions/history/counts). A chat is starred or archived with its own two quiet buttons (PATCH /api/sessions/history/{id}/flags: only the person).
  *   chatSections(counts)        -> the view list's sections for the chat folders
  *   chatFolder(key, counts)     -> { title, params } for a folder key, or null when the key is not a chat folder
@@ -111,18 +111,7 @@ function dayOf(iso, now = new Date()) {
     return `${MONTHS[d.getMonth()]} ${d.getDate()}${d.getFullYear() !== now.getFullYear() ? `, ${d.getFullYear()}` : ''}`;
 }
 const stampOf = (s) => s.last_timestamp || s.updated_at || '';
-const ran = (sec) => { if (sec == null || !(sec >= 0)) return ''; const m = Math.round(sec / 60); return m < 1 ? 'under a min' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`; };
 const name = (s) => (isGroup(s) ? (s.title || String(s.session_id).replace(/^board:/, '')) : (s.display_name || s.agent_name || ''));
-/** The line after a chat's title. A group chat's summary starts with its own name ("orch-notify - 1 messages, 0 participants"): the name is not said twice, and one is "1 message". */
-const snippetOf = (s) => {
-    const t = historyLabel(s);
-    let x = String(s.summary || '').replace(/\s+/g, ' ').trim();
-    if (isGroup(s)) {
-        for (const n of [t, String(s.session_id || '').replace(/^board:/, '')]) if (n && x.startsWith(n)) { x = x.slice(n.length).replace(/^\s*[-\u2013\u2014:]\s*/, ''); break; }
-        x = x.replace(/\b1 messages\b/, '1 message').replace(/\b1 participants\b/, '1 participant');
-    }
-    return x && x !== t ? x : '';
-};
 
 /** Star or archive a chat (the flags route): true when it was saved; a failure says so in a toast. */
 export async function setChatFlag(sessionId, flag, value, server = null) {
@@ -152,13 +141,15 @@ export function chatsSpec(key, ctx) {
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, extra, ctx.redraw) } },
+            oneLine: true, resize: false, sortBar: false, // one line per chat, never folded (#8961, the shared one-row table of #8931): Server, then Agent drop as the box narrows; the role and the first message are in the chat that opens
             columns: [
-                { key: 'agent', label: key === 'chats-group' ? 'Name' : 'Agent', primary: true, line: 1, cell: s => { const n = name(s); const w = isGroup(s) ? DT.primaryButton(n || 'Board') : DT.personButton(n || 'Agent', `Open the chat of ${n || 'the agent'}`); const b = w.matches('button') ? w : w.querySelector('.dt-primary'); b.dataset.sessionId = s.session_id; if (isGroup(s)) { const wrap = DT.el('span', 'dt-person'); wrap.append(b, DT.tag('Board')); return wrap; } return w; } },
-                ...serverColumns(),
-                { key: 'chat', label: 'Chat', width: 'grow', line: 2, cell: s => { /* a board's name is the agent column's: its line says only what happened in it */ const c = DT.el('span', 'dt-chat-line'); const sn = snippetOf(s); if (isGroup(s)) { if (sn) c.append(DT.el('span', 'dt-chat-snippet', sn)); } else { c.append(DT.el('span', 'dt-chat-title', historyLabel(s))); if (sn) c.append(DT.el('span', 'dt-chat-snippet', ` \u2013 ${sn}`)); } if (s.active) { const live = DT.el('span', 'dt-chat-live', ' · active now'); c.append(live); } /* an archived board stays in Board history, marked */ if (s.archived && key !== 'chats-archived') c.append(DT.tag('Archived')); return c; } },
-                { key: 'when', label: 'When', tone: 'tertiary', align: 'end', line: 1, cell: s => DT.timeCell(stampOf(s)) },
-                { key: 'ran', label: 'Ran', tone: 'tertiary', align: 'end', line: 0, cell: s => ran(s.duration_sec) },
-                { key: 'flags', label: 'Star and archive', hideLabel: true, line: 0, cell: s => {
+                { key: 'title', label: key === 'chats-group' ? 'Board' : 'Title', primary: true, width: 'grow', cell: s => { const group = isGroup(s), n = group ? (name(s) || 'Board') : historyLabel(s), who = group ? '' : name(s); const b = DT.primaryButton(n, group ? `Open the chat of the board ${n}` : `Open the chat ${n}${who ? ` of ${who}` : ''}`); b.dataset.sessionId = s.session_id;
+                    const marks = []; if (group) marks.push(DT.tag('Board')); if (s.active) marks.push(DT.tag('Active now')); /* an archived board stays in Board history, marked */ if (s.archived && key !== 'chats-archived') marks.push(DT.tag('Archived'));
+                    if (!marks.length) return b; const w = DT.el('span', 'dt-title-cell'); w.append(b, ...marks); return w; } },
+                ...(key === 'chats-group' ? [] : [{ key: 'agent', label: 'Agent', width: '9rem', dropAt: 36, cell: s => name(s) }]),
+                { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '7.5rem', cell: s => DT.timeCell(stampOf(s)) },
+                ...serverColumns().map(c => ({ ...c, line: undefined, sort: false, width: '7rem', dropAt: 52 })),
+                { key: 'flags', label: 'Star and archive', hideLabel: true, width: '5rem', dropAt: 36, cell: s => {
                     if (isCloud() || (s.server && s.server !== 'local')) return '';
                     const w = DT.el('span', 'dt-chat-flags');
                     // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat

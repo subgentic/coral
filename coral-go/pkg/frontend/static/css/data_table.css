@@ -112,10 +112,6 @@
 .dt-group th { position: sticky; top: var(--table-head-h); z-index: 1; padding: 6px var(--table-pad-x); text-align: left; background: var(--table-bg); border-bottom: 1px solid var(--table-border); font-size: var(--table-head-size); font-weight: var(--table-head-weight); letter-spacing: var(--table-head-track); text-transform: uppercase; color: var(--table-tertiary-color); } /* a day, a type: a divider that stays under the head while its rows scroll */
 .dt-box.dt-folded .dt-group th { display: block; top: 0; }
 .dt-box.dt-folded .dt-group { display: block; }
-.dt-chat-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a chat: its title, then its snippet after it, one line (Gmail's) */
-.dt-chat-title { color: var(--table-primary-color); font-size: var(--table-secondary-size); font-weight: var(--table-secondary-weight); }
-.dt-chat-snippet, .dt-chat-live { color: var(--table-secondary-color); font-size: var(--table-secondary-size); font-weight: var(--table-secondary-weight); }
-.dt-chat-line .dt-tag { margin-left: 6px; }
 .dt-chat-flags { display: inline-flex; gap: 2px; justify-content: flex-end; }
 .dt-flag { display: inline-flex; align-items: center; justify-content: center; width: var(--control-compact-height); height: var(--control-compact-height); padding: 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--table-tertiary-color); cursor: pointer; }
 .dt-row .dt-flag { opacity: 0; }
