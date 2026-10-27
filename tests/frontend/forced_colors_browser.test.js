@@ -63,8 +63,9 @@ const MD = '# Migration plan\n\n## Steps\n\n1. Add the new columns behind a flag
                     const out = {}; for (const n of ${JSON.stringify(names)}) { const cs = getComputedStyle(host.querySelector('.' + n)); out[n] = [cs.backgroundColor, cs.borderTopLeftRadius, cs.transform].join(' | '); } host.remove(); return out; })()`);
                 assert.equal(new Set(Object.values(shapes)).size, names.length, base + ' states are different dots: ' + JSON.stringify(shapes));
             }
-            const jobs = await ev(`(() => { const host = document.createElement('div'); host.innerHTML = '<span class="status-dot status-dot-working"></span><span class="status-dot status-dot-stale"></span>'; document.body.append(host); const [a, b] = host.children; const o = [getComputedStyle(a).backgroundColor, getComputedStyle(b).backgroundColor]; host.remove(); return o; })()`);
-            assert.notEqual(jobs[0], jobs[1], 'a running job dot is filled and a pending one a ring: ' + JSON.stringify(jobs));
+            // a job's and a workflow's state is a chip with its word (Passed, Failed, Running) and a border of its own, never a colour alone (Automations has no status dots since #8863)
+            const jobChips = await ev(`(() => { const host = document.createElement('div'); host.innerHTML = '<span class="dt-chip goal-chip goal-state-task-done sched-status">Passed</span><span class="dt-chip goal-chip team-state-bad sched-status">Failed</span><span class="dt-chip goal-chip goal-state-task-active sched-status">Running</span>'; document.body.append(host); const o = [...host.children].map(c => [c.textContent, getComputedStyle(c).borderTopWidth]); host.remove(); return o; })()`);
+            assert.ok(jobChips.every(([, w]) => parseFloat(w) > 0) && new Set(jobChips.map(c => c[0])).size === 3, 'each job state is a worded chip with a border: ' + JSON.stringify(jobChips));
 
             console.log(`6. ${mode}: a focused text field has an outline`);
             const focus = await ev(`(() => { const i = document.createElement('input'); i.type = 'text'; i.className = 'sidebar-search-input'; document.body.append(i); i.focus(); const cs = getComputedStyle(i); const o = [cs.outlineStyle, cs.outlineWidth]; i.remove(); return o; })()`);

@@ -165,9 +165,9 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
 
         // ── Scheduled jobs ─────────────────────────────────────────────────
         await ev(`window.openAutomationsFolder('jobs'); true`);
-        await until(`!!document.querySelector('#group-table-view button.dt-primary')`, 'the jobs list');
+        await until(`!!document.querySelector('#group-table-view tr[data-key="5"] button.dt-primary')`, 'the jobs list');
         await clear();
-        await click('#group-table-view button.dt-primary');
+        await click('#group-table-view tr[data-key="5"] button.dt-primary'); // job 5 is the one the stubs know (the folder lists in next-run order)
         await until(`!!document.querySelector('#scheduler-view [data-on-click="job-toggle"]')`, 'the job');
         check('a job opens it', await ev(`!!document.querySelector('#scheduler-view [data-on-click="job-edit"]')`));
         await clear();
