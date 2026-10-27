@@ -112,7 +112,7 @@ function draw(key) {
     const usual = num(d.average && d.average.usual);
     const cards = el('div', 'eff-cards');
     const best = ranked[0];
-    cards.append(card(`${cfg.best} (at least ${min} ${cfg.units})`, best ? best.label : 'Not enough data', best ? `${cfg.value(best.value)} ${cfg.metric === 'task_time' ? 'median' : 'per ' + cfg.unit}, ${Math.round((1 - best.value / avg) * 100)}% under the ${cfg.value(avg)} average` : `No group has ${min} ${cfg.units} yet.`, best ? 'good' : ''));
+    cards.append(card(`${cfg.best} (at least ${min} ${cfg.units})`, best ? best.label : 'Not enough data', best ? `${cfg.value(best.value)} ${cfg.metric === 'task_time' ? 'median' : 'per ' + cfg.unit}${avg > 0 && best.value < avg ? `, ${Math.round((1 - best.value / avg) * 100)}% under the ${cfg.value(avg)} average` : ''}` : `No group has ${min} ${cfg.units} yet.`, best ? 'good' : ''));
     if (cfg.metric === 'tokens_per_commit') cards.append(card('Average, all commits', cfg.value(avg), usual != null ? `Usual last week: ${cfg.value(usual)}` : 'tokens per commit'));
     else { const cheap = ranked.filter(g => num(g.cost_usd_per_unit) != null).sort((a, b) => a.cost_usd_per_unit - b.cost_usd_per_unit)[0]; cards.append(card('Cheapest per task', cheap ? cheap.label : 'Not enough data', cheap ? `${money(cheap.cost_usd_per_unit)} per task, ${cfg.value(cheap.value)} median` : '')); }
     cards.append(card(cfg.metric === 'task_time' ? 'Tasks done' : 'Commits counted', String(total), few.length ? `${few.length} group${few.length === 1 ? '' : 's'} below ${min} ${cfg.units}, shown but not ranked` : `every group has at least ${min} ${cfg.units}`));
@@ -126,12 +126,12 @@ function draw(key) {
     if (s.group === 'provider' || s.group === 'model') for (const p of provs) { const i = el('span', 'eff-legend-item'); const sw = el('i', 'eff-swatch'); sw.style.background = `var(${PROVIDER_VAR[p.toLowerCase()] || '--viz-other'})`; i.append(sw, document.createTextNode(p)); legend.append(i); }
     if (few.length) { const i = el('span', 'eff-legend-item'); i.append(el('i', 'eff-swatch eff-swatch-few'), document.createTextNode(`fewer than ${min} (not ranked)`)); legend.append(i); }
     if (legend.children.length) panel.append(legend);
-    const max = Math.max(...order.map(g => g.value), avg) * 1.08, bars = el('div', 'eff-bars'); bars.setAttribute('aria-hidden', 'true'); // the table below says the same in words
+    const max = Math.max(...order.map(g => g.value), avg, 1) * 1.08, bars = el('div', 'eff-bars'); bars.setAttribute('aria-hidden', 'true'); // the table below says the same in words
     for (const g of order) {
         const isFew = isFewG(g), row = el('div', 'eff-bar');
         const lab = el('div', 'eff-bar-label', g.label); lab.append(el('small', null, `${g.n} ${g.n === 1 ? cfg.unit : cfg.units}${cfg.metric === 'task_time' && num(g.sent_back_share) != null ? ` · ${Math.round(g.sent_back_share * 100)}% sent back` : ''}${isFew ? ' · too few to rank' : ''}`));
         const track = el('div', 'eff-track'), fill = el('div', `eff-fill${isFew ? ' eff-few' : ''}`); fill.style.width = `${Math.max(1, g.value / max * 100)}%`; fill.style.background = (s.group === 'provider' || s.group === 'model') ? provVar(g) : 'var(--viz-other)';
-        const line = el('div', 'eff-avg'); line.style.left = `${avg / max * 100}%`; track.append(fill, line);
+        const line = el('div', 'eff-avg'); line.style.left = `${Math.max(0, avg) / max * 100}%`; track.append(fill, line);
         const val = el('div', 'eff-bar-value', cfg.value(g.value)); if (num(g.cost_usd_per_unit) != null) val.append(el('small', null, `${money(g.cost_usd_per_unit)} per ${cfg.unit}`));
         row.append(lab, track, val); bars.append(row);
     }
@@ -140,7 +140,7 @@ function draw(key) {
     else panel.append(el('p', 'eff-note', 'Sent back is the share of tasks a reviewer returned for changes: fast is not efficient if the work comes back.'));
     view.append(panel);
 
-    const vs = g => { const p = Math.round((g.value / avg - 1) * 100); return `${p > 0 ? '+' : ''}${p}%`; };
+    const vs = g => { if (!(avg > 0)) return '—'; const p = Math.round((g.value / avg - 1) * 100); return `${p > 0 ? '+' : ''}${p}%`; }; // an average of 0 has nothing to be above or under
     const columns = [
         { key: 'label', label: groupLabel(s.group), tone: 'primary', cell: g => { const c = document.createElement('span'); c.append(document.createTextNode(g.label)); if (g === best) c.append(el('span', 'eff-tag eff-tag-best', cfg.metric === 'task_time' ? 'fastest' : 'most efficient')); if (g.n > 0 && isFewG(g)) c.append(el('span', 'eff-tag', 'few')); if (!g.n) c.append(el('span', 'eff-tag', 'no data')); return c; } },
         { key: 'value', label: cfg.metric === 'task_time' ? 'Median time' : 'Tokens per commit', numeric: true, cell: g => (num(g.value) == null ? '—' : cfg.value(g.value)) },
