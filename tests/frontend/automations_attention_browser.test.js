@@ -4,6 +4,7 @@
 // server and the websocket's live runs fed through live_jobs.js. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 
 const STUB = `(() => {
@@ -35,6 +36,8 @@ const STUB = `(() => {
 
 (async () => {
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = require('./helpers/scene_shots')(Page, 'automations-attention'); // Running now with its rows and Failed with a job and a workflow, at both widths in both themes
+    const themed = async (name, w) => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await settle(150); await shot(`${name}-${theme}-${w}`); } await setTheme(ev, 'dark'); };
     const { settle } = require('./helpers/wait').bind(ev);
     const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => tr.querySelector('.dt-primary').textContent.trim() + '|' + (tr.querySelector('.dt-tag') || {}).textContent)`);
     const pathname = () => ev(`location.pathname`);
@@ -61,6 +64,7 @@ const STUB = `(() => {
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent)`), ['Name', 'Kind', 'Schedule', 'Last run', 'Next'], `${at}the five columns`);
             assert.equal(await ev(`document.querySelector('#group-table-view .team-tb-pills')`), null, `${at}no pills: the folder is the filter`);
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search what failed', `${at}the search is named for the folder`);
+            await themed('failed', w);
             // the New menu makes either kind
             assert.equal(await ev(`document.querySelector('#automations-new-btn').textContent.trim()`), 'New', `${at}a New button at the toolbar's right`);
             await ev(`document.querySelector('#automations-new-btn').click(); true`); await settle(200);
@@ -76,6 +80,7 @@ const STUB = `(() => {
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 4`, `${at}the live runs join Running now`, 6000);
             assert.deepEqual((await rows()).sort(), ['Job run 51|One-off', 'review-pass|Workflow', 'summarize-the-day|Job', 'watch-the-queue|Job'].sort(), `${at}a live run of a job is the job, an API run with no job is a One-off row`);
             assert.equal(await ev(`document.querySelector('#live-jobs-status').textContent`), '2 jobs running now', `${at}and the status line says it once`);
+            await themed('running', w);
             await live([]);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}the live runs leave when they end`, 6000);
 
