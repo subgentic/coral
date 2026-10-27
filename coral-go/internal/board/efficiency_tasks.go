@@ -40,7 +40,7 @@ var reviewTitleRe = regexp.MustCompile(`^Review #\d+`)
 // EfficiencyTasks lists the tasks completed in [since, until) (RFC 3339 UTC), oldest first. The window is compared as text on a bound without its "Z" (windowBound), which orders a stored time with fractions of a second on the right side of a boundary and uses the completed_at index.
 func (s *Store) EfficiencyTasks(ctx context.Context, since, until string) ([]EfficiencyTask, error) {
 	rows, err := s.reader().QueryxContext(ctx, `SELECT t.id, t.board_id, t.title, COALESCE(t.assigned_to, ''), COALESCE(t.completed_by, ''), COALESCE(t.claimed_at, ''), t.completed_at,
-		COALESCE(t.claim_thinking, ''), COALESCE(t.input_tokens, 0) + COALESCE(t.output_tokens, 0), COALESCE(t.cost_usd, 0), COALESCE(w.data, ''), COALESCE(t.session_id, ''), COALESCE(t.work_before_seconds, 0), COALESCE(t.work_windows, '')
+		COALESCE(t.claim_thinking, ''), COALESCE(t.input_tokens, 0) + COALESCE(t.output_tokens, 0), COALESCE(t.cost_usd, 0), COALESCE(w.eff_state, 0), COALESCE(w.eff_review_of, 0), COALESCE(w.eff_author, ''), COALESCE(w.eff_submitted, ''), COALESCE(w.eff_rejected, 0), COALESCE(t.session_id, ''), COALESCE(t.work_before_seconds, 0), COALESCE(t.work_windows, '')
 		FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id
 		WHERE t.status = 'completed' AND t.completed_at >= ? AND t.completed_at < ? ORDER BY t.completed_at, t.id`, windowBound(since), windowBound(until))
 	if err != nil {
@@ -50,10 +50,12 @@ func (s *Store) EfficiencyTasks(ctx context.Context, since, until string) ([]Eff
 	out := []EfficiencyTask{}
 	for rows.Next() {
 		var t EfficiencyTask
-		var assigned, completedBy, completedAt, data string
+		var assigned, completedBy, completedAt, originalAuthor, submittedAt string
+		var state, rejected int
+		var reviewOf int64
 		var before float64
 		var windows string
-		if err := rows.Scan(&t.ID, &t.Board, &t.Title, &assigned, &completedBy, &t.ClaimedAt, &completedAt, &t.Thinking, &t.Tokens, &t.CostUSD, &data, &t.Session, &before, &windows); err != nil {
+		if err := rows.Scan(&t.ID, &t.Board, &t.Title, &assigned, &completedBy, &t.ClaimedAt, &completedAt, &t.Thinking, &t.Tokens, &t.CostUSD, &state, &reviewOf, &originalAuthor, &submittedAt, &rejected, &t.Session, &before, &windows); err != nil {
 			return nil, err
 		}
 		if reviewTitleRe.MatchString(t.Title) {
@@ -61,26 +63,23 @@ func (s *Store) EfficiencyTasks(ctx context.Context, since, until string) ([]Eff
 		}
 		t.EndedAt = completedAt
 		t.Claimer = firstNonEmpty(assigned, completedBy)
-		if data != "" {
-			w, err := decodeWorkflow(data, true)
-			if err != nil {
-				slog.Warn("efficiency: a task's workflow could not be read; its review and send-back facts are left out", "board", t.Board, "task", t.ID, "error", err)
-			} else {
-				if w.ReviewOf > 0 {
-					continue // a review task
-				}
-				if w.OriginalAuthor != "" {
-					t.Claimer = w.OriginalAuthor
-				}
-				if cr := w.CompletionReview; cr != nil && strings.TrimSpace(cr.SubmittedAt) != "" {
-					t.EndedAt = cr.SubmittedAt // review time is not work time: the work ended when it was handed in
-				}
-				for _, r := range w.ReviewRounds {
-					if r.Result == "rejected" {
-						t.SentBack = true
-					}
-				}
+		// the workflow's four facts are columns kept by saveWorkflow (ensureWorkflowEfficiencyFacts): the read does not decode a document per task (#9288)
+		switch state {
+		case 1:
+			if reviewOf > 0 {
+				continue // a review task
 			}
+			if originalAuthor != "" {
+				t.Claimer = originalAuthor
+			}
+			if strings.TrimSpace(submittedAt) != "" {
+				t.EndedAt = submittedAt // review time is not work time: the work ended when it was handed in
+			}
+			if rejected != 0 {
+				t.SentBack = true
+			}
+		case 2:
+			slog.Warn("efficiency: a task's workflow could not be read; its review and send-back facts are left out", "board", t.Board, "task", t.ID)
 		}
 		claimed, ok1 := parseT(t.ClaimedAt)
 		ended, ok2 := parseT(t.EndedAt)
