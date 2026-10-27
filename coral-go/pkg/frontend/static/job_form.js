@@ -5,7 +5,7 @@ import { ensureBuilt } from './lazy_dom.js';
 import { escapeHtml, showToast } from './utils.js';
 import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
 import { cronWords, atWords, localZone, zoneNote } from './job_words.js';
-import { DAYS, composeCron, parseCron } from './cron_picker.js';
+import { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } from './cron_picker.js';
 import { limitSeconds, limitParts } from './time_limit.js';
 
 let view = null;
@@ -49,6 +49,13 @@ function setMode(mode, { focus = false, keepCron = false } = {}) {
     document.querySelectorAll('#sched-picker .sched-preset').forEach(b => press(b, b.dataset.mode === mode));
     for (const p of document.querySelectorAll('#sched-picker [data-for]')) p.hidden = !p.dataset.for.split(' ').includes(mode);
     const unit = document.getElementById('sched-every-unit'); if (unit) unit.textContent = mode === 'minutes' ? 'minutes' : 'hours';
+    const every = document.getElementById('job-modal-every');
+    if (every && (mode === 'minutes' || mode === 'hours')) { // only the steps that divide the hour or the day: "every 7 hours" would not be every 7 hours
+        const steps = mode === 'minutes' ? MINUTE_STEPS : HOUR_STEPS;
+        const keep = steps.includes(pickerState.n) ? pickerState.n : steps.reduce((b, s) => (Math.abs(s - pickerState.n) < Math.abs(b - pickerState.n) ? s : b), steps[0]);
+        every.replaceChildren(...steps.map(s => { const o = document.createElement('option'); o.value = String(s); o.textContent = String(s); return o; }));
+        every.value = String(keep); pickerState.n = keep;
+    }
     const cronInput = document.getElementById('job-modal-cron');
     if (mode !== 'cron' && !keepCron) cronInput.value = composeCron(pickerState);
     if (mode === 'cron' && focus) cronInput.focus();
@@ -71,7 +78,6 @@ function showCron(expr) {
     document.getElementById('job-modal-cron').value = expr;
     if (st) {
         Object.assign(pickerState, { n: 1, at: '09:00', days: new Set([1]) }, st);
-        document.getElementById('job-modal-every').value = String(pickerState.n);
         document.getElementById('job-modal-at').value = pickerState.at;
         document.querySelectorAll('#sched-picker .sched-day').forEach(b => b.setAttribute('aria-pressed', String(pickerState.days.has(+b.dataset.day))));
     }
@@ -132,8 +138,8 @@ function scheduleField() {
             }
             // the pickers: a number (every N minutes or hours), a time, and the days of the week; each says its part of the sentence and writes the cron expression behind it
             const every = el('div', 'sched-line'); every.dataset.for = 'minutes hours';
-            const everyLab = el('label', 'sched-line-label', 'Every'); const n = el('input', 'field field-dense sched-n'); n.type = 'number'; n.id = 'job-modal-every'; n.min = '1'; n.max = '59'; n.value = '1'; n.setAttribute('aria-label', 'Every, how many');
-            n.addEventListener('input', pickerChanged);
+            const everyLab = el('label', 'sched-line-label', 'Every'); const n = el('select', 'field field-dense sched-n'); n.id = 'job-modal-every'; n.setAttribute('aria-label', 'Every, how many');
+            n.addEventListener('change', pickerChanged);
             const unit = el('span', 'sched-unit', 'hours'); unit.id = 'sched-every-unit';
             every.append(everyLab, n, unit);
             const days = el('div', 'sched-days'); days.dataset.for = 'weekly'; days.setAttribute('role', 'group'); days.setAttribute('aria-label', 'Days of the week');
