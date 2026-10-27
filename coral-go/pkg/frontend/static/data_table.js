@@ -152,9 +152,13 @@ export function dataTable(cfg) {
         const any = Object.keys(st.widths).length > 0;
         box.classList.toggle('dt-sized', any); widthBar.hidden = !any;
         if (cfg.layout !== 'fixed' && !cfg.oneLine) table.style.tableLayout = any ? 'fixed' : '';
-        if (!any) return;
+        if (!any) { table.style.width = ''; return; }
         if (sel) { const k = el('col'); k.style.width = 'var(--table-check-w)'; colgroup.append(k); }
         for (const c of columns) { const k = el('col'); if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; colgroup.append(k); }
+        // Every column has a width (the flexible name column's own separator was used): the table is as wide as its columns, not 100%. A fixed table at 100% spreads what is left over
+        // across ALL its columns, so shrinking one column grew the others (#9228); this way a column's separator changes that column alone, and the table scrolls or ends short of the box.
+        const all = columns.every(c => st.widths[c.key]);
+        table.style.width = all ? `calc(${sel ? 'var(--table-check-w) + ' : ''}${columns.reduce((n, c) => n + st.widths[c.key], 0)}px)` : '';
     }
     /** The first resize freezes the other columns at the widths they have (the title column, 'grow', takes whatever is left) so nothing jumps. */
     function freezeWidths() {
