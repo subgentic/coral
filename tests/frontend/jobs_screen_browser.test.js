@@ -50,7 +50,7 @@ const S = `(window.__coralStatic || '/static/')`;
 
             if (!mobile) {
                 await waitFor(`document.querySelectorAll('#group-table-view .dt-chip').length >= 3`, at + 'status chips in group tables', 4000);
-                assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .dt-chip')].map(e => e.textContent)`), ['last run failed', 'last run passed', 'Paused'], at + 'failed, passed and paused use the shared chips');
+                assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .dt-chip')].map(e => e.textContent)`), ['Failed', 'Passed', 'Paused'], at + 'failed, passed and paused use the shared chips');
                 assert.equal(await ev(`document.querySelectorAll('#group-table-view .dt-chip .goal-dot[aria-hidden="true"]').length`), 3, at + 'words convey state; dots are decorative');
                 await shot('jobs-state-chips');
             }

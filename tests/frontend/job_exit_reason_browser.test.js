@@ -33,11 +33,11 @@ const RESTART = 'Coral restarted before this run launched its agent.';
             await ev(`import(${S} + 'scheduler.js').then(m => { window.__sched = m; return true; })`);
             await ev(`window.switchNavTab('automations'); window.__sched.refreshJobs().then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 7`, 'the seven job rows', 8000);
-            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => ({ name: r.querySelector('.dt-primary').textContent, chip: (r.querySelector('.dt-chip') || {}).textContent || '', cls: (r.querySelector('.dt-chip') || {}).className || '' }))`);
+            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => ({ name: r.querySelector('.dt-primary').textContent, chip: (r.querySelector('.dt-chip') || {}).textContent || '', tip: (r.querySelector('.dt-chip') || {}).title || '', cls: (r.querySelector('.dt-chip') || {}).className || '' }))`);
             const by = n => rows.find(r => r.name === n);
-            check(`${tag}: a completed run whose agent ended while Coral was stopped says "result not seen" in its chip, not in the green of a pass`, by('seen-not').chip === 'last run completed (result not seen)' && !/goal-state-task-done/.test(by('seen-not').cls), JSON.stringify(by('seen-not')));
-            check(`${tag}: a run interrupted by a restart is red in its chip (the Runs table says why, below)`, by('restarted').chip === 'last run failed' && /team-state-bad/.test(by('restarted').cls), JSON.stringify(by('restarted')));
-            check(`${tag}: a plain pass reads as before (green)`, by('plain-pass').chip === 'last run passed' && /goal-state-task-done/.test(by('plain-pass').cls), JSON.stringify([by('plain-pass'), by('reaped')]));
+            check(`${tag}: a completed run whose agent ended while Coral was stopped says "result not seen" in its chip, not in the green of a pass`, by('seen-not').chip === 'Result not seen' && !/goal-state-task-done/.test(by('seen-not').cls), JSON.stringify(by('seen-not')));
+            check(`${tag}: a run interrupted by a restart is red in its chip (the Runs table says why, below)`, by('restarted').chip === 'Failed' && /team-state-bad/.test(by('restarted').cls), JSON.stringify(by('restarted')));
+            check(`${tag}: a plain pass reads as before (green)`, by('plain-pass').chip === 'Passed' && /goal-state-task-done/.test(by('plain-pass').cls), JSON.stringify([by('plain-pass'), by('reaped')]));
             // the Runs table
             const table = async id => { await ev(`window.__sched.selectScheduledJob(${id}).then(() => true)`); await waitFor(`!!document.querySelector('.sched-runs-section .sched-status')`, 'the runs table', 6000); await sleep(300); /* sleep-ok: the runs answer replaces the first draw */ return ev(`[...document.querySelectorAll('.sched-runs-section .sched-status')].map(s => ({ text: s.textContent, title: s.getAttribute('title') || '', cell: s.closest('td').textContent.replace(/\\s+/g, ' ').trim(), cls: s.className }))`); };
             let t = await table(1);
@@ -48,7 +48,7 @@ const RESTART = 'Coral restarted before this run launched its agent.';
             for (const [id, name, words, msg] of starts) {
                 const row = by(name); await table(id);
                 const cell = await ev(`(() => { const c = document.querySelector('.sched-runs-section .sched-status'); return { text: c.textContent, line: ((c.closest('td').querySelector('.dt-run-reason') || {}).textContent || '').trim(), title: c.title }; })()`); // the reason is the chip's tooltip and said to assistive technology, not a line under it (Goal #79)
-                check(`${tag}: a run that failed to start ("${words}") says it in its row's chip (last run failed (${words})) and in the Runs table (Failed, the server's sentence as its tooltip and for a screen reader)`, row.chip === `last run failed (${words})` && cell.text === 'Failed' && cell.line === msg && cell.title === msg, JSON.stringify([row, cell]));
+                check(`${tag}: a run that failed to start ("${words}") says it in its row's chip (Failed, the reason as its tooltip) and in the Runs table (Failed, the server's sentence as its tooltip and for a screen reader)`, row.chip === 'Failed' && row.tip.includes(words) && cell.text === 'Failed' && cell.line === msg && cell.title === msg, JSON.stringify([row, cell]));
             }
         }
     } finally { await client.close(); }
