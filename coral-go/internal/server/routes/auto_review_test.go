@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -224,4 +225,93 @@ func TestTaskRecordsHowItsNamesWereBacked(t *testing.T) {
 	task, err = h.bs.GetTask(ctx, "ids", id)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"2": "operator"}, task.Workflow.AmendIdentity)
+}
+
+// #8875: a reviewer at work on their own task is not interrupted by a review: Coral's line for them has no @ and nothing is typed into their terminal; the review waits in their queue
+// and is offered when their task ends. An idle reviewer is told as before.
+func TestAReviewForABusyReviewerWaitsQuietly(t *testing.T) {
+	base, h, first := reviewTeam(t, "auto", true)
+	ctx := context.Background()
+	terminal := newMockTerminal()
+	sessions := map[string]string{"Security Reviewer": "claude-0000001a-3864-4864-8864-00000000001a", "QA Engineer": "claude-0000001b-3864-4864-8864-00000000001b"}
+	for who, session := range sessions {
+		terminal.addSession(session, "/tmp/"+who)
+		_, err := h.bs.Subscribe(ctx, "auto", who, who, session, nil, "mentions")
+		require.NoError(t, err)
+	}
+	h.SetTerminal(terminal)
+	submit(t, base, first.ID)
+	// the Security Reviewer is working on their own task
+	own, err := h.bs.CreateTask(ctx, "auto", "Their own work", "", "high", "lead", "Security Reviewer")
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, "auto", "Security Reviewer", own.ID)
+	require.NoError(t, err)
+
+	task, err := h.bs.CreateTask(ctx, "auto", "Plan", "Do it.\nReviewers: Security Reviewer, QA Engineer", "high", "lead", "worker")
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, "auto", "worker", task.ID)
+	require.NoError(t, err)
+	submit(t, base, task.ID)
+	require.Equal(t, []string{"Security Reviewer", "QA Engineer"}, reviewersOf(t, h, "auto", task.ID))
+
+	msgs, err := h.bs.ListMessages(ctx, "auto", 200, 0, 0)
+	require.NoError(t, err)
+	var all []string
+	for _, m := range msgs {
+		all = append(all, m.Content)
+	}
+	text := strings.Join(all, "\n")
+	assert.Contains(t, text, "@QA Engineer [Task #", "the idle reviewer is told")
+	assert.NotContains(t, text, "@Security Reviewer [Task #", "the busy reviewer is not mentioned")
+	assert.Contains(t, text, "notification deferred while they have an active task", "the board says the review waits")
+	require.Eventually(t, func() bool { return len(terminal.sentTo(sessions["QA Engineer"])) > 0 }, 2*time.Second, 10*time.Millisecond, "the idle reviewer is nudged")
+	time.Sleep(200 * time.Millisecond)
+	assert.Empty(t, terminal.sentTo(sessions["Security Reviewer"]), "nothing is typed into the busy reviewer's terminal")
+	// the review is in their queue and is offered when their task ends
+	reviews, err := h.bs.ListTasks(ctx, "auto")
+	require.NoError(t, err)
+	var theirs *board.Task
+	for i := range reviews {
+		if reviews[i].Status == "pending" && reviews[i].AssignedTo != nil && *reviews[i].AssignedTo == "Security Reviewer" && strings.HasPrefix(reviews[i].Title, "Review #") {
+			theirs = &reviews[i]
+		}
+	}
+	require.NotNil(t, theirs, "the review waits in the busy reviewer's queue")
+}
+
+// The same when a task is resubmitted after a rejection (#3787): the reviewers' review tasks reopen, and the line that says so names a reviewer who is at work on their own task without an @.
+func TestAResubmittedReviewDoesNotMentionABusyReviewer(t *testing.T) {
+	base, h, first := reviewTeam(t, "again", true)
+	ctx := context.Background()
+	submit(t, base, first.ID)
+	code, out := postCode(t, base(first.ID, "review"), map[string]any{"subscriber_id": "lead", "reviewers": []string{"Security Reviewer", "QA Engineer"}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	got, err := h.bs.GetTask(ctx, "again", first.ID)
+	require.NoError(t, err)
+	secReview := got.Workflow.ReviewRounds[0].Reviewers[0].ReviewTaskID
+	_, err = h.bs.ClaimTask(ctx, "again", "Security Reviewer", secReview)
+	require.NoError(t, err)
+	code, out = postCode(t, base(first.ID, "reject"), map[string]any{"subscriber_id": "Security Reviewer", "note": "no", "round": 1})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	// the Security Reviewer starts their own work; the author fixes and resubmits
+	own, err := h.bs.CreateTask(ctx, "again", "Their own work", "", "high", "lead", "Security Reviewer")
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, "again", "Security Reviewer", own.ID)
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, "again", "worker", first.ID)
+	require.NoError(t, err)
+	submit(t, base, first.ID)
+
+	msgs, err := h.bs.ListMessages(ctx, "again", 200, 0, 0)
+	require.NoError(t, err)
+	var line string
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "resubmitted for review, round 2") {
+			line = m.Content
+		}
+	}
+	require.NotEmpty(t, line, "the resubmission is announced")
+	assert.Contains(t, line, "@QA Engineer", "the idle reviewer is mentioned")
+	assert.NotContains(t, line, "@Security Reviewer", "the busy reviewer is not")
+	assert.Contains(t, line, "Security Reviewer (busy: offered when their task ends)")
 }
