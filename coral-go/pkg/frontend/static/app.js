@@ -89,6 +89,7 @@ import './team_folder_import.js';
 import './sidebar_menus.js';
 import './startup_status.js';
 import './history_state.js';
+import { installFetchShare } from './fetch_share.js';
 import { initLocalStore, initPanels, initPlatform, installUnauthorizedRedirect, wireComposer, wirePaneScroll, wireWindowEvents, yieldToMain } from './app_wiring.js';
 import { wireHistoryFilters } from './history_filters.js';
 import './history_source.js';
@@ -112,6 +113,7 @@ async function startDashboard() {
     if (!isPhoneLayout()) buildWelcome(); // a phone starts on the agent list and builds the welcome screen only if it is shown (#4497)
     try {
     initPlatform();
+    installFetchShare(); // the same read asked twice at load is one request (#9111); the wrappers below each see every caller's own answer
     installUnauthorizedRedirect();
 
     // Back off on 429/502/503 (#3403): every poller pauses while Coral (or the hub) is overloaded.

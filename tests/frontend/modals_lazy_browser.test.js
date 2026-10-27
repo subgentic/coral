@@ -73,6 +73,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`(() => { const m = document.getElementById(${JSON.stringify(id)}); return !m || m.style.display === 'none'; })()`, id + ' closed', 3000);
         }
         assert.equal(count('modals.js'), 1, 'no refetch of modals.js');
+        assert.equal(count('settings_modal.js'), 1, 'Settings is its own module (#9111), loaded once');
         console.log('   ✓ settings and mobile QR dialogs open and close; no refetch');
 
         // 4b. The Default Prompts and Resume dialogs are modules of their own (#3836): opening one loads that module only.
@@ -97,15 +98,29 @@ const BASE = require('./test_base').BASE;
         reqs.length = 0; block = 1;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
-        await ev(`window.showSettingsModal(); true`);
+        await ev(`window.showLaunchModal(); true`); // modals.js is the launch dialog's module now: Settings has its own (#9111)
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Could not load this dialog/.test(t.textContent))`, 'the failure toast', 5000);
-        assert.ok(!(await shown('settings-modal')), 'no dialog after the failure');
-        await ev(`window.showSettingsModal(); true`);
-        await waitFor(`(() => { const m = document.getElementById('settings-modal'); return m && m.style.display !== 'none'; })()`, 'the settings dialog after the retry', 5000);
+        assert.ok(!(await shown('launch-modal')), 'no dialog after the failure');
+        await ev(`window.showLaunchModal(); true`);
+        await waitFor(`(() => { const m = document.getElementById('launch-modal'); return m && m.style.display !== 'none'; })()`, 'the launch dialog after the retry', 5000);
         const urls = reqs.filter(u => /\/modals\.js/.test(u)).map(u => u.split('/').pop());
         assert.deepEqual(urls, ['modals.js', 'modals.js?retry=1'], 'failed once, then retried under a new URL: ' + JSON.stringify(urls));
         await escape();
         console.log('   ✓ failed load -> toast, next click retries (?retry=1) and opens');
+
+        // 5b. Settings opens without the launch, team and wizard dialogs (#9111: Settings opened 46 files, 299 K, most of them theirs).
+        reqs.length = 0;
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+        await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
+        const before = reqs.length;
+        await ev(`window.showSettingsModal(); true`);
+        await waitFor(`(() => { const m = document.getElementById('settings-modal'); return m && m.style.display !== 'none'; })()`, 'the settings dialog on a cold page', 5000);
+        for (const m of ['modals.js', 'team_dialogs.js', 'launch_dialog.js', 'team_wizard.js', 'launch_core.js', 'board_launches.js', 'persona_io.js']) assert.equal(count(m), 0, 'opening Settings does not request ' + m);
+        assert.equal(count('settings_modal.js'), 1); assert.equal(count('settings_dialog.js'), 1);
+        const nStatic = reqs.slice(before).filter(u => /\/static\//.test(u)).length;
+        assert.ok(nStatic <= 24, 'opening Settings loads at most 24 static files (46 before): ' + nStatic);
+        await escape();
+        console.log('   ✓ Settings opens on its own module, ' + nStatic + ' static files, none of the launch, team or wizard dialogs');
 
         // 6. Restart (opened by controls.js) loads the dialogs first, so its config form renders.
         reqs.length = 0;
