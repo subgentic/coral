@@ -40,7 +40,7 @@ function buildOnce() {
     }
     buildTabsMore(tabs);
     tabs.addEventListener('scroll', drawTabEdges, { passive: true });
-    window.addEventListener('resize', drawTabEdges);
+    window.addEventListener('resize', () => { syncTabStop(); drawTabEdges(); });
     tabs.addEventListener('keydown', (e) => {
         const list = [...tabs.querySelectorAll('[role=tab]')].filter(b => b.getClientRects().length), i = list.indexOf(document.activeElement); // a phone's tabs behind More are not in the row
         if (i < 0) return;
@@ -218,12 +218,21 @@ function drawTabEdges() {
     if (v) t.setAttribute('data-more', v); else t.removeAttribute('data-more'); // (the stylesheet's [data-more] rules)
 }
 
+/** The strip is ONE Tab stop: the selected tab, or, when it is behind More on a phone (no box in the row), the row's first tab: otherwise no tab of the row is reachable by Tab and a keyboard user would get past the whole tablist (#8791: Board is behind More now). */
+function syncTabStop() {
+    const tabs = TEAM_TABS.map(t => $(`team-tab-${t}`)).filter(Boolean), shown = tabs.filter(b => b.getClientRects().length > 0);
+    const selected = tabs.find(b => b.getAttribute('aria-selected') === 'true');
+    for (const b of tabs) b.tabIndex = b === selected && shown.includes(b) ? 0 : -1;
+    if (shown.length && !shown.some(b => b.tabIndex === 0)) shown[0].tabIndex = 0;
+}
+
 function markTab(tab) {
     for (const t of TEAM_TABS) {
         const b = $(`team-tab-${t}`), on = t === tab;
         b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1;
         panel(t).hidden = !on;
     }
+    syncTabStop();
     $('team-panel-item').hidden = true;
     syncTabsMore();
     $(`team-tab-${tab}`)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); // the selected tab is in view inside the strip (on load and on change); the fade's room is the strip's scroll padding
