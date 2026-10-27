@@ -37,7 +37,7 @@ export function mountTeamLaunchSettings() {
                 { key: 'custom_instructions', type: 'textarea', id: 'team-custom-instructions', label: 'Additional instructions', help: 'Optional.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
             ] },
             { id: 'workflow', label: 'Workflow', icon: 'account_tree', fields: [
-                { key: 'mode', type: 'select', label: 'Working mode', help: WORKFLOW_HINT, options: [{ value: 'none', label: 'None' }, { value: 'shared_checkout', label: 'Shared checkout' }, { value: 'worktrees', label: 'Worktrees' }] },
+                { key: 'mode', type: 'select', label: 'Working mode', help: WORKFLOW_HINT, options: [{ value: 'none', label: 'None' }, { value: 'shared_checkout', label: 'Shared checkout' }, { value: 'worktrees', label: 'Worktrees' }, { value: 'task_queue', label: 'Task queue' }] },
                 { key: 'dependency_guidance', type: 'toggle', label: 'Guidance for dependent tasks' },
                 { key: 'asks_are_tasks', type: 'toggle', label: 'Requests for work are tasks', help: ASKS_ARE_TASKS_HINT },
                 { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence },

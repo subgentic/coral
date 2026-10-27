@@ -1,5 +1,5 @@
 // The Working mode list in Team settings says what the chosen mode means (#5760): a one-line description under it, read from the preset the server lists (its `description`),
-// tied to the list by aria-describedby so a screen reader reads it with the list. None, Shared checkout, Worktrees and Merge queue have one; a team's own preset has none, and the
+// tied to the list by aria-describedby so a screen reader reads it with the list. None, Shared checkout, Worktrees, Merge queue and Task queue have one; a team's own preset has none, and the
 // line is hidden (not an empty paragraph). Drives Chrome over CDP against the isolated dev server, at 1280 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -23,9 +23,9 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the Team settings', 15000);
             await waitFor(`[...document.querySelector('#team-settings-workspace select[name=mode]').options].some(o => o.value === 'merge_queue')`, 'the presets in the list', 15000);
             const modeLabels = await ev(`[...document.querySelector('#team-settings-workspace select[name=mode]').options].map(o => o.textContent)`);
-            assert.ok(['None', 'Shared checkout', 'Worktrees', 'Merge queue'].every(l => modeLabels.includes(l)) && !modeLabels.some(l => /built in/i.test(l)), 'the modes read the same way: no "built in" suffix on one of them: ' + JSON.stringify(modeLabels));
+            assert.ok(['None', 'Shared checkout', 'Worktrees', 'Merge queue', 'Task queue'].every(l => modeLabels.includes(l)) && !modeLabels.some(l => /built in/i.test(l)), 'the modes read the same way: no "built in" suffix on one of them: ' + JSON.stringify(modeLabels));
             const read = id => ev(`(() => { const f = document.querySelector('#team-settings-workspace'); const sel = f.querySelector('select[name=mode]'); sel.value = ${JSON.stringify(id)}; sel.dispatchEvent(new Event('change', { bubbles: true })); const d = document.getElementById('working-mode-desc'); const r = d.getBoundingClientRect(); return { text: d.textContent, hidden: d.hidden || !d.getClientRects().length, right: r.right, vw: innerWidth, h: Math.round(r.height) }; })()`);
-            const want = { none: 'No extra guidance.', shared_checkout: 'Everyone works in one checkout; agents coordinate who edits which files.', worktrees: 'Each agent works in its own Git worktree and branch from the agreed base.', merge_queue: 'Agents hand in patches for review; one role lands them with coral-board queue.' };
+            const want = { none: 'No extra guidance.', shared_checkout: 'Everyone works in one checkout; agents coordinate who edits which files.', worktrees: 'Each agent works in its own Git worktree and branch from the agreed base.', merge_queue: 'Agents hand in patches for review; one role lands them with coral-board queue.', task_queue: 'Agents work one claimed task at a time, hand it in for review, and take the next.' };
             for (const [id, text] of Object.entries(want)) {
                 const r = await read(id);
                 assert.equal(r.text, text, `${id}: the line says what the mode means`);
