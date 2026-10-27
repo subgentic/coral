@@ -329,15 +329,18 @@ function resetTeam(boardName) {
     });
 }
 
-window.toggleSendMenu = function(btn) {
+window.toggleSendMenu = function(btn, event) {
     const menu = btn.parentElement.querySelector('.send-btn-menu');
     if (!menu) return;
     const show = menu.style.display === 'none';
     menu.style.display = show ? '' : 'none';
+    btn.setAttribute('aria-expanded', String(show));
+    if (show && event && event.detail === 0) menu.querySelector('.send-menu-item')?.focus(); // opened by the keyboard (Enter or Space): the focus goes in (#9116)
     if (show) {
         const close = (e) => {
             if (!menu.contains(e.target) && !btn.contains(e.target)) {
                 menu.style.display = 'none';
+                btn.setAttribute('aria-expanded', 'false');
                 document.removeEventListener('click', close);
             }
         };
@@ -347,7 +350,22 @@ window.toggleSendMenu = function(btn) {
 
 window.closeSendMenu = function() {
     document.querySelectorAll('.send-btn-menu').forEach(m => m.style.display = 'none');
+    document.querySelectorAll('[data-on-click="cmd-send-menu"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
 };
+// The chevron's menu keyboard (#9116): the arrows and Home/End move among its entries; ArrowDown and ArrowUp on the chevron open it on its first or last entry.
+document.addEventListener('keydown', e => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    const menu = e.target.closest?.('.send-btn-menu'), chevron = e.target.closest?.('[data-on-click="cmd-send-menu"]');
+    if (!menu && !(chevron && e.key !== 'Home' && e.key !== 'End')) return;
+    const host = (menu || chevron).parentElement, panel = host.querySelector('.send-btn-menu');
+    if (!panel) return;
+    e.preventDefault();
+    if (chevron && panel.style.display === 'none') window.toggleSendMenu(chevron);
+    const items = [...panel.querySelectorAll('.send-menu-item')].filter(x => x.getClientRects().length);
+    if (!items.length) return;
+    const at = items.indexOf(document.activeElement);
+    items[chevron && !menu ? (e.key === 'ArrowUp' ? items.length - 1 : 0) : e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : e.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length].focus();
+});
 // Escape closes the chevron's menu and the focus goes back to the chevron (#9021)
 document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
