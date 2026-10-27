@@ -11,7 +11,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CSS = path.join(HERE, '..', '..', 'coral-go', 'pkg', 'frontend', 'static', 'css');
 const BASELINE = path.join(HERE, 'button_family_baseline.json');
 const update = process.argv.includes('--update');
-export const FAMILY = new Set(['btn', 'btn-primary', 'btn-quiet', 'btn-danger', 'btn-icon', 'btn-small']);
+export const FAMILY = new Set(['btn', 'btn-primary', 'btn-quiet', 'btn-danger', 'btn-icon', 'btn-small', 'btn-seg']);
 const NAMES = /(^|-)(btn|button)(-|$)/;
 const LOOK = /(^|[;\s])(background|border|padding|font-size|font-weight|min-height|height|border-radius)\s*:/g;
 
