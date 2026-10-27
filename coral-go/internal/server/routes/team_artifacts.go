@@ -155,6 +155,14 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		errInternalServer(w, "could not list artifacts")
 		return
 	}
+	// A name or id no board has, and nothing that names it, is "not found", not an empty list (#8821): the page says "No team named <name>". The board key resolver has already turned a label into its board's id; a board
+	// with a row, a subscriber, a message, a task or a goal, or with artifacts recorded under its name, is known.
+	if len(items) == 0 {
+		if known, kerr := h.bs.BoardKnown(r.Context(), project); kerr == nil && !known {
+			writeError(w, http.StatusNotFound, "board_not_found", "No team named "+project)
+			return
+		}
+	}
 	if tq != nil {
 		h.queryTeamArtifacts(w, r, project, items, scanTruncated, limit, offset, sessionFilter, tq)
 		return
