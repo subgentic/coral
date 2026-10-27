@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { oneLinePerRow } = require('./helpers/row_lines');
 
 const SERVERS = [
     { id: 'local', label: 'studio-mac', local: true, status: 'online' },
@@ -40,9 +41,10 @@ const SERVERS = [
             // 1. a table: Server, Status, Agents; the name opens the page; no Test, Edit or Remove in the rows
             const t = await ev(`(() => { const tb = document.querySelector('table.dt-table'); return { heads: [...tb.querySelectorAll('thead th')].map(h => (h.querySelector('.dt-sort span') || h.querySelector('.dt-head-text')).textContent.trim()), scopes: [...tb.querySelectorAll('thead th')].map(h => h.getAttribute('scope')), rows: tb.querySelectorAll('tbody tr').length,
                 links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => b.textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open').length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
-            assert.deepEqual(t.heads, ['Server', 'Status', 'Agents'], at + 'the columns');
+            assert.deepEqual(t.heads, ['Server', 'Tags', 'Version', 'Status', 'Agents'], at + 'the columns (one line a row, Goal #79)');
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), true, at + 'the table keeps the Servers title');
-            assert.deepEqual(t.scopes, ['col', 'col', 'col']);
+            assert.deepEqual(t.scopes, ['col', 'col', 'col', 'col', 'col']);
+            await oneLinePerRow(ev, 'table.dt-table tbody tr[data-key]', `${at}the servers`, assert, { min: 2 }); // Goal #79: a server is one line at both widths; a narrow list drops Tags, Version and Agents
             assert.equal(t.rows, 3, at + 'this hub and two servers');
             assert.deepEqual(t.links, ['epoch', 'LAN box'], at + 'each remote server\'s name opens its page; this hub has none');
             assert.equal(t.rowButtons, 0, at + 'no Test, Edit or Remove buttons in the table');
