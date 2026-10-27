@@ -34,7 +34,7 @@ export function openArtifactInPane(item, { team, host, opener, onClose, backLabe
         actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(link.hex ? `coral://artifacts/${link.hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
     }
     return openDetailPane({
-        key: itemKey(item), opener, title: name, host, backLabel, onClose,
+        key: itemKey(item), opener, title: name, host, backLabel, onClose, focusClose: true, resizable: true, // the keyboard starts on the pane's Close, as for a task (#8952)
         sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item),
         facts: [['Task', taskText(item)], ['Producer', item.produced_by], ['Team', team], ['Status', un ? 'Link not verified: this team has not uploaded this file, so Coral shows no size, type or preview' : '']].filter(([, v]) => v),
         body: link && link.preview ? (h, { signal, isStale }) => renderArtifact(h, link.hex ? `coral://artifacts/${link.hex}` : item.uri || '', { server: link.server, filename: name, mediaType: item.media_type, contentURL: link.contentURL, board: splitKey(team).name }, { signal, isStale, renderContent: renderText, openEntry: () => {}, setMeta: () => {} }) : null,
