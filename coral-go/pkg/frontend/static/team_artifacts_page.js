@@ -40,11 +40,12 @@ export function createArtifactsList({ inbox = false } = {}) {
     const PAGE = 100;
     const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...F.EMPTY }, kept: new Set(), tagCounts: {}, gen: 0, controller: null, teams: [] };
     let root = null, hooks = {}, bar = null, barKey = '';
-    let pendingBoard = null;
+    let pendingBoard = null, labelTimer = null, retryLabels = false;
+    function clearPendingBoard() { clearTimeout(labelTimer); labelTimer = null; pendingBoard = null; }
     onBoardLabelsChanged(() => {
         if (!pendingBoard || isBoardAnswerPending(model.project, pendingBoard.answered)) return;
         const options = pendingBoard.options;
-        pendingBoard = null;
+        clearPendingBoard();
         loadArtifacts(options); // a cold /team/<name>/artifacts answer can be checked now; keep the scope check on the new read
     });
     const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
@@ -119,7 +120,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     async function loadArtifacts({ append = false, keep = false } = {}) {
         const { project, key } = model; if (!key || (append && (model.controller || !model.hasMore))) return;
         const scope = model.scope;
-        pendingBoard = null;
+        clearPendingBoard(); retryLabels = false;
         model.controller?.abort();
         const gen = ++model.gen, ctrl = model.controller = new AbortController();
         if (!append) { if (!keep || !model.items.length) { model.items = []; model.hasMore = false; model.truncated = false; model.counts = null; } model.cursor = ''; model.loading = !model.items.length; }
@@ -138,7 +139,16 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (gen !== model.gen || key !== model.key) return;
             if (!Array.isArray(data.artifacts) || (scope && data.session_id !== scope.session)) throw new Error('Unable to load artifacts: unexpected response scope.');
             if (!inbox && !(scope && scope.standalone) && !isBoardAnswer(project, data.project)) {
-                if (isBoardAnswerPending(project, data.project)) { pendingBoard = { answered: data.project, options: { append, keep } }; return; }
+                if (isBoardAnswerPending(project, data.project)) {
+                    const pending = pendingBoard = { answered: data.project, options: { append, keep } };
+                    labelTimer = setTimeout(() => {
+                        if (pendingBoard !== pending || gen !== model.gen || key !== model.key) return;
+                        clearPendingBoard(); retryLabels = true;
+                        model.error = 'Unable to load artifacts: unexpected response scope.';
+                        draw();
+                    }, 10000); // an offline/failed board list must not leave a cold name link Loading forever (#8825)
+                    return;
+                }
                 throw new Error('Unable to load artifacts: unexpected response scope.');
             }
             const rows = data.artifacts.filter(a => a && (a.uri || a.id || a.name));
@@ -185,7 +195,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     // The tab keeps itself current (it had a Refresh icon, #7686): when the window comes back to the front and on a slow read while it is on screen; a list the person paged further is left as it is.
     let watching = false, reading = false;
     function refreshQuiet() {
-        if (!root || !root.isConnected || !root.getClientRects().length || document.hidden || reading || !model.key || model.loading || model.loadingMore || model.items.length > PAGE) return;
+        if (!root || !root.isConnected || !root.getClientRects().length || document.hidden || reading || retryLabels || !model.key || model.loading || model.loadingMore || model.items.length > PAGE) return;
         reading = true;
         loadArtifacts({ keep: true }).finally(() => { reading = false; });
     }
@@ -274,7 +284,11 @@ export function createArtifactsList({ inbox = false } = {}) {
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' team-empty-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
-        if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => loadArtifacts({ append: model.items.length > 0 && !!model.cursor, keep: true })));
+        if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
+            // A label timeout needs another board-list read, not only the same artifact answer. Do not await a possibly offline list: the fresh artifact read has its own bounded label wait.
+            if (retryLabels) importOnce('./board_fetch.js').then(m => m.fetchProjects()).catch(() => {});
+            loadArtifacts({ append: model.items.length > 0 && !!model.cursor, keep: true });
+        }));
         const toolbarRow = bar.node.querySelector('.list-bar-search-row');
         toolbarRow?.querySelector('.dt-select-toggle')?.remove();
         Toolbar.mountSelection(toolbarRow, null);
@@ -430,7 +444,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     /** Show the team's artifacts in `host`; with `scope` ({ session, server, standalone, name }) one agent's (standalone: it has no team, its list has no search). hooks: onCount(n). */
     let external = false; // the Inbox folder draws this list's bar itself, on the folder toolbar (inbox_toolbar.js): useBar
     function initModel(project, scope, key) {
-        pendingBoard = null;
+        clearPendingBoard(); retryLabels = false;
         artifactState = DT.tableState();
         forgetChoices();
         model.controller?.abort();
