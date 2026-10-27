@@ -24,10 +24,10 @@ const S = `(window.__coralStatic || '/static/')`;
                 return real(u, o); };
             return true; })()`);
         await ev(`import(${S} + 'scheduler.js').then(m => { window.__sched = m; return true; })`);
-        await ev(`window.switchNavTab('jobs'); window.__sched.refreshJobs().then(() => true)`);
-        await waitFor(`document.querySelectorAll('#scheduled-jobs-list .sched-row').length === 3`, 'three jobs', 10000);
+        await ev(`window.switchNavTab('automations'); window.__sched.refreshJobs().then(() => true)`);
+        await waitFor(`window.__sched.jobList().length === 3`, 'three jobs', 10000);
         const banner = async idx => {
-            await ev(`document.querySelectorAll('#scheduled-jobs-list .sched-row')[${idx}].querySelector('.row-btn').click(); true`);
+            await ev(`window.__sched.selectScheduledJob(${idx + 1}).then(() => true)`); // the jobs' ids in the stub are 1 to 3
             await waitFor(`!!document.querySelector('#scheduler-detail .sched-fail-banner') && document.querySelector('#scheduler-detail h2').textContent === ${JSON.stringify(['live-job', 'paused-by-hand', 'paused-by-failures'][idx])}`, 'the job page', 8000);
             return ev(`document.querySelector('#scheduler-detail .sched-fail-banner').textContent.replace(/\\s+/g, ' ').trim()`);
         };

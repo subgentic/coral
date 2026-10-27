@@ -1,6 +1,6 @@
-// One sidebar for every tab (#7443, UI/UX's one-sidebar design): the header's parts (search, Hide) are in the same pixels on the Agents, Chats and Jobs tabs at 1280 and 1024 px; every text in
+// One sidebar for every tab (#7443, UI/UX's one-sidebar design): the header's parts (search, Hide) are in the same pixels on the Agents, Chats and Automations tabs at 1280 and 1024 px; every text in
 // the sidebar is the page's font; a group's name opens it as a table in the centre while its chevron only folds it, and the item opened from the table says "‹ <group>" to go back; Hide turns
-// the column into a 56 px rail that is the tab's own; the Jobs tab's "+ New job" is pinned in the sidebar and is not in the main pane; no sideways scroll at 390 px. Drives Chrome over CDP through
+// the column into a 56 px rail that is the tab's own; the Automations tab's "New job" is on its folder's toolbar; no sideways scroll at 390 px. Drives Chrome over CDP through
 // agent_view_harness.js with the history list and the jobs answered at the page's fetch.
 // The main panes follow UI/UX's part-2 rules (audit c2596330): a group's table is titled 20/700 with its count (11/600) and its columns are Chat, Agent, When, Ran and Job, Schedule, Last run, Next;
 // an item's page has its own "← group" link, a 17/700 title and a line under it; the job page's actions are a pinned bar with the primary last; and every text on those pages is on the scale.
@@ -56,21 +56,21 @@ const STUB = `(() => {
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
 
-            // Chats and Jobs have the header, the groups and the way to act
+            // Chats and Automations have the header, the groups (folders) and the way to act
             await openTab('history');
             await waitFor(`document.querySelectorAll('${pane('history')} li[data-session-id]').length === 3`, at + 'three chats', 10000);
             const days = await ev(`[...document.querySelectorAll('${pane('history')} .sgroup-header .group-name-text')].map(e => e.textContent)`);
             assert.deepEqual(days, ['Today', 'Yesterday'], at + 'Chats are grouped by day');
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('history')} .sgroup-header .session-group-count')].map(e => e.textContent)`), ['2', '1'], at + 'with their counts');
-            await openTab('jobs');
-            await waitFor(`document.querySelectorAll('${pane('jobs')} .sched-row').length === 3`, at + 'three jobs', 10000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('jobs')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Active', 'Paused'], at + 'Jobs are Active and Paused');
+            await openTab('automations');
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'three jobs', 10000);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('automations')} .view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['Jobs3'], at + 'Automations holds the Jobs folder with its count');
 
             // no sideways scroll
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll on Jobs');
 
             // every text of the sidebar is the page's font
-            for (const tab of ['history', 'jobs']) {
+            for (const tab of ['history', 'automations']) {
                 await openTab(tab);
                 const odd = await ev(`(() => { const want = getComputedStyle(document.body).fontFamily; const out = [];
                     for (const e of document.querySelectorAll('${pane(tab)} *')) { if (!e.getClientRects().length || e.matches('.material-icons')) continue; /* the icon font draws icons, not text */ const own = [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) || e.matches('input'); if (!own) continue;
@@ -80,21 +80,18 @@ const STUB = `(() => {
             }
 
             if (mobile) {
-                // the phone's Jobs list IS the screen: its "+ New job" bar is at the foot of the screen and the centre is not shown until a job is chosen
-                await openTab('jobs');
-                assert.equal(await ev(`!!document.querySelector('#mobile-jobs-list ${pane('jobs')}')`), true, at + 'the Jobs pane is in the phone page');
-                assert.equal(await ev(`[...document.querySelectorAll('#mobile-jobs-list .sidebar-hide-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Hide on a phone');
-                const foot = await ev(`(() => { const b = document.querySelector('${pane('jobs')} .sidebar-footer .btn').getBoundingClientRect(); return { bottom: Math.round(b.bottom), vh: innerHeight, h: Math.round(b.height) }; })()`);
-                assert.ok(foot.vh - foot.bottom < 40 && foot.h >= 44, at + `"+ New job" is at the foot of the screen, 44 px high: ${JSON.stringify(foot)}`);
+                // the phone's Jobs folder IS the screen: the table with the folders' select over it, and the centre's job page is not shown until a job is chosen
+                await openTab('automations');
+                await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0 && !!document.querySelector('#group-table-view .view-list-select')`, at + 'the Jobs folder is the phone page', 8000);
                 assert.equal(await ev(`document.getElementById('scheduler-detail').getClientRects().length`), 0, at + 'the centre is not shown until a job is chosen');
                 await shot(`sidebar-one-jobs-${w}`);
-                await ev(`document.querySelector('${pane('jobs')} li.sched-row .row-btn').click(); true`);
+                await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click(); true`);
                 await waitFor(`!!document.querySelector('#scheduler-detail .item-bar') && document.querySelector('#scheduler-detail').getClientRects().length > 0`, at + "the job's page is a screen of its own", 8000);
-                assert.equal(await ev(`document.getElementById('mobile-jobs-list').getClientRects().length`), 0, at + 'and the list is not under it');
+                assert.equal(await ev(`document.getElementById('group-table-view').getClientRects().length`), 0, at + 'and the table is not under it');
                 assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-back').textContent.trim()`), '\u2190 Jobs', at + 'with the way back');
                 await shot(`sidebar-one-job-${w}`);
                 await ev(`document.querySelector('#scheduler-detail .sched-back').click(); true`);
-                await waitFor(`document.getElementById('mobile-jobs-list').getClientRects().length > 0 && document.getElementById('scheduler-detail').getClientRects().length === 0`, at + 'back is the list', 4000);
+                await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0 && document.getElementById('scheduler-detail').getClientRects().length === 0`, at + 'back is the table', 4000);
                 // a chat on a phone: its tabs' content and its pinned bar are both on the screen (the bar must not push the page's content off it)
                 await ev(`window.selectHistorySession('aaaaaa1'); true`);
                 await waitFor(`document.getElementById('history-session-view').checkVisibility() && document.getElementById('btn-resume-session').getClientRects().length > 0`, at + 'the chat on a phone', 8000);
@@ -108,18 +105,18 @@ const STUB = `(() => {
 
             // the header's parts are in the same pixels on every tab
             const parts = {};
-            for (const tab of ['agents', 'history', 'jobs']) {
+            for (const tab of ['agents', 'history', 'automations']) {
                 await openTab(tab);
                 parts[tab] = { search: await rect(`${pane(tab)} .sidebar-search-input`), hide: await rect(`${pane(tab)} .sidebar-hide-btn`), header: await rect(`${pane(tab)} .sidebar-header`), toggle: await rect(`${pane(tab)} [data-group-toggle]`) };
                 await shot(`sidebar-one-${tab}-${w}`);
             }
-            for (const tab of ['history', 'jobs']) {
+            for (const tab of ['history', 'automations']) {
                 assert.deepEqual(parts[tab].hide, parts.agents.hide, at + `Hide is in the same place on ${tab} as on Agents`);
                 assert.deepEqual(parts[tab].search.slice(0, 2), parts.agents.search.slice(0, 2), at + `the search starts in the same place on ${tab}`);
                 assert.equal(parts[tab].search[3], parts.agents.search[3], at + `the search is as tall on ${tab}`);
                 assert.equal(parts[tab].header[3] >= parts.agents.header[3] - 1 && parts[tab].header[3] <= parts.agents.header[3] + 1, true, at + `the header is as tall on ${tab}`);
             }
-            assert.deepEqual(parts.jobs.toggle, parts.history.toggle, at + 'Expand or collapse all is in the same place on Chats and Jobs');
+            assert.equal(parts.automations.toggle, null, at + 'Automations has folders, which do not fold: no Expand or collapse all');
             assert.ok(parts.history.toggle && parts.history.toggle[0] + parts.history.toggle[2] <= parts.history.hide[0], at + 'it is left of Hide');
 
             // the chevron only folds; the name opens the table
@@ -175,13 +172,13 @@ const STUB = `(() => {
             await waitFor(`document.getElementById('group-table-view').checkVisibility()`, at + 'the name opens the table', 8000);
 
             // Jobs: the table, the job's page and its pinned bar
-            await openTab('jobs');
-            await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelector('#group-table-title').textContent === 'Active'`, at + 'Jobs opens on Active as a table', 8000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table')[0].querySelectorAll('th')].map(h => h.querySelector('.dt-sort > span').textContent)`), ['Job', 'Schedule', 'Last run', 'Next'], at + 'the jobs table columns (of the first table: the page lists every group, #7722)');
+            await openTab('automations');
+            await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelector('#group-table-title').textContent === 'Jobs'`, at + 'Automations opens on Jobs as a table', 8000);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table')[0].querySelectorAll('th')].map(h => h.querySelector('.dt-sort > span').textContent)`), ['Job', 'Schedule', 'Last run', 'Next'], at + 'the jobs table columns');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), [11, 12, 13, 14, 17, 20])`), [], at + 'every text of the jobs table is on the scale');
             await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-detail .item-bar') && document.querySelector('#scheduler-detail .group-back').checkVisibility()`, at + "the job's page", 8000);
-            assert.equal(await ev(`document.querySelector('#scheduler-detail .group-back').textContent`), '\u2190 Active', at + 'the job page has its way back');
+            assert.equal(await ev(`document.querySelector('#scheduler-detail .group-back').textContent`), '\u2190 Jobs', at + 'the job page has its way back');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#scheduler-detail .sched-header h2')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + "the job's name is 17/700");
             assert.match(await ev(`document.querySelector('#scheduler-detail .sched-status-line').textContent`), /^Active \u00b7 /, at + 'a status line under the name');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-facts dt')].slice(0, 3).map(e => { const c = getComputedStyle(e), v = getComputedStyle(e.nextElementSibling); return [c.fontSize, c.fontWeight, v.fontSize, v.fontWeight].join(' '); })`), ['13px 500 13px 400', '13px 500 13px 400', '13px 500 13px 400'], at + 'facts: labels 13/500, values 13/400');
@@ -203,20 +200,20 @@ const STUB = `(() => {
             assert.equal(await ev(`document.getElementById('sidebar-rail-search').getAttribute('aria-label')`), 'Search chats', at + "the rail's search is named for the tab");
             assert.equal(await ev(`document.getElementById('sidebar-rail-new').hidden`), true, at + 'Chats has no pinned action, so no rail action');
             await shot(`sidebar-one-rail-chats-${w}`);
-            await openTab('jobs');
-            assert.equal(await ev(`document.querySelector('.layout').classList.contains('sidebar-collapsed')`), false, at + "the rail is each tab's own: Jobs is open");
-            assert.equal(await ev(`document.getElementById('sidebar-rail-new').getAttribute('aria-label')`), 'New job', at + "the rail's action is the tab's");
+            await openTab('automations');
+            assert.equal(await ev(`document.querySelector('.layout').classList.contains('sidebar-collapsed')`), false, at + "the rail is each tab's own: Automations is open");
+            assert.equal(await ev(`document.getElementById('sidebar-rail-new').hidden`), true, at + 'Automations has no pinned action (New job is on its folder\'s toolbar), so no rail action');
             await openTab('history');
             assert.equal(await ev(`document.querySelector('.layout').classList.contains('sidebar-collapsed')`), true, at + 'Chats is still the rail');
             await ev(`document.querySelector('.sidebar-rail-btn').click(); true`);
             await waitFor(`!document.querySelector('.layout').classList.contains('sidebar-collapsed')`, at + 'the rail opens again', 4000);
 
-            // Jobs: the pinned action is in the sidebar, under the list, and not in the main pane
-            await openTab('jobs');
-            const foot = await ev(`(() => { const b = document.querySelector('${pane('jobs')} .sidebar-footer .btn'); const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), inView: r.bottom <= innerHeight && r.top >= 0 }; })()`);
-            assert.deepEqual(foot, { text: '+ New job', inView: true }, at + '+ New job is pinned in the sidebar');
-            assert.equal(await ev(`!!document.querySelector('#scheduler-view [data-on-click="job-new"]')`), false, at + 'and not in the main pane');
-            await ev(`document.querySelector('${pane('jobs')} .sidebar-footer .btn').click(); true`);
+            // Jobs: New job is on the folder's toolbar, not pinned in the sidebar
+            await openTab('automations');
+            await waitFor(`!!document.querySelector('#group-table-view .team-tb-action')`, at + 'the folder toolbar has its action', 8000);
+            assert.equal(await ev(`document.querySelector('#group-table-view .team-tb-action').textContent.trim()`), 'New job', at + 'New job is on the folder toolbar');
+            assert.equal(await ev(`!!document.querySelector('${pane('automations')} .sidebar-footer')`), false, at + 'and nothing is pinned in the sidebar');
+            await ev(`document.querySelector('#group-table-view .team-tb-action').click(); true`);
             await waitFor(`[...document.querySelectorAll('.modal, dialog')].some(m => m.getClientRects().length > 0 && /cron|schedule/i.test(m.textContent))`, at + 'it opens the job editor', 8000);
             await ev(`window.hideJobModal && window.hideJobModal(); true`);
 
@@ -224,9 +221,8 @@ const STUB = `(() => {
             if (w === 1280) for (const theme of ['dark', 'light']) for (const zoom of ['', '32px']) {
                 const how = at + `${theme}${zoom ? ', 200% text' : ''}: `;
                 await setTheme(ev, theme); await ev(`document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`);
-                await openTab('jobs');
-                await ev(`document.querySelector('${pane('jobs')} .sgroup-header').click(); true`);
-                await waitFor(`document.getElementById('group-table-view').checkVisibility()`, how + 'the jobs table', 8000);
+                await openTab('automations');
+                await waitFor(`document.getElementById('group-table-view').checkVisibility() && !!document.querySelector('#group-table-view .dt-primary')`, how + 'the jobs table', 8000);
                 for (const [what, roots] of [['the sidebar and the table', ['.sidebar', '#group-table-view']]]) {
                     const au = await auditRegion(ev, roots);
                     assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + `${what}: contrast`);

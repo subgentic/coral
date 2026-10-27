@@ -1,5 +1,5 @@
-// Jobs on a phone (#6139): the Jobs list used to live only in the sidebar, which a phone does not show, so a person could not pick a job or edit it. At 390 px with touch the list is in the Jobs page, a tap on a job shows
-// its detail with Edit, and Edit opens the editor; on a wide screen the list stays in the sidebar. The scheduled-jobs routes are stubbed (the paths the dashboard's own suites stub).
+// Jobs on a phone (#6139; Automations, Goal #74): a phone does not show the sidebar, so the Jobs folder is the page's table with the folders' select over it, a tap on a job shows its detail with Edit, and Edit opens
+// the editor; on a wide screen the folders stay in the sidebar. The scheduled-jobs routes are stubbed (the paths the dashboard's own suites stub).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { tap } = require('./helpers/phone_targets');
@@ -24,13 +24,12 @@ const STUB = `(() => {
         for (const [name, w, h, phone] of [['phone', 390, 844, true], ['desktop', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: phone }); await Emulation.setTouchEmulationEnabled({ enabled: phone });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
-            await ev(`window.switchNavTab('jobs'); true`);
-            const where = await ev(`(() => { const s = document.querySelector('[data-section="jobs"]'); return { inPage: !!s.closest('#mobile-jobs-list'), inSidebar: !!s.closest('.sidebar') }; })()`);
-            if (!phone) { assert.deepEqual(where, { inPage: false, inSidebar: true }, 'desktop: the list stays in the sidebar'); console.log('ok desktop'); continue; }
-            assert.equal(where.inPage, true, 'phone: the Jobs list is in the Jobs page');
-            assert.equal(await ev(`[...document.querySelectorAll('#mobile-jobs-list .sidebar-section-header')].some(h => h.getClientRects().length > 0)`), false, 'phone: the moved section does not say "Jobs" a second time under the page title');
-            await waitFor(`!!document.querySelector('#scheduled-jobs-list [data-on-click="job-select"]') && document.querySelector('#scheduled-jobs-list [data-on-click="job-select"]').getClientRects().length > 0`, 'the job in the list', 10000);
-            await tap(ev, '#scheduled-jobs-list [data-on-click="job-select"]');
+            await ev(`window.switchNavTab('automations'); true`);
+            await waitFor(`!!document.querySelector('#group-table-view button.dt-primary')`, 'the jobs table', 10000);
+            if (!phone) { assert.equal(await ev(`!!document.querySelector('.sidebar #automations-nav-list .view-list-item')`), true, 'desktop: the folders are in the sidebar'); console.log('ok desktop'); continue; }
+            assert.equal(await ev(`!!document.querySelector('#group-table-view .view-list-select') && !document.querySelector('.sidebar #automations-nav-list')?.getClientRects().length`), true, 'phone: the folders are one select over the Jobs table, not a column');
+            await waitFor(`!!document.querySelector('#group-table-view button.dt-primary') && document.querySelector('#group-table-view button.dt-primary').getClientRects().length > 0`, 'the job in the list', 10000);
+            await tap(ev, '#group-table-view button.dt-primary');
             await waitFor(`/Hourly job/.test(document.getElementById('scheduler-detail').textContent) && !!document.querySelector('#scheduler-detail [data-on-click="job-edit"]')`, 'the job detail', 10000);
             const detail = await ev(`(() => { const d = document.getElementById('scheduler-detail').getBoundingClientRect(); return { top: Math.round(d.top), vh: innerHeight }; })()`);
             assert.ok(detail.top < detail.vh - 250, // the list above it holds the shared header and its group headers (#7443): enough of the job is on screen to read it

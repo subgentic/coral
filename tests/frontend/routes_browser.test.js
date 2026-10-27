@@ -49,7 +49,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
         console.log('1. Every top page loads at its path, and a reload keeps it');
         const PAGES = [['/agents', 'nav-tab-agents'], ['/chats', 'nav-tab-hub-inbox'], ['/workflows', 'nav-tab-workflows'],
-            ['/jobs', 'nav-tab-jobs'], ['/analytics', 'nav-tab-tokens'], ['/docs', 'nav-tab-docs']];
+            ['/jobs', 'nav-tab-automations'], ['/analytics', 'nav-tab-tokens'], ['/docs', 'nav-tab-docs']];
         for (const [path, tabId] of PAGES) {
             await open(path);
             await until(`(document.querySelector('.top-nav-tab.active') || {}).id === ${JSON.stringify(tabId)}`, tabId);

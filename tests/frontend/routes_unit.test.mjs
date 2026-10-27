@@ -53,6 +53,16 @@ rt('/board/@m2/qa', { view: 'board', server: 'm2', id: 'qa' });
 rt('/workflows', { view: 'workflows' });
 rt('/workflows/7', { view: 'workflows', id: 7 });
 rt('/workflows/7/runs/3', { view: 'workflows', id: 7, run: 3 });
+// Automations (Goal #74): Workflows and Jobs as one screen. A folder, a job or a workflow under its own folder, and a workflow's run page.
+rt('/automations', { view: 'automations', folder: null });
+for (const folder of ['running', 'failed', 'jobs', 'workflows']) rt(`/automations/${folder}`, { view: 'automations', folder });
+rt('/automations/jobs/4', { view: 'automations', folder: 'jobs', id: 4 });
+rt('/automations/workflows/7', { view: 'automations', folder: 'workflows', id: 7 });
+rt('/automations/workflows/7/runs/3', { view: 'automations', folder: 'workflows', id: 7, run: 3 });
+for (const bad of ['/automations/other', '/automations/running/4', '/automations/failed/4', '/automations/jobs/0', '/automations/jobs/x', '/automations/jobs/4/runs/3', '/automations/workflows/7/runs/x', '/automations/workflows/7/runs/3/x', '/automations/jobs/1%2F..'])
+    assert.equal(parse(bad), null, `${bad} is not an Automations route`);
+assert.equal(build({ view: 'automations', folder: 'nowhere', id: 3 }), '/automations', 'a folder that is not one builds the tab alone');
+assert.equal(build({ view: 'automations', folder: 'jobs', id: 4, run: 3 }), '/automations/jobs/4', 'only a workflow has a run page');
 rt('/jobs', { view: 'jobs' });
 rt('/analytics', { view: 'analytics' });
 // Each Analytics page has its own path (#8606); Overview is /analytics
