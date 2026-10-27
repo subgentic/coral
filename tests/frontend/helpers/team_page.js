@@ -70,7 +70,7 @@ const openSettings = async (ev, settle) => {
     await ev(`new Promise(res => { const t0 = Date.now(); const tick = () => (document.querySelector('.team-settings-modal #team-settings-workspace .sv[data-ready]') || Date.now() - t0 > 8000) ? res(true) : setTimeout(tick, 100); tick(); })`);
     await settle(300);
 };
-const closeSettings = async (ev, settle) => { await ev(`(() => { const m = document.querySelector('.team-settings-modal'); if (m) m.querySelector('.modal-close-btn').click(); return true; })()`); await settle(300); };
+const closeSettings = async (ev, settle) => { await ev(`(() => { const m = document.querySelector('.team-settings-modal'); if (m) m.querySelector('.sv-cancel').click(); return true; })()`); await settle(300); };
 const rect = ev => ev(`(() => { const h = window.__tp.h1(), t = window.__tp.tablist(); return { h1: window.__tp.box(h), tabs: window.__tp.box(t) }; })()`);
 // The seeded members have no terminal, so the board's status calls them Ended (offline, #8271) and the Agents tab draws no Remind for them. A suite about Remind's place on a row needs them up: the board's /status answer is read
 // as it is, the first offline member made available and the others waiting for input (a team with someone to remind, two statuses and a health icon).

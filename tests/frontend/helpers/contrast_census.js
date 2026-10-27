@@ -77,7 +77,7 @@ module.exports = part => (async () => {
             await load();
             await sc('team settings: workflow', async () => { await ev(`window.showTeamWorkingModeWorkspace(${JSON.stringify(TEAM)}); true`); await waitFor(`!!document.querySelector('#team-settings-workspace .settings-tab[data-section=workflow]')`, 'team settings', 10000); }, { min: 8, expect: `!!document.querySelector('#team-settings-workspace .settings-pane[data-section=workflow]:not([hidden])')` }); // team settings: the popout dialog (settings_view, #8853)
             for (const t of ['health', 'prompts']) await sc(`team settings: ${t}`, async () => { await tap(`#team-settings-workspace .settings-tab[data-section=${t}]`); }, { min: 6, expect: `!!document.querySelector('#team-settings-workspace .settings-pane[data-section=${t}]:not([hidden])')` });
-            await ev(`(() => { document.querySelector('.team-settings-modal .modal-close-btn')?.click(); return true; })()`); await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); true`); // the settings dialog and the team page, left for the next screens
+            await ev(`(() => { document.querySelector('.team-settings-modal .sv-cancel')?.click(); return true; })()`); await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); true`); // the settings dialog and the team page, left for the next screens
             await ev(`document.querySelectorAll('dialog[open]').forEach(d => d.close()); true`);
             await sc('history list', async () => { await ev(`window.switchNavTab('history'); true`); await require('./hub_chats').showHubChats(ev); await waitFor(`document.getElementById('history-sessions-list').textContent.includes('Release notes chat')`, 'history', 10000); }, { min: 4 });
             // the page's search: the results with their excerpts, the advanced filters, a search that finds nothing, and opening one hit (#6288)
@@ -130,7 +130,7 @@ module.exports = part => (async () => {
             await ev(`window.hideJobModal(); window.showWorkflowCreateModal(); true`);
             await sc('workflow new', async () => { await waitFor(`document.getElementById('wf-create-modal').getClientRects().length > 0 && !!document.querySelector('#wf-steps-editor .wf-step-editor-item')`, 'the new workflow form', 10000); }, { min: 5, expect: `document.getElementById('wf-create-modal').getClientRects().length > 0 && document.querySelectorAll('#wf-steps-editor .wf-step-editor-item').length === 1` });
             await sc('workflow new, more options', async () => { await ev(`document.querySelector('#wf-more > summary').click(); true`); }, { min: 5, expect: `document.getElementById('wf-more').open && document.getElementById('wf-input-max-dur').getClientRects().length > 0` });
-            await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); true`);
+            await ev(`[...document.querySelectorAll('#wf-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
             await ev(`document.querySelectorAll('.modal.show, dialog[open]').forEach(m => { m.classList.remove('show'); if (m.close) m.close(); }); true`);
         }
         if (part === 'b') {
