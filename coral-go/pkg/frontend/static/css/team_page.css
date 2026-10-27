@@ -341,9 +341,13 @@
 /* Keep review actions together; phone team metadata shares the second line with the review state. */
 /* Open below is the artifact's keyboard and touch target; its title does not need a duplicate button line. */
 .inbox-review-name { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.inbox-review-item { display: flex; align-items: center; gap: 8px; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
+.inbox-review-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.inbox-review-item > :not(.inbox-review-name) { flex: none; }
+.inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
 .inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; }
 .inbox-review-actions-read { grid-template-columns: max-content max-content max-content; } /* a read item has Unread beside Open and Mark reviewed (#9277) */
+.inbox-review-icon { min-width: 44px; padding-inline: 0; justify-content: center; } /* a read item's two actions are icons: the row stays one line, also on a phone */
+.inbox-review-icon .material-icons { width: var(--icon-size); height: var(--icon-size); overflow: hidden; font-size: var(--icon-size); white-space: nowrap; } /* the icon's name is its ligature: without the font it must not widen the button */
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
 .inbox-review-error:empty { display: none; }
 .inbox-review-metadata { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0 8px; min-width: 0; max-width: 9rem; } /* one line (#9060): For review, then the task, cut with an ellipsis when it is long (its full words are the link's tooltip) */
@@ -357,8 +361,6 @@
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {
     .inbox-review-actions button { min-height: 44px; }
-    .inbox-review-actions-read { grid-template-columns: max-content max-content; } /* three buttons would take the whole line: the third wraps under them and the name keeps its room */
-    .inbox-review-item { flex-direction: column; align-items: flex-start; gap: 2px; } /* the read tag under the name */
     .inbox-review-team { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); line-height: 1.3; color: var(--table-tertiary-color); }
 }
 /* A team no board has (#8848): its name and the way back, none of a team's tabs, panels or actions */
