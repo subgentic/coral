@@ -1,8 +1,8 @@
 # Notifications API
 
-Push notifications to the Coral UI from workflows, scripts, or any HTTP client. Notifications appear in real-time via WebSocket.
+Push notifications to the Coral UI from workflows, hooks and agents (`coral-agent notify`) or from the dashboard. Notifications appear in real-time via WebSocket.
 
-`coral-agent notify --title "…" [--message "…"] [--level info|success|warning|error] [--alert]` sends one from an agent (with its session token), from a workflow step or from your own terminal (signed as the Operator). The API key is not accepted on this route: a request with no agent token and no Operator signature is refused (401 `session_token_required`).
+`coral-agent notify --title "…" [--message "…"] [--level info|success|warning|error] [--alert]` sends one from an agent (with its session token), from a workflow step or from your own terminal (signed as the Operator). On this computer with strict local auth (the default), the API key is not accepted on this route: a request with no agent token and no Operator signature is refused (401 `session_token_required`).
 
 ## Create Notification
 
@@ -59,7 +59,7 @@ An agent, through its own tool (it carries the agent's session token):
 coral-agent notify --title "Deploy Complete" --message "v1.2.0 is live" --level success
 ```
 
-The request `coral-agent notify` sends, for its shape (a bare `curl` with the API key is refused 401 `session_token_required`: only an agent's token or the Operator is accepted here):
+The request `coral-agent notify` sends, for its shape (a bare `curl`, with or without the API key, is refused 401 `session_token_required`: only an agent's token or the Operator is accepted here). The alert below is the same request with `type` and `link`:
 
 ```bash
 curl -X POST http://localhost:${CORAL_PORT}/api/notifications \
