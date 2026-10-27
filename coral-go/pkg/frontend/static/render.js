@@ -31,7 +31,7 @@ import { buildSessionTooltip } from './session_state.js';
 import './board_accents.js';
 import { followServerOrder } from './list_order.js';
 import { _isServerCollapsed, _openServerDetails } from './server_rows.js';
-import { _attachDragListeners, _renderArchivedSection, _within, applySessionSummaryPref, isGroupedByServer } from './session_rows.js';
+import { _attachDragListeners, _renderArchivedSection, _within, syncDisplayMenu, isGroupedByServer } from './session_rows.js';
 import './confirm_dialog.js';
 import { getAgentFilter, setAgentFilter, getListFilters } from './agent_filter.js';
 import { isFiltered as _listFiltered } from './agent_list_filters.js';
@@ -42,17 +42,17 @@ import { getTeamTokenUsage } from './token_usage_ui.js';
 import { _renderSidebarRail } from './sidebar_rail.js';
 import { _passesFilters, _pinMatchesFilter } from './list_filter_match.js';
 import { _renderGroups } from './group_cards.js';
-import { UPDOWN, W, agentArgs, dirOf, menu, withAgent, withBoard } from './action_helpers.js';
+import { UPDOWN, W, dirOf, menu, withAgent, withBoard } from './action_helpers.js';
 export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, attachDirect, killSessionDirect, restartDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep } from './agent_actions.js';
 export { copyFolderPath, hideAlertModal, hidePromptModal, showAlertModal, showPromptModal } from './prompt_modals.js';
 export { killBoard, killGroup, saveTeamFromSidebar, shareAgentTeam, toggleTeamSleep } from './team_actions.js';
-export { expandSleepingGroup, toggleGroupByServer, toggleGroupByTeam, toggleSessionSummary, toggleShowServer, toggleShowBranches, toggleShowProvider, toggleShowModel, toggleShowThinking } from './list_display_settings.js';
+export { expandSleepingGroup, toggleGroupByServer, toggleGroupByTeam, toggleShowServer } from './list_display_settings.js';
 export { renderHistoryChat, renderHistoryNodes, renderHistorySessions } from './history_list.js';
-export { updateSessionBranch, updateSessionFolder, updateSessionStatus, updateSessionSummary, updateWaitingIndicator } from './session_header_updates.js';
+export { updateSessionBranch, updateSessionFolder, updateSessionModel, updateSessionStatus, updateSessionSummary, updateWaitingIndicator } from './session_header_updates.js';
 export { distillTeamKnowledge, showTeamTokenUsage, updateHistoryTokenUsage, updateTokenUsage } from './token_usage_ui.js';
 export { groupHeaderKey, teamHeaderKey, toggleGroupCollapse } from './group_collapse.js';
 export { hideConfirmModal, showConfirmModal } from './confirm_dialog.js';
-export { applySessionSummaryPref, isSessionSummaryShown, toggleArchivedSection } from './session_rows.js';
+export { syncDisplayMenu, toggleArchivedSection } from './session_rows.js';
 export { moveGroupDown, moveGroupUp, moveSessionDown, moveSessionUp } from './list_order.js';
 export { setBoardAccentColor } from './board_accents.js';
 export { buildSessionTooltip, commandPlaceholder, startingPlaceholder, deriveSessionState, resolveSessionIdentity, sessionStateInfo, terminalDotClass, applyTerminalDot } from './session_state.js';
@@ -257,7 +257,7 @@ function _renderLiveSessions(sessions) {
         return;
     }
 
-    applySessionSummaryPref();
+    syncDisplayMenu();
     const unfilteredCount = sessions.length;
     const everyAgent = sessions;
     if (getAgentFilter() || _listFiltered(getListFilters())) sessions = sessions.filter(_passesFilters);
@@ -411,7 +411,6 @@ registerActions({
     'folder-copy': (el, event) => { event.stopPropagation(); const d = dirOf(el); if (d) window.copyFolderPath(d); },
     'folder-pin': menu(el => { const d = dirOf(el); if (d && (el.dataset.mode === 'pin' || el.dataset.mode === 'unpin')) W(el.dataset.mode === 'pin' ? 'pinFolder' : 'unpinFolder')(d); }),
     'wf-run-open': menu(el => { const id = idOf(el.dataset.runId); if (id) window.selectWorkflowRun(id); }),
-    'goal-request': (el, event) => { event.stopPropagation(); const a = agentArgs(el); if (a) window.requestGoal(...a); },
     // A row (or a rail tile) opens its agent.
     'session-open': el => {
         const sid = textOf(el.dataset.sessionId) || '';

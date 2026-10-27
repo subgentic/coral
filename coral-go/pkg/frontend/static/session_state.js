@@ -22,12 +22,6 @@ const GOAL_LINE_MAX = 140;
     return flat.slice(0, max - 1).trimEnd() + '\u2026';
 }
 
-/** Goal text for a session row: summary, else the first user prompt. */
- export function sessionGoalText(s) {
-    if (!s) return '';
-    return oneLine(s.summary || s.first_prompt || '');
-}
-
 /**
  * Stable identity source for a session, or '' when there is none.
  * Chain: display_name -> auto_name (D8, transcript-derived, write-once) ->
@@ -204,11 +198,6 @@ export function applyTerminalDot(dot, s) {
     setAttr(document.getElementById('command-pane'), 'data-can-stop', ['working', 'needs_input', 'check_terminal', 'stuck'].includes(info.key) ? 'true' : 'false');
 }
 
-export function getMobileStatusChip(s) {
-    const info = sessionStateInfo(s);
-    return { label: info.label, className: info.chip };
-}
-
 export function buildSessionTooltip(s) {
     const stateLabel = getStateLabel(s);
     const lastAction = formatStaleness(s.staleness_seconds);
@@ -261,8 +250,6 @@ export function buildSessionTooltip(s) {
 export function getDotClass(s) {
     return sessionStateInfo(s).dot;
 }
-
-export const _WORKTREE_ICON = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v5a3 3 0 0 0 3 3h1"/><circle cx="6" cy="3" r="1.5"/><circle cx="11" cy="11" r="1.5"/></svg>';
 
 /** Compact "↑2 ↓1 ●3" divergence summary for a session's git_state, or ''.
  *  Ahead/behind are measured against the repo's default branch. */

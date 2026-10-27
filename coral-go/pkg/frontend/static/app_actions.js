@@ -4,9 +4,9 @@ import { importOnce } from './import_once.js';
 import { showTeamAvailabilityWorkspace } from './team_availability.js';
 import { state } from './state.js';
 import { loadLiveSessions } from './api.js';
-import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal, requestGoal } from './controls.js';
+import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal } from './controls.js';
 import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, setAgentIcon, toggleChatFlag } from './sessions.js';
-import { KILL_LOG_NOTE_MANY, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, toggleSessionSummary, applySessionSummaryPref, filterLiveAgents, agentSearchKey, toggleShowServer, toggleShowBranches, toggleShowProvider, toggleShowModel, toggleShowThinking, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
+import { KILL_LOG_NOTE_MANY, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
 import { toggleBrowser, browserNavigateTo, browserNavigateUp, browserSelectRecent, browserUse } from './browser.js';
 import { toggleAgenticPanel, toggleSidebarRail, focusSidebarSearch } from './sidebar.js';
 import { connectTerminalWs, disconnectTerminalWs } from './xterm_renderer.js';
@@ -119,7 +119,6 @@ registerActions({
     'm-test-team-wizard': el => { window.testTeamWizard(); },
     'm-toggle-browser': el => { const ids = String(el.dataset.browser || '').split(' '); if (ids.length === 4 && ids.every(i => /^[a-z0-9-]+$/.test(i))) window.toggleBrowser(...ids); },
     'm-toggle-group-by-team': el => { window.toggleGroupByTeam(); },
-    'm-toggle-session-summary': el => { window.toggleSessionSummary(); },
     'm-validate-team-name': () => { if (window._validateTeamName) window._validateTeamName(); },
     'm-verify-all-c-l-is': el => { window._verifyAllCLIs(); },
 });
@@ -156,15 +155,10 @@ registerActions({
     'launch-show': () => window.showLaunchModal(),
     'agent-search-filter': el => window.filterLiveAgents(el.value),
     'agent-search-key': (el, event) => window.agentSearchKey(event),
-    'toggle-session-summary': () => window.toggleSessionSummary(),
     'groups-toggle-all': el => { const kind = el.closest('.sidebar-pane')?.dataset.pane; if (kind && kind !== 'agents') toggleAllGroupFolds(kind); else toggleAllGroups(); }, // each tab's header folds its own groups (#7443)
     'display-panel-toggle': el => toggleDisplayPanel(el),
     'display-panel-key': (el, event) => displayPanelKey(event),
     'toggle-show-server': () => window.toggleShowServer(),
-    'toggle-show-branches': () => window.toggleShowBranches(),
-    'toggle-show-provider': () => window.toggleShowProvider(),
-    'toggle-show-model': () => window.toggleShowModel(),
-    'toggle-show-thinking': () => window.toggleShowThinking(),
     'toggle-group-by-server': () => window.toggleGroupByServer(),
 });
 
@@ -238,7 +232,7 @@ Object.assign(window, {
     
     // controls
     restartSession,
-    editGoal, refreshGoal, requestGoal,
+    editGoal, refreshGoal,
     hideRestartModal, confirmRestart, 
     // modals
     showSettingsModal, hideSettingsModal, applySettings,
@@ -390,8 +384,8 @@ document.addEventListener('focusout', e => {
 Object.assign(window, {
     toggleSidebarKebab, closeSidebarKebabs,
     // render (sidebar actions)
-    filterLiveAgents, agentSearchKey, toggleSessionSummary, applySessionSummaryPref,
-    toggleShowServer, toggleGroupByServer, toggleShowBranches, toggleShowProvider, toggleShowModel, toggleShowThinking,
+    filterLiveAgents, agentSearchKey, syncDisplayMenu,
+    toggleShowServer, toggleGroupByServer,
     toggleGroupCollapse, groupHeaderKey, teamHeaderKey, killGroup, moveGroupUp, moveGroupDown,
     copyFolderPath, killBoard, setBoardAccentColor, resetTeam,
     moveSessionUp, moveSessionDown,

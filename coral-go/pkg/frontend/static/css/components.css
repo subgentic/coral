@@ -161,9 +161,7 @@
 }
 
 /* Sleeping agent in sidebar — grey out text but keep controls visible */
-.session-group-item.sleeping .session-label,
-.session-group-item.sleeping .session-goal,
-.session-group-item.sleeping .chip {
+.session-group-item.sleeping .session-label, .session-group-item.sleeping .chip {
     color: var(--text-muted);
 }
 
@@ -557,7 +555,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .btn-send { flex-shrink: 0; } /* the family's primary (.btn-primary .btn-small) is its look */
 .btn-send.btn-icon { min-width: var(--control-compact-height); } /* the board composer's Send is the primary icon button: a square, not .btn-nav's 34 px minimum (#9643) */
 
-
 /* ── Badges ────────────────────────────────────────────────── */
 
 /* The chip family (#9095, Goal #84): every small label is a .chip. Three variants: the status chip (11/600: a word, with a dot or an icon), .chip-tag (12/400) and .chip-count (11/600,
@@ -578,8 +575,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .chip-tag { font-size: var(--fs-base); font-weight: var(--fw-regular); }
 .chip-count { min-width: var(--chip-height, 1.125rem); justify-content: center; padding: 0 6px; }
 .chip-caps { text-transform: uppercase; }
-.chip-attn { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--warning); } /* the quiet attention line of an agent row on a phone (#5123): the neutral surface and hairline, only the words warm */
-.chip-attn-error { color: color-mix(in srgb, var(--error) 62%, var(--text-primary)); } /* plain --error is 4.2:1 on the neutral surface in the dark theme */
 
 .chip.claude { background: var(--badge-claude); color: var(--text-on-accent); }
 .chip.agy, .chip.antigravity { background: var(--badge-agy); color: var(--text-on-accent); }
@@ -835,7 +830,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-base);
 }
 
-
 .session-info-grid {
     grid-template-columns: minmax(170px, 210px) minmax(0, 1fr);
     gap: 16px 24px;
@@ -1015,7 +1009,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border-color: var(--error);
     color: var(--error-text); /* red as text on the toast's panel: 4.5:1 (#6171) */
 }
-
 
 /* A toast with an action stays until dismissed or timed out; it must not fade
    while its button is still meant to be used. */
@@ -1438,7 +1431,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .emoji-picker-search { flex: 1; }
-
 
 .emoji-picker-clear {
     padding: 4px 10px;
@@ -1988,7 +1980,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     padding: 4px; /* room for a card's focus ring: the step scrolls (overflow), which clips what a card draws outside itself (#7066) */
 }
 
-
 /* Open folder (#3630) */
 .open-folder-help {
     margin: 0 0 var(--space-lg);
@@ -2251,7 +2242,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .generated-team-banner { margin: 12px 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 
-
 /* Collapsed card summary */
 
 /* Expandable edit form */
@@ -2308,7 +2298,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .template-browser-search { flex: 1; }
-
 
 .template-browser-body {
     display: flex;
@@ -2729,7 +2718,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 /* ── Modal Width Variants ──────────────────────────────────── */
-
 
 /* ── Default Prompts Modal ─────────────────────────────────── */
 
@@ -3326,7 +3314,6 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 /* a padding wrapper, no table of its own (named for what it is, so the table census does not count it, #8070): */
 .saved-list-pad { padding: 8px 12px 12px; } /* the Inbox's Saved table, filtered to the page's scope (inbox_sidebar.js drawDockSaved) */
 
-
 .saved-panel { overflow-y: auto; min-height: 0; flex: 1; }
 .saved-panel:focus { outline: none; }
 
@@ -3420,7 +3407,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .ibx-task-metarow .ibx-open { min-height: 0; padding-block: 16px; margin-block: -16px; }
     .ibx-task-metarow { padding-block: 16px; } /* the link's padding is taken back by its margin: the row holds it, so it never reaches over the task's head at 200% text (#6580) */
 }
-
 
 .saved-status { min-height: 1.25em; color: var(--text-secondary); font-size: var(--fs-md); padding: 0 12px 8px; flex: none; }
 
@@ -3655,7 +3641,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-unsaved { margin-right: auto; align-self: center; font-size: var(--fs-base); color: var(--text-secondary); }
 .settings-unsaved[hidden] { display: none; }
 
-
 /* The missing-CLI line of the New Agent dialog sits under the folder, outside More options (#5835): nothing shows while it has nothing to say. */
 .launch-cli-slot:empty { display: none; }
 .launch-cli-slot { margin: 10px 26px 0; font-size: var(--fs-md); line-height: var(--lh-body); color: var(--text-secondary); }
@@ -3748,7 +3733,6 @@ dialog.reminder-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 
 /* A list row or card that opens something is a button for the keyboard and a screen reader (#6976): one Tab stop, Enter or Space opens it (data-key-click), and its focus is drawn inside it. In a table the first cell holds a real button that looks like its text (a row with a button role would lose its table semantics). */
 [data-key-click]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-
 
 /* A row of a list is an li that holds one real button (#7006), so a screen reader still says "list of 9" and Tab, Enter and Space are the button's own. The button takes the li's inside layout (direction, alignment, gap) so the row looks as it did, and the ring is drawn on the li. */
 li > .row-btn { flex: 1 1 auto; align-self: stretch; min-width: 0; width: 100%; box-sizing: border-box; display: flex; flex-direction: inherit; align-items: inherit; justify-content: inherit; gap: inherit; min-height: inherit; margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; user-select: inherit; }
@@ -3996,7 +3980,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .mention-option.active, .mention-option:hover { background: var(--bg-hover); }
 .mention-note { font-size: var(--fs-base); color: var(--text-secondary); }
 @media (max-width: 767px), (pointer: coarse) { .mention-option { min-height: var(--control-touch-height, 44px); align-items: center; } }
-
 
 /* The Servers tab of a self-hosted hub (#7638): a table (Server, Status, Agents), and a server's page with its facts and Test, Edit and Remove in a bar pinned at its foot */
 .servers-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }

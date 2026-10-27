@@ -103,15 +103,9 @@ function _listHeader(agentList) {
             <div class="list-display-panel" id="mobile-display-panel" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
                 <div class="agent-list-bar" id="mobile-agent-list-bar" hidden></div>
                 <div class="list-display-options">
-                    ${switchRow({ label: 'Show summaries', labelClass: 'list-display-option', attrs: ' data-display-input="summary" data-on-change="toggle-session-summary"' })}
                     ${switchRow({ label: 'Show server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" hidden', attrs: ' data-display-input="server" data-on-change="toggle-show-server"' })}
                     ${switchRow({ label: 'Group by server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group" hidden', attrs: ' data-display-input="group" data-on-change="toggle-group-by-server"' })}
-                    ${switchRow({ label: 'Show branches', labelClass: 'list-display-option', labelAttrs: ' data-display-row="branches"', attrs: ' data-display-input="branches" data-on-change="toggle-show-branches"' })}
-                    ${switchRow({ label: 'Show provider', labelClass: 'list-display-option', labelAttrs: ' data-display-row="provider"', attrs: ' data-display-input="provider" data-on-change="toggle-show-provider"' })}
-                    ${switchRow({ label: 'Show model', labelClass: 'list-display-option', labelAttrs: ' data-display-row="model"', attrs: ' data-display-input="model" data-on-change="toggle-show-model"' })}
-                    ${switchRow({ label: 'Show thinking level', labelClass: 'list-display-option', labelAttrs: ' data-display-row="thinking"', attrs: ' data-display-input="thinking" data-on-change="toggle-show-thinking"' })}
                 </div>
-                <p class="list-display-hint" data-display-hint role="status" hidden></p>
             </div>
         `;
     agentList.prepend(header);

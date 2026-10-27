@@ -9,7 +9,7 @@ import { refreshSettingsGroups } from './settings_nav.js';
 /** The keys the hub stores per user (keep in step with internal/usersettings allowedSettings). */
 export const HUB_SETTING_KEYS = new Set([
     'theme', 'custom_theme', 'default_agent_type', 'default_permission_mode', 'default_renderer', 'git_diff_mode',
-    'show_session_summary', 'show_session_server', 'fit_pane_width', 'refresh_files_on_switch', 'notify_needs_input', 'file_search_limit',
+    'show_session_server', 'fit_pane_width', 'refresh_files_on_switch', 'notify_needs_input', 'file_search_limit',
     'session_order', 'group_order', 'saved_personas', 'saved_team_templates', 'macros',
     'default_prompt_worker', 'default_prompt_orchestrator',
 ]);
@@ -36,7 +36,7 @@ export function settingsErrorMessage(status, body) {
 // Dialog controls that map to hub settings, or are kept in this browser: everything else in the dialog is hidden.
 const SHOWN_CONTROLS = new Set([
     'settings-theme', 'settings-renderer-select', 'settings-agent-type', 'settings-permission-mode',
-    'settings-show-summary', 'settings-group-by-team', 'settings-fit-pane-width', 'settings-notify-needs-input', 'settings-desktop-notify',
+    'settings-group-by-team', 'settings-fit-pane-width', 'settings-notify-needs-input', 'settings-desktop-notify',
     'settings-file-search-limit',
 ]);
 

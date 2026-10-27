@@ -1,5 +1,5 @@
 /* Moved out of render.js as it was (#3795): no behaviour change. */
-import { _WORKTREE_ICON, _gitStateSummary, getDotClass, getMobileStatusChip, resolveSessionIdentity, sessionGoalText, sessionStateInfo, sessionUnreadCount } from './session_state.js';
+import { getDotClass, resolveSessionIdentity, sessionStateInfo, sessionUnreadCount } from './session_state.js';
 import { _saveSessionOrder } from './list_order.js';
 import { MORE_DOTS_SVG, escapeHtml, escapeAttr, agentNameColor } from './utils.js';
 import { autoAcceptChip, autoAcceptMenuItem } from './auto_accept.js';
@@ -11,11 +11,10 @@ import { sessionServer, keyLabel, sessionTeamKey } from './server_base.js';
 import { redrawLiveList } from './list_hooks.js';
 import { state } from './state.js';
 import { skippedOf } from './waiting.js';
-import { modelName, providerName, sessionLevel, typeName } from './model_labels.js';
+import { typeName } from './model_labels.js';
 import { terminalGoneChip } from './terminal_gone.js';
 import { hooksMissingChip } from './hooks_missing.js';
 import { browserLocal } from './safe_storage.js';
-import { onBuilt } from './lazy_dom.js';
 import { syncDisplayPanels } from './display_panel.js';
 import { setChecked, setHidden } from './dom_write.js';
 
@@ -111,24 +110,6 @@ function splitLabel(name) {
 }
 
 /** What the phone's row shows besides the name (the sidebar hides these): the state chip, the unread count, and the banner for an agent that needs the person. */
-function _mobileRowParts(s, stateInfo) {
-    const mobileStatus = getMobileStatusChip(s);
-    // One chip per state on a phone card: Needs input keeps its state chip (no banner); Check terminal and Stuck keep their banner, which says what to do, and drop the chip that only repeated the state (#9464).
-    const bannerStates = ['check_terminal', 'stuck'];
-    const mobileStatusChip = mobileStatus.className && !bannerStates.includes(stateInfo.key)
-        ? `<span class="chip session-status-chip ${escapeAttr(mobileStatus.className)}">${escapeHtml(mobileStatus.label)}</span>`
-        : '';
-    const mobileUnread = sessionUnreadCount(s);
-    const unreadBoardBadge = mobileUnread > 0
-        ? `<span class="chip session-mobile-meta-pill">${mobileUnread} unread</span>`
-        : '';
-    // Needs input has no banner: its state chip already says it in the desktop row's words ("Needs input", with the kind after it); a second chip said "Waiting for your input" (#9464).
-    const mobileAttentionBanner = stateInfo.key === 'check_terminal'
-        ? '<div class="chip chip-attn session-mobile-banner">Nothing yet — open the terminal</div>'
-        : (stateInfo.key === 'stuck' ? '<div class="chip chip-attn chip-attn-error session-mobile-banner">Session needs attention</div>' : '');
-    return { mobileStatusChip, unreadBoardBadge, mobileAttentionBanner };
-}
-
 /** The items of an agent row's action menu (drawn when it opens): the archived, sleeping or awake set. */
 function _rowMenuContent(s, sid) {
     const _archiveItem = `
@@ -257,32 +238,23 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // Directory override now lives in the tooltip (Directory row), not the row.
     const dirChip = "";
 
-    // 'Show branches' (#5117, #5237): the branch of every row that has one. An agent on its own worktree also gets the worktree icon and its ahead/behind summary; one on a shared
-    // checkout gets the branch alone (it used to get no line at all, so the option did nothing for a team that works in shared checkouts).
-    const gsWt = s.git_state?.is_worktree ? s.git_state : null;
-    const branchTag = (isBranchShown() && s.branch)
-        ? (gsWt
-            ? `<div class="session-worktree-line" title="Worktree branch ${escapeAttr(s.branch)}${escapeAttr(gsWt.base_branch ? ' (vs ' + escapeAttr(gsWt.base_branch) + ')' : '')}">${_WORKTREE_ICON}<span class="wt-branch">${escapeHtml(s.branch)}</span>${_gitStateSummary(gsWt)}</div>`
-            : `<div class="session-worktree-line" title="Branch ${escapeAttr(s.branch)}"><span class="wt-branch">${escapeHtml(s.branch)}</span></div>`)
-        : "";
     // One pill at most, from the shared state table. The attention states carry a
     // warning pill; "Task assigned · idle" a neutral one (#3227). "Ready for input"
     // has none: the tooltip and the aria-label carry that state (no dot) (task #175).
     const stateInfo = sessionStateInfo(s);
     const pillKind = stateInfo.attention ? 'waiting-badge session-state-pill session-attention-pill' : 'session-state-pill';
-    const waitingBadge = stateInfo.pill
+    const waitingBadge = stateInfo.pill && stateInfo.attention // one row, one line: the one chip is for an agent that needs you (the dot says every other state, #9686)
         ? ` <span class="chip chip-caps ${pillKind}${stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''}">${stateInfo.pill}</span>`
         : '';
     // Context is secondary: any state pill owns line 1 and the ctx pill
     // collapses to the dot's ring, which survives on every glyph.
-    const ctxPill = waitingBadge ? '' : _renderCtxPill(s);
+    // A message the paste gate held (the last automated one Coral did not type, #7727) is a state a person must see: the row's one chip, "Message held", when no attention chip owns it (Needs you wins; the hold stays in the tip and on the page).
+    const skipped = s.sleeping || !(Number(s.board_unread) > 0) ? null : skippedOf(s);
+    const heldChip = !waitingBadge && skipped ? ` <span class="chip chip-caps session-state-pill neutral session-held-chip" title="${escapeAttr(skipped.why)}">Message held</span>` : '';
+    const ctxPill = waitingBadge || heldChip ? '' : _renderCtxPill(s);
     const ctxHigh = s.context_pct !== null && s.context_pct !== undefined && s.context_pct >= 80;
     const isTerminal = s.agent_type === "terminal";
     const sid = s.session_id || ""; // raw: every use below escapes it (it was escaped here too, and a second time at each use: an id with a quote or an ampersand reached the click handlers as "&#39;")
-    // Goal line is rendered on every row (not just the active one):
-    // summary -> first user prompt -> inline "No goal yet" + generate button.
-    const goalText = sessionGoalText(s);
-    const goalBtn = "";
     // Row label follows the shared identity chain (display_name -> auto_name
     // -> board_job_title -> Agent/Terminal). The prompt is never a name; it
     // shows on the goal line below when there is no summary.
@@ -296,30 +268,8 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const reminderTag = reminder?.reminder
         ? `<span class="agent-reminder-icon" title="Periodic reminder every ${escapeAttr(Math.max(1, Math.round((reminder.reminder_interval_seconds || 300) / 60)))} min" aria-label="Periodic reminder active">⏰</span>`
         : '';
-    let goalLine = "";
-    if (goalText) {
-        goalLine = `<span class="session-goal list-row-meta${isCompact ? ' session-goal-compact' : ''}" title="${escapeAttr(goalText)}">${escapeHtml(goalText)}</span>`;
-    } else if (!isTerminal) {
-        // The "No goal yet" label is PASSIVE text: it sits where users click to
-        // select a row, so it must bubble to the row's click handler. Only the
-        // sparkle button requests a goal.
-        goalLine = `<span class="session-goal list-row-meta session-goal-empty${isCompact ? ' session-goal-compact' : ''}">
-                <button class="btn btn-quiet btn-icon btn-xs sidebar-goal-btn sidebar-goal-btn-inline" data-on-click="goal-request" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="Generate goal" aria-label="Generate goal for ${escapeAttr(identity)}"><span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">auto_awesome</span></button>
-                <span class="session-goal-empty-label">No goal yet</span>
-            </span>`;
-    }
-    // A state without a chip class ("Ready for input") renders no mobile chip. The meta
-    // row is emitted without whitespace so :empty can collapse it on the phone.
-    const { mobileStatusChip, unreadBoardBadge, mobileAttentionBanner } = _mobileRowParts(s, stateInfo);
     const needsAttention = sessionNeedsAttention(s);
-    // Unread board messages: a neutral count on line 2 (never an attention colour),
-    // shown on selected rows too.
-    const unreadCount = sessionUnreadCount(s);
-    // The unread count on agent rows was not useful to users, so no chip is rendered.
-    void unreadCount;
-    const unreadChip = '';
-    const skipped = s.sleeping || !(Number(s.board_unread) > 0) ? null : skippedOf(s); // the last automated message Coral did not type (#7727)
-    const heldLine = skipped ? `<div class="session-held-line" title="${escapeAttr(skipped.why)}">Not typed: ${escapeHtml(skipped.why)}</div>` : '';
+    const unreadCount = sessionUnreadCount(s); // said in the row's name for a screen reader; the row itself has no count
     const kebabMenuContent = _rowMenuContent(s, sid);
     // The menu's items (about 50 elements a row) are drawn when it opens (#4611): the row holds an empty menu and this module the text for it.
     rememberRowMenu(s, kebabMenuContent);
@@ -358,17 +308,9 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
                 <span class="session-dot ${dotClass}${ctxHigh ? ' ctx-high' : ''}" title="${escapeAttr(stateInfo.label)}" aria-hidden="true"></span>
                 <span class="session-label list-row-title${nameTail ? ' session-label-split' : ''}" title="${escapeAttr(displayLabel)}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}
                 <span class="session-name-spacer"></span>
-                ${stale ? '' : waitingBadge + ctxPill}
-                ${goalBtn}
+                ${stale ? '' : waitingBadge + heldChip + ctxPill}
                 ${stale ? '' : kebabMenu}
             </div>
-            <div class="session-mobile-banner-row">
-                ${mobileAttentionBanner}
-            </div>
-            <div class="session-mobile-meta">${mobileStatusChip}${unreadBoardBadge}</div>
-            ${(goalLine || unreadChip) ? `<div class="session-line2">${goalLine}${unreadChip}</div>` : ''}
-            ${agentLineHtml(s)}
-            ${branchTag}${heldLine}
         </div>
         <div class="session-tooltip"></div>
     </li>`;
@@ -410,61 +352,6 @@ export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact,
     return html;
 }
 
-// ── Agent summary line (the goal text under each agent name) ──────────
-
-/** The line under an agent's name that says what it runs (#5133, #5742): its provider, its model and its thinking level ("Claude · Opus 5.5 · High"). Three options, each kept per viewer and on
- *  unless turned off: Show provider, Show model, Show thinking level. A viewer who set the old single "Show agent type" switch keeps that choice for all three until they change one. */
-const AGENT_LINE_KEY = { provider: 'coral-show-provider', model: 'coral-show-model', thinking: 'coral-show-thinking' };
-export function isAgentLineShown(part) {
-    try {
-        const own = browserLocal.get(AGENT_LINE_KEY[part]);
-        if (own === 'true' || own === 'false') return own === 'true';
-        const legacy = browserLocal.get('coral-show-agent-type');
-        return legacy === 'true' || legacy === 'false' ? legacy === 'true' : true;
-    } catch { return true; }
-}
-export function setAgentLineShown(part, on) {
-    try { browserLocal.set(AGENT_LINE_KEY[part], on ? 'true' : 'false'); } catch { /* per-viewer only */ }
-}
-/** The words of the line for a row, by the options that are on: only what the agent has on record (a terminal has none of the three, an agent with no level shows no level). The provider is the
- *  start of the line, not a line of its own: a row with no model and no level on record has no line (as before the options, so the list does not grow a line per agent), except that with
- *  Show model and Show thinking level both off the provider is all that was asked for and is shown. */
-function agentLineText(s) {
-    const model = isAgentLineShown('model') ? modelName(s.agent_type, s.model, sessionServer(s)) : '';
-    const level = isAgentLineShown('thinking') ? sessionLevel(s) : null;
-    const provider = isAgentLineShown('provider') ? providerName(s.agent_type) : '';
-    const providerOnly = !isAgentLineShown('model') && !isAgentLineShown('thinking');
-    if (!model && !level && !(provider && providerOnly)) return '';
-    return [provider, model, level && level.name].filter(Boolean).join(' \u00b7 ');
-}
-function agentLineHtml(s) {
-    const text = agentLineText(s);
-    if (!text) return '';
-    const lvl = sessionLevel(s);
-    const tip = [s.model, lvl ? `thinking: ${lvl.name}${lvl.requested ? ' (as started)' : ''}` : ''].filter(Boolean).join(', ');
-    return `<div class="session-model"${tip ? ` title="${escapeAttr(tip)}"` : ''}>${escapeHtml(text)}</div>`;
-}
-
-/** 'Show branches' (#5117): the worktree and branch line under an agent's name. Kept per viewer, like Group by server; off unless turned on. The branch stays in the row's tooltip and the agent's header. */
-export function isBranchShown() {
-    try { return browserLocal.get('coral-show-branches') === 'true'; }
-    catch { return false; }
-}
-
-/** Stored server-side in user settings (`show_session_summary`); off unless turned on. */
-export function isSessionSummaryShown() {
-    return String(state.settings?.show_session_summary).toLowerCase() === 'true';
-}
-
-export function applySessionSummaryPref() {
-    const shown = isSessionSummaryShown();
-    document.querySelector('.sidebar')?.classList.toggle('summary-hidden', !shown);
-    const check = document.getElementById('settings-show-summary');
-    if (check) check.checked = shown;
-    syncDisplayMenu();
-}
-onBuilt('settings-modal', () => applySessionSummaryPref()); // its Show summaries box, once Settings is built (#4500)
-
 /** 'Show server' (setting show_session_server): unset = on with 2+ servers, off with one. */
  export function isServerShownOnRows() {
     const v = String(state.settings?.show_session_server ?? '').toLowerCase();
@@ -479,34 +366,18 @@ onBuilt('settings-modal', () => applySessionSummaryPref()); // its Show summarie
     try { return browserLocal.get('coral-group-by-server') === 'true'; } catch { return false; }
 }
 
-/** What the Display panel says under its options when 'Show branches' or 'Show agent type' is on and some agents have nothing to show for it (#5237): an option that
- *  seems to do nothing for a row is explained, not silent. "" when neither option is on or every agent has its data. A terminal has no model, so it is not counted for that. */
-function displayHintText() {
-    const model = isAgentLineShown('model'), thinking = isAgentLineShown('thinking'), branch = isBranchShown();
-    if (!model && !thinking && !branch) return '';
-    const live = (state.liveSessions || []).filter(s => !s.archived);
-    const parts = [];
-    const count = (n, what) => `${n} ${n === 1 ? 'agent has' : 'agents have'} no ${what} on record`;
-    if (model) { const n = live.filter(s => s.agent_type !== 'terminal' && !modelName(s.agent_type, s.model, sessionServer(s))).length; if (n) parts.push(count(n, 'model')); }
-    if (thinking) { const n = live.filter(s => s.agent_type !== 'terminal' && !sessionLevel(s)).length; if (n) parts.push(count(n, 'thinking level')); }
-    if (branch) { const n = live.filter(s => !s.branch).length; if (n) parts.push(count(n, 'branch')); }
-    return parts.length ? parts.join('; ') + '.' : '';
-}
-
 /** Sync the ≡ display menu's checkboxes and which options it offers: the sidebar's, and the phone's copy in the agent list
  *  header (#3991, the sidebar is hidden below 768 px). Both are found by data attributes, so each can appear once. It runs on every render of the
  *  list, so it looks only inside the two headers that hold the menu: an attribute selector over the whole document walked every node of the
  *  page (and of a long chat) each time (#4985). */
  export function syncDisplayMenu() {
     const n = serversShown().length;
-    const checked = { summary: isSessionSummaryShown(), server: isServerShownOnRows(), group: isGroupedByServer(), branches: isBranchShown(), provider: isAgentLineShown('provider'), model: isAgentLineShown('model'), thinking: isAgentLineShown('thinking') };
-    const offered = { summary: true, server: n >= 1, group: n >= 2, branches: true, provider: true, model: true, thinking: true };
-    const hintText = displayHintText();
+    const checked = { server: isServerShownOnRows(), group: isGroupedByServer() };
+    const offered = { server: n >= 1, group: n >= 2 };
     for (const header of [...document.getElementsByClassName('sidebar-header'), ...document.getElementsByClassName('mobile-list-header')]) {
         for (const input of header.querySelectorAll('[data-display-input]')) setChecked(input, checked[input.dataset.displayInput] === true);
         for (const row of header.querySelectorAll('[data-display-row]')) setHidden(row, !offered[row.dataset.displayRow]);
-        for (const btn of header.querySelectorAll('[data-display-button]')) btn.classList.toggle('active', checked.summary || (n >= 1 && checked.server));
-        for (const hint of header.querySelectorAll('[data-display-hint]')) { hint.textContent = hintText; setHidden(hint, !hintText); }
+        for (const btn of header.querySelectorAll('[data-display-button]')) btn.classList.toggle('active', n >= 1 && checked.server);
     }
     syncDisplayPanels(); // the phone's header is built later than the sidebar's: it takes the stored open or shut state here
 }

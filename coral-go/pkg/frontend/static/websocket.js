@@ -10,7 +10,7 @@ import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { signInUrl } from './cloud.js';
 import { feedRetryDelay, isStalenessDrift, DRIFT_RENDER_MAX_AGE_MS } from './feed_pacing.js';
-import { scheduleLiveSessionsRender, updateSessionStatus, updateSessionSummary, updateSessionBranch, updateSessionFolder, updateWaitingIndicator, resolveSessionIdentity, commandPlaceholder, startingPlaceholder, applyTerminalDot } from './render.js';
+import { scheduleLiveSessionsRender, updateSessionStatus, updateSessionSummary, updateSessionBranch, updateSessionFolder, updateSessionModel, updateWaitingIndicator, resolveSessionIdentity, commandPlaceholder, startingPlaceholder, applyTerminalDot } from './render.js';
 import { renderLiveJobs } from './live_jobs.js';
 import { updateChangedFileCount } from './changed_files.js';
 import { showNotificationToast, showWorkflowNotification, showAlertNotification, escapeHtml, dbg } from './utils.js';
@@ -383,6 +383,7 @@ function _syncViewedSession(data) {
             updateSessionSummary(s.summary);
             updateSessionBranch(s.branch, s.repo_name, s.git_state);
             updateSessionFolder(s.working_directory || "");
+            updateSessionModel(s);
             updateModelChip(s, sessionServer(s));
             updateWaitingIndicator(s);
             refreshNeedsInputCard();
