@@ -2407,26 +2407,9 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .template-item-btn {
     display: block;
     width: 100%;
+    margin: 0;
     text-align: left;
-    padding: 6px 10px;
-    background: none;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--text-secondary);
-    font-size: var(--fs-md);
-    cursor: pointer;
     text-transform: capitalize;
-}
-
-.template-cat-btn:hover,
-.template-item-btn:hover {
-    background: rgba(var(--white-rgb), 0.05);
-    color: var(--text-primary);
-}
-
-.template-cat-btn.active {
-    background: var(--accent-dim); /* the one selected style of a segment or a chip in a form (#8054) */
-    color: var(--text-on-accent);
 }
 
 .template-browser-loading {

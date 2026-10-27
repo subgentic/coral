@@ -102,8 +102,8 @@ export async function showTemplateBrowser(type, onSelect) {
         catPanel.innerHTML = filtered.map(c => {
             const name = categoryName(c);
             const display = displayName(name);
-            const active = activeCategory === name ? ' active' : '';
-            return `<button class="template-cat-btn${active}" data-cat="${escapeAttr(name)}">${escapeHtml(display)}</button>`;
+            const active = activeCategory === name;
+            return `<button class="btn btn-quiet template-cat-btn" aria-pressed="${active}" data-cat="${escapeAttr(name)}">${escapeHtml(display)}</button>`;
         }).join('') || '<div class="empty-state empty-state-tight">No matches</div>';
 
         catPanel.querySelectorAll('.template-cat-btn').forEach(btn => {
@@ -131,7 +131,7 @@ export async function showTemplateBrowser(type, onSelect) {
         listPanel.innerHTML = filtered.map(t => {
             const name = templateName(t);
             const display = displayName(name);
-            return `<button class="template-item-btn" data-cat="${escapeAttr(activeCategory)}" data-name="${escapeAttr(name)}">${escapeHtml(display)}</button>`;
+            return `<button class="btn btn-quiet template-item-btn" data-cat="${escapeAttr(activeCategory)}" data-name="${escapeAttr(name)}">${escapeHtml(display)}</button>`;
         }).join('');
 
         listPanel.querySelectorAll('.template-item-btn').forEach(btn => {
