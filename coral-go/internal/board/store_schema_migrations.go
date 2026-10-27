@@ -38,6 +38,8 @@ func (s *Store) migrateBoardColumns(ctx context.Context) {
 		"ALTER TABLE board_tasks ADD COLUMN parked_until TEXT",
 		"ALTER TABLE board_tasks ADD COLUMN remind_at TEXT",
 		"ALTER TABLE board_tasks ADD COLUMN reminded_at TEXT",
+		// the thinking level of the agent that claimed the task, as it was at the claim (#8915); NULL: not recorded (every older claim)
+		"ALTER TABLE board_tasks ADD COLUMN claim_thinking TEXT",
 		"ALTER TABLE board_subscribers ADD COLUMN session_joined_at TEXT",
 	}
 	for _, ddl := range alterColumns {
