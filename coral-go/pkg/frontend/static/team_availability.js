@@ -107,7 +107,7 @@ export function showTeamAvailability(team) {
     document.getElementById('team-availability-dialog')?.remove();
     const dialog = document.createElement('dialog');
     dialog.id = 'team-availability-dialog';
-    dialog.className = 'team-availability-dialog';
+    dialog.className = 'dlg-flow team-availability-dialog';
     dialog.setAttribute('aria-labelledby', 'availability-title');
     const actions = '<button type="button" data-dialog-close aria-label="Close team view">×</button>';
     dialog.innerHTML = `<header><div><h2 id="availability-title">Team view</h2><p>${escapeHtml(keyLabel(team))}</p></div>${actions}</header>

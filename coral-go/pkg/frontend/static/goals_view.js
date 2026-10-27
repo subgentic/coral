@@ -209,7 +209,7 @@ export const openGoalId = () => model.openId;
 function openCreate() {
     if (model.creating) return;
     model.creating = true;
-    const dlg = document.createElement('dialog'); dlg.className = 'goals-dialog'; dlg.setAttribute('aria-labelledby', 'goals-create-title');
+    const dlg = document.createElement('dialog'); dlg.className = 'dlg-confirm goals-dialog'; dlg.setAttribute('aria-labelledby', 'goals-create-title');
     const form = el('form', 'goals-form'); form.noValidate = true;
     const title = el('h3', null, 'New goal'); title.id = 'goals-create-title';
     const field = (label, input, id) => { const l = el('label', 'goals-field'); l.append(el('span', null, label), input); input.id = id; return l; };

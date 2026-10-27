@@ -444,6 +444,7 @@
     --dlg-w-confirm: 28rem;
     --dlg-w-form: 40rem;
     --dlg-w-flow: min(60rem, 94vw);
+    --dlg-max: 95vw;   /* no dialog is wider than the screen less a margin, whatever its size */
     --dlg-h-flow: min(640px, calc(100dvh - 32px));
     --dlg-radius: var(--radius-xl);
     --dlg-title: 700 1rem/1.3 var(--font-sans);          /* 16: the dialog's title */
