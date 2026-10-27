@@ -308,7 +308,7 @@
         border-radius: var(--radius-ml);
         color: var(--text-primary);
         font: inherit;
-        font-weight: 600;
+        font-weight: var(--fw-strong);
         cursor: pointer;
     }
     .nav-select-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -674,7 +674,7 @@
         cursor: pointer;
         padding: 12px 14px;
         font-size: var(--fs-md);
-        font-weight: 600;
+        font-weight: var(--fw-strong);
         color: var(--text-primary);
         list-style: none;
         -webkit-tap-highlight-color: transparent;
@@ -814,7 +814,7 @@
         white-space: normal;
         line-height: 1.35;
         font-size: var(--fs-lg);
-        font-weight: 500; /* agents are children of the 600-weight group header */
+        font-weight: var(--fw-medium); /* agents are children of the 600-weight group header */
     }
 
     #mobile-session-list .waiting-badge,
@@ -861,7 +861,7 @@
     #mobile-session-list .session-status-chip.needs-input {
         background: var(--bg-tertiary); /* quiet (#5123): only the text is warm */
         color: var(--warning);
-        font-weight: 600;
+        font-weight: var(--fw-strong);
         text-transform: none;
     }
 
@@ -874,7 +874,7 @@
     #mobile-session-list .session-status-chip.error {
         background: var(--bg-tertiary);
         color: color-mix(in srgb, var(--error) 62%, var(--text-primary));
-        font-weight: 600;
+        font-weight: var(--fw-strong);
     }
 
     #mobile-session-list .session-mobile-meta-pill {
@@ -1233,7 +1233,7 @@
 
 /* Titles of the phone-width agent and history lists. Classes rather than style="" attributes: the Cloud Hub's CSP
    (style-src 'self') refuses inline style attributes in markup assigned through innerHTML. */
-.mobile-list-title { font-size: var(--fs-xl); font-weight: 600; color: var(--text-primary); margin: 0; }
+.mobile-list-title { font-size: var(--fs-xl); font-weight: var(--fw-strong); color: var(--text-primary); margin: 0; }
 
 /* The artifacts table scrolls sideways; on a phone the default scrollbar is a thick grey bar under the header. */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
@@ -1302,7 +1302,7 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     /* Two rows, every key on the screen (no hidden keys to find): Esc, Tab, Ctrl-C and the arrows, then | ~ / - . */
     .terminal-key-bar:not([hidden]) { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(44px, 3.4em), 1fr)); gap: 3px; flex: 0 0 auto; padding: 4px 4px; background: var(--bg-secondary); border-top: 1px solid var(--border); }
-    .terminal-key-bar .tkb-key { min-width: 0; min-height: var(--control-touch-height, 44px); padding: 0 2px; margin: 0; font: inherit; font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-md); cursor: pointer; }
+    .terminal-key-bar .tkb-key { min-width: 0; min-height: var(--control-touch-height, 44px); padding: 0 2px; margin: 0; font: inherit; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-md); cursor: pointer; }
     .terminal-key-bar .tkb-key:active { background: var(--bg-hover); }
     .terminal-key-bar .tkb-key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }

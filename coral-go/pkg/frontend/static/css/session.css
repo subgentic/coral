@@ -69,7 +69,7 @@
 }
 
 .session-list li.empty-welcome { display: none; font-style: normal; color: var(--text-secondary); padding: 20px 12px; }
-.session-list li.empty-welcome h2 { margin: 0 0 6px; font-size: var(--icon-size); font-weight: 600; color: var(--text-primary); }
+.session-list li.empty-welcome h2 { margin: 0 0 6px; font-size: var(--icon-size); font-weight: var(--fw-strong); color: var(--text-primary); }
 .session-list li.empty-welcome p { margin: 0 0 14px; font-size: var(--fs-lg); line-height: 1.45; }
 .session-list li.empty-welcome .empty-launch-list { display: grid; grid-template-columns: 1fr; gap: 10px; }
 /* the phone Home's own cards: the desktop welcome's card rules under their own names, so one class names one thing (UI/UX #5990) */
@@ -205,7 +205,7 @@
 
 .htu-cost {
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 /* ── Session Hover Tooltip ���──────────���─────────────────────── */
@@ -229,12 +229,12 @@
 .session-tooltip-facts dt { white-space: nowrap; }
 .session-tooltip-facts dd { word-break: break-word; }
 
-.tt-state-working           { color: var(--working); font-weight: 600; }
-.tt-state-needs-input       { color: var(--warning); font-weight: 600; }
-.tt-state-done              { color: var(--success); font-weight: 600; }
-.tt-state-stuck             { color: var(--danger); font-weight: 600; }
+.tt-state-working           { color: var(--working); font-weight: var(--fw-strong); }
+.tt-state-needs-input       { color: var(--warning); font-weight: var(--fw-strong); }
+.tt-state-done              { color: var(--success); font-weight: var(--fw-strong); }
+.tt-state-stuck             { color: var(--danger); font-weight: var(--fw-strong); }
 .tt-state-idle              { color: var(--text-muted); }
-.tt-unread                   { color: var(--warning); font-weight: 600; }
+.tt-unread                   { color: var(--warning); font-weight: var(--fw-strong); }
 
 .session-time {
     font-size: var(--fs-base);
@@ -247,7 +247,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--fs-md);
-    font-weight: 400; /* .list-row-title's 13/400 (#9311) */
+    font-weight: var(--fw-regular); /* .list-row-title's 13/400 (#9311) */
 }
 
 .session-info {
@@ -442,7 +442,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .board-card-subline {
     font-size: var(--fs-base);
-    font-weight: 400;
+    font-weight: var(--fw-regular);
     color: var(--text-secondary);
     text-transform: none;
     letter-spacing: 0;
@@ -527,7 +527,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .session-group-header {
     font-size: var(--fs-base);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--text-secondary);
     padding: 4px 12px !important;
     text-transform: none;
@@ -555,7 +555,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     min-width: 0;
     gap: 4px;
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 /* A team's name stays on one line and ends in an ellipsis when the sidebar is narrow (the dock open, a phone); the whole name is its title (#4962). */
@@ -594,7 +594,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .session-group-count {
     font-size: var(--fs-sm);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--text-muted);
     background: var(--bg-tertiary);
     border-radius: var(--radius-lg);
@@ -743,7 +743,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .session-group-item .chip.session-state-pill {
     text-transform: none;
     letter-spacing: 0;
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     background: var(--bg-tertiary);
     color: var(--warning);
     box-shadow: inset 0 0 0 1px var(--border);
@@ -764,7 +764,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 /* Neutral state pill (Task assigned · idle): informational, never a warning. */
 .session-group-item .chip.session-state-pill.neutral,
 [data-theme="light"] .session-group-item .chip.session-state-pill.neutral {
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     background: var(--bg-tertiary);
     color: var(--text-secondary);
     box-shadow: inset 0 0 0 1px var(--border);
@@ -894,7 +894,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .session-title h2 {
     font-size: var(--fs-xl);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .session-meta {
@@ -930,14 +930,14 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .goal-label {
     font-size: 0.9375rem;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--color-tool-agent);
     flex-shrink: 0;
 }
 
 .summary-inline .summary-text {
     font-size: var(--fs-lg);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1100,7 +1100,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .session-board-card-toplevel .board-card-header .group-name-line {
     font-size: var(--fs-md);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 /* ── Board (right panel) ─────────────────────────────── */
@@ -1115,7 +1115,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .board-chat-header {
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-primary);
     padding: 6px 10px;
     border-bottom: 1px solid var(--border);
@@ -1301,14 +1301,14 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .session-group-header .group-name-line {
     /* Team and folder rows: a step down from the server header. */
     color: color-mix(in srgb, var(--text-primary) 82%, transparent);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 /* Agents and terminals in the secondary text colour; a per-agent override (set from
    Rename) wins. */
 .session-label-name {
     color: var(--agent-name-color, var(--text-secondary));
-    font-weight: 500;
+    font-weight: var(--fw-medium);
 }
 
 .session-label-name.is-terminal {
@@ -1359,7 +1359,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     cursor: pointer;
     padding: 0;
     font-size: var(--fs-sm);
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     color: var(--bg-primary);
     display: flex;
     align-items: center;
@@ -1389,7 +1389,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .team-view-details div { min-width:0; padding:10px 12px; border-radius:var(--radius-lg); background:var(--bg-tertiary); }
 .team-view-details span, .team-view-details strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .team-view-details span { color:var(--text-secondary); font-size: var(--fs-base); }
-.team-view-details strong { margin-top:4px; font-size:var(--fs-md); font-weight:500; }
+.team-view-details strong { margin-top:4px; font-size:var(--fs-md); font-weight:var(--fw-medium); }
 .availability-agents { display:flex; flex-direction:column; gap:6px; }
 .availability-agent { display:grid; grid-template-columns:minmax(150px,1fr) minmax(180px,2fr) auto; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-lg); overflow-wrap:anywhere; }
 .availability-agent > p { margin:0; }
@@ -1408,7 +1408,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .preset-editor select, .preset-editor textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .preset-editor p { font-size: var(--fs-md); color: var(--text-secondary); margin: 0; }
 .team-settings-section { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; margin: 0; display: grid; gap: 12px; }
-.team-settings-section legend { font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); padding: 0 4px; }
+.team-settings-section legend { font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); padding: 0 4px; }
 .working-mode-hint { font-size: var(--fs-base) !important; color: var(--text-secondary); margin: 0; line-height: 1.4; }
 .working-mode-hint .working-mode-settings-link { background: none; border: none; box-shadow: none; padding: 0; margin: 0; min-height: 0; min-width: 0; height: auto; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; display: inline; }
 .working-mode-hint .working-mode-settings-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
@@ -1427,7 +1427,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .prompt-inspection-folded > summary::-webkit-details-marker { display: none; }
 .prompt-inspection-folded > summary::before { content: '▸' / ''; }
 .prompt-inspection-folded[open] > summary::before { content: '▾' / ''; }
-.xt-how > summary { display: flex; align-items: center; gap: 4px; list-style: none; cursor: pointer; font-weight: 600; } /* "How this works" (Messaging settings, #7884): the disclosure's arrow, so it reads as a control */
+.xt-how > summary { display: flex; align-items: center; gap: 4px; list-style: none; cursor: pointer; font-weight: var(--fw-strong); } /* "How this works" (Messaging settings, #7884): the disclosure's arrow, so it reads as a control */
 .xt-how > summary::-webkit-details-marker { display: none; }
 .xt-how > summary::before { content: '▸' / ''; }
 .xt-how[open] > summary::before { content: '▾' / ''; }
@@ -1443,14 +1443,14 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 /* Team settings, Messaging tab (#5572): one status line and one button, two switches, the linked teams, "How this works". */
 .xt-head { display: flex; align-items: center; gap: 10px; }
 .xt-head .update-state-dot { margin: 0; flex: none; }
-.xt-line { font-weight: 600; font-size: var(--fs-lg, 1rem); min-width: 0; overflow-wrap: anywhere; }
+.xt-line { font-weight: var(--fw-strong); font-size: var(--fs-lg, 1rem); min-width: 0; overflow-wrap: anywhere; }
 .xt-row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .xt-primary { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; text-align: center; white-space: normal; max-width: 100%; box-sizing: border-box; } /* the label wraps: at 200% text on a phone it was one line wider than the panel and cut off */
 .xt-reach { margin: 6px 0 10px; padding: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary); font-size: var(--fs-sm, 0.875rem); } /* its own line under the box, not indented as if it explained it */
 .xt-changed { margin: 0; font-size: var(--fs-base); color: var(--text-secondary); }
 .settings-cloud-changed { margin: 8px 0 14px; font-size: var(--fs-base); color: var(--text-secondary); } /* its own line below the switch row's description, apart from it (#5847, the same words and size as .xt-changed) */
 .xt-hub-may { margin: 6px 0 0; }
-.xt-h { margin: 0 0 6px; font-size: var(--fs-md); color: var(--text-secondary); font-weight: 600; }
+.xt-h { margin: 0 0 6px; font-size: var(--fs-md); color: var(--text-secondary); font-weight: var(--fw-strong); }
 .xt-h-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; } /* the heading holds its words, the link sits beside it (a link inside a heading made its name longer) */
 .xt-teams { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .xt-teams li { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-primary); min-width: 0; }
@@ -1596,7 +1596,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .server-strip-item.server-unreachable,
 .server-strip-item.server-unauthorized { color: var(--text-primary); border-color: var(--warning); }
 .server-strip-item.server-unauthorized { border-color: var(--error); }
-.server-strip-state { font-weight: 600; }
+.server-strip-state { font-weight: var(--fw-strong); }
 /* The chip is a button that opens the Servers tab at that server (#3070 F7). */
 .server-strip-btn {
     display: inline-flex;
@@ -1707,14 +1707,14 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .server-group-toggle {
     display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0;
     padding: 4px 6px 4px 2px; border: 0; border-radius: var(--radius-md);
-    background: none; color: var(--text-primary); font: inherit; font-size: 1.05em; font-weight: 700; cursor: pointer; text-align: left;
+    background: none; color: var(--text-primary); font: inherit; font-size: 1.05em; font-weight: var(--fw-strong); cursor: pointer; text-align: left;
 }
 .server-group-toggle:hover { background: var(--bg-hover); }
 .server-group-icon { flex: none; color: var(--text-primary); }
 /* The name is only as wide as its text (no minimum width: min(8ch) padded "Local" and left a gap before the count, #6241) and shrinks last (flex-shrink 1 against the marker's 10000: the marker gives up all its room first, then the name takes the rest, so the count after it is never pushed out, #6241; a factor under 1 left a long name at full width); the Update marker is what shrinks first (at 200% text "workstation" was "w..." beside Update required, #4247). */
 .server-group-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
 .server-group-toggle > .server-update-marker { flex: 0 10000 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.server-group-state { color: var(--text-secondary); font-weight: 400; font-style: italic; white-space: nowrap; }
+.server-group-state { color: var(--text-secondary); font-weight: var(--fw-regular); font-style: italic; white-space: nowrap; }
 .server-group-header.is-down .server-group-icon,
 .server-group-header.is-down .server-group-name { opacity: 0.5; }
 /* A folder header is the button that collapses its group; a team header opens the team, and its chevron (#5989) is the one control that collapses. */
@@ -1729,7 +1729,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .server-details-update:not(.server-below-minimum) { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border); }
 /* 'Show server': the server before a team/folder name, "pro-coral-hub", server in italics (#3507). */
 .row-name-with-server { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-server-prefix { font-style: italic; font-weight: 500; opacity: 0.7; white-space: nowrap; }
+.row-server-prefix { font-style: italic; font-weight: var(--fw-medium); opacity: 0.7; white-space: nowrap; }
 .row-server-prefix .row-server-sep { font-style: normal; }
 .row-server-prefix.is-down { opacity: 0.45; }
 /* Phone width and touch screens: the header's controls are the touch size, all of them (mobile.css gives every .btn that minimum at this width). */
@@ -1769,7 +1769,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 /* Update notice marker on the server group header (#3059 via #3085). */
 .server-update-marker {
     padding: 0 4px; border: 1px solid currentColor; border-radius: var(--radius-sm, 4px);
-    font-size: var(--fs-sm, 11px); font-weight: 600; color: var(--accent); white-space: nowrap;
+    font-size: var(--fs-sm, 11px); font-weight: var(--fw-strong); color: var(--accent); white-space: nowrap;
 }
 .server-update-marker.server-update-required { color: var(--warning); }
 
@@ -1812,14 +1812,14 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 @media (pointer: coarse) { .group-chevron-deco { width: 44px; height: 24px; margin-left: -12px; } }
 .availability-help { margin: 0; align-self: center; } /* beside the counts, not on a row of its own (#6065); open, its note takes the whole row */
 .availability-help[open] { flex-basis: 100%; }
-.availability-help > summary { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; cursor: pointer; color: var(--text-secondary); font-weight: 600; list-style: none; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.availability-help > summary { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; cursor: pointer; color: var(--text-secondary); font-weight: var(--fw-strong); list-style: none; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .availability-help > summary::-webkit-details-marker { display: none; }
 .availability-help > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .availability-help > .availability-note { margin: 0; }
 
 /* What waits for an agent (#7727): the last automated message Coral did not type, one small line in the warning colour on the agent's row; the agent view has the unread count, a list and Send now. */
 .session-held-line { margin-top: 2px; font-size: var(--fs-xs, 0.75rem); line-height: 1.3; color: var(--warning); overflow-wrap: anywhere; }
-.composer-hint.composer-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: var(--fs-sm); font-weight: 400; color: var(--text-secondary); } /* the sentence, then What waits (a link), Send now (a small button) and Show terminal (a link), spaced apart */
+.composer-hint.composer-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); } /* the sentence, then What waits (a link), Send now (a small button) and Show terminal (a link), spaced apart */
 #composer-waiting-send { margin: 0; } /* .btn-small carries a 20px margin for the sidebars: it left a blank line before the links on a phone */
 .composer-waiting-detail .composer-waiting-why { margin: 0 0 6px; }
 .composer-waiting-detail summary { cursor: pointer; }
@@ -1855,7 +1855,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .worktree-dock[hidden] { display: none; }
 .worktree-dock.error { border-top-color: var(--error); }
 .worktree-dock-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
-.worktree-dock-title { font-weight: 600; margin-right: auto; min-width: 0; overflow-wrap: anywhere; }
+.worktree-dock-title { font-weight: var(--fw-strong); margin-right: auto; min-width: 0; overflow-wrap: anywhere; }
 @media (min-width: 768px) { .worktree-dock-line { justify-content: flex-start; } .worktree-dock-title { margin-right: 12px; } } /* a wide window: the title and its buttons stay together, not at the two ends of a 1000 px bar (#6971); a phone's bar keeps them at the ends */
 .worktree-dock.error .worktree-dock-title { color: var(--error-text); }
 .worktree-dock .btn { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); padding-inline: 10px; margin: 0; } /* (the phone's .btn has a 20 px side margin of its own) */
