@@ -81,6 +81,9 @@ const S = `(window.__coralStatic || '/static/')`;
         await open(1280, 800, false);
         assert.equal(await shown('options-chip'), false, 'no Options button on a desktop');
         assert.equal(await shown('model-chip'), true, 'the Model chip is there');
+        // #9648: on a desktop too the options caret and Send are one split control: touching, one height, one fill
+        const split = await ev(`(() => { const o = document.querySelector('#command-toolbar .btn-send-dropdown'), s = document.querySelector('#command-toolbar .btn-send'); if (!o || !s) return null; const a = o.getBoundingClientRect(), b = s.getBoundingClientRect(), ca = getComputedStyle(o), cb = getComputedStyle(s); return { seam: Math.max(b.left - a.right, a.left - b.right), oh: a.height, sh: b.height, same: ca.backgroundColor === cb.backgroundColor, filled: cb.backgroundColor !== 'rgba(0, 0, 0, 0)', joined: parseFloat(ca.borderTopRightRadius) === 0 && parseFloat(cb.borderTopLeftRadius) === 0 || parseFloat(ca.borderTopLeftRadius) === 0 && parseFloat(cb.borderTopRightRadius) === 0 }; })()`);
+        assert.ok(split && split.seam >= 0 && split.seam <= 2 && Math.abs(split.oh - split.sh) < 1 && split.same && split.filled && split.joined, 'a desktop: the caret and Send are one split control ' + JSON.stringify(split));
         console.log('PASS phone composer one row');
     } finally { await client.close(); }
 })().catch(err => { console.error(err); process.exit(1); });
