@@ -15,7 +15,7 @@
 .sv-row[hidden] { display: none; }
 .sv-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; } /* a group of rows for a screen reader: no box of its own */
 .sv-legend { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; } /* named, not drawn: the rule's heading and toggle already say it */
-.sv-heading { margin: 8px 0 0; font-size: var(--sv-label-size); font-weight: 600; color: var(--sv-label-color); }
+.sv-heading { margin: 8px 0 0; font-size: var(--sv-label-size); font-weight: var(--fw-strong); color: var(--sv-label-color); }
 #settings-modal .sv .sv-heading { font: var(--dlg-section); } /* inside the dialog a heading is the dialog's section type (settings_dialog_stable: one scale) */
 .sv-notice { min-width: 0; }
 .sv-row-notice:has(> .sv-notice > [hidden]:only-child), .sv-row-notice:has(> .sv-notice > dl > [hidden]:only-child) { display: none; } /* a live part its own module has hidden leaves no empty row */
@@ -64,7 +64,7 @@
 .sv-row[data-disabled] .sv-label { color: var(--sv-value-color); }
 .sv-choices { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .sv-choice { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; font-size: var(--sv-label-size); color: var(--sv-label-color); }
-.sv .sv-choice { display: grid; margin: 0; font-weight: 400; } /* a dialog's label and input rules (display: block, a 100% field) do not apply to a choice */
+.sv .sv-choice { display: grid; margin: 0; font-weight: var(--fw-regular); } /* a dialog's label and input rules (display: block, a 100% field) do not apply to a choice */
 .sv .sv-choice > input { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; }
 .sv .sv-choice > input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--bg-primary); } /* the shared check: a box that fills with the accent and shows a tick */
 .sv .sv-choice > input[type="checkbox"]:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
@@ -88,11 +88,11 @@
 
 /* the bar: the status at the left, Cancel and Save at the right */
 .sv-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: var(--sv-bar-pad); border-top: 1px solid var(--border); background: var(--bg-primary); }
-.sv-status { font-size: var(--sv-status-size); font-weight: 500; color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }
+.sv-status { font-size: var(--sv-status-size); font-weight: var(--fw-medium); color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }
 .sv-status.is-error { color: var(--sv-error-color); }
 .sv-bar-buttons { display: flex; align-items: center; gap: 8px; flex: none; }
 .sv-fold { margin: 4px 0 0; }
-.sv-fold > summary { color: var(--text-primary); font-weight: 600; } /* a form's optional part: closed, its rows inside */
+.sv-fold > summary { color: var(--text-primary); font-weight: var(--fw-strong); } /* a form's optional part: closed, its rows inside */
 /* the line reads as a control, not a caption: one "▸" marker (a flex summary draws no native one), 32 px high (44 on a coarse pointer, touch.css), the CLI paths' fold (#7041, #8460) */
 .sv-fold > summary { display: flex; align-items: center; gap: 6px; min-height: 32px; list-style: none; font-size: var(--fs-md); }
 .sv-fold > summary::-webkit-details-marker { display: none; }

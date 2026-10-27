@@ -4,10 +4,10 @@
 .team-page-head { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 12px 24px 0; min-height: 48px; box-sizing: border-box; }
 .team-page-title { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; min-width: 0; }
 .team-page-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
-.team-page-machine { font-weight: 400; font-size: var(--fs-lg); color: var(--text-secondary); }
-.team-page-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); font-weight: 500; color: var(--text-secondary); }
+.team-page-machine { font-weight: var(--fw-regular); font-size: var(--fs-lg); color: var(--text-secondary); }
+.team-page-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
 .team-page-status:empty { display: none; }
-.team-page-health { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 4px 0; min-height: 32px; font: inherit; font-size: var(--fs-md); font-weight: 500; color: var(--link-text, var(--accent)); cursor: pointer; text-align: left; }
+.team-page-health { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 4px 0; min-height: 32px; font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--link-text, var(--accent)); cursor: pointer; text-align: left; }
 .team-page-health[hidden] { display: none; }
 .team-page-health:hover { text-decoration: underline; }
 .team-page-health:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
@@ -30,10 +30,10 @@
 .team-tabs-row::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--border); pointer-events: none; } /* the strip's line runs under More too */
 .team-tabs-row > .team-tabs { flex: 1 1 auto; min-width: 0; border-bottom: 0; padding-bottom: 1px; } /* the strip keeps its height: its 1px line is the row's */
 .team-tabs-row > .team-tab-more { display: none; } /* a desktop shows every tab */
-.team-tab-more.is-current { font-weight: 500; } /* not bolder: the strip keeps its width */
+.team-tab-more.is-current { font-weight: var(--fw-medium); } /* not bolder: the strip keeps its width */
 .team-tab-more::after { content: ''; display: inline-block; margin-left: 6px; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-2px) rotate(45deg); }
 .team-more-menu.team-tabs-more-menu > button { display: flex !important; align-items: center; justify-content: space-between; gap: 12px; }
-.team-more-menu.team-tabs-more-menu > button[aria-current="true"] { font-weight: 600; }
+.team-more-menu.team-tabs-more-menu > button[aria-current="true"] { font-weight: var(--fw-strong); }
 .team-tabs[data-more="end"] { mask-image: linear-gradient(to right, currentColor calc(100% - 2rem), transparent); }
 .team-tabs[data-more="start"] { mask-image: linear-gradient(to left, currentColor calc(100% - 2rem), transparent); }
 .team-tabs[data-more="both"] { mask-image: linear-gradient(to right, transparent, currentColor 2rem, currentColor calc(100% - 2rem), transparent); }
@@ -61,7 +61,7 @@
 .team-panel .team-tb-chips { display: flex; flex-wrap: nowrap; gap: var(--toolbar-gap); flex: 1 1 0; min-width: 8rem; overflow: hidden; } /* the chips of the filters that are on: in the row after the pills, one line, an ellipsis for what does not fit (#9078) */
 .team-panel .team-tb-chips .team-tb-chip { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .team-panel .team-tb-chips .team-tb-chip:first-child { flex: 1 1 8rem; min-width: 8rem; }
-.team-panel .team-tb-chips .team-tb-chip-more { flex: none; font-weight: 600; }
+.team-panel .team-tb-chips .team-tb-chip-more { flex: none; font-weight: var(--fw-strong); }
 .team-panel .team-tb-chips .team-tb-chip:not(:first-child):not(.team-tb-chip-more) { display: none; }
 .team-panel .team-tb-select { display: none; flex: 0 1 auto; min-height: var(--toolbar-control-h); max-width: 14em; }
 .team-panel .team-tb-action { flex: none; margin-left: auto; min-height: var(--toolbar-control-h); padding: 0 12px; font-size: var(--fs-md); }
@@ -91,7 +91,7 @@
 
 /* a goal's page and a task's page: facts side by side, tasks as a table, the actions pinned at the bottom */
 .goals-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: var(--fs-lg); max-width: 70ch; }
-.goals-facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 500; padding-top: 2px; }
+.goals-facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: var(--fw-medium); padding-top: 2px; }
 .goals-facts dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
 .goals-tasks-head { margin: 8px 0 0; font-size: 0.9375rem; }
 .goals-updating { min-height: 1.2em; margin: 0; } /* its slot keeps its height whether or not it says Updating */
@@ -104,14 +104,14 @@
 .detail-pane { position: relative; flex: none; width: var(--detail-w, 460px); max-width: 100%; } /* where it sits and how wide; what it looks like is the one pane's (.pane, layout.css) */
 .detail-pane[hidden] { display: none; }
 .detail-title, .goals-table-page .goals-detail-title { width: fit-content; max-width: 100%; }
-.detail-title { margin: 0; font-size: 1.0625rem; font-weight: 700; overflow-wrap: anywhere; }
+.detail-title { margin: 0; font-size: 1.0625rem; font-weight: var(--fw-strong); overflow-wrap: anywhere; }
 .detail-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .detail-sub { margin: 2px 0 0; font-size: var(--fs-base); color: var(--text-secondary); }
 .detail-close { flex: none; width: 36px; height: 36px; display: inline-grid; place-items: center; border: 0; background: none; border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; }
 .detail-close:hover { background: var(--bg-hover); color: var(--text-primary); }
 .detail-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .detail-facts { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 12px; font-size: var(--fs-md); margin: 0; }
-.detail-facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 500; padding-top: 1px; }
+.detail-facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: var(--fw-medium); padding-top: 1px; }
 .detail-facts dd { margin: 0; overflow-wrap: anywhere; }
 .detail-doc { min-width: 0; }
 .detail-grip { position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; outline: none; } /* the goal page column's handle (#7702) on the pane's left edge: an 8 px target, the 2 px line drawn in the middle */
@@ -133,7 +133,7 @@
 #team-panel-messages { padding: 16px 24px 0; } /* the same top as the other tabs (a tab's body starts 16 px under the strip, 12 on a phone), and the search row's left edge where theirs is (the messages themselves stay on the tables' edge) */
 .team-panel .list-bar-bar { padding: 0 0 8px; } /* a tab's search starts on the page edge where its chips and table do, not 12 px in (UI/UX 170 consistency, item 3) */
 #team-panel-messages .mb-tools { padding: 0; }
-#team-panel-messages .list-bar-filter-btn { background: var(--bg-tertiary); font-weight: 500; padding: 0 12px; }
+#team-panel-messages .list-bar-filter-btn { background: var(--bg-tertiary); font-weight: var(--fw-medium); padding: 0 12px; }
 @media (pointer: fine) { #team-panel-messages .list-bar-filter-btn { min-height: var(--toolbar-control-h); } } /* a fine pointer only: a touch screen's 44 px (touch.css) is not undone by this id's rule (#8157: the search's previous and next were 32 px on a phone) */ /* Filters, Jump to first and Jump to latest are the page's buttons: 13/500 on the tertiary fill, as Add agent and More (UI/UX #7588 item 4) */
 #team-panel-messages .list-bar-filter-btn:hover { background: var(--bg-hover); }
 
@@ -179,7 +179,7 @@
 
 /* Knowledge: an entry's notes as a text box in the documents pane */
 .knowledge-editor { width: 100%; box-sizing: border-box; min-height: 14rem; font: inherit; font-size: var(--fs-md); resize: vertical; }
-.detail-status { flex: 1 1 12rem; min-width: 0; align-self: center; font-size: var(--fs-base); font-weight: 500; color: var(--text-secondary); overflow-wrap: anywhere; }
+.detail-status { flex: 1 1 12rem; min-width: 0; align-self: center; font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-secondary); overflow-wrap: anywhere; }
 .detail-status:empty { display: none; }
 .detail-ask { flex-basis: 100%; } /* the question is a line of its own, the two buttons under it */
 
@@ -202,20 +202,20 @@
 
 /* a task's page as a form (#7644): Edit and Complete on the page, the fields the dialog had, one column */
 .team-task-form, #team-panel-item .task-completion-form { max-width: 760px; margin-top: 12px; }
-.team-task-form label, #team-panel-item .task-completion-form label { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; font-size: var(--fs-md); font-weight: 500; color: var(--text-primary); }
+.team-task-form label, #team-panel-item .task-completion-form label { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
 .team-task-form input[type="text"], .team-task-form select, .team-task-form textarea,
-#team-panel-item .task-completion-form input:not([type="file"]), #team-panel-item .task-completion-form select, #team-panel-item .task-completion-form textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; font-weight: 400; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border, var(--border)); border-radius: var(--radius-md); }
+#team-panel-item .task-completion-form input:not([type="file"]), #team-panel-item .task-completion-form select, #team-panel-item .task-completion-form textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; font-weight: var(--fw-regular); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border, var(--border)); border-radius: var(--radius-md); }
 .team-task-form ::placeholder, #team-panel-item .task-completion-form ::placeholder { color: var(--text-secondary); opacity: 1; }
 .team-task-form textarea, #team-panel-item .task-completion-form textarea { resize: vertical; min-height: 72px; }
-.team-task-form-label { margin: 0 0 6px; font-size: var(--fs-md); font-weight: 500; }
+.team-task-form-label { margin: 0 0 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .team-task-form .task-edit-revision { margin: 0 0 12px; }
 .team-task-extra { max-width: 760px; margin-top: 16px; }
 .team-task-artifacts { max-width: 760px; margin-top: 16px; }
 .team-task-extra .task-detail-section { margin-top: 12px; }
 .goals-pinbar .btn-danger, .item-bar .btn-danger { margin-right: auto; } /* a danger button is alone at the left edge of every pinned bar, first in the order too (#7684) */
 /* the dialog's sections under a task's facts read like the page's other labels: sentence case, 14/600 (UI/UX, #7644) */
-.team-task-extra .task-detail-label { text-transform: none; letter-spacing: 0; font-size: var(--fs-lg); font-weight: 600; }
-.team-task-extra summary { font-size: var(--fs-lg); font-weight: 600; }
+.team-task-extra .task-detail-label { text-transform: none; letter-spacing: 0; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.team-task-extra summary { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .team-task-extra .task-dep-status { text-transform: capitalize; } /* the pill reads Unmet, not UNMET (UI/UX, #7644) */
 
 /* a goal's screen (#8914, the Operator's layout): its details and one Tasks | Artifacts list on the left; the clicked task or artifact opens in the shared detail pane on the right (nothing is there until one is clicked: the list has the whole width) */
@@ -230,10 +230,10 @@
 .goals-page.goals-open .goals-body { gap: 0; }
 .goal-tabs { margin-top: 8px; }
 .goal-list { min-height: 0; padding-bottom: 12px; }
-.goal-side-group { margin: 0; padding: 10px 0 4px; font-size: var(--fs-base); font-weight: 600; color: var(--text-secondary); }
+.goal-side-group { margin: 0; padding: 10px 0 4px; font-size: var(--fs-base); font-weight: var(--fw-strong); color: var(--text-secondary); }
 .goal-list .goals-note, .goal-list .goals-failed, .goal-list .goals-more { margin: 10px 0; }
 .goal-main > .goals-table-page { padding: 0; } /* the task page in the main pane sits where the goal's details sat */
-.goals-progress { margin: 14px 0 6px; font-weight: 600; font-size: var(--fs-lg); }
+.goals-progress { margin: 14px 0 6px; font-weight: var(--fw-strong); font-size: var(--fs-lg); }
 @media (max-width: 900px) { /* narrow: the pane covers the list, with a Back (the tabs and details stay behind it) */
     .goal-split-open .goal-detail-pane { position: absolute; inset: 0; z-index: 5; flex: none; border-left: 0; }
     .goal-detail-pane .detail-back { display: inline-flex; }
@@ -256,7 +256,7 @@
 .inbox-goal-page > .goals-page { flex: 1 1 auto; width: 100%; min-height: 0; }
 .inbox-goal-page > .view-list { display: none; }
 .goal-back-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.goal-team-link { font-size: var(--fs-md); font-weight: 500; color: var(--accent); }
+.goal-team-link { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--accent); }
 /* A task page's row in the Inbox holds the way back, the team link and the title: the back on the left and the link on the right over the title; on a phone the back is beside the title and the link is under them (the phone way-back rule) */
 .goal-back-row > .goals-back, .goal-back-row > .phone-title-row { order: 1; }
 .goal-back-row > .goal-team-link { order: 2; }
@@ -301,7 +301,7 @@
 .inbox-folder-head h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; color: var(--text-primary); }
 .inbox-folder-head h2:focus { outline: none; }
 .inbox-folder-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
-.inbox-folder-head .session-group-count { flex: none; font-weight: 600; }
+.inbox-folder-head .session-group-count { flex: none; font-weight: var(--fw-strong); }
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 0 auto; }
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 0 1 16rem; } /* the search box is capped so the chip beside the pills has the rest of the row (#9078) */
 .inbox-folder-toolbar .list-bar-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; align-items: start; }

@@ -158,6 +158,10 @@
     --fs-xl:   1rem;       /* 16px */
     --fs-2xl:  1.25rem;    /* 20px: a page title, an item page title, a big figure (Goal #84) */
     --fs-display: 2rem;    /* 32px: the welcome title only */
+    /* Weights: three. 700 only on the 20 px and 32 px titles (Goal #84) */
+    --fw-regular: 400;
+    --fw-medium: 500;     /* UI text, buttons, labels */
+    --fw-strong: 600;     /* titles, selected, badges, uppercase labels */
 
     /* Shared UI roles. User themes may override the prose family and size. */
     --type-page-size: 1.25rem;   /* 20px */

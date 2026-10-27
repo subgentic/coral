@@ -70,7 +70,7 @@
 
 .chat-bubble .role-label {
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     text-transform: uppercase;
     color: var(--text-secondary);
     margin-bottom: 4px;
@@ -127,7 +127,7 @@
 .chat-bubble .message-text h3 {
     margin: 10px 0 4px;
     font-size: var(--fs-lg);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .chat-bubble .message-text blockquote {
@@ -249,7 +249,7 @@
 
 .work-group-count {
     flex-shrink: 0;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-secondary);
 }
 
@@ -325,7 +325,7 @@
 
 .tool-call-name {
     flex-shrink: 0;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-secondary);
 }
 
@@ -392,7 +392,7 @@
 
 .tool-question-text {
     font-size: var(--fs-md);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--text-primary);
     margin-bottom: 6px;
 }
@@ -414,7 +414,7 @@
 
 .tool-question-option-label {
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--accent);
 }
 
@@ -739,7 +739,7 @@
 .chat-prose.chat-messages .chat-bubble.assistant .message-text h3,
 .chat-prose.chat-messages .chat-bubble.assistant .message-text h4 {
     font-family: var(--chat-prose-font);
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     line-height: 1.3;
     color: var(--text-primary);
     margin: 26px 0 10px;
@@ -1035,7 +1035,7 @@
 }
 .chat-system-label {
     flex: none;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--accent);
 }
 .chat-system-text {
@@ -1051,7 +1051,7 @@
     background: color-mix(in srgb, var(--accent) 18%, transparent);
     color: var(--accent);
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     font-variant-numeric: tabular-nums;
 }
 
@@ -1090,14 +1090,14 @@
 }
 .cni-kicker {
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--warning);
 }
 .cni-question {
     font-size: var(--fs-xl);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     line-height: 1.4;
     margin: 2px 0 12px;
 }
@@ -1133,7 +1133,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 }
 .cni-plan h1, .cni-plan h2, .cni-plan h3, .cni-plan h4 {
     font-size: var(--fs-lg);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     margin: 10px 0 4px;
 }
 .cni-plan > :first-child {
@@ -1248,7 +1248,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     min-width: 0;
 }
 .cni-answer-label {
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 .cni-answer-desc {
     font-size: var(--fs-base);
@@ -1307,7 +1307,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 }
 .cni-review dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     font-size: var(--fs-lg);
     line-height: 1.45;
     overflow-wrap: anywhere;
@@ -1361,7 +1361,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 }
 .chat-empty-title {
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     margin-bottom: 0.375rem;
 }
 .chat-empty-hint {
@@ -1650,7 +1650,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 [data-theme="light"] .hljs-code, [data-theme="light"] .hljs-comment, [data-theme="light"] .hljs-formula { color: #57606a; }
 [data-theme="light"] .hljs-name, [data-theme="light"] .hljs-quote, [data-theme="light"] .hljs-selector-pseudo, [data-theme="light"] .hljs-selector-tag { color: #116329; }
 [data-theme="light"] .hljs-subst, [data-theme="light"] .hljs-emphasis, [data-theme="light"] .hljs-strong { color: inherit; }
-[data-theme="light"] .hljs-section { color: #0550ae; font-weight: 700; }
+[data-theme="light"] .hljs-section { color: #0550ae; font-weight: var(--fw-strong); }
 [data-theme="light"] .hljs-addition { color: #0f5323; background-color: #dafbe1; }
 [data-theme="light"] .hljs-deletion { color: #82071e; background-color: #ffebe9; }
 
