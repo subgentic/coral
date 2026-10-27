@@ -38,9 +38,10 @@ const BASE = require('./test_base').BASE;
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view .dt-primary').length >= 1`, 'inbox tasks rows', 20000);
             const inbox = await titles('#group-table-view .dt-primary');
-            assert.ok(inbox.every(s => s === '13px 400'), at + 'Inbox tasks: every title is 13px 400: ' + inbox.join(', '));
+            const want = mobile ? '16px 400' : '13px 400'; // a phone's Inbox list is mail rows (#9545): the title is the row's own text, 16 px, regular
+            assert.ok(inbox.length && inbox.every(s => s === want), at + `Inbox tasks: every title is ${want}: ` + inbox.join(', '));
             for (const t of ['dark', 'light']) { await theme(t); await new Promise(r => setTimeout(r, 450)); await shot(`table-titles-inbox-${t}-${w}`); } // sleep-ok: the theme's colour transition settles
         }
-        console.log('PASS table titles: 13px 400 on the Tasks tab, the Artifacts tab and the Inbox Tasks list, 1280 and 390');
+        console.log('PASS table titles: 13px 400 on the Tasks tab, the Artifacts tab and (at 1280) the Inbox Tasks list; a phone Inbox mail rows are 16px 400');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
