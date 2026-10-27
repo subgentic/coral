@@ -1,4 +1,5 @@
 /* The task list: polling, loading, filtering, sorting and drawing it (moved out of tasks.js, #5082; no behaviour change). */
+import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { pollEvery, afterPause, isBusyStatus, busyRetryingText, machineOf } from './overload.js';
 import { platform } from './platform/detect.js';
@@ -20,6 +21,20 @@ import { taskStatusWord, statusClass } from './goal_words.js';
 import { whenText } from './when_text.js';
 
 const dockTaskTableState = DT.tableState();
+let previewTask = null;
+export async function openDockTaskPreview(id, opener) {
+    const project = _currentBoardKey(), session = state.currentSession;
+    if (!project) return;
+    const pane = await importOnce('./preview_pane.js');
+    if (state.currentSession !== session || _currentBoardKey() !== project) return;
+    const key = `board:${id}`;
+    const selection = { project, key };
+    previewTask = selection;
+    const mark = () => { for (const row of document.querySelectorAll('#board-task-list tbody tr')) { if (previewTask?.project === project && row.dataset.key === previewTask?.key) row.setAttribute('aria-current', 'true'); else row.removeAttribute('aria-current'); } };
+    pane.openTaskPreview(project, id, opener?.closest('tr')?.querySelector('.dt-primary')?.textContent || `Task ${id}`, () => { if (previewTask === selection) { previewTask = null; mark(); } });
+    mark();
+}
+
 
 let _goalBoard = ''; // the board whose goal titles the chips read (the one the list was last loaded for)
 
@@ -510,9 +525,9 @@ function _taskTable(tasks, footer) {
         if (whoCol) { whoCol.firstDir = 'desc'; whoCol.when = t => !!TV.doerOf(t); whoCol.cell = t => (TV.doerOf(t) ? TV.whoCell(t) : ''); } // the same circles as the Tasks tab (#8507); an empty Who is an empty cell, not a dash (#8003)
     };
     const table = TV.tasksTable(agentTaskScope() ? 'agent' : 'agent-team', tasks, { label: 'Agent tasks', tweak, rowKey: key, rowName: t => t.title || t.description || '',
-        footer, state: dockTaskTableState, onSort: field => _toggleTaskSort(FIELD[field] || field), bare: true, sortBar: false, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first' });
+        footer, current: previewTask?.project === _currentBoardKey() ? previewTask.key : null, state: dockTaskTableState, onSort: field => _toggleTaskSort(FIELD[field] || field), bare: true, sortBar: false, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first' });
     // Keep the existing action dispatcher and identifiers: opening a board task,
-    // personal task or subagent still takes the same route as before.
+    // personal task or subagent retains its own detail action.
     const byKey = new Map(tasks.map(t => [key(t), t]));
     for (const row of table.el.querySelectorAll('tbody tr')) {
         const t = byKey.get(row.dataset.key); if (!t) continue;
