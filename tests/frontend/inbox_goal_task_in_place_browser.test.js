@@ -32,9 +32,10 @@ const BASE = require('./test_base').BASE;
             console.log(`${at}a goal's task opens in the Inbox, Back returns to the goal`);
             await load(goalUrl);
             await waitFor(`document.querySelector('#inbox-page #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'the Inbox goal', 15000);
-            if (mobile) await ev(`document.querySelector('#inbox-page .goal-tasks-open').click(); true`); // a phone's goal page: the task list is the next screen
-            await waitFor(`!!document.querySelector('#inbox-page .goal-side .dt-primary[data-task-id="${T}"]')`, 'the goal\'s task row', 15000);
-            await ev(`document.querySelector('#inbox-page .goal-side .dt-primary[data-task-id="${T}"]').click(); true`);
+            await waitFor(`!!document.querySelector('#inbox-page .goal-list .dt-primary[data-task-id="${T}"]')`, 'the goal\'s task row', 15000);
+            await ev(`document.querySelector('#inbox-page .goal-list .dt-primary[data-task-id="${T}"]').click(); true`); // a click previews the task beside the list (#8914); its Open task page opens the screen in place
+            await waitFor(`!![...document.querySelectorAll('#inbox-page .goal-detail-pane button')].find(b => b.textContent.trim() === 'Open task page')`, 'the preview with its Open task page', 15000);
+            await ev(`[...document.querySelectorAll('#inbox-page .goal-detail-pane button')].find(b => b.textContent.trim() === 'Open task page').click(); true`);
             await waitFor(`location.pathname === ${JSON.stringify(taskUrl)} && document.querySelector('#inbox-page .team-task-page')?.textContent.includes(${JSON.stringify(TASK)})`, 'the task in the Inbox at ' + taskUrl, 15000);
             assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none'`), true, at + 'the team page is not on screen');
             assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`), 'hub-inbox', at + 'still the Inbox tab');

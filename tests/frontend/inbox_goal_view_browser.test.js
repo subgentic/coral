@@ -76,14 +76,15 @@ const BASE = require('./test_base').BASE;
             await detail('#inbox-page');
             await load(url); await detail('#inbox-page');
             assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`),'hub-inbox','reload keeps Inbox');
-            if (width===390) {
-                await ev(`document.querySelector('#inbox-page .goal-tasks-open').click(); true`);
-                assert.ok(await ev(`document.querySelector('#inbox-page .goal-side').getClientRects().length>0`));
-                await ev(`document.querySelector('#inbox-page .goal-side-back').click(); true`);
-                assert.ok(await ev(`document.querySelector('#inbox-page .goal-main').getClientRects().length>0`));
-                await ev(`document.querySelector('#inbox-page .goal-tasks-open').click(); true`);
+            if (width===390) { // a phone: a click previews the task over the list, Back returns to the list (#8914)
+                await ev(`document.querySelector('#inbox-page .goal-list .dt-primary').click(); true`);
+                await waitFor(`document.querySelector('#inbox-page .goal-detail-pane')?.getClientRects().length>0`, 'the preview covers the list');
+                await ev(`document.querySelector('#inbox-page .goal-detail-pane .detail-back').click(); true`);
+                await waitFor(`document.querySelector('#inbox-page .goal-detail-pane')?.hidden===true && document.querySelector('#inbox-page .goal-main').getClientRects().length>0`, 'Back shows the list again');
             }
-            await ev(`document.querySelector('#inbox-page .goal-side .dt-primary').click(); true`);
+            await ev(`document.querySelector('#inbox-page .goal-list .dt-primary').click(); true`);
+            await waitFor(`!![...document.querySelectorAll('#inbox-page .goal-detail-pane button')].find(b => b.textContent.trim() === 'Open task page')`, 'the preview');
+            await ev(`[...document.querySelectorAll('#inbox-page .goal-detail-pane button')].find(b => b.textContent.trim() === 'Open task page').click(); true`);
             await waitFor(`location.pathname===${JSON.stringify(`/inbox/tasks/${board}/${taskId}`)} && !!document.querySelector('#inbox-page .team-task-page')`, 'a task of the goal opens in the Inbox (#8861), not on the team page');
             assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`),'\u2190 Keep this goal in the I\u2026','the task opened from a goal says that goal (cut at 24 characters)');
             await shot(`inbox-goal-task-${width}`);

@@ -97,8 +97,3 @@
 .goals-tasks-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
 @media (pointer: coarse) { .goals-tasks-link { min-height: 44px; min-width: 44px; } } /* a short count ("9 tasks") is still a 44 px target both ways (#7972, the phone census) */
 
-/* A goal's Artifacts (#8592): one closed disclosure under the goal's facts, the table inside it the shared one */
-.goal-artifacts { margin: 1rem 0; }
-.goal-artifacts-summary { cursor: pointer; font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); min-height: 44px; display: flex; align-items: center; }
-.goal-artifacts-body { padding-top: 0.25rem; }
-.goal-artifacts-count { margin-left: 0.25rem; font-weight: 400; color: var(--text-secondary); }
