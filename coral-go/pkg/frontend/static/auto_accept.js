@@ -95,7 +95,7 @@ export function autoAcceptMenuItem(s) {
         : on ? onDetails(s)
         : s.auto_accept_paused_code ? `Turned off: ${pausedText(s.auto_accept_paused_code)}` : '';
     const stateText = on ? (s.auto_accept_until ? `On until ${clock(s.auto_accept_until)}` : 'On') : 'Off';
-    return `<button type="button" class="overflow-menu-item auto-accept-menu-item" role="menuitemcheckbox" aria-checked="${on}"`
+    return `<button type="button" class="menu-item overflow-menu-item auto-accept-menu-item" role="menuitemcheckbox" aria-checked="${on}"`
         + `${supported ? '' : ' disabled aria-disabled="true"'}${why ? ` title="${escapeAttr(why)}"` : ''}`
         + ` data-on-click="agent-auto-accept" data-name="${escapeAttr(s.name)}" data-session-id="${escapeAttr(sid)}">`
         + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg>'
