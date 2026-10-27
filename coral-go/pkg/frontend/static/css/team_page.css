@@ -58,23 +58,23 @@
 .goals-body, .team-tasks-body, .team-artifacts-body, .team-knowledge-body { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 /* The one toolbar line of every list tab (#7717, team_toolbar.js; Messages, Tasks and Artifacts are list bars, Goals, Agents and Knowledge build a row of the same make): the search field, the state pills, the Filters and More icons, the tab's action at the right, 32 px high on a desktop.
    The pills become one compact select on the same line when the line is narrow (a container query on the row), and a phone wraps the line at most once with 44 px hit areas. */
-.team-panel .list-bar-search-row { flex-wrap: nowrap; align-items: center; gap: 8px; container-type: inline-size; }
+.team-panel .list-bar-search-row { flex-wrap: nowrap; align-items: center; gap: var(--toolbar-gap); container-type: inline-size; }
 .team-panel .list-bar-search-wrap { flex: 1 1 12em; min-width: 8em; }
 .team-panel .list-bar-search-row:has(.team-tb-pills) .list-bar-search-wrap { flex: 1 1 8em; max-width: 14em; }
-.team-panel .list-bar-search { min-height: 32px; }
+.team-panel .list-bar-search { min-height: var(--toolbar-control-h); }
 .team-panel .list-bar-search-row .team-tb-pills { flex: 0 0 auto; min-width: auto; overflow: visible; } /* the pills keep their size: the field gives way first, and below 54 rem the select takes their place */
-.team-panel .team-tb-pills .goals-chip { min-height: 32px; }
-.team-panel .team-tb-chip { flex: none; min-height: 32px; white-space: nowrap; }
-.team-panel .team-tb-chips { display: flex; flex-wrap: nowrap; gap: 8px; flex: 1 1 0; min-width: 8rem; overflow: hidden; } /* the chips of the filters that are on: in the row after the pills, one line, an ellipsis for what does not fit (#9078) */
+.team-panel .team-tb-pills .goals-chip { min-height: var(--toolbar-control-h); }
+.team-panel .team-tb-chip { flex: none; min-height: var(--toolbar-control-h); white-space: nowrap; }
+.team-panel .team-tb-chips { display: flex; flex-wrap: nowrap; gap: var(--toolbar-gap); flex: 1 1 0; min-width: 8rem; overflow: hidden; } /* the chips of the filters that are on: in the row after the pills, one line, an ellipsis for what does not fit (#9078) */
 .team-panel .team-tb-chips .team-tb-chip { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .team-panel .team-tb-chips .team-tb-chip:first-child { flex: 1 1 8rem; min-width: 8rem; }
 .team-panel .team-tb-chips .team-tb-chip-more { flex: none; font-weight: 600; }
 .team-panel .team-tb-chips .team-tb-chip:not(:first-child):not(.team-tb-chip-more) { display: none; }
-.team-panel .team-tb-select { display: none; flex: 0 1 auto; min-height: 32px; max-width: 14em; }
-.team-panel .team-tb-action { flex: none; margin-left: auto; min-height: 32px; padding: 0 12px; font-size: var(--fs-md); }
+.team-panel .team-tb-select { display: none; flex: 0 1 auto; min-height: var(--toolbar-control-h); max-width: 14em; }
+.team-panel .team-tb-action { flex: none; margin-left: auto; min-height: var(--toolbar-control-h); padding: 0 12px; font-size: var(--fs-md); }
 /* While something is selected the selection bar (team_toolbar.js mountSelection) replaces the line's controls (#7743); the field stays. */
 .team-panel .team-toolbar-selecting > :is(.team-tb-pills, .team-tb-select, .team-tb-chip, .team-tb-chips, .team-tb-action, .list-bar-toggle, .list-bar-more, .list-bar-count) { display: none !important; }
-.team-panel .team-tb-selection { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.team-panel .team-tb-selection { flex: 1 1 auto; display: flex; align-items: center; gap: var(--toolbar-gap); min-width: 0; }
 @container (max-width: 54rem) { .team-panel .team-tb-pills { display: none; } .team-panel .team-tb-select { display: block; } }
 @media (max-width: 760px) {
     .team-panel .list-bar-search-row { flex-wrap: wrap; }
@@ -86,7 +86,7 @@
 }
 .goals-table-page .goals-chips-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; gap: 6px; } /* one line that scrolls sideways, its scrollbar hidden: the Goals and Tasks chips are alike */
 .goals-table-page .goals-chips-row::-webkit-scrollbar { display: none; }
-.goals-table-page .goals-chip { flex: none; min-height: 32px; white-space: nowrap; }
+.goals-table-page .goals-chip { flex: none; min-height: var(--toolbar-control-h); white-space: nowrap; }
 .goals-table-page .goals-new { flex: none; }
 .goals-table-page .goals-back, .inbox-board-head .goals-back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 4px 0; min-height: 36px; }
 .goals-table-page .goals-back:hover, .inbox-board-head .goals-back:hover { text-decoration: underline; }
@@ -148,7 +148,7 @@
 .team-panel .list-bar-bar { padding: 0 0 8px; } /* a tab's search starts on the page edge where its chips and table do, not 12 px in (UI/UX 170 consistency, item 3) */
 #team-panel-messages .mb-tools { padding: 0; }
 #team-panel-messages .list-bar-filter-btn { background: var(--bg-tertiary); font-weight: 500; padding: 0 12px; }
-@media (pointer: fine) { #team-panel-messages .list-bar-filter-btn { min-height: 32px; } } /* a fine pointer only: a touch screen's 44 px (touch.css) is not undone by this id's rule (#8157: the search's previous and next were 32 px on a phone) */ /* Filters, Jump to first and Jump to latest are the page's buttons: 13/500 on the tertiary fill, as Add agent and More (UI/UX #7588 item 4) */
+@media (pointer: fine) { #team-panel-messages .list-bar-filter-btn { min-height: var(--toolbar-control-h); } } /* a fine pointer only: a touch screen's 44 px (touch.css) is not undone by this id's rule (#8157: the search's previous and next were 32 px on a phone) */ /* Filters, Jump to first and Jump to latest are the page's buttons: 13/500 on the tertiary fill, as Add agent and More (UI/UX #7588 item 4) */
 #team-panel-messages .list-bar-filter-btn:hover { background: var(--bg-hover); }
 
 @media (max-width: 760px) {

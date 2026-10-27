@@ -22,8 +22,8 @@
     order: -1; /* drawn above the text box; it follows the box in the DOM so Tab reaches the box first */
     display: flex;
     align-items: center;
-    gap: var(--space-md);
-    padding: 8px 12px;
+    gap: var(--toolbar-gap);
+    padding: var(--toolbar-pad);
     flex-shrink: 0;
     border-bottom: 1px solid var(--border);
     min-width: 0;
