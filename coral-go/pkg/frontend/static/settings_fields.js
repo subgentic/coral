@@ -129,6 +129,8 @@ export const CLEANUP_FIELDS = [
     { key: 'terminal_logs', type: 'heading', id: 'settings-terminal-logs-title', label: 'Terminal logs', help: { text: 'Kept after an agent is killed.', more: "Each agent's terminal output stays in the logs folder of Coral's data folder. Deleting removes the logs of agents that have ended; the log of a live, sleeping or archived agent is never touched." } },
     live('settings-terminal-logs-status'),
     live('settings-terminal-logs-delete'),
+    { key: 'message_search', type: 'heading', id: 'settings-message-search-title', label: 'Board message search', help: { text: 'An index that makes a search of board messages faster.', more: 'On by default. It takes disk, about 0.6 times the text of the messages, and is built in the background after Coral starts: a search reads every message until it is ready. To turn it off, start Coral with CORAL_BOARD_SEARCH_INDEX=off; the index is then dropped.' } },
+    live('settings-message-search-status'),
     { key: 'worktrees', type: 'heading', id: 'wt-title', label: 'Kept worktrees', help: { text: 'Kept because they still hold your work.', more: 'Git worktrees Coral made for teams and jobs and kept when they stopped. Remove one when you no longer need it: Coral never forces a removal, so unsaved changes or unmerged commits keep it.' } },
     { key: 'worktrees_list', type: 'notice', render: slot => { slot.id = 'settings-worktrees-row'; const el = document.getElementById('settings-worktrees-live'); if (el) slot.append(el); } },
 ];

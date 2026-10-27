@@ -11,7 +11,7 @@ import { browserLocal } from './safe_storage.js';
 const { _fillModelDatalist, _getAgentModels } = await importOnce('./launch_models.js');
 const { _updatePermModeDescription } = await importOnce('./permission_flags.js');
 const { _setApiKey, _wireApiKeyControls, loadDatabaseEncryptionStatus } = await importOnce('./settings_machine.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
-const { loadArtifactStoreSize, loadTerminalLogs, wireStorageActions } = await importOnce('./settings_storage.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
+const { loadArtifactStoreSize, loadMessageSearchIndex, loadTerminalLogs, wireStorageActions } = await importOnce('./settings_storage.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { loadCodexTrustHooks } = await importOnce('./settings_codex_hooks.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { settingsAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
@@ -80,6 +80,7 @@ export async function _fillMachineSettings(s) {
         if (telemetry) telemetry.checked = settingBool(s.telemetry_enabled, true);
         loadArtifactStoreSize({ fresh: true }); // the store's size next to its limit (#3553)
         loadTerminalLogs(); // the terminal logs of ended agents (#4447)
+        loadMessageSearchIndex(); // the board message search index: its setting, state and size (#9685)
         wireStorageActions(); // free space and automatic cleanup (#3554)
         const autoAttach = document.getElementById('settings-board-auto-attach');
         // Off unless the Operator turned it on (#3563); an empty value is unset.

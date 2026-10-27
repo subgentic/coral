@@ -71,6 +71,22 @@ export async function loadArtifactStoreSize({ fresh = false } = {}) {
 // ── Terminal logs of ended agents (#4447) ─────────────────────────────
 let _endedLogs = null; // { count, bytes } as last shown: what a confirmation is for
 
+/** Settings: the board message search index (#9685): on or off, building or ready, and the disk it takes. This computer's dashboard only. */
+export async function loadMessageSearchIndex() {
+    const out = document.getElementById('settings-message-search-status');
+    if (!out) return;
+    try {
+        const d = await requestJson('GET', '/api/system/message-search-index');
+        if (!d.available) out.textContent = 'Not in this build: a search reads every message.';
+        else if (d.setting === 'off') out.textContent = 'Off (CORAL_BOARD_SEARCH_INDEX=off): a search reads every message.';
+        else if (d.state === 'ready') out.textContent = `On and ready. It takes ${_gib(d.size_bytes)} of disk.`;
+        else if (d.state === 'building') out.textContent = 'On, building in the background: a search reads every message until it is ready.';
+        else out.textContent = 'On: it is built when Coral next starts.';
+    } catch {
+        out.textContent = "Couldn't read the search index.";
+    }
+}
+
 /** Settings: how many terminal logs there are and how many belong to ended agents. This computer's dashboard only. */
 export async function loadTerminalLogs() {
     const out = document.getElementById('settings-terminal-logs-status');

@@ -183,6 +183,7 @@ c GET /api/system/cli-check
 c GET /api/system/database-security
 c GET /api/system/editors
 b GET /api/system/hooks-status
+c GET /api/system/message-search-index
 c GET /api/system/hub-mode
 c GET /api/system/hub-operator
 b GET /api/system/codex-trust-hooks
