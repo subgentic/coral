@@ -48,14 +48,16 @@ const { connect } = require('./agent_view_harness');
             }
             assert.ok(seen > 0, `${label}: some Learn more buttons were seen`);
         }
-        // the team page's Settings tab: the same Learn more buttons beside its own links (Messaging, the working mode's "Settings" link) at the same widths
+        // the team's Settings (a popout over the team page since #8853, it used to be the page's Settings tab): the same Learn more buttons beside its own links (Messaging, the working mode's "Settings" link) at the same widths
         const B = 'learn-8107-' + (Date.now() % 100000);
         await ev(`fetch('/api/board/${B}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'orchestrator', job_title: 'Orchestrator', session_name: 'o-s' }) }).then(r => r.status)`);
         await ev(`fetch('/api/board/${B}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'orchestrator', content: 'hello' }) }).then(r => r.status)`);
         try {
             for (const [label, w, h, mobile, zoom] of [['team 1280', 1280, 1000, false, ''], ['team 1280-200', 1280, 1000, false, '200%'], ['team 390-200', 390, 844, true, '200%']]) {
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-                await Page.navigate({ url: `${process.env.CORAL_TEST_URL}/team/${B}/settings` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await Page.navigate({ url: `${process.env.CORAL_TEST_URL}/team/${B}/goals` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await waitFor(`typeof window.showTeamWorkingModeWorkspace === 'function' && !!document.getElementById('team-page-settings')`, 'the team page', { timeout: 15000 });
+                await ev(`window.showTeamWorkingModeWorkspace(${JSON.stringify(B)}); true`);
                 await waitFor(`document.querySelectorAll('#team-panel-settings .sv-learn').length > 0`, 'the team settings Learn more buttons', { timeout: 15000 });
                 if (zoom) await ev(`document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`); await settle(500);
                 const p = await probe();
