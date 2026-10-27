@@ -34,6 +34,5 @@
   "team_page.css: @media (max-width: 760px) | .team-tabs-row > .team-tabs": 2,
   "team_page.css:  | .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap": 2,
   "updates.css:  | .update-agents": 2,
-  "variables.css:  | :root": 3,
   "workflows.css:  | .wf-more": 2
 }
