@@ -976,6 +976,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .facts { display: grid; grid-template-columns: var(--facts-label, max-content) minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: var(--fs-md); font-weight: 400; color: var(--text-primary); }
 .facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 500; padding-top: 1px; }
 .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.facts-row { display: contents; } /* each pair is a div in the dl (facts.js) */
 /* The group head (#9245, Goal #88 slice 5): the heading of a group of rows or of a section of a page. 12/600 in capitals with a little tracking in the muted colour (a sidebar's "Needs attention", "Starred");
  * -lg is a section title of a page (Analytics' "Tokens per commit"): 14/600 in the secondary colour, in the case it is written. A count beside it is a count chip. A table's own group row (dt-group) and column heads are the table's. */
 .group-head { margin: 0; font-size: var(--fs-base); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }

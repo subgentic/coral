@@ -224,37 +224,10 @@
     max-width: 400px;
 }
 
-.session-tooltip-table {
-    border-collapse: collapse;
-    font-size: var(--fs-base);
-    line-height: 1.5;
-}
-
-.session-tooltip-table td {
-    padding: 1px 0;
-}
-
-.tt-label {
-    color: var(--text-muted);
-    padding-right: 12px;
-    font-weight: 500;
-}
-
-/* `.session-tooltip-table td { padding: 1px 0 }` outranks `.tt-label`, which
-   zeroed the label's right padding: the value column started exactly where the
-   longest label ("Last action") ended. Restore a real gutter between the
-   title column and the description column, and keep labels on one line. */
-.session-tooltip-table td.tt-label {
-    padding-right: 18px;
-    white-space: nowrap;
-    vertical-align: top;
-}
-
-.tt-value {
-    color: var(--text-primary);
-    max-width: 300px;
-    word-break: break-word;
-}
+/* the tooltip's list is the shared .facts (layout.css); the tooltip places it: its width, and labels that stay on one line */
+.session-tooltip-facts { max-width: 360px; }
+.session-tooltip-facts dt { white-space: nowrap; }
+.session-tooltip-facts dd { word-break: break-word; }
 
 .tt-state-working           { color: var(--working); font-weight: 600; }
 .tt-state-needs-input       { color: var(--warning); font-weight: 600; }
