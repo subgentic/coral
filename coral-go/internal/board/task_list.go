@@ -198,6 +198,16 @@ func (s *Store) taskListTotals(ctx context.Context, project string) (open, done 
 	return open, done, nil
 }
 
+// TaskCounts is a page with no tasks and the board's two totals (GET /api/board/{project}/tasks?counts=1, #9100): the team page's tab
+// counts read only these, and the page they used to ask for held every open task of the board.
+func (s *Store) TaskCounts(ctx context.Context, project string) (*TaskListPage, error) {
+	open, done, err := s.taskListTotals(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	return &TaskListPage{Tasks: []TaskListItem{}, TotalOpen: open, TotalCompleted: done}, nil
+}
+
 // doneTaskPage pages the done tasks by (completed_at DESC, id DESC). A task finished while
 // a client pages gets the newest completed_at, so it lands on page one and never shifts
 // the pages after the cursor. Rows without completed_at (none are written today) sort last.

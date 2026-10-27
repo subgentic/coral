@@ -213,7 +213,7 @@ async function readCounts() {
     const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
     const [goals, tasks, avail, kn] = await Promise.allSettled([
         boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
-        boardFetch(team, '/tasks?limit=1').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
+        boardFetch(team, '/tasks?counts=1').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
         refreshTeamAvailability(team, true),
         knowledge,
     ]);
