@@ -37,8 +37,8 @@ assert.equal(AR.isFailed(null), false);
 assert.equal(AR.tookWords(at(0), at(0)), '0 s');
 assert.equal(AR.tookWords(at(0), new Date(Date.UTC(2026, 9, 27, 10, 0, 42)).toISOString()), '42 s');
 assert.equal(AR.tookWords(at(0), at(3)), '3 min');
-assert.equal(AR.tookWords(at(0), at(65)), '1 h 5 min');
-assert.equal(AR.tookWords(at(0), at(60)), '1 h');
+assert.equal(AR.tookWords(at(0), at(65)), '1 h 05 min');
+assert.equal(AR.tookWords(at(0), at(60)), '1 h 00 min');
 assert.equal(AR.tookWords(at(0), ''), '', 'not finished: no time');
 assert.equal(AR.tookWords(at(5), at(0)), '', 'a finish before the start is no time');
 

@@ -49,9 +49,9 @@ const BASE = require('./test_base').BASE;
                 assert.match(page.rows[0], /^\S+ [\d:]+ [AP]M Failed: step 2 \(Test\) exit code 3$/, at + page.rows[0]);
                 assert.match(page.rows[1], /Passed$/, at + page.rows[1]); assert.match(page.rows[2], /Passed$/, at + page.rows[2]);
             } else {
-                assert.match(page.rows[0], /Failed: step 2 \(Test\).*exit code 3.*1m 40s/, at + page.rows[0]);
-                assert.match(page.rows[1], /Passed.*10s?.*manual/, at + page.rows[1]);
-                assert.match(page.rows[2], /Passed.*under 1s.*api/, at + 'a run under a second says so, not 0s: ' + page.rows[2]);
+                assert.match(page.rows[0], /Failed: step 2 \(Test\).*exit code 3.*2 min/, at + page.rows[0]);
+                assert.match(page.rows[1], /Passed.*10 s.*manual/, at + page.rows[1]);
+                assert.match(page.rows[2], /Passed.*under 1 s.*api/, at + 'a run under a second says so, not 0 s: ' + page.rows[2]);
             }
             assert.match(page.last, /The last run failed.*step 2 \(Test\): exit code 3\. Open the failed run/, at + page.last);
             assert.ok(page.last.includes(page.rows[0].split(' ').slice(0, 2).join(' ')), at + 'the line and the first row give the same time: ' + page.last + ' | ' + page.rows[0]);
