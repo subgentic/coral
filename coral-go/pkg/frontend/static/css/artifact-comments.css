@@ -183,7 +183,7 @@
 .av-seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
 .av-seg .btn { white-space: normal; }
 .av-seg .btn { margin: 0; border: 0; border-radius: 0; background: transparent; color: var(--text-secondary); }
-.av-seg .btn[aria-pressed="true"] { background: var(--bg-tertiary); color: var(--text-primary); font-weight: 600; }
+.av-seg .btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; } /* the one selected style: the accent fill (#9096) */
 .av-line { padding: 2px 8px 2px 11px; margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .av-line ins, .av-line del { text-decoration: none; }
 .av-add { background: color-mix(in srgb, var(--success) 18%, transparent); border-left: 3px solid var(--success); padding-left: 8px; }

@@ -39,7 +39,7 @@ export function taskButtons(task, ctx) {
     items.push({ label: 'Cancel task', danger: true, className: 'team-task-cancel', run: () => ctx.redraw(task, 'cancel') });
     out.push(moreMenu(`task-more-${task.id}`, items));
     if (task.status === 'draft') out.push(btn('btn btn-primary', 'Publish', () => publish(task, ctx)));
-    if (canComplete) out.push(btn('btn btn-success', 'Complete', () => ctx.redraw(task, 'complete')));
+    if (canComplete) out.push(btn('btn btn-primary', 'Complete', () => ctx.redraw(task, 'complete')));
     return out;
 }
 

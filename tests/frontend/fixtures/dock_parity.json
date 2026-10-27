@@ -2549,7 +2549,7 @@
       "newHome": "the task page's completion form: its bar's Complete",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "btn('btn btn-success', 'Complete', () => form.submit())"
+        "needle": "btn('btn btn-primary', 'Complete', () => form.submit())"
       }
     },
     {
