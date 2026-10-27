@@ -752,7 +752,7 @@
 
     #mobile-session-list .session-board-card {
         margin: 10px 0 !important;
-        border-radius: var(--radius-xl);
+        border-radius: var(--card-radius);
         overflow: hidden;
     }
 

@@ -361,9 +361,9 @@
 
 .tool-card {
     margin-top: 6px;
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    padding: var(--card-pad-dense);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
     background: var(--bg-secondary);
     font-size: var(--fs-base);
 }
