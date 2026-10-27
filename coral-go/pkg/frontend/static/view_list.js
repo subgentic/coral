@@ -32,7 +32,7 @@ function draw(root, { sections, current }) {
         const group = sec.title ? document.createElement('optgroup') : select;
         if (sec.title) group.label = sec.title;
         for (const it of sec.items) {
-            const b = el('button', 'view-list-item'); b.type = 'button'; b.dataset.key = it.key;
+            const b = el('button', 'view-list-item list-row'); b.type = 'button'; b.dataset.key = it.key;
             const lab = el('span', 'view-list-label');
             const icon = folderIcon(it.icon);
             if (icon) { b.classList.add('view-list-with-icon'); lab.append(icon); }
@@ -42,7 +42,7 @@ function draw(root, { sections, current }) {
             b.setAttribute('aria-label', it.soon ? `${it.label}, soon` : (it.count != null ? `${it.label}, ${it.count}` : it.label)); // the name and the count are read apart ("Board history, 1"), the count once (it is not in the name's text twice)
             if (it.soon) { b.disabled = true; b.classList.add('view-list-soon'); b.append(el('span', 'view-list-count', 'soon')); }
             else if (it.count != null) b.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
-            if (it.key === current) { b.setAttribute('aria-current', 'true'); b.classList.add('view-list-current'); }
+            if (it.key === current) { b.setAttribute('aria-current', 'true'); b.classList.add('view-list-current', 'list-row-current'); }
             nav.append(b);
             if (!it.soon) {
                 const o = el('option', null, it.count != null ? `${it.label} (${it.count})` : it.label); o.value = it.key; o.selected = it.key === current;

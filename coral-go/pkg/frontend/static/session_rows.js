@@ -342,7 +342,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         + (ctxHigh ? `, context ${s.context_pct >= 100 ? 'full' : Math.round(s.context_pct) + '%'}` : '')
         + (unreadCount > 0 ? `, ${unreadCount} unread` : '');
     const stuckClass = stateInfo.key === 'stuck' ? ' is-stuck' : '';
-    return `<li class="session-group-item${isActive ? ' active' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
+    return `<li class="session-group-item list-row${isActive ? ' active' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
         draggable="${stale ? 'false' : 'true'}"${stale ? ` aria-disabled="true" title="${escapeAttr(staleReason(s))}"` : ''}
         data-state="${escapeAttr(stateInfo.key)}"
         tabindex="0"
