@@ -15,6 +15,10 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
+	// The thinking level a call ran at, kept on each usage row from now on (#8915): what the transcript recorded for the call, else the level the agent's session was set to when a live call was
+	// recorded. NULL on every older row (the analytics show "Not recorded"); a rolled-up hourly row keeps it too (token_usage_hourly groups by it).
+	{"token_usage", "thinking", "TEXT"},
+	{"token_usage_hourly", "thinking", "TEXT"},
 	// Why a run failed, as a fixed word, and the agent CLI it concerns (#5469): "not_signed_in" and "claude". NULL on every other run.
 	{"workflow_runs", "error_code", "TEXT"},
 	{"workflow_runs", "agent_type", "TEXT"},

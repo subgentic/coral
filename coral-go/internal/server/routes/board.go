@@ -90,6 +90,8 @@ type BoardHandler struct {
 	// isArchivedSession reports whether a board session (agentType-sessionID) is
 	// an archived agent. Nil means no agent is ever treated as archived.
 	isArchivedSession func(ctx context.Context, sessionName string) bool
+	// sessionThinking returns the thinking level a board session is set to, "" when it has none or is not known (#8915).
+	sessionThinking func(ctx context.Context, sessionName string) string
 	// liveSessionType is a live session's agent type by session id (ok false when it has none);
 	// board notices are typed only into a live session of the type its name says (#3864).
 	// Nil skips that check (a handler without the sessions database).
@@ -123,6 +125,11 @@ func (h *BoardHandler) SetHubOperatorAllowed(fn func(*http.Request) bool) {
 // tasks are never assigned to them and task nudges skip them.
 func (h *BoardHandler) SetArchivedSessionLookup(fn func(ctx context.Context, sessionName string) bool) {
 	h.isArchivedSession = fn
+}
+
+// SetSessionThinkingLookup tells the board how to find the thinking level a board session (agentType-sessionID) is set to: a task claim records it (#8915).
+func (h *BoardHandler) SetSessionThinkingLookup(fn func(ctx context.Context, sessionName string) string) {
+	h.sessionThinking = fn
 }
 
 // SetLiveSessionLookup tells the board how to find a live session's agent type (#3864).
