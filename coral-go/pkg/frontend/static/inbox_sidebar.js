@@ -446,15 +446,15 @@ registerGroupSource('hub-inbox', {
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, oneLine: true, sortBar: false, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : resolveSessionIdentity(s),
                     open: s => { if (s.review) { openReview(s.review); return; } window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
                     columns: [
-                        { key: 'agent', label: rows.some(s => s.review) ? 'Item' : 'Agent', primary: true, width: rows.some(askOf) ? '9rem' : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; return name; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
-                        ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: 'grow', title: askOf, line: 1, cell: s => {
+                        { key: 'agent', label: rows.some(s => s.review) ? 'Item' : 'Agent', primary: true, width: rows.some(s => s.review) ? 'grow' : rows.some(askOf) ? '9rem' : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = `${s.review.name} · ${teamOf(s)}`; name.setAttribute('aria-label', name.title); name.dataset.reviewArtifact = s.review.id; return name; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                        ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: 'grow', ...(rows.some(s => s.review) ? { dropAt: 36 } : {}), title: askOf, line: 1, cell: s => {
                             if (!s.review) return askOf(s) || '';
                             return 'For review';
                         } }] : []), // no row has a question: no empty column
                         ...(rows.some(s => s.agent_type) ? [{ key: 'cli', label: 'CLI', width: '6rem', dropAt: 52, sort: true, sortValue: s => providerName(s.agent_type) || '', line: 2, cell: s => (s.agent_type ? DT.tag(providerName(s.agent_type)) : '') }] : []),
                         ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', width: '8rem', dropAt: 52, sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
                         ...serverColumns().map(c => ({ ...c, width: '8rem', dropAt: 52 })),
-                        { key: 'team', label: 'Team', width: '8rem', dropAt: 52, sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
+                        { key: 'team', label: 'Team', width: '8rem', dropAt: 52, sort: true, sortValue: s => teamOf(s), line: 0, cell: s => DT.el('span', s.review ? 'inbox-review-team' : '', teamOf(s)) },
                         ...(goal || rows.some(s => s.review) ? [{ key: 'goal', label: 'Goal', width: '8rem', dropAt: 52, sort: true, sortValue: s => (goalOf(s) ? s.goal.title : '\uffff'), line: rows.some(s => s.review) ? 2 : 0, cell: s => {
                             // a review's goal and task come from its artifact's roll-up (#8579); they open in the Inbox, in place; "No goal" when it serves none
                             if (!s.review) { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; }
@@ -463,7 +463,7 @@ registerGroupSource('hub-inbox', {
                             if (s.task) { const t = DT.link(s.task.title || `Task ${s.task.id}`, () => openItemRoute('tasks', s.review.team, String(s.task.id), `${s.review.team}#${s.task.id}`)); t.classList.add('inbox-review-task'); t.setAttribute('aria-label', `Task: ${s.task.title || s.task.id}`); t.dataset.taskLink = String(s.task.id); cell.append(t); }
                             return cell;
                         } }] : []),
-                        ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', dropAt: 36, width: '14rem', line: 1, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
+                        ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', width: '14rem', line: 1, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
                         { key: 'waiting', label: 'Waiting', width: '6rem', dropAt: 36, tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(s => s.review) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
                     ] });
                     wrap.append(table.el);

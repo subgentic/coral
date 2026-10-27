@@ -23,7 +23,7 @@ const TEAM = 'one-line-' + Date.now().toString(36);
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await ev('window.__coralReady.then(()=>true)');await installTP(ev);await seed(ev,TEAM);await agentsUp(ev);
    await openTeam(ev,waitFor,TEAM);await goTab(ev,settle,'Goals');await check('#team-panel-goals');await shot('one-line-team-goals-'+width);
    await goTab(ev,settle,'Agents');await check('#team-panel-agents');
-   assert.deepEqual(await ev(`[...document.querySelectorAll('#team-panel-agents th[data-key]')].map(h=>h.dataset.key)`),['agent','doing']);await shot('one-line-agents-'+width);
+   assert.deepEqual(await ev(`[...document.querySelectorAll('#team-panel-agents th[data-key]')].map(h=>h.dataset.key)`),['agent','status','doing','remind']);await shot('one-line-agents-'+width);
    await ev(`window.switchNavTab('hub-inbox');true`);await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('goals')).then(()=>true)`);await check('#group-table-view');await shot('one-line-inbox-goals-'+width);
    await ev(`(async()=>{window.__qaState.liveSessions=window.__qaState.liveSessions.map(s=>({...s,waiting_for_input:true,waiting_kind:'permission',waiting_summary:'Wants to run: an intentionally long command that must stay on one line without losing its full request'}));const m=await import((window.__coralStatic||'/static/')+'inbox_tab.js');m.updateInboxTab();m.selectInboxTab('needs');return true;})()`);
    await waitFor(`document.querySelector('#group-table-view td[data-key=asks]')?.textContent.includes('Wants to run')`,'request column');await check('#group-table-view');

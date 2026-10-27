@@ -90,6 +90,15 @@ async function sendReminder(agent, { message, seconds }) {
 
 const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, onSend: (v) => sendReminder(agent, v) });
 
+function remindButton(agent) {
+    const b = btn('btn btn-small team-remind', '');
+    b.setAttribute('aria-label', `Remind ${agent.name}`); b.title = `Remind ${agent.name}`;
+    const icon = el('span', 'material-icons', 'notifications'); icon.setAttribute('aria-hidden', 'true'); b.append(icon);
+    b.addEventListener('click', e => { e.stopPropagation(); askRemind(agent, b); });
+    return b;
+}
+
+
 // The Orchestrator first, then the agents that need a person (the header's "N need attention" opens this tab): a waiting agent, then a queued one, then an offline one; the rest in the sidebar's order.
 const NEEDS = ['waiting', 'needs_input']; // an ended agent needs no one: it sorts with the rest (#8271)
 const rank = (a) => { const i = NEEDS.indexOf(a.availability); return i < 0 ? NEEDS.length : i; };
@@ -140,7 +149,9 @@ function draw() {
         columns: [
             { key: 'agent', label: 'Agent', primary: true, width: '10rem', line: 1, field: 'name', sort: true,
                 cell: ag => { const b = DT.primaryButton('', ag.name); b.append(DT.avatar(ag.name)); return b; } },
-            { key: 'doing', label: 'Doing', width: 'grow', title: doingOf, line: 1, sort: true, sortValue: doingOf, cell: doingOf },
+            { key: 'status', label: 'Status', width: '8rem', sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
+            { key: 'doing', label: 'Doing', width: 'grow', dropAt: 36, title: doingOf, line: 1, sort: true, sortValue: doingOf, cell: doingOf },
+            { key: 'remind', label: 'Remind', hideLabel: true, width: '3.5rem', cell: ag => canRemind(ag) && ag.agent_type !== 'terminal' ? remindButton(ag) : '' },
         ],
     }).el);
     if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.goals-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }

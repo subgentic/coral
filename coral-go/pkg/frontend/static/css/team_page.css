@@ -386,3 +386,5 @@
     .team-settings-dialog-body { padding: 8px 0 0; } /* the form has its own 16px margins: the full 390 px is its width, so it keeps the bar-at-the-foot layout (a container under 24rem scrolls as a whole) */
 }
 
+
+.team-remind { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; }
