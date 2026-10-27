@@ -199,6 +199,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                         const au = await auditRegion(ev, ['.sidebar', '#cost-page']);
                         assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + label + ': contrast');
                         assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, how + label + ': no sideways scroll');
+                        if (zoom) assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-page select, #cost-page input')].filter(e => e.getClientRects().length && parseFloat(getComputedStyle(e).fontSize) < 20).map(e => e.id || e.className)`), [], how + label + ': a select or input grows with the text (#9427, the Group by select kept the browser 13.3 px)');
                         if (label === 'Overview') assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-summary-cards .cost-card')].filter(c => c.scrollWidth > c.clientWidth + 1 || c.getBoundingClientRect().right > document.getElementById('cost-page').getBoundingClientRect().right + 1 || [...c.querySelectorAll('.cost-card-value, .cost-card-label')].some(v => v.scrollWidth > v.clientWidth + 1)).map(c => c.textContent.trim().slice(0, 20))`), [], how + 'no tile clips its figure or its label (they wrap when the text is large)');
                     }
                 }
