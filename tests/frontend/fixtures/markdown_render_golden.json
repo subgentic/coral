@@ -4,8 +4,8 @@
   "board": "<p>Just some <strong>bold</strong> and <em>italic</em> text with a <code>code span</code> and a <a href=\"https://example.com/a?b=1&amp;c=2\" rel=\"noopener noreferrer\" target=\"_blank\">link</a>.</p>\n"
  },
  "lists": {
-  "chat": "<h1>Title</h1>\n<ul>\n<li>one</li>\n<li>two<ul>\n<li>nested</li>\n</ul>\n</li>\n</ul>\n<ol>\n<li>first</li>\n<li>second</li>\n</ol>\n<blockquote>\n<p>a quote\nover two lines</p>\n</blockquote>\n",
-  "board": "<h1>Title</h1>\n<ul>\n<li>one</li>\n<li>two<ul>\n<li>nested</li>\n</ul>\n</li>\n</ul>\n<ol>\n<li>first</li>\n<li>second</li>\n</ol>\n<blockquote>\n<p>a quote\nover two lines</p>\n</blockquote>\n"
+  "chat": "<h1 aria-level=\"4\">Title</h1>\n<ul>\n<li>one</li>\n<li>two<ul>\n<li>nested</li>\n</ul>\n</li>\n</ul>\n<ol>\n<li>first</li>\n<li>second</li>\n</ol>\n<blockquote>\n<p>a quote\nover two lines</p>\n</blockquote>\n",
+  "board": "<h1 aria-level=\"4\">Title</h1>\n<ul>\n<li>one</li>\n<li>two<ul>\n<li>nested</li>\n</ul>\n</li>\n</ul>\n<ol>\n<li>first</li>\n<li>second</li>\n</ol>\n<blockquote>\n<p>a quote\nover two lines</p>\n</blockquote>\n"
  },
  "table": {
   "chat": "<table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n<tbody><tr>\n<td>1</td>\n<td>2</td>\n</tr>\n<tr>\n<td><code>x</code></td>\n<td><strong>y</strong></td>\n</tr>\n</tbody></table>\n",
