@@ -137,18 +137,7 @@
     background: rgba(var(--fx-red-rgb), 0.15);
 }
 
-.theme-generate-banner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    background: var(--accent-dim);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-md);
-    font-size: var(--fs-base);
-    color: var(--text-primary);
-}
+.theme-generate-banner { margin-bottom: 8px; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 
 .theme-generate-spinner {
     display: inline-block;

@@ -275,7 +275,7 @@ async function generateThemeFromDescription() {
     let banner = null;
     if (scroll) {
         banner = document.createElement('div');
-        banner.className = 'theme-generate-banner';
+        banner.className = 'notice notice-info theme-generate-banner';
         banner.innerHTML = '<span class="theme-generate-spinner"></span> Generating theme with AI — this may take 10-20 seconds...';
         scroll.prepend(banner);
     }

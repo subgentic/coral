@@ -128,12 +128,12 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
     const why = reasonWords(last);
     const when = last && (last.finished_at || last.started_at) ? ` ${whenWords(last.finished_at || last.started_at)}` : '';
     const failBanner = noSignIn
-        ? `<div class="sched-fail-banner" role="status">
+        ? `<div class="notice notice-error sched-fail-banner" role="status">
              <strong>The last run did not start: ${escapeHtml(noSignIn.text)}.</strong>
              ${escapeHtml(noSignIn.hint)} This job keeps its schedule and ${escapeHtml(noSignIn.again)}.
            </div>`
         : fails >= 1
-        ? `<div class="sched-fail-banner" role="status">
+        ? `<div class="notice notice-error sched-fail-banner" role="status">
              <strong>${fails === 1 ? 'The last run failed' : `The last ${fails} runs failed`}</strong>${escapeHtml(when)}${why ? `: ${escapeHtml(why)}` : ''}. ${!job.enabled ? (job.paused_reason ? 'It is paused. Fix the cause, then press Enable.' : 'It is paused. Press Enable to run it again.') : 'It is still scheduled.'}
            </div>`
         : '';

@@ -129,7 +129,7 @@ export function xtermReady() {
 export function showVendorLoadError(host, what, onRetry) {
     host.querySelector(':scope > .vendor-load-notice')?.remove();
     const box = document.createElement('div');
-    box.className = 'vendor-load-notice vendor-load-error';
+    box.className = 'notice-line vendor-load-notice vendor-load-error';
     box.setAttribute('role', 'alert');
     const msg = document.createElement('span');
     msg.textContent = `${what} could not load. Check the connection to Coral, then try again.`;
@@ -147,7 +147,7 @@ export function showVendorLoadError(host, what, onRetry) {
 export function showVendorLoading(host, what) {
     host.querySelector(':scope > .vendor-load-notice')?.remove();
     const box = document.createElement('div');
-    box.className = 'vendor-load-notice';
+    box.className = 'notice-line vendor-load-notice';
     box.setAttribute('role', 'status');
     box.textContent = `Loading ${what}…`;
     host.appendChild(box);

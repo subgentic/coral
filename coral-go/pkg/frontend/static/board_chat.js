@@ -111,7 +111,7 @@ export function showBoardChatTab(boardName, agent = null) {
                 <button class="btn-nav board-icon-btn" id="board-chat-pause-btn" data-on-click="board-chat-pause" data-board="${escapeAttr(boardName)}" aria-label="Pause board" title="Pause board: stops agents from receiving new messages until resumed"><span class="material-icons" aria-hidden="true">pause</span></button>
                 <button class="btn-nav board-select-btn board-icon-btn" data-on-click="board-chat-select" aria-label="Export messages" aria-pressed="false" title="Export: select messages to export as Markdown"><span class="material-icons" aria-hidden="true">download</span></button>
             </div>
-            <div class="board-paused-banner" id="board-chat-paused-banner" style="display:none">Board reads are paused — agents cannot see new messages</div>
+            <div class="notice notice-error notice-bar notice-center board-paused-banner" id="board-chat-paused-banner" style="display:none">Board reads are paused — agents cannot see new messages</div>
             <div class="board-chat-msgs-wrap">
                 <div id="board-chat-earlier-status" class="sr-only" role="status" aria-live="polite"></div><!-- #7762: "50 earlier messages loaded" -->
                 <div id="board-chat-loading" class="mb-earlier-loading" hidden aria-hidden="true">Loading earlier messages&hellip;</div>
