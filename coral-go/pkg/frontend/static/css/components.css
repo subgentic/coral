@@ -110,13 +110,7 @@
 .btn-seg > .btn { margin: 0; border: 0; border-radius: 0; min-height: var(--control-compact-height); padding: 0 var(--space-lg); background: var(--bg-secondary); color: var(--text-secondary); white-space: nowrap; }
 .btn-seg > .btn + .btn { border-inline-start: 1px solid var(--control-border); }
 .btn-seg > .btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.btn-seg > /* The icon-only button (Goal #94, #9332): a square .btn with one icon and no label (its name is its aria-label), 36 px, 32 with .btn-small, 44 on touch; with .btn-quiet it has no box. The icon is --icon-size
-   unless the place sets its own. .btn-small's margin is for a button on its own line: an icon button never has one. */
-.btn-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--control-height); padding: 0; }
-.btn-icon.btn-small { width: var(--control-compact-height); margin: 0; }
-.btn-icon .material-icons { font-size: var(--icon-size); }
-@media (max-width: 767px), (pointer: coarse) { .btn-icon, .btn-icon.btn-small { width: var(--control-touch-height); } }
-.btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); }
+.btn-seg > .btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); }
 .btn-seg > .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 767px), (pointer: coarse) { .btn-seg > .btn { min-height: var(--control-touch-height); } }
 
