@@ -39,10 +39,10 @@ const NAME = 'Production build server for the release candidate integration and 
             for (const theme of ['dark','light']) {
                 await swapTheme(ev,theme);
                 await ev(`window.switchNavTab('automations'); import(${S}+'scheduler.js').then(async m=>{await m.refreshJobs(); await m.selectScheduledJob(1);return true;})`);
-                await waitFor(`!!document.querySelector('#sched-run-history .dt-clamp-2')`, 'the reason below Failed');
-                const reason=await ev(`(()=>{const chip=document.querySelector('#sched-run-history .sched-status'),r=document.querySelector('#sched-run-history .dt-clamp-2'),s=getComputedStyle(r);return {chip:chip.textContent,text:r.textContent,title:r.title,size:s.fontSize,weight:s.fontWeight,color:s.color,secondary:getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),clamp:s.webkitLineClamp,normal:s.whiteSpace,below:r.getBoundingClientRect().top>=chip.getBoundingClientRect().bottom-1,over:document.documentElement.scrollWidth-innerWidth};})()`);
-                assert.equal(reason.chip,'Failed'); assert.equal(reason.text,REASON); assert.equal(reason.title,REASON);
-                assert.equal(reason.size,'12px'); assert.equal(reason.weight,'400'); assert.equal(reason.clamp,'2'); assert.equal(reason.normal,'normal'); assert.ok(reason.below && reason.over<=1,JSON.stringify(reason));
+                await waitFor(`!!document.querySelector('#sched-run-history .dt-run-reason')`, 'the reason of the Failed run');
+                const reason=await ev(`(()=>{const chip=document.querySelector('#sched-run-history .sched-status'),r=document.querySelector('#sched-run-history .dt-run-reason'),row=chip.closest('tr');return {chip:chip.firstChild.textContent||chip.textContent,text:r.textContent.trim(),title:chip.title,screenReader:!!r.closest('.sr-only')||getComputedStyle(r).position==='absolute',rowHeight:Math.round(row.getBoundingClientRect().height),over:document.documentElement.scrollWidth-innerWidth};})()`);
+                assert.match(reason.chip,/Failed/); assert.equal(reason.text,REASON); assert.equal(reason.title,REASON);
+                assert.ok(reason.screenReader,'the reason is said to assistive technology, not drawn as a second line: '+JSON.stringify(reason)); assert.ok(reason.rowHeight<60 && reason.over<=1,'the run is one line (Goal #79): '+JSON.stringify(reason));
                 await shot(`jobs-long-reason-${width}-${theme}`);
                 await ev(`window.switchNavTab('servers'); true`);
                 await waitFor(`!!document.querySelector('#server-row-build-west .dt-name-text')`, 'long server name', 10000, `({tab:document.querySelector('.nav-tab.active')?.id,body:document.querySelector('#servers-tab-body')?.textContent,servers:window.__qaState?.servers})`);
