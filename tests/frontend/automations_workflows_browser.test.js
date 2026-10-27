@@ -1,6 +1,6 @@
 // Automations, the Workflows folder (Goal #74, UI/UX #8862; it carried the Workflows tab's checks from #7471): the sidebar's folder list has Workflows with its count; the folder's page is one table on the shared
 // toolbar (the search named "Search workflows", the All / Active / Paused pills with counts, Filters: Result, Step type, Sort, Build with Agent and New workflow at the right) with the columns Workflow, Steps, Last run and
-// Used by (no state-changing button in a row: Run is on the workflow's page); a workflow's page has its link back, a 17/700 name, one facts line, Steps and Runs as tables, and a bar pinned at the foot (More, Edit with Agent,
+// Used by (no state-changing button in a row: Run is on the workflow's page); a workflow's page has its link back, a 20/700 name, one facts line, Steps and Runs as tables, and a bar pinned at the foot (More, Edit with Agent,
 // Edit, Run as the primary); a run's page has its link back to the workflow and a bar (Re-run); with no workflow the folder is one empty line with its hint; /workflows opens the folder; both themes and 200%
 // text; a phone's table is the page and a workflow the screen after it. Drives Chrome over CDP through agent_view_harness.js, stubbed API.
 const assert = require('node:assert/strict');
@@ -124,7 +124,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
                 assert.equal(await ev(`document.getElementById('group-table-view').getClientRects().length`), 0, at + 'the table is not under the workflow screen');
                 assert.equal(await ev(`document.querySelector('#wf-detail .wf-phone-back').textContent.trim()`), '\u2190 Workflows', at + 'with the way back');
             } else assert.equal(await ev(`document.getElementById('wf-back-btn').textContent`), '\u2190 Workflows', at + 'back names the folder');
-            assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.getElementById('wf-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + 'the name is 17/700');
+            assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.getElementById('wf-title')); return [t.fontSize, t.fontWeight]; })()`), ['20px', '700'], at + 'the name is 20/700 (the 20 px title step, #9207)');
             assert.match(await ev(`document.querySelector('#wf-detail .wf-facts-line').textContent`), /^Folder \/work\/app \u00b7 Time limit .* \u00b7 Created /, at + 'one facts line under the name');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#wf-detail .wf-steps-table th')].map(h => h.textContent)`), ['Step', 'Type', 'Command'], at + 'Steps are a table');
             await oneLinePerRow(ev, '#wf-detail .wf-steps-table tbody tr', `${at}the steps`, assert, { min: 2 }); // Goal #79: a step and a run are one line at both widths; a long command is cut with an ellipsis, a narrow list drops Type
@@ -142,7 +142,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title') && !!document.querySelector('#wf-run-detail .item-bar')`, at + "the run's page", 8000);
             assert.equal(await pathname(), '/automations/workflows/1/runs/2', at + "the address is the run's");
             assert.equal(await ev(`document.getElementById('wf-run-back').textContent`), '\u2190 nightly-build', at + 'back goes to its workflow');
-            assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#wf-run-detail .wf-run-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + 'Run #2 is 17/700');
+            assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#wf-run-detail .wf-run-title')); return [t.fontSize, t.fontWeight]; })()`), ['20px', '700'], at + 'Run #2 is 20/700');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#wf-run-detail .item-bar .btn')].map(b => b.textContent.replace(/replay|stop/, '').trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['Re-run*'], at + "the run's bar");
             await ev(`document.querySelectorAll('#toast-host > .toast').forEach(t => t.remove()); true`); await themed('automations-workflows-run', w);
             await ev(`document.getElementById('wf-run-back').click(); true`);
