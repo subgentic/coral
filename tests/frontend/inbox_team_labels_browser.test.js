@@ -3,6 +3,8 @@
 // at /api/remote/box-2/...). 1280 and 390. Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const fs = require('node:fs');
+const path = require('node:path');
 
 const GOALS = { local: [{ id: 1, board_id: 'alpha', title: 'Local goal', outcome: 'o', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-26T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }],
     'box-2': [{ id: 1, board_id: 'alpha', title: 'Remote goal', outcome: 'o', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-25T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }] };
@@ -14,6 +16,11 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
     const { settle } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
+    const shot = async (name, theme) => { // the review shots, when a folder is given (CORAL_SCREENSHOT_DIR)
+        const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out')); if (!dir) return;
+        await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`); await settle(200);
+        fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+    };
     const column = title => ev(`(() => { const th = [...document.querySelectorAll('#group-table-view th')].findIndex(h => h.textContent.replace(/[\\u2191\\u2193\\u2195]/g, '').trim() === ${JSON.stringify(title)}); if (th < 0) return null;
         return [...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.querySelector('.dt-primary, td')).map(r => (r.children[th] || {}).textContent.replace(/\\s+/g, ' ').trim()); })()`);
     const teamChoices = () => ev(`[...document.querySelectorAll('.inbox-folder-toolbar select[id$="-team"] option')].map(o => [o.value, o.textContent.trim()])`);
@@ -44,6 +51,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length >= 2`, `${label}: two goals`, 10000);
             const gteams = await column('Team');
             check(`${label}: Goals' Team column tells the two alpha teams apart`, gteams && gteams.length === 2 && gteams[0] !== gteams[1] && gteams.some(t => /alpha.*This computer/.test(t)) && gteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(gteams));
+            await shot(`team-labels-goals-${label}`, mobile ? 'dark' : 'light');
             await panel();
             const gchoices = await teamChoices();
             check(`${label}: Goals' Team filter offers both, by their computer`, gchoices.filter(([v]) => v).length === 2 && new Set(gchoices.map(c => c[1])).size === gchoices.length && gchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)), JSON.stringify(gchoices));
@@ -55,7 +63,9 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length >= 2`, `${label}: two tasks`, 10000);
             const tteams = await column('Team');
             check(`${label}: Tasks' Team column tells the two alpha teams apart`, tteams && tteams.length === 2 && tteams[0] !== tteams[1] && tteams.some(t => /alpha.*This computer/.test(t)) && tteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(tteams));
+            await shot(`team-labels-tasks-${label}`, mobile ? 'dark' : 'light');
             await panel();
+            await shot(`team-labels-tasks-filters-${label}`, mobile ? 'dark' : 'light');
             const tchoices = await ev(`[...document.querySelectorAll('#inbox-tk-team option')].map(o => [o.value, o.textContent.trim()])`);
             check(`${label}: Tasks has a Team filter with both teams, by their computer`, tchoices.filter(([v]) => v).length === 2 && tchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)) && tchoices.some(([v, t]) => v === 'alpha' && /This computer/.test(t)), JSON.stringify(tchoices));
             await ev(`(() => { const s = document.getElementById('inbox-tk-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500);
