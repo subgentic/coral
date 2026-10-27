@@ -2093,46 +2093,6 @@
     color: var(--text-primary);
 }
 
-.overflow-menu {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: 4px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    padding: 4px;
-    min-width: 180px;
-    box-shadow: var(--shadow-lg);
-    z-index: 50;
-}
-
-.overflow-menu-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 8px 12px;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: var(--fs-md);
-    font-family: inherit;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: background 0.1s;
-}
-
-.overflow-menu-item:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
-.overflow-menu-item.overflow-menu-danger:hover {
-    background: rgba(var(--fx-red-rgb), 0.15);
-    color: var(--error);
-}
-
 /* A team action this account may not take through the Coral Hub (#3443): shown, not usable,
    with a short visible note; the full reason is the title. */
 .overflow-menu-item.overflow-menu-blocked,

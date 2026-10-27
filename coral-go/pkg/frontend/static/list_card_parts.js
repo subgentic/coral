@@ -13,12 +13,12 @@ export function killAllItem(boardName) {
     const icon = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>';
     const blocked = launchBlockedReason(splitKey(boardName).server);
     if (blocked) {
-        return `<button class="overflow-menu-item overflow-menu-danger overflow-menu-blocked" disabled aria-disabled="true" title="${escapeAttr(blocked)}">
+        return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger overflow-menu-blocked" disabled aria-disabled="true" title="${escapeAttr(blocked)}">
                     ${icon}
                     Kill All <span class="overflow-menu-note">needs Launch</span>
                 </button>`;
     }
-    return `<button class="overflow-menu-item overflow-menu-danger" data-on-click="team-kill" data-board="${escapeAttr(boardName)}">
+    return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-kill" data-board="${escapeAttr(boardName)}">
                     ${icon}
                     Kill All
                 </button>`;
@@ -46,7 +46,7 @@ const PIN_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
 export function _pinMenuItem(groupName, dir) {
     if (!dir || splitKey(groupName).server !== LOCAL_SERVER) return '';
     const pinned = isPinnedDir(dir);
-    return `<button class="overflow-menu-item" data-pin-action="${escapeAttr(pinned ? 'unpin' : 'pin')}" data-on-click="folder-pin" data-mode="${escapeAttr(pinned ? 'unpin' : 'pin')}" data-dir="${escapeAttr(dir)}">${PIN_ICON}${pinned ? 'Unpin folder' : 'Pin folder'}</button>`;
+    return `<button class="menu-item overflow-menu-item" data-pin-action="${escapeAttr(pinned ? 'unpin' : 'pin')}" data-on-click="folder-pin" data-mode="${escapeAttr(pinned ? 'unpin' : 'pin')}" data-dir="${escapeAttr(dir)}">${PIN_ICON}${pinned ? 'Unpin folder' : 'Pin folder'}</button>`;
 }
 
 export const FOLDER_GROUP_ICON = '<svg class="team-group-icon folder-group-icon" role="img" aria-label="Folder" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"'

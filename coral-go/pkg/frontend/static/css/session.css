@@ -442,13 +442,7 @@
 .sidebar-kebab-menu {
     position: fixed;
     z-index: 1100;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    padding: 4px 0;
-    box-shadow: 0 4px 16px rgba(var(--black-rgb), 0.3);
-    min-width: 160px;
-}
+} /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 
 /* ── Board Card Groups ─────────────────────────────────────── */
 

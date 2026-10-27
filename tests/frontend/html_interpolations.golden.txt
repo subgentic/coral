@@ -15,7 +15,7 @@
 1	artifact_item.js	renderMarkdownStrict(content)
 1	artifact_preview.js	rows
 1	artifact_viewer.js	renderMarkdownStrict(content)
-1	auto_accept.js	`<button type="button" class="overflow-menu-item auto-accept-menu-item" role="menuitemcheckbox" aria-checked="
+1	auto_accept.js	`<button type="button" class="menu-item overflow-menu-item auto-accept-menu-item" role="menuitemcheckbox" aria
 1	auto_accept.js	`Auto-accept prompts<span class="auto-accept-state">${stateText}</span></button>`
 1	auto_accept.js	on
 1	auto_accept.js	stateText

@@ -25,53 +25,53 @@ function _renderTeamCard(boardName, boardSessions) {
         const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
         const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
             <button class="sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(boardName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">&#x22EE;</button>
-            <div class="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(boardName)}">
-                <button class="overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
-                <button class="overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
-                <button class="overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
+            <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(boardName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
+                <button class="menu-item overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
+                <button class="menu-item overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                     Add Agent
                 </button>
-                <button class="overflow-menu-item" data-on-click="team-add-terminal" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
+                <button class="menu-item overflow-menu-item" data-on-click="team-add-terminal" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
                     Add Terminal
                 </button>
                 <hr class="overflow-menu-divider">
-                <button class="overflow-menu-item" data-on-click="team-save" data-board="${escapeAttr(boardName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="team-save" data-board="${escapeAttr(boardName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8l2 2v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M6 3v3h4V3"/><rect x="5" y="9" width="6" height="3"/></svg>
                     Save as Template
                 </button>
-                <button class="overflow-menu-item" data-on-click="team-distill" data-board="${escapeAttr(boardName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="team-distill" data-board="${escapeAttr(boardName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2L3 7v7h10V7L8 2z"/><path d="M6 14v-4h4v4"/><line x1="8" y1="7" x2="8" y2="10"/><line x1="6.5" y1="8.5" x2="9.5" y2="8.5"/></svg>
                     Distill Knowledge
                 </button>
-                <button class="overflow-menu-item" data-on-click="team-share" data-board="${escapeAttr(boardName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="team-share" data-board="${escapeAttr(boardName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v1a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-1"/><polyline points="8 3 8 10"/><polyline points="5 6 8 3 11 6"/></svg>
                     Share Team
                 </button>
-                <button class="overflow-menu-item" data-on-click="team-sleep" data-board="${escapeAttr(boardName)}" data-mode="${escapeAttr(sleepAction)}">
+                <button class="menu-item overflow-menu-item" data-on-click="team-sleep" data-board="${escapeAttr(boardName)}" data-mode="${escapeAttr(sleepAction)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                     ${sleepLabel}
                 </button>
                 <hr class="overflow-menu-divider">
-                <button class="overflow-menu-item" data-on-click="team-accent" data-board="${escapeAttr(boardName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="team-accent" data-board="${escapeAttr(boardName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5v13M1.5 8h13"/></svg>
                     Set Color
                 </button>
-                <button class="overflow-menu-item" data-on-click="team-tokens" data-board="${escapeAttr(boardName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="team-tokens" data-board="${escapeAttr(boardName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13V5h3v8H2zM7 13V3h3v10H7zM12 13V7h3v6h-3z"/></svg>
                     Token Usage
                 </button>
-                <button class="overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(boardName)}" data-dir="up">
+                <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(boardName)}" data-dir="up">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 7l4-4 4 4"/></svg>
                     Move Up
                 </button>
-                <button class="overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(boardName)}" data-dir="down">
+                <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(boardName)}" data-dir="down">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 9l4 4 4-4"/></svg>
                     Move Down
                 </button>
                 <hr class="overflow-menu-divider">
-                <button class="overflow-menu-item overflow-menu-danger" data-on-click="team-reset" data-board="${escapeAttr(boardName)}">
+                <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-reset" data-board="${escapeAttr(boardName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg>
                     Reset Team
                 </button>
@@ -107,12 +107,12 @@ function _renderWorkflowCard(wfName, wfSessions) {
         const wfSubline = `<div class="board-card-subline"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg> Workflow · ${wfSessions.length} agent${wfSessions.length !== 1 ? 's' : ''}${wfRunId ? ' · Run #' + wfRunId : ''}</div>`;
         const wfKebab = `<div class="sidebar-kebab-wrapper group-kebab">
             <button class="sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Workflow actions" aria-label="More actions for ${escapeAttr(wfName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('workflow', wfName))}">&#x22EE;</button>
-            <div class="sidebar-kebab-menu" id="${escapeAttr(kebabId('workflow', wfName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(wfName)}">
-                ${wfRunId ? `<button class="overflow-menu-item" data-on-click="wf-run-open" data-run-id="${Number(wfRunId)}">
+            <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('workflow', wfName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(wfName)}">
+                ${wfRunId ? `<button class="menu-item overflow-menu-item" data-on-click="wf-run-open" data-run-id="${Number(wfRunId)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 8h12M10 4l4 4-4 4"/></svg>
                     View Run
                 </button>` : ''}
-                <button class="overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="wf:${escapeAttr(wfName)}">
+                <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="wf:${escapeAttr(wfName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
                     Kill All
                 </button>
@@ -142,34 +142,34 @@ function _renderFolderGroup(groupName, groupSessions) {
         const groupDirRaw = sorted[0]?.working_directory || pinPathForKey(groupName);
         const groupKebab = `<div class="sidebar-kebab-wrapper group-kebab">
             <button class="sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(groupName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('folder', groupName))}">&#x22EE;</button>
-            <div class="sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
-                <button class="overflow-menu-item" data-on-click="folder-launch-default" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
+            <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="folder-launch-default" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                     Add Agent
                 </button>
-                <button class="overflow-menu-item" data-on-click="folder-add-agent" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
+                <button class="menu-item overflow-menu-item" data-on-click="folder-add-agent" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="10" y1="5" x2="14" y2="5"/></svg>
                     Add Custom Agent
                 </button>
-                <button class="overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
+                <button class="menu-item overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
                     Add Terminal
                 </button>
                 <hr class="overflow-menu-divider">
                 ${_pinMenuItem(groupName, groupDirRaw)}
-                <button class="overflow-menu-item" data-on-click="folder-tag" data-group="${escapeAttr(groupName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="folder-tag" data-group="${escapeAttr(groupName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5V3a1 1 0 0 1 1-1h5.5l5.5 5.5-5.5 5.5L2 8.5z"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor" stroke="none"/></svg>
                     Manage Tags
                 </button>
-                <button class="overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="up">
+                <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="up">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10"/><path d="M4 7l4-4 4 4"/></svg>
                     Move Up
                 </button>
-                <button class="overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="down">
+                <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="down">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3"/><path d="M4 9l4 4 4-4"/></svg>
                     Move Down
                 </button>
-                ${sorted.length ? `<button class="overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="${escapeAttr(groupName)}">
+                ${sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="${escapeAttr(groupName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
                     Kill All
                 </button>` : ''}
@@ -198,34 +198,34 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
         const groupDirRaw = sorted[0]?.working_directory || pinPathForKey(groupName);
         const groupKebab = `<div class="sidebar-kebab-wrapper group-kebab">
             <button class="sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(groupName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('folder', groupName))}">&#x22EE;</button>
-            <div class="sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
-                <button class="overflow-menu-item" data-on-click="folder-launch-default" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
+            <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="folder-launch-default" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                     Add Agent
                 </button>
-                <button class="overflow-menu-item" data-on-click="folder-add-agent" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
+                <button class="menu-item overflow-menu-item" data-on-click="folder-add-agent" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="10" y1="5" x2="14" y2="5"/></svg>
                     Add Custom Agent
                 </button>
-                <button class="overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
+                <button class="menu-item overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
                     Add Terminal
                 </button>
                 <hr class="overflow-menu-divider">
                 ${_pinMenuItem(groupName, groupDirRaw)}
-                <button class="overflow-menu-item" data-on-click="folder-tag" data-group="${escapeAttr(groupName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="folder-tag" data-group="${escapeAttr(groupName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5V3a1 1 0 0 1 1-1h5.5l5.5 5.5-5.5 5.5L2 8.5z"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor" stroke="none"/></svg>
                     Manage Tags
                 </button>
-                <button class="overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="up">
+                <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="up">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10"/><path d="M4 7l4-4 4 4"/></svg>
                     Move Up
                 </button>
-                <button class="overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="down">
+                <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="down">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3"/><path d="M4 9l4 4 4-4"/></svg>
                     Move Down
                 </button>
-                ${sorted.length ? `<button class="overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="${escapeAttr(groupName)}">
+                ${sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="${escapeAttr(groupName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
                     Kill All
                 </button>` : ''}
@@ -266,40 +266,40 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
                 const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
                     <button class="sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(boardName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">&#x22EE;</button>
-                    <div class="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(boardName)}">
-                <button class="overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
-                <button class="overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
-                        <button class="overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
+                    <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(boardName)}">
+                <button class="menu-item overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
+                <button class="menu-item overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
+                        <button class="menu-item overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                             Add Agent
                         </button>
-                        <button class="overflow-menu-item" data-on-click="team-add-terminal" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
+                        <button class="menu-item overflow-menu-item" data-on-click="team-add-terminal" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
                             Add Terminal
                         </button>
                         <hr class="overflow-menu-divider">
-                        <button class="overflow-menu-item" data-on-click="team-save" data-board="${escapeAttr(boardName)}">
+                        <button class="menu-item overflow-menu-item" data-on-click="team-save" data-board="${escapeAttr(boardName)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8l2 2v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M6 3v3h4V3"/><rect x="5" y="9" width="6" height="3"/></svg>
                             Save as Template
                         </button>
-                        <button class="overflow-menu-item" data-on-click="team-distill" data-board="${escapeAttr(boardName)}">
+                        <button class="menu-item overflow-menu-item" data-on-click="team-distill" data-board="${escapeAttr(boardName)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2L3 7v7h10V7L8 2z"/><path d="M6 14v-4h4v4"/><line x1="8" y1="7" x2="8" y2="10"/><line x1="6.5" y1="8.5" x2="9.5" y2="8.5"/></svg>
                             Distill Knowledge
                         </button>
-                        <button class="overflow-menu-item" data-on-click="team-share" data-board="${escapeAttr(boardName)}">
+                        <button class="menu-item overflow-menu-item" data-on-click="team-share" data-board="${escapeAttr(boardName)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v1a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-1"/><polyline points="8 3 8 10"/><polyline points="5 6 8 3 11 6"/></svg>
                             Share Team
                         </button>
-                        <button class="overflow-menu-item" data-on-click="team-sleep" data-board="${escapeAttr(boardName)}" data-mode="${escapeAttr(sleepAction)}">
+                        <button class="menu-item overflow-menu-item" data-on-click="team-sleep" data-board="${escapeAttr(boardName)}" data-mode="${escapeAttr(sleepAction)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                             ${sleepLabel}
                         </button>
                         <hr class="overflow-menu-divider">
-                        <button class="overflow-menu-item" data-on-click="team-accent" data-board="${escapeAttr(boardName)}">
+                        <button class="menu-item overflow-menu-item" data-on-click="team-accent" data-board="${escapeAttr(boardName)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5v13M1.5 8h13"/></svg>
                             Set Color
                         </button>
-                        <button class="overflow-menu-item" data-on-click="team-tokens" data-board="${escapeAttr(boardName)}">
+                        <button class="menu-item overflow-menu-item" data-on-click="team-tokens" data-board="${escapeAttr(boardName)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13V5h3v8H2zM7 13V3h3v10H7zM12 13V7h3v6h-3z"/></svg>
                             Token Usage
                         </button>

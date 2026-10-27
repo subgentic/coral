@@ -3,9 +3,7 @@ body.cloud-mode [data-local-only] { display: none !important; }
 body:not(.cloud-mode) [data-cloud-only] { display: none !important; }
 body.cloud-mode [data-history-local-only] { display: none !important; }
 .cloud-account-wrapper { position: relative; display: inline-block; }
-.cloud-account-menu { position: absolute; right: 0; top: 100%; z-index: 1000; min-width: 220px; padding: 6px;
-    background: var(--bg-secondary, #151a22); border: 1px solid var(--border, var(--fx-navy-line)); border-radius: var(--radius-lg); box-shadow: 0 8px 24px rgba(var(--black-rgb), .4); }
-.cloud-account-menu[hidden] { display: none; }
+.cloud-account-menu { position: absolute; right: 0; top: 100%; z-index: 1000; min-width: 220px; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .cloud-account-menu a.overflow-menu-item { text-decoration: none; } /* the hub's own pages, as links (#4596) */
 .cloud-account-email { padding: 6px 10px 8px; font-size: var(--fs-base); opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     border-bottom: 1px solid var(--border, var(--fx-navy-line)); margin-bottom: 4px; }
