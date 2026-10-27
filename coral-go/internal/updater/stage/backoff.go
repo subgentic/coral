@@ -6,9 +6,20 @@ import "time"
 // a network failure retries in 5 minutes, then 15, then an hour; a verification failure or a package that does not match waits an hour and doubles
 // to a day. A newer version starts again.
 const (
-	KindNetwork = "network"
-	KindVerify  = "verify"
+	KindNetwork   = "network"
+	KindVerify    = "verify"
+	KindRateLimit = "rate_limit" // GitHub's limit on anonymous requests (#9704): the wait is the time it says it is over, not a doubling
 )
+
+// rateLimitWait is how long to wait after a rate-limit answer that is over at retryAt: until then (and a few seconds more), at least a minute and at most a day; an answer that did not say when
+// waits an hour. Never a loop that asks again while the limit is still on.
+func rateLimitWait(now, retryAt time.Time) time.Duration {
+	const slack, least, most, unknown = 10 * time.Second, time.Minute, 24 * time.Hour, time.Hour
+	if retryAt.IsZero() {
+		return unknown
+	}
+	return min(max(retryAt.Sub(now)+slack, least), most)
+}
 
 func backoff(kind string, attempts int) time.Duration {
 	if attempts < 1 {

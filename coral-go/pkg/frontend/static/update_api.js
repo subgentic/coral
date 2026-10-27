@@ -32,7 +32,7 @@ const str = (v) => (typeof v === 'string' ? v : '');
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 const INSTALL_KINDS = ['app', 'msi', 'portable', 'tarball', 'homebrew', 'unwritable'];
-const NOT_READY = ['not_checked', 'up_to_date', 'not_promoted', 'backoff', 'check_failed', 'unsupported_install', 'switch_off', 'applying'];
+const NOT_READY = ['not_checked', 'up_to_date', 'not_promoted', 'backoff', 'rate_limited', 'check_failed', 'unsupported_install', 'switch_off', 'applying'];
 const ROLLBACK_REASONS = ['did_not_start', 'not_healthy', 'swap_failed', 'verify_failed', 'other'];
 const VERSION_RE = /^\d{1,4}\.\d{1,4}\.\d{1,4}$/;
 const SOURCE_RE = /^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/;
@@ -152,6 +152,7 @@ export function notReadyText(s) {
         case 'up_to_date': return { title: 'Coral is up to date', sub: `You are on ${s.installed}.` };
         case 'not_promoted': return { title: s.latest ? `Coral ${s.latest} is out` : 'A newer Coral is out', sub: 'Coral will download and check it once it is ready. Installing it is up to you.' };
         case 'backoff': return { title: 'Nothing to install right now', sub: 'Coral will check again later.' };
+        case 'rate_limited': return { title: 'Coral could not check for updates', sub: "GitHub limits how many anonymous requests one network address may make, and this one reached it. Coral will check again when the limit is over. Nothing was changed." };
         case 'check_failed': return { title: 'Coral could not check for updates', sub: 'It will try again later. Nothing was changed.' };
         case 'not_checked': return { title: 'Coral has not checked for updates yet', sub: `You are on ${s.installed}.` };
         case 'switch_off': return { title: 'Automatic update checks are off', sub: 'Turn on "Check for updates automatically" in Settings > Updates to have updates downloaded and kept ready.' };
