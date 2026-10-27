@@ -76,14 +76,6 @@
 
 /* the on/off box is a switch; it stays a native checkbox (the keyboard, the screen reader and the touch target are unchanged) */
 .sv-switch-hit, .sv .sv-switch-hit { display: inline-flex; align-items: center; justify-content: flex-end; margin: 0; } /* a dialog's own label rule (block, a bottom margin) must not take the switch off its line */
-.sv-switch { appearance: none; -webkit-appearance: none; position: relative; width: 2.5rem; height: 1.4rem; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
-.sv-switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
-.sv input.sv-switch.sv-switch { padding: 0; box-sizing: border-box; width: 2.5rem; height: 1.4rem; min-height: 0; margin: 0; flex: none; } /* in rem: the switch grows with the text size */ /* inside a dialog, the dialog's own input padding must not squeeze the switch */
-.sv-switch:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
-.sv-switch:checked::before { background: var(--text-on-accent); transform: translateX(1.1rem); }
-.sv-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.sv-switch:disabled { opacity: .5; cursor: not-allowed; }
-@media (prefers-reduced-motion: reduce) { .sv-switch::before { transition: none; } }
 
 /* the bar: the status at the left, Cancel and Save at the right */
 .sv-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: var(--sv-bar-pad); border-top: 1px solid var(--border); background: var(--bg-primary); }
@@ -106,8 +98,6 @@
 @media (pointer: coarse), (max-width: 767px) {
     .sv-action, .sv-confirm .btn, .sv-bar .btn { min-height: var(--sv-control-height-touch); }
     .sv-switch-hit { min-width: var(--sv-control-height-touch); min-height: var(--sv-control-height-touch); }
-    .sv-switch { width: 44px; } /* the switch itself is a 44 px target on a touch screen: 40 px wide was the census's red */
-    .sv-switch:checked::before { transform: translateX(24px); }
     .sv .sv-row-toggle { align-items: start; } /* the switch's 44 px target starts at the row's top: the label's line is level with the switch, however many lines the hint has below it */
     .sv-row-toggle .sv-text { min-height: var(--sv-control-height-touch); display: flex; flex-wrap: wrap; align-content: center; align-items: baseline; } /* and a short row's words are centred on it (the label and an inline Learn more stay on one line) */
     .sv-row-toggle .sv-text > p.sv-help, .sv-row-toggle .sv-text > .sv-more { flex: 0 0 100%; }
@@ -132,16 +122,6 @@
     .sv-flat .sv-row { grid-template-columns: minmax(0, 1fr); }
     .sv-flat .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; }
     .sv-flat .sv-row:not(.sv-row-toggle) .sv-control { justify-content: flex-start; }
-}
-
-/* Windows High Contrast: a switch shows its state with system colours (backgrounds are dropped) */
-@media (forced-colors: active) {
-    .sv-switch { background: Canvas; border: 2px solid ButtonText; }
-    .sv-switch::before { background: ButtonText; }
-    .sv-switch:checked { background: Highlight; border-color: Highlight; }
-    .sv-switch:checked::before { background: HighlightText; }
-    .sv-switch:disabled { opacity: 1; border-color: GrayText; }
-    .sv-switch:disabled::before { background: GrayText; }
 }
 
 /* a narrow view for its text (a phone at a large text size, a 320 px phone): the view scrolls as a whole, the bar at its end, so the pane keeps room to read. In rem, so the text size counts. */

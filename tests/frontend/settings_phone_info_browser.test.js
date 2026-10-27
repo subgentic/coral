@@ -30,7 +30,7 @@ const { connect } = require('./agent_view_harness');
             if (!row.getClientRects().length) continue;
             const label = row.querySelector('.sv-label'); if (!label) continue;
             const text = row.querySelector('.sv-help-text'), learn = row.querySelector('.sv-learn'), l = label.getBoundingClientRect();
-            const tog = row.querySelector('.sv-switch'), tb = tog && tog.getBoundingClientRect();
+            const tog = row.querySelector('.switch'), tb = tog && tog.getBoundingClientRect();
             const hintShown = !!text && text.textContent.trim() !== '' && text.getClientRects().length > 0;
             out.push({ label: label.textContent.trim().slice(0, 30), info: !!row.querySelector('.settings-info-btn'), hint: hintShown, under: !hintShown || text.getBoundingClientRect().top >= l.bottom - 2, learnH: learn ? Math.round(Math.max(learn.getBoundingClientRect().height, parseFloat(getComputedStyle(learn, '::after').height) || 0)) : null, tog: tb ? tb.top < l.bottom && tb.bottom > l.top : null });
             }

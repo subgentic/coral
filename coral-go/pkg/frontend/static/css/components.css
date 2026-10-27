@@ -3207,6 +3207,23 @@ label:has(+ .field-error) { margin-bottom: 0; } /* the line sits after the label
 .field-search { padding-left: 1.875rem; }
 .field-clear { padding-right: 28px; }
 @media (max-width: 767px), (pointer: coarse) { .field { min-height: var(--control-touch-height); } }
+/* One switch (Goal #88, #9241): a native checkbox drawn as a track and a knob; 44 px wide on a phone or touch. */
+.switch { appearance: none; -webkit-appearance: none; position: relative; box-sizing: border-box; width: 2.5rem; height: 1.4rem; min-height: 0; margin: 0; padding: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
+.switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
+.switch:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
+.switch:checked::before { background: var(--text-on-accent); transform: translateX(1.1rem); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch:disabled { opacity: .5; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .switch::before { transition: none; } }
+@media (max-width: 767px), (pointer: coarse) { .switch { width: 44px; } .switch:checked::before { transform: translateX(24px); } }
+@media (forced-colors: active) {
+    .switch { background: Canvas; border: 2px solid ButtonText; }
+    .switch::before { background: ButtonText; }
+    .switch:checked { background: Highlight; border-color: Highlight; }
+    .switch:checked::before { background: HighlightText; }
+    .switch:disabled { opacity: 1; border-color: GrayText; }
+    .switch:disabled::before { background: GrayText; }
+}
 .field-error { margin: 4px 0 .9rem; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); line-height: 1.4; overflow-wrap: anywhere; }
 
 /* Auto-accept (#3182): the AUTO chip (agent row and header), the menu switch's state and the warning dialog. */
@@ -3711,16 +3728,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-info-text[hidden] { display: none; }
 .settings-info-text > * + * { margin-top: .4rem; }
 .settings-pane > .settings-theme-btn, .settings-pane > .settings-prompts-btn { margin-top: 1rem; }
-/* The on/off boxes are switches; they stay native checkboxes (the keyboard, the screen reader and the touch target are unchanged). */
-:is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; width: 2.5rem; height: 1.4rem; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
-:is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
-:is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
-:is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:checked::before { background: var(--text-on-accent); transform: translateX(1.1rem); }
-:is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-:is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
-@media (prefers-reduced-motion: reduce) { :is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]::before { transition: none; } }
-/* A touch screen: the switches are 44 px wide targets (they were 40 px: the phone census's red on the health switches): their width and knob travel are these two variables. */
-@media (pointer: coarse) { :root { --switch-w: 2.75rem; --switch-travel: 1.35rem; } }
+/* The on/off boxes are .switch (the family is by .field): native checkboxes, so the keyboard, the screen reader and the touch target are unchanged. */
 @container settingspane (max-width: 40rem) {
     .settings-row { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
     .settings-row:has(> dd > .check-hit) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }

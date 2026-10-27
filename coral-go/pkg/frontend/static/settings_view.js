@@ -91,7 +91,7 @@ export function mountSettingsView(host, spec) {
         const common = e => { if (field.required) e.setAttribute('aria-required', 'true'); return e; };
         const t = field.type || 'text';
         if (t === 'toggle') {
-            const input = node('input', 'sv-switch'); input.type = 'checkbox'; input.id = field.id || `${id}-c`; input.name = field.key;
+            const input = node('input', 'switch'); input.type = 'checkbox'; input.id = field.id || `${id}-c`; input.name = field.key;
             const hit = node('label', 'check-hit sv-switch-hit'); hit.htmlFor = input.id; hit.append(input);
             return { node: hit, input, get: () => input.checked, set: v => { input.checked = !!v; }, focus: () => input.focus(), disable: on => { input.disabled = on; }, labelledBy: true };
         }
