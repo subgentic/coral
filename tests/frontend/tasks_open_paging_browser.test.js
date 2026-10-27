@@ -43,14 +43,27 @@ const B = 'open-paging-' + Date.now().toString(36);
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length > ${n}`, 'the next page', 10000);
         }
         assert.equal(await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].filter(r => /Open task/.test(r.textContent)).length`), 360, 'every open task is there once the pages are loaded');
-        // a refresh keeps the pages that were loaded, but reads at most five of them again (seven were loaded)
+        // a task of the first page finishes, then a refresh: it must not stay open on screen, the pages beyond the five re-read are dropped and Load more fetches them again (#9153)
+        const finished = await ev(`fetch('/api/board/${B}/tasks?limit=1').then(r => r.json()).then(j => j.tasks[0])`);
+        assert.ok((await post('/tasks/claim', { subscriber_id: 'Boss', task_id: finished.id })).status < 300);
+        assert.ok((await post(`/tasks/${finished.id}/complete`, { subscriber_id: 'Boss', message: 'done', outcome: 'success' })).status < 300);
         const reads = (await ev(`window.__tasksReads.length`));
         await ev(`import((window.__coralStatic || '/static/') + 'team_tasks_page.js').then(m => m.loadTasks()).then(() => true)`);
         await waitFor(`window.__tasksReads.length > ${reads}`, 'the refresh', 10000);
         await ev(`new Promise(r => setTimeout(r, 1500))`); // sleep-ok: the refresh's pages arrive one after another; the count of reads after it has no event
         const refreshReads = (await ev(`window.__tasksReads.length`)) - reads;
         assert.ok(refreshReads <= 6, `a refresh makes the first read and at most five more (${refreshReads})`);
-        assert.equal(await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].filter(r => /Open task/.test(r.textContent)).length`), 360, 'a refresh keeps every loaded row, the pages beyond the cap as they were');
-        console.log('PASS open set paging: 50 rows and ' + first.bytes + ' bytes for the first read instead of the whole ' + whole.bytes + '; Load more open tasks follows the cursor; a refresh read ' + refreshReads + ' pages of the 8 loaded and kept them all');
+        const openRows = () => ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].filter(r => /Open task/.test(r.textContent)).map(r => r.textContent)`);
+        const afterRefresh = await openRows();
+        assert.ok(!afterRefresh.some(t => t.includes(finished.title)), `the task that finished (${finished.title}) is not open on screen after the refresh`);
+        assert.equal(afterRefresh.length, 300, 'the first page and the five re-read pages stay, the two beyond are dropped');
+        assert.equal(await ev(`/Load more open tasks/.test(document.getElementById('team-panel-tasks').textContent)`), true, 'and Load more open tasks offers them again');
+        for (let i = 0; i < 4 && await ev(`/Load more open tasks/.test(document.getElementById('team-panel-tasks').textContent)`); i++) {
+            const n = (await openRows()).length;
+            await ev(`[...document.querySelectorAll('#team-panel-tasks .goals-more')].find(b => /Load more open tasks/.test(b.textContent)).click(); true`);
+            await waitFor(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].filter(r => /Open task/.test(r.textContent)).length > ${n}`, 'the next page again', 10000);
+        }
+        assert.equal((await openRows()).length, 359, 'Load more fetched the rest: every open task but the finished one');
+        console.log('PASS open set paging: 50 rows and ' + first.bytes + ' bytes for the first read instead of the whole ' + whole.bytes + '; Load more open tasks follows the cursor; a refresh read ' + refreshReads + ' pages of the 8 loaded and dropped the rest');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
