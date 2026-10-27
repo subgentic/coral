@@ -193,3 +193,58 @@ func BenchmarkWorkflowListFactsOpen(b *testing.B) {
 		}
 	}
 }
+
+// #9567: the done page (status=completed, and the second half of the default list) stage by stage, 200 rows.
+func BenchmarkTaskListDonePage200(b *testing.B) {
+	s, err := NewStoreWithKey(filepath.Join(b.TempDir(), "board_bench7.db"), "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { s.Close() })
+	seedTaskBoardWithWorkflows(b, s, 1500, 3500)
+	ctx := context.Background()
+	b.Run("whole_page", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			if p, err := s.ListTaskPage(ctx, "team", TaskListQuery{Status: TaskListCompleted, Limit: 200}); err != nil || len(p.Tasks) != 200 {
+				b.Fatal(err)
+			}
+		}
+	})
+	rows, _, _ := s.doneTaskPage(ctx, "team", "", 200)
+	b.Run("done_query", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			if _, _, err := s.doneTaskPage(ctx, "team", "", 200); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("verification", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			s.loadListVerification(ctx, rows)
+		}
+	})
+	b.Run("load_documents_only", func(b *testing.B) {
+		b.ReportAllocs()
+		ids := make([]int64, len(rows))
+		for i := range rows {
+			ids[i] = rows[i].ID
+		}
+		for i := 0; i < b.N; i++ {
+			if _, err := s.loadWorkflowData(ctx, ids); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("other_stages", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			fillListReviewers(rows)
+			s.fillListArtifactCounts(ctx, rows)
+			_ = s.loadListBlockedBy(ctx, rows)
+			_, _, _ = s.taskListTotals(ctx, "team")
+		}
+	})
+}
