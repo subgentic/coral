@@ -142,24 +142,75 @@ func TestANoticeStillTagsItsAssignee(t *testing.T) {
 	require.Len(t, got, 1, "the assignee is tagged by the notice that means to")
 }
 
-// The review pool's line (#8957) quotes the title, the candidate and the reason too.
-func TestReviewPoolLineQuotesTitleCandidateAndReasonWithoutTaggingAnyone(t *testing.T) {
-	base, h, _ := tagsBoard(t, "pool")
+// The review pool's line (#8957) quotes the title, the candidate and the reason: each is probed alone, on its own board, with the others plain, so a part left raw cannot hide behind one that is defused.
+func TestReviewPoolLineQuotesEachOfTitleCandidateAndReasonWithoutTaggingAnyone(t *testing.T) {
+	for _, c := range []struct{ name, title, candidate, reason, words string }{
+		{"title", "Docs Writer: pooled build", "rev 1", "ready", "Docs Writer: pooled build"},
+		{"candidate", "Pooled build", "Docs Writer — rev 1", "ready", "Docs Writer — rev 1"},
+		{"reason", "Pooled build", "rev 1", "Docs Writer: ready", "Docs Writer: ready"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			project := "pool-" + c.name
+			base, h, _ := tagsBoard(t, project)
+			ctx := context.Background()
+			_, err := h.bs.Subscribe(ctx, project, "Rev Only", "Reviewer", "ro-session", nil, "all")
+			require.NoError(t, err)
+			yes, none := true, []string{}
+			_, err = h.bs.SetReviewSettings(ctx, project, "Rev Only", &yes, &none)
+			require.NoError(t, err)
+			task, err := h.bs.CreateTask(ctx, project, c.title, "", "high", "lead", "worker")
+			require.NoError(t, err)
+			_, err = h.bs.ClaimTask(ctx, project, "worker", task.ID)
+			require.NoError(t, err)
+			code, out := postCode(t, base(task.ID, "submit-review"), map[string]any{"subscriber_id": "worker", "reason": c.reason, "candidate_revision": c.candidate, "message": "built", "artifacts": []board.TaskArtifact{{Name: "report", Content: "done"}}})
+			require.Equal(t, http.StatusOK, code, "%v", out)
+			h.WaitBackground()
+			noOneTagged(t, h, project, "the pool line tagged a bystander through its "+c.name)
+			text := readable(t, h, project)
+			assert.Contains(t, text, "in the review pool")
+			assert.Contains(t, text, c.words, "the quoted part is readable whole")
+		})
+	}
+}
+
+// A blocked task's creation notice names what it waits for, and the reason for a dependency is built from stored text (a required artifact's name): it is quoted data too.
+func TestBlockedCreationNoticeQuotesTheBlockerReasonWithoutTaggingAnyone(t *testing.T) {
+	_, h, root := tagsBoard(t, "blk")
 	ctx := context.Background()
-	_, err := h.bs.Subscribe(ctx, "pool", "Rev Only", "Reviewer", "ro-session", nil, "all")
+	up, err := h.bs.CreateTask(ctx, "blk", "Upstream", "", "medium", "lead")
 	require.NoError(t, err)
-	yes, none := true, []string{}
-	_, err = h.bs.SetReviewSettings(ctx, "pool", "Rev Only", &yes, &none)
+	code, out := postCode(t, root+"/tasks", map[string]any{"title": "Downstream", "created_by": "lead", "blocked_by": []map[string]any{{"task_id": up.ID, "required_artifacts": []string{"Docs Writer: spec"}}}})
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	h.WaitBackground()
+	noOneTagged(t, h, "blk", "the blocked notice tagged a bystander through the blocker reason")
+	assert.Contains(t, readable(t, h, "blk"), "missing required artifacts: Docs Writer: spec", "the reason is quoted whole")
+}
+
+// A member's id can hold a name and a colon ("Docs Writer: Lead"): when that member sends a task back, the notice names them without tagging the member the id begins with.
+func TestSendBackNoticeQuotesTheSendersIdWithoutTaggingAnyone(t *testing.T) {
+	base, h, _ := tagsBoard(t, "sb")
+	ctx := context.Background()
+	const sender = "Docs Writer: Lead"
+	_, err := h.bs.Subscribe(ctx, "sb", sender, "Orchestrator", "sb-session", nil, "all")
 	require.NoError(t, err)
-	task, err := h.bs.CreateTask(ctx, "pool", "Docs Writer: pooled build", "", "high", "lead", "worker")
+	task, err := h.bs.CreateTask(ctx, "sb", "Merge queue task", "", "high", "lead", "worker")
 	require.NoError(t, err)
-	_, err = h.bs.ClaimTask(ctx, "pool", "worker", task.ID)
+	_, err = h.bs.ClaimTask(ctx, "sb", "worker", task.ID)
 	require.NoError(t, err)
-	code, out := postCode(t, base(task.ID, "submit-review"), map[string]any{"subscriber_id": "worker", "reason": "Docs Writer: ready", "candidate_revision": "Docs Writer — rev", "message": "built", "artifacts": []board.TaskArtifact{{Name: "report", Content: "done"}}})
+	patch := board.TaskArtifact{Name: "fix.patch", Content: "diff --git a/a b/a", Revision: "r1"}
+	code, out := postCode(t, base(task.ID, "submit-review"), map[string]any{"subscriber_id": "worker", "reason": "ready", "message": "built", "artifacts": []board.TaskArtifact{patch}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	code, out = postCode(t, base(task.ID, "review"), map[string]any{"subscriber_id": "lead", "reviewers": []string{"Security Reviewer"}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	code, out = postCode(t, base(task.ID, "approve"), map[string]any{"subscriber_id": "Security Reviewer"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	code, out = postCode(t, base(task.ID, "send-back"), map[string]any{"subscriber_id": sender, "note": "conflicts in a.go"})
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	h.WaitBackground()
-	noOneTagged(t, h, "pool", "the pool line tagged a bystander")
-	text := readable(t, h, "pool")
-	assert.Contains(t, text, "in the review pool")
-	assert.Contains(t, text, "Docs Writer: ready")
+	noOneTagged(t, h, "sb", "the send-back notice tagged a bystander through the sender's id")
+	assert.Contains(t, readable(t, h, "sb"), "sent back by "+sender, "the sender is named whole")
+}
+
+func TestQuoteNoticeEscapesQuotesAndKeepsTheZeroWidthSpaces(t *testing.T) {
+	assert.Equal(t, "\"say \\\"hi\\\" a\\\\b Docs Writer\u200b: x\"", quoteNotice("say \"hi\" a\\b Docs Writer\u200b: x"))
 }

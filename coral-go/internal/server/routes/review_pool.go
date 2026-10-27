@@ -117,8 +117,8 @@ func (h *BoardHandler) putReviewInPool(ctx context.Context, project string, id i
 	for i, f := range fits {
 		mentions[i] = "@" + f
 	}
-	line := fmt.Sprintf("[Task #%d in the review pool] %s submitted %q (candidate: %s; %s). It waits for %s (%s). A reviewer that matches claims it with 'coral-board task claim', then reads it with 'coral-board task detail %d'.",
-		id, h.noticeText(ctx, project, author), h.noticeText(ctx, project, title), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, reason), count, areaText, id)
+	line := fmt.Sprintf("[Task #%d in the review pool] %s submitted %s (candidate: %s; %s). It waits for %s (%s). A reviewer that matches claims it with 'coral-board task claim', then reads it with 'coral-board task detail %d'.",
+		id, h.noticeText(ctx, project, author), quoteNotice(h.noticeText(ctx, project, title)), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, reason), count, areaText, id)
 	if len(mentions) > 0 {
 		line = strings.Join(mentions, " ") + " " + line
 	} else {

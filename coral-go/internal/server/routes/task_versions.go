@@ -130,3 +130,9 @@ func (h *BoardHandler) noticeText(ctx context.Context, project, text string) str
 func (h *BoardHandler) postNotice(ctx context.Context, project, content string) {
 	h.bs.PostSystemDefusedMessage(ctx, project, "Coral Task Queue", content, nil)
 }
+
+// quoteNotice puts text already made by noticeText in double quotes, escaping a backslash and a quote as %q does but leaving every other character as it is: %q would write the zero-width
+// spaces that defuse a mention as the six characters \u200b.
+func quoteNotice(text string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(text) + `"`
+}
