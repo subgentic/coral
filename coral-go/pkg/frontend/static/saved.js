@@ -79,7 +79,8 @@ async function load() {
     const [local, ...others] = await Promise.all([onlyRemote ? Promise.resolve(null) : read(LOCAL_SERVER), ...remotes.map(s => read(s.id).catch(() => ({ server: s.id, failed: true, label: s.label || s.id })))]);
     if (mine !== loadSeq) return; // a newer read was asked for while this one was on its way: it draws the list
     const answered = [local, ...others.filter(o => !o.failed)].filter(Boolean);
-    down = others.filter(o => o.failed).map(o => ({ id: o.server, label: o.label }));
+    down = [...others.filter(o => o.failed).map(o => ({ id: o.server, label: o.label })),
+        ...(scope.kind === 'all' && state.hub ? (state.servers || []).filter(s => s && s.id && s.id !== LOCAL_SERVER && s.status !== 'online').map(s => ({ id: s.id, label: s.label || s.id })) : [])]; // a computer the hub knows is offline is named too, not only one that timed out (#8904)
     multi = scope.kind === 'all' && remotes.length > 0;
     // Only what a server sent in a usable shape is listed (an id goes into a URL: saved_marks.js validSavedItem).
     items = answered.flatMap(a => (Array.isArray(a.d.items) ? a.d.items : []).filter(validSavedItem).map(i => ({ ...i, server: a.server }))).filter(i => savedKeeps(i, filters) && serverMatches(i, filters))
