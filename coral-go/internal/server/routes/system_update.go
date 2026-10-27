@@ -36,6 +36,21 @@ func FetchLatestVersion() string {
 	return v
 }
 
+// updateCheckWait is how long GET /api/system/update-check waits for GitHub when it has no fresh answer. With the outside network down or black-holed the request
+// itself takes updatecheck.Timeout (5 s); a page that asks on every load must not hold a connection that long (#9360). Past this the check answers "nothing new" and the
+// request goes on in the background, so the next ask has its answer (or the failure, kept five minutes). A person's "Check for Updates" (refresh) waits for the whole request.
+var updateCheckWait = 1500 * time.Millisecond
+
+// feedWithin is Cache.Feed that gives up waiting after wait (not for refresh); the request the cache started is not cancelled by that.
+func feedWithin(ctx context.Context, ch updatecheck.Channel, f updatecheck.Feeds, refresh bool, wait time.Duration) (*updatecheck.Feed, error) {
+	if !refresh {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, wait)
+		defer cancel()
+	}
+	return updatecheck.Default.Feed(ctx, ch, f, refresh)
+}
+
 // UpdateCheck returns update availability info for the channel the settings name.
 // GET /api/system/update-check
 func (h *SystemHandler) UpdateCheck(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +70,7 @@ func (h *SystemHandler) UpdateCheck(w http.ResponseWriter, r *http.Request) {
 	// Answered from a cache (an hour, a failure five minutes) with one request in flight at a time per feed,
 	// for every caller, an agent's token included (#4133). ?refresh=1 is the dashboard's manual
 	// "Check for Updates": it asks again, at most once a minute.
-	feed, _ := updatecheck.Default.Feed(r.Context(), ch, releaseFeeds(), r.URL.Query().Get("refresh") == "1")
+	feed, _ := feedWithin(r.Context(), ch, releaseFeeds(), r.URL.Query().Get("refresh") == "1", updateCheckWait)
 	latest, approved := "", true
 	if feed != nil {
 		latest, approved = feed.Offer.Version, !feed.Offer.Prerelease

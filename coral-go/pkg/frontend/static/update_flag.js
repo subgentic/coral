@@ -2,7 +2,7 @@
  * shown only on `enabled: true` (#5280 step 3 C). It starts false; loadUpdatesFlag() asks once at startup, and every local status the UI reads (update_api.js) refreshes it. It has no imports, so
  * the modules that hang the UI on a page (Settings' tab list, the top bar, the Servers badge) can read it synchronously. A dashboard served through Coral Hub never asks: this computer's own
  * updates are for its own dashboard. */
-import { isCloud } from './server_base.js';
+import { dropBody, isCloud } from './server_base.js';
 
 let on = false;
 let probe = null;
@@ -17,7 +17,7 @@ export function loadUpdatesFlag() {
     if (isCloud()) return Promise.resolve(false);
     if (!probe) {
         probe = fetch('/api/system/update', { headers: { Accept: 'application/json' } })
-            .then(r => (r.ok ? r.json() : null))
+            .then(r => { if (r.ok) return r.json(); dropBody(r); return null; }) // a refusal's body is given up, not left unread
             .then(b => { if (b && typeof b === 'object') setUpdatesEnabled(b.enabled); return on; })
             .catch(() => on);
     }
