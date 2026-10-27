@@ -14,7 +14,7 @@ export function hasUnsavedTeamSettings() {
 export function confirmTeamWorkspaceChange() {
     if (!hasUnsavedTeamSettings()) return Promise.resolve(true);
     return new Promise(resolve => window.showConfirmModal('Unsaved Team Settings', 'Team settings have unsaved changes. Leave without saving?',
-        () => resolve(true), () => resolve(false)));
+        () => resolve(true), () => resolve(false), { label: 'Leave', cancelLabel: 'Keep editing' }));
 }
 
 /** Open the team's settings (#8853: a popout over the page on screen; the team page has no Settings tab). */

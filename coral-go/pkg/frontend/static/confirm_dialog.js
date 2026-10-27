@@ -11,6 +11,7 @@ export function showConfirmModal(title, message, onConfirm, onCancel, opts = {})
     const yesBtn = document.getElementById("confirm-modal-yes");
     const newBtn = yesBtn.cloneNode(true);
     newBtn.textContent = opts.label || 'Yes';
+    const noBtn = document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)'); if (noBtn) noBtn.textContent = opts.cancelLabel || 'Cancel'; // the stay button's words, put back to Cancel for every other question
     yesBtn.parentNode.replaceChild(newBtn, yesBtn);
     newBtn.addEventListener("click", () => {
         _confirmCancel = null;
