@@ -420,3 +420,75 @@ func TestGitReleaseCountsCommitsOnOriginsBranchTheLocalOneHasNotPulled(t *testin
 	assert.Equal(t, "v1.0.0", st.Tag)
 	assert.Equal(t, 2, st.Commits, "origin's two commits past the tag, the local branch has none")
 }
+
+// #9041 (QA Reviewer 2's surviving mutant): the newest release tag may exist only on origin's branch, which the local one has not pulled: the alert still names it, and counts from it.
+func TestGitReleaseUsesANewestTagThatExistsOnlyOnOriginsBranch(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir := t.TempDir()
+	run := func(env []string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), env...)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	commit := func(name string, env []string) {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600))
+		run(nil, "add", name)
+		run(env, "commit", "-q", "-m", name)
+	}
+	run(nil, "init", "-q")
+	commit("a", nil)
+	run(nil, "tag", "v1.0.0")
+	run(nil, "checkout", "-q", "-b", "fetched")
+	later := []string{"GIT_COMMITTER_DATE=2035-01-01T00:00:00Z", "GIT_AUTHOR_DATE=2035-01-01T00:00:00Z"}
+	commit("b", later)
+	run(later, "tag", "-a", "-m", "v2", "v2.0.0") // the newest tag, on a commit only origin's branch has
+	commit("c", later)
+	run(nil, "update-ref", "refs/remotes/origin/main", "fetched")
+	run(nil, "checkout", "-q", "main") // the local main is still at the first release
+	st, err := gitRelease(context.Background(), dir, "main", "v*")
+	require.NoError(t, err)
+	assert.Equal(t, "v2.0.0", st.Tag, "the tag only origin's branch contains is the newest release")
+	assert.Equal(t, 1, st.Commits, "one commit past it on origin's branch")
+}
+
+// #9041: the branch the alert reads is the later by commit time of the local one and origin's, not the one with more commits: here the local branch has the newer commit and fewer commits than origin, and it is the one counted.
+func TestGitReleaseTakesTheLaterBranchByCommitTimeNotByCommitCount(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir := t.TempDir()
+	run := func(env []string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), env...)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	commit := func(name string, env []string) {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600))
+		run(nil, "add", name)
+		run(env, "commit", "-q", "-m", name)
+	}
+	run(nil, "init", "-q")
+	commit("a", nil)
+	run(nil, "tag", "v1.0.0")
+	run(nil, "checkout", "-q", "-b", "fetched")
+	older := []string{"GIT_COMMITTER_DATE=2030-01-01T00:00:00Z", "GIT_AUTHOR_DATE=2030-01-01T00:00:00Z"}
+	commit("b", older)
+	commit("c", older)
+	commit("d", older) // origin's branch: three commits past the tag, all older
+	run(nil, "update-ref", "refs/remotes/origin/main", "fetched")
+	run(nil, "checkout", "-q", "main")
+	newer := []string{"GIT_COMMITTER_DATE=2035-01-01T00:00:00Z", "GIT_AUTHOR_DATE=2035-01-01T00:00:00Z"}
+	commit("e", newer) // the local branch: one commit past the tag, newer than any of origin's
+	st, err := gitRelease(context.Background(), dir, "main", "v*")
+	require.NoError(t, err)
+	assert.Equal(t, "v1.0.0", st.Tag)
+	assert.Equal(t, 1, st.Commits, "the local branch has the later commit: it is the one counted, whatever origin's commit count")
+}
