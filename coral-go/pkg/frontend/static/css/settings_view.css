@@ -157,3 +157,7 @@
 .sv #tb-now, .sv #tb-fixed { font: var(--dlg-control); } /* the backend this run uses: a value like every other row's */
 .sv #tb-pending { color: var(--warning); margin: 0; } /* the terminal backend's pending line (terminal_backend.js) */
 .sv-row-notice:has(> .sv-notice > #tb-pending:empty) { padding: 0; border-top: 0; } /* empty, it takes no room but stays a live region */
+
+/* inside the team settings dialog (#8853): the foot is always in view, also when a narrow or large-text form scrolls as a whole; on a phone the dialog has no margins of its own, so the lead keeps its 16 px edge */
+.team-settings-modal .sv-bar { position: sticky; bottom: 0; }
+@media (max-width: 760px) { .team-settings-modal .sv-lead { padding: 0 16px; } }
