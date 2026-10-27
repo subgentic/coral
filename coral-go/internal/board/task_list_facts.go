@@ -26,7 +26,8 @@ var listFactCols = []struct{ name, def, none string }{
 	{"lst_in_pool", "INTEGER NOT NULL DEFAULT 0", "0"},
 	{"lst_wanted", "INTEGER NOT NULL DEFAULT 0", "0"},
 	{"lst_artifacts", "INTEGER NOT NULL DEFAULT 0", "0"},
-	{"lst_parent", "INTEGER NOT NULL DEFAULT 0", "0"}, // the task this one is a follow-up of (0: none): task detail lists a task's follow-ups from it (#9560)
+	{"lst_art_refs", "TEXT NOT NULL DEFAULT ''", "''"}, // the artifact references the team artifacts list reads, as one small object (#9594)
+	{"lst_parent", "INTEGER NOT NULL DEFAULT 0", "0"},  // the task this one is a follow-up of (0: none): task detail lists a task's follow-ups from it (#9560)
 }
 
 // listFactExprs are the expressions of the columns over a document d (a column or NEW.data), in listFactCols order. The artifact count is the distinct stored objects and links of the completion's and the
@@ -45,6 +46,7 @@ func listFactExprs(d string) []string {
 		`CASE WHEN COALESCE(json_extract(` + d + `, '$.review_in_pool'), 0) = 1 THEN 1 ELSE 0 END`,
 		`COALESCE(json_extract(` + d + `, '$.reviewers_wanted'), 0)`,
 		`CASE WHEN ` + d + ` LIKE '%` + artifactsMark + `%' THEN ` + uris + ` + ` + inline("$.artifacts") + ` + ` + inline("$.completion_review.artifacts") + ` ELSE 0 END`, // a document without the mark (most tasks) holds no artifact row: the text test is cheaper than the two walks (the same mark has_artifacts uses)
+		artRefs(d),
 		`COALESCE(json_extract(` + d + `, '$.parent_task_id'), 0)`,
 	}
 }
@@ -115,4 +117,10 @@ func (s *Store) ensureWorkflowListFacts(ctx context.Context) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// artRefs is the expression of lst_art_refs over a document d: exactly what the team artifacts read takes from a workflow (the completion's artifacts, and the review's submitter, time and artifacts), empty for a
+// document without the artifacts mark. The list used to select and decode the whole document (about 800 bytes) for these.
+func artRefs(d string) string {
+	return `CASE WHEN ` + d + ` LIKE '%` + artifactsMark + `%' THEN json_object('artifacts', json_extract(` + d + `, '$.artifacts'), 'completion_review', CASE WHEN json_type(` + d + `, '$.completion_review') = 'object' THEN json_object('submitted_by', json_extract(` + d + `, '$.completion_review.submitted_by'), 'submitted_at', json_extract(` + d + `, '$.completion_review.submitted_at'), 'artifacts', json_extract(` + d + `, '$.completion_review.artifacts')) END) ELSE '' END`
 }
