@@ -110,6 +110,11 @@ func costAnswersFor(t *testing.T, s *TokenUsageStore, since string) costAnswers 
 		out["series "+iv], err = s.GetUsageTimeSeries(ctx, since, iv)
 		require.NoError(t, err)
 	}
+	// the day series split by each group (#9447: a day bucket with no end reads the rolled-up hours through the day aggregate): the totals and every group's series
+	for _, g := range []string{"team", "agent", "provider", "model", ""} {
+		out["grouped 1d by "+g], err = s.GetUsageTimeSeriesGrouped(ctx, TimeSeriesQuery{Since: since, Interval: "1d", GroupBy: g})
+		require.NoError(t, err)
+	}
 	return out
 }
 
