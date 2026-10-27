@@ -14,7 +14,7 @@ import { HISTORY_PAGE, setHistoryWindow } from './history_pages.js';
 import { normServer, serverForSession, serverFetch, sessionServer, agentPath, identityKey, keyLabel, isCloud } from './server_base.js';
 import { updateHeaderContext } from './header_context.js';
 import { stopCaptureRefresh, startCaptureRefresh } from './capture.js';
-import { updateSessionStatus, updateSessionSummary, updateSessionBranch, updateSessionFolder, updateWaitingIndicator, updateTokenUsage, updateHistoryTokenUsage, renderHistoryChat, showBoardChatTab, hideBoardChatTab, resolveSessionIdentity, commandPlaceholder, startingPlaceholder, applyTerminalDot } from './render.js';
+import { updateSessionStatus, updateSessionSummary, updateSessionBranch, updateSessionFolder, updateSessionModel, updateWaitingIndicator, updateTokenUsage, updateHistoryTokenUsage, renderHistoryChat, showBoardChatTab, hideBoardChatTab, resolveSessionIdentity, commandPlaceholder, startingPlaceholder, applyTerminalDot } from './render.js';
 import { renderQuickActions, updateSidebarActive, renderAttachments } from './controls.js';
 import { loadSessionNotes, switchHistoryTab } from './notes.js';
 import { loadSessionTags } from './tags.js';
@@ -355,6 +355,7 @@ export async function selectLiveSession(name, agentType, sessionId, server) {
     captureWrapper.classList.remove("loading-skeleton");
     updateSessionBranch(agent?.branch || null, agent?.repo_name || null, agent?.git_state || null);
     updateSessionFolder(agent?.working_directory || "");
+    updateSessionModel(agent || null);
     updateModelChip(agent || null, srv);
     updateWaitingIndicator(agent || {});
     updateTokenUsage(sessionId);

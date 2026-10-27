@@ -13,7 +13,6 @@ const NOT_AN_EMPTY_STATE = new Map([
     ['chat-empty', 'the first-run hero of a chat with no transcript; the chat logic keeps it out of the transcript (chat_content.js)'],
     ['chat-empty-title', 'its title'], ['chat-empty-hint', 'its hint'],
     ['composer-waiting-empty', 'a screen-reader-only node'],
-    ['session-goal-empty', 'the inline "generate a goal" button of a session row'], ['session-goal-empty-label', 'its label'],
     ['empty-launch', 'the welcome page launch cards (cards, not an empty line)'], ['empty-launch-arrow', 'the same card'], ['empty-launch-copy', 'the same card'], ['empty-launch-icon', 'the same card'], ['empty-launch-list', 'the same cards'],
     ['empty-welcome', 'the phone Home (a title, a sentence and the launch cards)'], ['empty-plain', 'the desktop list line that the phone Home replaces'],
     ['hub-connect-empty', 'the connect-a-computer card of Coral Hub: a button and a sentence inside the agent list'],

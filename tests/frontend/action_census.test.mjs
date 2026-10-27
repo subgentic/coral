@@ -99,7 +99,6 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
     'team-sleep': 'sidebar team menu; reversible (Wake)',
     'agent-move': 'sidebar order only',
     'group-move': 'sidebar order only',
-    'goal-request': 'sidebar row: asks the server to summarise the agent\'s goal; types nothing into the agent',
     'msg-edit-resubmit': 'copies a past message into the command input; sending is cmd-send (gated)',
     // Names with a destructive word, reviewed one by one
     'attachment-remove': 'drops a pending attachment from the unsent message',
@@ -142,7 +141,7 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
 }));
 const RISKY = /(^|-)(restart|kill|rename|delete|reset|remove|stop|cancel)(-|$)/;
 const MUST_REVIEW = /^m-launch-|(^|-)import(-|$)|(^|-)save(-|$)|^m-apply-settings$/;
-const SECURITY_NAMED = ['agent-sleep', 'agent-archive', 'team-sleep', 'agent-move', 'group-move', 'goal-request', 'msg-edit-resubmit'];
+const SECURITY_NAMED = ['agent-sleep', 'agent-archive', 'team-sleep', 'agent-move', 'group-move', 'msg-edit-resubmit'];
 const unclassified = [...registered.keys()].filter(n => (RISKY.test(n) || MUST_REVIEW.test(n)) && !DESTRUCTIVE_ACTIONS.has(n) && !NOT_POPOUT_RELEVANT.has(n));
 assert.deepStrictEqual(unclassified, [], 'classify each: DESTRUCTIVE_ACTIONS in actions.js (a popout removes it) or NOT_POPOUT_RELEVANT here, with the reason');
 for (const n of SECURITY_NAMED) assert.ok(DESTRUCTIVE_ACTIONS.has(n) || NOT_POPOUT_RELEVANT.has(n), `${n} is reviewed`);

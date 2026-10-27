@@ -5,6 +5,8 @@ import { _shortPath, _gitStateSummary, _repoBranch, presentationSessionState } f
 import { startupSignedOut } from './signin_line.js';
 import { syncAgentKeys } from './agent_keys.js';
 import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill } from './dom_write.js';
+import { modelName, sessionLevel } from './model_labels.js';
+import { sessionServer } from './server_base.js';
 
 export function updateSessionStatus(status) {
     const el = document.getElementById("session-status");
@@ -22,11 +24,24 @@ let _headerHasBranch = false;
 function _syncHeaderFolder() {
     const el = document.getElementById("terminal-header-folder");
     if (!el) return;
-    const show = !!_headerDir && !_headerHasBranch;
+    const show = !!_headerDir; // the folder and the branch are both in the header now (the row no longer says either, #9686); the full path is the hover
     setHidden(el, !show);
     if (!show) return;
     setText(el.querySelector(".terminal-folder-text"), _shortPath(_headerDir, 2));
     setTitle(el, _headerDir);
+}
+
+/** The model and thinking level in the open agent's header (#9686: the agent row is one line and no longer says them; the composer's chips still change them). Hidden when neither is on record. */
+export function updateSessionModel(s) {
+    const el = document.getElementById("terminal-header-model");
+    if (!el) return;
+    const model = s ? modelName(s.agent_type, s.model, sessionServer(s)) : '';
+    const level = s ? sessionLevel(s) : null;
+    const text = [model, level && level.name].filter(Boolean).join(' \u00b7 ');
+    setHidden(el, !text);
+    if (!text) return;
+    setText(el.querySelector(".terminal-folder-text"), text);
+    setTitle(el, [model && `Model ${model}`, level && `Thinking ${level.name}${level.requested ? ' (as started)' : ''}`].filter(Boolean).join(', '));
 }
 
 export function updateSessionFolder(dir) {
