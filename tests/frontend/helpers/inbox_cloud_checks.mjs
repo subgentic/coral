@@ -85,6 +85,13 @@ try {
         assert.equal(document.getElementById('inbox-search').disabled, true, 'a Hub page has its own search');
         nav().find(b => /Starred/.test(b.textContent)).click(); await settle(300);
         assert.equal(document.getElementById('inbox-search').disabled, false);
+        // Enter in the Inbox's search sends ONE read of each online computer, and the same words again send one again (#9574: a kept list answered them with no request)
+        const sb = await importUi('inbox_sidebar');
+        const histReads = () => calls.filter(c => c === '/api/remote/box-2/api/sessions/history').length;
+        calls.length = 0; sb.filterInbox('needle'); await settle(300);
+        assert.equal(histReads(), 1, `Enter sends one read of the one online computer: ${calls}`);
+        calls.length = 0; sb.filterInbox('needle'); await settle(300);
+        assert.equal(histReads(), 1, `the same words again send one more: ${calls}`);
         const ok = new Set(['/api/remote/box-2/api/sessions/history/counts', '/api/remote/box-2/api/sessions/history']);
         assert.ok(calls.every(c => ok.has(c)), `only the chat folders are read: ${[...new Set(calls)]}`);
     }

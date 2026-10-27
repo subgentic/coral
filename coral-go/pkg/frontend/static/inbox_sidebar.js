@@ -301,6 +301,7 @@ function inboxChatsToolbar(key) {
             chatFilters.set(key, next); CF.saveFilters(key, next);
             queries[key] = next.q;
             const input = $('inbox-search'); if (input && group === key) input.value = next.q; // the sidebar's box shows the same words
+            if (nativeInbox()) CH.resetChatLists(); // a search sent on Enter is one read of each online computer, even for words read before (a list kept from then would answer it with no request)
             renderInboxNav(true);
         }));
     }
@@ -619,7 +620,7 @@ export function filterInbox(value) {
     if (group === 'artifacts') { IA.setArtifactSearch(text); return; } // the folder's own search box shows the same text
     queries[group] = CH.CHAT_KEY.test(group) || group === 'tasks' ? text : text.toLowerCase();
     if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; } // a chat search goes to the server as typed
-    if (CH.CHAT_KEY.test(group)) chatFilters.set(group, { ...chatFiltersOf(group), q: text }); // the sidebar's box and the page's share the one search (#8603)
+    if (CH.CHAT_KEY.test(group)) { chatFilters.set(group, { ...chatFiltersOf(group), q: text }); if (nativeInbox()) CH.resetChatLists(); } // the sidebar's box and the page's share the one search (#8603); on a Hub it is sent on Enter, one read of each online computer every time
     if (group === 'needs') { needsFilters = { ...needsFilters, q: text }; NF.saveFilters(needsFilters); } // the sidebar's box and the page's share the one search (#8604)
     if (group === 'goals') { goalFilters = { ...goalFilters, q: text }; GF.saveFilters(goalFilters); } // the sidebar's box and the page's share the one search (#8596)
     renderInboxNav(true);
