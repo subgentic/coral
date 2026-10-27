@@ -10,9 +10,9 @@ assert.equal(waitingText(ago(4 * MIN + 59000), now), 'waiting 4 min', 'whole min
 assert.equal(waitingText(ago(30000), now), 'waiting under 1 min');
 assert.equal(waitingText(ago(-5 * MIN), now), 'waiting under 1 min', 'a start in the future reads as just begun');
 assert.equal(waitingText(ago(59 * MIN), now), 'waiting 59 min');
-assert.equal(waitingText(ago(60 * MIN), now), 'waiting 1 h');
-assert.equal(waitingText(ago(125 * MIN), now), 'waiting 2 h 5 min');
-assert.equal(waitingText(ago(50 * 60 * MIN), now), 'waiting 2 d');
+assert.equal(waitingText(ago(60 * MIN), now), 'waiting 1 h 00 min');
+assert.equal(waitingText(ago(125 * MIN), now), 'waiting 2 h 05 min');
+assert.equal(waitingText(ago(50 * 60 * MIN), now), 'waiting 2 d 2 h');
 assert.equal(waitingText(null, now), '', 'null: nothing is said');
 assert.equal(waitingText(undefined, now), ''); assert.equal(waitingText('', now), ''); assert.equal(waitingText('not a date', now), '');
 console.log('waiting_text: ok');
