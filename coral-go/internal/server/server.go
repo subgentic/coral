@@ -73,6 +73,7 @@ type Server struct {
 	goalMetrics     *routes.GoalMetricsHandler
 	systemHandler   *routes.SystemHandler
 	workflowHandler *routes.WorkflowHandler
+	schedHandler    *routes.ScheduleHandler
 
 	// The server's own background work (recoveries, the auto-accept loop) runs on bgCtx and
 	// is waited for by Close, before the board database closes (#3914).
@@ -306,6 +307,9 @@ func (s *Server) SetCloud(m *cloud.Manager) {
 func (s *Server) SetScheduler(sched *background.JobScheduler) {
 	if s.tasksHandler != nil {
 		s.tasksHandler.SetScheduler(sched)
+	}
+	if s.schedHandler != nil {
+		s.schedHandler.SetScheduler(sched)
 	}
 }
 

@@ -250,8 +250,13 @@ func (s *JobScheduler) evaluateJob(ctx context.Context, job store.ScheduledJob, 
 		return nil
 	}
 
-	// Calculate next fire time
-	afterTime := lookbackStart(job, lastRun, now)
+	// Calculate next fire time. A run a person started (Run now) does not move the schedule: the next slot is counted from the last run the
+	// schedule made.
+	lastSlot, err := s.store.GetLastCronRunForJob(ctx, job.ID)
+	if err != nil {
+		return err
+	}
+	afterTime := lookbackStart(job, lastSlot, now)
 
 	nextFire, err := s.nextFireTimeFn(job.CronExpr, job.Timezone, afterTime)
 	if err != nil {
@@ -262,18 +267,59 @@ func (s *JobScheduler) evaluateJob(ctx context.Context, job store.ScheduledJob, 
 		return nil // Not due yet
 	}
 
-	// Check concurrency limit and pre-register to prevent TOCTOU race
+	if _, err := s.startRun(ctx, job, now, store.TriggerCron); err != nil {
+		var full *ConcurrencyLimitError
+		if errors.As(err, &full) || errors.Is(err, ErrJobRunning) {
+			return nil // At capacity, or a run began since the check above
+		}
+		return err
+	}
+	return nil
+}
+
+// ErrJobRunning: the job already has a run pending or running.
+var ErrJobRunning = errors.New("the job is already running")
+
+// ErrJobNotFound: no job has that id.
+var ErrJobNotFound = errors.New("job not found")
+
+// RunNow runs a job once now, at a person's request (#9293): the same run the schedule would make (a run record, the workflow or the agent,
+// the same watching), recorded as the job's run with trigger "manual". It works for a paused job (the person asked for it), refuses a job
+// that is already running, and does not move the job's schedule. Returns the run's id; *ConcurrencyLimitError when the scheduler is full.
+func (s *JobScheduler) RunNow(ctx context.Context, jobID int64) (int64, error) {
+	job, err := s.store.GetScheduledJob(ctx, jobID)
+	if err != nil {
+		return 0, err
+	}
+	if job == nil {
+		return 0, ErrJobNotFound
+	}
+	return s.startRun(ctx, *job, time.Now().UTC(), store.TriggerManual)
+}
+
+// startRun makes a run record for job, taking a place among the running ones, and starts it. The record is made while the lock is held, so
+// two callers cannot both start a job that has no run yet.
+func (s *JobScheduler) startRun(ctx context.Context, job store.ScheduledJob, now time.Time, trigger string) (int64, error) {
 	s.runningMu.Lock()
 	if len(s.running) >= s.maxConcurrent {
 		s.runningMu.Unlock()
-		return nil // At capacity
+		return 0, &ConcurrencyLimitError{Limit: s.maxConcurrent}
+	}
+	active, err := s.store.GetActiveRunForJob(ctx, job.ID)
+	if err != nil {
+		s.runningMu.Unlock()
+		return 0, err
+	}
+	if active != nil {
+		s.runningMu.Unlock()
+		return 0, ErrJobRunning
 	}
 
 	// Create a run record while holding the lock
-	runID, err := s.store.CreateScheduledRun(ctx, job.ID, now.Format(store.ISOFormat), "pending")
+	runID, err := s.store.CreateScheduledRunTrigger(ctx, job.ID, now.Format(store.ISOFormat), "pending", trigger)
 	if err != nil {
 		s.runningMu.Unlock()
-		return err
+		return 0, err
 	}
 
 	// Pre-register placeholder so concurrent evaluateJob calls see it
@@ -284,7 +330,7 @@ func (s *JobScheduler) evaluateJob(ctx context.Context, job store.ScheduledJob, 
 	if job.JobType == "workflow" && job.WorkflowID != nil {
 		go func() {
 			defer safego.Recover("background/scheduler:s.triggerWorkflowForJob")
-			s.triggerWorkflowForJob(runID, job)
+			s.triggerWorkflowForJob(runID, job, trigger)
 		}()
 	} else if s.launchFn != nil {
 		rc := runConfig{
@@ -297,8 +343,7 @@ func (s *JobScheduler) evaluateJob(ctx context.Context, job store.ScheduledJob, 
 		}
 		s.watch(runID, job, rc)
 	}
-
-	return nil
+	return runID, nil
 }
 
 // runConfig holds launch parameters for a run.

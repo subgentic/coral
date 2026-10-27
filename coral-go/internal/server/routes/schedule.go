@@ -12,16 +12,22 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/gitutil"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
 )
 
 // ScheduleHandler handles scheduled jobs API endpoints.
 type ScheduleHandler struct {
-	sched *store.ScheduleStore
-	cfg   *config.Config
+	sched     *store.ScheduleStore
+	cfg       *config.Config
+	scheduler *background.JobScheduler // Run now; nil until the server hands it over
 }
+
+// SetScheduler gives the handler the job scheduler Run now goes through.
+func (h *ScheduleHandler) SetScheduler(s *background.JobScheduler) { h.scheduler = s }
 
 func NewScheduleHandler(db *store.DB, cfg *config.Config) *ScheduleHandler {
 	return &ScheduleHandler{
@@ -357,6 +363,37 @@ func (h *ScheduleHandler) ToggleJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
+}
+
+// RunJob runs a job once now (#9293): the run the schedule would make, recorded as the job's run with trigger "manual". A paused job can be
+// run; a job that is already running answers 409, and a full scheduler 429. The job's schedule does not move.
+// POST /api/scheduled/jobs/{jobID}/run
+func (h *ScheduleHandler) RunJob(w http.ResponseWriter, r *http.Request) {
+	jobID, err := strconv.ParseInt(chi.URLParam(r, "jobID"), 10, 64)
+	if err != nil {
+		errBadRequest(w, "invalid job id")
+		return
+	}
+	if h.scheduler == nil {
+		writeError(w, http.StatusServiceUnavailable, "", "the job scheduler is not running")
+		return
+	}
+	runID, err := h.scheduler.RunNow(r.Context(), jobID)
+	switch {
+	case errors.Is(err, background.ErrJobNotFound):
+		errNotFound(w, "job not found")
+	case errors.Is(err, background.ErrJobRunning):
+		errConflict(w, "this job is already running")
+	case err != nil:
+		var full *background.ConcurrencyLimitError
+		if errors.As(err, &full) {
+			httputil.WriteActionLimit(w, 30, "too_many_runs", err.Error())
+			return
+		}
+		errInternalServer(w, "could not start the run")
+	default:
+		writeJSON(w, http.StatusOK, map[string]any{"run_id": runID, "job_id": jobID, "status": "pending"})
+	}
 }
 
 // GetJobRuns returns run history for a job.
