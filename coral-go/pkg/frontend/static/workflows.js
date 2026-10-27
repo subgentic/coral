@@ -172,7 +172,7 @@ function workflowStepsTable(steps) {
 
 function workflowRunsTable(page) {
     const open = r => withId(r.id, selectWorkflowRun);
-    const table = DT.dataTable({ label: 'Workflow runs', rows: page.rows, rowKey: r => r.id, bare: true, sortBar: false, oneLine: true, open, empty: { line: 'No runs yet.', hint: 'A run is listed here once the workflow has run.' },
+    const table = DT.dataTable({ label: 'Workflow runs', rows: page.rows, rowKey: r => r.id, bare: true, sortBar: false, oneLine: true, open, empty: { line: 'No runs yet.', hint: 'Runs are listed here once the workflow has run.' },
         footer: page.rows.length < page.total ? { text: `Showing the newest ${page.rows.length} of ${page.total} runs`, more: { label: 'Show older runs', busy: page.busy, run: () => readOlderRuns(page) } } : undefined,
         columns: [
             { key: 'started', label: 'Started', primary: true, width: '12rem', cell: r => { const time = DT.timeCell(r.started_at); const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b; } },
