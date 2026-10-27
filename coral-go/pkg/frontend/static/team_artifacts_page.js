@@ -286,17 +286,17 @@ export function createArtifactsList({ inbox = false } = {}) {
             const by = !model.scope && !inbox ? model.filters.group : ''; // the team's list read by task or goal: a head per group, its files together (an agent's list is not grouped)
             const shown = by ? orderByGroup(model.items, by) : model.items;
             const table = DT.dataTable({
-                label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
+                label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, fold: model.scope ? 'none' : 'column', foldAt: 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
                 selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
                 columns: [
                     { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1,
                         cell: item => {
-                            const first = el('span', 'dt-title-stack');
+                            const first = el('span', model.scope ? 'dt-title-cell' : 'dt-title-stack');
                             const b = DT.primaryButton(readableName(item)); b.dataset.artifactId = itemKey(item); first.append(b);
                             const badge = originBadge(item);
                             if (badge) { const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`); if (isUnverified(item)) note.classList.add('dt-warning'); first.append(note); }
-                            const tagged = Tags.rowTags(item.tags); if (tagged) first.append(tagged);
+                            const tagged = model.scope ? null : Tags.rowTags(item.tags); if (tagged) first.append(tagged);
                             return first;
                         } },
                     ...(inbox ? serverColumns() : []),
@@ -308,14 +308,14 @@ export function createArtifactsList({ inbox = false } = {}) {
                     ...(by === 'goal' || model.scope || !shown.some(i => i.goal_id) ? [] : [{ key: 'goal', label: 'Goal', line: 2, tone: 'tertiary', cell: item => (item.goal_id && item.goal_title ? String(item.goal_title) : '') }]),
                     { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
                     // An agent's list opens an artifact in the preview panel; its sheet (the facts, Keep, Delete, Copy link, who can read it) is one quiet link away (#8539)
-                    ...(model.scope ? [{ key: 'details', label: 'Details', line: 2, tone: 'tertiary', align: 'end', cell: item => detailsLink(item) }] : []), // only an agent's list has the column: a `when` kept its head and its links on the team's and the Inbox's list at a wide width
-                ],
+                    ...(model.scope ? [{ key: 'details', label: 'Details', hideLabel: true, line: 2, tone: 'tertiary', align: 'end', cell: item => detailsLink(item) }] : []), // only an agent's list has the column: a `when` kept its head and its links on the team's and the Inbox's list at a wide width
+                ].filter(c => !model.scope || !['type', 'task'].includes(c.key)).map(c => model.scope && c.key !== 'name' ? { ...c, width: 'content' } : c),
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
             });
             // Keep row heights stable while the new ResizeObserver settles the dock width.
             // Restoring scroll against an unfolded table first makes browser anchoring jump.
-            if (tableBox) table.el.classList.toggle('dt-folded', tableBox.classList.contains('dt-folded'));
+            if (tableBox && !model.scope) table.el.classList.toggle('dt-folded', tableBox.classList.contains('dt-folded'));
             body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
             if (!model.scope && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton);
         }
@@ -349,7 +349,9 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     /** The sheet's own link on an agent's row (the row itself opens the preview): the item's facts and actions, as the team page's rows open them. */
     function detailsLink(item) {
-        const b = DT.link('Details', () => openArtifactSheet(item, b));
+        const b = DT.link('', () => openArtifactSheet(item, b));
+        const icon = el('span', 'material-icons', 'info'); icon.setAttribute('aria-hidden', 'true'); b.append(icon);
+        b.title = `Details for ${readableName(item)}`;
         b.classList.add('artifact-details');
         b.setAttribute('aria-label', `Details for ${readableName(item)}`);
         return b;
