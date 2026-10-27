@@ -359,7 +359,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     /** The Task column: a link that opens the task's page (#8617); "No task" for a file no task holds. */
     function taskCell(item) {
         if (!item.task_id) return taskText(item);
-        const b = DT.link(taskText(item), () => { importOnce('./task_navigation.js').then(m => m.openTask(inbox ? item.board_id : model.project, item.task_id)).catch(() => {}); });
+        const b = DT.link(taskText(item), () => { importOnce('./task_navigation.js').then(m => m.openTask(inbox ? item.board_id : model.project, item.task_id, b)).catch(() => {}); }); // b: where the click was, so the Inbox opens the task in the Inbox (#8861)
         b.dataset.taskLink = String(item.task_id);
         return b;
     }
