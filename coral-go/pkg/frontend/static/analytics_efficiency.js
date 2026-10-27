@@ -18,6 +18,7 @@ const SECTIONS = {
 const groupsOf = cfg => (cfg.metric === 'task_time' ? GROUPS.filter(g => g[0] !== 'task') : GROUPS); // every task is a group of one: a task has no comparison to make with itself
 const state = {}; // view key -> { group, data, loading, error, seq }
 let range = '24h';
+const RANGE_WORDS = { '24h': 'in the last 24 hours', '7d': 'in the last 7 days', '30d': 'in the last 30 days' };
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -34,7 +35,7 @@ function build(key) {
     const cfg = SECTIONS[key], section = document.getElementById(cfg.section);
     if (!section || section.dataset.effBuilt) return !!section;
     section.dataset.effBuilt = '1';
-    let saved = 'all'; try { const v = browserLocal.get(cfg.key); if (groupsOf(cfg).some(g => g[0] === v)) saved = v; } catch { /* the choice lasts until the page closes */ }
+    let saved = 'model'; try { const v = browserLocal.get(cfg.key); if (groupsOf(cfg).some(g => g[0] === v)) saved = v; } catch { /* the choice lasts until the page closes */ }
     state[key] = { group: saved, data: null, loading: false, error: '', seq: 0 };
     const bar = el('div', 'eff-switch');
     bar.append(el('div', 'eff-switch-label', 'Group by'));
@@ -131,7 +132,7 @@ function draw(key) {
     if (!s.data) { view.append(el('p', 'goals-note', 'Loading…')); return; }
     const d = s.data, min = num(d.min_sample) || 10, groups = d.groups.filter(g => num(g.value) != null && num(g.n) != null && g.n > 0), empty = d.groups.filter(g => !groups.includes(g)); // a group with no commits or tasks (n 0) is listed in the table, with no bar
     const isFewG = g => g.low_sample === true || g.n < min; // the endpoint says it (low_sample); older answers: under the minimum
-    if (!groups.length) { view.append(el('p', 'goals-note', `No ${cfg.units} in this time range to compare.`)); return; }
+    if (!groups.length) { view.append(el('p', 'goals-note', `No ${cfg.units} ${RANGE_WORDS[range] || 'in this time range'}: ${range === '30d' ? 'nothing to compare yet' : 'pick a longer range above'}.`)); return; }
     if (s.group === 'task') { drawTaskList(view, cfg, d, groups); return; }
     const ranked = groups.filter(g => !isFewG(g)).sort((a, b) => a.value - b.value), few = groups.filter(isFewG).sort((a, b) => a.value - b.value), order = [...ranked, ...few];
     const total = num(d.total && d.total.n) != null ? d.total.n : groups.reduce((n, g) => n + g.n, 0);

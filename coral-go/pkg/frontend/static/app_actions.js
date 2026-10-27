@@ -222,7 +222,7 @@ registerActions({
 
 registerActions({
     'cost-time-range': () => _costTimeRangeChanged(),
-    'cost-refresh': () => _refreshCostDashboard(),
+    'cost-refresh': () => _refreshCostDashboard({ force: true }), // the Refresh button reads again, whatever a view switch reused (#9250)
 });
 
 Object.assign(window, lazyWindowFns(loadModals, ['_selectLaunchType', '_showMobileConnectModal']));

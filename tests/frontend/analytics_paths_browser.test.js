@@ -27,9 +27,16 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
     };
+const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking level': 'Thinking level', 'By team': 'Team', 'By agent': 'Agent', 'By branch': 'Branch', 'By task': 'Task' }; // the groupings are Overview's Group by (#9236), not sidebar entries
     const choose = async (label, want) => {
-        await ev(`[...document.querySelectorAll('.sidebar-pane[data-pane="tokens"] li .row-btn')].find(b => b.textContent.trim() === ${JSON.stringify(label)}).click(); true`);
-        await waitFor(`document.getElementById('cost-view-title').textContent === ${JSON.stringify(label)}`, 'the ' + label + ' page', 6000);
+        const g = GROUP_OF[label];
+        if (g) {
+            await ev(`[...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(b => b.textContent === ${JSON.stringify(g)}).click(); true`);
+            await waitFor(`document.getElementById('cost-view-title').textContent === 'Overview' && document.querySelector('#cost-group-bar .eff-seg-btn[aria-pressed="true"]').textContent === ${JSON.stringify(g)}`, 'Overview grouped by ' + g, 6000);
+        } else {
+            await ev(`[...document.querySelectorAll('.sidebar-pane[data-pane="tokens"] li .row-btn')].find(b => b.textContent.trim() === ${JSON.stringify(label)}).click(); true`);
+            await waitFor(`document.getElementById('cost-view-title').textContent === ${JSON.stringify(label)}`, 'the ' + label + ' page', 6000);
+        }
         assert.equal(await path(), want, `${label}: the path`);
     };
     const back = async (want, label) => { await ev(`history.back(); true`); await waitFor(`location.pathname === ${JSON.stringify(want)} && document.getElementById('cost-view-title').textContent === ${JSON.stringify(label)}`, `back to ${label}`, 6000); };
@@ -38,9 +45,9 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
 
         // desktop
         await open(1280, 820, false, '/analytics/model');
-        await waitFor(`document.getElementById('cost-view-title') && document.getElementById('cost-view-title').textContent === 'By model'`, 'a path opens its page', 10000);
+        await waitFor(`document.getElementById('cost-view-title') && document.getElementById('cost-view-title').textContent === 'Overview'`, 'a path opens its page', 10000);
         assert.equal(await path(), '/analytics/model', 'the path stays');
-        assert.equal(await ev(`document.querySelector('.sidebar-pane[data-pane="tokens"] .row-btn[aria-current="true"]').textContent.trim()`), 'By model', 'the list marks it');
+        assert.equal(await ev(`document.querySelector('.sidebar-pane[data-pane="tokens"] .row-btn[aria-current="true"]').textContent.trim()`), 'Overview', 'the list marks Overview: a grouping is Overview with a choice made');
         await choose('By team', '/analytics/team');
         await choose('By thinking level', '/analytics/thinking');
         await choose('Tool and API calls', '/analytics/calls');
@@ -56,18 +63,18 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         await ev(`window.switchNavTab('agents'); true`);
         await waitFor(`!location.pathname.startsWith('/analytics')`, 'left Analytics', 6000);
         await ev(`window.switchNavTab('tokens'); true`);
-        await waitFor(`location.pathname === '/analytics/branch' && document.getElementById('cost-view-title').textContent === 'By branch'`, 'the tab comes back on its page and path', 8000);
+        await waitFor(`location.pathname === '/analytics/branch' && document.getElementById('cost-view-title').textContent === 'Overview'`, 'the tab comes back on its page and path', 8000);
         // a reload
         await Page.navigate({ url: BASE + '/analytics/branch' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
-        await waitFor(`document.getElementById('cost-view-title') && document.getElementById('cost-view-title').textContent === 'By branch'`, 'a reload keeps the page', 10000);
+        await waitFor(`document.getElementById('cost-view-title') && document.getElementById('cost-view-title').textContent === 'Overview'`, 'a reload keeps the page', 10000);
         // an agent's page is under By agent
         await ev(`window.switchNavTab('tokens'); true`);
         await choose('By agent', '/analytics/agent');
 
         // phone: the list is /analytics, a page is the screen after it
         await open(390, 844, true, '/analytics/model');
-        await waitFor(`document.getElementById('cost-view-title') && document.getElementById('cost-view-title').textContent === 'By model' && document.getElementById('cost-page').getClientRects().length > 0`, 'a phone path opens the page as a screen', 10000);
+        await waitFor(`document.getElementById('cost-view-title') && document.getElementById('cost-view-title').textContent === 'Overview' && document.getElementById('cost-page').getClientRects().length > 0`, 'a phone path opens the page as a screen', 10000);
         assert.equal(await path(), '/analytics/model', 'phone: the path stays');
         await ev(`document.querySelector('.cost-phone-back').click(); true`);
         await waitFor(`document.getElementById('mobile-analytics-list').getClientRects().length > 0 && document.getElementById('cost-page').getClientRects().length === 0`, 'back is the list', 6000);
