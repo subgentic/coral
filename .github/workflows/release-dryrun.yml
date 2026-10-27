@@ -18,6 +18,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  CORAL_TELEMETRY_DISABLED: "1"   # no CI run sends real events (internal/tracking's census requires it)
+
 jobs:
   dryrun:
     runs-on: ubuntu-24.04
