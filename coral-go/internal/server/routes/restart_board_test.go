@@ -102,3 +102,51 @@ func TestRestartTwiceKeepsBoardMembership(t *testing.T) {
 		assert.Equal(t, name, subs[0].SessionName, "restart %d: it targets the new terminal", attempt)
 	}
 }
+
+// A restart may switch the provider (#8973): the agent keeps its name, role, board and prompt, the old terminal is found by the type it runs on (not the one it is going to), and the new session is the new
+// provider's, subscribed to the same board under the same name.
+func TestRestartSwitchesTheProviderAndKeepsNameBoardAndPrompt(t *testing.T) {
+	t.Parallel()
+	server, handler, term, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	const oldID = "switch-worker"
+	const oldName = "claude-" + oldID
+	term.addSession(oldName, t.TempDir())
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{
+		SessionID: oldID, AgentType: "claude", AgentName: "coral-go", DisplayName: ptr.NonEmpty("Reviewer"), Prompt: ptr.NonEmpty("You review the work."),
+		BoardName: ptr.NonEmpty("coral-go-team"),
+	}))
+	_, err := handler.bs.Subscribe(ctx, "coral-go-team", "Reviewer", "Reviewer", oldName, nil, "all", true)
+	require.NoError(t, err)
+	resp, err := http.Post(server.URL+"/api/sessions/live/"+oldName+"/restart", "application/json",
+		bytes.NewBufferString(`{"session_id":"switch-worker","agent_type":"codex","model":""}`))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var result struct {
+		SessionID   string `json:"session_id"`
+		SessionName string `json:"session_name"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+	assert.Equal(t, "codex-"+result.SessionID, result.SessionName, "the new session is the new provider's")
+	ls, err := ss.GetLiveSession(ctx, result.SessionID)
+	require.NoError(t, err)
+	require.NotNil(t, ls)
+	assert.Equal(t, "codex", ls.AgentType)
+	assert.Equal(t, "coral-go-team", ptr.Value(ls.BoardName), "the board is kept")
+	assert.Equal(t, "You review the work.", ptr.Value(ls.Prompt), "the prompt is kept")
+	assert.Equal(t, "Reviewer", ptr.Value(ls.DisplayName), "the name is kept")
+	sub, err := handler.bs.GetSubscriptionBySessionName(ctx, result.SessionName)
+	require.NoError(t, err)
+	require.NotNil(t, sub)
+	assert.Equal(t, "Reviewer", sub.SubscriberID, "the role on the board is kept")
+	old, err := handler.bs.GetSubscriptionBySessionName(ctx, oldName)
+	require.NoError(t, err)
+	assert.Nil(t, old, "the old provider's subscription is gone")
+	term.mu.Lock()
+	defer term.mu.Unlock()
+	require.NotEmpty(t, term.findTypes)
+	for _, ty := range term.findTypes {
+		assert.Equal(t, "claude", ty, "the old terminal is found by the provider it runs on, not the one it is going to run on")
+	}
+}

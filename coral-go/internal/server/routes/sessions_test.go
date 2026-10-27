@@ -82,6 +82,7 @@ type mockSessionTerminal struct {
 	outputs          map[string]string
 	sent             map[string][]string
 	captures         []string
+	findTypes        []string                          // the agent type each FindSession was asked for, in order (#8973: a restart that switches provider finds the old terminal by the old type)
 	raw              map[string][]string               // keys sent with SendRawInput
 	origins          map[string][]terminalinput.Origin // the origin of each SendInput and SendRawInput, in order (#5715)
 	killSessionCalls []string
@@ -146,9 +147,10 @@ func (m *mockSessionTerminal) ListSessions(_ context.Context) ([]ptymanager.Pane
 	return result, nil
 }
 
-func (m *mockSessionTerminal) FindSession(_ context.Context, name, _, _ string) (*ptymanager.PaneInfo, error) {
+func (m *mockSessionTerminal) FindSession(_ context.Context, name, agentType, _ string) (*ptymanager.PaneInfo, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.findTypes = append(m.findTypes, agentType)
 	if m.gone {
 		return nil, nil
 	}
