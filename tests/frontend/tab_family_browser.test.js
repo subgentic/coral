@@ -31,6 +31,12 @@ const BASE = require('./test_base').BASE;
                 const on = ts => ts.find(t => t.getAttribute('aria-selected') === 'true'), off = ts => ts.find(t => t.getAttribute('aria-selected') !== 'true');
                 const counts = [...document.querySelectorAll('.team-tab .tab-count, .goal-tab .tab-count')].filter(c => c.getClientRects().length).map(c => { const cs = getComputedStyle(c); return { size: cs.fontSize, weight: cs.fontWeight, radius: cs.borderTopLeftRadius }; });
                 return { acc, teamOn: g(on(team)), teamOff: g(off(team)), goalOn: g(on(goal)), goalOff: g(off(goal)), counts, teamStrip: getComputedStyle(document.getElementById('team-tabs')).borderBottomWidth }; })()`);
+            if (mobile) { // #9377: at 200% text the team tabs are wider than the strip: it says which edge hides more, with the text size changed after the page loaded
+                await ev(`document.documentElement.style.fontSize = '32px'; true`); await new Promise(r => setTimeout(r, 500)); // sleep-ok: the observer draws the cue after the reflow
+                const cue = await ev(`(() => { const s = document.getElementById('team-tabs'); return { scrolls: s.scrollWidth > s.clientWidth + 1, more: s.getAttribute('data-more') || '' }; })()`);
+                assert.ok(cue.scrolls && cue.more, 'the team tabs scroll at 200% text and fade the hidden edge: ' + JSON.stringify(cue));
+                await ev(`document.documentElement.style.fontSize = ''; true`);
+            }
             const want = mobile ? 44 : 40;
             for (const [n, t] of [['team', m.teamOn], ['goal', m.goalOn]]) {
                 assert.ok(t.cls.split(' ').includes('tab'), at + `the ${n} tab is a .tab: ` + t.cls);
