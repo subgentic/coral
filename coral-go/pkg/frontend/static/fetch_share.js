@@ -5,7 +5,8 @@
  * gets one), and a write to Coral's /api forgets everything when it starts AND when it ends, and no read is shared while one is in flight, so a read after a change is never
  * the answer from before it. A failed answer is not kept. A person's own input (a click, a key, a touch) forgets everything too, and a read made within two seconds of it
  * is never shared: a Refresh, a Retry, or a reload after the person's own action reads fresh. And reads share only while the page is loading (its first three seconds): a
- * reload the page makes by itself later, after a live event, is never answered from an earlier read (#9167). */
+ * reload the page makes by itself later, after a live event, is never answered from an earlier read (#9167). The test harness turns the share off for a page by setting
+ * window.__coralNoFetchShare before the app runs (tests/frontend/agent_view_harness.js, #9181): a suite that changes a stub and lets the page reload itself reads the stub. */
 const SHARE_MS = 1000;
 const LOAD_MS = 3000; // reads share only in the page's first seconds, when the load asks for the same things twice
 const INPUT_MS = 2000; // after a person's input, reads are their own
@@ -42,7 +43,7 @@ export function installFetchShare(now = () => Date.now(), loadMs = LOAD_MS) {
     }
     window.fetch = function (input, init) {
         const u = localApi(input);
-        if (!u) return orig(input, init);
+        if (!u || window.__coralNoFetchShare === true) return orig(input, init);
         const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
         if (method !== 'GET') { // a write: nothing read before it, or while it ran, is the answer after it
             entries.clear(); writing++;

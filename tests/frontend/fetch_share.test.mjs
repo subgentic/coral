@@ -134,4 +134,14 @@ assert.equal(hits, 1, 'in the page\'s first three seconds: shared');
 clock += 3500; hits = 0;
 await window.fetch('/api/board/alpha/status'); clock += 100; await window.fetch('/api/board/alpha/status');
 assert.equal(hits, 2, 'after the load, a read 100 ms after another is its own request (a reload after a live event is fresh)');
+
+// #9181: the test harness's switch turns the share off: two reads in the load window are two requests
+hits = 0; clock = 200000;
+await over(async () => { hits++; return new Response('{}'); }, () => clock, 3000);
+window.__coralNoFetchShare = true;
+await Promise.all([window.fetch('/api/cloud/status'), window.fetch('/api/cloud/status')]);
+assert.equal(hits, 2, 'with window.__coralNoFetchShare set, nothing is shared');
+delete window.__coralNoFetchShare; hits = 0; clock += 10;
+await Promise.all([window.fetch('/api/system/status'), window.fetch('/api/system/status')]);
+assert.equal(hits, 1, 'and without it the same reads share (the product is unchanged)');
 console.log('fetch_share: ok');
