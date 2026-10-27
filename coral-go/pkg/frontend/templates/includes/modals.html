@@ -761,7 +761,7 @@
                             </details>
                             <div id="settings-cloud-hub-operator-msg" data-cloud="hub-operator-msg" class="settings-hint settings-error" role="alert" hidden></div>
                             </div>
-                            <label class="check-hit"><input type="checkbox" id="settings-cloud-hub-operator" data-cloud="hub-operator" aria-describedby="settings-cloud-hub-operator-desc"></label>
+                            <label class="check-hit"><input type="checkbox" class="switch" id="settings-cloud-hub-operator" data-cloud="hub-operator" aria-describedby="settings-cloud-hub-operator-desc"></label>
                         </div>
                         </details>
                     </div>
@@ -982,5 +982,5 @@
                                 <label for="{{ .InputID }}" class="settings-cloud-switch-label">{{ .Label }}</label>
                                 <div id="{{ .DescID }}" class="settings-hint">{{ .Desc }}</div>
                             </div>
-                            <label class="check-hit"><input type="checkbox" id="{{ .InputID }}"{{ .InputAttrs }}></label>
+                            <label class="check-hit"><input type="checkbox" class="switch" id="{{ .InputID }}"{{ .InputAttrs }}></label>
                         </div>{{ end }}

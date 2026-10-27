@@ -3,13 +3,7 @@
    HighlightText, ButtonText, GrayText) written by the page is kept, so each state below is drawn with those: a switch's track and knob, the selected
    tab, and the dot that says what an agent is doing. Loaded after the other sheets so these win at equal specificity. */
 @media (forced-colors: active) {
-    /* The Settings switches: off is an empty track with the knob at the left, on is a Highlight track with the knob at the right. */
-    :is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"] { background: Canvas; border: 2px solid ButtonText; }
-    :is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]::before { background: ButtonText; }
-    :is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:checked { background: Highlight; border-color: Highlight; }
-    :is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:checked::before { background: HighlightText; }
-    :is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:disabled { opacity: 1; border-color: GrayText; }
-    :is(#settings-modal .settings-row .check-hit, #settings-modal .settings-cloud-switch-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:disabled::before { background: GrayText; }
+    /* The switches (.switch, in components.css): off is an empty track with the knob at the left, on is a Highlight track with the knob at the right. */
 
     /* The selected tab (Settings and the dialogs' section lists, Team settings): a thick Highlight border, since the heavier weight alone is easy to miss and a
        background fill is drawn behind a text backplate. */

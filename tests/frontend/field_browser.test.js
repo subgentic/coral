@@ -1,5 +1,5 @@
 // The field as the page draws it (Goal #88, #9241): every text input, search box and select that is a .field has one border, radius, background and font size, a 36 px minimum height (32 when dense, 44 on touch), the placeholder in
-// the secondary colour and the accent border on focus. The fields in the page's own markup (the sidebar searches, the files search, the Analytics time range) ; 1280 and 390, both themes, with shots.
+// the secondary colour and the accent border on focus; every on/off box is one .switch (a 40 px track, 44 on touch). The fields in the page's own markup (the sidebar searches, the files search, the Analytics time range) ; 1280 and 390, both themes, with shots.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -28,11 +28,15 @@ const BASE = require('./test_base').BASE;
                 const want = mobile ? '44px' : (r.cls.split(' ').includes('field-dense') ? '32px' : '36px');
                 assert.ok(r.minH === want || (!mobile && r.minH === '32px' && /gt-toolbar|team-tb/.test(r.cls)), at + `${r.cls}: min-height ${want}: ` + r.minH);
             }
+            const sw = await ev(`(() => { const p = document.createElement('input'); p.type = 'checkbox'; p.className = 'switch'; document.body.append(p); return true; })() && [...document.querySelectorAll('input.switch')].map(e => { const c = getComputedStyle(e); return { w: c.width, h: c.height, radius: c.borderTopLeftRadius, appearance: c.appearance }; })`);
+            assert.ok(sw.length >= 1, at + 'a switch is drawn: ' + sw.length);
+            for (const x of sw) { assert.equal(x.appearance, 'none', at + 'a switch is drawn, not native'); assert.equal(x.w, mobile ? '44px' : '40px', at + 'one switch width: ' + x.w); assert.ok(Math.abs(parseFloat(x.h) - 22.4) < 0.1, at + 'one switch height: ' + x.h); assert.equal(x.radius, '16px', at + 'one switch radius'); }
+            assert.equal(await ev(`document.querySelectorAll('.sv-switch').length`), 0, at + 'no second switch class');
             await ev(`(() => { const e = document.querySelector('#agent-search-input'); if (e) e.focus(); return true; })()`);
             const f = await ev(`(() => { const e = document.querySelector('#agent-search-input'); const c = getComputedStyle(e); const t = document.createElement('i'); t.style.color = 'var(--accent)'; document.body.append(t); const a = getComputedStyle(t).color; t.remove(); return { border: c.borderTopColor, accent: a, focused: document.activeElement === e }; })()`);
             if (f.focused) assert.equal(f.border, f.accent, at + 'a focused field has the accent border');
             for (const t of ['dark', 'light']) { await theme(t); await new Promise(r => setTimeout(r, 450)); await shot(`fields-${t}-${w}`); } // sleep-ok: the theme's colour transition settles
         }
-        console.log('PASS field: one border, radius, background and font size on every .field; 36 px (32 dense, 44 touch); the accent border on focus');
+        console.log('PASS field: one border, radius, background and font size on every .field; 36 px (32 dense, 44 touch); the accent border on focus; one .switch');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
