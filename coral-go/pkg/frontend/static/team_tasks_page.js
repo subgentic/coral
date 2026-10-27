@@ -377,7 +377,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     const parentId = task.workflow && Number(task.workflow.parent_task_id);
     if (parentId > 0) page.append(followUpOfLine(parentId, ctx)); // a follow-up says which task it is the follow-up of (#7829)
     const bar = el('div', 'goals-pinbar');
-    let focus = ctx.teamLink ? back : h; // the Inbox's page opens on its Back link: a ring round the title's plain words is never drawn (#7404)
+    let focus = ctx.teamLink || ctx.focusBack ? back : h; // the Inbox's page opens on its Back link: a ring round the title's plain words is never drawn (#7404)
     if (mode === 'edit') {
         const loading = el('p', 'goals-note', 'Loading the task’s form…'); page.append(loading, bar);
         foldWayBack(page, '.goals-back', '.goals-detail-title');

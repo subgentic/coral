@@ -38,6 +38,7 @@ const board = 'task-preview-' + Date.now().toString(36);
    await waitFor(`!!document.querySelector('#preview-pane #task-edit-title')`,'edit form in preview');
    await ev(`[...document.querySelectorAll('#preview-pane .goals-pinbar button')].find(b=>b.textContent==='Cancel').click();true`);
    await waitFor(`!document.querySelector('#preview-pane #task-edit-title') && !!document.querySelector('#preview-pane .team-task-body')`,'cancel restores detail');
+   assert.equal(await ev(`document.activeElement === document.querySelector('#preview-pane .goals-back')`),true,'preview focuses Back rather than the task heading');
    const dir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
    if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(dir,`dock-task-preview-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
    if(width===390){await ev(`document.getElementById('preview-full-back').click();true`);await waitFor(`document.getElementById('agentic-panel-tasks').getClientRects().length>0`,'Back restores list');}

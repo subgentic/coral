@@ -11,7 +11,7 @@ export async function mountTaskPreview(body, tab, hooks) {
     body._taskPreviewDispose = () => { host._taskConversation?.destroy({ keepDrafts: true }); host.replaceChildren(); };
     hooks.title(task.title);
     renderTaskPage(host, task, {
-        project: tab.project, backLabel: 'Tasks', onBack: hooks.close,
+        project: tab.project, backLabel: 'Tasks', onBack: hooks.close, focusBack: true,
         openGoal: id => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(tab.project, id)),
     });
 }
