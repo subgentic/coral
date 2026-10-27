@@ -38,6 +38,8 @@ const BASE = require('./test_base').BASE;
             await shot(`team-goal-task-landing-${w}`);
             await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
             await waitFor(`location.pathname === ${JSON.stringify(goalUrl)} && document.querySelector('#team-panel-goals #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'Back returns to the goal', 15000);
+            await waitFor(`document.activeElement?.dataset?.taskId === '${T}' || (document.activeElement?.classList.contains('goal-tasks-open') && ${mobile})`, at + 'the keyboard is on the task\'s row (the Tasks button on a phone), never the heading', 8000);
+            assert.equal(await ev(`document.activeElement?.id === 'goals-detail-title'`), false, at + 'not the heading');
             await shot(`team-goal-task-back-${w}`);
             console.log('   \u2713');
 

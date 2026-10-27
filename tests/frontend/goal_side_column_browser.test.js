@@ -97,6 +97,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
         // Back returns to the goal the task was opened from (#8898), with the goal page and its task list drawn again
         await waitFor(`location.pathname === '/team/${B}/goals/${goal}' && !!document.querySelector('#team-panel-goals #goals-detail-title') && !!document.querySelector('.goal-split')`, 'back at the goal the task was opened from', 12000);
+        await waitFor(`document.activeElement?.dataset?.taskId === '${second}'`, 'the keyboard is on the task row opened from the goal (never the heading)', 8000);
         await openGoal(goal);
         await waitFor(`document.querySelector('.goal-side-head').textContent.replace(/\\s+/g, ' ').includes('1 open, 2 done')`, 'goal reflects the completed task', 15000);
         // The goal rollup arrives before its separate task-list request. Wait for the

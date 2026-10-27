@@ -333,7 +333,7 @@ async function openTaskById(id) {
         project: S.team, backLabel,
         openGoal: (id) => { closeItem(false); openGoalPage(id); },
         openTask: (t) => openTask(S.team, t.id), // a follow-up listed on the task's page
-        onBack: () => { if (fromGoal) history.back(); else closeItem(true); },
+        onBack: () => { if (fromGoal) { history.back(); focusGoalTask(full.id); } else closeItem(true); },
     });
     note(keyRoute('team', team, 'tasks', id));
 }
@@ -346,6 +346,15 @@ async function openAgentPage(agent) {
     origin.hidden = true;
     host.hidden = false;
     m.renderAgentPage(host, agent, { onBack: () => closeItem(true) });
+}
+
+/** After Back from a task opened from a goal: the keyboard is on that task's row in the goal's column (on a phone, where the column is the next screen, on the Tasks button), never the heading (#7404, #8898). Waits for the goal to be drawn again. */
+async function focusGoalTask(id) {
+    for (let i = 0; i < 80; i++) {
+        const target = [`#team-panel-goals .goal-side .dt-primary[data-task-id="${Number(id)}"]`, '#team-panel-goals .goal-tasks-open'].map(q => document.querySelector(q)).find(e => e && e.getClientRects().length);
+        if (target && S.tab === 'goals') { target.focus(); return; }
+        await new Promise(r => setTimeout(r, 50));
+    }
 }
 
 function closeItem(restoreFocus) {
