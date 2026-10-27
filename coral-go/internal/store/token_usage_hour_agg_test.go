@@ -162,6 +162,23 @@ func oldSeries1h(t *testing.T, db *DB, since string) []TimeSeriesBucket {
 	return out
 }
 
+// oldSeries1d is the day series as it was before the day aggregate (#9447), over token_usage_all: the one independent reading of it.
+func oldSeries1d(t *testing.T, db *DB, since string) []TimeSeriesBucket {
+	q := `SELECT strftime('%Y-%m-%dT00:00:00Z', recorded_at) as bucket, COALESCE(SUM(cost_usd), 0) as cost_usd, COALESCE(SUM(input_tokens), 0) as input_tokens,
+	      COALESCE(SUM(output_tokens), 0) as output_tokens, COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens,
+	      COALESCE(SUM(cache_write_tokens), 0) as cache_write_tokens, SUM(n_rows) as num_requests
+	      FROM token_usage_all WHERE ` + sourceDedup + ` AND 1=1`
+	var args []any
+	if since != "" {
+		q += " AND recorded_at >= ?"
+		args = append(args, oracleBound(since))
+	}
+	q += ` GROUP BY bucket ORDER BY bucket ASC`
+	var out []TimeSeriesBucket
+	require.NoError(t, db.SelectContext(context.Background(), &out, q, args...))
+	return out
+}
+
 func aggSinces() []string {
 	return []string{
 		"",
