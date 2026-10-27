@@ -130,7 +130,7 @@ func (s *Store) TaskHistory(ctx context.Context, project string, id int64) ([]Ta
 }
 
 // EditTaskText serializes the text update and its history in the same transaction.
-// The HTTP layer authenticates the editor and checks creator/planner authority.
+// The HTTP layer authenticates the editor and checks Operator/planner authority.
 func (s *Store) EditTaskText(ctx context.Context, project string, id int64, editor string, title, priority *string, restore, baseVersion int) (*Task, error) {
 	if restore < 0 || baseVersion < 0 {
 		return nil, fmt.Errorf("versions must be positive")
