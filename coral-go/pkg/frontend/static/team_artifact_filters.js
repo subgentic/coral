@@ -9,10 +9,10 @@ const { normalizeTag } = await importOnce('./artifact_tag_rules.js'); // lazy: i
 
 export const KINDS = ['image', 'pdf', 'text', 'other'];
 export const ORIGINS = ['shared', 'received', 'unlisted'];
-export const SORTS = ['newest', 'oldest', 'name', 'size'];
+export const SORTS = ['newest', 'oldest', 'name', 'name_desc', 'size', 'size_asc', 'type', 'type_desc', 'tags', 'tags_desc']; // the server's words (#8945); the table's headers say the same by their arrows
 export const KIND_LABEL = { image: 'Image', pdf: 'PDF', text: 'Text', other: 'Other' };
 export const ORIGIN_LABEL = { shared: 'Shared here', received: 'Received', unlisted: 'Unlisted' };
-export const SORT_LABEL = { newest: 'Newest', oldest: 'Oldest', name: 'Name', size: 'Size' };
+export const SORT_LABEL = { newest: 'Newest', oldest: 'Oldest', name: 'Name A to Z', name_desc: 'Name Z to A', size: 'Largest first', size_asc: 'Smallest first', type: 'Type A to Z', type_desc: 'Type Z to A', tags: 'Tags A to Z', tags_desc: 'Tags Z to A' };
 export const TAG_KEY = 'ta' + 'g'; // the Tag field's key, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 export const GROUPS = ['task', 'goal'];
 export const GROUP_LABEL = { task: 'Task', goal: 'Goal' };
