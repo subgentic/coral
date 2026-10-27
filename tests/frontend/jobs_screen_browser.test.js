@@ -100,6 +100,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.equal(await ev(vis('#scheduler-detail .sched-delete')), false, `${at}: Delete is not on the page until More opens`);
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`);
             assert.equal(await ev(vis('#scheduler-detail .sched-delete')), true);
+            assert.equal(await ev(`(() => { const r = document.querySelector('#scheduler-detail .sched-delete').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })()`), true, `${at}: the open More menu is on the screen (a pinned bar's menu opens upward, it was cut by the foot of the window)`);
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`);
             // More closes on an outside click, and when Tab leaves it
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`);

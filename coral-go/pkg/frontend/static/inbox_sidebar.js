@@ -601,7 +601,7 @@ function openSavedPage(id) {
     const bar = el('div', 'item-bar inbox-saved-actions');
     const x = f.gone ? null : savedExpandFor(it, f.which, { auto: true, onText: has => { snippetEl.hidden = has; } }); // the shared component, in its read-at-once mode: the whole text is in the page, no button
     if (x && !x.root.hidden) host.append(x.region);
-    const wrap = el('div', 'wf-more'), toggle = el('button', 'btn btn-small', 'More'), menu = el('div', 'wf-more-menu'), rm = el('button', 'btn btn-small btn-warning', 'Remove from saved');
+    const wrap = el('div', 'wf-more'), toggle = el('button', 'btn btn-small', 'More'), menu = el('div', 'menu wf-more-menu'), rm = el('button', 'menu-item menu-item-danger', 'Remove from saved');
     toggle.type = 'button'; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-label', `More for ${f.which}`);
     menu.hidden = true; menu.id = 'inbox-saved-more'; menu.setAttribute('role', 'menu'); toggle.setAttribute('aria-controls', menu.id); rm.setAttribute('role', 'menuitem'); rm.type = 'button'; rm.setAttribute('aria-label', `Remove from saved: ${f.which}`);
     const openMenu = () => { closeMore(false); openMore = { wrap, menu, toggle }; menu.hidden = false; toggle.setAttribute('aria-expanded', 'true'); rm.focus(); };

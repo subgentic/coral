@@ -468,11 +468,9 @@
 .wf-step-files-more[open] > summary { margin-bottom: 4px; }
 .wf-step-files-more .wf-step-files { margin-top: 0; }
 .wf-more { position: relative; }
-.wf-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 120px; padding: 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.wf-more-menu[hidden] { display: none; }
-.wf-more-menu .btn { width: 100%; margin: 0; }
+.wf-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .wf-more-menu .btn, .wf-more-btn, .wf-step-files-more > summary { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); display: flex; align-items: center; }
+    .wf-more-btn, .wf-step-files-more > summary { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); display: flex; align-items: center; }
 }
 
 /* Workflows on a phone (#7471; Goal #74): the folder's table is the page, and a workflow or a run is the screen after it, with a way back to the folder */

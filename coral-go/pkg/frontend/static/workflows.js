@@ -213,8 +213,8 @@ function renderWorkflowDetail(wf, runs) {
         <div class="item-bar wf-detail-actions">
             <div class="wf-more">
                 <button class="btn btn-sm wf-more-btn" type="button" data-on-click="wf-more" aria-expanded="false" aria-controls="wf-more-menu-${Number(wf.id)}" aria-label="More for ${escAttr(wf.name)}">More</button>
-                <div class="wf-more-menu" id="wf-more-menu-${Number(wf.id)}" hidden>
-                    <button class="btn btn-sm btn-warning" data-on-click="wf-delete" data-workflow-id="${Number(wf.id)}" data-name="${escAttr(wf.name)}">Delete</button>
+                <div class="menu wf-more-menu" id="wf-more-menu-${Number(wf.id)}" hidden>
+                    <button class="menu-item menu-item-danger" data-on-click="wf-delete" data-workflow-id="${Number(wf.id)}" data-name="${escAttr(wf.name)}">Delete</button>
                 </div>
             </div>
             <button class="btn btn-sm" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">

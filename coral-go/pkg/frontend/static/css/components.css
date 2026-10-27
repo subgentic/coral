@@ -77,9 +77,6 @@
 
 /* The family's other variants (Goal #84, #9096): quiet is a button with no box (an icon or a word in a toolbar), and a chosen button of any choice wears the one selected style, the accent fill (a text tab strip keeps
    its underline and does not use .btn). The square icon-only variant comes with the first icon buttons that move onto it. */
-.btn-quiet { border-color: transparent; background: transparent; color: var(--text-secondary); }
-.btn-quiet:hover { background: var(--bg-hover); color: var(--text-primary); }
-.btn-quiet.btn-danger:hover { background: rgba(var(--fx-red-rgb), 0.15); color: var(--error-text); }
 .btn[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
 
 /* One text tab strip (Goal #88, spec item 10, #9210): .tabs holds .tab buttons (role tab, aria-selected): 13/500, a 2 px transparent underline that is the accent on the chosen tab (text-primary, 600), a count in .tab-count, 40 px high
