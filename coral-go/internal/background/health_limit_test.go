@@ -111,3 +111,22 @@ func TestSendUnlessBlockedTypesNothingToABlockedAgent(t *testing.T) {
 	assert.NoError(t, sendUnlessBlocked(context.Background(), nil, deliver, a, "k", "x"))
 	assert.Equal(t, 2, sent)
 }
+
+// #9267 review: a Codex agent whose quota reset while it sat idle still shows the old notice; it is not blocked, and the nudge that wakes it
+// is typed. A line that only quotes the notice (no ■ bullet) blocks nothing.
+func TestStaleCodexNoticeDoesNotStopTheNudges(t *testing.T) {
+	a := AgentInfo{AgentType: "codex", SessionID: "s1"}
+	sent := 0
+	deliver := func(context.Context, AgentInfo, string, string) error { sent++; return nil }
+	for name, screen := range map[string]string{
+		"the date has passed": "■ You've hit your usage limit. Upgrade to Pro or try again at Oct 20th, 2020 10:07 PM.\n\n› \n",
+		"only a quote":        "Lead: You've hit your usage limit. Try again in 3 days.\n\n› \n",
+	} {
+		limit := screenLimit(screenRT{screen: screen})
+		_, blocked := limit(context.Background(), a)
+		assert.False(t, blocked, name)
+		before := sent
+		require.NoError(t, sendUnlessBlocked(context.Background(), limit, deliver, a, "k", "x"), name)
+		assert.Equal(t, before+1, sent, name)
+	}
+}
