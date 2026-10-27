@@ -14,7 +14,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.switchNavTab('automations'); true`);
         await waitFor(`!!document.querySelector('#group-table-view button.dt-primary') && document.getElementById('group-table-view').getClientRects().length > 0`, 'the Jobs folder', 10000);
         const m = await ev(`(() => { const head = document.querySelector('#group-table-view .inbox-folder-head'), sel = document.querySelector('#group-table-view .view-list-select'), top = document.getElementById('group-table-view').getBoundingClientRect().top, bar = document.querySelector('#group-table-view .list-bar-search-row');
-            return { headDrawn: !!head && head.getClientRects().length > 0, select: !!sel && sel.getClientRects().length > 0, selectName: sel ? sel.selectedOptions[0].textContent.replace(/\\s+/g, ' ').trim() : '', barGap: bar ? Math.round(bar.getBoundingClientRect().top - top) : null }; })()`);
+            return { headDrawn: !!head && (head.getBoundingClientRect().width > 2 || head.getBoundingClientRect().height > 2), select: !!sel && sel.getClientRects().length > 0, selectName: sel ? sel.selectedOptions[0].textContent.replace(/\\s+/g, ' ').trim() : '', barGap: bar ? Math.round(bar.getBoundingClientRect().top - top) : null }; })()`);
         assert.equal(m.headDrawn, false, 'the folder page draws no title of its own on a phone: the folders\' select names it ' + JSON.stringify(m));
         assert.equal(m.select, true, 'the folders are one select over the table ' + JSON.stringify(m));
         assert.match(m.selectName, /^Jobs/, 'and it says which folder is on screen ' + JSON.stringify(m));

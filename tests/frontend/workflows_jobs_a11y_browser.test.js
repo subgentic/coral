@@ -44,7 +44,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
             await ev(`import(${S} + 'workflows.js').then(m => m.hideWorkflowCreateModal()).then(() => true)`);
 
             // the job editor
-            await ev(`window.switchNavTab('automations'); true`);
+            await ev(`window.openAutomationsFolder('jobs'); true`);
             await waitFor(`!!document.querySelector('#group-table-view button.dt-primary')`, `${tag}: jobs`, 10000);
             await ev(`document.querySelector('#group-table-view button.dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-detail [data-on-click="job-edit"]')`, `${tag}: job`, 10000);
