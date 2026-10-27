@@ -118,7 +118,7 @@ const PAGE_PRELOAD = `(() => {
         await select('t-a');
         await waitFor(`!!document.querySelector('.vendor-load-error')`, 'terminal load error', 8000);
         let p = await pane();
-        assert.equal(p.notice.cls, 'vendor-load-notice vendor-load-error');
+        assert.equal(p.notice.cls, 'notice-line vendor-load-notice vendor-load-error');
         assert.equal(p.notice.role, 'alert');
         assert.match(p.notice.text, /^The terminal could not load\./);
         assert.ok(p.notice.retry, 'Retry button');

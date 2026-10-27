@@ -203,7 +203,8 @@
     margin-bottom: 8px;
 }
 
-.sched-fail-banner { margin: 0 0 14px; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
+.sched-fail-banner { margin: 0 0 14px; }
+.sched-fail-text { flex: 1 1 auto; min-width: 0; } /* the headline and its words are one flex child of the notice: they stack inside it */ /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 
 .sched-fail-banner strong {
     display: block;
