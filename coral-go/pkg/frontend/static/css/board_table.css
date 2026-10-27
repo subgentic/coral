@@ -88,12 +88,7 @@
 .board-chat-messages.mb-table { max-width: none; }
 .board-chat-header .board-chat-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a long team name gives way to the switch in the narrowest dock */
 
-/* The dock's scope row (#8484): "For this agent | Whole board" under the head, and one quiet line saying what the list holds. */
+/* The dock's scope row (#8484): one quiet line under the head saying what the list holds. */
 .board-chat-scope { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; padding: 0.375rem 10px 0.5rem; } /* the head's own side padding */
-.board-chat-scope .mb-view-switch { margin-inline-start: 0; }
-.board-chat-scope .mb-view-btn { min-height: 1.75rem; padding-inline: 0.625rem; font-size: 0.75rem; }
-@media (max-width: 767px), (pointer: coarse) { .board-chat-scope .mb-view-btn { min-height: var(--control-touch-height, 44px); } }
 .board-chat-scope-note { margin: 0; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); }
-.board-chat-empty .board-scope-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
 .board-chat-search { padding: 0 10px; }
-.mb-search-link { background: none; border: 0; padding: 0 0.25rem; font: inherit; font-size: 0.75rem; color: var(--accent); text-decoration: underline; cursor: pointer; }

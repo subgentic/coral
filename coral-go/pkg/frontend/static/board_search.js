@@ -78,14 +78,8 @@ export function createBoardSearch(idp) {
         _status.hidden = false;
         const busy = _list.busy && !_list.ids.length;
         const nothing = !_list.error && !busy && !_list.total;
-        const miss = nothing && _hooks.noMatch ? _hooks.noMatch() : null; // the dock: "No match in what Ada reads", with the way to the whole board
+        const miss = nothing && _hooks.noMatch ? _hooks.noMatch() : null; // the dock: "No match in what Ada reads"
         _results.textContent = _list.error || (busy ? 'Searching…' : miss ? miss.text : resultsText(Math.max(_index, 0), _list.total, _list.truncated));
-        _status.querySelector('.mb-search-link')?.remove();
-        if (miss && miss.link) {
-            const more = make('button', 'mb-search-link', miss.link.label); more.type = 'button';
-            more.addEventListener('click', () => miss.link.run());
-            _results.after(more);
-        }
         const none = !_list.ids.length;
         for (const b of _status.querySelectorAll('button[data-step]')) b.disabled = none || (b.dataset.step === 'older' ? _index >= _list.total - 1 : _index <= 0);
     }
@@ -147,7 +141,6 @@ export function createBoardSearch(idp) {
     }
 
     /** The same search again (the list it searches changed): ask for the matches again and go to the newest. */
-    function rerun() { if (_bar && isFiltered(_filters)) run(_filters); }
 
     /** The tools row in its place for this board (a fresh search); hooks: {me, redraw(), jumpTo(id), first(), latest()}. */
     function mountBoardSearch(host, project, hooks) {
@@ -189,7 +182,7 @@ export function createBoardSearch(idp) {
 
     const boardSearchState = () => ({ filters: _filters, ids: _list.ids, total: _list.total, index: _index });
 
-        return { mount: mountBoardSearch, highlight: highlightBoard, setMembers: setBoardMembers, reset: resetBoardSearch, state: boardSearchState, rerun };
+        return { mount: mountBoardSearch, highlight: highlightBoard, setMembers: setBoardMembers, reset: resetBoardSearch, state: boardSearchState };
 }
 
 // The board page's search (message_board.js, board_window.js).
