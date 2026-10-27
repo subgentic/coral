@@ -183,7 +183,7 @@ async function _initViewEditor(content) {
         });
     } else {
         // Fallback textarea
-        container.innerHTML = `<textarea class="inline-preview-fallback-editor" style="height:350px">${escapeHtml(content)}</textarea>`;
+        container.innerHTML = `<textarea class="inline-preview-fallback-editor inline-preview-fallback-editor-tall">${escapeHtml(content)}</textarea>`;
     }
 }
 

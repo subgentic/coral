@@ -1456,6 +1456,7 @@ body.panel-dragging .agentic-state {
     color: var(--text-muted);
     font-family: var(--font-mono);
 }
+.inline-preview-fallback-editor-tall { height: 350px; }
 .image-panes-compare .image-pane-frame img {
     max-height: 40vh;
 }

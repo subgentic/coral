@@ -86,8 +86,8 @@ const BASE = require('./test_base').BASE;
         await ev(`import((window.__coralStatic || '/static/') + 'cli_check.js').then(m => { m.CLI_INSTALL_INSTRUCTIONS.claude.cmd = ${JSON.stringify(nasty)}; return true; })`);
         await startLaunch(); await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="skip"]')`, 'the question'); await click('skip');
         await waitFor(`[...document.querySelectorAll('body > .modal:not([id]) h3')].some(h => /is not installed/.test(h.textContent))`, 'the dialog with the nasty command');
-        const shown = await ev(`(() => { const d = document.querySelector('body > .modal:not([id])'); return { code: d.querySelector('code[style*="user-select"]').textContent, copy: d.querySelector('[data-on-click="info-copy"]').dataset.cmd, injected: !!d.querySelector('#pwn, b') }; })()`);
-        assert.deepEqual(shown, { code: nasty, copy: nasty, injected: false });
+        const shown = await ev(`(() => { const d = document.querySelector('body > .modal:not([id])'); return { code: d.querySelector('.cli-dialog-command code').textContent, selectAll: getComputedStyle(d.querySelector('.cli-dialog-command code')).userSelect, copy: d.querySelector('[data-on-click="info-copy"]').dataset.cmd, injected: !!d.querySelector('#pwn, b') }; })()`);
+        assert.deepEqual(shown, { code: nasty, selectAll: 'all', copy: nasty, injected: false });
         await click('close');
         console.log('PASS cli dialogs');
     } finally { await client.close(); }

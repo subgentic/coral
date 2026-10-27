@@ -113,9 +113,6 @@
     "coral-go/pkg/frontend/static/platform/native.js": {
       "font-family: -apple-system,BlinkMacSystemFont,sans-serif": 1,
       "font-size: 3rem": 1
-    },
-    "coral-go/pkg/frontend/static/team_actions.js": {
-      "font-family: monospace": 1
     }
   }
 }

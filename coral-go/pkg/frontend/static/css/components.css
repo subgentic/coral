@@ -3836,6 +3836,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* In the launch dialog the sectioned steps sit inside the dialog's own box: it has no padding then, the step's header and footer are full width, the fixed footer is always in view. */
 .modal-content.sd-modal-content:has(.launch-modal-step) { padding: 0; overflow: hidden; }
 .sd-modal-content > .launch-access-note, .sd-modal-content > .launch-server-row { margin: 0; padding: 12px 24px 0; }
+.sd-modal-content > .launch-server-row { margin-bottom: 12px; } /* the row's own 12 px below, as it had inline */
 .sd-modal-content > .launch-access-note:empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */
 .sd-modal-content .launch-modal-step { overflow: hidden; }
 .sd-step-header { flex: none; padding: 24px 24px 12px; border-bottom: 1px solid var(--border); }
@@ -4317,3 +4318,32 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .servers-page .item-bar { margin-top: auto; bottom: calc(-1 * var(--space-lg, 16px)); margin-bottom: calc(-1 * var(--space-lg, 16px)); padding-bottom: calc(var(--space-lg) + var(--space-lg, 16px)); } /* the view's padding is taken back so nothing shows under the bar */
 .servers-view.servers-view-page .servers-tab { min-height: 100%; display: flex; flex-direction: column; }
 .servers-view.servers-view-page .servers-tab-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+
+/* the install and permission dialogs of cli_dialogs.js (#9186): classes, not style attributes */
+.cli-dialog { width: 480px; }
+.cli-dialog-narrow { width: 460px; }
+.cli-dialog-text { margin: 8px 0 12px; font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
+.cli-dialog-text-roomy { margin-bottom: 16px; }
+.cli-dialog-command { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-family: var(--font-mono); font-size: var(--fs-md); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.cli-dialog-command code { flex: 1; user-select: all; }
+.cli-dialog-alt { margin: 10px 0 0; font-size: var(--fs-md); }
+.cli-dialog-alt a { color: var(--link-text); overflow-wrap: anywhere; }
+.cli-dialog-note { margin: 8px 0 0; font-size: var(--fs-base); line-height: 1.5; color: var(--text-secondary); }
+.cli-dialog-actions { margin-top: 16px; }
+.cli-dialog-actions-tight { gap: 8px; }
+
+/* the form row outside a settings_view (#9186, Goal #84 item 7): the hand-built dialogs write the same row, the label above, the control, and under it the shared .settings-hint, from the same --sv-* tokens (settings_view.css keeps only .sv rules, so the hand-built row is here), and never a style attribute on a field */
+.form-row { display: grid; gap: 4px; margin: 0 0 12px; min-width: 0; }
+.form-row-inline { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); }
+.form-label, .modal-content .form-label { display: block; margin: 0 0 6px; font-size: var(--sv-label-size); font-weight: var(--sv-label-weight); color: var(--sv-label-color); } /* in a dialog too: .modal-content label (12 px below, secondary) would otherwise win */
+.form-row .form-label, .modal-content .form-row .form-label { margin: 0; }
+.form-label-nowrap, .modal-content .form-label-nowrap { white-space: nowrap; }
+.form-label-block, .modal-content .form-label-block { margin-bottom: 8px; }
+.form-label-strong, .modal-content .form-label-strong { font-weight: 600; }
+.form-control-full { width: 100%; }
+.form-control-grow { flex: 1; min-width: 0; }
+.form-control-auto { width: auto; }
+.form-control-gap { margin-top: 4px; }
+.form-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); }
+.form-check-compact { gap: 6px; padding: 2px 0; cursor: pointer; white-space: nowrap; }
+.form-textarea-readonly { width: 100%; height: 260px; padding: 12px; box-sizing: border-box; font-family: var(--font-mono); font-size: var(--fs-base); resize: vertical; color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-lg); }

@@ -5,9 +5,9 @@
         <div class="modal-content modal-content-wide">
             <p id="launch-access-note" class="launch-access-note" role="status"></p>
             <!-- Hub only: launch target server (hidden unless hub mode has a usable remote) -->
-            <div id="launch-server-row" class="launch-server-row" style="display:none;align-items:center;gap:8px;margin-bottom:12px;font-size:var(--fs-md)">
-                <label for="launch-server" style="margin:0;white-space:nowrap">Machine</label>
-                <select id="launch-server" style="flex:1;min-width:0" data-on-change="m-on-launch-server-change"></select>
+            <div id="launch-server-row" class="launch-server-row form-row form-row-inline" style="display:none">
+                <label for="launch-server" class="form-label form-label-nowrap">Machine</label>
+                <select id="launch-server" class="form-control-grow" data-on-change="m-on-launch-server-change"></select>
                 <span id="launch-server-note" class="text-muted-sm"></span>
             </div>
             <!-- Step 1: Session type chooser -->
@@ -395,8 +395,8 @@
                 <h3 id="prompt-modal-title">Enter value</h3>
             </div>
             <div class="modal-body">
-                <label id="prompt-modal-label" for="prompt-modal-input" style="font-size:var(--fs-md);color:var(--text-secondary);display:block;margin-bottom:6px"></label>
-                <input type="text" id="prompt-modal-input" style="width:100%" aria-labelledby="prompt-modal-title prompt-modal-label" autofocus>
+                <label id="prompt-modal-label" for="prompt-modal-input" class="form-label"></label>
+                <input type="text" id="prompt-modal-input" class="form-control-full" aria-labelledby="prompt-modal-title prompt-modal-label" autofocus>
                 <div id="prompt-modal-colors" class="prompt-modal-colors" style="display:none">
                     <div class="prompt-modal-colors-label">Name color</div>
                     <div class="color-swatches" role="group" aria-label="Name color"></div>
@@ -531,8 +531,8 @@
             </div>
             <div class="modal-body">
                 <div id="resume-launch-form">
-                    <label style="font-size:var(--fs-md);display:block;margin-bottom:8px">Working Directory:
-                        <div class="dir-input-row" style="margin-top:4px">
+                    <label class="form-label form-label-block">Working Directory:
+                        <div class="dir-input-row form-control-gap">
                             <input type="text" id="resume-dir" placeholder="/path/to/project" data-coral-root="{{ .CoralRoot }}" value="{{ .CoralRoot }}">
                             <button class="btn" data-on-click="m-toggle-browser" data-browser="resume-dir resume-dir-browser resume-browser-list resume-browser-current-path">Browse</button>
                         </div>
@@ -548,7 +548,7 @@
                         </ul>
                     </div>
                     <div id="resume-board-row" style="display:none;margin-top:8px">
-                        <label style="font-size:var(--fs-md);display:flex;align-items:center;gap:8px">
+                        <label class="form-check">
                             <input type="checkbox" id="resume-board-check" checked>
                             Rejoin board: <span id="resume-board-name" class="badge board-badge" style="font-size:var(--fs-base)"></span>
                         </label>
