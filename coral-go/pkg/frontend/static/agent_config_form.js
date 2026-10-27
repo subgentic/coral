@@ -405,7 +405,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
         const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label" hidden><span class="acf-provider-head">Provider</span>');
         container.innerHTML = [
             `<div class="acf-persona-page"><p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="acf-prompt-host" data-rows="8"></div></div>`,
-            pane('agent', 'Model', 'smart_toy', '', `<div class="acf-pick-head"><span id="${escapeAttr(uid)}-pick-label">Provider</span></div><div class="launch-agent-pick acf-agent-pick" role="radiogroup" aria-labelledby="${escapeAttr(uid)}-pick-label" hidden></div>${agentHTML}`),
+            pane('agent', 'Model', 'smart_toy', '', `<div class="acf-pick-head"><span id="${escapeAttr(uid)}-pick-label">Provider</span></div><div id="${escapeAttr(uid)}-pick" class="launch-agent-pick acf-agent-pick" role="radiogroup" aria-labelledby="${escapeAttr(uid)}-pick-label" hidden></div>${agentHTML}`),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
             pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
         ].join('');
@@ -479,6 +479,7 @@ function wireAcfAgentType(container) {
     container.querySelector('.acf-agent-type')?.addEventListener('change', () => {
         const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
         _checkAgentCLI(agentType, cliWarningOf(container));
+        if (container.querySelector('.acf-restart-name')) { const f = container.querySelector('.acf-flags'); if (f) f.value = ''; } // Restart: another provider's CLI does not take the old one's flags (#8973)
         setThinking(container, undefined); // a provider has its own levels: the choice goes back to Default and is not sent (#7391; only a provider resets the Model and Thinking)
         // Still showing the default (nobody picked a mode here): it follows the agent type, Auto for Claude and the other CLIs' own default (#5836)
         syncDefaultPermissionMode(container.querySelector('.acf-permission-mode'), _settingsFor(_acfServer(container)), agentType);
