@@ -1,0 +1,76 @@
+name: update-real-macos
+
+# The auto-update chain with REAL releases (#9030): tests/release/update_real.sh on a GitHub-hosted macOS runner, which is a throwaway machine, so the
+# install, the tmux-survival and the settled checks run too (items 5 to 8 of tools/devops/update_check.md). Run it AFTER the release is approved and promoted:
+# the updater only finds a release the promote workflow signed (the highest promote-<tag>-<n> pre-release) and GitHub marks latest. Nothing here promotes,
+# tags, uploads or signs anything, and the token is read-only and reaches only the gh command (the downloaded app and its agents never see it).
+#   gh workflow run update-real-macos.yml -f from=v2.0.0 -f to=v2.0.1
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "The installed release to start from (a release tag, for example v2.0.0)"
+        required: true
+        default: "v2.0.0"
+      to:
+        description: "The release the updater must find and install (for example v2.0.1)"
+        required: true
+
+concurrency:
+  group: update-real-macos
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CORAL_TELEMETRY_DISABLED: "1"   # no CI run sends real events (internal/tracking's census requires it)
+
+jobs:
+  update-real:
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: coral-go/go.mod
+          cache: false
+      # The token goes to the gh command only: a gh wrapper in PATH reads it from a private file and sets GH_TOKEN for that one process, so the env of
+      # the script, of the downloaded app and of its agents holds no token.
+      - name: Give gh the read-only token, and nothing else
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          real=$(command -v gh)
+          mkdir -p "$RUNNER_TEMP/bin"
+          umask 077
+          printf '%s' "$TOKEN" > "$RUNNER_TEMP/gh-token"
+          printf '#!/usr/bin/env bash\nGH_TOKEN=$(cat "%s/gh-token") exec "%s" "$@"\n' "$RUNNER_TEMP" "$real" > "$RUNNER_TEMP/bin/gh"
+          chmod 700 "$RUNNER_TEMP/bin/gh"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Update from one real release to the next
+        env:
+          FROM_TAG: ${{ inputs.from }}
+          TO_TAG: ${{ inputs.to }}
+        run: |
+          set -euo pipefail
+          # the tags come in through env and are checked here before they reach the script: a release tag, nothing else
+          for t in "$FROM_TAG" "$TO_TAG"; do
+            [[ "$t" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(rc[0-9]*|beta|dev|forDropbox))?$ ]] || { echo "::error::not a release tag: refused"; exit 2; }
+          done
+          rc=0
+          bash tests/release/update_real.sh --from "$FROM_TAG" --to "$TO_TAG" 2>&1 | tee "$RUNNER_TEMP/update_real.txt" || rc=$?
+          {
+            echo "## Update from $FROM_TAG to $TO_TAG on a hosted macOS runner"
+            echo
+            echo '```'
+            tail -30 "$RUNNER_TEMP/update_real.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
