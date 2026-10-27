@@ -51,7 +51,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.querySelector('#inbox-page .goals-facts').textContent`),'OutcomeOne shared goal viewDone whenBack returns to the filtered list');
             assert.equal(await ev(`document.querySelectorAll('#inbox-page .goal-team-link').length`),1);
             assert.ok(await ev(`document.querySelector('#inbox-page .goal-team-link').getAttribute('aria-label').includes(${JSON.stringify(board)})`));
-            if (width===390) assert.equal(await ev(`document.querySelector('#inbox-page select[aria-label="Inbox views"]').value`),'goals');
+            if (width===390) assert.equal(await ev(`document.querySelector('#inbox-page .view-list-item[aria-current="true"]').dataset.key`),'goals'); // a phone's folders are a drawer (#9545): the open folder is the current item
             for (const theme of ['light','dark']) {
                 await ev(`document.documentElement.setAttribute('data-theme',${JSON.stringify(theme)}); true`);
                 assert.ok(await ev('document.documentElement.scrollWidth <= innerWidth + 1'),'no horizontal overflow');

@@ -383,7 +383,7 @@
 .dt-mail-avatar { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--on-avatar); font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .dt-mail-avatar.material-icons { font-size: var(--fs-lg); }
 .dt-mail-square { border-radius: var(--radius-lg); }
-.dt-box .dt-mail-open.dt-primary, .dt-box .dt-mail-open { display: flex; width: auto; overflow: visible; white-space: normal; flex: 1; align-items: center; gap: 8px; min-width: 0; min-height: calc(var(--table-touch) + 12px); margin: 0; padding: 0 12px 0 4px; border: 0; background: none; color: var(--table-primary-color); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.dt-box .dt-mail-open.dt-primary, .dt-box .dt-mail-open { display: flex; width: auto; overflow: visible; white-space: normal; flex: 1; align-items: center; gap: 8px; min-width: 0; min-height: calc(var(--table-touch) + 12px); margin: 0; padding: 0 12px 0 4px; border: 0; background: none; color: var(--table-primary-color); font: inherit; font-feature-settings: "calt" 0; text-align: left; text-decoration: none; cursor: pointer; } /* the font shorthand resets the feature settings: a name like 2x4 is read as written, as every .dt-primary is */
 .dt-mail-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dt-mail-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dt-mail-line { display: flex; gap: 8px; min-width: 0; font-size: var(--fs-md); }

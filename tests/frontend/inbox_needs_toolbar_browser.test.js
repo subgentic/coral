@@ -11,7 +11,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
     const S = `(window.__coralStatic || '/static/')`;
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
-    const names = () => ev(`[...document.querySelectorAll('#group-table-view button.dt-primary, #group-table-view button.dt-person')].filter(b => b.getClientRects().length).map(b => b.textContent.trim())`);
+    const names = () => ev(`[...document.querySelectorAll('#group-table-view button.dt-primary, #group-table-view button.dt-person')].filter(b => b.getClientRects().length).map(b => (b.querySelector('.dt-mail-title') || b).textContent.trim())`); // a phone's row is a mail row (#9545): its button holds the name, the ask and the time; the name is the title
     const folders = () => ev(`${FOLDER_ROWS}.join('|')`);
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0;
@@ -35,8 +35,8 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
                 window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, waiting_for_input: true, waiting_kind: W[s.session_id][0], waiting_since: W[s.session_id][1] }));
                 (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
-            if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'needs'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
+            await waitFor(`document.querySelectorAll('.view-list-item').length > 3`, 'the folders', 10000);
+            if (mobile) await ev(`document.querySelector('#group-table-view .view-list-item[data-key="needs"]')?.click(); true`); // a phone picks its folder in the drawer (#9545)
             else await ev(`document.querySelector('.view-list-item[data-key="needs"]').click(); true`);
             await waitNames(4, 'the four waiting agents'); await settle(300);
             const before = await folders();
