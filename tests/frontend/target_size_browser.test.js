@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const NA = require('./helpers/new_agent');
+const { TOUCH_AREA } = require('./helpers/touch_area');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -23,8 +24,8 @@ const NA = require('./helpers/new_agent');
                                ['launch-back-btn', '<button type="button" class="launch-back-btn" aria-label="Back"><span class="material-icons">arrow_back</span></button>']];
                 for (const [name, html] of cases) {
                     const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:200px;top:200px;z-index:2147483647;background:#fff;padding:40px'; host.innerHTML = html; document.body.append(host);
-                    const b = host.querySelector('button'); b.style.opacity = '1'; const r = b.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-                    for (const [dx, dy] of [[-11, 0], [11, 0], [0, -11], [0, 11]]) { const t = document.elementFromPoint(cx + dx, cy + dy); if (!(t === b || b.contains(t))) out.push(name + ' misses ' + dx + ',' + dy + ' (size ' + Math.round(r.width) + 'x' + Math.round(r.height) + ')'); }
+                    const b = host.querySelector('button'); b.style.opacity = '1'; const r = (${TOUCH_AREA})(b); const cx = r.l + r.w / 2, cy = r.t + r.h / 2;
+                    for (const [dx, dy] of [[-11, 0], [11, 0], [0, -11], [0, 11]]) { const t = document.elementFromPoint(cx + dx, cy + dy); if (!(t === b || b.contains(t))) out.push(name + ' misses ' + dx + ',' + dy + ' (size ' + Math.round(r.w) + 'x' + Math.round(r.h) + ')'); }
                     const moved = host.getBoundingClientRect(); host.remove(); }
                 return out; })()`);
             assert.deepEqual(miss, [], 'each small control has a 24 px target: ' + JSON.stringify(miss));

@@ -8,6 +8,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { TOUCH_AREA } = require('./helpers/touch_area');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -16,6 +17,7 @@ const BASE = require('./test_base').BASE;
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const hit = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = (${TOUCH_AREA})(e); return { l: Math.round(r.l), t: Math.round(r.t), r: Math.round(r.r), b: Math.round(r.b), w: Math.round(r.w), h: Math.round(r.h) }; })()`); // the area a finger hits (#9332)
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height) }; })()`);
     const tap = async sel => { const r = await rect(sel); assert.ok(r && r.w > 0 && r.h > 0, `${sel} can be tapped: ` + JSON.stringify(r)); const x = (Math.max(r.l, 0) + Math.min(r.r, 9999)) / 2, y = (r.t + r.b) / 2;
         await Input.dispatchTouchEvent({ type: 'touchStart', touchPoints: [{ x, y }] }); await Input.dispatchTouchEvent({ type: 'touchEnd', touchPoints: [] }); };
@@ -46,8 +48,8 @@ const BASE = require('./test_base').BASE;
             await setup(W, H, theme, true);
             let pane = await rect('#preview-pane');
             check(`${at}: before, the preview is the sheet's lower part (${pane.w}x${pane.h} at ${pane.t}), not the screen`, pane.h < H * 0.6 && pane.t > 100);
-            const btn = await rect('#preview-max-btn');
-            check(`${at}: the full-screen toggle is on the tab bar and 44 px (${btn && btn.w}x${btn && btn.h})`, btn && btn.w >= 44 && btn.h >= 44 && btn.r <= W);
+            const btn = await hit('#preview-max-btn'), btnBox = await rect('#preview-max-btn'); // the size is the area a finger hits, the place is the box
+            check(`${at}: the full-screen toggle is on the tab bar and 44 px (${btn && btn.w}x${btn && btn.h})`, btn && btn.w >= 44 && btn.h >= 44 && btnBox.r <= W);
             await shot(`preview-phone-before-${W}-${theme}`);
             await ev(`document.getElementById('preview-max-btn').focus(); true`);
             await tap('#preview-max-btn');
@@ -55,9 +57,9 @@ const BASE = require('./test_base').BASE;
             pane = await rect('#preview-pane');
             check(`${at}: the pane covers the viewport (${JSON.stringify(pane)})`, pane.l === 0 && pane.t === 0 && pane.r === W && pane.b === H);
             const st = await ev(`(() => { const p = document.getElementById('preview-pane'); const body = document.getElementById('preview-body'); const top = document.elementFromPoint(${W} / 2, 4); const mid = document.elementFromPoint(${W} / 2, ${H} / 2);
-                const back = document.getElementById('preview-full-back'); const br = back.getBoundingClientRect();
+                const back = document.getElementById('preview-full-back'); const br0 = back.getBoundingClientRect(), ta = (${TOUCH_AREA})(back), br = { width: br0.width, height: br0.height }; br.hit = ta;
                 return { role: p.getAttribute('role'), modal: p.getAttribute('aria-modal'), pressed: document.getElementById('preview-max-btn').getAttribute('aria-pressed'), hist: !!(history.state && history.state.coralOverlay), topIn: p.contains(top), midIn: p.contains(mid),
-                    backShown: br.width > 0, backH: Math.round(br.height), backW: Math.round(br.width), focusIn: p.contains(document.activeElement), focusId: document.activeElement && document.activeElement.id, over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+                    backShown: br.width > 0, backH: Math.round(br.hit.h), backW: Math.round(br.hit.w), focusIn: p.contains(document.activeElement), focusId: document.activeElement && document.activeElement.id, over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
                     bodyScrolls: body.scrollHeight > body.clientHeight + 5, bodyOverflowY: getComputedStyle(body).overflowY, sideOver: p.scrollWidth - p.clientWidth, docScrolls: document.documentElement.scrollHeight > innerHeight + 1 }; })()`);
             check(`${at}: it is a modal layer with a history entry, over the top bar, with a 44 px Back button`, st.role === 'dialog' && st.modal === 'true' && st.pressed === 'true' && st.hist && st.topIn && st.midIn && st.backShown && st.backH >= 44 && st.backW >= 44, JSON.stringify(st));
             check(`${at}: focus moved inside (${st.focusId}), nothing scrolls sideways, and the long content scrolls inside the pane`, st.focusIn && st.over === 0 && st.sideOver <= 0 && st.bodyScrolls && /auto|scroll/.test(st.bodyOverflowY), JSON.stringify(st));

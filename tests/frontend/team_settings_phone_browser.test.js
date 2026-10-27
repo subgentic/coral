@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { TOUCH_AREA } = require('./helpers/touch_area');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -33,7 +34,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
             window.__m.add('boss', 'A', 3, { sleeping: false }); window.__m.add('dev', 'B', 3, { sleeping: false });
             T.state.liveSessions.forEach(s => { s.board_name = ${JSON.stringify(TEAM)}; s.board_project = ${JSON.stringify(TEAM)}; });
             T.render.renderLiveSessions(T.state.liveSessions); return T.state.liveSessions.length; })()`);
-        const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; })()`);
+        const hit = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return e ? (${TOUCH_AREA})(e) : null; })()`); // the area a finger hits: the box, or its transparent ::after (#9332)
+    const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; })()`);
         const tap = async sel => {
             const r = await rect(sel); assert.ok(r && r.w > 0 && r.h > 0, `${sel} is on screen to tap: ` + JSON.stringify(r));
             const x = (Math.max(r.l, 0) + Math.min(r.r, 390)) / 2, y = (r.t + r.b) / 2;
@@ -43,7 +45,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const open = async () => {
             assert.equal(await scene(), 2);
             await waitFor(`!!document.querySelector(${JSON.stringify(HEADER + ' .group-kebab-btn')})`, 'the team card on the phone list', 6000);
-            const k = await rect(HEADER + ' .group-kebab-btn'); assert.ok(k.w >= 44 && k.h >= 44, `the team's menu button is touch-sized (${k.w}x${k.h})`);
+            const k = await hit(HEADER + ' .group-kebab-btn'); assert.ok(k.w >= 44 && k.h >= 44, `the team's menu button is touch-sized (${k.w}x${k.h})`);
             await tap(HEADER + ' .group-kebab-btn');
             const item = await rect(HEADER + ' [data-on-click="team-working-mode"]'); assert.ok(item && item.h >= 44, 'Team settings is in the menu, touch-sized: ' + JSON.stringify(item));
             await tap(HEADER + ' [data-on-click="team-working-mode"]');
