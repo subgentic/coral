@@ -367,3 +367,6 @@
 .dt-one-line .team-artifact-badge { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .artifact-name-icon { display: inline-flex; flex: 0 0 16px; }
+/* a goal screen's one-line rows (#8952): the row button is a target of its own, 24 px, 44 px on a phone */
+.goal-list .dt-primary { display: block; min-height: 1.5rem; line-height: 1.5rem; }
+@media (max-width: 767px), (pointer: coarse) { .goal-list .dt-primary { min-height: var(--control-touch-height, 44px); line-height: var(--control-touch-height, 44px); } }

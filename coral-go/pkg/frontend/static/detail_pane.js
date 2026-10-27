@@ -42,7 +42,7 @@ function modalOpen() {
 
 /** The resize handle on the pane's left edge: the goal page's handle (goals_view.js) for this pane, with the same limits, keys and double click. */
 function addResizeHandle(aside) {
-    const row = aside.closest('.inbox-artifacts-row') || document.getElementById('team-page-row'); // the Inbox's Artifacts folder has its own row: the pane is its right sidebar (#8925)
+    const row = aside.closest('.inbox-artifacts-row') || aside.closest('.goal-split') || document.getElementById('team-page-row'); // the Inbox's Artifacts folder has its own row: the pane is its right sidebar (#8925); a goal screen's preview resizes within its own split (#8952)
     if (!row) return;
     const mainMin = aside.classList.contains('inbox-detail-pane') ? INBOX_MAIN_MIN : undefined;
     const grip = el('div', 'detail-grip');
@@ -110,7 +110,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     }
     aside.append(head, more.panel, main);
     if (actions.length) aside.append(foot);
-    if (resizable && (!host || host.classList.contains('inbox-detail-pane'))) addResizeHandle(aside); else aside.style.removeProperty('--detail-w'); // a pane that is not resizable has its own width, not the last one's
+    if (resizable && (!host || host.classList.contains('inbox-detail-pane') || host.classList.contains('goal-detail-pane'))) addResizeHandle(aside); else aside.style.removeProperty('--detail-w'); // a pane that is not resizable has its own width, not the last one's
     aside.hidden = false;
     if (!host) {
         page()?.classList.add('detail-open');

@@ -41,6 +41,7 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await ev(`document.querySelector('${host} .goal-detail-pane').hidden`), true, at + 'nothing is open at first');
                 const rows = await ev(`[...document.querySelectorAll('${host} .goal-list tbody tr')].map(r => Math.round(r.getBoundingClientRect().height))`);
                 assert.ok(rows.every(n => n <= 64), at + 'one-line rows: ' + JSON.stringify(rows));
+                assert.equal(await ev(`document.querySelector('${host} .goal-list tr:has([data-task-id="${t1}"]) td[data-key="who"] [role=img]')?.title`), 'Done by be', at + 'a done task says who did it');
                 await shot(`goal-screen-list-${where === 'Inbox' ? 'inbox' : 'team'}-${w}`);
 
                 console.log(`${at}a task opens in the pane, Esc puts it away`);
@@ -51,6 +52,16 @@ const BASE = require('./test_base').BASE;
                 if (mobile) assert.equal(await ev(`(() => { const p = document.querySelector('${host} .goal-detail-pane').getBoundingClientRect(), s = document.querySelector('${host} .goal-split').getBoundingClientRect(); return p.width >= s.width - 2; })()`), true, at + 'the pane covers the list');
                 else assert.equal(await ev(`(() => { const p = document.querySelector('${host} .goal-detail-pane').getBoundingClientRect(), m = document.querySelector('${host} .goal-main').getBoundingClientRect(); return p.left >= m.right - 2 && p.width > 300; })()`), true, at + 'the pane is on the right');
                 await shot(`goal-screen-task-${where === 'Inbox' ? 'inbox' : 'team'}-${w}`);
+                // UI Accessibility's notes (#8952): the pane is named and is a dialog only where it is the whole screen; the heading is not said twice; the keyboard starts on Close; the row button is named with its state and is a 44 px target on a phone; the page is not cramped; a resize grip where the pane is a column
+                const pane = await ev(`(() => { const p = document.querySelector('${host} .goal-detail-pane'), t = p.querySelector('.team-task-page').getBoundingClientRect(), r = p.getBoundingClientRect(), b = document.querySelector('${host} .goal-list .dt-primary[data-task-id="${t2}"]'); const grip = p.querySelector('.detail-grip'); return { role: p.getAttribute('role'), name: document.getElementById(p.getAttribute('aria-labelledby'))?.textContent, dup: p.querySelector('#team-task-title') ? getComputedStyle(p.querySelector('#team-task-title')).display : 'none', focus: document.activeElement?.classList.contains('detail-close'), side: Math.round(t.left - r.left), rowName: b.getAttribute('aria-label'), rowH: Math.round(b.getBoundingClientRect().height), grip: grip ? { sep: grip.getAttribute('role'), shown: getComputedStyle(grip).display !== 'none' } : null }; })()`);
+                assert.equal(pane.role, mobile ? 'dialog' : 'complementary', at + 'the pane\'s role: ' + JSON.stringify(pane));
+                assert.equal(pane.name, '#' + t2 + ' ' + OPEN, at + 'the pane is named for the task');
+                assert.equal(pane.dup, 'none', at + 'the title is not repeated in the pane');
+                assert.equal(pane.focus, true, at + 'the keyboard starts on Close');
+                assert.ok(pane.side <= 20, at + 'the task page sits close to the pane\'s edge: ' + pane.side);
+                assert.equal(pane.rowName, 'Open task #' + t2 + ': ' + OPEN + ', Queued', at + 'the row button is named with its state');
+                assert.ok(pane.rowH >= (mobile ? 44 : 24), at + 'the row button is a target: ' + pane.rowH);
+                assert.equal(pane.grip && pane.grip.sep, 'separator', at + 'the pane has a resize grip'); assert.equal(pane.grip.shown, !mobile, at + 'the grip is drawn where the pane is a column');
                 await ev(`(document.querySelector('${host} .goal-detail-pane .detail-back')?.getClientRects().length ? document.querySelector('${host} .goal-detail-pane .detail-back') : null)?.click(); if (!${mobile}) (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`);
                 await waitFor(`document.querySelector('${host} .goal-detail-pane').hidden`, 'the pane is closed', 8000);
                 await waitFor(`document.activeElement?.dataset?.taskId === '${t2}'`, 'the keyboard is back on the row', 8000);
@@ -63,6 +74,17 @@ const BASE = require('./test_base').BASE;
                 await ev(`[...document.querySelectorAll('${host} .goal-list [data-artifact-id]')].find(b => b.textContent === 'report.md').click(); true`);
                 await waitFor(`!document.querySelector('${host} .goal-detail-pane').hidden && document.querySelector('${host} .goal-detail-pane').textContent.includes('report.md')`, 'the file in the pane', 15000);
                 await waitFor(`document.querySelector('${host} .goal-detail-pane').textContent.includes('The report')`, 'the document in the pane', 15000);
+                assert.equal(await ev(`document.activeElement?.classList.contains('detail-close')`), true, at + 'a file starts the keyboard on Close too');
+                assert.equal(await ev(`document.querySelector('${host} .goal-detail-pane').getAttribute('role')`), mobile ? 'dialog' : 'complementary', at + 'the file\'s pane has the same role');
+                // the strip: Home and End
+                await ev(`document.querySelector('${host} .goal-detail-pane .detail-close').click(); document.querySelector('${host} #goal-tab-artifacts').focus(); true`);
+                await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Home', code: 'Home', windowsVirtualKeyCode: 36 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Home', code: 'Home', windowsVirtualKeyCode: 36 });
+                await waitFor(`document.activeElement?.id === 'goal-tab-tasks' && document.activeElement.getAttribute('aria-selected') === 'true'`, 'Home goes to the first tab', 8000);
+                await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'End', code: 'End', windowsVirtualKeyCode: 35 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'End', code: 'End', windowsVirtualKeyCode: 35 });
+                await waitFor(`document.activeElement?.id === 'goal-tab-artifacts' && document.activeElement.getAttribute('aria-selected') === 'true'`, 'End goes to the last tab', 8000);
+                await waitFor(`document.querySelectorAll('${host} .goal-list [data-artifact-id]').length === 2`, 'the files again', 15000);
+                await ev(`[...document.querySelectorAll('${host} .goal-list [data-artifact-id]')].find(b => b.textContent === 'report.md').click(); true`);
+                await waitFor(`document.querySelector('${host} .goal-detail-pane').textContent.includes('The report')`, 'the document again', 15000);
                 await shot(`goal-screen-artifact-${where === 'Inbox' ? 'inbox' : 'team'}-${w}`);
                 console.log('   ✓');
             }
