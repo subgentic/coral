@@ -132,6 +132,14 @@ export function parse(pathname, search = '') {
         case INBOX:
             if (rest.length === 1 && (rest[0] === 'needs' || rest[0] === 'saved' || rest[0] === 'artifacts')) return { view: 'inbox-folder', folder: rest[0] };
             if (rest[0] === 'chats' && rest.length <= 2 && (rest.length === 1 || INBOX_CHATS_RE.test(rest[1]))) return { view: 'inbox-folder', folder: rest.length === 1 || rest[1] === 'all' ? 'chats' : `chats-${rest[1]}` };
+            if (rest[0] === 'chats' && rest.length >= 3 && INBOX_CHATS_RE.test(rest[1])) { // a chat on screen in the Inbox: /inbox/chats/<folder>/[@<server>/]<id> (Goal #100, #9549); the folder is the one it opens under
+                const folder = rest[1] === 'all' ? 'chats' : `chats-${rest[1]}`;
+                rest.splice(0, 2);
+                const t = take();
+                if (t.bad || rest.length !== 1) return null;
+                const id = decode(rest[0]);
+                return id !== null && HISTORY_ID_RE.test(id) ? { view: 'inbox-folder', folder, ...(t.server ? { server: t.server } : {}), id } : null;
+            }
             return null;
         case 'workflows': {
             if (!rest.length) return { view: 'workflows' };
@@ -176,6 +184,19 @@ export function parse(pathname, search = '') {
 function terminalQuery(search) {
     const v = new URLSearchParams(search || '').getAll('view');
     return v.length === 1 && v[0] === 'terminal';
+}
+
+/** Where an old Chats address goes when the Inbox is the native one (nativeInbox(), Goal #100, #9549): the same chat or list as an Inbox route, never a not-found page. A chat is the chat on screen in the Inbox, under
+ *  All chats (an old address does not say its folder); a list is the folder its filter names (starred, archived, active, with_notes; type=group is the Boards folder), else All chats: every other filter is dropped and the
+ *  address still lands on a page. The computer (/chats/@<server>) is dropped from a list (the Inbox folders read every online computer) and kept on a chat. Any other route is returned as it is. */
+export function inboxRouteFor(route) {
+    if (!route || route.view !== 'chats') return route;
+    if (route.id) return { view: 'inbox-folder', folder: 'chats', ...(route.server ? { server: route.server } : {}), id: route.id };
+    const q = new URLSearchParams(route.query || '');
+    const on = k => q.get(k) === '1';
+    if (q.get('type') === 'group') return { view: 'inbox-boards', sub: 'boards' };
+    const folder = on('starred') ? 'chats-starred' : on('archived') ? 'chats-archived' : on('active') ? 'chats-active' : on('with_notes') ? 'chats-notes' : 'chats';
+    return { view: 'inbox-folder', folder };
 }
 
 /** The Chats tab's filters from a query string (only its own keys). */
@@ -223,7 +244,7 @@ export function build(r) {
         case 'board':
             return `/board/${srvSeg(r.server)}${seg(r.id)}`;
         case 'inbox-folder':
-            return INBOX_FOLDER_RE.test(String(r.folder)) ? `/inbox/${r.folder === 'needs' || r.folder === 'saved' || r.folder === 'artifacts' ? r.folder : 'chats/' + (r.folder === 'chats' ? 'all' : r.folder.slice(6))}` : '/';
+            return INBOX_FOLDER_RE.test(String(r.folder)) ? `/inbox/${r.folder === 'needs' || r.folder === 'saved' || r.folder === 'artifacts' ? r.folder : 'chats/' + (r.folder === 'chats' ? 'all' : r.folder.slice(6))}${r.id && String(r.folder).startsWith('chats') ? '/' + srvSeg(r.server) + seg(r.id) : ''}` : '/';
         case 'workflows':
             return r.id ? `/workflows/${r.id}${r.run ? '/runs/' + r.run : ''}` : '/workflows';
         case 'jobs':
