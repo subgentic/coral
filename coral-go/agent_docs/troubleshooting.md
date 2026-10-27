@@ -656,6 +656,10 @@ says what it found. Nothing but the search index changes. If the search text its
 the one command that drops the search table; Coral makes it again at the next start and fills it again from the transcripts
 that still exist.
 
+### Analytics task times look wrong after running an older Coral
+
+The task times and sent-back marks in Analytics read four facts of each finished task's workflow (is it a review task, who wrote it, when it was handed in, did a round send it back) from columns of `task_workflows` in `messageboard.db` (`eff_state`, `eff_review_of`, `eff_author`, `eff_submitted`, `eff_rejected`), which Coral keeps up to date whenever it saves a workflow and fills in from the stored workflows when the board opens. A Coral older than this one does not know the columns: a workflow it rewrites keeps its old values, so a task it sent back or handed in can show its earlier facts here. To make Coral derive them again from the workflows themselves, stop Coral, run `sqlite3 messageboard.db "UPDATE task_workflows SET eff_state = 0"` on the board database (in the data folder, `~/.coral/` unless `CORAL_DATA_DIR` says otherwise), and start the current Coral: the next open fills every row in again.
+
 ## Platform
 
 ### Windows
