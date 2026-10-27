@@ -48,8 +48,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await Runtime.enable();
 
         console.log('1. Every top page loads at its path, and a reload keeps it');
-        const PAGES = [['/agents', 'nav-tab-agents'], ['/chats', 'nav-tab-hub-inbox'], ['/workflows', 'nav-tab-workflows'],
-            ['/jobs', 'nav-tab-automations'], ['/analytics', 'nav-tab-tokens'], ['/docs', 'nav-tab-docs']];
+        const PAGES = [['/agents', 'nav-tab-agents'], ['/chats', 'nav-tab-hub-inbox'], ['/automations/workflows', 'nav-tab-automations'],
+            ['/automations/jobs', 'nav-tab-automations'], ['/analytics', 'nav-tab-tokens'], ['/docs', 'nav-tab-docs']];
         for (const [path, tabId] of PAGES) {
             await open(path);
             await until(`(document.querySelector('.top-nav-tab.active') || {}).id === ${JSON.stringify(tabId)}`, tabId);
@@ -68,8 +68,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const len0 = await ev('history.length');
         await ev(`window.switchNavTab('history'); true`);
         await atUrl('/inbox/chats/all'); // the Inbox's folder path replaces /chats once the folder opens (#8652)
-        await ev(`document.getElementById('nav-tab-workflows').click(); true`);
-        await atUrl('/workflows');
+        await ev(`document.getElementById('nav-tab-automations').click(); true`);
+        await atUrl('/automations/jobs');
         check('two tab clicks are two entries', (await ev('history.length')) === len0 + 2, `${len0} -> ${await ev('history.length')}`);
         await ev('history.back(); true');
         await atUrl('/inbox/chats/all'); // the Inbox's folder path replaces /chats once the folder opens (#8652)
@@ -88,8 +88,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await open('/chats?q=routesqa');
         await until(`(document.getElementById('history-search') || {}).value === 'routesqa'`, 'the search box');
         check('/chats?q= fills the search box', (await ev(`document.getElementById('history-search').value`)) === 'routesqa' && (await url()) === '/chats?q=routesqa', await url());
-        await ev(`document.getElementById('nav-tab-workflows').click(); true`);
-        await atUrl('/workflows');
+        await ev(`document.getElementById('nav-tab-automations').click(); true`);
+        await atUrl('/automations/jobs');
         await ev(`document.getElementById('history-search').value = ''; true`);
         await ev('history.back(); true');
         await atUrl('/chats?q=routesqa');
@@ -98,7 +98,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
         console.log('4. Old hash links become their paths (replaced, not pushed)');
         for (const [hash, path, tabId] of [['#tokens', '/analytics', 'nav-tab-tokens'], ['#history', '/inbox/chats/all', 'nav-tab-hub-inbox'],
-            ['#workflows', '/workflows', 'nav-tab-workflows'], ['#agents', '/agents', 'nav-tab-agents']]) {
+            ['#workflows', '/automations/workflows', 'nav-tab-automations'], ['#agents', '/agents', 'nav-tab-agents']]) {
             await open('/' + hash);
             await until(`(document.querySelector('.top-nav-tab.active') || {}).id === ${JSON.stringify(tabId)}`, tabId);
             await until(`location.pathname === ${JSON.stringify(path)}`, path).catch(() => {}); // the Inbox notes its folder's path a moment after its tab opens

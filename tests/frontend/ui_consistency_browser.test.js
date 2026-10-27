@@ -110,7 +110,7 @@ const fixtures = async () => {
             if(name==='settings')await mods.modals.showSettingsModal('agents');
             if(name==='team-settings')mods.team_working_mode.showTeamWorkingMode('coral-task-workflows',{page:document.body.appendChild(Object.assign(document.createElement('div'),{id:'qa-ts-host',style:'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)'}))});
             if(name==='agent-ui'&&innerWidth<768)window.toggleAgenticPanel(true);
-        } else if(name==='workflows'){mods.workflows.showWorkflowsTab();await new Promise(r=>setTimeout(r,30));await mods.workflows.selectWorkflow(1)}
+        } else if(name==='workflows'){await mods.workflows.selectWorkflow(1)}
         else if(name==='docs'){await mods.docs.showDocsTab();await mods.docs.selectDoc('README')}
         else if(name==='analytics'){await mods.cost_dashboard.showCostDashboard();(await import((window.__coralStatic||'/static/')+'analytics_views.js')).selectView('overview');mods.cost_dashboard.stopCostDashboard()} // a phone's list is the page: the view is the screen after it (#7473)
         else if(name==='board'){localStorage.setItem('coral.board.view','chat');mods.message_board.selectBoardProject('coral-task-workflows');for(let i=0;i<80&&!document.querySelector('#team-page-view .mb-message-body');i++)await new Promise(r=>setTimeout(r,100));} // the board is the team page's Messages tab (#8129), drawn as chat rows here

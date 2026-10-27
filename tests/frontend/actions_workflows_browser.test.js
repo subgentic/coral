@@ -70,10 +70,10 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         const sent = async (want, what) => { await until(`window.__req.includes(${JSON.stringify(want)})`, what, 5000); return (await reqs()).includes(want); };
 
         // ── Workflows ──────────────────────────────────────────────────────
-        await ev(`window.switchNavTab('workflows'); true`);
-        await until(`!!document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]')`, 'the workflow list');
+        await ev(`window.openAutomationsFolder('workflows'); true`);
+        await until(`!!document.querySelector('#group-table-view tbody tr[data-key] .dt-primary')`, 'the workflow list');
         await clear();
-        await click('#wf-nav-list .row-btn[data-on-click="wf-select"]');
+        await click('#group-table-view tbody tr[data-key] .dt-primary');
         check('a workflow row opens the workflow', await sent('GET /api/workflows/7', 'the workflow') && await ev(`document.getElementById('wf-detail-container').style.display !== 'none'`));
         await until(`!!document.querySelector('#wf-detail-container .wf-runs-table tr.dt-row[data-key="31"]')`, 'its runs');
 

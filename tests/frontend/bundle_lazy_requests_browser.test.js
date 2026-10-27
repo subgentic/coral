@@ -58,7 +58,7 @@ const BASE = require('./test_base').BASE;
         await require('./helpers/wait').bind(ev).coralReady('startup', 'settings');
         const first = await ev(`(async () => { const base = window.__coralStatic; const { importOnce } = await import(base + 'import_once.js');
             const byUrl = await import(base + 'workflow_editor.js'); const byOnce = await importOnce('./workflow_editor.js'); const main = await importOnce('./workflows.js');
-            return { stubFirst: byUrl.saveWorkflow === byOnce.saveWorkflow, mainLoaded: typeof main.showWorkflowsTab === 'function' }; })()`);
+            return { stubFirst: byUrl.saveWorkflow === byOnce.saveWorkflow, mainLoaded: typeof main.selectWorkflow === 'function' }; })()`);
         assert.deepEqual(first, { stubFirst: true, mainLoaded: true }, JSON.stringify(first));
         console.log('   ✓ one instance whichever is asked for first');
         console.log('\nPASS the lazy modules make no stub requests and keep one instance');
