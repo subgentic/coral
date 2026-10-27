@@ -1,5 +1,6 @@
 // #9054: a message from another board shows the server's own line on how to answer it (reply_with), escaped; any other message shows nothing.
 import assert from 'node:assert/strict';
+process.env.CORAL_TELEMETRY_DISABLED = '1'; // nothing here starts a Coral, but the telemetry census wants it in every script that names coral-board
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 
 installDom();
