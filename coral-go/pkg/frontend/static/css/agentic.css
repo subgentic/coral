@@ -1743,6 +1743,9 @@ body.panel-dragging .agentic-state {
 .list-bar-filter-btn, .list-bar-clear-all { cursor: pointer; }
 .list-bar-filter-btn[aria-expanded="true"] { background: var(--bg-hover); }
 .list-bar-sort, .list-bar-field { display: flex; align-items: center; gap: 6px; font-size: var(--fs-base); color: var(--text-secondary); }
+/* The Filters panel's boxes are one height: a select is a control (--control-height); the text box (Uploaded by, Agent) and the date boxes were 26 and 28 px beside it (#9388). */
+.list-bar-menu .list-bar-field :is(.list-bar-by, input[type="date"]) { min-height: var(--control-height, 36px); box-sizing: border-box; }
+@media (max-width: 767px), (pointer: coarse) { .list-bar-menu .list-bar-field :is(.list-bar-by, input[type="date"]) { min-height: var(--control-touch-height, 44px); } } /* a touch screen's selects are 44 */
 .list-bar-sort { margin-left: auto; }
 /* Each field is a line of its own; the tool-group boxes of the events panels (list-bar-group, #4798) go two to a line. */
 .list-bar-menu > * { flex: 0 0 100%; box-sizing: border-box; }
