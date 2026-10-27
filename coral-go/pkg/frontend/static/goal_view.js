@@ -138,7 +138,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
         main.append(line);
         if (g.outcome || g.doneWhen) {
-            const dl = el('dl', 'goals-facts');
+            const dl = el('dl', 'facts goals-facts');
             if (g.outcome) dl.append(el('dt', null, 'Outcome'), el('dd', null, g.outcome));
             if (g.doneWhen) dl.append(el('dt', null, 'Done when'), el('dd', null, g.doneWhen));
             main.append(dl);

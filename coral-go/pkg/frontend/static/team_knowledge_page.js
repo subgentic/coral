@@ -49,7 +49,7 @@ const exactTime = (stamp) => { const d = new Date(stamp); return stamp && !Numbe
 
 /** The entry's front matter as a quiet block of facts: type, title, description and tags as chips. The time is the pane's header line alone (one time format, UI/UX on #7761). */
 function factsBlock(f) {
-    const dl = el('dl', 'detail-facts knowledge-facts');
+    const dl = el('dl', 'facts detail-facts');
     const row = (k, v) => { dl.append(el('dt', null, k), v); };
     if (f.type) row('Type', el('dd', null, f.type));
     if (f.title) row('Title', el('dd', null, f.title));

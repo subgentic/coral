@@ -449,7 +449,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
 
 /** The facts of a task's page: who, goal, priority, who made it and when. (What the dialog showed beyond them is under them, taskExtraHtml.) */
 function factsOf(task, ctx) {
-    const dl = el('dl', 'goals-facts');
+    const dl = el('dl', 'facts goals-facts');
     const who = agentOf(ctx.project, task); // the agent that has it, when it runs here: its name opens it (the old subagent row's "Launched by", for a board's tasks)
     const doer = doerOf(task); // who did the work: for a done task the one who built it (the server's worked_by)
     fact(dl, isDoneTask(task) ? 'Done by' : 'Assigned to', who && !isDoneTask(task) ? btn('team-link', doer || task.assigned_to, () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(who.name, who.agent_type, who.session_id, who.server); }) : (doer || (isDoneTask(task) ? 'Nobody recorded' : 'Nobody yet')));

@@ -164,7 +164,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         </div>
         <p class="item-meta sched-status-line">${escapeHtml(status)}</p>
         ${job.description ? `<p class="sched-desc">${escapeHtml(job.description)}</p>` : ''}
-        <dl class="sched-facts">
+        <dl class="facts sched-facts">
             <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${job.timezone ? ` (${escapeHtml(job.timezone)})` : ''}</dd>
             ${job.enabled
                 ? (job.next_fire_at ? `<dt>Next</dt><dd title="${escapeAttr(awayWords(job.next_fire_at))}">${escapeHtml(atWords(job.next_fire_at))} your time</dd>` : '<dt>Next</dt><dd>not scheduled</dd>')
@@ -174,7 +174,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         ${promptHtml}
         <details class="disclosure sched-settings">
             <summary>Settings: ${isWorkflow ? 'folder, time limit' : 'folder, branch, time limit'}</summary>
-            <dl class="sched-facts">${settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+            <dl class="facts sched-facts">${settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
         </details>
         <div class="sched-runs-section">
             <h3>${workflowHistory ? 'Workflow runs' : 'Runs'}</h3>
