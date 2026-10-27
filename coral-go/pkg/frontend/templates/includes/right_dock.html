@@ -122,17 +122,17 @@
             </div>
             <!-- Preview pane (file viewer with tabs) — bottom of right sidebar -->
             <div id="preview-pane-resize-handle" class="preview-pane-resize-handle" style="display:none"></div>
-            <div id="preview-pane" class="preview-pane" style="display:none" role="region" aria-label="Preview">
-                <div class="preview-tabbar">
+            <div id="preview-pane" class="pane pane-top preview-pane" style="display:none" role="region" aria-label="Preview">
+                <div class="pane-head pane-head-strip preview-tabbar">
                     <button class="preview-dock-btn preview-full-back" id="preview-full-back" type="button" aria-label="Back to the side panel">&#x2039; Back</button>
                     <div class="preview-tabs" id="preview-tabs"></div>
                     <button class="preview-dock-btn preview-max-btn" id="preview-max-btn" type="button" aria-pressed="false" hidden></button>
                     <button class="preview-dock-btn" id="preview-dock-btn" type="button"></button>
                 </div>
-                <div class="preview-toolbar" id="preview-toolbar"></div>
+                <div class="pane-head pane-head-bar preview-toolbar" id="preview-toolbar"></div>
                 <!-- the document, and beside it (or over it as a sheet, by the width) an artifact's comments (#5311, artifact_comments.js) -->
                 <div class="preview-main" id="preview-main">
-                    <div class="preview-body" id="preview-body"></div>
+                    <div class="pane-body pane-body-canvas preview-body" id="preview-body"></div>
                 </div>
             </div>
         </div>

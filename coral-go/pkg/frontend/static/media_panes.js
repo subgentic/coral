@@ -20,7 +20,7 @@ export function isMediaPath(filepath) {
 export function renderImagePanes(container, panes) {
     container.innerHTML = '';
     const wrap = document.createElement('div');
-    wrap.className = 'image-panes' + (panes.length > 1 ? ' image-panes-compare' : '');
+    wrap.className = 'pane-stack image-panes' + (panes.length > 1 ? ' image-panes-compare' : '');
     const frames = [];
     for (const pane of panes) {
         const fig = document.createElement('figure');
@@ -32,7 +32,7 @@ export function renderImagePanes(container, panes) {
             fig.appendChild(label);
         }
         const frame = document.createElement('div');
-        frame.className = 'image-pane-frame';
+        frame.className = 'pane-frame pane-frame-checker image-pane-frame';
         const img = document.createElement('img');
         img.alt = pane.label || '';
         img.decoding = 'async';
@@ -154,7 +154,7 @@ function _imageZoomControls(frames) {
 export function renderMediaPanes(container, panes) {
     container.innerHTML = '';
     const wrap = document.createElement('div');
-    wrap.className = 'media-panes' + (panes.length > 1 ? ' media-panes-compare' : '');
+    wrap.className = 'pane-stack media-panes' + (panes.length > 1 ? ' media-panes-compare' : '');
     for (const pane of panes) {
         const fig = document.createElement('figure');
         fig.className = 'media-pane';
@@ -165,7 +165,7 @@ export function renderMediaPanes(container, panes) {
             fig.appendChild(label);
         }
         const frame = document.createElement('div');
-        frame.className = 'media-pane-frame';
+        frame.className = 'pane-frame media-pane-frame';
         // The media URL is an API endpoint, so inspect its filepath query
         // parameter rather than the endpoint path itself.
         let mediaPath = pane.url;
