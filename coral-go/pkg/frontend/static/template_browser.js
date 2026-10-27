@@ -56,7 +56,7 @@ export async function showTemplateBrowser(type, onSelect) {
     modal.className = 'modal';
     modal.style.display = 'flex';
     modal.innerHTML = `
-        <div class="modal-content template-browser">
+        <div class="modal-content dlg-form template-browser">
             <div class="template-browser-header">
                 <h3>${type === 'agents' ? 'Agent Templates' : 'Command Templates'}</h3>
                 <input type="text" class="template-browser-search" placeholder="Filter templates...">

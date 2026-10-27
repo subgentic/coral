@@ -67,7 +67,7 @@ function renderModal() {
     }).join('');
 
     modal.innerHTML = `
-        <div class="modal-content theme-configurator-content">
+        <div class="modal-content dlg-form theme-configurator-content">
             <h3>Theme Configurator</h3>
             <div class="theme-toolbar">
                 <select id="theme-load-select" class="settings-select">

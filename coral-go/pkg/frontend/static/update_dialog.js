@@ -44,7 +44,7 @@ function ensure() {
 function draw(note) {
     const s = current, r = s.relaunch, n = r.restarts.length;
     dialog.replaceChildren();
-    const content = mk('div', 'modal-content modal-md update-confirm');
+    const content = mk('div', 'modal-content dlg-confirm update-confirm');
     const win = installsLocally(s); // Windows installs from here with Windows's own permission prompt, not a relaunch (#7338)
     const head = mk('div', 'modal-header'); const h = mk('h3', null, win ? `Install Coral ${s.staged.version}?` : `Update to Coral ${s.staged.version} and relaunch?`); h.id = 'update-confirm-title'; head.append(h);
     const body = mk('div', 'modal-body'); body.id = 'update-confirm-body';

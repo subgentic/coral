@@ -3,7 +3,7 @@
    TYPE: Plus Jakarta Sans only, in eight sizes and weights: dialog title 16/700, pane title 17/700, section heading 14/600, tab 14/400 (selected 14/600), row label 13/500, control 13/400, button 13/500,
    hint 12/400, badge 11/600. A text outside that list fails settings_dialog_stable_browser. */
 @media (min-width: 768px) {
-    #settings-modal .modal-content.settings-modal-content { width: min(960px, 92vw); height: min(720px, 90dvh); max-height: none; min-height: 0; }
+    #settings-modal .modal-content.settings-modal-content { height: min(720px, 90dvh); max-height: none; min-height: 0; }
 }
 
 /* the type scale */

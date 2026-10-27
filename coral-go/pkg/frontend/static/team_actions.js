@@ -179,7 +179,7 @@ export async function shareAgentTeam(boardName) {
     modal.className = 'modal';
     modal.style.display = 'flex';
     modal.innerHTML = `
-        <div class="modal-content" style="width:600px">
+        <div class="modal-content dlg-form">
             <div class="modal-header">
                 <h3>Export Team: ${escapeHtml(keyLabel(boardName))}</h3>
                 <p style="color:var(--text-secondary);font-size:var(--fs-md);margin:6px 0 0">${tmpl.agents.length} agents</p>
