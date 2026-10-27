@@ -98,7 +98,12 @@ export function initDockTabs() {
     const state = $('agentic-state');
     if (state) new MutationObserver(syncMore).observe(state, { attributes: true, attributeFilter: ['class', 'data-page'] }); // a page, or the customizer's hidden tabs
     const row = strip();
-    if (row) { new ResizeObserver(fitWords).observe(row); watchScrollCue(row); } // the phone's overlay strip scrolls: a fade says which edge hides tabs
+    if (row) {
+        const ro = new ResizeObserver(fitWords);
+        ro.observe(row);
+        for (const b of row.children) ro.observe(b); // with the words on the row does not wrap (agentic.css), so a larger text size or a tab's new count widens the tabs and leaves the row's size alone: the tabs are watched, and the words come off when they do not fit (#9435)
+        watchScrollCue(row);
+    } // the phone's overlay strip scrolls: a fade says which edge hides tabs
     WIDE.addEventListener('change', fitWords);
     document.addEventListener('click', e => { if (menuOpen && !e.target.closest?.('#agentic-more')) closeMore(false); });
     document.addEventListener('focusout', e => { if (menuOpen && e.relatedTarget && !e.relatedTarget.closest?.('#agentic-more')) closeMore(false); });
