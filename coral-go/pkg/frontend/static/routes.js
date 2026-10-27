@@ -28,7 +28,7 @@
  const DOC_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
  const INT_RE = /^[1-9][0-9]{0,15}$/;
 // The team page's tabs, in order (#7453). /team/<name> with no tab is the first.
-export const TEAM_TABS = ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages', 'settings']; // the strip's order, left to right and by the arrow keys (the operator's, #8791): Goals, Agents, Tasks, Artifacts, Knowledge, Board, Settings
+export const TEAM_TABS = ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages']; // the strip's order, left to right and by the arrow keys (the operator's, #8791): Goals, Agents, Tasks, Artifacts, Knowledge, Board; team settings are a popout (#8853), not a tab
 const TEAM_ITEM_TABS = ['goals', 'tasks', 'messages']; // the tabs with an item: /team/<name>/goals/<id>, /team/<name>/tasks/<id> (pages), /team/<name>/messages/<id> (the Board tab scrolled to that message, #7921)
 // An agent's own tabs (live_session.html #agentic-tab-<id>); the team-scoped ones belong to /team.
 export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui'];
@@ -239,7 +239,7 @@ export function fromLegacyHash(hash) {
         const key = decode(team[2]);
         if (key === null) return null;
         const m = /^@([^/]+)\/(.+)$/.exec(key);
-        return { view: 'team', server: m ? m[1] : null, id: m ? m[2] : key, sub: team[1] === 'settings' ? 'settings' : 'agents' }; // the Team view is the Agents tab (#7453)
+        return { view: 'team', server: m ? m[1] : null, id: m ? m[2] : key, sub: team[1] === 'settings' ? null : 'agents' }; // the Team view is the Agents tab (#7453); team settings are a popout now (#8853): an old settings link opens the team
     }
     const [v, ...parts] = h.split('/');
     const d = parts.map(decode);

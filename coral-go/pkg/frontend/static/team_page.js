@@ -18,8 +18,8 @@ const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy modu
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
-const PHONE_MORE = ['knowledge', 'messages', 'settings']; // (the last three of TEAM_TABS: the row is its first four, Goals, Agents, Tasks, Artifacts, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
-const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', settings: 'Settings' };
+const PHONE_MORE = ['knowledge', 'messages']; // (the last three of TEAM_TABS: the row is its first four, Goals, Agents, Tasks, Artifacts, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
+const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, navSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
 
@@ -72,6 +72,7 @@ function buildOnce() {
     $('team-page-health').addEventListener('click', () => { goTab('agents', { user: true }); });
     $('team-page-missing-back')?.addEventListener('click', () => { go({ view: 'agents' }); });
     $('team-page-add-agent').addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
+    $('team-page-settings').addEventListener('click', () => { openSettings(); });
     buildMore();
     // A click or a tap that opens a page or the pane puts the focus on its heading by script: no ring for a pointer, the ring for a key (the dialogs' rule, quiet_focus.js).
     $('team-page-view').addEventListener('click', () => quietFocus($('team-page-view')), true);
@@ -121,13 +122,18 @@ function teamDir() {
 
 // More: the board's own actions (Select, Export, Pause, Delete), moved here from the board view's hidden holder (message_board.html) while this page is on screen (they keep their ids and their handlers).
 let moreOpen = false;
+/** The team's settings, in a popout over the page (#8853): the header's Settings button and its phone More item. */
+function openSettings() { importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(S.team)).catch(e => console.error('team settings', e)); }
+
 function buildMore() {
     const host = $('team-page-actions');
     const b = el('button', 'btn team-page-more', 'More'); b.type = 'button'; b.id = 'team-page-more'; b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
     const menu = el('div', 'team-more-menu'); menu.id = 'team-page-more-menu'; menu.hidden = true; menu.setAttribute('aria-label', 'More team actions');
-    const add = el('button', 'team-more-add', 'Add agent'); add.type = 'button'; add.id = 'team-page-more-add'; // a phone's header has one button: More, with Add agent first
+    const add = el('button', 'team-more-add', 'Add agent'); add.type = 'button'; add.id = 'team-page-more-add'; // a phone's header has one button: More, with Add agent first, then Settings
     add.addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
-    menu.append(add);
+    const settings = el('button', 'team-more-add team-more-settings', 'Settings'); settings.type = 'button'; settings.id = 'team-page-more-settings';
+    settings.addEventListener('click', () => { openSettings(); });
+    menu.append(add, settings);
     host.append(b, menu);
     const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
     b.addEventListener('click', () => set(!moreOpen));
@@ -314,12 +320,6 @@ async function fillTab(tab, item = 0) {
             const m = await importOnce('./team_agents_page.js');
             if (stale()) return;
             await m.showAgents(host, team, { openAgent: (agent) => openAgentPage(agent), onCount: (n) => { S.counts.agents = n; drawCounts(); } });
-        } else if (tab === 'settings') {
-            const m = await importOnce('./team_working_mode.js');
-            if (stale()) return;
-            const built = host.querySelector('#team-settings-workspace');
-            if (built && built.dataset.team === team && m.hasUnsavedTeamSettings()) return; // edits are waiting: the page stays as it is
-            await m.showTeamWorkingMode(team, { page: host });
         } else if (tab === 'knowledge') {
             const m = await importOnce('./team_knowledge_page.js');
             if (stale()) return;
@@ -407,7 +407,7 @@ export async function openTeamPage(team, opts = {}) {
     showView('team-page-view');
     buildOnce();
     if (changed) { // another team: the tables of the last one go, the moved-in panels and the board's column are drawn again for this one
-        for (const t of ['goals', 'tasks', 'artifacts', 'agents', 'knowledge', 'settings']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
+        for (const t of ['goals', 'tasks', 'artifacts', 'agents', 'knowledge']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
         drawCounts(); drawStatus(null);
     }
     drawHeader();
