@@ -35,7 +35,7 @@ var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "ke
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
 	teamArtifactOrigins = []string{"task", "upload", "shared", "received", "unlisted"}
-	teamArtifactSorts   = []string{"newest", "oldest", "name", "size"}
+	teamArtifactSorts   = []string{"newest", "oldest", "name", "name_desc", "size", "size_asc", "type", "type_desc", "tags", "tags_desc"} // name: A to Z, size: largest first, the others have the direction in the name (#8945)
 )
 
 const (
@@ -66,6 +66,8 @@ type teamArtifactCursor struct {
 	At     string `json:"a"`
 	Name   string `json:"n"`
 	Size   int64  `json:"z"`
+	Type   string `json:"y"`
+	Tags   string `json:"g"`
 	TaskID int64  `json:"t"`
 	Source string `json:"r"`
 	Index  int    `json:"x"`
@@ -451,7 +453,7 @@ func (q *teamArtifactQuery) kindMatch(it teamArtifact) bool {
 // needsEnrichment: the name (a digest-named object takes its sidecar's name), the type and the size of managed files come from the
 // store, so searching, kind and the name and size sorts read each candidate's sidecar and stat its blob (never its bytes).
 func (q *teamArtifactQuery) needsEnrichment() bool {
-	return q.q != "" || len(q.kinds) > 0 || q.sortName == "name" || q.sortName == "size"
+	return q.q != "" || len(q.kinds) > 0 || q.sortName == "name" || q.sortName == "name_desc" || q.sortName == "size" || q.sortName == "size_asc" || q.sortName == "type" || q.sortName == "type_desc" || q.sortName == "tags" || q.sortName == "tags_desc" // the text sorts read the shown text: through the Hub they are redacted before they sort (redactItemForTunnel)
 }
 
 func finishTeamArtifactName(it *teamArtifact) {
@@ -512,6 +514,8 @@ type artifactSortKey struct {
 	At     string
 	Name   string
 	Size   int64
+	Type   string // the media type, lowercase (the type sorts); a cursor carries it only for them
+	Tags   string // the tags joined, the first words (the tags sorts)
 	TaskID int64
 	Source string
 	Index  int
@@ -529,7 +533,7 @@ func keyOf(it teamArtifact) artifactSortKey {
 		tie = it.BoardID + "\x00" + it.ID // the cross-team list: one digest in two teams is two rows, in a total order
 	}
 	sum := sha256.Sum256([]byte(tie))
-	return artifactSortKey{At: it.CreatedAt, Name: strings.ToLower(it.Name), Size: size, TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
+	return artifactSortKey{At: it.CreatedAt, Name: strings.ToLower(it.Name), Size: size, Type: strings.ToLower(strings.TrimSpace(it.MediaType)), Tags: clipKey(strings.Join(it.Tags, " "), 64), TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
 }
 
 // newestAfter: a comes after b in the plain list's order (newest first; ties by task id, source, position, then id, so it is total).
@@ -557,12 +561,50 @@ func artifactAfter(sortName string, a, b artifactSortKey) bool {
 		if a.Name != b.Name {
 			return a.Name > b.Name
 		}
+	case "name_desc":
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
 	case "size":
 		if a.Size != b.Size {
 			return a.Size < b.Size // largest first; rows with no size (-1) last
 		}
+	case "size_asc":
+		if a.Size != b.Size {
+			if a.Size < 0 || b.Size < 0 {
+				return a.Size < 0 // rows with no size are last in both directions
+			}
+			return a.Size > b.Size // smallest first
+		}
+	case "type", "type_desc":
+		if a.Type != b.Type {
+			return wordAfter(sortName == "type_desc", a.Type, b.Type)
+		}
+	case "tags", "tags_desc":
+		if a.Tags != b.Tags {
+			return wordAfter(sortName == "tags_desc", a.Tags, b.Tags)
+		}
 	}
 	return newestAfter(a, b)
+}
+
+// wordAfter: a comes after b in a text order (A to Z, Z to A when desc); a row with no text is last in both directions.
+func wordAfter(desc bool, a, b string) bool {
+	if a == "" || b == "" {
+		return a == ""
+	}
+	if desc {
+		return a < b
+	}
+	return a > b
+}
+
+// clipKey keeps the first n runes of a sort key's text: the cursor carries it, and a cursor is short.
+func clipKey(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }
 
 // teamArtifactSelection is one page of a query over a collected list.
@@ -620,7 +662,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	sel := &teamArtifactSelection{total: len(set), tags: counts}
 	start := offset
 	if q.cursor != nil {
-		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
+		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, Type: q.cursor.Type, Tags: q.cursor.Tags, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
 		start = sort.Search(len(set), func(i int) bool { return artifactAfter(q.sortName, keyOf(set[i]), ck) })
 	}
 	if start > len(set) {
@@ -647,10 +689,16 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	}
 	if sel.hasMore && len(sel.page) > 0 {
 		k := keyOf(sel.page[len(sel.page)-1])
-		if q.sortName != "name" {
-			k.Name = "" // only the name sort compares names: a cursor carries no text it does not need
+		if q.sortName != "name" && q.sortName != "name_desc" {
+			k.Name = "" // only the name sorts compare names: a cursor carries no text it does not need
 		}
-		sel.next = teamArtifactCursor{Sort: q.sortName, Finger: q.finger, At: k.At, Name: k.Name, Size: k.Size, TaskID: k.TaskID, Source: k.Source, Index: k.Index, ID: k.ID}.encode()
+		if q.sortName != "type" && q.sortName != "type_desc" {
+			k.Type = ""
+		}
+		if q.sortName != "tags" && q.sortName != "tags_desc" {
+			k.Tags = ""
+		}
+		sel.next = teamArtifactCursor{Sort: q.sortName, Finger: q.finger, At: k.At, Name: k.Name, Size: k.Size, Type: k.Type, Tags: k.Tags, TaskID: k.TaskID, Source: k.Source, Index: k.Index, ID: k.ID}.encode()
 	}
 	return sel, nil
 }
