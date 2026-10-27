@@ -43,12 +43,10 @@ body.popout-mode .terminal-session-label {
 
 .terminal-state-pill {
     flex-shrink: 0;
-}
-
-.terminal-state-pill {
     background: rgba(var(--fx-slate-rgb), 0.15);
     color: var(--text-muted);
 }
+
 .terminal-state-pill[data-state="working"]      { background: rgba(var(--fx-green-rgb), 0.15); color: var(--success); }
 .terminal-state-pill[data-state="waiting"],
 .terminal-state-pill[data-state="check"]        { background: rgba(var(--fx-amber-rgb), 0.18); color: var(--warning); }
