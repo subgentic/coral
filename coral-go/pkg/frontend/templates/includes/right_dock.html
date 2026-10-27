@@ -7,51 +7,51 @@
             </button>
             <!-- Top block: Files, Tasks, Stats, Transcript, Notes -->
             <div class="agentic-block" id="agentic-block-top">
-                <div class="agentic-state-tabs" role="tablist" aria-label="Session panels" data-on-contextmenu="tabs-customize-menu">
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="board" data-where="top" id="agentic-tab-board" title="Board: the team's message board" aria-label="Board" style="display:none">
+                <div class="tabs tabs-icons agentic-state-tabs" role="tablist" aria-label="Session panels" data-on-contextmenu="tabs-customize-menu">
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="board" data-where="top" id="agentic-tab-board" title="Board: the team's message board" aria-label="Board" style="display:none">
                         <span class="material-icons" aria-hidden="true">forum</span><span class="agentic-tab-word">Board</span>
                     </button>
-                    <button class="agentic-tab active" data-on-click="agentic-tab" data-tab="files" data-where="top" data-scope="agent" id="agentic-tab-files" title="Files — changed files in this session" aria-label="Files">
+                    <button class="tab agentic-tab active" data-on-click="agentic-tab" data-tab="files" data-where="top" data-scope="agent" id="agentic-tab-files" title="Files — changed files in this session" aria-label="Files">
                         <span class="material-icons" aria-hidden="true">description</span><span class="agentic-tab-word">Files</span>
-                        <span class="agentic-tab-count" id="files-bar-count"></span>
+                        <span class="tab-count agentic-tab-count" id="files-bar-count"></span>
                     </button>
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="browse" data-rare data-where="top" data-scope="agent" id="agentic-tab-browse" title="Browse — repository file tree" aria-label="Browse">
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="browse" data-rare data-where="top" data-scope="agent" id="agentic-tab-browse" title="Browse — repository file tree" aria-label="Browse">
                         <span class="material-icons" aria-hidden="true">folder_open</span><span class="agentic-tab-word">Browse</span>
                     </button>
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="artifacts" data-where="top" data-scope="agent" id="agentic-tab-artifacts" title="Artifacts — this agent's artifacts" aria-label="Artifacts">
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="artifacts" data-where="top" data-scope="agent" id="agentic-tab-artifacts" title="Artifacts — this agent's artifacts" aria-label="Artifacts">
                         <span class="material-icons" aria-hidden="true">inventory_2</span><span class="agentic-tab-word">Artifacts</span>
                     </button>
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="tasks" data-where="top" id="agentic-tab-tasks" title="Tasks — agent task list and progress" aria-label="Tasks">
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="tasks" data-where="top" id="agentic-tab-tasks" title="Tasks — agent task list and progress" aria-label="Tasks">
                         <span class="material-icons" aria-hidden="true">checklist</span><span class="agentic-tab-word">Tasks</span>
-                        <span class="agentic-tab-count" id="task-bar-count"></span>
+                        <span class="tab-count agentic-tab-count" id="task-bar-count"></span>
                     </button>
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="notes" data-where="top" id="agentic-tab-notes" title="Notes — agent notes and observations" aria-label="Notes">
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="notes" data-where="top" id="agentic-tab-notes" title="Notes — agent notes and observations" aria-label="Notes">
                         <span class="material-icons" aria-hidden="true">edit_note</span><span class="agentic-tab-word">Notes</span>
-                        <span class="agentic-tab-count" id="note-bar-count"></span>
+                        <span class="tab-count agentic-tab-count" id="note-bar-count"></span>
                     </button>
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="activity" data-rare data-where="top" data-scope="agent" id="agentic-tab-activity" title="Activity — tool use and event timeline" aria-label="Activity">
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="activity" data-rare data-where="top" data-scope="agent" id="agentic-tab-activity" title="Activity — tool use and event timeline" aria-label="Activity">
                         <span class="material-icons" aria-hidden="true">timeline</span><span class="agentic-tab-word">Activity</span>
                     </button>
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="agent-ui" data-rare data-where="top" data-scope="agent" id="agentic-tab-agent-ui" title="Agent UI" aria-label="Agent UI">
-                        <span class="material-icons" aria-hidden="true">widgets</span><span class="agentic-tab-word">Agent UI</span><span class="agentic-tab-count" id="agent-ui-count"></span>
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="agent-ui" data-rare data-where="top" data-scope="agent" id="agentic-tab-agent-ui" title="Agent UI" aria-label="Agent UI">
+                        <span class="material-icons" aria-hidden="true">widgets</span><span class="agentic-tab-word">Agent UI</span><span class="tab-count agentic-tab-count" id="agent-ui-count"></span>
                     </button>
                     <!-- Saved for later (#4510): the Operator's bookmarks, beside whatever the main view shows -->
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="saved" data-where="top" data-pages="chats other" id="agentic-tab-saved" data-local-only title="Saved for later: messages you bookmarked" aria-label="Saved for later on this page">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11L8 10.5l-4 3z"/></svg><span class="agentic-tab-word">Saved</span><span class="agentic-tab-count" id="saved-tab-count"></span>
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="saved" data-where="top" data-pages="chats other" id="agentic-tab-saved" data-local-only title="Saved for later: messages you bookmarked" aria-label="Saved for later on this page">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11L8 10.5l-4 3z"/></svg><span class="agentic-tab-word">Saved</span><span class="tab-count agentic-tab-count" id="saved-tab-count"></span>
                     </button>
                     <!-- The rarely used tabs (Browse, Activity, Agent UI) open from here (dock_tabs.js); the real buttons above stay for their panels -->
                     <div class="agentic-more" id="agentic-more">
-                        <button class="agentic-tab agentic-tab-more" id="agentic-tab-more" type="button" data-on-click="dock-more-toggle" data-on-keydown="dock-more-open-key" aria-haspopup="menu" aria-expanded="false" aria-controls="agentic-more-menu" title="More tabs" aria-label="More tabs" hidden>
+                        <button class="tab agentic-tab agentic-tab-more" id="agentic-tab-more" type="button" data-on-click="dock-more-toggle" data-on-keydown="dock-more-open-key" aria-haspopup="menu" aria-expanded="false" aria-controls="agentic-more-menu" title="More tabs" aria-label="More tabs" hidden>
                             <span class="material-icons" aria-hidden="true">expand_more</span><span class="agentic-tab-word">More</span>
                         </button>
                         <div class="menu agentic-more-menu" id="agentic-more-menu" role="menu" aria-label="More tabs" hidden></div>
                     </div>
                     <!-- Custom view tabs (disabled for now) -->
                     <span id="custom-view-tabs" style="display:none"></span>
-                    <button class="agentic-tab agentic-tab-customize" id="agentic-tab-customize" data-on-click="tabs-customize" aria-haspopup="dialog" aria-expanded="false" aria-controls="tab-customize" title="Customize tabs" aria-label="Customize tabs">
+                    <button class="tab agentic-tab agentic-tab-customize" id="agentic-tab-customize" data-on-click="tabs-customize" aria-haspopup="dialog" aria-expanded="false" aria-controls="tab-customize" title="Customize tabs" aria-label="Customize tabs">
                         <span class="material-icons" aria-hidden="true">view_list</span>
                     </button>
-                    <button class="agentic-tab agentic-tab-close" id="agentic-mobile-close-btn" data-on-click="agentic-panel-toggle" data-open="0" title="Close side panel" aria-label="Close side panel">
+                    <button class="tab agentic-tab agentic-tab-close" id="agentic-mobile-close-btn" data-on-click="agentic-panel-toggle" data-open="0" title="Close side panel" aria-label="Close side panel">
                         <span class="material-icons" aria-hidden="true">close</span>
                     </button>
                 </div>

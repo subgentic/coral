@@ -925,7 +925,7 @@
         display: none !important;
     }
 
-    .agentic-tab {
+    .agentic-state-tabs .tab {
         flex: 0 0 auto;
         padding: 8px 10px;
         white-space: nowrap;
@@ -1111,10 +1111,6 @@
     }
 
     /* History tabs: smaller on small phones */
-    .history-tab-btn {
-        font-size: var(--fs-sm);
-        padding: 6px 8px;
-    }
 }
 
 /* ── Landscape Mobile ────────────────────────────────────── */
@@ -1221,12 +1217,6 @@
     .file-item {
         min-height: 44px;
         padding: 8px 12px;
-    }
-
-    /* Agentic tab buttons: larger for touch */
-    .agentic-tab {
-        min-width: 40px;
-        min-height: 40px;
     }
 
     /* A row's Copy, Preview and Edit are behind one More button (#7652): the name keeps the row, they open on a line under it */

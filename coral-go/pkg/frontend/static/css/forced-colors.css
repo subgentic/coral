@@ -16,8 +16,8 @@
 
     /* The state pills of the team tabs' toolbar: the chosen one is a fill, which forced colors drop, so every pill looked the same. The chosen one has a Highlight border and text, heavier. */
     .goals-chip[aria-pressed="true"] { border-color: Highlight; color: Highlight; font-weight: 600; }
-    /* The team page's tab strip: every tab has an underline in the text colour, so the open one differs by weight alone; its underline and text are Highlight. */
-    .team-tab[aria-selected="true"] { border-bottom-color: Highlight; color: Highlight; }
+    /* Every tab strip (.tabs .tab): every tab has an underline in the text colour, so the open one differs by weight alone; its underline and text are Highlight. */
+    .tab[aria-selected="true"], .tab.is-current, .tab.active { border-bottom-color: Highlight; color: Highlight; }
 
     /* The state chip's dot (a task's, a goal's, an agent's in the team page's tables): its colour is a background, which forced colors drop, so it was empty space before the word; the word says the state, the dot is drawn in ButtonText. */
     .goal-chip .goal-dot { background: ButtonText; }
@@ -51,7 +51,7 @@
 
     /* Chips and badges that are only a coloured pill (the Inbox count in the top bar, tab and section counts, state and kind pills, the job badges): the
        background goes, so a border keeps the shape and the number or word stays a label of its own (#5735). They all carry their meaning as text. */
-    :is(.nav-tab-badge, .agentic-tab-count, .section-count-badge, .session-group-count, .saved-count, .chip, .session-state-pill,
+    :is(.nav-tab-badge, .tab-count, .section-count-badge, .session-group-count, .saved-count, .chip, .session-state-pill,
         .terminal-state-pill, .wf-status-badge, .availability-badge, .display-badge, .display-dot,
         .hf-tag-pill, .dep-tag, .session-ctx-pill, .team-distill-chip, .chat-system-count, .selection-pause-badge, .xterm-disconnected-badge, .session-status-chip,
         .session-mobile-meta-pill) { border: 1px solid CanvasText; }
