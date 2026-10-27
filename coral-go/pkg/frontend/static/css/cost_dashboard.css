@@ -292,7 +292,7 @@
 }
 
 .spend-label {
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
     fill: var(--text-muted);
     font-family: var(--font-mono, monospace);
 }
@@ -327,10 +327,10 @@
 .spend-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
 .spend-team { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--text-secondary); }
 .spend-sub { margin: 0 0 4px; font-size: var(--fs-md); color: var(--text-secondary); }
-.spend-headline { margin: 0 0 12px; font-size: 1.0625rem; font-weight: var(--fw-strong); }
+.spend-headline { margin: 0 0 12px; font-size: var(--fs-2xl); font-weight: var(--fw-strong); }
 .spend-cards { margin-bottom: 12px; }
 /* Missing-data words can wrap between words; numeric figures keep their single line. */
-.spend-card .cost-card-value-word { white-space: normal; font-size: 1.0625rem; }
+.spend-card .cost-card-value-word { white-space: normal; font-size: var(--fs-2xl); }
 .spend-card-sub { font-size: var(--fs-base); color: var(--text-secondary); margin-top: 2px; }
 .spend-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; margin-bottom: 16px; }
 .spend-box { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); padding: 14px 16px; min-width: 0; }
@@ -472,11 +472,11 @@
 @media (max-width: 760px) { .eff-cards { grid-template-columns: 1fr; } }
 .eff-card { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
 .eff-card-k { font-size: var(--fs-base); color: var(--text-secondary); margin-bottom: 4px; }
-.eff-card-v { font-size: 1.5rem; font-weight: var(--fw-strong); overflow-wrap: anywhere; }
+.eff-card-v { font-size: var(--fs-2xl); font-weight: var(--fw-strong); overflow-wrap: anywhere; }
 .eff-card-d { font-size: var(--fs-base); color: var(--text-secondary); margin-top: 2px; }
 .eff-card-d.eff-good { color: var(--success-text, var(--success)); }
 .eff-panel { padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
-.eff-panel-title { margin: 0 0 2px; font-size: 0.9375rem; }
+.eff-panel-title { margin: 0 0 2px; font-size: var(--fs-lg); }
 .eff-hint, .eff-note { margin: 0 0 10px; font-size: var(--fs-base); color: var(--text-secondary); }
 .eff-note { margin: 10px 0 0; }
 .eff-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 10px; font-size: var(--fs-base); color: var(--text-secondary); }
