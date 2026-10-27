@@ -325,7 +325,7 @@
 .inbox-folder-toolbar .list-bar-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; align-items: start; }
 .inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 4px; } /* a field's label above its box, two fields a line (UI/UX on #8681): the panel is two or three lines tall, not one per field */
 .inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) > .list-bar-field-label { flex: none; white-space: nowrap; }
-.inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) > :last-child:not(.list-bar-field-label) { flex: none; width: 100%; max-width: none; }
+.inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) > :is(:last-child:not(.list-bar-field-label), .list-bar-by) { flex: none; width: 100%; max-width: none; } /* the text field too: a datalist after it is the last child, and the panel's 9rem flex basis would be its height in this column (#8802) */
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 1 1 10rem; min-width: min(10rem, calc(100% - 3.25rem)); } /* at least 10rem, but never so wide that the Filters icon (44 px, and it grows with the text) leaves the row: at 200% text the search gives way (#8700, UI/UX) */
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-toggle { flex: none; }
 @media (max-width: 767px) { /* a phone's panel is a sheet over the list, one column, its own scroll; the page behind keeps its scroll, nothing traps the focus (UI/UX on #8681) */
