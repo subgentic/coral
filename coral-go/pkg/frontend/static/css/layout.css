@@ -77,7 +77,7 @@
 
 @media (max-width: 639px) {
     .nav-select, .top-bar-actions > .top-bar-btn:not(.hub-indicator), .top-bar-actions .top-bar-settings-wrapper, .top-bar-actions .cloud-account-wrapper { display: none !important; }
-    .top-menu-btn { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; min-height: 44px; margin: 0 8px; padding: 0 12px; background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-ml); color: var(--text-primary); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+    .top-menu-btn { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; min-height: 44px; margin: 0 8px; padding: 0 12px; background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-ml); color: var(--text-primary); font: inherit; font-weight: var(--fw-strong); cursor: pointer; text-align: left; }
     .top-menu-btn .material-icons { font-size: 1.5rem; flex-shrink: 0; }
     .top-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
@@ -90,7 +90,7 @@
 
 .top-bar h1 {
     font-size: var(--fs-md);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-secondary);
 }
 
@@ -427,7 +427,7 @@ body.panel-dragging .sidebar {
     width: 100%;
     padding: 8px 0;
     font-size: var(--fs-md);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     font-family: inherit;
     border: none;
     border-radius: var(--radius-lg);
@@ -448,7 +448,7 @@ body.panel-dragging .sidebar {
 
 .sidebar-section h2 {
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     text-transform: uppercase;
     color: var(--text-muted); /* the scheme's tertiary: every sidebar section title is this colour (#7883) */
     padding: 0 16px 8px;
@@ -625,7 +625,7 @@ body.panel-dragging .sidebar {
 .welcome h2 {
     font-size: var(--fs-2xl);
     margin-bottom: 4px;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-primary);
 }
 
@@ -638,7 +638,7 @@ body.panel-dragging .sidebar {
 /* Simplified launch page */
 .welcome-shell { width: min(640px, 100%); margin: 0 auto; }
 .welcome-header { margin-bottom: 30px; }
-.welcome-eyebrow { display: block; margin-bottom: 10px; color: var(--accent); font-size: var(--fs-sm); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.welcome-eyebrow { display: block; margin-bottom: 10px; color: var(--accent); font-size: var(--fs-sm); font-weight: var(--fw-strong); letter-spacing: .1em; text-transform: uppercase; }
 .welcome-header h1 { margin: 0 0 8px; color: var(--text-primary); font-size: clamp(1.625rem, 3.4vw, 2.375rem); line-height: 1.15; letter-spacing: -.035em; }
 .welcome-header p { margin: 0; color: var(--text-secondary); font-size: var(--fs-lg); }
 .welcome-launch:hover { border-color: var(--border-light); background: var(--bg-tertiary); } /* --bg-hover takes the muted line under 4.5:1 (#4218) */
@@ -691,7 +691,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .editions-home { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
 .editions-home[hidden] { display: none; }
 .editions-home-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.editions-home-head h2 { margin: 0; color: var(--text-secondary); font-size: var(--fs-base); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.editions-home-head h2 { margin: 0; color: var(--text-secondary); font-size: var(--fs-base); font-weight: var(--fw-strong); letter-spacing: .04em; text-transform: uppercase; }
 .editions-home-hide { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: none; border-radius: var(--radius-md); background: none; color: var(--text-muted); cursor: pointer; }
 .editions-home-hide:hover, .editions-home-hide:focus-visible { color: var(--text-primary); background: var(--bg-hover); }
 .editions-home-hide .material-icons { font-size: var(--icon-size); }
@@ -703,7 +703,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .editions-home-item:hover, .editions-home-item:focus-visible { border-color: var(--border-light); background: var(--bg-tertiary); } /* as .welcome-launch (#4218) */
 .editions-home-icon { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-2xl); }
 .editions-home-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.editions-home-copy strong { color: var(--text-primary); font-size: var(--fs-lg); font-weight: 600; }
+.editions-home-copy strong { color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .editions-home-copy span { color: var(--text-muted); font-size: var(--fs-base); line-height: 1.45; }
 .editions-home-copy code, .editions-content code { white-space: nowrap; padding: 0 4px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: .95em; }
 .editions-home-arrow { position: absolute; top: 14px; right: 14px; color: var(--text-muted); font-size: 1.0625rem; }
@@ -730,14 +730,14 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .cloud-command-row[hidden] { display: none; }
 .cloud-command-row code { white-space: pre-line; padding: 4px 8px; border-radius: var(--radius-md); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-md); user-select: all; }
 .editions-ask { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; }
-.editions-ask legend { padding: 0; margin-bottom: 2px; color: var(--text-primary); font-size: 0.9375rem; font-weight: 600; }
+.editions-ask legend { padding: 0; margin-bottom: 2px; color: var(--text-primary); font-size: 0.9375rem; font-weight: var(--fw-strong); }
 .editions-ask label.editions-ask-opt { display: flex; margin: 0; align-items: flex-start; gap: 10px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; }
 .editions-ask-opt:has(input:checked) { border-color: var(--accent); background: var(--bg-secondary); }
 .editions-ask input[type="radio"], .editions-ask input[type="checkbox"] { display: inline-block; width: auto; flex: none; margin: 2px 0 0; }
-.editions-ask label.editions-auto-accept { display: flex; align-items: flex-start; margin: 0; font-weight: 500; color: var(--text-primary); }
+.editions-ask label.editions-auto-accept { display: flex; align-items: flex-start; margin: 0; font-weight: var(--fw-medium); color: var(--text-primary); }
 .editions-ask div.editions-ask-desc { margin: 0 0 0 26px; }
 .editions-ask-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.editions-ask-name { color: var(--text-primary); font-size: var(--fs-lg); font-weight: 500; }
+.editions-ask-name { color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-medium); }
 .editions-ask-desc { color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.4; }
 .editions-ask-note { color: var(--text-secondary); font-size: var(--fs-md); }
 .editions-auto-accept { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: var(--fs-md); }
@@ -829,25 +829,25 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-table-head h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
 #group-table-title:focus { outline: none; } /* it takes the focus by script when a group opens: a mouse click on a group header shows no box, a keyboard start does (QA Reviewer 2's #7577 note) */
 #group-table-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
-.group-table-head .session-group-count { font-weight: 600; }
+.group-table-head .session-group-count { font-weight: var(--fw-strong); }
 .group-table-head .group-table-extra { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 0 auto; }
 .group-table-head .group-table-extra .material-icons { font-size: var(--fs-xl); }
 /* The one empty state (#9097, Goal #84): a line (14/400, the secondary colour), an optional hint under it (12/400, muted) and an optional action; no box. A line can sit straight in the element or in .empty-state-line. -tight is the density
  * for a dock panel, a menu, a picker or a list: less padding, the same type. What to do on a tab is the sidebar's pinned action. */
-.empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); margin: 0; padding: var(--space-2xl); color: var(--text-secondary); font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; }
+.empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); margin: 0; padding: var(--space-2xl); color: var(--text-secondary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: 1.5; }
 .empty-state[hidden] { display: none; }
 .empty-state-tight { padding: var(--space-md); }
-.empty-state-line, .goals-note.empty-state-line, .welcome p.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-secondary); } /* the line is the secondary colour: an empty message is never as loud as the rows on the other screens */
-.empty-state-hint, .welcome p.empty-state-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-muted); }
+.empty-state-line, .goals-note.empty-state-line, .welcome p.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: 1.5; color: var(--text-secondary); } /* the line is the secondary colour: an empty message is never as loud as the rows on the other screens */
+.empty-state-hint, .welcome p.empty-state-hint { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-regular); line-height: 1.4; color: var(--text-muted); }
 .empty-state-action { margin-top: var(--space-sm); }
 .start-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-md); align-self: stretch; margin-top: var(--space-sm); max-width: 44rem; }
 .start-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); text-align: left; font: inherit; color: var(--text-primary); background: var(--bg-secondary); border: var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad); cursor: pointer; }
 .start-card:hover { background: var(--bg-hover); }
-.start-card-title { font-size: var(--fs-lg); font-weight: 600; }
-.start-card-text { font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
+.start-card-title { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.start-card-text { font-size: var(--fs-base); font-weight: var(--fw-regular); line-height: 1.4; color: var(--text-secondary); }
 .welcome > .empty-state { margin: 0; align-self: stretch; }
 /* The line under an item page's title: who, when, how long */
-.item-meta { margin: 2px 0 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
+.item-meta { margin: 2px 0 0; font-size: var(--fs-base); font-weight: var(--fw-regular); line-height: 1.4; color: var(--text-secondary); }
 .group-table-back { margin-bottom: var(--space-lg); }
 .group-table-head .group-table-back { margin: 0; flex: 0 0 auto; } /* a phone's way back sits in the title row (#7722) */
 @media (max-width: 760px) { .group-table-head:has(.group-table-back) { flex-wrap: wrap; row-gap: 0; } }
@@ -873,8 +873,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .pane-frame.pane-frame-checker { min-height: 80px; padding: 8px; background-color: var(--bg-primary); background-image: linear-gradient(45deg, var(--bg-tertiary) 25%, transparent 25%), linear-gradient(-45deg, var(--bg-tertiary) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--bg-tertiary) 75%), linear-gradient(-45deg, transparent 75%, var(--bg-tertiary) 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; }
 /* The facts list (#9245, Goal #88 slice 5): label and value pairs of a task, a job, a goal, a member or a server, as a definition list. The label is 12/500 in the secondary colour, the value 13/400 in the primary one; the label
  * column is as wide as its longest label unless the page sets --facts-label; a page's own class says only the gap, the margin, the label column and whether it stacks on a phone. */
-.facts { display: grid; grid-template-columns: var(--facts-label, max-content) minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: var(--fs-md); font-weight: 400; color: var(--text-primary); }
-.facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 500; padding-top: 1px; }
+.facts { display: grid; grid-template-columns: var(--facts-label, max-content) minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-primary); }
+.facts dt { color: var(--text-secondary); font-size: var(--fs-base); font-weight: var(--fw-medium); padding-top: 1px; }
 .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .facts-row { display: contents; } /* each pair is a div in the dl (facts.js) */
 /* The one list row (#9242, Goal #88 slice 4): a row of a list in a sidebar, one line, 36 px (44 on a touch screen, touch.css), the hover surface, the focus ring drawn inside, and the current row the hover surface with an accent bar. A page's own class says only its padding and its columns;
@@ -883,12 +883,12 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .list-row:hover:not(:disabled) { background: var(--bg-hover); }
 .list-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .list-row-current { background: var(--bg-hover); box-shadow: inset 3px 0 0 var(--accent); }
-.list-row-title { font-size: var(--fs-md); font-weight: 400; } /* the row's name: 13/400, like a table title (#9270) */
-.list-row-meta { font-size: var(--fs-base); font-weight: 400; } /* the line under it, and a count at the right: 12/400 */
+.list-row-title { font-size: var(--fs-md); font-weight: var(--fw-regular); } /* the row's name: 13/400, like a table title (#9270) */
+.list-row-meta { font-size: var(--fs-base); font-weight: var(--fw-regular); } /* the line under it, and a count at the right: 12/400 */
 @media (forced-colors: active) { .list-row-current { outline: 2px solid Highlight; outline-offset: -2px; box-shadow: none; } }
 /* The group head (#9245, Goal #88 slice 5): the heading of a group of rows or of a section of a page. 12/600 in capitals with a little tracking in the muted colour (a sidebar's "Needs attention", "Starred");
  * -lg is a section title of a page (Analytics' "Tokens per commit"): 14/600 in the secondary colour, in the case it is written. A count beside it is a count chip. A table's own group row (dt-group) and column heads are the table's. */
-.group-head { margin: 0; font-size: var(--fs-base); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.group-head { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-strong); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 .group-head-lg { font-size: var(--fs-lg); letter-spacing: normal; text-transform: none; color: var(--text-secondary); }
 /* A phone's way back and the page's title are one row, the title dropping under the link only when less than 10 rem would be left beside it (#7734; the way #7721 did Analytics); elsewhere the row is not a box */
 .phone-title-row { display: contents; }
@@ -910,7 +910,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-chip:hover { color: var(--text-primary); background: var(--bg-hover); }
 .group-chip[aria-pressed="true"] { color: var(--text-primary); border-color: var(--accent); background: var(--bg-tertiary); }
 .group-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.group-chip-count { font-size: var(--fs-sm); font-weight: 600; color: var(--text-secondary); }
+.group-chip-count { font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--text-secondary); }
 .group-table-note { margin-top: var(--space-md); }
 /* A page that lists several groups (the landing, #7722): their tables share one column grid, and each next head has room above it */
 .group-table-head ~ .group-table-head { margin-top: var(--space-2xl); }
@@ -954,7 +954,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 /* The one notice (#9244, Goal #88 item 3): an icon and words in a tinted box; the tone is the variant (.notice-info, -warn and -error: one colour each, from the page's tokens; an ok tone is added with its first use). .notice-bar is the full-width band at the edge of a screen, .notice-center centres it.
  * .notice-line is the load and error line (the words, and a Try again beside them) with no box. A page's own class (sched-fail-banner, tmux-missing-banner ...) says only where it sits, never what a notice looks like; error and warn notices carry
  * role=alert or status in the markup. notice_census.test.mjs fails a class named *-banner, *-notice or *-toast that declares its own look, with a down-only list of those still to move. */
-.notice { --notice-tone: var(--accent); display: flex; align-items: flex-start; gap: var(--space-md); padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--notice-tone) 45%, var(--border)); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--notice-tone) 12%, var(--bg-secondary)); color: var(--text-primary); font-size: var(--fs-md); font-weight: 400; line-height: 1.5; }
+.notice { --notice-tone: var(--accent); display: flex; align-items: flex-start; gap: var(--space-md); padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--notice-tone) 45%, var(--border)); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--notice-tone) 12%, var(--bg-secondary)); color: var(--text-primary); font-size: var(--fs-md); font-weight: var(--fw-regular); line-height: 1.5; }
 .notice[hidden] { display: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .notice-compact { padding: 8px 12px; font-size: var(--fs-base); } }
 @media (max-height: 500px) and (orientation: landscape) { .notice-compact { padding: 4px 10px; font-size: var(--fs-sm); } }
@@ -973,7 +973,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .menu { display: flex; flex-direction: column; gap: 2px; min-width: 12rem; padding: 4px; background: var(--bg-secondary); border: var(--card-border); border-radius: var(--card-radius); box-shadow: var(--shadow-md); }
 .menu[hidden] { display: none; }
 .menu-panel { flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 10px; box-shadow: var(--shadow-lg); } /* a menu that holds fields (the Filters popup): its rows lie side by side, with more room */
-.menu-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); font-weight: 500; text-align: left; text-decoration: none; cursor: pointer; }
+.menu-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); text-align: left; text-decoration: none; cursor: pointer; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--bg-hover); }
 .menu-item[hidden] { display: none; }
 .menu-item-danger { color: var(--error-text); }

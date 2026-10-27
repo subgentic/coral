@@ -410,12 +410,12 @@ body.panel-dragging .preview-pane {
 
 .output-scroll .line.status-line {
     color: var(--accent);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .output-scroll .line.summary-line {
     color: var(--warning);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .capture-text {
@@ -638,12 +638,12 @@ body.panel-dragging .xterm-container {
 
 .capture-user-input {
     color: var(--capture-user-color);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
 }
 
 .capture-tool-header {
     color: var(--accent);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .capture-tool-result {
@@ -671,18 +671,18 @@ body.panel-dragging .xterm-container {
 
 .capture-diff-summary {
     color: var(--accent);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .sh-diff-gutter-add {
     color: var(--diff-add-color);
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     user-select: none;
 }
 
 .sh-diff-gutter-del {
     color: var(--diff-del-color);
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     user-select: none;
 }
 
@@ -722,7 +722,7 @@ body.panel-dragging .xterm-container {
     gap: 8px;
     color: var(--accent);
     font-size: var(--fs-lg);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .drop-overlay-content svg {

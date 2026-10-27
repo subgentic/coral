@@ -12,7 +12,7 @@
     background: var(--bg-tertiary);
     color: var(--text-primary);
     font-size: var(--fs-md);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     cursor: pointer;
     transition: all 0.15s;
     white-space: nowrap;
@@ -78,18 +78,18 @@
 
 /* The family's other variants (Goal #84, #9096): quiet is a button with no box (an icon or a word in a toolbar), and a chosen button of any choice wears the one selected style, the accent fill (a text tab strip keeps
    its underline and does not use .btn). The square icon-only variant comes with the first icon buttons that move onto it. */
-.btn[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
+.btn[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); font-weight: var(--fw-strong); }
 
 /* One text tab strip (Goal #88, spec item 10, #9210): .tabs holds .tab buttons (role tab, aria-selected): 13/500, a 2 px transparent underline that is the accent on the chosen tab (text-primary, 600), a count in .tab-count, 40 px high
    (44 on touch). A strip that scrolls sideways keeps its layout in its own class; a choice between two to five buttons is a segmented control (.btn-seg), not tabs. */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
-.tab { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--text-secondary); font: inherit; font-size: var(--fs-md); font-weight: 500; cursor: pointer; white-space: nowrap; }
+.tab { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--text-secondary); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer; white-space: nowrap; }
 .tab:hover { color: var(--text-primary); }
-.tab[aria-selected="true"], .tab.is-current, .tab.active { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--accent); }
+.tab[aria-selected="true"], .tab.is-current, .tab.active { color: var(--text-primary); font-weight: var(--fw-strong); border-bottom-color: var(--accent); }
 .tab[aria-expanded="true"] { background: var(--bg-hover); color: var(--text-primary); } /* a tab that opens a panel (the dock's Customize), while it is open */
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-sm); }
-.tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-sm); font-weight: 600; line-height: 1.5; }
+.tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 1.5; }
 .tab-count[hidden], .tab-count:empty { display: none; }
 /* the strip of a narrow panel (the dock's): icon tabs that share the width and wrap at large text (#4344) */
 .tabs-icons { flex-wrap: wrap; gap: 0; overflow-x: visible; }
@@ -115,9 +115,9 @@
     color: var(--text-secondary);
 }
 .mb-project-count { margin-left: auto; }
-.mb-earlier-loading { position: absolute; top: var(--space-xs, 4px); left: 50%; transform: translateX(-50%); z-index: 2; padding: 2px var(--space-sm, 8px); border-radius: var(--radius-ml); background: var(--bg-secondary, var(--bg)); font-size: var(--fs-sm); font-weight: 400; color: var(--text-secondary); pointer-events: none; } /* "Loading earlier messages\u2026" floats over the top of the box while a page is out and takes no room: nothing shifts (#7762) */
+.mb-earlier-loading { position: absolute; top: var(--space-xs, 4px); left: 50%; transform: translateX(-50%); z-index: 2; padding: 2px var(--space-sm, 8px); border-radius: var(--radius-ml); background: var(--bg-secondary, var(--bg)); font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); pointer-events: none; } /* "Loading earlier messages\u2026" floats over the top of the box while a page is out and takes no room: nothing shifts (#7762) */
 .mb-earlier-loading[hidden] { display: none; }
-.mb-earlier-line { text-align: center; padding: var(--space-xs) 0 var(--space-md); font-size: var(--fs-sm); font-weight: 400; color: var(--text-secondary); } /* "Loading earlier messages\u2026" and "Start of the board": quiet, one line (#7762) */
+.mb-earlier-line { text-align: center; padding: var(--space-xs) 0 var(--space-md); font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); } /* "Loading earlier messages\u2026" and "Start of the board": quiet, one line (#7762) */
 
 /* Message board — sleep banner */
 .mb-sleep-banner { margin: 8px 16px 12px; flex-shrink: 0; } /* above the message list, not in it (#8453); where it sits: what it looks like is the one notice's (.notice, layout.css) */
@@ -254,7 +254,7 @@
 }
 
 .mb-agent-name {
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     font-size: var(--fs-md);
     color: var(--mb-color);
     /* A long sender name with no break (a job title or a hub name) wraps like the body does, never widening the feed (#4502). */
@@ -437,7 +437,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .mb-select-count {
     font-size: var(--fs-lg);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-primary);
     margin-right: auto;
 }
@@ -445,7 +445,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .mb-select-action-btn {
     padding: 6px 14px;
     font-size: var(--fs-md);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     border-radius: var(--radius-md);
 }
 
@@ -471,7 +471,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     text-decoration: none;
 }
 /* @mentions of a board member (#5964): weight and a tint, never colour alone; the viewer's own name (the Operator) is stronger, with an underline bar as well. Text only: no role change. */
-.mb-mention { font-weight: 600; color: var(--text-primary); background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: var(--radius-sm); padding: 0 3px; }
+.mb-mention { font-weight: var(--fw-strong); color: var(--text-primary); background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: var(--radius-sm); padding: 0 3px; }
 .mb-mention-self { background: color-mix(in srgb, var(--accent) 36%, transparent); box-shadow: inset 0 -2px 0 var(--accent); }
 .mb-message-body a:hover,
 .board-artifact-link:hover {
@@ -490,7 +490,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .mb-message-body h4, .mb-message-body h5, .mb-message-body h6 {
     margin: 8px 0 4px;
     font-size: var(--fs-md);
-    font-weight: 700;
+    font-weight: var(--fw-strong);
 }
 
 .mb-message-body h2 { font-size: var(--fs-lg); }
@@ -534,7 +534,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .mb-message-body strong {
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     color: var(--mb-text-bright);
 }
 
@@ -554,7 +554,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     min-width: 34px;
     height: var(--control-compact-height);
     text-align: center;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     font-size: var(--fs-md);
     border-radius: var(--radius-md);
     display: inline-flex;
@@ -602,7 +602,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .btn-send {
     background: var(--accent) !important;
     color: var(--text-on-accent) !important;
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     padding: 6px 20px;
     border-radius: var(--radius-lg);
     box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.25);
@@ -634,11 +634,11 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     padding: 0 8px;
     border-radius: var(--radius-xl);
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     line-height: 1.2;
     white-space: nowrap;
 }
-.chip-tag { font-size: var(--fs-base); font-weight: 400; }
+.chip-tag { font-size: var(--fs-base); font-weight: var(--fw-regular); }
 .chip-count { min-width: var(--chip-height, 1.125rem); justify-content: center; padding: 0 6px; }
 .chip-caps { text-transform: uppercase; }
 .chip-attn { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--warning); } /* the quiet attention line of an agent row on a phone (#5123): the neutral surface and hairline, only the words warm */
@@ -781,7 +781,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-md);
     color: var(--text-secondary);
     margin-bottom: 12px;
-    font-weight: 500;
+    font-weight: var(--fw-medium);
 }
 
 .modal-content input,
@@ -877,7 +877,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .info-grid dt {
     color: var(--text-secondary);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     white-space: nowrap;
 }
 
@@ -906,7 +906,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .info-grid dt.toggle-dt .toggle-desc {
     font-size: var(--fs-base);
     color: var(--text-secondary);
-    font-weight: 400;
+    font-weight: var(--fw-regular);
     line-height: 1.3;
     margin-top: -2px;
 }
@@ -954,7 +954,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .info-value-emphasis {
     font-size: 0.9375rem;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 .info-value-mono,
@@ -998,7 +998,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .info-token-label {
     color: var(--text-secondary);
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     line-height: 1.2;
@@ -1006,7 +1006,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .info-token-value {
     font-variant-numeric: tabular-nums;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     font-size: var(--icon-size);
     line-height: 1.1;
 }
@@ -1214,7 +1214,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     color: var(--accent);
     text-decoration: none;
     font-size: var(--fs-md);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     cursor: pointer;
 }
 
@@ -1271,7 +1271,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .alert-notification-title {
     font-size: var(--icon-size);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-primary);
     margin-bottom: 8px;
 }
@@ -1423,12 +1423,12 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .update-toast-title {
     font-size: var(--fs-lg);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--link-text); /* the accent is 4.4:1 on the light panel; this is the accent in the dark theme and a darker blue in the light one (#5781) */
 }
 
 .update-toast-current {
-    font-weight: 400;
+    font-weight: var(--fw-regular);
     font-size: var(--fs-base);
     color: var(--text-secondary);
 }
@@ -1568,7 +1568,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .emoji-picker-category {
     font-size: var(--fs-xs);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -1659,7 +1659,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     justify-content: space-between;
     margin-bottom: 8px;
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-secondary);
 }
 
@@ -1682,7 +1682,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     padding: 4px 10px;
     border-radius: var(--radius-xl);
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-on-accent);
     cursor: pointer;
     transition: opacity 0.15s;
@@ -2079,7 +2079,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .overflow-menu-tier {
     padding: 6px 14px;
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -2090,7 +2090,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     padding: 2px 8px;
     border-radius: var(--radius-sm);
     font-size: var(--fs-xs);
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     letter-spacing: 0.5px;
 }
 
@@ -2157,7 +2157,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .launch-type-label {
     font-size: 0.9375rem;
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-primary);
 }
 
@@ -2186,7 +2186,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .acf-auto-permissions-flag {
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
 }
 
 /* New Agent's persona controls (#6407): Save Persona is the one button; Export and Import are a disclosure away, and the form's own Agent Type select is hidden once the radio group names the agent. */
@@ -2248,7 +2248,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     cursor: pointer;
     padding: 10px 12px;
     font-size: var(--fs-md);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-secondary);
     list-style: none;
 }
@@ -2508,7 +2508,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .template-preview-name {
     font-size: var(--fs-xl);
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     text-transform: capitalize;
     margin-bottom: 6px;
 }
@@ -2561,7 +2561,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     min-height: var(--control-compact-height);
     font-size: var(--fs-md);
     font-family: var(--font-sans);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--text-secondary);
     background: var(--bg-tertiary);
     border: 1px solid var(--control-border);
@@ -2624,7 +2624,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .perms-label {
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -2826,7 +2826,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     min-height: 32px;
     font: inherit;
     font-size: var(--fs-md);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(var(--black-rgb), 0.35);
 }
@@ -2911,7 +2911,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .prompt-field-label {
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     font-size: var(--fs-md);
 }
 
@@ -2997,7 +2997,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .text-muted-sm {
     color: var(--text-muted);
-    font-weight: normal;
+    font-weight: var(--fw-regular);
 }
 
 .text-secondary-sm {
@@ -3069,17 +3069,17 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .servers-id {
     font-family: var(--font-mono);
     font-size: var(--fs-sm);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--text-secondary);
 }
 .servers-tag { border: 1px solid var(--warning); font-family: var(--font-sans); }
 .servers-row-error { margin-top: var(--space-xs); font-size: var(--fs-base); color: var(--error); overflow-wrap: anywhere; }
-.servers-row-warn { display: flex; align-items: flex-start; gap: var(--space-sm); margin-top: var(--space-xs); font-size: var(--fs-base); font-weight: 400; color: var(--text-primary); overflow-wrap: anywhere; min-width: 0; } /* #4301: icon and words, not only a colour */
+.servers-row-warn { display: flex; align-items: flex-start; gap: var(--space-sm); margin-top: var(--space-xs); font-size: var(--fs-base); font-weight: var(--fw-regular); color: var(--text-primary); overflow-wrap: anywhere; min-width: 0; } /* #4301: icon and words, not only a colour */
 .servers-row-warn .material-icons { flex: none; font-size: 1.15em; color: var(--warning); }
 .servers-row-detail { display: inline; color: var(--text-secondary); }
 .servers-row-detail summary { display: inline; cursor: pointer; color: var(--text-secondary); text-decoration: underline; }
 .servers-row-detail[open] summary { display: block; margin: var(--space-xs) 0; }
-.server-status { display: inline-flex; align-items: center; gap: var(--space-sm); font-size: var(--fs-base); font-weight: 500; }
+.server-status { display: inline-flex; align-items: center; gap: var(--space-sm); font-size: var(--fs-base); font-weight: var(--fw-medium); }
 .servers-form {
     border-top: 1px solid var(--border);
     padding-top: var(--space-lg);
@@ -3163,7 +3163,7 @@ button.auto-accept-header-chip { cursor: pointer; font-family: inherit; margin: 
 button.auto-accept-header-chip:hover { background: rgba(var(--warning-rgb), 0.24); }
 button.auto-accept-header-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .auto-accept-menu-item .auto-accept-state { margin-left: auto; padding-left: 12px; font-size: var(--fs-sm, 11px); color: var(--text-muted); }
-.auto-accept-menu-item[aria-checked="true"] .auto-accept-state { color: var(--warning); font-weight: 600; }
+.auto-accept-menu-item[aria-checked="true"] .auto-accept-state { color: var(--warning); font-weight: var(--fw-strong); }
 .auto-accept-menu-item[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 dialog.auto-accept-confirm {
@@ -3177,13 +3177,13 @@ dialog.auto-accept-confirm {
 }
 dialog.auto-accept-confirm::backdrop { background: rgba(var(--black-rgb), 0.55); }
 dialog.auto-accept-confirm h3 { margin: 0 0 6px; font-size: var(--fs-xl); }
-.auto-accept-confirm-agent { margin: 0 0 10px; color: var(--text-secondary); font-weight: 600; }
+.auto-accept-confirm-agent { margin: 0 0 10px; color: var(--text-secondary); font-weight: var(--fw-strong); }
 #auto-accept-confirm-text { margin: 0 0 18px; line-height: 1.5; color: var(--text-secondary); }
 #auto-accept-confirm-text p { margin: 0 0 8px; }
 #auto-accept-confirm-text p:last-child { margin: 0; }
-#auto-accept-confirm-text strong { color: var(--text-primary); font-weight: 600; }
+#auto-accept-confirm-text strong { color: var(--text-primary); font-weight: var(--fw-strong); }
 .auto-accept-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-.auto-accept-confirm-enable { background: var(--warning); border-color: var(--warning); color: #111; font-weight: 600; }
+.auto-accept-confirm-enable { background: var(--warning); border-color: var(--warning); color: #111; font-weight: var(--fw-strong); }
 .auto-accept-confirm-enable:hover { filter: brightness(1.08); }
 #stop-all-auto-accept[hidden] { display: none; }
 .auto-accept-confirm-duration { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; color: var(--text-secondary); }
@@ -3192,7 +3192,7 @@ dialog.auto-accept-confirm h3 { margin: 0 0 6px; font-size: var(--fs-xl); }
 .settings-cloud-switch-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: start; margin-top: 12px; }
 .settings-cloud-switch-row[hidden] { display: none; }
 .settings-cloud-switch-text { min-width: 0; }
-.settings-cloud-switch-label { font-weight: 600; font-size: var(--fs-lg); cursor: default; }
+.settings-cloud-switch-label { font-weight: var(--fw-strong); font-size: var(--fs-lg); cursor: default; }
 .settings-cloud-switch-row .settings-hint { margin-top: 2px; }
 #settings-cloud-auto-accept-row[hidden] { display: none; }
 #settings-cloud-hub-operator-row[hidden], #settings-cloud-hub-operator-msg[hidden] { display: none; }
@@ -3213,7 +3213,7 @@ button.auto-accept-header-off:focus-visible { outline: 2px solid var(--accent); 
     border-radius: var(--radius-sm);
     font: inherit;
     font-size: var(--fs-xs);
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     line-height: 16px;
     color: var(--error);
     background: rgba(var(--error-rgb), 0.12);
@@ -3254,7 +3254,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .machine-health-title {
     margin: 0;
     font-size: var(--fs-sm, 12px);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-primary);
 }
 .machine-health-status {
@@ -3299,7 +3299,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .detail-sub-row { display: flex; align-items: center; flex-wrap: wrap; column-gap: 12px; }
 .detail-sub-row .details-toggle { min-height: 24px; margin: -2px 0 -2px -6px; } /* the pane's: no taller than the line it ends */
 .details-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.details-toggle-count { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); font-weight: 600; line-height: 1; }
+.details-toggle-count { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 1; }
 .details-toggle-count[hidden] { display: none; }
 .details-toggle-chevron { font-size: var(--fs-2xl); transition: transform .12s; }
 .details-toggle[aria-expanded="true"] .details-toggle-chevron { transform: rotate(180deg); }
@@ -3328,7 +3328,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .mb-message-body img { max-width: 100%; height: auto; }
 
 .tb-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md); margin-bottom: var(--space-xs); } /* wraps: at 200% text on a phone the state pill goes under its title instead of out of the pane (#7041) */
-.tb-label { font-weight: 600; color: var(--text-primary); font-size: var(--fs-md); }
+.tb-label { font-weight: var(--fw-strong); color: var(--text-primary); font-size: var(--fs-md); }
 .tb-now { margin-left: auto; font-size: var(--fs-sm); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-secondary); background: var(--bg-tertiary); }
 .tb-now b { color: var(--text-primary); }
 .tb-learn { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--link-text, var(--accent)); font: inherit; font-size: var(--fs-base); cursor: pointer; text-decoration: underline; }
@@ -3379,7 +3379,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .hooks-detail { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm, 13px); }
 .hooks-list { display: flex; flex-direction: column; gap: var(--space-sm); max-height: min(40vh, 320px); overflow-y: auto; padding-right: var(--space-xs, 4px); }
 .hooks-team { margin: 0; }
-.hooks-team h4 { margin: 0 0 var(--space-xs, 4px); font-size: var(--fs-sm, 13px); font-weight: 600; color: var(--text-secondary); }
+.hooks-team h4 { margin: 0 0 var(--space-xs, 4px); font-size: var(--fs-sm, 13px); font-weight: var(--fw-strong); color: var(--text-secondary); }
 .hooks-team ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-xs, 4px); }
 .hooks-team li { display: grid; grid-template-columns: minmax(8rem, 1fr) auto auto; align-items: center; column-gap: var(--space-md); font-size: var(--fs-sm, 13px); }
 .hooks-team .hooks-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3396,7 +3396,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 /* ── Browser password (#3948): the set-password prompt and Settings > Browser sign-in ─────────────────────────── */
 .pw-lead { margin: 8px 0 14px; line-height: 1.5; color: var(--text-secondary); font-size: var(--fs-lg); }
 .pw-field { display: block; margin: 0 0 12px; font-size: var(--fs-md); }
-.pw-label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--text-primary); }
+.pw-label { display: block; margin-bottom: 5px; font-weight: var(--fw-medium); color: var(--text-primary); }
 .pw-input-row { display: flex; align-items: center; gap: 6px; } /* the Show button is beside the field, never over its text (a longer word or 200% text would run under it) */
 .pw-input { flex: 1 1 auto; min-width: 0; width: 100%; }
 [data-theme="light"] .pw-toggle { color: var(--accent-dim); }   /* AA on the light card (#4023) */
@@ -3408,15 +3408,15 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .pw-strength[data-level="strong"] .pw-meter > i { background: var(--fx-green); }
 .pw-strength[data-level="weak"] .pw-meter > i { background: var(--fx-red); }
 .pw-hint { font-size: var(--fs-base); color: var(--text-secondary); margin: 0 0 12px; min-height: 1.3em; line-height: 1.45; }
-.pw-hint b { color: var(--text-primary); font-weight: 600; }
+.pw-hint b { color: var(--text-primary); font-weight: var(--fw-strong); }
 .pw-error { color: var(--fx-red); font-size: var(--fs-md); margin: 0 0 10px; }
 .pw-note { font-size: var(--fs-base); color: var(--text-secondary); margin: 8px 0 0; line-height: 1.5; }
 .sec-row details { margin: 10px 0; }
-.sec-row summary { cursor: pointer; font-weight: 600; font-size: var(--fs-md); margin-bottom: 10px; }
+.sec-row summary { cursor: pointer; font-weight: var(--fw-strong); font-size: var(--fs-md); margin-bottom: 10px; }
 .sec-sessions { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 12px; }
 .sec-sessions:empty { display: none; } /* nothing to manage and nothing to say: no rule either (#7040) */
-.sec-sub-head { font-weight: 600; font-size: var(--fs-md); margin-bottom: 6px; }
-.sec-count { color: var(--text-secondary); font-weight: 400; }
+.sec-sub-head { font-weight: var(--fw-strong); font-size: var(--fs-md); margin-bottom: 6px; }
+.sec-count { color: var(--text-secondary); font-weight: var(--fw-regular); }
 .sec-list { list-style: none; margin: 0 0 10px; padding: 0; font-size: var(--fs-md); }
 .sec-item { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
 .sec-who { overflow-wrap: anywhere; }
@@ -3426,7 +3426,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .sec-gap { margin-top: 14px; }
 .sec-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 767px), (pointer: coarse) { .sec-actions .btn { min-height: var(--control-touch-height, 44px); } }
-.sec-muted { color: var(--text-secondary); font-weight: 400; }
+.sec-muted { color: var(--text-secondary); font-weight: var(--fw-regular); }
 #settings-modal .sec-switch { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; font-size: var(--fs-md); margin: 6px 0; cursor: pointer; }
 #settings-modal .sec-switch input[type="checkbox"] { width: 16px; height: 16px; flex: none; margin: 2px 0 0; padding: 0; }
 .sec-warn { display: flex; gap: 8px; align-items: flex-start; background: rgba(212, 167, 44, .13); border: 1px solid rgba(212, 167, 44, .55); border-radius: var(--radius-lg); padding: 10px 12px; font-size: 0.7812rem; line-height: 1.5; margin: 8px 0; }
@@ -3459,11 +3459,11 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .acf-model-refresh .material-icons { font-size: var(--fs-xl); }
 .acf-model-refresh:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
 .acf-model-refresh:disabled { opacity: .5; cursor: progress; }
-.acf-model-id { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-sm, 11px); font-weight: 400; color: var(--text-muted); overflow-wrap: anywhere; }
+.acf-model-id { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-sm, 11px); font-weight: var(--fw-regular); color: var(--text-muted); overflow-wrap: anywhere; }
 .acf-model-id:empty { display: none; }
-.acf-model-note { display: block; margin-top: 2px; font-size: var(--fs-sm, 11px); font-weight: 400; color: var(--text-secondary); }
+.acf-model-note { display: block; margin-top: 2px; font-size: var(--fs-sm, 11px); font-weight: var(--fw-regular); color: var(--text-secondary); }
 .acf-model-note:empty { display: none; }
-.acf-thinking-note, .acf-thinking-ran { display: block; margin-top: 2px; font-size: var(--fs-sm, 11px); font-weight: 400; color: var(--text-secondary); }
+.acf-thinking-note, .acf-thinking-ran { display: block; margin-top: 2px; font-size: var(--fs-sm, 11px); font-weight: var(--fw-regular); color: var(--text-secondary); }
 .acf-thinking-note:empty, .acf-thinking-ran:empty { display: none; }
 .acf-model-picker:not([hidden]) + .acf-model:not([hidden]) { margin-top: var(--space-sm); }
 @media (pointer: coarse), (max-width: 767px) { .acf-model-refresh { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); } }
@@ -3500,7 +3500,7 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .ibx-task-head[aria-expanded="true"]::after { transform: translateY(-30%) rotate(-135deg); }
 @media (prefers-reduced-motion: reduce) { .ibx-task-head::after { transition: none; } }
 .ibx-task-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.ibx-task-title { font-weight: 600; overflow-wrap: anywhere; }
+.ibx-task-title { font-weight: var(--fw-strong); overflow-wrap: anywhere; }
 .ibx-task-meta { font-size: var(--fs-sm, 0.8125rem); color: var(--text-secondary); }
 /* The expanded message: only its BODY sits in an inset panel (#5882), apart from the list and from the meta line above and the reply below it. One padding token (--ibx-pad) gives the card content,
    the panel and the reply box the same left and right edge; 8px from the meta line (or the button) to the panel and 12px from the panel to what follows. The panel is one clear step from the
@@ -3519,7 +3519,7 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .ibx-saved-toggle { font-size: var(--fs-sm, 0.8125rem); }
 /* The task's conversation on its page (#7703, UI/UX's layout): a 14/600 heading with the count, entries oldest first with a hairline between, no bubbles, the box under it. */
 .ibx-thread { margin: 16px 0 12px; min-width: 0; }
-.ibx-thread-head { margin: 0 0 8px; font-size: var(--fs-lg); font-weight: 600; }
+.ibx-thread-head { margin: 0 0 8px; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .ibx-thread-list { list-style: none; margin: 0; padding: 0; }
 .ibx-thread-item { padding: 10px 0; border-top: 1px solid var(--border); min-width: 0; }
 .ibx-thread-who { margin: 0 0 4px; font-size: var(--fs-base); color: var(--text-secondary); }
@@ -3533,11 +3533,11 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .ibx-loading, .ibx-why, .ibx-note { margin: 4px 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
 .ibx-error { margin: 4px 0; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); }
 .ibx-reply { display: flex; flex-direction: column; gap: 6px; margin: 0; }
-.ibx-reply-label { font-weight: 600; font-size: var(--fs-sm, 0.8125rem); }
+.ibx-reply-label { font-weight: var(--fw-strong); font-size: var(--fs-sm, 0.8125rem); }
 .ibx-reply-input { width: 100%; resize: vertical; overflow-y: auto; max-height: 240px; }
 .ibx-reply-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .ibx-reply-status { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); overflow-wrap: anywhere; }
-.ibx-open { margin: 0; font-size: var(--fs-sm, 0.8125rem); font-weight: 400; }
+.ibx-open { margin: 0; font-size: var(--fs-sm, 0.8125rem); font-weight: var(--fw-regular); }
 a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .ibx-open-link { background: none; border: 0; padding: 0; color: var(--link-text); font: inherit; font-size: var(--fs-sm, 0.8125rem); text-decoration: underline; cursor: pointer; } /* "Open the task" on a task's own page (mountInbox's only option): a plain link under the title line (#7572); the box is for lists */
 .ibx-open-link:hover { text-decoration-thickness: 2px; }
@@ -3549,7 +3549,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .md blockquote { padding-left: 10px; border-left: 3px solid var(--border); color: var(--text-secondary); }
 .md pre { padding: 8px 10px; overflow-x: auto; background: var(--bg-tertiary); border-radius: var(--radius-md); }
 .md code { font-family: var(--font-mono, monospace); font-size: 0.9em; }
-.md .md-h { font-weight: 700; margin: 10px 0 4px; }
+.md .md-h { font-weight: var(--fw-strong); margin: 10px 0 4px; }
 .md hr { border: 0; border-top: 1px solid var(--border); margin: 10px 0; }
 .md a { color: var(--link-text); overflow-wrap: anywhere; }
 .md-plain { white-space: pre-wrap; }
@@ -3576,7 +3576,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* The top bar's Saved button: a bookmark with the number open. */
 .saved-top-btn { position: relative; }
 .saved-top-btn.on { color: var(--accent); }
-.saved-top-btn .saved-count { position: absolute; top: -2px; right: -3px; min-width: 14px; padding: 0 4px; border-radius: var(--radius-lg); background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-xs); font-weight: 700; line-height: 14px; text-align: center; }
+.saved-top-btn .saved-count { position: absolute; top: -2px; right: -3px; min-width: 14px; padding: 0 4px; border-radius: var(--radius-lg); background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-xs); font-weight: var(--fw-strong); line-height: 14px; text-align: center; }
 .saved-top-btn .saved-count[hidden] { display: none; }
 /* The jump: a slim bar above the conversation, and the "Saved" tag on the message. */
 .jumpbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: 0.78125rem; color: var(--text-secondary); flex: none; }
@@ -3584,7 +3584,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .jumpbar span { flex: 1; }
 @media (pointer: coarse) { .jumpbar .btn { min-height: 44px; min-width: 44px; } }
 .saved-jump { position: relative; }
-.saved-jump::before { content: "Saved"; position: absolute; left: 0; top: -22px; background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-xs); font-weight: 700; border-radius: var(--radius-lg); padding: 0 7px; line-height: 16px; pointer-events: none; }
+.saved-jump::before { content: "Saved"; position: absolute; left: 0; top: -22px; background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-xs); font-weight: var(--fw-strong); border-radius: var(--radius-lg); padding: 0 7px; line-height: 16px; pointer-events: none; }
 /* Keep the bookmark and the view selector at large text sizes on a phone. */
 .saved-bar-wrap .top-bar { flex-wrap: wrap; row-gap: 4px; }
 .saved-bar-wrap .nav-select { order: 3; flex: 1 1 100%; margin: 0; }
@@ -3603,11 +3603,11 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-shell { display: flex; flex: 1; min-width: 0; min-height: 0; }
 .settings-nav { width: 13.5rem; flex: none; border-right: 1px solid var(--border); padding: .6rem; overflow-y: auto; background: var(--bg-tertiary); }
 .settings-nav .settings-group-pick { display: none; }
-.info-grid.settings-grid .settings-row > dt, .settings-row > dt label { font-size: var(--fs-lg); font-weight: 600; }
+.info-grid.settings-grid .settings-row > dt, .settings-row > dt label { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .settings-tabs { display: flex; flex-direction: column; gap: 2px; }
 .settings-tab { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; background: none; border: 0; border-radius: var(--radius-md); color: var(--text-secondary); font: inherit; font-size: var(--fs-lg); padding: .5rem .7rem; min-height: 2.25rem; cursor: pointer; }
 .settings-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
-.settings-tab[aria-selected="true"] { background: var(--bg-hover); color: var(--text-primary); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.settings-tab[aria-selected="true"] { background: var(--bg-hover); color: var(--text-primary); font-weight: var(--fw-strong); box-shadow: inset 3px 0 0 var(--accent); }
 .settings-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .settings-tab[hidden] { display: none; }
 .settings-tab .material-icons { font-size: var(--icon-size); flex: none; }
@@ -3680,7 +3680,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-dir-hint { margin: 0 0 8px; }
 @media (pointer: coarse), (max-width: 767px) { .launch-dir-recent { min-height: var(--control-touch-height, 44px); } }
 
-.modal-header .sd-sub { margin: .15rem 0 0; color: var(--text-secondary); font-size: var(--fs-md); font-weight: 400; }
+.modal-header .sd-sub { margin: .15rem 0 0; color: var(--text-secondary); font-size: var(--fs-md); font-weight: var(--fw-regular); }
 .sd-modal-content .modal-footer { flex: none; }
 /* In the launch dialog the sectioned steps sit inside the dialog's own box: it has no padding then, the step's header and footer are full width, the fixed footer is always in view. */
 .modal-content.sd-modal-content:has(.launch-modal-step) { padding: 0; overflow: hidden; }
@@ -3713,7 +3713,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .sd-modal-content .settings-pane :is(select, input[type="text"], textarea, .btn, .perm-chip) { min-height: 44px; }
     .sd-modal-content .modal-footer .btn { min-height: 44px; }
     .sd-modal-content .modal-header .sd-sub:not(.launch-stage-sub), .sd-step-header .sd-sub:not(.launch-stage-sub) { display: none; } /* the pane's sub-title goes on a phone (#6012); the step line ("Step 2 of 2") stays under the title (#7912) */
-    .sd-step-header .launch-stage-sub { font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); }
+    .sd-step-header .launch-stage-sub { font-size: var(--fs-base); font-weight: var(--fw-regular); color: var(--text-secondary); }
     .sd-step-header { padding: 16px 16px 10px; }
     .sd-modal-content .launch-modal-step > .modal-actions { padding: 12px 16px; }
     .sd-modal-content .launch-modal-step > .modal-actions .btn { min-height: 44px; }
@@ -3738,7 +3738,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* On a phone the search row is shown as it is: the field growing, the Filters and More icons at its right, like the Artifacts and Tasks tabs (#7713; the "Search" row of #7183 that opened it is gone). */
 .mb-search-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mb-search-status[hidden] { display: none; }
-.mb-search-results { margin-right: auto; font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); }
+.mb-search-results { margin-right: auto; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); }
 .mb-search-step { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; padding: 2px 6px; }
 .mb-search-step:disabled { opacity: 0.45; cursor: default; }
 .mb-hit { background: #ffd33d; color: #1f2328; border-radius: 2px; padding: 0 1px; }
@@ -3769,8 +3769,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 
 /* Settings > Agents > Custom models (#5480): a group per provider, a row per model, an inline form to add or edit one */
 .settings-custom-models { display: flex; flex-direction: column; gap: var(--space-md, 8px); width: 100%; min-width: 0; }
-.cm-provider { min-width: 5.5rem; font-size: var(--fs-base); font-weight: 600; color: var(--text-secondary); }
-.cm-editing { margin: 0; font-size: var(--fs-base); font-weight: 600; color: var(--text-secondary); }
+.cm-provider { min-width: 5.5rem; font-size: var(--fs-base); font-weight: var(--fw-strong); color: var(--text-secondary); }
+.cm-editing { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-strong); color: var(--text-secondary); }
 .cm-list { list-style: none; margin: 0 0 var(--space-md, 8px); padding: 0; display: flex; flex-direction: column; gap: var(--space-sm, 4px); }
 .cm-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm, 4px) var(--space-md, 8px); min-width: 0; }
 .cm-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-sm, 4px) var(--space-md, 8px); flex: 1 1 12rem; min-width: 0; }
@@ -3789,7 +3789,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* Agent Team (UI audit #5589, findings 5 and 6): the team name, which every launch needs, is above the sections; the template tools are one disclosure after the picker, so the members come first. */
 .modal-content:has(.settings-shell) #launch-step-team .settings-modal-body { flex-direction: column; overflow: auto; } /* the steps scroll inside the fixed dialog (#7407) */
 /* Folded section: one summary style. A user sets only the --dz-* variables that differ. */
-.disclosure > summary { cursor: pointer; width: var(--dz-width, fit-content); padding: var(--dz-pad, .25rem .5rem .25rem 0); color: var(--dz-color, inherit); font-size: var(--dz-size, var(--fs-md)); font-weight: 600; }
+.disclosure > summary { cursor: pointer; width: var(--dz-width, fit-content); padding: var(--dz-pad, .25rem .5rem .25rem 0); color: var(--dz-color, inherit); font-size: var(--dz-size, var(--fs-md)); font-weight: var(--fw-strong); }
 .disclosure[open] > summary { margin-bottom: var(--dz-gap, .4rem); }
 .launch-type-glyph { font-size: 2rem; } /* the agent card draws the same robot as the start page */
 
@@ -3802,9 +3802,9 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-cli-slot:empty { display: none; }
 .launch-cli-slot { margin: 10px 26px 0; font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
 .launch-cli-slot .acf-cli-warning { margin: 0 !important; } /* the form gave it a margin inline */
-.acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px 12px; font-size: var(--fs-md); font-weight: 500; } /* a row like any other: the status as its label (13/500), the button at the right, a link or note under it */
+.acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px 12px; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* a row like any other: the status as its label (13/500), the button at the right, a link or note under it */
 .acf-cli-warning > span { flex: 0 1 auto; }
-.acf-cli-warning > p { flex: 0 0 100%; margin: 0; font-weight: 400; }
+.acf-cli-warning > p { flex: 0 0 100%; margin: 0; font-weight: var(--fw-regular); }
 .acf-cli-warning > .btn { order: 1; } /* the button is on the status line at the right, the link, the command and the note under them (the DOM has the button last) */
 .acf-cli-warning > p { order: 2; }
 .launch-cli-slot .acf-cli-warning code { color: var(--text-primary); overflow-wrap: anywhere; }
@@ -3831,8 +3831,8 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .settings-cloud-notice { margin: 8px 0 12px; flex-direction: column; align-items: flex-start; } /* where it sits: the look is .notice's */
 #settings-cloud .settings-cloud-notice[hidden] { display: none; }
 #settings-cloud .settings-cloud-more { margin-top: 10px; }
-#settings-cloud .settings-cloud-more > summary { color: var(--text-primary); font-weight: 600; overflow-wrap: anywhere; }
-#settings-cloud .settings-cloud-warn { display: block; color: var(--warning-text, var(--warning)); font-weight: 500; margin-top: 2px; }
+#settings-cloud .settings-cloud-more > summary { color: var(--text-primary); font-weight: var(--fw-strong); overflow-wrap: anywhere; }
+#settings-cloud .settings-cloud-warn { display: block; color: var(--warning-text, var(--warning)); font-weight: var(--fw-medium); margin-top: 2px; }
 #settings-cloud .settings-cloud-warn .material-icons { font-size: var(--fs-xl); vertical-align: text-bottom; }
 #settings-cloud .settings-cloud-saved { margin: 4px 0 0; }
 @media (pointer: coarse), (max-width: 767px) { #settings-cloud-link { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); } } /* the link to approve the code is a 44 px target on a phone */
@@ -3870,7 +3870,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .launch-agent-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .launch-agent-opt input { margin: 0; width: auto; flex: 0 0 auto; }
 .launch-agent-pick .launch-agent-opt { color: var(--text-primary); } /* the dialog's labels are the secondary colour: 4.4:1 on this chip in the light theme */
-.launch-agent-pick .launch-agent-missing { color: var(--text-muted); font-size: var(--fs-sm); font-weight: 400; }
+.launch-agent-pick .launch-agent-missing { color: var(--text-muted); font-size: var(--fs-sm); font-weight: var(--fw-regular); }
 @media (pointer: coarse), (max-width: 767px) { .launch-agent-opt { min-height: var(--control-touch-height, 44px); } }
 
 /* the reminder dialog (#6329): a native dialog (top layer, so it sits above the Team view dialog it opens from) that is the dashboard's own dialog card (.modal-content), so its fields look like every other form */
@@ -3886,7 +3886,7 @@ dialog.reminder-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .team-undo { margin: 8px 0 0; color: var(--text-secondary); }
 .team-undo:empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */ /* in the page with nothing to say: no room, still a live region */
 .team-undo .btn-link { background: none; border: 0; padding: 0 2px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
-.team-mode-warn { color: var(--warning); font-weight: 600; }
+.team-mode-warn { color: var(--warning); font-weight: var(--fw-strong); }
 /* New Agent's second step as compact rows, like the members table (#6457): the value that will be used, a Change that opens its section. */
 
 /* A list row or card that opens something is a button for the keyboard and a screen reader (#6976): one Tab stop, Enter or Space opens it (data-key-click), and its focus is drawn inside it. In a table the first cell holds a real button that looks like its text (a row with a button role would lose its table semantics). */
@@ -3909,12 +3909,12 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-more-options > .settings-shell { flex: 1; min-height: 0; }
 .launch-more-options > summary { display: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .launch-more-options > summary { display: list-item; cursor: pointer; font-weight: 600; font-size: var(--fs-md); line-height: var(--control-touch-height, 44px); padding: 0 1rem; border-top: 1px solid var(--border); }
+    .launch-more-options > summary { display: list-item; cursor: pointer; font-weight: var(--fw-strong); font-size: var(--fs-md); line-height: var(--control-touch-height, 44px); padding: 0 1rem; border-top: 1px solid var(--border); }
     .launch-more-options:not([open]) { flex: none; }
 }
 
 .ibx-task-metarow:has(.ibx-goal) { justify-content: flex-start; }
-.ibx-task-metarow .ibx-goal { background: none; border: 0; padding-inline: 0; font: inherit; font-size: var(--fs-sm, 0.8125rem); font-weight: 400; color: var(--link-text); text-decoration: underline; cursor: pointer; text-align: left; max-width: 100%; overflow-wrap: anywhere; }
+.ibx-task-metarow .ibx-goal { background: none; border: 0; padding-inline: 0; font: inherit; font-size: var(--fs-sm, 0.8125rem); font-weight: var(--fw-regular); color: var(--link-text); text-decoration: underline; cursor: pointer; text-align: left; max-width: 100%; overflow-wrap: anywhere; }
 
 /* ── New Agent, three steps in one dialog that keeps its size (#7391, UI/UX's v4) ─────────────────────────────────────────────────────────────────
    Step 1 the folder (and, above, the machine), step 2 the persona page, step 3 the tabs Agent, Permissions and Advanced. The dialog has ONE size for every step and
@@ -3932,11 +3932,11 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-wizard .acf-persona-page { padding: 0; }
 .launch-wizard .settings-panes { padding: 20px 24px; overflow: auto; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
-.launch-field-head, .acf-pick-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: var(--fs-md); font-weight: 500; } /* the field label style of every form: 13/500 (UI/UX on #8401) */
+.launch-field-head, .acf-pick-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* the field label style of every form: 13/500 (UI/UX on #8401) */
 .launch-field-head label, .launch-field-head span:first-child, .acf-pick-head span:first-child { margin: 0; flex: none; } /* the label stays on one line; "optional" wraps under it at 200% text (UI/UX, #7407) */
 .sd-modal-content.restart-wizard-content :is(.settings-pane, .acf-persona-page) textarea.acf-prompt { font-family: inherit; font-size: var(--fs-md, .875rem); }
 .sd-modal-content.restart-wizard-content .acf-persona-page textarea.acf-prompt { min-height: 16rem; resize: vertical; } /* the prompt is the person's writing: the product font, not mono */
-.launch-optional { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 400; }
+.launch-optional { color: var(--text-secondary); font-size: var(--fs-base); font-weight: var(--fw-regular); }
 .launch-recent-label { align-self: center; color: var(--text-secondary); font-size: var(--fs-md); }
 .launch-persona-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 6px; }
 .launch-persona-row .agent-preset-selector { flex: 1 1 14rem; min-width: 0; }
@@ -3948,7 +3948,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-persona-top input[type="text"] { width: 100%; max-width: none; box-sizing: border-box; }
 .launch-stage-sub b { color: var(--text-primary); }
 .launch-recap { flex: none; margin: 0; padding: 10px 24px 0; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
-.launch-recap b { color: var(--text-primary); font-weight: 600; }
+.launch-recap b { color: var(--text-primary); font-weight: var(--fw-strong); }
 .launch-recap[hidden] { display: none; }
 .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { display: flex; align-items: center; gap: 8px; padding: 10px 24px 16px; border-top: 0; }
 .launch-wizard[data-stage="folder"] > .modal-actions { border-top: 1px solid var(--border); padding-top: 16px; }
@@ -3979,16 +3979,16 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 /* Segmented controls and cards drawn over a select (segmented.js). */
 select.seg-source { display: none; } /* (.modal-content select is display: block, one class more specific than the class alone) */
 .seg-group { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow: hidden; margin: 2px 0 8px; }
-.seg-btn { min-height: 36px; padding: 6px 16px; background: var(--bg-primary); color: var(--text-primary); border: 0; border-right: 1px solid var(--control-border); font: inherit; font-size: var(--fs-md); font-weight: 500; cursor: pointer; }
+.seg-btn { min-height: 36px; padding: 6px 16px; background: var(--bg-primary); color: var(--text-primary); border: 0; border-right: 1px solid var(--control-border); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer; }
 .seg-btn:last-child { border-right: 0; }
-.seg-btn[aria-checked="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
+.seg-btn[aria-checked="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: var(--fw-strong); }
 .seg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .seg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 8px; border: 0; overflow: visible; }
 .seg-cards .seg-btn { border: 1px solid var(--control-border); border-radius: var(--radius-md); text-align: left; min-height: 44px; }
 .seg-cards .seg-btn[data-value="bypassPermissions"] { color: var(--warning-text, var(--warning)); }
 .seg-cards .seg-btn[data-value="bypassPermissions"][aria-checked="true"] { color: var(--text-on-accent); }
-.acf-tools-details > summary { cursor: pointer; font-size: var(--fs-lg); font-weight: 600; min-height: 32px; } /* 14/600 like the other headings of a pane (UI/UX, #7640) */
-.acf-tools-details .acf-perms-summary { font-weight: 400; margin-left: 6px; }
+.acf-tools-details > summary { cursor: pointer; font-size: var(--fs-lg); font-weight: var(--fw-strong); min-height: 32px; } /* 14/600 like the other headings of a pane (UI/UX, #7640) */
+.acf-tools-details .acf-perms-summary { font-weight: var(--fw-regular); margin-left: 6px; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     #launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; padding: 0 !important; } /* (!important: mobile.css's tighter padding is one too) */
     #restart-modal .restart-wizard-content > .modal-header { margin: 0 !important; padding: 16px 16px 10px; }
@@ -4013,12 +4013,12 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .acf-agent-rows .seg-group { align-self: flex-start; max-width: 100%; margin: 0; }
 .launch-wizard .acf-thinking-wrap { display: block; margin: 0; }
 .launch-wizard .acf-thinking-wrap[hidden] { display: none; }
-.launch-wizard .acf-thinking-label, .launch-wizard .acf-model-wrap { display: block; margin-bottom: 4px; font-size: var(--fs-md); font-weight: 500; } /* Model and Thinking: the form label style, 13/500 (UI/UX on Restart) */
+.launch-wizard .acf-thinking-label, .launch-wizard .acf-model-wrap { display: block; margin-bottom: 4px; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* Model and Thinking: the form label style, 13/500 (UI/UX on Restart) */
 #launch-agent-pick .launch-agent-opt { margin: 0; flex: 0 0 auto; }
 .launch-agent-pick { width: max-content; max-width: 100%; }
 .launch-persona-row .agent-preset-selector { border: 0; padding: 0; margin: 0; }
 .launch-persona-row .persona-files { flex-basis: auto; }
-.launch-persona-row .persona-files > summary { display: inline-flex; align-items: center; width: auto; padding: 8px 14px; min-height: 40px; font-size: var(--fs-md); font-weight: 500; color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); box-sizing: border-box; }
+.launch-persona-row .persona-files > summary { display: inline-flex; align-items: center; width: auto; padding: 8px 14px; min-height: 40px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); box-sizing: border-box; }
 .launch-persona-row .persona-files[open] .persona-files-row { position: absolute; right: 0; z-index: 3; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; }
 
 .launch-wizard .launch-cli-slot { margin: 0 0 6px; }
@@ -4028,12 +4028,12 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .restart-wizard-content > .modal-actions { display: flex; align-items: center; gap: 8px; }
 .acf-restart-name { margin: 0 0 16px; padding: 0; font-size: var(--fs-lg); color: var(--text-primary); overflow-wrap: anywhere; }
 .acf-provider-label { display: block; margin: 0 0 14px; }
-.acf-provider-head { display: block; font-size: var(--fs-lg); font-weight: 600; margin-bottom: 4px; }
+.acf-provider-head { display: block; font-size: var(--fs-lg); font-weight: var(--fw-strong); margin-bottom: 4px; }
 .restart-wizard-content > .modal-actions .btn-warning { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); }
 .restart-wizard-content > .modal-actions .btn-warning:hover { background: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); border-color: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); color: var(--text-on-accent); }
 
 /* The provider's mark on its button, from CSS so it is no text for a reader or a word count (the design's v4). */
-#launch-agent-pick .launch-agent-opt::before, .acf-provider-label .seg-btn::before, .agent-type-mark::before { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; margin-right: 6px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-sm); font-weight: 700; }
+#launch-agent-pick .launch-agent-opt::before, .acf-provider-label .seg-btn::before, .agent-type-mark::before { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; margin-right: 6px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
 #launch-agent-pick .launch-agent-opt:has(input:checked)::before, .acf-provider-label .seg-btn[aria-checked="true"]::before { background: color-mix(in srgb, var(--text-on-accent) 22%, transparent); color: var(--text-on-accent); }
 #launch-agent-pick .launch-agent-opt:has(input[value="claude"])::before, .acf-provider-label .seg-btn[data-value="claude"]::before, .agent-type-mark[data-agent-type="claude"]::before { content: "C"; }
 #launch-agent-pick .launch-agent-opt:has(input[value="codex"])::before, .acf-provider-label .seg-btn[data-value="codex"]::before, .agent-type-mark[data-agent-type="codex"]::before { content: "X"; }
@@ -4054,9 +4054,9 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 }
 
 /* The type scale of the dialogs (UI/UX's #7391 review): segments and the provider 13/500 (selected 600), hints 12/400, the back arrow in the product's font. */
-.launch-wizard .acf-model-note, .launch-wizard .acf-thinking-note, .launch-wizard .acf-thinking-ran { font-size: var(--fs-base); font-weight: 400; }
-#launch-agent-pick .launch-agent-opt { font-size: var(--fs-md); font-weight: 500; }
-#launch-agent-pick .launch-agent-opt:has(input:checked) { font-weight: 600; }
+.launch-wizard .acf-model-note, .launch-wizard .acf-thinking-note, .launch-wizard .acf-thinking-ran { font-size: var(--fs-base); font-weight: var(--fw-regular); }
+#launch-agent-pick .launch-agent-opt { font-size: var(--fs-md); font-weight: var(--fw-medium); }
+#launch-agent-pick .launch-agent-opt:has(input:checked) { font-weight: var(--fw-strong); }
 .sd-step-header .launch-back-btn { font-family: inherit; }
 [data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; }
 
@@ -4094,11 +4094,11 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agent-open { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 16rem) minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; padding: 8px 6px; background: none; border: 0; border-radius: var(--radius-md); color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .team-agent-open:hover { background: var(--bg-hover); }
 .team-agent-open:focus-visible, .team-agent-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.team-agent-role-name { font-size: var(--fs-md); font-weight: 500; color: var(--text-primary); overflow-wrap: anywhere; }
+.team-agent-role-name { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
 .team-agent-badge { margin-left: 8px; border: 1px solid var(--accent); color: var(--link-text); white-space: nowrap; }
 .team-agent-badge[hidden] { display: none; }
 .team-agent-summary { color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
-.team-agent-summary b { color: var(--text-primary); font-weight: 600; }
+.team-agent-summary b { color: var(--text-primary); font-weight: var(--fw-strong); }
 .team-agent-chev { color: var(--text-secondary); font-size: var(--fs-2xl); }
 .team-agent-menu-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); color: var(--text-primary); cursor: pointer; }
 .team-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 6; min-width: min(12rem, calc(100vw - 3rem)); max-width: calc(100vw - 3rem); } /* where it sits and how wide: what it looks like is the one menu's (.menu, layout.css) */
@@ -4151,7 +4151,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 /* The Servers tab of a self-hosted hub (#7638): a table (Server, Status, Agents), and a server's page with its facts and Test, Edit and Remove in a bar pinned at its foot */
 .servers-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .servers-page > * { flex-shrink: 0; }
-.servers-page-name { margin: 0; font-size: 1.0625rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
+.servers-page-name { margin: 0; font-size: 1.0625rem; font-weight: var(--fw-strong); line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-page .item-meta { display: flex; align-items: center; gap: var(--space-md); }
 .servers-facts { gap: 6px var(--space-xl); margin: var(--space-lg) 0; }
 .servers-fact { display: contents; }
@@ -4177,7 +4177,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .form-label, .modal-content .form-label { display: block; margin: 0 0 6px; font-size: var(--sv-label-size); font-weight: var(--sv-label-weight); color: var(--sv-label-color); } /* in a dialog too: .modal-content label (12 px below, secondary) would otherwise win */
 .form-row .form-label, .modal-content .form-row .form-label { margin: 0; }
 .form-label-nowrap, .modal-content .form-label-nowrap { white-space: nowrap; }
-.form-label-strong, .modal-content .form-label-strong { font-weight: 600; }
+.form-label-strong, .modal-content .form-label-strong { font-weight: var(--fw-strong); }
 .form-control-full { width: 100%; }
 .form-control-grow { flex: 1; min-width: 0; }
 .form-control-auto { width: auto; }

@@ -25,7 +25,7 @@ export function agentCheckboxHtml(s) {
     const role = escapeHtml(s.job_title || s.subscriber_id);
     return `<label class="form-check form-check-compact">
             <input type="checkbox" class="export-agent-cb" value="${escapeAttr(s.subscriber_id)}" data-role="${escapeAttr(s.job_title || s.subscriber_id)}">
-            <span style="font-weight:600;font-size:var(--fs-base)">${role}</span>
+            <span style="font-weight:var(--fw-strong);font-size:var(--fs-base)">${role}</span>
         </label>`;
 }
 
