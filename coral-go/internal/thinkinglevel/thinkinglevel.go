@@ -6,8 +6,8 @@ import "strings"
 // Other is what any level outside Known is recorded as.
 const Other = "other"
 
-// Known are the levels Coral records as they are.
-var Known = []string{"low", "medium", "high", "xhigh", "max"}
+// Known are the levels Coral records as they are: Claude's, and the ones Codex and Pi write (off, none, minimal).
+var Known = []string{"off", "none", "minimal", "low", "medium", "high", "xhigh", "max"}
 
 // Normalize trims and lower-cases a level, and caps it to the known set: "" stays "" (nothing was recorded, never a guess), a known level is itself, anything else is Other.
 func Normalize(s string) string {

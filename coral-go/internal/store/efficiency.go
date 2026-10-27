@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -41,50 +42,137 @@ func (s *TokenUsageStore) EfficiencyUsage(ctx context.Context, since, until stri
 	return rows, err
 }
 
-// EfficiencyCommit is a commit, with the session that recorded it first.
+// EfficiencyCommit is a commit, with the sessions whose snapshots saw it, first to last.
 type EfficiencyCommit struct {
-	Hash      string
+	Hash string
+	At   time.Time // the commit's own (author) time: a rebased, amended or cherry-picked copy keeps it
+	Seen []CommitSighting
+}
+
+// CommitSighting is one session's snapshot of a commit.
+type CommitSighting struct {
 	SessionID string
 	AgentName string
 	AgentType string
 	Branch    string
-	At        time.Time // the commit's own time
 }
 
-// EfficiencyCommits lists the commits whose own time is in [since, until), one per commit hash, attributed to the session whose snapshot of it was recorded first. A snapshot with no session, or with
-// no commit time that parses, is not a commit anyone made in the window and is left out.
+// EfficiencyCommits lists the commits whose own time is in [since, until). A commit is one however many hashes it has had: a rebase, an amend that keeps the message or a cherry-pick gives a new hash with the
+// same subject and the same author time, and the copies are one commit (the first hash recorded names it). The same hash in two checkouts is one commit too. Each commit lists every session that saw it, in the order
+// the snapshots were recorded: the caller decides which of them made it (it knows when the sessions began). A snapshot with no session, or with no commit time that parses, is left out.
 func (s *SessionStore) EfficiencyCommits(ctx context.Context, since, until time.Time) ([]EfficiencyCommit, error) {
 	// recorded_at moves forward on the newest snapshot of a session at every poll, so it is never before the commit: a snapshot recorded before the window cannot hold a commit of it.
 	var rows []struct {
 		ID        int64   `db:"id"`
 		Hash      string  `db:"commit_hash"`
+		Subject   string  `db:"commit_subject"`
 		SessionID string  `db:"session_id"`
 		AgentName string  `db:"agent_name"`
 		AgentType string  `db:"agent_type"`
 		Branch    string  `db:"branch"`
 		At        *string `db:"commit_timestamp"`
 	}
-	if err := s.db.Reader().SelectContext(ctx, &rows, `SELECT id, commit_hash, session_id, agent_name, agent_type, branch, commit_timestamp FROM git_snapshots
+	if err := s.db.Reader().SelectContext(ctx, &rows, `SELECT id, commit_hash, COALESCE(commit_subject, '') AS commit_subject, session_id, agent_name, agent_type, branch, commit_timestamp FROM git_snapshots
 		WHERE session_id IS NOT NULL AND session_id != '' AND commit_timestamp IS NOT NULL AND recorded_at >= ? ORDER BY id`, since.UTC().Format(ISOFormat)); err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
+	byKey := map[string]int{} // the commit's identity (hash, or subject and author time) to its place in out
 	var out []EfficiencyCommit
 	for _, r := range rows {
-		if r.At == nil || seen[r.Hash] {
+		if r.At == nil {
 			continue
 		}
 		at, err := time.Parse(time.RFC3339, *r.At)
 		if err != nil {
 			continue
 		}
-		seen[r.Hash] = true // the first snapshot of a hash is the one that counts, in or out of the window
+		at = at.UTC()
 		if at.Before(since) || !at.Before(until) {
 			continue
 		}
-		out = append(out, EfficiencyCommit{Hash: r.Hash, SessionID: r.SessionID, AgentName: r.AgentName, AgentType: r.AgentType, Branch: r.Branch, At: at.UTC()})
+		sighting := CommitSighting{SessionID: r.SessionID, AgentName: r.AgentName, AgentType: r.AgentType, Branch: r.Branch}
+		i, ok := byKey["h|"+r.Hash]
+		if !ok && strings.TrimSpace(r.Subject) != "" {
+			i, ok = byKey["s|"+at.Format(time.RFC3339)+"|"+r.Subject]
+		}
+		if !ok {
+			out = append(out, EfficiencyCommit{Hash: r.Hash, At: at})
+			i = len(out) - 1
+		}
+		byKey["h|"+r.Hash] = i
+		if strings.TrimSpace(r.Subject) != "" {
+			byKey["s|"+at.Format(time.RFC3339)+"|"+r.Subject] = i
+		}
+		dup := false
+		for _, e := range out[i].Seen {
+			if e.SessionID == r.SessionID {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out[i].Seen = append(out[i].Seen, sighting)
+		}
 	}
 	return out, nil
+}
+
+// SessionFacts is what is known of a session after it may have ended: when it began (the earliest of its live row, its transcript's first message and its first usage row) and its provider.
+type SessionFacts struct {
+	Start    time.Time // zero when unknown
+	Provider string    // "" when unknown
+}
+
+// SessionFacts reads the facts of the sessions ids, from the live row, the transcript index and the usage rows (raw and rolled up alike), whichever have them.
+func (s *SessionStore) SessionFacts(ctx context.Context, ids []string) (map[string]SessionFacts, error) {
+	out := make(map[string]SessionFacts, len(ids))
+	note := func(id, start, provider string) {
+		f := out[id]
+		if t, ok := parseSessionTime(start); ok && (f.Start.IsZero() || t.Before(f.Start)) {
+			f.Start = t
+		}
+		if f.Provider == "" {
+			f.Provider = provider
+		}
+		out[id] = f
+	}
+	const chunk = 400
+	for from := 0; from < len(ids); from += chunk {
+		part := ids[from:min(from+chunk, len(ids))]
+		marks := strings.TrimSuffix(strings.Repeat("?,", len(part)), ",")
+		args := make([]any, len(part))
+		for i, id := range part {
+			args[i] = id
+		}
+		var rows []struct {
+			ID       string `db:"id"`
+			Start    string `db:"start"`
+			Provider string `db:"provider"`
+		}
+		for _, q := range []string{
+			`SELECT session_id AS id, created_at AS start, agent_type AS provider FROM live_sessions WHERE session_id IN (` + marks + `)`,
+			`SELECT session_id AS id, COALESCE(MIN(NULLIF(session_start_at, '')), '') AS start, MIN(agent_type) AS provider FROM token_usage_all WHERE session_id IN (` + marks + `) GROUP BY session_id`,
+			`SELECT session_id AS id, COALESCE(first_timestamp, '') AS start, COALESCE(source_type, '') AS provider FROM session_index WHERE session_id IN (` + marks + `)`,
+		} {
+			rows = rows[:0]
+			if err := s.db.Reader().SelectContext(ctx, &rows, q, args...); err != nil {
+				return nil, err
+			}
+			for _, r := range rows {
+				note(r.ID, r.Start, r.Provider)
+			}
+		}
+	}
+	return out, nil
+}
+
+func parseSessionTime(v string) (time.Time, bool) {
+	for _, layout := range []string{time.RFC3339Nano, ISOFormat, "2006-01-02T15:04:05", "2006-01-02 15:04:05"} {
+		if t, err := time.Parse(layout, v); err == nil {
+			return t.UTC(), true
+		}
+	}
+	return time.Time{}, false
 }
 
 // LatestBranches is each session's most recent branch (the one its newest snapshot names), as the By branch read attributes a session's tokens.

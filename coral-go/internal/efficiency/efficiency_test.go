@@ -83,7 +83,7 @@ func TestAFigureNobodyCouldAnswerIsAbsentNeverZero(t *testing.T) {
 	for _, g := range r.Groups {
 		assert.Nil(t, g.Value, g.Key)
 	}
-	assert.Nil(t, r.Average)
+	assert.Nil(t, r.Median)
 }
 
 func TestAProviderWithNoUsageRowsIsLeftOutAndSaidSo(t *testing.T) {
@@ -101,8 +101,8 @@ func TestAProviderWithNoUsageRowsIsLeftOutAndSaidSo(t *testing.T) {
 
 func TestTheAverageAndTheTotalAreOverEverything(t *testing.T) {
 	r, _ := Compute(TokensPerCommit, Model, fixture())
-	require.NotNil(t, r.Average)
-	assert.InDelta(t, 2500.0/4, *r.Average, 0.001)
+	require.NotNil(t, r.Median)
+	assert.InDelta(t, 2500.0/4, *r.Median, 0.001)
 	assert.EqualValues(t, 2500, r.Total.Tokens)
 	assert.InDelta(t, 14.0, r.Total.CostUSD, 0.001)
 }
@@ -150,9 +150,9 @@ func TestTaskTimeIsTheMedianAndTheSentBackShare(t *testing.T) {
 	assert.InDelta(t, 2.0, *be.CostPerUnit, 0.001)
 	fe := g["Frontend Dev"]
 	assert.Equal(t, 1, fe.N, "a task with no claim time is not a sample")
-	assert.EqualValues(t, 6, fe.Tokens, "but its tokens are still counted")
-	require.NotNil(t, r.Average)
-	assert.InDelta(t, 100, *r.Average, 0.001, "median of 100, 300, 200, 50, 10")
+	assert.EqualValues(t, 5, fe.Tokens, "and its tokens are not counted against the timed ones (#8968)")
+	require.NotNil(t, r.Median)
+	assert.InDelta(t, 150, *r.Median, 0.001, "median of 100, 300, 200, 50: the Gemini task is in neither measure")
 }
 
 func TestTaskTimeByTaskAndByThinkingLevel(t *testing.T) {
@@ -201,4 +201,47 @@ func TestUsageOfAnUnmeasuredProviderIsNotCounted(t *testing.T) {
 	_, ok := groupsByKey(r)["gemini"]
 	assert.False(t, ok)
 	assert.EqualValues(t, 2500, r.Total.Tokens)
+}
+
+// #8968 (6): a task with no claim time counts for nothing in a task-time group: not its tokens, not its cost.
+func TestTaskTimeTokensAndCostAreOfTheTimedTasksOnly(t *testing.T) {
+	sec := 600.0
+	in := Input{Measured: map[string]bool{"claude": true}, Tasks: []TaskRow{
+		{ID: 1, Team: "a", Provider: "claude", Tokens: 100, CostUSD: 1, WorkSeconds: &sec},
+		{ID: 2, Team: "a", Provider: "claude", Tokens: 900, CostUSD: 9}, // never claimed: no time
+	}}
+	r, err := Compute(TaskTime, Team, in)
+	require.NoError(t, err)
+	require.Len(t, r.Groups, 1)
+	g := r.Groups[0]
+	assert.Equal(t, 1, g.N)
+	assert.EqualValues(t, 100, g.Tokens)
+	require.NotNil(t, g.CostPerUnit)
+	assert.InDelta(t, 1, *g.CostPerUnit, 1e-9, "the cost of the one timed task over that one task")
+	assert.EqualValues(t, 100, r.Total.Tokens)
+}
+
+// #8968 (3): the same rule in both measures.
+func TestBothMeasuresLeaveOutUnmeasuredAndUnknownProviders(t *testing.T) {
+	sec := 60.0
+	in := Input{Measured: map[string]bool{"claude": true}, Tasks: []TaskRow{
+		{ID: 1, Provider: "claude", WorkSeconds: &sec, Commits: 1, Tokens: 10},
+		{ID: 2, Provider: "gemini", WorkSeconds: &sec, Commits: 1, Tokens: 10},
+		{ID: 3, Provider: "", WorkSeconds: &sec, Commits: 1, Tokens: 10},
+	}}
+	for _, m := range []string{TaskTime, TokensPerCommit} {
+		r, err := Compute(m, Task, in)
+		require.NoError(t, err)
+		assert.Len(t, r.Groups, 1, m)
+		assert.Equal(t, []string{"gemini"}, r.Unmeasured, m)
+	}
+}
+
+// #8968 (14, 13): one dominant-model rule, a named model beats "not recorded", and an even median is not rounded.
+func TestDominantModelsPreferANamedModelAndTheMedianIsExact(t *testing.T) {
+	rows := []UsageRow{{Session: "s", Model: "", Tokens: 900}, {Session: "s", Model: "opus", Tokens: 100}, {Session: "t", Model: "", Tokens: 5}}
+	m := DominantModels(rows)
+	assert.Equal(t, "opus", m["s"])
+	assert.NotContains(t, m, "t", "no model named: none")
+	assert.InDelta(t, 1.005, median([]float64{1, 1.01}), 1e-12)
 }

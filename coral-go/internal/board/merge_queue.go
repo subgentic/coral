@@ -264,8 +264,8 @@ func (s *Store) SendBack(ctx context.Context, project string, id int64, actor, n
 	if status != "completed" || n == 0 || w.ReviewRounds[n-1].Result != "approved" || w.OriginalAuthor == "" {
 		return nil, fmt.Errorf("task #%d is not an approved, completed task: send-back applies to those only", id)
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status='pending', assigned_to=?, claimed_at=NULL, completed_by=NULL, completion_message=NULL,
-		completed_at=NULL, edited_at=? WHERE id=? AND board_id=? AND status='completed'`, ptr.NullIfEmpty(w.OriginalAuthor), nowUTC(), id, project); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status='pending', assigned_to=?, `+keepWorkBeforeSQL+`, claimed_at=NULL, completed_by=NULL, completion_message=NULL,
+		completed_at=NULL, edited_at=? WHERE id=? AND board_id=? AND status='completed'`, ptr.NullIfEmpty(w.OriginalAuthor), submittedAtOf(w.CompletionReview), submittedAtOf(w.CompletionReview), nowUTC(), id, project); err != nil {
 		return nil, err
 	}
 	last := &w.ReviewRounds[n-1]

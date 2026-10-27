@@ -5,14 +5,17 @@
 //   - A usage row has its own provider, model, thinking level and team, and belongs to a session (its agent). Its tokens are input + output, as the Spend read counts them.
 //   - A commit belongs to the session that recorded it first, and has the provider, team and agent of that session and the branch it was recorded on. For a model or thinking-level group a commit
 //     belongs to the model or level that spent most of its session's tokens in the range.
-//   - A task has the provider, model, thinking level (the one recorded at its claim), team, agent and branch of the agent that claimed it, and its own tokens and cost (what the board stored when it
-//     was completed). Its time is from the (last) claim to the last submission for review, or to completion when it had none: review time is not counted.
-//   - A figure nobody could answer (tokens per commit with no commit, a median with no task) is absent, never zero.
+//   - A task has the provider, model, thinking level (the one recorded at its claim), team, agent and branch of the session that claimed it (the session recorded at the claim), and its own tokens and cost
+//     (what the board stored when it was completed). Its time is the work: from the claim to the submission for review (or to completion when it had none), and the same for each round before it that a
+//     rejection or send-back ended; review time is not counted. A commit belongs to at most one task: the latest-claimed of its session's tasks that was open when it was made.
+//   - A task whose session is not known (none was recorded at its claim) or whose provider is not measured (Gemini writes no usage) is left out of BOTH measures: a measure over fewer tasks than exist
+//     says which providers it cannot read (Unmeasured), and the rest are not guessed.
+//   - A figure nobody could answer (tokens per commit with no commit, a median with no task) is absent, never zero. Result.Median is the median task time, or the ratio of all tokens to all commits (the
+//     "average" of the view's JSON).
 package efficiency
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 )
@@ -137,7 +140,7 @@ type Total struct {
 type Result struct {
 	Groups     []Group
 	Total      Total
-	Average    *float64 // the figure over everything in the window
+	Median     *float64 // the figure over everything in the window: the median task time, or all tokens per all commits (the JSON's "average")
 	Unmeasured []string
 }
 
@@ -262,7 +265,7 @@ func tokensPerCommit(dim string, in Input) Result {
 	res.Groups = out
 	if res.Total.N > 0 && res.Total.Tokens > 0 {
 		v := float64(res.Total.Tokens) / float64(res.Total.N)
-		res.Average = &v
+		res.Median = &v
 	}
 	res.Unmeasured = sortedKeys(unmeasured)
 	return res
@@ -274,8 +277,11 @@ func taskTime(dim string, in Input) Result {
 	var res Result
 	var all []float64
 	for _, t := range in.Tasks {
-		if t.Provider != "" && !in.Measured[t.Provider] {
-			unmeasured[t.Provider] = true
+		if !in.Measured[t.Provider] { // the same rule as tokens per commit: a provider Coral reads no usage of, or a task of no known session, is not counted
+			if t.Provider != "" {
+				unmeasured[t.Provider] = true
+			}
+			continue
 		}
 		key := ""
 		switch dim {
@@ -302,14 +308,14 @@ func taskTime(dim string, in Input) Result {
 			}
 			groups[key] = g
 		}
+		g.providerCounter[t.Provider]++
+		if t.WorkSeconds == nil {
+			continue // no claim time: the task is not a sample of how long work takes, and its tokens and cost are not counted against the tasks that are
+		}
 		g.Tokens += t.Tokens
 		g.CostUSD += t.CostUSD
 		res.Total.Tokens += t.Tokens
 		res.Total.CostUSD += t.CostUSD
-		g.providerCounter[t.Provider]++
-		if t.WorkSeconds == nil {
-			continue // no claim time: the task is not a sample of how long work takes
-		}
 		g.N++
 		g.values = append(g.values, *t.WorkSeconds)
 		all = append(all, *t.WorkSeconds)
@@ -340,7 +346,7 @@ func taskTime(dim string, in Input) Result {
 	res.Groups = out
 	if len(all) > 0 {
 		v := median(all)
-		res.Average = &v
+		res.Median = &v
 	}
 	res.Unmeasured = sortedKeys(unmeasured)
 	return res
@@ -359,9 +365,12 @@ func dominantBySession(rows []UsageRow) map[string]dominantPair {
 		models[r.Session][r.Model] += r.Tokens
 		levels[r.Session][r.Thinking] += r.Tokens
 	}
-	pick := func(m map[string]int64) string {
+	pick := func(m map[string]int64) string { // a named model or level beats "not recorded", whatever its tokens
 		best, bestT := "", int64(-1)
 		for k, v := range m {
+			if k == "" {
+				continue
+			}
 			if v > bestT || (v == bestT && k < best) {
 				best, bestT = k, v
 			}
@@ -451,7 +460,7 @@ func median(v []float64) float64 {
 	if n%2 == 1 {
 		return s[n/2]
 	}
-	return math.Round((s[n/2-1]+s[n/2])/2*100) / 100
+	return (s[n/2-1] + s[n/2]) / 2
 }
 
 func sortedKeys(m map[string]bool) []string {
@@ -460,5 +469,17 @@ func sortedKeys(m map[string]bool) []string {
 		out = append(out, k)
 	}
 	sort.Strings(out)
+	return out
+}
+
+// DominantModels is, for each session, the model that spent most of its tokens in the rows (ties: the smaller name); a session whose rows name no model has none. It is the model a session's commits and
+// tasks are attributed to.
+func DominantModels(rows []UsageRow) map[string]string {
+	out := map[string]string{}
+	for s, p := range dominantBySession(rows) {
+		if p.model != "" {
+			out[s] = p.model
+		}
+	}
 	return out
 }

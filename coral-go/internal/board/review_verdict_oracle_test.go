@@ -353,7 +353,7 @@ func (s *Store) reviewVerdictBefore4599(ctx context.Context, project string, id 
 		// open and reopen for the next round when the author resubmits.
 		round.Result = "rejected"
 		// Back to its author, pending, with a fresh candidate to come.
-		if _, err := tx.ExecContext(ctx, "UPDATE board_tasks SET status='pending', assigned_to=?, claimed_at=NULL WHERE id=? AND board_id=?", ptr.NullIfEmpty(w.OriginalAuthor), id, project); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE board_tasks SET status='pending', assigned_to=?, "+keepWorkBeforeSQL+", claimed_at=NULL WHERE id=? AND board_id=?", ptr.NullIfEmpty(w.OriginalAuthor), submittedAtOf(w.CompletionReview), submittedAtOf(w.CompletionReview), id, project); err != nil {
 			return nil, err
 		}
 		w.CompletionReview = nil
