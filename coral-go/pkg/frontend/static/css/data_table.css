@@ -353,3 +353,6 @@
 #agentic-panel-artifacts .artifact-details { display: inline-flex; align-items: center; justify-content: center; width: var(--table-touch); height: var(--table-touch); }
 #agentic-panel-artifacts .artifact-details::after { content: none; } /* the icon itself is 44px; no overlapping hit-area extension */
 .dt-box.dt-folded .inbox-review-task { display: none; } /* a folded (phone) Needs you row has a review's goal on its second line; its task is one tap away on the goal (#8917) */
+/* a goal screen's one-line rows (#8952): the row button is a target of its own, 24 px, 44 px on a phone */
+.goal-list .dt-primary { display: block; min-height: 1.5rem; line-height: 1.5rem; }
+@media (max-width: 767px), (pointer: coarse) { .goal-list .dt-primary { min-height: var(--control-touch-height, 44px); line-height: var(--control-touch-height, 44px); } }
