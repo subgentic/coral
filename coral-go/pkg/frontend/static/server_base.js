@@ -137,14 +137,23 @@ export function serverFetch(server, url, options) {
 /** How long a registered computer has to answer a list the Inbox merges (#8904). This computer is not timed: it is the one the page came from. */
 const SERVER_READ_MS = 8000;
 
+/** A computer whose read ran out its time is "slow" for SLOW_MS: every merged read to it that is waiting or arrives in that time gives up at once, so the sidebar's own reads (counts) cannot hold the two slots one
+ *  after another while the folder that is open waits behind them (#8922). A Retry forgets it. */
+const SLOW_MS = 20000;
+const slow = new Map(); // server id -> when its last read timed out
+const isSlow = id => { const t = slow.get(id); if (t === undefined) return false; if (Date.now() - t > SLOW_MS) { slow.delete(id); return false; } return true; };
+export function forgetSlowComputers() { slow.clear(); }
+
 /** serverFetch for a read that is merged with other computers' (the Inbox's artifacts, goals, tasks, saved messages): a registered computer that does not answer in `ms` (hung, port still
  *  accepting) rejects with { timedOut: true } instead of holding the whole list on "Loading", so the reachable computers' rows show at once. The body is read inside the limit too; the Response
  *  returned is whole. The caller's own signal still cancels it. */
 export async function serverRead(server, url, options = {}, ms = SERVER_READ_MS) {
     if (normServer(server) === LOCAL_SERVER) return serverFetch(server, url, options);
-    const target = serverUrl(url, server);
+    const target = serverUrl(url, server), id = normServer(server);
     const outer = options.signal;
-    const release = await takeSlot(server, outer, ms); // the answer's clock starts when the request is sent, not while it waits for its turn; a turn is waited for at most as long again
+    if (isSlow(id)) throw Object.assign(new Error('did not answer'), { timedOut: true });
+    const release = await takeSlot(server, outer, ms);
+    if (isSlow(id)) { release(); throw Object.assign(new Error('did not answer'), { timedOut: true }); } // it ran out its time while this read waited // the answer's clock starts when the request is sent, not while it waits for its turn; a turn is waited for at most as long again
     const ctrl = new AbortController(); let timedOut = false;
     if (outer) { if (outer.aborted) ctrl.abort(); else outer.addEventListener('abort', () => ctrl.abort(), { once: true }); }
     const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
@@ -153,7 +162,7 @@ export async function serverRead(server, url, options = {}, ms = SERVER_READ_MS)
         const text = await r.text();
         return new Response(text, { status: r.status, statusText: r.statusText, headers: r.headers });
     } catch (e) {
-        if (timedOut) throw Object.assign(new Error('did not answer'), { timedOut: true });
+        if (timedOut) { slow.set(id, Date.now()); throw Object.assign(new Error('did not answer'), { timedOut: true }); }
         throw e;
     } finally { clearTimeout(timer); release(); }
 }
