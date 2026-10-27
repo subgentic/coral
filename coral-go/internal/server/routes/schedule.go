@@ -390,6 +390,26 @@ func (h *ScheduleHandler) GetRecentRuns(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs)})
 }
 
+// MarkRunSeen records that a person opened a run, so that its unread dot and its Needs you row go on every screen that shows it (#9315). The first time only.
+// POST /api/scheduled/runs/{runID}/seen
+func (h *ScheduleHandler) MarkRunSeen(w http.ResponseWriter, r *http.Request) {
+	runID, err := strconv.ParseInt(chi.URLParam(r, "runID"), 10, 64)
+	if err != nil {
+		errBadRequest(w, "invalid run ID")
+		return
+	}
+	found, err := h.sched.MarkScheduledRunSeen(r.Context(), runID, time.Now().UTC().Format(store.ISOFormat))
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	if !found {
+		errNotFound(w, "run not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "run_id": runID})
+}
+
 // ValidateCron validates a cron expression and returns next fire times.
 // POST /api/scheduled/validate-cron
 func (h *ScheduleHandler) ValidateCron(w http.ResponseWriter, r *http.Request) {

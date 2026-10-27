@@ -97,6 +97,8 @@ When you paste or attach an image in the message box and send it, its chip in th
 
 The **Inbox** has three tabs: **Needs you** (agents waiting for you), **Tasks for you** and **Saved for later**.
 
+**Needs you** also lists a scheduled job or workflow run that failed and that you have not opened: press **Open** to go to its page, or **Dismiss** to clear it. Automations has a **Recent runs** folder with every run, newest first and a dot before each finished run you have not opened; opening a run (here, on your phone or in another tab) clears its dot everywhere.
+
 **Tasks for you** lists the open tasks that an agent assigned to you, the Operator, on any board of this computer: its title, the board, its priority and how long ago it changed, newest first. Press a task to open it in place and press it again to close it.
 
 - An open task shows who it is from and its status, an **Open the task** link (to that task's board), its full text, and a reply box named for the task.

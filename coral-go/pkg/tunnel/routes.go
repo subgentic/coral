@@ -310,6 +310,9 @@ var routeTable = cat(
 		"/api/sessions/live/{id}/archive",
 		"/api/sessions/live/{id}/unarchive",
 		"/api/workflows/runs/{id}/kill",
+		// A run opened (#9315): the unread dot and the Needs you row of a failed run go on the Hub too. Interact, like the workflow reads: a view-only viewer sees no workflow run to open.
+		"/api/workflows/runs/{id}/seen",
+		"/api/scheduled/runs/{id}/seen",
 		"/api/board/{project}/messages",
 		"/api/board/{project}/external-messages",
 		// A file Coral Hub relayed from another Coral (cross-team artifacts): only with its stamped header.

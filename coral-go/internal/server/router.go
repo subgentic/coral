@@ -575,6 +575,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/scheduled/jobs/{jobID}/toggle", schedHandler.ToggleJob)
 	r.Get("/api/scheduled/jobs/{jobID}/runs", schedHandler.GetJobRuns)
 	r.Get("/api/scheduled/runs/recent", schedHandler.GetRecentRuns)
+	r.Post("/api/scheduled/runs/{runID}/seen", schedHandler.MarkRunSeen)
 	r.Post("/api/scheduled/validate-cron", schedHandler.ValidateCron)
 
 	// Workflows
@@ -590,6 +591,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/workflows/{workflowID}/runs", workflowHandler.ListWorkflowRuns)
 	r.Get("/api/workflows/runs/{runID}", workflowHandler.GetWorkflowRun)
 	r.Post("/api/workflows/runs/{runID}/kill", workflowHandler.KillWorkflowRun)
+	r.Post("/api/workflows/runs/{runID}/seen", workflowHandler.MarkRunSeen)
 	r.Get("/api/workflows/runs/{runID}/steps/{stepIndex}/files/*", workflowHandler.GetStepFile)
 
 	// Connected Apps/OAuth endpoints are retired. Existing rows remain in the

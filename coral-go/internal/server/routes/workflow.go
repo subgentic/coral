@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -540,6 +541,26 @@ func (h *WorkflowHandler) GetWorkflowRun(w http.ResponseWriter, r *http.Request)
 		runView(run)
 		return run, err
 	})
+}
+
+// MarkRunSeen records that a person opened a run (#9315): the first time only.
+// POST /api/workflows/runs/{runID}/seen
+func (h *WorkflowHandler) MarkRunSeen(w http.ResponseWriter, r *http.Request) {
+	runID, err := strconv.ParseInt(chi.URLParam(r, "runID"), 10, 64)
+	if err != nil {
+		errBadRequest(w, "invalid run ID")
+		return
+	}
+	found, err := h.ws.MarkWorkflowRunSeen(r.Context(), runID, time.Now().UTC().Format(store.ISOFormat))
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	if !found {
+		errNotFound(w, "run not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "run_id": runID})
 }
 
 // KillWorkflowRun kills a running workflow.

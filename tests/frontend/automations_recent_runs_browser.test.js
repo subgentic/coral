@@ -1,7 +1,7 @@
 // Automations, Recent runs (#9296, audit #9255 item 3): a folder next to Running now and Failed that lists every run of every job and workflow, newest first, one line each (Run, Kind, Result, Started, Took),
 // with a dot before the name of a finished run nobody has opened and the folder's count the number of those; a run a job made of its workflow is listed once (the job's); opening a run opens its job's or
 // its workflow's page and clears its dot and the count. A failed run nobody has opened is also a row of the Inbox's Needs you (Item, "Run failed: why", Open and Dismiss), counted in the Inbox badge; Dismiss
-// or Open takes it out. 1280 and 390 px, a stubbed server (jobs, workflows and the two recent-runs reads), light and dark. Drives Chrome over CDP through agent_view_harness.js.
+// or Open takes it out. What was opened is the server's (seen_at, POST .../seen: #9315), so another screen's open is read on the next refresh. 1280 and 390 px, a stubbed server (jobs, workflows and the two recent-runs reads), light and dark. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
@@ -39,6 +39,8 @@ const STUB = `(() => {
         if (/\\/api\\/scheduled\\/jobs\\/(\\d+)\\/runs/.test(url)) return json({ runs: [], total: 0 });
         if (method === 'GET' && /\\/api\\/workflows$/.test(url)) return json({ workflows: window.__wfs });
         if (method === 'GET' && /\\/api\\/workflows\\/\\d+\\/runs/.test(url)) return json({ runs: [], total: 0 });
+        const seen = /\\/api\\/(scheduled|workflows)\\/runs\\/(\\d+)\\/seen$/.exec(url);
+        if (method === 'POST' && seen) { (window.__seenPosts = window.__seenPosts || []).push(seen[1] + ':' + seen[2]); const list = seen[1] === 'scheduled' ? window.__jobRuns : window.__wfRuns, r = list.find(x => x.id === Number(seen[2])); if (!r) return json({ error: 'not found' }, 404); if (!r.seen_at) r.seen_at = new Date().toISOString(); return json({ ok: true }); }
         const run = /\\/api\\/workflows\\/runs\\/(\\d+)$/.exec(url);
         if (method === 'GET' && run) { const r = window.__wfRuns.find(x => x.id === Number(run[1])); return r ? json({ ...r, steps: [] }) : json({ error: 'not found' }, 404); }
         const one = /\\/api\\/workflows\\/(\\d+)$/.exec(url);
@@ -58,14 +60,12 @@ const STUB = `(() => {
     const S = `(window.__coralStatic || '/static/')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
-        // this browser first looked a day ago: every run of the stub is after that
-        await Page.addScriptToEvaluateOnNewDocument({ source: `try { if (!localStorage.getItem('coral-automation-runs-seen')) localStorage.setItem('coral-automation-runs-seen', JSON.stringify({ since: Date.now() - 86400000, ids: [] })); } catch {}` });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
-            await ev(`try { localStorage.setItem('coral-automation-runs-seen', JSON.stringify({ since: Date.now() - 86400000, ids: [] })); for (const k of Object.keys(localStorage)) if (k.startsWith('coral-automations-')) localStorage.removeItem(k); } catch {} true`);
+            await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-automations-')) localStorage.removeItem(k); } catch {} true`);
             await ev(`window.openAutomationsFolder('recent'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 5`, `${at}the five runs in Recent runs`, 10000);
             assert.equal(await pathname(), '/automations/recent', `${at}the address is the folder's`);
@@ -112,6 +112,10 @@ const STUB = `(() => {
             await ev(`[...document.querySelectorAll('[data-on-click="automations-back"]')].find(b => b.getClientRects().length).click(); true`);
             await waitFor(`document.querySelector('#group-table-title') && document.querySelector('#group-table-title').textContent === 'Recent runs'`, `${at}Back is Recent runs`, 8000);
             assert.equal(await pathname(), '/automations/recent', `${at}Back returns to the folder it was opened from`);
+            assert.deepEqual((await ev(`window.__seenPosts`)).slice().sort(), ['scheduled:104', 'scheduled:105', 'workflows:202'], `${at}the server was told of each run opened or dismissed, once`);
+            // another screen opened a run: this one reads it on its next refresh
+            await ev(`window.__wfRuns.find(r => r.id === 200).seen_at = new Date().toISOString(); import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true)).then(() => true)`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key] .automations-unread').length === 0`, `${at}the last unread run was opened on another screen: it lost its dot here too`, 8000);
             // no runs at all: one line and its hint
             await ev(`window.__jobRuns = []; window.__wfRuns = []; import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true)).then(() => true)`);
             await waitFor(`!!document.querySelector('#group-table-view .empty-state .empty-state-line')`, `${at}the empty folder`, 8000);
