@@ -16,7 +16,7 @@ const GOALS = [
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const heights = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(r => r.querySelector('td') && r.getClientRects().length).map(r => Math.round(r.getBoundingClientRect().height))`);
 
-    const one = async (label, what, sel, min) => { const h = await heights(sel); assert.ok(h.length >= min, `${label}: ${what} has its rows (${h.length})`); assert.ok(h.every(x => x <= 48), `${label}: every ${what} row is one line (heights ${JSON.stringify(h)})`); };
+    const one = async (label, what, sel, min, max = 48) => { const h = await heights(sel); assert.ok(h.length >= min, `${label}: ${what} has its rows (${h.length})`); assert.ok(h.every(x => x <= max), `${label}: every ${what} row is ${max === 48 ? 'one line' : 'at most the name and one more line'} (heights ${JSON.stringify(h)})`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
@@ -29,7 +29,10 @@ const GOALS = [
             await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length >= 2`, 'agents', 8000);
             await ev(`(async () => { const ago = m => new Date(Date.now() - m * 60000).toISOString(); const W = { 'fe-id': ['permission', ago(3)], 'be-id': ['question', ago(30)] }; window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, waiting_for_input: true, waiting_kind: (W[s.session_id] || ['', ''])[0], waiting_since: (W[s.session_id] || ['', ''])[1], waiting_summary: 'Wants to run: npm test -- --coverage --watch=false in the frontend folder and then push the result to the shared branch' })); (await import((window.__coralStatic || '/static/') + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`); await settle(1200); if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'needs'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`); await settle(1200);
-            await one(label, 'Needs you', '#group-table-view tr', 2); await shot(`${label}-needs`);
+            await one(label, 'Needs you', '#group-table-view tr', 2, 64); // the one exception (UI/UX): the ask is a second line under the agent's name, 12/400 secondary, cut with an ellipsis; every other column stays one line
+            const ask = await ev(`(() => { const s = [...document.querySelectorAll('#group-table-view td .dt-subtitle')].filter(e => e.getClientRects().length); const c = s[0] && getComputedStyle(s[0]); return { n: s.length, text: s[0] ? s[0].textContent : '', size: c && c.fontSize, weight: c && c.fontWeight, cut: c && c.textOverflow, nowrap: c && c.whiteSpace }; })()`);
+            assert.ok(ask.n >= 2 && /^Wants to run/.test(ask.text), `${label}: each Needs you agent shows its ask under the name: ` + JSON.stringify(ask));
+            assert.deepEqual([ask.size, ask.weight, ask.cut, ask.nowrap], ['12px', '400', 'ellipsis', 'nowrap'], `${label}: the ask is 12/400, cut with an ellipsis, on one line`); await shot(`${label}-needs`);
             // Goals folder
             await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)} }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
