@@ -2,8 +2,7 @@
 
 .goals-page { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; min-height: 100%; box-sizing: border-box; }
 .goals-note { margin: 2px 0 0; color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
-.goals-detail-col { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.goals-detail-col { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; background: var(--bg-secondary); }
+.goals-detail-col { min-width: 0; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; background: var(--bg-secondary); container-type: inline-size; }
 .goals-back { display: none; align-self: flex-start; min-height: var(--control-touch-height, 44px); }
 
 .goals-chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -30,8 +29,7 @@
 .goals-detail-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 
 
-.goals-failed { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border: 1px dashed var(--border-light); border-radius: var(--radius-lg); color: var(--text-secondary); }
-.goals-failed { flex-direction: row; flex-wrap: wrap; align-items: center; border-style: solid; border-color: var(--error); }
+.goals-failed { display: flex; gap: 8px; padding: 12px; border: 1px dashed var(--border-light); border-radius: var(--radius-lg); color: var(--text-secondary); flex-direction: row; flex-wrap: wrap; align-items: center; border-style: solid; border-color: var(--error); }
 
 .goals-dialog { margin: auto; /* the base reset gives every dialog margin 0, which pinned it to the corner */ border: 1px solid var(--border-light); border-radius: var(--dlg-radius); background: var(--bg-secondary); color: var(--text-primary); padding: 16px; }
 .goals-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
@@ -82,7 +80,6 @@
 .goals-page { max-width: 1440px; width: 100%; margin-inline: auto; }
 .goals-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; } /* it scrolls sideways when the six do not fit (a phone); no bar is drawn under the chips */
 .goals-chip { flex: none; white-space: nowrap; }
-.goals-detail-col { container-type: inline-size; }
 .goals-detail-col:focus { outline: none; }
 .goals-detail-col .goals-sub { margin: 0 0 4px; }
 @media (min-width: 768px) {
