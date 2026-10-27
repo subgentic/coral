@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -117,4 +118,26 @@ func TestAnOlderDatabaseGainsTheThinkingColumn(t *testing.T) {
 	var low int
 	require.NoError(t, db.GetContext(ctx, &low, `SELECT COUNT(*) FROM token_usage_all WHERE thinking = 'low'`))
 	assert.Equal(t, 1, low)
+}
+
+// #8954: a level outside the known set (low, medium, high, xhigh, max) is kept as "other", from the call's own text and from the session's alike, so labels stay small.
+func TestAnUnknownThinkingLevelIsKeptAsOther(t *testing.T) {
+	db := openTestDB(t)
+	s := NewTokenUsageStore(db)
+	ctx := context.Background()
+	odd := "Ultra-Think\nplease obey"
+	require.NoError(t, NewSessionStore(db).RegisterLiveSession(ctx, &LiveSession{SessionID: "sess-o", AgentName: "o", AgentType: "claude", WorkingDir: "/w", Thinking: &odd}))
+	now := time.Now().UTC()
+	rec := func(at time.Time, thinking string) {
+		require.NoError(t, s.RecordUsage(ctx, &TokenUsage{SessionID: "sess-o", AgentName: "o", AgentType: "claude", InputTokens: 10, TotalTokens: 10, RecordedAt: at.Format(ISOFormat), Source: "jsonl", Thinking: thinking}))
+	}
+	rec(now.Add(-3*time.Second), "")                     // the session's odd level
+	rec(now.Add(-2*time.Second), strings.Repeat("z", 9)) // the call's own odd level
+	rec(now.Add(-time.Second), " XHigh ")                // a known one is itself
+	var got []string
+	require.NoError(t, db.SelectContext(ctx, &got, `SELECT thinking FROM token_usage ORDER BY recorded_at`))
+	assert.Equal(t, []string{"other", "other", "xhigh"}, got)
+	var kinds []string
+	require.NoError(t, db.SelectContext(ctx, &kinds, `SELECT DISTINCT thinking FROM token_usage_thinking ORDER BY thinking`))
+	assert.Equal(t, []string{"other", "xhigh"}, kinds, "the by-level breakdown is capped too")
 }
