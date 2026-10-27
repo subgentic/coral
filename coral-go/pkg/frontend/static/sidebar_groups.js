@@ -92,6 +92,11 @@ function dataAttrs(data) { return Object.entries(data || {}).map(([k, v]) => `da
 
 /** The page toolbar's create actions (#7723), as the literal attribute: a source names one of these. */
 const TOOLBAR_ACTION_ATTR = { 'wf-create': 'data-on-click="wf-create"', 'job-new': 'data-on-click="job-new"', 'wf-build-agent': 'data-on-click="wf-build-agent"' };
+/** An empty page's first choices (#9297): each a title and a sentence, the whole card one button; a source names one of the page's create actions. */
+function startCardsHtml(cards) {
+    const cs = (cards || []).filter(c => TOOLBAR_ACTION_ATTR[c.action]);
+    return cs.length ? `<div class="start-cards">${cs.map(c => `<button type="button" class="start-card" ${TOOLBAR_ACTION_ATTR[c.action]}><span class="start-card-title">${escapeHtml(c.title)}</span><span class="start-card-text">${escapeHtml(c.text)}</span></button>`).join('')}</div>` : '';
+}
 const MORE_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
 
 /** The page's one toolbar line (#7723, the team tabs' toolbar): the search field (the sidebar's own search, shown here and kept the same: typing in it types in the sidebar's), the chips of the first table
@@ -130,7 +135,7 @@ function tableHtml(t, n = 0, lead = '', bar = false) {
     const top = (t.headless || inRow ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2>${count == null ? '' : `<span class="session-group-count">${count}</span>`}${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
     const status = t.status ? `<p class="item-meta group-table-status" role="status">${escapeHtml(t.status)}</p>` : ''; // one line under the title for what just happened (a job deleted: the page it returns to says so, #9298)
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
-    if (!t.rows.length && t.empty) return top + status + `<div class="empty-state"><p class="empty-state-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-state-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
+    if (!t.rows.length && t.empty) return top + status + `<div class="empty-state"><p class="empty-state-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-state-hint">${escapeHtml(t.empty.hint)}</p>` : ''}${startCardsHtml(t.empty.cards)}</div>`;
     return top + status + '<div class="group-table-node"></div>' + (t.note ? `<p class="empty-state-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
 }
 

@@ -15,6 +15,7 @@ export const CARDS = {
     'ac-card': 'dense',               // a comment thread
     'tool-card': 'dense',             // a tool call in the chat
     'machine-health-card': 'dense',   // a machine's health row in About
+    'start-card': 'regular',          // a first-visit choice in an empty state (Automations)
     'cost-card': 'regular',           // an Analytics figure
     'viz-card': 'regular',            // an Analytics chart
     'eff-card': 'regular',            // an efficiency figure

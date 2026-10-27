@@ -350,15 +350,18 @@
 1	sidebar_groups.js	EXTRA_ACTION_ATTR[x.action]
 1	sidebar_groups.js	MORE_SVG
 1	sidebar_groups.js	TOOLBAR_ACTION_ATTR[bar.action.name]
+1	sidebar_groups.js	TOOLBAR_ACTION_ATTR[c.action]
 1	sidebar_groups.js	TOOLBAR_ACTION_ATTR[i.name]
 2	sidebar_groups.js	attrs
 1	sidebar_groups.js	bar ? '' : extraHtml(t.extra)
 1	sidebar_groups.js	count
 1	sidebar_groups.js	count == null ? '' : `<span class="session-group-count">${count}</span>`
+1	sidebar_groups.js	cs.map(c => `<button type="button" class="start-card" ${TOOLBAR_ACTION_ATTR[c.action]}><span class="start-card
 1	sidebar_groups.js	dataAttrs(c.data)
 1	sidebar_groups.js	html
 1	sidebar_groups.js	items.map(i => `<button type="button" class="menu-item" role="menuitem" ${TOOLBAR_ACTION_ATTR[i.name]}>${escap
 1	sidebar_groups.js	lead
+1	sidebar_groups.js	startCardsHtml(t.empty.cards)
 1	sidebar_groups.js	status
 1	sidebar_groups.js	t.chips.filter(c => CHIP_ACTION_ATTR[c.action]).map(c => `<button type="button" class="group-chip" ${CHIP_ACTI
 1	sidebar_groups.js	top

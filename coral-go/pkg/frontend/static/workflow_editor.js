@@ -9,6 +9,7 @@ import { limitSeconds, limitParts } from './time_limit.js';
 
 let view = null;
 let editingWorkflowId = null; // non-null when editing
+let returnTo = null; // what to do when the dialog closes, saved or not: New job opened it, and the job form comes back (#9297)
 let hooks = { fetchDetail: async () => null, saved: () => {} };
 
 /** workflows.js tells the form how to read a workflow and what to redraw when one is saved (the form imports nothing back from the page). */
@@ -136,8 +137,19 @@ function limitField() {
 
 // -- the fields -------------------------------------------------------------------------------------------
 
+// The first step a new workflow starts with: a real one to edit, so the form shows what a step is for (#9297). Edit and Save keep what the person typed.
+const EXAMPLE_STEP = { name: 'Run tests', type: 'shell', command: 'npm test' };
+
 function workflowFields() {
     return [
+        {
+            key: 'build_hint', type: 'notice',
+            render: slot => {
+                slot.id = 'wf-build-hint'; slot.classList.add('wf-build-hint');
+                const b = el('button', 'btn btn-small', 'Build with Agent'); b.type = 'button'; b.setAttribute('data-on-click', 'wf-build-agent-from-form');
+                slot.append(el('span', '', 'Not sure what the steps are? An agent can write them with you.'), ' ', b);
+            },
+        },
         { key: 'name', type: 'text', id: 'wf-input-name', label: 'Name', required: true, requiredMessage: 'Give the workflow a name.', placeholder: 'lint-and-fix', help: 'Letters, numbers, hyphens and underscores.', attrs: { pattern: '[a-zA-Z0-9_-]+' } },
         stepsField(),
         { key: 'extras', type: 'heading', fold: true, id: 'wf-more', label: 'More options' },
@@ -197,10 +209,13 @@ function openModal(title, submit) {
     document.getElementById('wf-create-modal').style.display = 'flex'; // display-ok: a dialog is shown as the flex container the .modal rule centres (modal_chrome and the close census read it)
 }
 
-export function showWorkflowCreateModal() {
+export function showWorkflowCreateModal(onClose) {
     const v = workflowView();
     editingWorkflowId = null;
-    v.reset(); // every field at its default (one empty step), no errors, an empty status line
+    returnTo = typeof onClose === 'function' ? onClose : null;
+    v.reset(); // every field at its default, no errors, an empty status line
+    v.set('steps', [EXAMPLE_STEP]); // the example step, to edit
+    document.getElementById('wf-build-hint').hidden = false;
     v.fold(false);
     openModal('New workflow', 'Create workflow');
     document.getElementById('wf-input-name').focus();
@@ -210,7 +225,8 @@ export async function editWorkflow(id) {
     const wf = await hooks.fetchDetail(id);
     if (!wf) return;
     const v = workflowView();
-    editingWorkflowId = id;
+    editingWorkflowId = id; returnTo = null;
+    document.getElementById('wf-build-hint').hidden = true; // a workflow that exists is changed with Edit with Agent on its page
     v.reset();
     for (const [k, val] of Object.entries({ name: wf.name || '', steps: wf.steps || [], description: wf.description || '', repo_path: wf.repo_path || '', max_duration_s: wf.max_duration_s || DEFAULT_LIMIT_S })) v.set(k, val);
     // Nothing a workflow already has is hidden: More options opens when it holds something other than the defaults.
@@ -218,8 +234,10 @@ export async function editWorkflow(id) {
     openModal('Edit workflow', 'Save changes');
 }
 
-export function hideWorkflowCreateModal() {
+export function hideWorkflowCreateModal(skipReturn) {
     document.getElementById('wf-create-modal').style.display = 'none'; // display-ok: the same inline state the dialog was opened with
+    const back = returnTo; returnTo = null;
+    if (back && skipReturn !== true) back();
 }
 
 /** Save from the caller (the same check and send as the button). */

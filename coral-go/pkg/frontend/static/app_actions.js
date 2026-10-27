@@ -20,7 +20,7 @@ import { popoutRetry } from './popout.js';
 import { setLiveViewMode, showTerminalView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { copyBranchName, showToast } from './utils.js';
-import { showJobModal, hideJobModal } from './job_form.js';
+import { showJobModal, hideJobModal, reshowJobModal } from './job_form.js';
 import { selectBoardProject, postBoardMessage, deleteMessageBoardProject, toggleBoardPause, showExportBoardModal, toggleSelectMode } from './message_board.js';
 import { showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolderTag } from './folder_tags.js';
 import { pinFolder, unpinFolder, showOpenFolderModal, hideOpenFolderModal, submitOpenFolder } from './pinned_folders.js';
@@ -215,8 +215,9 @@ registerActions({
     'automations-search-filter': el => { const v = el.value; importOnce('./automations.js').then(m => m.filterAutomations(v)).catch(() => {}); }, // the Automations sidebar's search box is in the page from the start; automations.js loads with the tab
     'inbox-search-filter': el => { const v = el.value; importOnce('./inbox_sidebar.js').then(m => m.filterInbox(v)).catch(() => {}); }, // the Inbox sidebar's search box is in the page from the start; inbox_sidebar.js loads with the tab
     'wf-build-agent': () => launchWorkflowAgent(),
+    'wf-build-agent-from-form': () => { hideWorkflowCreateModal(true); launchWorkflowAgent(); }, // the New workflow form's hint
     'wf-create': () => showWorkflowCreateModal(),
-    'job-create-workflow': () => { hideJobModal(); showWorkflowCreateModal(); }, // New job with no workflow to run
+    'job-create-workflow': () => { hideJobModal(); showWorkflowCreateModal(reshowJobModal); }, // New job with no workflow to run
     'wf-modal-backdrop': (el, event) => { if (event.target === el) hideWorkflowCreateModal(); },
     'wf-modal-close': () => hideWorkflowCreateModal(),
 });

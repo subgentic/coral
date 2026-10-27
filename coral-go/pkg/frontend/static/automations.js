@@ -168,12 +168,17 @@ function lastCell(i) {
     if (i.kind === 'workflow') return i.run ? DT.chip(workflowResult(i) || 'Run', resultClass(i.run)) : 'Never run';
     return DT.chip('running now', resultClass(i.run));
 }
+/** A first visit (no job and no workflow yet) starts with two choices, in whichever folder it lands (#9297, the audit's 2). */
+const firstRun = () => countOf('jobs') === 0 && countOf('workflows') === 0 ? { cards: [
+    { title: 'Run a prompt on a schedule', text: 'An agent does the same task at the times you pick.', action: 'job-new' },
+    { title: 'Run steps from a workflow', text: 'Shell commands and agent steps that run one after another.', action: 'wf-create' },
+] } : {};
 /** Running now and Failed: the jobs and workflows together, one table, the same five columns in both. */
 function attentionTable(key, rows, narrowed) {
     const f = folderOf(key), failed = key === 'failed';
     return { title: f.label, noun: f.noun, rows,
-        empty: { line: narrowed ? `No ${f.noun[0]} matches the search.` : failed ? 'Nothing has failed.' : 'Nothing is running.', hint: narrowed ? '' : failed ? 'A job or workflow whose last run failed shows here.' : 'A job or workflow with a run going shows here.' },
-        signature: JSON.stringify(rows.map(i => [i.kind, i.id, i.name, i.run && i.run.status, i.run && i.run.id, i.kind === 'job' ? nextOf(i.job) : ''])),
+        empty: { line: narrowed ? `No ${f.noun[0]} matches the search.` : failed ? 'Nothing has failed.' : 'Nothing is running.', hint: narrowed ? '' : failed ? 'A job or workflow whose last run failed shows here.' : 'A job or workflow with a run going shows here.', ...(narrowed ? {} : firstRun()) },
+        signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.kind, i.id, i.name, i.run && i.run.status, i.run && i.run.id, i.kind === 'job' ? nextOf(i.job) : ''])]),
         node: () => DT.dataTable({
             label: `${f.label}, ${rows.length}`, rows, oneLine: true, rowKey: itemKey, rowName: i => i.name, state: stateOf(key), open: openItem,
             columns: [ // one line a row (Goal #79): what it is goes to the name's tooltip, and a narrow list drops Schedule, then Kind, then Next (dropAt, #8931)
@@ -196,9 +201,9 @@ function folderTable(key) {
     const f = folderOf(key), rows = rowsOf(key), filt = filtersOf(key), narrowed = AF.isFiltered(filt) || filt.q;
     if (f.attention) return attentionTable(key, rows, narrowed);
     const base = { title: f.label, noun: f.noun, rows, status: key === 'jobs' ? _gone : '',
-        empty: { line: narrowed ? `No ${f.noun[0]} matches the search and filters.` : `No ${f.noun[1]} yet.`, hint: narrowed ? '' : key === 'jobs' ? 'New job schedules one.' : 'Build with Agent starts an agent that builds one with you; New workflow opens an empty form. A workflow runs when you press Run, when a job schedules it, or through the API.' } };
+        empty: { line: narrowed ? `No ${f.noun[0]} matches the search and filters.` : `No ${f.noun[1]} yet.`, hint: narrowed ? '' : key === 'jobs' ? 'New job schedules one.' : 'Build with Agent starts an agent that builds one with you; New workflow opens an empty form. A workflow runs when you press Run, when a job schedules it, or through the API.', ...(narrowed ? {} : firstRun()) } };
     if (key === 'jobs') {
-        return { ...base, signature: JSON.stringify([_gone, rows.map(i => [i.job, lastWords(i.run), nextOf(i.job), runsWords(i)])]),
+        return { ...base, signature: JSON.stringify([_gone, !!firstRun().cards, rows.map(i => [i.job, lastWords(i.run), nextOf(i.job), runsWords(i)])]),
             node: () => DT.dataTable({
                 label: `Jobs, ${rows.length}`, rows, oneLine: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
                 columns: [ // one line a row (Goal #79): what the job runs is the name's tooltip and its page's; a narrow list drops Schedule, then Next (dropAt, #8931)
@@ -213,7 +218,7 @@ function folderTable(key) {
                 ],
             }).el };
     }
-    return { ...base, signature: JSON.stringify(rows.map(i => [i.wf, i.usedBy, workflowResult(i)])),
+    return { ...base, signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.wf, i.usedBy, workflowResult(i)])]),
         node: () => DT.dataTable({
             label: `Workflows, ${rows.length}`, rows, oneLine: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
             columns: [ // one line a row (Goal #79): the description is the name's tooltip and the page's; a narrow list drops Steps, then Used by (dropAt, #8931)

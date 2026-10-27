@@ -92,6 +92,9 @@
 .job-help { font-size: var(--fs-base); color: var(--text-secondary); margin: -6px 0 12px; }
 .job-no-workflows { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: var(--fs-md); color: var(--text-secondary); margin: -4px 0 12px; }
 .job-no-workflows .btn { margin: 0; }
+.wf-build-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: var(--fs-md); color: var(--text-secondary); margin: 0 0 12px; }
+.wf-build-hint .btn { margin: 0; }
+.wf-build-hint[hidden] { display: none; }
 .job-more { margin-top: 4px; }
 .job-more > summary { color: var(--text-primary); font-weight: 600; }
 .sched-limit-fields { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 8px; }

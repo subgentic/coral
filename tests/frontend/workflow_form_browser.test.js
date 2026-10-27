@@ -40,7 +40,10 @@ const STUB = `(() => {
             const pat = await ev(`(() => { const m = document.querySelector('#wf-create-modal .modal-content').getBoundingClientRect(), x = document.querySelector('#wf-create-modal .modal-close-btn').getBoundingClientRect(), f = document.getElementById('wf-modal-save').getBoundingClientRect(); return { xRight: Math.round(m.right - x.right), xTop: Math.round(x.top - m.top), btnRight: Math.round(m.right - f.right) }; })()`);
             assert.ok(pat.xRight >= 0 && pat.xRight <= 40 && pat.xTop <= 40, at + 'the X is at the top right: ' + JSON.stringify(pat));
             assert.ok(pat.btnRight <= 40, at + 'the buttons are at the bottom right, as in New job: ' + JSON.stringify(pat));
-            assert.equal(await ev(`document.querySelectorAll('#wf-steps-editor .wf-step-editor-item').length`), 1, at + 'one empty step is already there');
+            assert.equal(await ev(`document.querySelectorAll('#wf-steps-editor .wf-step-editor-item').length`), 1, at + 'one step is already there');
+            assert.deepEqual(await ev(`[document.querySelector('.wf-step-type-select').value, document.querySelector('.wf-step-name-input').value, document.querySelector('.wf-step-content').value]`), ['shell', 'Run tests', 'npm test'], at + 'it is an example step to edit (#9297)');
+            assert.equal(await ev(vis('#wf-build-hint')), true, at + 'a hint offers Build with Agent');
+            assert.match(await ev(`document.getElementById('wf-build-hint').textContent.replace(/\\s+/g, ' ').trim()`), /^Not sure what the steps are\? An agent can write them with you\. Build with Agent$/, at);
             for (const id of ['#wf-input-desc', '#wf-input-repo', '#wf-input-max-dur']) assert.equal(await ev(vis(id)), false, at + id + ' is behind More options');
             assert.equal(await ev(`document.getElementById('wf-more').open`), false);
             assert.deepEqual(await ev(`(() => { const r = document.getElementById('wf-input-name').closest('.sv-row'); return [r.querySelector('.sv-label').textContent.replace('Required', '').trim(), !!r.querySelector('.sv-required'), document.getElementById('wf-input-name').getAttribute('aria-required')]; })()`), ['Name', true, 'true'], at + 'Name says Required');
@@ -75,6 +78,7 @@ const STUB = `(() => {
             }
 
             // 3. steps: add one, numbered; Create with a gap focuses the first invalid field, says it on the field and beside the buttons
+            await ev(`(() => { for (const sel of ['.wf-step-name-input', '.wf-step-content']) { const e = document.querySelector(sel); e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); } return true; })()`); // the example step cleared: the gaps below are the ones a blank step has
             await click('.wf-add-step-btn');
             assert.deepEqual(await ev(`[...document.querySelectorAll('.wf-step-num')].map(e => e.textContent)`), ['Step 1', 'Step 2']);
             const said = () => ev(`(() => { const e = document.querySelector('#wf-form .sv-error:not([hidden])'); return { field: e ? e.textContent : '', role: e && e.getAttribute('role'), line: document.querySelector('#wf-footer .sv-status').textContent }; })()`);

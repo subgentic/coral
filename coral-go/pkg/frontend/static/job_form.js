@@ -228,8 +228,8 @@ function jobFields(host) {
             key: 'no_workflows', type: 'notice', visibleWhen: v => workflow(v) && noWorkflows,
             render: slot => {
                 slot.id = 'job-modal-no-workflows'; slot.classList.add('job-no-workflows');
-                const b = el('button', 'btn btn-small', 'Create a workflow'); b.type = 'button'; b.setAttribute('data-on-click', 'job-create-workflow');
-                slot.append(el('span', '', 'No workflows yet. A job runs a workflow on a schedule.'), ' ', b);
+                const b = el('button', 'btn btn-small', 'Create one'); b.type = 'button'; b.setAttribute('data-on-click', 'job-create-workflow');
+                slot.append(el('span', '', 'No workflows yet.'), ' ', b);
             },
         },
         { key: 'repo_path', type: 'path', id: 'job-modal-repo', label: 'Repository path', required: true, requiredMessage: 'Enter the repository path.', placeholder: '/path/to/repo', default: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' }, visibleWhen: prompt },
@@ -363,7 +363,7 @@ export function showJobModal() {
     v.reset(); // every field at its default, no errors, an empty status line
     v.fold(false);
     openModal('New job', 'Create job');
-    loadWorkflowOptions();
+    loadWorkflowOptions().then(() => { if (noWorkflows && editingJobId === null) v.set('job_type', 'prompt'); }); // a first job with no workflow to pick opens on the Agent prompt (#9297)
     document.getElementById('cron-preview').textContent = '';
     checkSchedule();
     document.getElementById('job-modal-name').focus();
@@ -397,6 +397,14 @@ export async function editScheduledJob(jobId) {
     }
     openedJob = jobFormValues();
     checkSchedule();
+}
+
+/** The dialog is shown again as it was left (New workflow was opened from it), with the workflow list read again so a workflow just made is in it (#9297). */
+export function reshowJobModal() {
+    const modal = document.getElementById('job-modal');
+    if (!modal) return;
+    modal.style.display = 'flex'; // display-ok: the same inline state openModal sets
+    loadWorkflowOptions();
 }
 
 export function hideJobModal() {

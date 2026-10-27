@@ -150,15 +150,19 @@ const STUB = `(() => {
             for (const id of ['#job-modal-branch', '#job-modal-flags', '#job-modal-cleanup']) assert.equal(await ev(vis(id)), true, at + id + ' shows in More options');
             await shot(`job-form-agent-${w}`);
 
-            // 8. no workflows yet: the field says so and offers to make one
+            // 8. no workflows yet (#9297): the form opens on the Agent prompt; the Workflow tab says so and offers "Create one", which opens New workflow and comes back
             await ev(`window.__wf = []; window.showJobModal(); true`);
+            await waitFor(`document.querySelector('.job-type-btn[data-type="prompt"]').getAttribute('aria-pressed') === 'true'`, 'the Agent prompt is the type', 8000);
+            assert.equal(await ev(vis('#job-modal-prompt')), true, at + 'an agent job shows its Prompt first');
+            await ev(`document.querySelector('.job-type-btn[data-type="workflow"]').click(); true`);
             await waitFor(`!!document.getElementById('job-modal-no-workflows') && document.getElementById('job-modal-no-workflows').checkVisibility()`, 'the no-workflow line', 8000);
-            assert.match(await ev(`document.getElementById('job-modal-no-workflows').textContent.replace(/\\s+/g, ' ').trim()`), /^No workflows yet\. A job runs a workflow on a schedule\. Create a workflow$/, at);
+            assert.match(await ev(`document.getElementById('job-modal-no-workflows').textContent.replace(/\\s+/g, ' ').trim()`), /^No workflows yet\. Create one$/, at);
             await shot(`job-form-no-workflows-${w}`);
             await ev(`document.querySelector('#job-modal-no-workflows button').click(); true`);
             await waitFor(`document.getElementById('wf-create-modal') && getComputedStyle(document.getElementById('wf-create-modal')).display !== 'none'`, 'New workflow opens', 8000);
             assert.equal(await ev(`getComputedStyle(document.getElementById('job-modal')).display`), 'none', at + 'the job form closes');
-            await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); window.showJobModal(); true`);
+            await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); true`);
+            await waitFor(`getComputedStyle(document.getElementById('job-modal')).display !== 'none'`, 'the job form comes back', 8000);
             await ev(`document.querySelector('#job-modal .modal-close-btn').click(); true`);
             assert.equal(await ev(`getComputedStyle(document.getElementById('job-modal')).display`), 'none', at + 'the X closes New job');
         }
