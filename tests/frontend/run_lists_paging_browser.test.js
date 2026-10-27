@@ -36,9 +36,9 @@ const S = `(window.__coralStatic || '/static/')`;
 
             // a job with 45 runs
             await ev(`import(${S} + 'scheduler.js').then(m => { window.__sched = m; return true; })`);
-            await ev(`window.switchNavTab('jobs'); window.__sched.refreshJobs().then(() => true)`);
-            await waitFor(`!!document.querySelector('#scheduled-jobs-list .sched-row')`, 'the job row', 8000);
-            await ev(`document.querySelector('#scheduled-jobs-list .sched-row').click(); true`);
+            await ev(`window.switchNavTab('automations'); window.__sched.refreshJobs().then(() => true)`);
+            await waitFor(`window.__sched.jobList().length > 0`, 'the job', 8000);
+            await ev(`window.__sched.selectScheduledJob(window.__sched.jobList()[0].id).then(() => true)`);
             const T = '#sched-run-history';
             await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 20`, `${tag}: the first 20 runs`, 8000);
             assert.deepEqual(await foot(T), { text: 'Showing the newest 20 of 45 runs', more: 'Show older runs' }, `${tag}: the job page says there are more`);

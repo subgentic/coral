@@ -28,6 +28,7 @@ function panel(label, spec) {
 }
 
 export const loadWorkflows = panel('Workflows', './workflows.js');
+export const loadAutomations = panel('Automations', './automations.js'); // Workflows and Jobs as one screen (Goal #74): its folders, toolbars and tables
 export const loadCostDashboard = panel('the token dashboard', './cost_dashboard.js');
 export const loadDocs = panel('Docs', './docs.js');
 export const loadThemeConfig = panel('the theme editor', './theme_config.js');

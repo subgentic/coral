@@ -4,16 +4,16 @@ import { serverField, syncServerField } from './inbox_servers.js';
  * like goal_filters.js); this draws them and keeps the focus where it was when the page redraws under a poll.
  *
  *   const tb = folderToolbar({ idp: 'inbox-goals', noun: 'goal', searchLabel: 'Search goals', fields, sorts, model }, filters => { ... });
- *   tb.draw({ filters, pills: { label, items: [{ key, label, count }], current, onPick(key) }, options: { team: { values, labels } } })  ->  the toolbar's node
+ *   tb.draw({ filters, pills: { label, items: [{ key, label, count }], current, onPick(key) }, options: { team: { values, labels } }, action: a create button (Automations) })  ->  the toolbar's node
  * The Filters panel stays shut across redraws (the bar is built once); the sidebar (the folder list) is not touched. */
 import { importOnce } from './import_once.js';
 const { buildListBar } = await importOnce('./list_bar.js');
 const Toolbar = await importOnce('./team_toolbar.js');
 
 /** The state pills of a folder, in the row where the width permits, and the same choice as a select in the Filters panel for when it does not (css shows one or the other, #8700). Called on every draw; what an earlier draw put there goes first. */
-export function adoptPills(node, pills) {
+export function adoptPills(node, pills, action = null) {
     const row = node.querySelector('.list-bar-search-row'), menu = node.querySelector('.list-bar-menu');
-    Toolbar.adopt(row, { pills });
+    Toolbar.adopt(row, { pills, action });
     menu?.querySelector(':scope > .inbox-pill-field')?.remove();
     const select = row.querySelector('.team-tb-select');
     if (!pills || !select || !menu) return;
@@ -32,13 +32,13 @@ export function folderToolbar(spec, onChange) {
     return {
         bar,
         /** Show `filters` in the bar, fill the select options that follow the data, and put the pills in the row; the focus stays on the control that had it. */
-        draw({ filters, pills = null, options = {} }) {
+        draw({ filters, pills = null, options = {}, action = null }) {
             bar.set(filters);
             syncServerField(bar);
             for (const [key, o] of Object.entries(options)) bar.setOptions(key, o.values, o.labels || {});
             const active = document.activeElement;
             const held = bar.node.contains(active) ? (active.matches('.team-tb-select') ? 'select' : active.dataset.filter) : null;
-            adoptPills(bar.node, pills);
+            adoptPills(bar.node, pills, action);
             if (held) {
                 const next = held === 'select' ? bar.node.querySelector('.team-tb-select') : [...bar.node.querySelectorAll('[data-filter]')].find(e => e.dataset.filter === held);
                 next?.focus({ preventScroll: true });
