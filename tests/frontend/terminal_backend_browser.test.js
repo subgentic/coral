@@ -55,11 +55,11 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
     const settingsOpen = () => ev(`!!document.getElementById('settings-modal') && getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`);
     const row = () => ev(`(() => { const vis = id => { const r = document.getElementById(id)?.closest('.sv-row'); return !!r && !r.hidden; };
         return { hidden: !vis('tb-now'), now: 'Running now: ' + document.getElementById('tb-now').textContent, choice: vis('tb-choice'),
-            fixed: vis('tb-fixed'), checked: (document.querySelector('input[name="terminal-backend"]:checked') || {}).value || null,
+            fixed: vis('tb-fixed'), checked: document.getElementById('tb-choice').value || null,
             pending: document.getElementById('tb-pending').textContent, pendingHiddenAttr: document.getElementById('tb-pending').hasAttribute('hidden'),
-            texts: [...document.querySelectorAll('#tb-choice label.sv-choice')].map(l => [...l.querySelectorAll(':scope > .sv-choice-text, :scope > .sv-choice-help')].map(y => y.textContent.trim().replace(/\\s+/g, ' ')).join(' | ')), // #7405: a card is its name and one line
+            texts: [...document.querySelectorAll('#tb-choice option')].map(o => o.textContent.trim()), // #9490: the backend is a select, like every other row's choice
             ptyText: (document.getElementById('tb-choice').closest('.sv-row').querySelector('.sv-more') || {}).textContent || '' }; })()`);
-    const pick = v => ev(`(() => { const r = document.getElementById('tb-opt-${v}'); r.checked = true; r.dispatchEvent(new Event('change')); return true; })()`);
+    const pick = v => ev(`(() => { const r = document.getElementById('tb-choice'); r.value = '${v}'; r.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
     const confirmState = () => ev(`({ shown: getComputedStyle(document.getElementById('confirm-modal')).display !== 'none', title: document.getElementById('confirm-modal-title').textContent,
         msg: document.getElementById('confirm-modal-message').textContent, yes: document.getElementById('confirm-modal-yes').textContent })`);
     // The real saved value, past the fake.
@@ -86,23 +86,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`document.getElementById('tb-now')?.closest('.sv-row')?.hidden === false`, 'the backend row');
         let r = await row();
         check('Settings shows the backend row: running tmux, tmux picked, both options', !r.hidden && r.now === 'Running now: tmux' && r.choice && !r.fixed && r.checked === 'tmux'
-            && r.texts[0] === "tmux | Agents keep running when you quit Coral, and can reach each other's terminals." && r.texts[1] === 'pty (default) | Agents stop when you quit Coral and wake next time.', JSON.stringify(r));
-        { // the pty title says its agents wake next time only while Wake agents after a restart is on (#6263); a pty Coral with the choice, where the wake box is shown
-            await ev(`window.__tbFake = { status: () => ({ saved: 'pty', running: 'pty', next: 'pty', forced: false, choice: true, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 }) };
-                import((window.__coralStatic || '/static/') + 'terminal_backend.js').then(m => m.loadTerminalBackendRow()).then(() => true)`);
-            await until(`document.getElementById('tb-now')?.closest('.sv-row')?.hidden === false && !document.getElementById('tb-autowake-on').closest('.sv-row').hidden`, 'the wake box');
-            const wakes = () => ev(`(() => { const words = n => n.nodeType === 3 ? n.nodeValue : (n.hidden ? '' : [...n.childNodes].map(words).join('')); return words(document.querySelectorAll('#tb-choice label.sv-choice')[1].querySelector(':scope > .sv-choice-help')).replace(/\\s+/g, ' ').trim(); })()`); // the words not under a hidden element (innerText is the whole text while the pane is not drawn)
-            const tick = on => ev(`(() => { const b = document.getElementById('tb-autowake-on'); b.checked = ${on}; b.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await tick(true);
-            check('with Wake agents after a restart on, the pty title says they wake next time', (await wakes()) === 'Agents stop when you quit Coral and wake next time.', await wakes());
-            await tick(false);
-            check('with it off, the pty title no longer says they wake', (await wakes()) === 'Agents stop when you quit Coral.', await wakes());
-            await tick(true);
-            // back to the tmux install the checks below run on
-            await ev(`window.__tbFake = { status: () => ({ saved: 'tmux', running: 'tmux', next: 'tmux', forced: false, choice: true, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 }) };
-                import((window.__coralStatic || '/static/') + 'terminal_backend.js').then(m => m.loadTerminalBackendRow()).then(() => true)`);
-            await until(`document.getElementById('tb-now').textContent === 'tmux'`, 'the tmux row again');
-        }
+            && r.texts[0] === 'tmux (agents keep running)' && r.texts[1] === 'pty (default)', JSON.stringify(r));
         check("the pty text has Security's crash wording", /puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash/.test(r.ptyText), r.ptyText);
         check('nothing pending to start with', r.pending === '', r.pending);
         await pick('pty');

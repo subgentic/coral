@@ -50,7 +50,7 @@ function render(root, st, sessions) {
     const label = el('span', 'tb-label', 'Browser sign-in'); label.id = 'sec-label';
     // The one sentence that explains the row is its hint line, under the label (#7405: no (i)).
     const whyText = el('p', 'settings-hint settings-hint-line', 'Browsers ask for this password. The Coral app, the tray and coral open sign in by themselves.'); whyText.id = 'sec-why-text';
-    head.append(label, el('span', 'tb-now', st.password_set ? 'password set' : 'no password'));
+    head.append(label, el('span', 'tb-now', st.password_set ? 'Password set' : 'No password'));
     root.setAttribute('aria-labelledby', 'sec-label');
     root.append(head, whyText);
     if (!st.password_set) {

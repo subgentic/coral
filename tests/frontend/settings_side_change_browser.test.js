@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
   const clearToasts = () => ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
   const openDialog = async () => {
     await ev(`window.showSettingsModal(); true`);
-    await until(`document.getElementById('tb-autowake-on')?.closest('.sv-row')?.hidden === false && document.querySelector('input[name="terminal-backend"]')`, 'the wake and backend parts of the dialog');
+    await until(`document.getElementById('tb-autowake-on')?.closest('.sv-row')?.hidden === false && document.getElementById('tb-choice')`, 'the wake and backend parts of the dialog');
     // The dialog fills its CLI path fields a moment after it opens; a Save before that drops them, which is not what this test is about.
     await until(`document.getElementById('settings-cli-path-claude').dataset.filled === '1'`, 'the dialog to finish filling');
   };
@@ -74,7 +74,7 @@ const BASE = require('./test_base').BASE;
     await openDialog();
     const tb = `import(${MOD}+'terminal_backend.js')`;
     assert.equal(await ev(`${tb}.then(m => m.hasUnsavedBackendChange())`), false, 'nothing picked differently: no change');
-    await ev(`(() => { const r = [...document.querySelectorAll('input[name="terminal-backend"]')].find(x => !x.checked); r.checked = true; return true; })()`);
+    await ev(`(() => { const r = document.getElementById('tb-choice'); r.value = r.value === 'pty' ? 'tmux' : 'pty'; return true; })()`);
     assert.equal(await ev(`${tb}.then(m => m.hasUnsavedBackendChange())`), true, 'a different backend picked is a change');
     console.log('PASS a Save with only a side change is not "nothing to save"');
   } finally {
