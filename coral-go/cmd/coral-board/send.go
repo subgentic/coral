@@ -27,7 +27,7 @@ type sendIdentity struct {
 
 // runSend posts a cross-team message to another board's Orchestrator.
 //
-//	coral-board send --board <target> [--to <orchestrator>] [--attach coral://artifacts/<id> ...] "<message>"
+//	coral-board send --board <target> [--to <orchestrator>] [--reply-to <message id>] [--attach coral://artifacts/<id> ...] "<message>"
 //	coral-board send --address <server>/<team> [--reply-to <message id>] [--message-id <id>] [--attach coral://artifacts/<id> ...] "<message>"
 //
 // The server checks that the sender is an Orchestrator on its board (or the
@@ -106,8 +106,16 @@ func runSend(args []string, id sendIdentity, out io.Writer) error {
 		}
 		return runRelaySend(id, address, replyTo, messageID, message, attach, out)
 	}
-	if replyTo != "" || messageID != "" {
-		return fmt.Errorf("--reply-to and --message-id go with --address")
+	if messageID != "" {
+		return fmt.Errorf("--message-id goes with --address")
+	}
+	var replyToID int64
+	if replyTo != "" { // an answer to a message another board sent here (#9054): the id is of the message on THIS board
+		n, err := strconv.ParseInt(replyTo, 10, 64)
+		if err != nil || n <= 0 {
+			return fmt.Errorf("--reply-to takes a message id (a number)")
+		}
+		replyToID = n
 	}
 	if target == "" || message == "" {
 		return fmt.Errorf(`usage: coral-board send --board <target> [--to <orchestrator>] [--attach coral://artifacts/<id> ...] "<message>"`)
@@ -127,6 +135,9 @@ func runSend(args []string, id sendIdentity, out io.Writer) error {
 	}
 	if len(attach) > 0 {
 		body["attach"] = attach
+	}
+	if replyToID > 0 {
+		body["reply_to"] = replyToID
 	}
 	data, status, err := apiCallRaw(http.MethodPost, "/"+url.PathEscape(target)+"/external-messages", body)
 	if err != nil {

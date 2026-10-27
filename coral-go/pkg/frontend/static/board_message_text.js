@@ -26,6 +26,14 @@ export function externalMessageBadge(m) {
     return `<span class="chip chip-tag mb-external-badge${outbound ? ' is-outbound' : ''}" title="${escapeAttr(title)}">${outbound ? 'to' : 'from'} ${escapeHtml(board)}</span>`;
 }
 
+/** How to answer a message from another board (#9054): the server's own line (m.reply_with), shown under the message as text to read and copy; '' for any other message. */
+export function replyWithHtml(m) {
+    const line = m && typeof m.reply_with === 'string' ? m.reply_with.trim() : '';
+    if (!line) return '';
+    const m2 = /^Reply with:\s*(.*)$/.exec(line);
+    return `<div class="mb-reply-with">${m2 ? 'Reply with: <code>' + escapeHtml(m2[1]) + '</code>' : escapeHtml(line)}</div>`;
+}
+
 /** A question (post --ask, #7794): a small "Question" mark on the message, "answered" once each member it asks has answered; the title says who it still waits on. Words, not colour alone. */
 export function askBadge(m) {
     const ask = m && m.ask;

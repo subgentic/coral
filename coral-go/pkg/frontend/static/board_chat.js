@@ -2,7 +2,7 @@ import { openTask } from './task_navigation.js';
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { formatHourMinute } from './format.js';
 import { morphHtml } from './dom_morph.js';
-import { OPERATOR_ID, isOperatorId, escapeHtml, showToast, escapeAttr, getAgentColor, askBadge, externalMessageBadge, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
+import { OPERATOR_ID, isOperatorId, escapeHtml, showToast, escapeAttr, getAgentColor, askBadge, externalMessageBadge, replyWithHtml, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
 import { splitKey, keyLabel, boardFetch } from './server_base.js';
 import { groupTaskQueueRuns, renderTaskQueueRun } from './board_system_lines.js';
 import { messageAttachmentAttrs, messageAttachmentsHtml } from './board_attachments.js';
@@ -391,6 +391,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
             ${parts.tagsOpen}
             <div class="mb-message-body" id="${escapeAttr(parts.bodyId)}">${renderBoardMessageBody(m)}</div>
             ${messageAttachmentsHtml(m)}
+            ${replyWithHtml(m)}
             ${parts.actions}
         </div>`;
     }).join(''));

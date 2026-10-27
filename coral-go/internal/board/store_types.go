@@ -131,6 +131,8 @@ type Message struct {
 	// Ask: this message is a question (post --ask, asks.go) and who has not answered it; ReplyTo: the message this one answers (post --reply-to). Filled where messages are read, never stored on the row.
 	Ask     *AskInfo `db:"-" json:"ask,omitempty"`
 	ReplyTo *int64   `db:"-" json:"reply_to,omitempty"`
+	// ReplyWith: for a message from another board, the line that says how to answer it (CrossReplyLine, #9054). Built where messages are read, never stored.
+	ReplyWith string `db:"-" json:"reply_with,omitempty"`
 	// Legacy column — kept for DB compat, mirrors SubscriberID for new rows.
 	SessionID string `db:"session_id" json:"-"`
 }

@@ -181,7 +181,7 @@ Commands:
                                (the Operator, or an Orchestrator for the agents of its own team)
   waiting send "<agent>"       Type the board nudge into the agent now (the Operator, or an Orchestrator for its own
                                team's agents; it may be mid-turn, never into an open prompt or over a draft)
-  send --board <target> [--to <orchestrator>] [--attach coral://artifacts/<id> ...] "<message>"
+  send --board <target> [--to <orchestrator>] [--reply-to <id>] [--attach coral://artifacts/<id> ...] "<message>"
        (or --file <path> instead of the message: a UTF-8 file, as for post)
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards

@@ -311,6 +311,10 @@
     color: var(--link-text, var(--accent, var(--text-secondary))); /* the accent was 4.44:1 on the badge's panel in the light theme; the link colour is 5.9 or more (#5273) */
 }
 
+/* How to answer a message from another board (#9054): the server's line, under the message, to read and copy. */
+.mb-reply-with { margin-top: 4px; font-size: var(--fs-sm, 11px); color: var(--text-secondary); overflow-wrap: anywhere; }
+.mb-reply-with code { font-family: var(--font-mono, monospace); color: var(--text); }
+
 .mb-message-body {
     font-size: var(--fs-lg);
     color: var(--mb-text);
