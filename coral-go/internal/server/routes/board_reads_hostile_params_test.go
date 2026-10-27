@@ -83,7 +83,8 @@ type readsSeed struct {
 	byPriority      map[string][]int64
 	goalA, goalB    int64
 	goalATasks      []int64
-	goalADone       int // of goalATasks, completed
+	goalADone       int // of goalATasks, completed or skipped (the rollup's Done)
+	goalABlocked    int // of goalATasks, blocked by a task that is not done
 	parent          int64
 	followUps       []int64 // the tasks made from parent, oldest first
 	parent2         int64   // another parent, with one follow-up
@@ -145,6 +146,21 @@ func (e *readsEnv) seed(project string) readsSeed {
 		s.all = append(s.all, f.ID)
 		s.byPriority["medium"] = append(s.byPriority["medium"], f.ID)
 	}
+	// one skipped and one blocked task in Goal A, so the rollup's split by status is pinned at the route: skipped counts as done, blocked as blocked, the rest queued
+	skipped, err := bs.CreateTaskWithOpts(ctx, project, "skipped", "", "medium", "lead", &board.CreateTaskOpts{GoalID: &s.goalA})
+	require.NoError(t, err)
+	_, err = bs.CancelTask(ctx, project, skipped.ID, "lead", nil)
+	require.NoError(t, err)
+	s.done, s.all = append(s.done, skipped.ID), append(s.all, skipped.ID)
+	s.goalATasks = append(s.goalATasks, skipped.ID)
+	s.goalADone++
+	blocker := s.open[2]
+	blocked, err := bs.CreateTaskWithOpts(ctx, project, "blocked", "", "medium", "lead", &board.CreateTaskOpts{GoalID: &s.goalA, BlockedBy: []board.TaskDep{{TaskID: blocker}}, MaxDepth: 5})
+	require.NoError(t, err)
+	s.open, s.all = append(s.open, blocked.ID), append(s.all, blocked.ID)
+	s.byPriority["medium"] = append(s.byPriority["medium"], blocked.ID)
+	s.goalATasks = append(s.goalATasks, blocked.ID)
+	s.goalABlocked++
 	s.parent2 = s.open[1]
 	f2, err := bs.CreateTaskWithOpts(ctx, project, "follow-up of another", "", "medium", "lead", &board.CreateTaskOpts{Workflow: board.TaskWorkflow{ParentTaskID: s.parent2}})
 	require.NoError(t, err)
@@ -457,7 +473,11 @@ func checkRollup(t *testing.T, e *readsEnv, goals string, seed readsSeed) {
 	require.NoError(t, json.Unmarshal(body, &r))
 	for _, g := range r.Goals {
 		if g.ID == seed.goalA {
-			assert.Equal(t, board.GoalRollup{Done: seed.goalADone, Queued: len(seed.goalATasks) - seed.goalADone, Total: len(seed.goalATasks)}, g.Rollup, "Goal A's rollup is its tasks as seeded")
+			assert.Equal(t, seed.goalADone, g.Rollup.Done, "Goal A: completed and skipped tasks are done")
+			assert.Equal(t, seed.goalABlocked, g.Rollup.Blocked, "Goal A: a task waiting on an unfinished blocker is blocked")
+			assert.Equal(t, 0, g.Rollup.Active, "Goal A: nothing is in progress")
+			assert.Equal(t, len(seed.goalATasks)-seed.goalADone-seed.goalABlocked, g.Rollup.Queued, "Goal A: the rest are queued (pending, draft)")
+			assert.Equal(t, len(seed.goalATasks), g.Rollup.Total, "Goal A: its tasks")
 		}
 		if g.ID == seed.goalB {
 			assert.Equal(t, board.GoalRollup{}, g.Rollup, "Goal B has no tasks")
