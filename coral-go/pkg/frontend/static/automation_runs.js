@@ -3,6 +3,7 @@
  * added. A job that runs a workflow makes two records (its own run and the workflow's run, which says so in its trigger context): the job's run is the one listed. What a person has opened is the server's (seen_at, #9315),
  * so every screen agrees; a run over when the column was added counts as opened (a long history is not a wall of dots). */
 import { lastWords } from './job_words.js';
+import { compactDuration } from './format.js';
 
 const FRESH_MS = 30000, LIMIT = 100;
 let runs = [], pending = null, lastRead = 0, activated = false;
@@ -23,15 +24,11 @@ export function resultWords(run) {
 export const isFailed = run => !!run && (run.status === 'failed' || /^last run failed/.test(String(lastWords(run))));
 const isOver = run => !!run && run.status !== 'running' && run.status !== 'pending';
 const ms = iso => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? t : 0; };
-/** How long a finished run took, "2 s", "3 min", "1 h 5 min"; '' when it has not finished or has no times. */
+/** How long a finished run took, "2 s", "3 min", "1 h 05 min"; '' when it has not finished or has no times. */
 export function tookWords(startedAt, finishedAt) {
     const a = ms(startedAt), b = ms(finishedAt);
     if (!a || !b || b < a) return '';
-    const s = Math.round((b - a) / 1000);
-    if (s < 60) return `${s} s`;
-    if (s < 3600) return `${Math.round(s / 60)} min`;
-    const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
-    return m ? `${h} h ${m} min` : `${h} h`;
+    return compactDuration((b - a) / 1000);
 }
 
 // ── The merged list (pure) ───────────────────────────────────────────────
