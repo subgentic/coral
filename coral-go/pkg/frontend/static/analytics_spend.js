@@ -4,7 +4,7 @@
  *  - task time: tasks done, median and slowest 1 in 10 from claimed to done, the wait before claimed, review time (assignment to approval), sent back 2 or more times, tasks done a day or an hour, and by agent. A measure the endpoint does not return is left out.
  * One read feeds both: GET /api/board/<team>/spend?range=24h|7d sends counts and seconds, not ratios; the page divides. Everything is built with the DOM and textContent: agent names are written by agents. Lazy: cost_dashboard.js imports it. */
 import { state } from './state.js';
-import { compactFigure } from './format.js';
+import { compactFigure, compactDuration } from './format.js';
 import { boardFetch, identityKey, isCloud, noteBoardLabels, serverFetch, spendTeamKeys } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { browserLocal } from './safe_storage.js';
@@ -23,15 +23,8 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 
 /** 517K, 1.2M, 61M: tokens as a person reads them, the one figure format of the Analytics pages (format.js compactFigure, #9516); '' for a figure that is not a number. */
 export function fmtTokens(n) { return Number.isFinite(Number(n)) ? compactFigure(Math.round(Number(n))) : ''; }
-/** 38 min, 2 h 05 min, 45 s: a time as a person reads it. */
-export function fmtDur(s) {
-    const v = Number(s);
-    if (!Number.isFinite(v)) return '';
-    if (v < 60) return `${Math.round(v)} s`;
-    const m = Math.round(v / 60);
-    if (m < 60) return `${m} min`;
-    return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
-}
+/** 38 s, 2 min, 1 h 02 min: a time as a person reads it, the one duration format of the Analytics pages (format.js compactDuration, #9540). */
+export const fmtDur = compactDuration;
 const tokensOf = (t) => (typeof t === 'number' ? t : t && typeof t.tokens === 'number' ? t.tokens : t ? (Number(t.input) || 0) + (Number(t.output) || 0) : 0); // input plus output (a day's row has the sum already): the cache is beside it
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
