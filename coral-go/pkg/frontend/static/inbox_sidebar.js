@@ -458,6 +458,7 @@ export function drawDockSaved(host) {
 
 /** A chat of a folder opens in the chat viewer with its way back ("<- folder"): the folder is kept in state for the viewer and for the browser's Back. */
 async function openChat(c) {
+    if (nativeInbox() && !c.server) return; // a Hub's row names its computer: with none there is no "local" to fall back to, so nothing opens (fail closed)
     state.inboxFolder = { key: group, label: (groupMeta(group) || {}).label || 'All chats' };
     const isGroup = c.type === 'group' || String(c.session_id || '').startsWith('board:');
     if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); openItemRoute('boards', identityKey(c.server || historyServer(), c.title || String(c.session_id).replace(/^board:/, '')), null, c.session_id); return; }
