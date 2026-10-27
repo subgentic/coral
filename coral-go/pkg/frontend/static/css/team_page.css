@@ -51,7 +51,6 @@
 .team-panel .list-bar-search-row:has(.team-tb-pills) .list-bar-search-wrap { flex: 1 1 8em; max-width: 14em; }
 .team-panel .list-bar-search { min-height: var(--toolbar-control-h); }
 .team-panel .list-bar-search-row .team-tb-pills { flex: 0 0 auto; min-width: auto; overflow: visible; } /* the pills keep their size: the field gives way first, and below 54 rem the select takes their place */
-.team-panel .team-tb-pills .goals-chip { min-height: var(--toolbar-control-h); }
 .team-panel .team-tb-chip { flex: none; min-height: var(--toolbar-control-h); white-space: nowrap; }
 .team-panel .team-tb-chips { display: flex; flex-wrap: nowrap; gap: var(--toolbar-gap); flex: 1 1 0; min-width: 8rem; overflow: hidden; } /* the chips of the filters that are on: in the row after the pills, one line, an ellipsis for what does not fit (#9078) */
 .team-panel .team-tb-chips .team-tb-chip { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
@@ -282,6 +281,7 @@
 /* An Inbox folder page's header is ONE row (#8700, the operator's layout): the title and its count, the search, the quick-filter pills where the page's width permits, the Filters icon at the right.
  * Nothing wraps: when the width runs out the pills become a select in the Filters panel first (adoptPills), then the search narrows to its minimum. */
 .inbox-folder-toolbar { container: inboxfolder / inline-size; }
+@media (max-width: 767px) { .inbox-folder-toolbar.list-bar-bar { padding-inline: 0; } } /* the page already pads 24 px: the toolbar starts at the folder select's left edge, not 12 px in (#9454) */
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: nowrap; align-items: center; gap: 8px; }
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-select { display: none; }
 .inbox-folder-toolbar .inbox-pill-field { display: none; }
