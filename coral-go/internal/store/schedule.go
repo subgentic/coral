@@ -178,11 +178,22 @@ func (s *ScheduleStore) DeleteScheduledJob(ctx context.Context, jobID int64) err
 
 // CreateScheduledRun creates a new run record.
 func (s *ScheduleStore) CreateScheduledRun(ctx context.Context, jobID int64, scheduledAt, status string) (int64, error) {
+	return s.CreateScheduledRunTrigger(ctx, jobID, scheduledAt, status, TriggerCron)
+}
+
+// The triggers of a job's run: the schedule's own, and a person's Run now (#9293).
+const (
+	TriggerCron   = "cron"
+	TriggerManual = "manual"
+)
+
+// CreateScheduledRunTrigger is CreateScheduledRun with the run's trigger.
+func (s *ScheduleStore) CreateScheduledRunTrigger(ctx context.Context, jobID int64, scheduledAt, status, trigger string) (int64, error) {
 	now := nowUTC()
 	result, err := s.db.ExecContext(ctx,
-		`INSERT INTO scheduled_runs (job_id, status, scheduled_at, created_at)
-		 VALUES (?, ?, ?, ?)`,
-		jobID, status, scheduledAt, now)
+		`INSERT INTO scheduled_runs (job_id, status, scheduled_at, trigger_type, created_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		jobID, status, scheduledAt, trigger, now)
 	if err != nil {
 		return 0, err
 	}
@@ -244,6 +255,18 @@ func (s *ScheduleStore) GetLastRunForJob(ctx context.Context, jobID int64) (*Sch
 	var run ScheduledRun
 	err := s.db.GetContext(ctx, &run,
 		"SELECT * FROM scheduled_runs WHERE job_id = ? ORDER BY scheduled_at DESC, id DESC LIMIT 1", jobID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &run, err
+}
+
+// GetLastCronRunForJob is the most recent run the schedule made for a job: a run a person started (Run now) does not count, so it does not move
+// the job's next slot.
+func (s *ScheduleStore) GetLastCronRunForJob(ctx context.Context, jobID int64) (*ScheduledRun, error) {
+	var run ScheduledRun
+	err := s.db.GetContext(ctx, &run,
+		"SELECT * FROM scheduled_runs WHERE job_id = ? AND COALESCE(trigger_type, 'cron') <> ? ORDER BY scheduled_at DESC, id DESC LIMIT 1", jobID, TriggerManual)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

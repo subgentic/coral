@@ -336,6 +336,7 @@ b POST /api/pinned-folders
 b POST /api/saved
 b POST /api/remote/{server}/*
 b POST /api/scheduled/jobs
+b POST /api/scheduled/jobs/{jobID}/run
 b POST /api/scheduled/jobs/{jobID}/toggle
 b POST /api/scheduled/validate-cron
 b POST /api/servers
