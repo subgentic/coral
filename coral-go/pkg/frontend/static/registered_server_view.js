@@ -89,10 +89,17 @@ function statusDotWord(status) {
 
 const isLocal = s => !!(s.local || s.id === 'local');
 /** A server's name cell: this hub is plain text (it has no page), a remote server is the row's one button (it opens the server's page). One line (Goal #79): its id, the private-network mark and the warning are the Tags column's, its version the Version column's. */
-function serverCell(s) {
-    if (isLocal(s)) return DT.el('span', 'dt-name-text', s.label || 'This computer');
+/** The status as a dot by the name, shown only where the Status column has left (a phone at 200% text, under 16 rem): the state word is its accessible name and tooltip (UI/UX #9683). */
+function nameDot(status) {
+    const m = statusMeta(status);
+    const d = DT.el('i', `servers-name-dot servers-dot-${m.cls || 'offline'}`);
+    d.setAttribute('role', 'img'); d.setAttribute('aria-label', m.label); d.title = m.hint ? `${m.label}: ${m.hint}` : m.label;
+    return d;
+}
+function serverCell(s, live) {
+    if (isLocal(s)) { const w = DT.el('span', 'servers-name'); w.append(nameDot('online'), DT.el('span', 'dt-name-text servers-name-text', s.label || 'This computer')); return w; }
     const b = DT.primaryButton(s.label || s.id, `Open ${s.label || s.id}`);
-    const wrap = DT.el('span', 'servers-name'); wrap.append(DT.el('span', 'dt-name-text servers-name-text', s.label || s.id)); b.replaceChildren(wrap);
+    const wrap = DT.el('span', 'servers-name'); wrap.append(nameDot((live && live.status) || s.status), DT.el('span', 'dt-name-text servers-name-text', s.label || s.id)); b.replaceChildren(wrap);
     if (!isLocal(s) && s.warning) { const t = DT.tag('warning'); t.classList.add('servers-warn'); t.title = String(s.warning); const g = DT.el('span', 'material-icons servers-warn-icon', 'warning'); g.setAttribute('aria-hidden', 'true'); t.textContent = ''; t.append(g, DT.el('span', 'servers-warn-word', 'warning')); wrap.append(t); b.setAttribute('aria-label', `Open ${s.label || s.id}, warning: ${s.warning}`); } // the unencrypted-key warning stays on the row at every width (#9679), by the name, not in a column a narrow list drops; a narrow list keeps its glyph and drops the word (the name wins the width), the sentence is the tag's tooltip and the button's name
     b.title = s.label || s.id;
     b.dataset.action = 'open'; b.dataset.id = s.id; // the tab's click handler opens the server's page
@@ -121,12 +128,12 @@ function serversTable(local, remotes) {
     const live = s => (isLocal(s) ? { id: 'local', status: 'online' } : liveOf(s));
     return buildServersTable(DT, {
         label: 'Registered servers', state: _dt, rows, oneLine: true, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
-        columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); the name's warning never goes and Needs you only under 16 rem (a phone at 200% text: three columns do not fit 12 rem)
-            { key: 'server', label: 'Server', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: serverCell, title: s => s.label || s.id },
+        columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); Needs you and the name's warning never go; under 16 rem (a phone at 200% text) Status leaves and its dot moves before the name
+            { key: 'server', label: 'Server', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: s => serverCell(s, live(s)), title: s => s.label || s.id },
             { key: 'tags', label: 'Tags', width: '11rem', dropAt: 36, cell: tagsCell },
-            { key: 'status', label: 'Status', width: '8rem', sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusDotWord(live(s).status || s.status) },
+            { key: 'status', label: 'Status', width: '8rem', dropAt: 16, sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusDotWord(live(s).status || s.status) },
             { key: 'agents', label: 'Agents', width: '5rem', dropAt: 28, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => { const n = serverAgentCount(live(s)); return n ? String(n) : ''; } }, // the count alone under its header, nothing at zero (UI/UX #9679)
-            { key: 'needs', label: 'Needs you', width: '6rem', dropAt: 16, align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
+            { key: 'needs', label: 'Needs you', width: '6rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
             { key: 'seen', label: 'Last seen', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: s => seenValue(s, live(s)), cell: s => seenWords(s, live(s)) },
             { key: 'version', label: 'Version', width: '7.5rem', dropAt: 52, tone: 'tertiary', sort: true, sortValue: s => versionWords(s, live(s)), cell: s => versionWords(s, live(s)) || '\u2014' },
         ],

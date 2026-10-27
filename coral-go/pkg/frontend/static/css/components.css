@@ -4012,6 +4012,11 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .servers-status-unreachable .servers-status-dot { background: var(--warning); }
 .servers-status-unauthorized .servers-status-dot { background: var(--error); }
 .servers-status:not(.servers-status-online) .servers-status-word { color: var(--text-secondary); }
+.servers-name-dot { display: none; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); } /* the status dot by the name, only where the Status column has left (under 16 rem) */
+.servers-dot-online { background: var(--success); }
+.servers-dot-unreachable { background: var(--warning); }
+.servers-dot-unauthorized { background: var(--error); }
+@container (max-width: 16rem) { .servers-name-dot { display: inline-block; } }
 .servers-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .servers-name > .servers-warn { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--warning-text); border-color: var(--warning); } /* the unencrypted-key warning is a security cue: the warning colour and a glyph, not a neutral grey tag (UI/UX, #9679) */
 .servers-warn-icon { font-size: var(--fs-md); line-height: 1; }
