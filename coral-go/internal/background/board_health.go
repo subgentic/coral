@@ -143,7 +143,7 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	if err != nil || (items == 0 && !hs.AllClear) {
 		return
 	}
-	if err := m.deliver(ctx, rcptAgent, "health-check:"+project, text); err != nil {
+	if err := sendUnlessBlocked(ctx, m.limit, m.deliver, rcptAgent, "health-check:"+project, text); err != nil {
 		m.logger.Warn("health check delivery failed", "project", project, "error", err)
 		return
 	}
