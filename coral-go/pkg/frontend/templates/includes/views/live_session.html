@@ -87,6 +87,16 @@
                                     </button>
                                 </div>
                             </div>
+                            <!-- A phone's header has no room for the folder, the branch, the model and its thinking level (the agent row is one line, #9686): one tap on Details shows them (session_header_updates.js fills it). -->
+                            <details class="disclosure agent-phone-details" id="agent-phone-details" hidden>
+                                <summary>Details</summary>
+                                <dl class="facts">
+                                    <div class="facts-row" hidden><dt>Folder</dt><dd id="apd-folder"></dd></div>
+                                    <div class="facts-row" hidden><dt>Branch</dt><dd id="apd-branch"></dd></div>
+                                    <div class="facts-row" hidden><dt>Model</dt><dd id="apd-model"></dd></div>
+                                    <div class="facts-row" hidden><dt>Thinking</dt><dd id="apd-thinking"></dd></div>
+                                </dl>
+                            </details>
                             <!-- Notices over the top of the agent view (#5287): pills under the terminal header that take no layout space and show after a delay
                                  (dom_write.setPill). The agent's server is unreachable (#3151): hub_access.syncUnreachableBanner. The agent is waiting: session_header_updates. -->
                             <div class="live-pills">

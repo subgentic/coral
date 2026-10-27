@@ -35,6 +35,16 @@ const { connect } = require('./agent_view_harness');
             assert.match(by('o4').chips[0] || '', /Needs input/, `${label}: Needs you wins over the hold`);
             assert.equal(by('o4').chips.length, 1, `${label}: one chip`);
             console.log(`PASS ${label}: one line, a dot, a name, at most one chip`);
+            if (mobile) { // a phone's header has no room: one tap on Details shows the folder, branch and model
+                await ev(`window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
+                await waitFor(`document.getElementById('agent-phone-details') && !document.getElementById('agent-phone-details').hidden && document.getElementById('agent-phone-details').getClientRects().length > 0`, 'the Details disclosure on a phone', 8000);
+                const sum = await ev(`(() => { const d = document.getElementById('agent-phone-details'); return { open: d.open, h: Math.round(d.querySelector('summary').getBoundingClientRect().height), text: d.querySelector('summary').textContent.trim() }; })()`);
+                assert.equal(sum.text, 'Details'); assert.equal(sum.open, false, 'closed until asked'); assert.ok(sum.h >= 44, `a 44 px target ${JSON.stringify(sum)}`);
+                await ev(`document.querySelector('#agent-phone-details > summary').click(); true`);
+                const dd = await ev(`[...document.querySelectorAll('#agent-phone-details .facts-row')].filter(r => !r.hidden).map(r => r.querySelector('dt').textContent + ': ' + r.querySelector('dd').textContent)`);
+                assert.ok(dd.some(x => /^Folder: .*coral-project/.test(x)) && dd.some(x => /^Branch: .*long-branch-name/.test(x)) && dd.some(x => /^Model: .*Opus/.test(x)), `Details has the folder, the branch and the model ${JSON.stringify(dd)}`);
+                console.log('PASS 390: Details shows the folder, branch and model');
+            }
             if (!mobile) { // nothing is lost: the agent's own page header has the branch, the folder and the model with its level (the row says none of them)
                 await ev(`window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
                 await waitFor(`!document.getElementById('terminal-header-model')?.hidden && !document.getElementById('terminal-header-folder')?.hidden && !document.getElementById('terminal-header-branch')?.hidden`, 'the header: model, folder and branch', 8000);

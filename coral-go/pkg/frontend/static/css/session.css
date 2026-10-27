@@ -1753,3 +1753,12 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     .session-name-row:has(.session-attention-pill) .session-label { flex-basis: calc(100% - 40px); }
     .session-name-row .session-attention-pill { order: 2; margin-left: var(--row-dot-block, 16px); }
 }
+
+/* A phone's Details disclosure (#9686): the folder, branch, model and thinking level of the open agent; a desktop's header has them. */
+.agent-phone-details { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .agent-phone-details:not([hidden]) { display: block; padding: 0 var(--space-lg); border-bottom: 1px solid var(--border); }
+    .agent-phone-details > summary { min-height: var(--control-touch-height); display: flex; align-items: center; }
+    .agent-phone-details .facts { padding-bottom: var(--space-md); }
+    .agent-phone-details .facts dd { overflow-wrap: anywhere; }
+}

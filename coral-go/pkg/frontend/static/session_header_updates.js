@@ -33,10 +33,12 @@ function _syncHeaderFolder() {
 
 /** The model and thinking level in the open agent's header (#9686: the agent row is one line and no longer says them; the composer's chips still change them). Hidden when neither is on record. */
 export function updateSessionModel(s) {
-    const el = document.getElementById("terminal-header-model");
-    if (!el) return;
     const model = s ? modelName(s.agent_type, s.model, sessionServer(s)) : '';
     const level = s ? sessionLevel(s) : null;
+    _details.model = model; _details.thinking = level ? `${level.name}${level.requested ? ' (as started)' : ''}` : '';
+    _syncPhoneDetails();
+    const el = document.getElementById("terminal-header-model");
+    if (!el) return;
     const text = [model, level && level.name].filter(Boolean).join(' \u00b7 ');
     setHidden(el, !text);
     if (!text) return;
@@ -44,13 +46,34 @@ export function updateSessionModel(s) {
     setTitle(el, [model && `Model ${model}`, level && `Thinking ${level.name}${level.requested ? ' (as started)' : ''}`].filter(Boolean).join(', '));
 }
 
+// A phone's Details disclosure (#9686): the four facts the agent row no longer says, one tap away; a row with no value is not drawn, and with none the disclosure is not either.
+const _details = { folder: '', branch: '', model: '', thinking: '' };
+function _syncPhoneDetails() {
+    const box = document.getElementById('agent-phone-details');
+    if (!box) return;
+    let any = false;
+    for (const [key, value] of Object.entries(_details)) {
+        const dd = document.getElementById(`apd-${key}`);
+        if (!dd) continue;
+        setText(dd, value);
+        setTitle(dd, key === 'folder' ? value : '');
+        setHidden(dd.parentElement, !value);
+        any = any || !!value;
+    }
+    setHidden(box, !any);
+}
+
 export function updateSessionFolder(dir) {
+    _details.folder = dir || '';
+    _syncPhoneDetails();
     _headerDir = dir || "";
     _syncHeaderFolder();
 }
 
 export function updateSessionBranch(branch, repoName, gitState) {
     const display = _repoBranch(repoName, branch);
+    _details.branch = display || '';
+    _syncPhoneDetails();
     const el = document.getElementById("session-branch");
     if (el) {
         if (display) {
