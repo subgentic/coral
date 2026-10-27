@@ -9,7 +9,10 @@ Build new dashboard UI from the shared families below. Each family is one class 
 
 ## Families
 
-- **Button**: `.btn` with `.btn-primary`, `.btn-quiet`, `.btn-danger`, `.btn-small` or `.btn-icon` (icon only). 13/500, 36 px, 44 on touch. A selected toggle is the accent fill (`aria-pressed="true"`). A choice among two to five buttons is `.btn-seg`. Guard: `button_family_census`, `selected_style`.
+- **Button**: `.btn` with `.btn-primary`, `.btn-quiet`, `.btn-danger` or `.btn-small`. 13/500, 36 px, 44 on touch. A selected toggle is the accent fill (`aria-pressed="true"`). A choice among two to five buttons is `.btn-seg`. Guard: `button_family_census`, `selected_style`.
+- **Icon button**: `.btn.btn-icon` is a square icon-only button (36 px, `.btn-small` 32); `.btn-icon.btn-xs` is the 24 px quiet one for a row's own action (a delete, a pin). Always give it an `aria-label`. Guard: `button_family_census`.
+- **Field** (a text input, search box, select or textarea): `.field`, with `.field-search` for the search icon's room and `[aria-invalid="true"]` for an error. 36 px, 44 on touch. Guard: `field_census`.
+- **Switch and check**: an on/off box is a native checkbox with `.switch` (inside a `.check-hit` target); a plain checkbox is `input.check` (16 px, accent when ticked). Guard: `field_census`.
 - **Chip** (a small label, status or count): `.chip`, with `.chip-tag` and `.chip-count`. Set colour and margin only. Guard: `chip_census`.
 - **Form row**: the `settings_view` row (label above, control, hint) or a hand-built `.form-row` with `.form-label`, `.form-control-*`, `.form-check` and `.settings-hint`. No `style` attribute on a field. Guard: `form_row_census`, `settings_view_census`.
 - **Menu**: `.menu` with `.menu-item` rows (`.menu-item-danger` for the one destructive row), arrow keys from `menu_keys.js`. Guard: `menu_census`.
