@@ -559,8 +559,6 @@ body.panel-dragging .sidebar {
 
 .hf-clear-btn {
     align-self: flex-start;
-    font-size: var(--fs-md);
-    color: var(--text-muted);
     margin-top: 2px;
 }
 
