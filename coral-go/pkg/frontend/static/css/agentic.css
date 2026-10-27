@@ -1739,8 +1739,7 @@ body.panel-dragging .agentic-state {
 .list-bar-count { font-size: var(--fs-base); color: var(--text-secondary); white-space: nowrap; }
 .list-bar-live { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .list-bar-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.list-bar-filter-btn, .list-bar-clear-all, .list-bar-by, .list-bar-field input[type="date"] { font-size: var(--fs-md); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); padding: 4px 8px; }
-.list-bar-filter-btn, .list-bar-clear-all { cursor: pointer; }
+.list-bar-filter-btn, .list-bar-clear-all { font-size: var(--fs-md); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); padding: 4px 8px; cursor: pointer; } /* the text and date boxes of the Filters panel are .field (components.css) */
 .list-bar-filter-btn[aria-expanded="true"] { background: var(--bg-hover); }
 .list-bar-sort, .list-bar-field { display: flex; align-items: center; gap: 6px; font-size: var(--fs-base); color: var(--text-secondary); }
 .list-bar-sort { margin-left: auto; }
