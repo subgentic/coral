@@ -189,6 +189,8 @@
     padding: 8px 10px 8px 0;
     position: relative;
     border-radius: var(--radius-lg);
+    --mb-color: var(--mb-color-dark);
+    --mb-tint: var(--mb-tint-dark);
 }
 
 .mb-message:hover {
@@ -196,10 +198,6 @@
 }
 
 /* The sender's colour, in the theme's AA shade (boardMessageColorStyle). */
-.mb-message {
-    --mb-color: var(--mb-color-dark);
-    --mb-tint: var(--mb-tint-dark);
-}
 [data-theme="light"] .mb-message {
     --mb-color: var(--mb-color-light);
     --mb-tint: var(--mb-tint-light);
@@ -1076,6 +1074,10 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     color: var(--text-primary);
     z-index: 200;
     animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(520px, calc(100vw - 40px));
 }
 
 .toast.error {
@@ -1083,12 +1085,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     color: var(--error-text); /* red as text on the toast's panel: 4.5:1 (#6171) */
 }
 
-.toast {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: min(520px, calc(100vw - 40px));
-}
 
 /* A toast with an action stays until dismissed or timed out; it must not fade
    while its button is still meant to be used. */
@@ -3027,6 +3023,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .servers-form {
     border-top: 1px solid var(--border);
     padding-top: var(--space-lg);
+    min-width: 0;
+    max-width: 100%;
 }
 .servers-form h4 { margin: 0 0 var(--space-lg); font-size: var(--fs-lg); }
 .servers-form-error {
@@ -3042,7 +3040,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .servers-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-md); margin: 0 0 var(--space-lg); }
 .servers-summary { color: var(--text-secondary); font-size: var(--fs-base); }
 /* The Add/Edit server form in the Servers tab (a page, not a dialog) is a settings_view form; this is its frame, nothing wider than the page at 390 px or 200% text. */
-.servers-form { min-width: 0; max-width: 100%; }
 .servers-form-actions { flex-wrap: wrap; margin-top: var(--space-lg); }
 @media (max-width: 767px), (pointer: coarse) {
     .servers-form-actions .btn, .servers-top .btn { min-height: var(--control-touch-height, 44px); }
@@ -3434,12 +3431,11 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .ibx-live { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .ibx-tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-sm); }
 .ibx-task { border: 1px solid var(--border); border-radius: var(--radius-ml); background: var(--bg-secondary); min-width: 0; }
-.ibx-task-head { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; background: none; border: 0; color: var(--text-primary); padding: 10px 12px; cursor: pointer; border-radius: var(--radius-ml); font: inherit; }
+.ibx-task-head { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; background: none; border: 0; color: var(--text-primary); padding: 10px 12px; cursor: pointer; border-radius: var(--radius-ml); font: inherit; position: relative; padding-right: 36px; }
 .ibx-task-head:hover { background: var(--bg-tertiary); }
 .ibx-task-single > .ibx-task-body { padding-top: var(--ibx-pad); } /* the heading's row is not there to space it */
 .ibx-task-single > .ibx-task-head { display: none; } /* one task as a page of its own (mountInbox's only option): the host's page has the title, so the heading button is not drawn twice (#7472) */
 /* A chevron says a task opens and which way it is now (the state is aria-expanded; this is the same for the eye). It is drawn with borders, so it stays in forced colors. */
-.ibx-task-head { position: relative; padding-right: 36px; }
 .ibx-task-head::after { content: ""; position: absolute; right: 16px; top: 50%; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-70%) rotate(45deg); transition: transform .12s ease; }
 .ibx-task-head[aria-expanded="true"]::after { transform: translateY(-30%) rotate(-135deg); }
 @media (prefers-reduced-motion: reduce) { .ibx-task-head::after { transition: none; } }
@@ -3575,10 +3571,9 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 #settings-cloud .settings-cloud-connect-row .btn { margin-left: 0; }
 .tb-head > .settings-info-btn { align-self: center; margin-top: 0; } /* the head is one centred row (title, (i)): the (i) centres with the title (a wrapped title: centred on it as a block), not at the top of the row with a margin worked out for a body label's line height (the icon census, #6879) */
 /* (the phone used to put Coral Hub first with order: -1: the pane reads in the same order at every width now, #7040) */
-.settings-info-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; flex: none; border: 1px solid var(--control-border); border-radius: 50%; background: none; color: var(--text-secondary); cursor: pointer; }
+.settings-info-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; flex: none; border: 1px solid var(--control-border); border-radius: 50%; background: none; color: var(--text-secondary); cursor: pointer; align-self: flex-start; margin-top: calc((1lh - 1.5rem) / 2); }
 .settings-info-btn .material-icons { font-size: var(--fs-xl); }
 /* On its label's first line, not centred on the whole row: the circle's centre is the first line's centre (a label of two lines keeps it beside the first). */
-.settings-info-btn { align-self: flex-start; margin-top: calc((1lh - 1.5rem) / 2); }
 /* The touch target: on a phone or a touch screen the circle stays 1.5rem and an invisible 44 px square around it takes the tap (#6750: the visible circle was 44 px and sat below its label). */
 @media (max-width: 767px), (pointer: coarse) { .settings-info-btn::after { content: ''; position: absolute; left: 50%; top: 50%; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); transform: translate(-50%, -50%); } }
 .settings-info-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -3748,9 +3743,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-cli-slot .acf-cli-warning { margin: 0 !important; } /* the form gave it a margin inline */
 .acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px 12px; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* a row like any other: the status as its label (13/500), the button at the right, a link or note under it */
 .acf-cli-warning > span { flex: 0 1 auto; }
-.acf-cli-warning > p { flex: 0 0 100%; margin: 0; font-weight: var(--fw-regular); }
+.acf-cli-warning > p { flex: 0 0 100%; margin: 0; font-weight: var(--fw-regular); order: 2; }
 .acf-cli-warning > .btn { order: 1; } /* the button is on the status line at the right, the link, the command and the note under them (the DOM has the button last) */
-.acf-cli-warning > p { order: 2; }
 .launch-cli-slot .acf-cli-warning code { color: var(--text-primary); overflow-wrap: anywhere; }
 .launch-cli-slot .acf-cli-warning .cli-install-link a { color: var(--link-text); }
 .launch-cli-slot .acf-cli-warning .btn { margin: 0 0 0 auto; }
@@ -3874,7 +3868,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-wizard[data-stage="persona"] :is(.launch-shell .settings-nav, .launch-shell .settings-pane) { display: none; }
 .launch-wizard[data-stage="agent"] .acf-persona-page { display: none; }
 .launch-wizard .acf-persona-page { padding: 0; }
-.launch-wizard .settings-panes { padding: 20px 24px; overflow: auto; }
+.launch-wizard .settings-panes { padding: 20px 24px; overflow: auto; scrollbar-gutter: stable; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
 .launch-field-head, .acf-pick-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* the field label style of every form: 13/500 (UI/UX on #8401) */
 .launch-field-head label, .launch-field-head span:first-child, .acf-pick-head span:first-child { margin: 0; flex: none; } /* the label stays on one line; "optional" wraps under it at 200% text (UI/UX, #7407) */
@@ -3885,8 +3879,6 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-persona-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 6px; }
 .launch-persona-row .agent-preset-selector { flex: 1 1 14rem; min-width: 0; }
 .launch-persona-row .agent-preset-select { width: 100%; max-width: none; }
-.launch-persona-row .persona-files { position: relative; }
-.launch-persona-row .persona-files > summary { list-style: none; cursor: pointer; }
 .launch-persona-row .persona-files > summary::-webkit-details-marker { display: none; }
 .launch-persona-top .settings-hint { margin: 0 0 14px; }
 .launch-persona-top input[type="text"] { width: 100%; max-width: none; box-sizing: border-box; }
@@ -3903,14 +3895,13 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-agent-provider { margin: 0 0 20px; }
 .settings-pane .launch-agent-provider { margin-bottom: 0; } /* in the Agent pane the Provider is followed directly by Model: the pane's rows have their own spacing, and the notes (CLI line first, then the provider's) are under Thinking (#8528) */
 .settings-pane .launch-agent-pick { margin-bottom: 0; }
-.launch-wizard .settings-panes { scrollbar-gutter: stable; } /* a note that makes the pane scroll must not narrow Model by the scrollbar (nothing moves on a provider or CLI change, #8528) */
+ /* a note that makes the pane scroll must not narrow Model by the scrollbar (nothing moves on a provider or CLI change, #8528) */
 .launch-agent-pick { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 2px 0 8px; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow: hidden; }
-#launch-agent-pick .launch-agent-opt { position: relative; border: 0; border-right: 1px solid var(--control-border); border-radius: 0; padding: 8px 16px; background: var(--bg-primary); min-height: 40px; }
+#launch-agent-pick .launch-agent-opt { position: relative; border: 0; border-right: 1px solid var(--control-border); border-radius: 0; padding: 8px 16px; background: var(--bg-primary); min-height: 40px; display: grid !important; grid-template-columns: auto minmax(0, 1fr); column-gap: 6px; align-items: center; }
 #launch-agent-pick .launch-agent-opt:last-child { border-right: 0; }
-#launch-agent-pick .launch-agent-opt:has(input:checked) { background: var(--accent-dim); color: var(--text-on-accent); border-color: var(--control-border); }
+#launch-agent-pick .launch-agent-opt:has(input:checked) { background: var(--accent-dim); color: var(--text-on-accent); border-color: var(--control-border); font-weight: var(--fw-strong); }
 #launch-agent-pick .launch-agent-opt:has(input:checked) .launch-agent-missing { color: inherit; }
 /* a tile is the badge and two lines: the name, and under it "not installed" (11/400, tertiary) when the CLI probe says so; the line is always there, so the answer moves nothing (#8033) */
-#launch-agent-pick .launch-agent-opt { display: grid !important; grid-template-columns: auto minmax(0, 1fr); column-gap: 6px; align-items: center; }
 #launch-agent-pick .launch-agent-opt::before { grid-row: 1 / span 2; }
 #launch-agent-pick .launch-agent-name { grid-column: 2; grid-row: 1; align-self: end; line-height: var(--lh-label); }
 #launch-agent-pick .launch-agent-missing { grid-column: 2; grid-row: 2; align-self: start; height: 1.1em; line-height: var(--lh-label); }
@@ -3961,8 +3952,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 #launch-agent-pick .launch-agent-opt { margin: 0; flex: 0 0 auto; }
 .launch-agent-pick { width: max-content; max-width: 100%; }
 .launch-persona-row .agent-preset-selector { border: 0; padding: 0; margin: 0; }
-.launch-persona-row .persona-files { flex-basis: auto; }
-.launch-persona-row .persona-files > summary { display: inline-flex; align-items: center; width: auto; padding: 8px 14px; min-height: 40px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); box-sizing: border-box; }
+.launch-persona-row .persona-files { position: relative; flex-basis: auto; }
+.launch-persona-row .persona-files > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; width: auto; padding: 8px 14px; min-height: 40px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); box-sizing: border-box; }
 .launch-persona-row .persona-files[open] .persona-files-row { position: absolute; right: 0; z-index: 3; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; }
 
 .launch-wizard .launch-cli-slot { margin: 0 0 6px; }
@@ -4000,7 +3991,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 /* The type scale of the dialogs (UI/UX's #7391 review): segments and the provider 13/500 (selected 600), hints 12/400, the back arrow in the product's font. */
 .launch-wizard .acf-model-note, .launch-wizard .acf-thinking-note, .launch-wizard .acf-thinking-ran { font-size: var(--fs-base); font-weight: var(--fw-regular); }
 #launch-agent-pick .launch-agent-opt { font-size: var(--fs-md); font-weight: var(--fw-medium); }
-#launch-agent-pick .launch-agent-opt:has(input:checked) { font-weight: var(--fw-strong); }
 .sd-step-header .launch-back-btn { font-family: inherit; }
 [data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; }
 
@@ -4029,7 +4019,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-more-wrap, .team-agent-more { position: relative; flex: none; }
 .team-allworkers { margin: 0 0 14px; }
 .team-allworkers[hidden] { display: none; }
-.team-allworkers select { min-width: 12rem; }
+.team-allworkers select { min-width: 0; max-width: 100%; width: min(12em, 100%); }
 .team-agents-count { margin: 0 0 6px; color: var(--text-secondary); font-size: var(--fs-sm); }
 .team-agents-count:empty { display: none; }
 .team-agents-list { display: flex; flex-direction: column; }
@@ -4046,7 +4036,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agent-chev { color: var(--text-secondary); font-size: var(--fs-2xl); }
 .team-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 6; min-width: min(12rem, calc(100vw - 3rem)); max-width: calc(100vw - 3rem); } /* where it sits and how wide: what it looks like is the one menu's (.menu, layout.css) */
 .team-menu.team-menu-up { top: auto; bottom: calc(100% + 4px); }
-.team-menu-item { white-space: normal; overflow-wrap: anywhere; } /* at 200% text an item wraps inside the menu, the menu never wider than the screen: the dialog's scroll box clipped its left edge (#8678) */
+.team-menu-item { overflow-wrap: anywhere; white-space: normal; } /* at 200% text an item wraps inside the menu, the menu never wider than the screen: the dialog's scroll box clipped its left edge (#8678) */
 .team-menu-item[disabled] { color: var(--text-muted); cursor: default; }
 .team-menu-item[hidden] { display: none; }
 .team-orchestrator-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: var(--fs-sm); }
@@ -4075,9 +4065,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 #launch-step-team .settings-pane fieldset.team-settings-section { border: 0; padding: 0; margin: 0; min-width: 0; } /* the health panel's layout in the launch dialog (the Team settings form's class is not used here) */
 
 /* New team on a phone and at large text: nothing wider than the screen (the census), and the health panel's (i) on its label's first line. */
-.team-allworkers select { min-width: 0; max-width: 100%; width: min(12em, 100%); }
 .team-menu { min-width: min(12rem, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
-.team-menu-item { white-space: normal; }
 .team-agent-role-name, .team-agent-summary { min-width: 0; }
 
 /* The composer's @ mention list (#7549): above the box, rows of 44 px on a touch screen */
