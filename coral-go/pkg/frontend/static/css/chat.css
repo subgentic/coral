@@ -1420,7 +1420,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 .chat-prose.chat-messages .chat-bubble.human .chat-save-btn { right: -4px; }
 .chat-bubble .chat-save-btn[hidden] { display: none; }
 @media (hover: none) {
-    .chat-bubble .chat-save-btn, .chat-bubble.assistant .chat-copy-btn { opacity: 1; }
+    .chat-bubble button.chat-save-btn, .chat-bubble.assistant button.chat-copy-btn { opacity: 1; } /* as specific as the hidden rules above (button.chat-*-btn, #9494): a touch screen has no hover to reveal them */
 }
 
 /* A thumbnail on an image chip (#5028): fixed size, shown once the image has loaded. */

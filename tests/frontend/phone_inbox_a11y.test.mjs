@@ -30,7 +30,9 @@ const plain = DT.dataTable({ label: 'Goals', columns: [{ key: 'title', label: 'G
 document.body.append(plain.el);
 const lead = plain.el.querySelector('.dt-mail-lead');
 assert.equal(lead.getAttribute('aria-hidden'), 'true', 'a row that cannot be selected hides its glyph');
-assert.equal(plain.el.querySelector('.dt-mail-open').getAttribute('aria-label'), 'Ship the thing', 'the open button is named by the row');
+const open = plain.el.querySelector('.dt-mail-open');
+assert.equal(open.getAttribute('aria-label'), 'Ship the thing, 2m', 'the open button is named by the row and then its time: every word the row shows is in the name (label in name, #9642)');
+assert.equal(open.dataset.rowName, 'Ship the thing', 'and the row name alone is kept for what finds the row');
 plain.el.remove();
 const pick = DT.dataTable({ label: 'Goals', columns: [{ key: 'title', label: 'Goal', field: 'title' }], rows, rowKey: r => r.id, rowName: r => r.title, mail: r => ({ lead: { icon: 'flag', name: 'open' }, title: r.title }), selectable: { actions: [{ label: 'Star', run() {} }] } });
 document.body.append(pick.el);

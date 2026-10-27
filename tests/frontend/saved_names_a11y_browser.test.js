@@ -21,10 +21,12 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody tr').length === 4`, `${tag}: four saved items`, 10000);
             const btnNames = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].map(b => ({ name: (b.getAttribute('aria-label') || b.textContent).replace(/\\s+/g, ' ').trim(), visible: [...b.childNodes].filter(n => !(n.classList && n.classList.contains('material-icons'))).map(n => n.textContent).join('').replace(/\\s+/g, ' ').trim() }))`);
             const names = async () => [await btnNames('#group-table-view tbody button')]; // the rows' links and their Done buttons
+            const words = x => x.toLowerCase().replace(/[,·.:;…]/g, ' ').replace(/\s+/g, ' ').trim(); // the words, not the punctuation a name puts between them
+            const inOrder = (name, visible) => { const n = name.split(' '); let i = 0; return visible.split(' ').every(w => { const k = n.indexOf(w, i); if (k < 0) return false; i = k + 1; return true; }); }; // every visible word is in the name, in the same order (a name may add words between them: "(1 of 2)")
             const check = (rows, when) => {
                 const all = rows.flat().map(b => b.name);
                 assert.deepEqual([...new Set(all.filter((n, i) => all.indexOf(n) !== i))], [], `${tag}, ${when}: no two buttons in the list share a name`);
-                for (const b of rows.flat()) assert.ok(b.name.toLowerCase().includes(b.visible.toLowerCase()), `${tag}, ${when}: "${b.name}" contains its visible words "${b.visible}"`);
+                for (const b of rows.flat()) assert.ok(inOrder(words(b.name), words(b.visible)), `${tag}, ${when}: "${b.name}" contains its visible words "${b.visible}"`);
             };
             check(await names(), 'closed');
             // a message's page: More and Open name the message too (the whole text is on the page, #7660)
@@ -42,7 +44,7 @@ const BASE = require('./test_base').BASE;
             await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.loadSaved()).then(() => true)`); // the list is read again
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, `${tag}: the three items`, 10000);
             check(await names(), 'two that start alike');
-            const lone = await ev(`[...document.querySelectorAll('#group-table-view .dt-quiet')].map(b => b.getAttribute('aria-label'))`);
+            const lone = await ev(`[...document.querySelectorAll('#group-table-view .dt-quiet, #group-table-view .dt-mail-open[data-row-name]')].map(b => b.dataset.rowName || b.getAttribute('aria-label'))`); // a phone's Saved rows are mail rows with no Done column (#9583): the row's own name is what tells the pair apart
             // told apart by what the names say, not by where the list put them
             const pair = lone.filter(n => /The same first words/.test(n)), single = lone.filter(n => !/The same first words/.test(n));
             assert.deepEqual(pair.map(n => n.slice(-8)).sort(), ['(1 of 2)', '(2 of 2)'], `${tag}: the pair is told apart (${JSON.stringify(lone)})`);

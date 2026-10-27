@@ -121,14 +121,14 @@ const mailCell = (m, label, open, pick) => { // open: the row opens (a button), 
     lead.append(shape, tick);
     const body = el(open ? 'button' : 'span', `dt-mail-open${m.unread ? ' dt-mail-unread' : ''}${open ? ' dt-primary' : ''}`);
     if (m.data) Object.assign(body.dataset, m.data); // the data-* the row's primary button carried as a column (a task's data-task-id): what finds the row again and what a deep link or a focus return reads
-    if (open) { body.type = 'button'; body.setAttribute('aria-label', label); } // its click is the row's (a .dt-primary button is not interactive to the row's handler: it opens, or toggles while selecting)
+    if (open) { body.type = 'button'; body.dataset.rowName = label; body.setAttribute('aria-label', m.time && !String(label).includes(m.time) ? `${label}, ${m.time}` : label); } // the name holds every word the row shows (the time too), so a visible label is in its name; its click is the row's (a .dt-primary button is not interactive to the row's handler: it opens, or toggles while selecting)
     const text = el('span', 'dt-mail-text'), line = el('span', 'dt-mail-line');
-    line.append(el('span', 'dt-mail-title', m.title || ''), el('span', 'dt-mail-snippet', m.snippet || ''));
+    line.append(el('span', 'dt-mail-title', m.title || ''), ' ', el('span', 'dt-mail-snippet', m.snippet || '')); // a space between the words: the row reads as words, not run together
     text.append(line);
     if (m.ask) { text.classList.add('dt-mail-two'); text.append(el('span', 'dt-mail-ask', m.ask)); }
     const side = el('span', 'dt-mail-side'); side.append(el('span', 'dt-mail-time', m.time || ''));
     if (m.mark) { const dot = el('span', `dt-mail-dot dt-mail-${m.mark}`); dot.setAttribute('aria-hidden', 'true'); side.append(dot); }
-    body.append(text, side);
+    body.append(text, ' ', side);
     td.append(lead, body);
     return td;
 };

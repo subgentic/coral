@@ -27,7 +27,7 @@ const hex = i => i.toString(16).padStart(20, '0');
     const SNAP = `(() => { const t = document.getElementById('group-table-view'), inbox = !!t && t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved', n = c => c && c.textContent !== '0' ? '(' + c.textContent + ')' : '';
         return {
         heading: inbox ? 'All saved' : (document.getElementById('saved-ui')?.getAttribute('aria-label') || ''),
-        rows: inbox ? [...t.querySelectorAll('tbody .dt-primary')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort() : [...document.querySelectorAll('#saved-table tbody .dt-primary')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort(),
+        rows: inbox ? [...t.querySelectorAll('tbody .dt-primary')].map(r => (r.dataset.rowName || r.textContent).replace(/^[^,]*, /, '')).sort() : [...document.querySelectorAll('#saved-table tbody .dt-primary')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort(),
         empty: (document.querySelector(inbox ? '#group-table-view .empty-state-line' : '#saved-table .empty-state-line') || {}).textContent || null,
         tabs: inbox ? [...t.querySelectorAll('.team-tb-pills .goals-chip')].map(b => { const m = b.textContent.match(/\\d+/); return m && m[0] !== '0' ? '(' + m[0] + ')' : ''; }) : [...document.querySelectorAll('#saved-table .group-chip .group-chip-count')].map(c => n(c)),
         badge: (document.getElementById('saved-tab-count') || {}).textContent || '',
