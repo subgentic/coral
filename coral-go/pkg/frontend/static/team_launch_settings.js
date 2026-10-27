@@ -20,7 +20,7 @@ const startValues = () => ({ first_task: '', custom_instructions: '', mode: 'non
 const healthRows = () => healthFields({
     members: () => Promise.resolve([]), hasHeld: () => false, monitorOff: () => false, openSettings: () => {},
     onReset: view => { for (const [k, v] of Object.entries(healthToValues(HEALTH_DEFAULTS))) view.set(k, v); },
-}).filter(f => f.key !== 'recipient');
+}).filter(f => f.key !== 'recipient' && f.key !== 'landing_nudge'); // no members to pick from yet
 
 /** Draw the step with a new team's own values (every time the team dialog opens: nothing from the last team stays). */
 export function mountTeamLaunchSettings() {
