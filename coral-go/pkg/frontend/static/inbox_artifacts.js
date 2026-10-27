@@ -64,6 +64,16 @@ export function artifactsSpec() {
         const pane = DT.el('aside', 'detail-pane inbox-detail-pane'); pane.setAttribute('aria-label', 'Details'); pane.hidden = true;
         main.append(head, body); row.append(main, pane);
         pageHost = row;
+        // the pane is the folder's right sidebar: as tall as the view and reaching up to its top edge (sticky, so the page scrolls under it), and the search row ends where it begins. Its height, its offset and its
+        // width are set on the row and the view, and kept when the window, the view or the pane's width changes (#8925)
+        const fit = () => {
+            const view = row.closest('.group-table-view'); if (!view) return;
+            const open = !pane.hidden;
+            row.style.setProperty('--pane-h', `${view.clientHeight}px`);
+            row.style.setProperty('--pane-top', open ? `${Math.max(0, Math.round(row.getBoundingClientRect().top - view.getBoundingClientRect().top + view.scrollTop))}px` : '0px');
+            view.style.setProperty('--pane-w', open ? `${pane.offsetWidth}px` : '0px');
+        };
+        requestAnimationFrame(() => { fit(); const view = row.closest('.group-table-view'); if (view && typeof ResizeObserver === 'function') { const ro = new ResizeObserver(fit); ro.observe(view); ro.observe(pane); } });
         list.showArtifacts(body, KEY, hooks());
         return row;
     } };

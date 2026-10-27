@@ -346,7 +346,13 @@
 .inbox-artifacts-main { flex: 1 1 0; min-width: 0; }
 .inbox-artifacts-list .goals-table-page { padding: 0; } /* the group page has its own padding */
 @media (min-width: 761px) {
-    .inbox-artifacts-row > .inbox-detail-pane { position: sticky; top: 0; align-self: flex-start; max-height: calc(100vh - 7rem); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+    /* The document pane is the folder's right sidebar (#8925), not a card: it is as tall as the view, flush to its right and bottom edges (the view's padding goes while it is open), resized by its grip on the left edge
+       (detail_pane.js, the width kept per browser), and the list keeps its Name column (the sidebar's widest is what leaves the list 480 px: it folds its columns under the name). */
+    .group-table-view:has(.inbox-detail-pane:not([hidden])) { padding-right: 0; padding-bottom: 0; }
+    .group-table-view:has(.inbox-detail-pane:not([hidden])) > .inbox-folder-toolbar { margin-right: calc(var(--pane-w, 0px) + var(--space-xl)); } /* the search row ends where the sidebar begins */
+    .group-table-view:has(.inbox-detail-pane:not([hidden])) .inbox-artifacts-main { padding-right: var(--space-xl); padding-bottom: var(--space-2xl); }
+    .inbox-artifacts-row:has(> .inbox-detail-pane:not([hidden])) { gap: 0; }
+    .inbox-artifacts-row > .inbox-detail-pane { --detail-w-fit: max(280px, min(var(--detail-w, 460px), calc(100% - 480px))); width: var(--detail-w-fit); position: sticky; top: calc(-1 * var(--space-2xl)); align-self: flex-start; height: var(--pane-h, 100vh); margin-top: calc(-1 * var(--pane-top, 0px)); border: 0; border-left: 1px solid var(--border); border-radius: 0; }
 }
 
 /* The same literal board name as its list row, including digit+x (#8682). */
