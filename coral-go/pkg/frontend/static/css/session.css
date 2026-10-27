@@ -581,6 +581,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .session-group-item.sleeping .session-label {
     color: var(--text-secondary);
 }
+[data-theme="light"] .session-group-item.sleeping:hover .session-label { color: var(--text-primary); } /* the sleeping name on a hovered row was 4.4:1 in the light theme (goal_label_contrast, #9700): the primary colour passes, as on every other hovered row (#4218); the row is still muted at rest */
 
 /* A sleeping row is still a readable, selectable item: its goal line must
    meet WCAG AA. components.css dims it to --text-muted with the same
