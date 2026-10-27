@@ -68,9 +68,24 @@ export function refreshReviews(force = false) {
     return pending;
 }
 
-/** Add or remove the 'read' tag, keeping the other tags; the row stays in the list and the counts follow at once. Throws with the server's words when the save fails (the row keeps its tags). */
+/** The artifact's tags as the server has them now, read right before a write: the tags route replaces the whole list, so a tag someone added since the last refresh would be lost from the row's copy. null when it is no longer a for-review artifact. */
+async function currentTags(row) {
+    for (let offset = 0; offset <= 10000; offset += 200) {
+        const r = await boardFetch(row.team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
+        if (!r.ok) throw new Error(`Could not read the current tags (HTTP ${r.status}).`);
+        const data = await r.json(), list = data.artifacts || [];
+        const hit = list.find(a => a.id === row.id);
+        if (hit) return hit.tags || [];
+        if (!data.has_more || !list.length) return null;
+    }
+    return null;
+}
+
+/** Add or remove the 'read' tag, keeping the other tags as they are now; the row stays in the list and the counts follow at once. Throws with the server's words when the save fails (the row keeps its tags). */
 export async function setReviewRead(row, read) {
-    const rest = (row.tags || []).filter(t => t !== 'read');
+    const current = await currentTags(row);
+    if (current === null) { revision++; items = items.filter(a => a.reviewKey !== row.reviewKey); changed(); return; } // someone settled it meanwhile: nothing to write
+    const rest = current.filter(t => t !== 'read');
     const tags = read ? [...rest, 'read'] : rest;
     const r = await boardFetch(row.team, `/artifacts/${encodeURIComponent(row.id)}/tags`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }),
@@ -84,6 +99,21 @@ export async function setReviewRead(row, read) {
     if (hit) hit.tags = tags;
     row.tags = tags;
     changed();
+}
+
+const reading = new Map(); // hex -> the write in flight, so the viewer and the preview opening the same artifact write once
+/** The operator opened an artifact (the viewer, a preview, a link): when it is one of the for-review artifacts, tag it read. Any other artifact is never tagged. Resolves when it is done; rejects with the server's words. */
+export function markOpenedRead(hex) {
+    hex = String(hex || '').toLowerCase();
+    if (!hex || isCloud()) return Promise.resolve();
+    if (reading.has(hex)) return reading.get(hex);
+    const p = (async () => {
+        if (!activated) await refreshReviews(true); else if (pending) await pending;
+        const row = items.find(a => a.hex.toLowerCase() === hex && !isRead(a));
+        if (row) await setReviewRead(row, true);
+    })().finally(() => reading.delete(hex));
+    reading.set(hex, p);
+    return p;
 }
 
 /** Swap the review tag, preserving the remaining tags (the 'read' tag goes: a reviewed artifact is settled); keep the row on failure. */

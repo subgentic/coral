@@ -13,7 +13,7 @@ const BASE = require('./test_base').BASE;
     const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     const badge = () => ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`);
     const navCount = () => ev(`(() => { const e = [...document.querySelectorAll('.view-list-item, [data-view-key="needs"], #inbox-nav [data-key="needs"]')].find(x => /Needs you/.test(x.textContent)); return e ? e.textContent.replace(/Needs you/, '').trim() : null; })()`);
-    const click = (name, label) => ev(`[...(${row(name)}).querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(label)}).click();true`);
+    const click = (name, label) => ev(`[...(${row(name)}).querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(label)}||(b.getAttribute('aria-label')||'').startsWith(${JSON.stringify(label)})).click();true`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
         for (const width of [1280,390]) {
@@ -59,8 +59,9 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await ev(`[...(${row('Read me 1.txt')}).querySelectorAll('button')].some(b=>b.getAttribute('aria-label')==='Mark unread: Read me 1.txt')`),true,'a read item offers Mark unread');
                 const nc = await navCount(); assert.ok(nc !== null && /(^|\D)2$/.test(nc), 'the Needs you folder counts the two unread: ' + nc);
                 const heights = await ev(`[${row('Read me 1.txt')}.getBoundingClientRect().height, ${row('Read me 2.txt')}.getBoundingClientRect().height]`);
-                if (width === 1280) assert.ok(Math.abs(heights[0] - heights[1]) <= 2, 'a read row is as tall as an unread one (actions and tag on one line): ' + JSON.stringify(heights));
-                else assert.ok(await ev(`${row('Read me 1.txt')}.querySelector('.inbox-review-name').getBoundingClientRect().width >= 60`), 'on a phone the read item keeps its name beside the buttons: ' + JSON.stringify(heights));
+                assert.ok(Math.abs(heights[0] - heights[1]) <= 2, 'a read row is as tall as an unread one, one line at every width (Goal #79): ' + JSON.stringify(heights));
+                assert.ok(await ev(`${row('Read me 1.txt')}.querySelector('.inbox-review-name').getBoundingClientRect().width >= 60`), 'the read item keeps its name beside the buttons');
+                assert.ok(await ev(`[...(${row('Read me 1.txt')}).querySelectorAll('.inbox-review-actions button')].every(b => b.getAttribute('aria-label') && b.getBoundingClientRect().width >= 44 && b.getBoundingClientRect().height >= (innerWidth <= 760 ? 44 : 24))`), 'every action of a read row is named and a target');
                 const writes = await ev(`window.__tagWrites.length`);
                 await click('Read me 1.txt','Open'); await waitFor(`document.body.textContent.includes('Review preview text')`,'the preview again'); await ev(`document.querySelector('.artifact-viewer-close').click();true`);
                 assert.equal(await ev(`window.__tagWrites.length`),writes,'opening an item that is read writes nothing');
@@ -72,9 +73,23 @@ const BASE = require('./test_base').BASE;
                 await waitFor(`document.getElementById('inbox-live') && /Tag save failed/.test(document.body.textContent)||true`,'settle');
                 assert.equal(await badge(),'2','a failed save leaves the item counting');
                 await ev(`window.__tagFail=false;true`);
+                // opened from anywhere (the viewer, a link): a for-review artifact is read, with the tags as the server has them now (a tag added meanwhile is kept); any other artifact is never tagged
+                await ev(`window.__reviewItems[2].tags=['for review','team-tag'];true`);
+                const before3 = await ev(`window.__tagWrites.length`);
+                await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer(window.__reviewItems[2].id,{filename:'Read me 3.txt',board:${JSON.stringify(team)}})); true`);
+                await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent==='1'`,'a for-review artifact opened in the viewer, not from Needs you, is read');
+                assert.deepEqual((await ev(`window.__tagWrites.at(-1)`)).sort(),['for review','read','team-tag'],'the tag added meanwhile is kept');
+                await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+                const writes3 = await ev(`window.__tagWrites.length`);
+                await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${'ab'.repeat(32)}',{filename:'other.txt'})); true`);
+                await ev(`new Promise(r=>setTimeout(r,600))`); // sleep-ok: nothing is to happen, so there is nothing to wait for
+                assert.equal(await ev(`window.__tagWrites.length`),writes3,'an artifact that is not for review is never tagged');
+                await ev(`document.querySelector('.artifact-viewer-close')?.click();true`);
+                assert.ok(writes3 === before3 + 1, 'one write for the open, however many places render the artifact: ' + (writes3 - before3));
+                await ev(`window.__reviewItems[2].tags=['for review'];true`);
                 // mark unread: it counts again
-                await click('Read me 1.txt','Unread');
-                await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent==='3'`,'the badge is 3 again');
+                await click('Read me 1.txt','Mark unread');
+                await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent==='2'`,'the badge counts it again (the viewer-opened item stays read)');
                 assert.deepEqual(await ev(`window.__tagWrites.at(-1)`),['for review'],'the read tag is taken off');
                 assert.ok(await ev(`!(${row('Read me 1.txt')}).querySelector('.inbox-review-item')`),'the tag is gone from the row');
                 console.log('PASS review read '+width);

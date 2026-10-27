@@ -101,6 +101,7 @@ export function openArtifactViewer(hex, opts = {}) {
     _abort = new AbortController();
     const gen = ++_gen;
     _server = opts.server; _hex = hex; _lastOpts = opts;
+    importOnce('./inbox_reviews.js').then(m => m.markOpenedRead(hex)).catch(() => {}); // opening a for-review artifact reads it, wherever it is opened from (#9277)
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = opts.filename || 'Artifact';
