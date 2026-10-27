@@ -12,7 +12,7 @@ const art = (id, name) => ({ id: id.repeat(64), name, media_type: 'text/markdown
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
-    const results = [];
+    const results = []; let lineSizeOfArtifacts = '';
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out')); if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
@@ -42,11 +42,12 @@ const art = (id, name) => ({ id: id.repeat(64), name, media_type: 'text/markdown
             else await ev(`document.querySelector('.view-list-item[data-key="artifacts"]').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: the reachable computers' files, after Box Two's time limit (one wait of 8 s, not one per redraw)`, 12000);
             await settle(300);
-            const down = await ev(`({ rows: [...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')), line: ((document.querySelector('.team-artifacts-down') || {}).textContent || '').trim(), retry: !!document.querySelector('.team-artifacts-down-retry'), loading: /Loading artifacts/.test(document.getElementById('group-table-view').textContent) })`);
+            const down = await ev(`({ rows: [...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')), line: ((document.querySelector('.team-artifacts-down') || {}).textContent || '').trim(), lineSize: getComputedStyle(document.querySelector('.team-artifacts-down') || document.body).fontSize, retry: !!document.querySelector('.team-artifacts-down-retry'), loading: /Loading artifacts/.test(document.getElementById('group-table-view').textContent) })`);
             check(`${label}: with Box Two hung, this computer's and the healthy Box Three's files are listed and the page is not stuck on Loading`, down.rows.length === 2 && down.rows.some(r => /local-report/.test(r)) && down.rows.some(r => /three-report/.test(r)) && !down.loading, JSON.stringify(down));
             check(`${label}: Box Two was asked twice at most (and its hung requests did not make Box Three look hung) (the sidebar's count and the page), not again at every redraw`, (await ev(`window.__remoteReads`)) <= 2, String(await ev(`window.__remoteReads`)));
             check(`${label}: a quiet line names Box Two only (not the healthy Box Three), with a Retry`, /^Box Two did not answer, so its artifacts are not shown\.$/.test(down.line) && down.retry && await ev(`document.querySelector('.team-artifacts-down-retry').getBoundingClientRect().width < 160`), JSON.stringify(down));
             await shot(`inbox-artifacts-down-${label}`);
+            lineSizeOfArtifacts = down.lineSize;
             await ev(`window.__boxTwoUp = true; document.querySelector('.team-artifacts-down-retry').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 3`, `${label}: all three files after Retry`, 10000);
             const after = await ev(`({ rows: document.querySelectorAll('#group-table-view tbody tr').length, line: !!document.querySelector('.team-artifacts-down') })`);
@@ -56,7 +57,8 @@ const art = (id, name) => ({ id: id.repeat(64), name, media_type: 'text/markdown
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
             await waitFor(`!!document.querySelector('.group-table-note') && /Box Two did not answer/.test(document.querySelector('.group-table-note').textContent)`, `${label}: Goals names Box Two after its time limit`, 20000);
-            const gl = await ev(`({ rows: [...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')), note: document.querySelector('.group-table-note').textContent.trim() })`);
+            const gl = await ev(`({ rows: [...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')), note: document.querySelector('.group-table-note').textContent.trim(), size: getComputedStyle(document.querySelector('.group-table-note')).fontSize })`);
+            check(`${label}: the Goals line is the same small note as Artifacts' (one style)`, gl.size === lineSizeOfArtifacts, gl.size + ' vs ' + lineSizeOfArtifacts);
             check(`${label}: Goals lists this computer's goal and says "Box Two did not answer, so its goals are not shown."`, gl.rows.length === 2 && gl.rows.some(r => /Local goal/.test(r)) && gl.rows.some(r => /Three goal/.test(r)) && gl.note === 'Box Two did not answer, so its goals are not shown.', JSON.stringify(gl));
         }
     } finally { await client.close(); }
