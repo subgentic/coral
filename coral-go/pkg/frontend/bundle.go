@@ -149,13 +149,35 @@ func BuildBundle(static fs.FS, indexHTML []byte) (*Bundle, error) {
 		}
 	}
 	sort.Strings(names)
-	exports := map[string][]string{}
+	startup := map[string]bool{"app.js": true}
 	for _, m := range names {
-		ex, err := exportNames(static, m)
-		if err != nil {
-			return nil, err
+		startup[m] = true
+	}
+	// Every module's export names in one build (#8760): the startup modules' for their stubs and aliases, the lazy modules' for theirs. A tree one module of which does not parse falls back to a build per
+	// module, which fails for a startup module and skips a lazy one, as before.
+	lazy := lazyModules(static, startup)
+	exports := map[string][]string{}
+	lazyExports := map[string][]string{}
+	if all, err := exportNamesBatch(static, append(append([]string{}, names...), lazy...)); err == nil {
+		for _, m := range names {
+			exports[m] = all[m]
 		}
-		exports[m] = ex
+		for _, m := range lazy {
+			lazyExports[m] = all[m]
+		}
+	} else {
+		for _, m := range names {
+			ex, err := exportNames(static, m)
+			if err != nil {
+				return nil, err
+			}
+			exports[m] = ex
+		}
+		for _, m := range lazy {
+			if ex, err := exportNames(static, m); err == nil {
+				lazyExports[m] = ex
+			}
+		}
 	}
 	var entry strings.Builder
 	entry.WriteString(startupEntry())
@@ -223,11 +245,7 @@ func BuildBundle(static fs.FS, indexHTML []byte) (*Bundle, error) {
 	}
 
 	// 3. The lazy modules, built against the bundle's instance: no stub requests, and the tab families in one file (bundle_lazy.go).
-	startup := map[string]bool{"app.js": true}
-	for _, m := range names {
-		startup[m] = true
-	}
-	lazyFiles, lazyCovered, lazySkipped, err := buildLazyModules(static, startup, alias, exports)
+	lazyFiles, lazyCovered, lazySkipped, err := buildLazyModules(static, startup, alias, exports, lazy, lazyExports)
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,2 @@
+A release build puts the dashboard's bundled family here as bundle.gob.gz (tools/strip-static adds it to the build overlay, next to the minified static files), so a release server does no
+esbuild at start (#8760). In a source tree this folder holds only this file: the server then builds the family at start, as a dev build always does. See pkg/frontend/prebuilt.go.

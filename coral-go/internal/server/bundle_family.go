@@ -14,6 +14,7 @@ import (
 var (
 	freeOSMemory = debug.FreeOSMemory
 	releaseDelay = 2 * time.Second
+	bundleSource = frontend.PrebuiltOrBuild // the embedded prebuilt family when it is of this tree, else a build (#8760)
 )
 
 // buildBundleFamily builds the bundled family (#4228: app.js's module graph, the lazy modules and the shell's stylesheets as a few files, next to the unchanged files) from the
@@ -30,9 +31,11 @@ func (s *Server) buildBundleFamily(staticSub fs.FS) fs.FS {
 	}
 	var bundleFS fs.FS
 	index, _ := fs.ReadFile(frontend.Templates, "templates/index.html")
-	if b, err := frontend.BuildBundle(staticSub, index); err != nil {
+	b, how, err := bundleSource(staticSub, index)
+	if err != nil {
 		log.Printf("bundled dashboard unavailable, serving the original files: %v", err)
 	} else {
+		log.Printf("[STARTUP] dashboard bundle: %s", how)
 		bundleFS = b.FS(staticSub)
 		// The build id names the bytes served, not only the sources: the bundler, its options and
 		// the stylesheet order change them with the tree untouched (#4320). It is ONE id for both
@@ -41,13 +44,15 @@ func (s *Server) buildBundleFamily(staticSub fs.FS) fs.FS {
 		s.staticVersion = bundleVersion(s.staticVersion, b)
 		s.bundleBase = "/static/bb/" + s.staticVersion + "/"
 	}
-	// Whether or not the build succeeded: the garbage is the same.
-	// A timer, not a goroutine asleep: a test binary builds a server per test, and a sleeping goroutine each is what testleak reports at the end (#4167). The delay and the call are read
-	// now, so a test that swaps them for its own is not called by an earlier server's timer.
-	delay, free := releaseDelay, freeOSMemory
-	time.AfterFunc(delay, func() {
-		defer safego.Recover("release-build-memory")
-		free()
-	})
+	// Whether or not the build succeeded: the garbage is the same. A prebuilt family left none (a release reads it back: no esbuild, no 300 MB peak, #8760).
+	if how != "prebuilt" {
+		// the delay and the call are read now, not when the goroutine runs: a test that swaps them for its own must not have an earlier server's goroutine call its hook late (#8785)
+		// A timer, not a goroutine asleep: a test binary builds a server per test, and a sleeping goroutine each is what testleak reports at the end (#4167).
+		delay, free := releaseDelay, freeOSMemory
+		time.AfterFunc(delay, func() {
+			defer safego.Recover("release-build-memory")
+			free()
+		})
+	}
 	return bundleFS
 }

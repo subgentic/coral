@@ -30,6 +30,7 @@ type Result struct {
 	SourceBytes   int64  // their size before
 	StrippedBytes int64  // and after
 	Unchanged     int    // JS and CSS files MinifyAsset leaves as they are
+	Prebuilt      int64  // the size of the prebuilt bundled family the overlay adds (#8760)
 }
 
 type overlayJSON struct {
@@ -59,6 +60,7 @@ func Generate(staticDir, outDir string) (Result, error) {
 		return r, err
 	}
 	ov := overlayJSON{Replace: map[string]string{}}
+	minifiedBytes := map[string][]byte{} // the stripped files by name under the static tree, for the prebuilt family
 	err = filepath.WalkDir(absStatic, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
@@ -88,6 +90,7 @@ func Generate(staticDir, outDir string) (Result, error) {
 			return err
 		}
 		ov.Replace[p] = target
+		minifiedBytes[rel] = out
 		r.Files++
 		r.SourceBytes += int64(len(data))
 		r.StrippedBytes += int64(len(out))
@@ -98,6 +101,9 @@ func Generate(staticDir, outDir string) (Result, error) {
 	}
 	if r.Files == 0 {
 		return r, fmt.Errorf("nothing under %s changes when minified: refusing to write an empty overlay", staticDir)
+	}
+	if err := addPrebuilt(absStatic, absOut, minifiedBytes, &ov, &r); err != nil {
+		return r, err
 	}
 	b, err := json.MarshalIndent(ov, "", "  ")
 	if err != nil {
@@ -142,17 +148,25 @@ func Validate(overlayPath, staticDir string) error {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+	prebuilt := prebuiltKey(absStatic)
 	for _, key := range keys {
 		target := ov.Replace[key]
 		if !filepath.IsAbs(key) || strings.Contains(filepath.ToSlash(key), "..") {
 			return fmt.Errorf("overlay key %q is not a clean absolute path", key)
 		}
-		rel, err := filepath.Rel(absStatic, filepath.Clean(key))
-		if err != nil || rel == "." || strings.HasPrefix(filepath.ToSlash(rel), "../") || filepath.IsAbs(rel) {
-			return fmt.Errorf("overlay key %q is not under %s: an overlay may only replace files of the static tree", key, staticDir)
-		}
-		if !minified(rel) {
-			return fmt.Errorf("overlay key %q is not a JS or CSS file the dashboard minifies", key)
+		if filepath.Clean(key) == prebuilt {
+			// the one file an overlay may ADD (#8760): the prebuilt bundled family, at exactly this path, from a file of exactly this name in the overlay's own folder
+			if filepath.Base(target) != frontend.PrebuiltName {
+				return fmt.Errorf("overlay target %q for the prebuilt bundle must be named %s", target, frontend.PrebuiltName)
+			}
+		} else {
+			rel, err := filepath.Rel(absStatic, filepath.Clean(key))
+			if err != nil || rel == "." || strings.HasPrefix(filepath.ToSlash(rel), "../") || filepath.IsAbs(rel) {
+				return fmt.Errorf("overlay key %q is not under %s: an overlay may only replace files of the static tree", key, staticDir)
+			}
+			if !minified(rel) {
+				return fmt.Errorf("overlay key %q is not a JS or CSS file the dashboard minifies", key)
+			}
 		}
 		if !filepath.IsAbs(target) || strings.Contains(filepath.ToSlash(target), "..") {
 			return fmt.Errorf("overlay target %q is not a clean absolute path", target)
@@ -204,3 +218,80 @@ func CheckOutDir(dir string) error {
 	}
 	return nil
 }
+
+// prebuiltKey is the path the overlay gives the prebuilt bundled family: the prebuilt folder beside the static tree (pkg/frontend/prebuilt/bundle.gob.gz), where go:embed looks for it.
+func prebuiltKey(absStatic string) string {
+	return filepath.Join(filepath.Dir(absStatic), frontend.PrebuiltDir, frontend.PrebuiltName)
+}
+
+// addPrebuilt builds the bundled family from the tree the binary will embed (the source tree with the stripped files in place of their sources) and adds it to the overlay (#8760): a release
+// server then reads it back instead of running esbuild at start. It fails the run when the family does not build: a release must not quietly lose it.
+func addPrebuilt(absStatic, absOut string, stripped map[string][]byte, ov *overlayJSON, r *Result) error {
+	tree := layered{base: os.DirFS(absStatic), repl: stripped}
+	index, err := fs.ReadFile(frontend.Templates, "templates/index.html")
+	if err != nil {
+		return err
+	}
+	b, err := frontend.BuildBundle(tree, index)
+	if err != nil {
+		return fmt.Errorf("the prebuilt bundle: %w", err)
+	}
+	if len(b.LazySkipped) > 0 {
+		return fmt.Errorf("the prebuilt bundle skipped lazy modules: %v", b.LazySkipped)
+	}
+	hash, err := frontend.BundleInputHash(tree, index)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	if err := frontend.EncodePrebuilt(&buf, b, hash); err != nil {
+		return err
+	}
+	target := filepath.Join(absOut, frontend.PrebuiltDir, frontend.PrebuiltName)
+	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+		return err
+	}
+	if err := os.WriteFile(target, buf.Bytes(), 0o600); err != nil {
+		return err
+	}
+	ov.Replace[prebuiltKey(absStatic)] = target
+	r.Prebuilt = int64(buf.Len())
+	return nil
+}
+
+// layered is the static tree as the binary embeds it: the source folder with each stripped file read from its stripped bytes.
+type layered struct {
+	base fs.FS
+	repl map[string][]byte
+}
+
+func (l layered) Open(name string) (fs.File, error) {
+	if data, ok := l.repl[name]; ok {
+		f, err := l.base.Open(name)
+		if err != nil {
+			return nil, err
+		}
+		st, err := f.Stat()
+		f.Close()
+		if err != nil {
+			return nil, err
+		}
+		return &replacedFile{Reader: bytes.NewReader(data), info: replacedInfo{FileInfo: st, size: int64(len(data))}}, nil
+	}
+	return l.base.Open(name)
+}
+
+type replacedFile struct {
+	*bytes.Reader
+	info replacedInfo
+}
+
+func (f *replacedFile) Stat() (fs.FileInfo, error) { return f.info, nil }
+func (f *replacedFile) Close() error               { return nil }
+
+type replacedInfo struct {
+	fs.FileInfo
+	size int64
+}
+
+func (i replacedInfo) Size() int64 { return i.size }

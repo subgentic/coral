@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,6 +32,9 @@ func TestOverlayIsMinifyAssetFileByFile(t *testing.T) {
 	abs, _ := filepath.Abs(realStatic)
 	replaced := map[string]bool{}
 	for src, dst := range ov.Replace {
+		if src == prebuiltKey(abs) {
+			continue // the prebuilt bundled family: TestOverlayAddsThePrebuiltBundleOfTheStrippedTree
+		}
 		rel, err := filepath.Rel(abs, src)
 		require.NoError(t, err)
 		rel = filepath.ToSlash(rel)
@@ -58,7 +62,7 @@ func TestOverlayIsMinifyAssetFileByFile(t *testing.T) {
 		assert.False(t, minified(rel) && len(frontend.MinifyAsset(rel, data)) < len(data), "%s", rel)
 		return nil
 	}))
-	assert.Equal(t, res.Files, len(ov.Replace))
+	assert.Equal(t, res.Files, len(ov.Replace)-1, "the stripped files and the one prebuilt bundle")
 	assert.Greater(t, res.SourceBytes-res.StrippedBytes, int64(500_000), "the strip saves hundreds of KB: %+v", res)
 	// everything it wrote is inside its own folder
 	for _, dst := range ov.Replace {
@@ -194,4 +198,106 @@ func TestCheckOutDir(t *testing.T) {
 		require.NoError(t, os.Symlink(mk("coral-static-real"), filepath.Join(root, "coral-static-link")))
 		assert.Error(t, CheckOutDir(filepath.Join(root, "coral-static-link")), "symlink")
 	}
+}
+
+// The overlay also adds the bundled family built from the stripped tree (#8760): at the one path go:embed reads it from, naming the tree it was built from. Rebuilding that tree's name here,
+// from the sources and the stripped files the overlay holds, gives the same hash: what a release server compares with the tree it embeds.
+func TestOverlayAddsThePrebuiltBundleOfTheStrippedTree(t *testing.T) {
+	out := ownerOnly(t, t.TempDir())
+	res, err := Generate(realStatic, out)
+	require.NoError(t, err)
+	abs, _ := filepath.Abs(realStatic)
+	raw, err := os.ReadFile(res.Overlay)
+	require.NoError(t, err)
+	var ov overlayJSON
+	require.NoError(t, json.Unmarshal(raw, &ov))
+	dst, ok := ov.Replace[prebuiltKey(abs)]
+	require.True(t, ok, "the overlay does not add the prebuilt bundle")
+	assert.Equal(t, filepath.Join(filepath.Dir(abs), "prebuilt", "bundle.gob.gz"), prebuiltKey(abs))
+	assert.Equal(t, filepath.Join(out, "prebuilt", "bundle.gob.gz"), dst)
+	f, err := os.Open(dst)
+	require.NoError(t, err)
+	defer f.Close()
+	b, hash, err := frontend.DecodePrebuilt(f)
+	require.NoError(t, err)
+	assert.Greater(t, len(b.Files), 500)
+	assert.Empty(t, b.LazySkipped)
+	assert.Equal(t, res.Prebuilt > 1_000_000, true, "the prebuilt file is a few MB: %d", res.Prebuilt)
+
+	// The tree a release binary embeds: the source tree with the overlay's files in place of what they replace.
+	tree := fstest.MapFS{}
+	require.NoError(t, filepath.WalkDir(abs, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(abs, p)
+		src := p
+		if repl, ok := ov.Replace[p]; ok {
+			src = repl
+		}
+		data, err := os.ReadFile(src)
+		require.NoError(t, err)
+		tree[filepath.ToSlash(rel)] = &fstest.MapFile{Data: data}
+		return nil
+	}))
+	index, _ := fs.ReadFile(frontend.Templates, "templates/index.html")
+	want, err := frontend.BundleInputHash(tree, index)
+	require.NoError(t, err)
+	assert.Equal(t, want, hash, "the prebuilt bundle names another tree than the one the overlay makes")
+
+	// go:embed would leave out a dotfile or an underscore file the walk above reads: the JS and CSS the hash covers must be the same set in both.
+	embedded := map[string]bool{}
+	sub, _ := fs.Sub(frontend.Static, "static")
+	require.NoError(t, fs.WalkDir(sub, ".", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && (strings.HasSuffix(p, ".js") || strings.HasSuffix(p, ".css")) {
+			embedded[p] = true
+		}
+		return nil
+	}))
+	for p := range tree {
+		if (strings.HasSuffix(p, ".js") || strings.HasSuffix(p, ".css")) && !embedded[p] {
+			t.Errorf("%s is read by the generator but not embedded: the prebuilt hash would never match", p)
+		}
+	}
+	assert.Equal(t, len(embedded), func() int {
+		n := 0
+		for p := range tree {
+			if strings.HasSuffix(p, ".js") || strings.HasSuffix(p, ".css") {
+				n++
+			}
+		}
+		return n
+	}())
+}
+
+// The overlay may add exactly one file that is not a static JS or CSS file: the prebuilt bundle, at its path, named bundle.gob.gz, inside the overlay's own folder.
+func TestValidateAllowsOnlyThePrebuiltBundleBesidesStaticFiles(t *testing.T) {
+	dir := ownerOnly(t, t.TempDir())
+	abs, _ := filepath.Abs(realStatic)
+	good := filepath.Join(dir, "prebuilt", "bundle.gob.gz")
+	require.NoError(t, os.MkdirAll(filepath.Dir(good), 0o700))
+	require.NoError(t, os.WriteFile(good, []byte("x"), 0o600))
+	if runtime.GOOS != "windows" {
+		require.NoError(t, os.Chmod(filepath.Dir(good), 0o700))
+	}
+	js := filepath.Join(abs, "app.js")
+	jsTarget := filepath.Join(dir, "app.js")
+	require.NoError(t, os.WriteFile(jsTarget, []byte("x"), 0o600))
+	ok := writeOverlay(t, dir, map[string]string{js: jsTarget, prebuiltKey(abs): good})
+	require.NoError(t, Validate(ok, realStatic), "the prebuilt bundle at its path is allowed")
+
+	for name, extra := range map[string]string{
+		"another file in the prebuilt folder": filepath.Join(filepath.Dir(prebuiltKey(abs)), "other.js"),
+		"the template":                        filepath.Join(filepath.Dir(abs), "templates", "index.html"),
+		"a Go file":                           filepath.Join(filepath.Dir(abs), "bundle.go"),
+	} {
+		bad := writeOverlay(t, dir, map[string]string{js: jsTarget, extra: good})
+		assert.Error(t, Validate(bad, realStatic), name)
+	}
+	other := filepath.Join(dir, "prebuilt", "bundle.bin")
+	require.NoError(t, os.WriteFile(other, []byte("x"), 0o600))
+	assert.Error(t, Validate(writeOverlay(t, dir, map[string]string{js: jsTarget, prebuiltKey(abs): other}), realStatic), "the prebuilt target must be named bundle.gob.gz")
+	outside := filepath.Join(t.TempDir(), "bundle.gob.gz")
+	require.NoError(t, os.WriteFile(outside, []byte("x"), 0o600))
+	assert.Error(t, Validate(writeOverlay(t, dir, map[string]string{js: jsTarget, prebuiltKey(abs): outside}), realStatic), "the prebuilt target must be inside the overlay's folder")
 }
