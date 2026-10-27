@@ -13,6 +13,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { framesJs } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
+const { TOUCH_AREA } = require('./helpers/touch_area');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -96,9 +97,9 @@ const BASE = require('./test_base').BASE;
 
         console.log('4. Maximise covers Chat; Restore and Escape bring it back');
         await open(1900, 900, 600);
-        const btn = () => ev(`(() => { const b = document.getElementById('preview-max-btn'); const r = b.getBoundingClientRect(); return { shown: !b.hidden && getComputedStyle(b).display !== 'none', w: Math.round(r.width), h: Math.round(r.height), pressed: b.getAttribute('aria-pressed'), label: b.getAttribute('aria-label'), title: b.title }; })()`);
+        const btn = () => ev(`(() => { const b = document.getElementById('preview-max-btn'); const r = (${TOUCH_AREA})(b); return { shown: !b.hidden && getComputedStyle(b).display !== 'none', w: Math.round(r.w), h: Math.round(r.h), pressed: b.getAttribute('aria-pressed'), label: b.getAttribute('aria-label'), title: b.title }; })()`);
         let b = await btn();
-        check('the toggle is in the pane\'s header, 44 px wide, labelled "Maximise ...", not pressed', b.shown && b.w >= 44 && b.pressed === 'false' && /^Maximise/.test(b.label), JSON.stringify(b));
+        check('the toggle is in the pane\'s header, at least 24 px wide (a fine pointer; a touch screen\'s hit area is 44, preview_phone_full), labelled "Maximise ...", not pressed', b.shown && b.w >= 24 && b.pressed === 'false' && /^Maximise/.test(b.label), JSON.stringify(b));
         g = await geo(); const before = g.col;
         await ev(`document.getElementById('preview-max-btn').click(); true`);
         await waitFor(`document.querySelector('.live-body').classList.contains('preview-maximised')`, 'maximised');
