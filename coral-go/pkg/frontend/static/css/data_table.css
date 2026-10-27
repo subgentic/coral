@@ -105,7 +105,7 @@
 .dt-avatars { gap: 4px; }
 .dt-avatars > .dt-avatar { background: var(--dt-avatar-bg); }
 /* a reviewer: smaller, outlined in its colour, the letter in the text colour (#8492) */
-.dt-avatars > .dt-avatar-review { width: calc(var(--table-avatar) - 4px); height: calc(var(--table-avatar) - 4px); background: transparent; border: 1.5px solid var(--dt-avatar-bg); color: var(--text-primary); font-size: var(--fs-xs); }
+.dt-avatars > .dt-avatar-review { width: calc(var(--table-avatar) - 4px); height: calc(var(--table-avatar) - 4px); background: transparent; border: 1.5px solid var(--dt-avatar-bg); color: var(--text-primary); font-size: var(--fs-sm); }
 .dt-avatars-more { font-size: var(--table-tertiary-size); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
 .dt-person-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dt-quiet { font-size: var(--table-tertiary-size); font-weight: var(--table-secondary-weight); color: var(--table-secondary-color); } /* a row's own small action (Done, Reopen): quiet, not a call to action */

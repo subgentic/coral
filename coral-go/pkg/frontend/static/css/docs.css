@@ -48,7 +48,7 @@
 }
 
 .docs-content h2 {
-    font-size: 1.0625rem; /* the document keeps its reading scale: headings 20/700 and 17/700 (#7443) */
+    font-size: var(--fs-xl); /* the document keeps its reading scale: headings 20/700 and 17/700 (#7443) */
     font-weight: var(--fw-strong);
     margin: 24px 0 8px;
     padding-bottom: 4px;

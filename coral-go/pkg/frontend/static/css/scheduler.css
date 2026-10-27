@@ -146,7 +146,7 @@
 
 .sched-header h2 {
     margin: 0;
-    font-size: 1.0625rem; /* an item's page title: 17/700 (#7443) */
+    font-size: var(--fs-2xl); /* an item's page title: 17/700 (#7443) */
     font-weight: var(--fw-strong);
 }
 
