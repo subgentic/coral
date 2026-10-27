@@ -96,6 +96,11 @@ func (s *Store) backfillBoardSubscriberIDs(ctx context.Context) {
 			board_groups.session_id
 		) WHERE subscriber_id IS NULL`},
 	}
+	// The message backfill looks for rows with no subscriber_id, and scanned every message to find none (89 ms on 500,000, #9611). This index holds a row only while a message has none: empty after the
+	// backfill, free on every write, and still the way a message an older binary wrote without one is found.
+	if _, err := s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_board_messages_no_subscriber ON board_messages(id) WHERE subscriber_id IS NULL`); err != nil {
+		log.Printf("[board] migration index of messages with no subscriber_id failed: %v", err)
+	}
 	for _, bf := range backfills {
 		if _, err := s.db.ExecContext(ctx, bf.sql); err != nil {
 			log.Printf("[board] migration %s failed: %v", bf.desc, err)
