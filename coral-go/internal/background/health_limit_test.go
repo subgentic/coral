@@ -70,3 +70,44 @@ func TestScreenLimitReadsAgyQuotaOnly(t *testing.T) {
 }
 
 type nilScreenRT struct{ AgentRuntime }
+
+// #9267: Codex's notice is read off its screen too.
+func TestScreenLimitReadsCodexNotice(t *testing.T) {
+	f := screenLimit(screenRT{screen: "■ You've hit your usage limit. Upgrade to Pro or try again at Nov 1st, 2030 10:07 PM.\n\n› \n"})
+	resets, blocked := f(context.Background(), AgentInfo{AgentType: "codex", SessionID: "s1"})
+	assert.True(t, blocked)
+	assert.Greater(t, resets, time.Hour)
+	idle := screenLimit(screenRT{screen: "› Ask Codex to do anything\n"})
+	_, blocked = idle(context.Background(), AgentInfo{AgentType: "codex", SessionID: "s1"})
+	assert.False(t, blocked)
+}
+
+// #9267: a limit can cut a turn short with no hook event, so an agent "in a turn" is still BLOCKED when its screen says so; and nothing is
+// typed to a blocked agent.
+func TestHealthCheckShowsAnInTurnAgentWithALimitAsBlocked(t *testing.T) {
+	h := newCheckHarness(t)
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 0) // in a turn by its hooks
+	quotaSID := h.sid(2)
+	assert.Contains(t, h.check(), "1 working")
+	h.m.limit = func(_ context.Context, a AgentInfo) (time.Duration, bool) {
+		return 5 * 24 * time.Hour, a.SessionID == quotaSID
+	}
+	out := h.check()
+	assert.Contains(t, out, "1 BLOCKED by a usage limit", out)
+	assert.Contains(t, out, "0 working", out)
+	assert.Contains(t, out, "Dev (resets in 120 h)")
+}
+
+func TestSendUnlessBlockedTypesNothingToABlockedAgent(t *testing.T) {
+	sent := 0
+	deliver := func(context.Context, AgentInfo, string, string) error { sent++; return nil }
+	blocked := func(context.Context, AgentInfo) (time.Duration, bool) { return 0, true }
+	free := func(context.Context, AgentInfo) (time.Duration, bool) { return 0, false }
+	a := AgentInfo{AgentType: "codex", SessionID: "s"}
+	assert.ErrorIs(t, sendUnlessBlocked(context.Background(), blocked, deliver, a, "k", "x"), errBlockedByLimit)
+	assert.Zero(t, sent)
+	assert.NoError(t, sendUnlessBlocked(context.Background(), free, deliver, a, "k", "x"))
+	assert.NoError(t, sendUnlessBlocked(context.Background(), nil, deliver, a, "k", "x"))
+	assert.Equal(t, 2, sent)
+}
