@@ -34,6 +34,9 @@ try {
     // Goals: the same limit
     const goals = inbox.listInboxGoals(); await new Promise(r => setImmediate(r)); mock.timers.tick(8000);
     assert.deepEqual((await goals).map(g => g.title), ['Local goal'], 'goals: the reachable computer\'s rows, no waiting');
+    assert.equal(inbox.inboxDownNote('goals'), 'Box Two did not answer, so its goals are not shown.', 'Goals says so, quietly');
+    const tasks = inbox.coralInboxAdapter.listTasks(); await new Promise(r => setImmediate(r)); mock.timers.tick(8000); await tasks;
+    assert.equal(inbox.inboxDownNote('tasks'), 'Box Two did not answer, so its tasks are not shown.', 'Tasks says so, quietly');
     mock.timers.reset();
 
     // when it answers, both computers' files are listed and nobody is down
@@ -41,5 +44,6 @@ try {
     const ok = await readInboxArtifacts(new URLSearchParams({ limit: '50' }), {});
     assert.deepEqual(ok.artifacts.map(a => a.name).sort(), ['a.md', 'b.md'], 'both computers\' files');
     assert.deepEqual(ok.down, [], 'nobody is down');
+    await inbox.listInboxGoals(); assert.equal(inbox.inboxDownNote('goals'), '', 'the line goes when Box Two answers');
     console.log('inbox_server_timeout: ok');
 } finally { dom.close && dom.close(); }
