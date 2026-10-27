@@ -78,7 +78,10 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 			OR OLD.closed_at IS NOT NEW.closed_at OR OLD.closed_reason IS NOT NEW.closed_reason`
 	const wasClosed, nowClosed = `OLD.state IN ('done', 'dropped')`, `NEW.state IN ('done', 'dropped')`
 	for _, stmt := range []string{
-		`CREATE INDEX IF NOT EXISTS idx_board_tasks_goal ON board_tasks(board_id, goal_id) WHERE goal_id IS NOT NULL`,
+		// The rollup's grouped count reads (board_id, goal_id, status) and nothing else of the task, so the index holds status and the count is index-only (#9584: 1.6 to 0.36 ms for a page of 40 goals). It is the older
+		// (board_id, goal_id) index with a column more, so that one is dropped: the same write cost, the same lookups.
+		`CREATE INDEX IF NOT EXISTS idx_board_tasks_goal_status ON board_tasks(board_id, goal_id, status) WHERE goal_id IS NOT NULL`,
+		`DROP INDEX IF EXISTS idx_board_tasks_goal`,
 		// A board's own uid (boards.board_uid) is set by CreateBoard only, is unique where there is one, and is never changed once set: no backfill (a board made before it has none).
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_boards_board_uid ON boards(board_uid) WHERE board_uid IS NOT NULL`,
 		`CREATE TRIGGER IF NOT EXISTS boards_board_uid_immutable BEFORE UPDATE OF board_uid ON boards WHEN OLD.board_uid IS NOT NULL AND NEW.board_uid IS NOT OLD.board_uid

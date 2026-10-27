@@ -103,8 +103,8 @@
       "type": "index"
     },
     {
-      "name": "idx_board_tasks_goal",
-      "sql": "CREATE INDEX idx_board_tasks_goal ON board_tasks(board_id, goal_id) WHERE goal_id IS NOT NULL",
+      "name": "idx_board_tasks_goal_status",
+      "sql": "CREATE INDEX idx_board_tasks_goal_status ON board_tasks(board_id, goal_id, status) WHERE goal_id IS NOT NULL",
       "tbl_name": "board_tasks",
       "type": "index"
     },
@@ -3347,15 +3347,23 @@
               "seqno": 1
             },
             {
+              "cid": 5,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "status",
+              "seqno": 2
+            },
+            {
               "cid": -1,
               "coll": "BINARY",
               "desc": 0,
               "key": 0,
               "name": null,
-              "seqno": 2
+              "seqno": 3
             }
           ],
-          "name": "idx_board_tasks_goal",
+          "name": "idx_board_tasks_goal_status",
           "origin": "c",
           "partial": 1,
           "seq": 1,
