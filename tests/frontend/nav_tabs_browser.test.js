@@ -2,7 +2,7 @@
 //  - 1440, 1024, 900 and 768 px: one row of plain text tabs with their normal 24 px gap, never wrapped, never touching, clear of
 //    the brand and the action buttons, the active tab marked by its underline (no pill, no icons); when the row is too tight
 //    (large text, eight tabs) the last tabs, never the active one, go under a More menu and stay reachable.
-//  - 390 px: no tab row and no bottom bar; one 44 px dropdown in the top bar names the current view, opens the list of all views,
+//  - 640 to 767 px (the phone dropdown; under 640 px the top row is one hamburger, phone_top_menu, #9021): no tab row and no bottom bar; one 44 px dropdown in the top bar names the current view, opens the list of all views,
 //    switches the view, and closes on Escape and on a click outside; the page opened by a link shows its view; no sideways scroll.
 //  - Nothing here carries an inline handler.
 // Drives Chrome over CDP through agent_view_harness.js; run_cdp_suites.mjs finds CDP suites by that name.
@@ -16,10 +16,10 @@ const BASE = require('./test_base').BASE;
     const { Emulation, Input } = client;
     const { waitStable } = require('./helpers/wait').bind(ev);
     const open = async (w, h, { extraTabs = false, bigText = false, path = '/' } = {}) => {
-        await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: w < 500 });
+        await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: w < 768 });
         // A phone is a touch screen: its targets are the touch size (touch.css); wider windows are mouse-driven.
-        await Emulation.setEmulatedMedia({ features: w < 500 ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [{ name: 'pointer', value: 'fine' }, { name: 'hover', value: 'hover' }] });
-        await Emulation.setTouchEmulationEnabled({ enabled: w < 500, maxTouchPoints: w < 500 ? 5 : 1 });
+        await Emulation.setEmulatedMedia({ features: w < 768 ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [{ name: 'pointer', value: 'fine' }, { name: 'hover', value: 'hover' }] });
+        await Emulation.setTouchEmulationEnabled({ enabled: w < 768, maxTouchPoints: w < 768 ? 5 : 1 });
         await Page.navigate({ url: BASE + path });
         await Page.loadEventFired();
         await install();
@@ -104,8 +104,8 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelector('.top-nav-tab.active').classList.contains('nav-overflowed')`), false, 'the chosen tab is in the row (the active tab is never hidden)');
         console.log(`   ✓ ${tight.length} shown; More lists ${r.more.join(', ')}; choosing ${pick} activates it and keeps it visible`);
 
-        console.log('3. 390 px: a 44 px current-view dropdown replaces the row');
-        await open(390, 844);
+        console.log('3. 700 px (640 to 767 px): a 44 px current-view dropdown replaces the row (under 640 px it is the hamburger: phone_top_menu, #9021)');
+        await open(700, 844);
         assert.equal(await ev(`getComputedStyle(document.querySelector('.top-nav-tabs')).display`), 'none', 'the tab row is gone');
         assert.equal(await ev(`!!document.getElementById('bottom-nav')`), false, 'no bottom bar');
         const sel = (await rects('#nav-select'))[0];
@@ -125,7 +125,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(items.every(i => i[1] >= 44), 'every item is at least 44 px tall');
         assert.deepEqual(items.filter(i => i[2]).map(i => i[0]), ['agents'], 'the current view is marked');
         const box = await ev(`(() => { const m = document.getElementById('nav-more-menu').getBoundingClientRect(), b = document.getElementById('nav-select').getBoundingClientRect(); return { top: m.top, bottom: m.bottom, left: m.left, right: m.right, btnBottom: b.bottom, h: innerHeight }; })()`);
-        assert.ok(box.top >= box.btnBottom && box.left >= 0 && box.right <= 390 && box.bottom <= box.h, `the list opens under the dropdown, inside the screen (${JSON.stringify(box)})`);
+        assert.ok(box.top >= box.btnBottom && box.left >= 0 && box.right <= 700 && box.bottom <= box.h, `the list opens under the dropdown, inside the screen (${JSON.stringify(box)})`);
         await ev(`document.querySelector('#nav-more-menu [data-arg=docs]').click(); true`);
         await waitFor(`document.getElementById('nav-more-menu').hidden`, 'the list to close after a choice', 3000);
         await waitFor(`document.querySelector('.top-nav-tab.active').dataset.arg === 'docs' && document.getElementById('nav-select-label').textContent === 'Docs'`, 'Docs to be current and named', 5000);
@@ -149,7 +149,7 @@ const BASE = require('./test_base').BASE;
         console.log('5. A page opened by a link names its view, in both themes, with no sideways scroll');
         for (const theme of ['dark', 'light']) {
             await ev(`localStorage.setItem('coral-theme', ${JSON.stringify(theme)}); true`);
-            await open(390, 844, { path: '/docs' });
+            await open(700, 844, { path: '/docs' });
             await waitFor(`document.getElementById('nav-select-label').textContent === 'Docs'`, `${theme}: the dropdown names Docs after opening /docs`, 8000);
             const s = await ev(`({ page: document.documentElement.scrollWidth, win: innerWidth })`);
             assert.ok(s.page <= s.win, `${theme}: no sideways page scroll (${s.page} > ${s.win})`);
@@ -158,7 +158,7 @@ const BASE = require('./test_base').BASE;
         console.log('   ✓ /docs opens with "Docs" named, dark and light, no sideways scroll');
 
         console.log('6. No inline handlers');
-        await open(390, 844);
+        await open(700, 844);
         await ev(`document.getElementById('nav-select').click(); true`);
         const inline = await ev(`[...document.querySelectorAll('#nav-select, #nav-select *, #nav-more-menu, #nav-more-menu *, .top-nav-tabs, .top-nav-tabs *')].flatMap(n => [...n.attributes].filter(a => /^on/i.test(a.name)).map(a => n.tagName + '.' + a.name))`);
         assert.deepEqual(inline, [], 'no on* attribute in the navigation');

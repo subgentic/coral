@@ -123,6 +123,16 @@
 
 /* The phone's current-view dropdown (<= 767 px: mobile.css shows it in place of the row). */
 .nav-select { display: none; }
+/* Under 640 px the whole top row is one hamburger (nav_tabs.js, #9021): it names the view and opens the views, Home, Saved, Settings and the account. */
+.top-menu-btn { display: none; }
+.nav-more-sep { height: 1px; margin: 4px 8px; background: var(--border); }
+a.nav-more-item { text-decoration: none; }
+@media (max-width: 639px) {
+    .nav-select, .top-bar-actions > .top-bar-btn, .top-bar-actions .top-bar-settings-wrapper, .top-bar-actions .cloud-account-wrapper { display: none !important; }
+    .top-menu-btn { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; min-height: 44px; margin: 0 8px; padding: 0 12px; background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-ml); color: var(--text-primary); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+    .top-menu-btn .material-icons { font-size: 1.5rem; flex-shrink: 0; }
+    .top-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 
 .top-bar-title {
     display: inline-flex;

@@ -4,9 +4,11 @@
  *    all fit (large text, zoom, more tabs) the last ones (never the active one) move under a "More" menu in the top bar.
  *  - Phone (<= 767 px): the row is replaced by one current-view dropdown in the top bar (44 px tall): it names the view you are
  *    on and opens the list of all views. Escape and a click outside close it.
+ * - Under 640 px (#9021) the top row is one hamburger button: it names the view and opens the views, then Home, Saved for later, Settings (themes, servers, updates) and the account.
  * The buttons drawn here carry the same data-on-click as the tabs, so switching a tab is still the one action. */
 import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
+import { isHub } from './server_base.js';
 
 const ICONS = { agents: 'smart_toy', history: 'chat_bubble_outline', workflows: 'account_tree', jobs: 'schedule', tokens: 'insights',
     docs: 'menu_book', servers: 'dns', 'hub-inbox': 'notifications', board: 'forum', artifacts: 'inventory_2' };
@@ -67,24 +69,63 @@ function makeMore() {
     return b;
 }
 
+/** One entry of the hamburger menu, built with the DOM: an action (the same data-on-click as the control it stands for) or a link. */
+function entry(icon, label, { action, href, onClick } = {}) {
+    const b = document.createElement(href ? 'a' : 'button');
+    if (href) b.href = href; else b.type = 'button';
+    b.className = 'nav-more-item';
+    b.setAttribute('role', 'menuitem');
+    if (action) b.dataset.onClick = action;
+    if (onClick) b.addEventListener('click', onClick);
+    const i = document.createElement('span');
+    i.className = 'material-icons'; i.setAttribute('aria-hidden', 'true'); i.textContent = icon;
+    const l = document.createElement('span');
+    l.textContent = label;
+    b.append(i, l);
+    return b;
+}
+
+/** What the gear and the account buttons hold, as entries (#9021): the settings, the themes, the update check, the servers; on the Hub the account's pages and Sign out, by clicking the account menu's own items. */
+function menuEntries() {
+    const cloud = document.body.classList.contains('cloud-mode');
+    const out = [entry('home', 'Home', { action: 'm-go-home' })];
+    if (!cloud) out.push(entry('star', 'Saved for later', { action: 'm-show-saved' }));
+    out.push(entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }), entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
+    if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
+    if (isHub() || cloud) out.push(entry('dns', 'Servers', { action: 'm-close-top-bar-settings-then-show-servers-modal' }));
+    const account = document.getElementById('cloud-account-menu');
+    if (account) for (const item of account.querySelectorAll('a.overflow-menu-item, button.overflow-menu-item')) {
+        const label = item.textContent.trim();
+        if (label === 'Servers' || label === 'Saved for later' && !cloud) continue; // already above
+        out.push(entry(label === 'Sign out' ? 'lock' : label === 'Account' ? 'account_circle' : 'open_in_new', label, { onClick: () => item.click() })); // the account menu's own handler, so Sign out clears the drafts first
+    }
+    return out;
+}
+
 let _more = [];          // the tabs the row's More menu lists right now
 let _menuFor = null;     // the button that opened the menu
 
 function closeMenu() {
     const menu = document.getElementById('nav-more-menu');
     if (menu) menu.hidden = true;
-    document.querySelectorAll('[data-on-click="m-nav-more"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    document.querySelectorAll('[data-on-click="m-nav-more"], [data-on-click="m-top-menu"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     _menuFor = null;
 }
 
 function openMenu(btn) {
     const menu = document.getElementById('nav-more-menu');
     if (!menu) return;
-    const all = btn.hasAttribute('data-nav-all');
+    const hamburger = btn.id === 'top-menu-btn';
+    const all = hamburger || btn.hasAttribute('data-nav-all');
     const items = all ? availableTabs() : _more;
     if (!items.length) return;
     menu.classList.toggle('nav-all', all);
-    menu.replaceChildren(...items.map(makeItem));
+    menu.classList.toggle('nav-hamburger', hamburger);
+    if (hamburger) {
+        const sep = document.createElement('div'); sep.className = 'nav-more-sep'; sep.setAttribute('role', 'separator');
+        menu.replaceChildren(...items.map(makeItem), sep, ...menuEntries());
+        for (const v of menu.querySelectorAll('.nav-more-item:not([role])')) v.setAttribute('role', 'menuitem');
+    } else menu.replaceChildren(...items.map(makeItem));
     menu.hidden = false;
     const r = btn.getBoundingClientRect();
     menu.style.top = Math.round(r.bottom + 6) + 'px';
@@ -126,7 +167,8 @@ function layoutSelect() {
     if (!label) return;
     const cur = availableTabs().find(t => t.active);
     label.textContent = cur ? cur.label : '';
-    if (_menuFor && _menuFor.id === 'nav-select' && !isPhone()) closeMenu();
+    const top = document.getElementById('top-menu-label'); if (top) top.textContent = cur ? cur.label : '';
+    if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || _menuFor.id === 'top-menu-btn' && !window.matchMedia('(max-width: 639px)').matches)) closeMenu();
 }
 
 let _scheduled = 0;
@@ -140,6 +182,10 @@ function syncNav() {
 }
 
 registerActions({
+    'm-top-menu': (el, event) => {
+        event.stopPropagation();
+        if (_menuFor === el) closeMenu(); else { closeMenu(); openMenu(el); }
+    },
     'm-nav-more': (el, event) => {
         event.stopPropagation();
         if (_menuFor === el) closeMenu(); else { closeMenu(); openMenu(el); }
@@ -157,9 +203,10 @@ if (typeof document !== 'undefined') {
         _obs.observe(nav, { attributes: true, subtree: true, attributeFilter: ['class', 'hidden', 'style', 'aria-current'] });
         window.addEventListener('resize', syncNav);
         window.matchMedia(PHONE_QUERY).addEventListener('change', syncNav);
+        window.matchMedia('(max-width: 639px)').addEventListener('change', syncNav);
         document.addEventListener('click', e => {
             if (!_menuFor) return;
-            if (e.target.closest('#nav-more-menu .nav-more-item') || !e.target.closest('#nav-more-menu, [data-on-click="m-nav-more"]')) closeMenu();
+            if (e.target.closest('#nav-more-menu .nav-more-item') || !e.target.closest('#nav-more-menu, [data-on-click="m-nav-more"], [data-on-click="m-top-menu"]')) closeMenu();
         });
         document.addEventListener('keydown', e => { if (e.key === 'Escape' && _menuFor) { const b = _menuFor; closeMenu(); b.focus(); } });
         syncNav();

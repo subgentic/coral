@@ -781,6 +781,8 @@ registerActions({
     'cmd-send-menu': el => window.toggleSendMenu(el),
     'send-menu-send': () => { sendCommand({ nudge: true }); window.closeSendMenu(); },
     'send-menu-team': () => { sendCommandWithTeam(); window.closeSendMenu(); },
+    'send-menu-options': () => { window.closeSendMenu(); setTimeout(() => document.getElementById('options-chip')?.click(), 0); }, // after this click has passed the outside-click handlers that would close the sheet at once, // under 640 px the Model and thinking chip is not drawn: the chevron's menu opens its sheet (#9021)
+    'send-menu-keys': () => { window.closeSendMenu(); setTimeout(() => document.getElementById('keys-chip')?.click(), 0); }, // and the terminal's Keys
     'send-menu-resend': () => { resendInputPrompt(); window.closeSendMenu(); },
     'send-menu-protocol': () => { sendBoardProtocol(); window.closeSendMenu(); },
     'attachment-remove': el => { const i = indexOf(el.dataset.index); if (i !== null) removeAttachment(i); },

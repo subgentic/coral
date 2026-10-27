@@ -348,6 +348,14 @@ window.toggleSendMenu = function(btn) {
 window.closeSendMenu = function() {
     document.querySelectorAll('.send-btn-menu').forEach(m => m.style.display = 'none');
 };
+// Escape closes the chevron's menu and the focus goes back to the chevron (#9021)
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const open = [...document.querySelectorAll('.send-btn-menu')].find(m => m.style.display !== 'none' && m.getClientRects().length);
+    if (!open) return;
+    window.closeSendMenu();
+    open.parentElement.querySelector('[data-on-click="cmd-send-menu"]')?.focus();
+});
 
 document.addEventListener('keydown', e => {
     const menu = e.target.closest?.('.sidebar-kebab-menu');

@@ -76,6 +76,8 @@
         </div>
         <!-- #3816: on a phone this replaces the tab row: it names the current view and opens the list of all (nav_tabs.js) -->
         <button type="button" id="nav-select" class="nav-select" data-on-click="m-nav-more" data-nav-all="1" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Current view"><span id="nav-select-label" class="nav-select-label"></span><span class="material-icons" aria-hidden="true">expand_more</span></button>
+        <!-- #9021: under 640 px the top row is this one button (nav_tabs.js): it names the view and opens the views, Home, Saved, Settings and the account -->
+        <button type="button" id="top-menu-btn" class="top-menu-btn" data-on-click="m-top-menu" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span><span id="top-menu-label" class="top-menu-label"></span></button>
         <nav class="top-nav-tabs" aria-label="Main navigation">
             <button class="top-nav-tab active" id="nav-tab-agents" data-on-click="m-switch-nav-tab" data-arg="agents" aria-current="page">Agents</button>
             <!-- Inbox right after Agents, on every Coral (inbox_tab.js, #4718, #4811): the hub's /inbox page in a frame where the hub serves the dashboard, the dashboard's own Inbox elsewhere (Needs you, Saved for later); the number of agents waiting for input is its badge. -->
