@@ -2,6 +2,8 @@ package board
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"strings"
@@ -71,14 +73,48 @@ func listFactDiffers() string {
 	return strings.Join(parts, " OR ")
 }
 
-// ensureWorkflowListFacts adds the columns and the triggers, derives the rows that have none yet and re-derives (and logs) the rows that disagree with their document: one pass over the stored documents at
-// every open, in one transaction, so no write lands between the check and the triggers being in place.
+// listFactDerivation names the derivation the columns above are made by: it is the hash of the column definitions, their expressions and the triggers' text (listFactDerivationOf), written to
+// board_derivations once the rows are derived. TestListFactDerivationIsPinned fails when the code changes the derivation without this being updated, which is the reminder to bump it: a changed
+// expression is the one case where rows already derived must be derived again.
+const listFactDerivation = "eae5b4cb650f778f"
+
+const listFactTriggerNames = `'task_workflows_lst_ai', 'task_workflows_lst_au'`
+
+// listFactTriggerSQL is the two triggers' statements over NEW.data.
+func listFactTriggerSQL() []string {
+	out := []string{}
+	for _, t := range []struct{ name, event string }{{"task_workflows_lst_ai", "AFTER INSERT ON task_workflows"}, {"task_workflows_lst_au", "AFTER UPDATE OF data ON task_workflows"}} {
+		out = append(out, `CREATE TRIGGER IF NOT EXISTS `+t.name+` `+t.event+` BEGIN UPDATE task_workflows SET `+listFactAssign("NEW.data")+` WHERE task_id = NEW.task_id; END`)
+	}
+	return out
+}
+
+// listFactDerivationOf is the hash of what derives the columns.
+func listFactDerivationOf() string {
+	h := sha256.New()
+	for _, c := range listFactCols {
+		fmt.Fprintf(h, "%s|%s|%s\n", c.name, c.def, c.none)
+	}
+	fmt.Fprintln(h, listFactAssign("data"))
+	for _, q := range listFactTriggerSQL() {
+		fmt.Fprintln(h, q)
+	}
+	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
+// ensureWorkflowListFacts adds the columns and the triggers and keeps the rows right. The triggers keep every row right for any writer of any version, so the full check (derive the rows that have none, re-derive and
+// log the rows that disagree with their document: ten JSON walks over every stored document, 70 ms on 5,000 workflows and 600 ms on 50,000, #9601) runs only when something could have left a row wrong: the stored
+// derivation is not this code's (a first open, an upgrade, a changed expression), a trigger is missing (a database a binary without them wrote to, or a manual edit of the schema) or a row has no facts yet. Every other open
+// costs three small reads. All in one transaction, so no write lands between the check and the triggers being in place.
 func (s *Store) ensureWorkflowListFacts(ctx context.Context) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS board_derivations (name TEXT PRIMARY KEY, version TEXT NOT NULL) WITHOUT ROWID`); err != nil {
+		return err
+	}
 	cols := append([]struct{ name, def, none string }{{"lst_state", "INTEGER NOT NULL DEFAULT 0", "0"}}, listFactCols...)
 	for _, c := range cols {
 		var n int
@@ -91,28 +127,50 @@ func (s *Store) ensureWorkflowListFacts(ctx context.Context) error {
 			}
 		}
 	}
-	var fresh int
+	var stored string
+	if err := tx.GetContext(ctx, &stored, `SELECT COALESCE((SELECT version FROM board_derivations WHERE name = 'task_workflows_list_facts'), '')`); err != nil {
+		return err
+	}
+	var triggers, fresh int
+	if err := tx.GetContext(ctx, &triggers, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN (`+listFactTriggerNames+`)`); err != nil {
+		return err
+	}
 	if err := tx.GetContext(ctx, &fresh, `SELECT COUNT(*) FROM task_workflows WHERE lst_state = 0`); err != nil {
 		return err
 	}
-	if fresh > 0 {
-		if _, err := tx.ExecContext(ctx, `UPDATE task_workflows SET `+listFactAssign("data")+` WHERE lst_state = 0`); err != nil {
+	if stored != listFactDerivation || triggers != len(listFactTriggerSQL()) || fresh > 0 {
+		if fresh > 0 {
+			if _, err := tx.ExecContext(ctx, `UPDATE task_workflows SET `+listFactAssign("data")+` WHERE lst_state = 0`); err != nil {
+				return err
+			}
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE task_workflows SET `+listFactAssign("data")+` WHERE `+listFactDiffers())
+		if err != nil {
 			return err
 		}
-	}
-	res, err := tx.ExecContext(ctx, `UPDATE task_workflows SET `+listFactAssign("data")+` WHERE `+listFactDiffers())
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n > 0 {
-		log.Printf("board: re-derived the task list facts of %d task workflow(s): they did not match the stored documents", n)
+		if n, _ := res.RowsAffected(); n > 0 {
+			log.Printf("board: re-derived the task list facts of %d task workflow(s): they did not match the stored documents", n)
+		}
 	}
 	// the follow-ups of a task are the rows with its id here: a partial index of the few follow-ups, so task detail does not walk every workflow (#9560)
 	if _, err := tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_task_workflows_parent ON task_workflows(lst_parent) WHERE lst_parent > 0`); err != nil {
 		return err
 	}
-	for _, t := range []struct{ name, event string }{{"task_workflows_lst_ai", "AFTER INSERT ON task_workflows"}, {"task_workflows_lst_au", "AFTER UPDATE OF data ON task_workflows"}} {
-		if _, err := tx.ExecContext(ctx, `CREATE TRIGGER IF NOT EXISTS `+t.name+` `+t.event+` BEGIN UPDATE task_workflows SET `+listFactAssign("NEW.data")+` WHERE task_id = NEW.task_id; END`); err != nil {
+	if stored != listFactDerivation {
+		// CREATE TRIGGER IF NOT EXISTS keeps a trigger of the same name whatever its body: after a changed derivation the old triggers would derive every later write by the old expressions for good
+		for _, name := range []string{"task_workflows_lst_ai", "task_workflows_lst_au"} {
+			if _, err := tx.ExecContext(ctx, `DROP TRIGGER IF EXISTS `+name); err != nil {
+				return err
+			}
+		}
+	}
+	for _, q := range listFactTriggerSQL() {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return err
+		}
+	}
+	if stored != listFactDerivation {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO board_derivations (name, version) VALUES ('task_workflows_list_facts', ?) ON CONFLICT (name) DO UPDATE SET version = excluded.version`, listFactDerivation); err != nil {
 			return err
 		}
 	}

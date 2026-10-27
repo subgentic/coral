@@ -105,6 +105,9 @@ func TestParentTaskColumnIsRepairedAtOpen(t *testing.T) {
 		_, err := s.db.ExecContext(ctx, q)
 		require.NoError(t, err, q)
 	}
+	// an open that finds the stored derivation the code's does not look at the rows (#9610): this drift is what a changed derivation or a missing trigger would be found by
+	_, err = s.db.ExecContext(ctx, `UPDATE board_derivations SET version = 'older' WHERE name = 'task_workflows_list_facts'`)
+	require.NoError(t, err)
 	require.NoError(t, s.Close())
 
 	s, err = NewStoreWithKey(path, "")
