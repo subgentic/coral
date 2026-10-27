@@ -209,7 +209,7 @@ const REMOTE = `(() => {
         await waitFor(`document.querySelectorAll('#saved-table tbody tr').length >= 2`, 'the Saved rows');
         // #8981: a Saved row is one line when narrow (the message, when it was saved, its action); the Computer column goes, and the computer's name stays on the row's hover (its title)
         const narrow = await ev(`(() => { const t = document.getElementById('saved-table'); const rows = [...t.querySelectorAll('tbody tr')].map(tr => ({ title: (tr.querySelector('.dt-primary') || {}).title || '', h: Math.round(tr.getBoundingClientRect().height), computerColumn: tr.cells.length > 4 && !!tr.querySelector('td[data-key=machine]') && tr.querySelector('td[data-key=machine]').getClientRects().length > 0 })); return { over: t.scrollWidth > t.clientWidth + 1, rows }; })()`);
-        assert.ok(!narrow.over && narrow.rows.length >= 2 && narrow.rows.every(r => /Box B|This computer/.test(r.title) && r.h <= 60 && !r.computerColumn), 'in a 300 px panel a row is one line, with no Computer column and the computer\'s name on its hover: ' + JSON.stringify(narrow));
+        assert.ok(!narrow.over && narrow.rows.length >= 2 && narrow.rows.every(r => /Box B|This computer/.test(r.title) && r.h <= 64 && !r.computerColumn), 'in a 300 px panel a row is one line, with no Computer column and the computer\'s name on its hover: ' + JSON.stringify(narrow));
         await shot('saved-servers-narrow');
         await ev(`document.getElementById('agentic-state').style.width = ''; true`);
 

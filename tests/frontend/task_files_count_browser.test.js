@@ -42,6 +42,12 @@ const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
             assert.deepEqual(by['Write the report'], { text: '2 files', name: '2 artifacts, open', icon: 'true' }, at + JSON.stringify(rows));
             assert.deepEqual(by['Draw the diagram'], { text: '1 file', name: '1 artifact, open', icon: 'true' });
             assert.equal(by['A task with nothing attached'], null, at + 'no count for a task with none');
+            if (mobile) { // #8936: a phone's task row is one line (status, title, avatar); the file count is on the task's page, so the button is not drawn in the row (it stays in the page for a screen reader of the wide layout only)
+                const shown = await ev(`[...document.querySelectorAll('#team-panel-tasks button.dt-files')].some(b => b.getClientRects().length > 0)`);
+                assert.equal(shown, false, at + 'a folded phone row does not draw the file count');
+                await shot(`task-files-${w}`);
+                continue;
+            }
             const g = await ev(`(() => { const b = document.querySelector('#team-panel-tasks button.dt-files'), cs = getComputedStyle(b), r = b.getBoundingClientRect(), tr = b.closest('tr').getBoundingClientRect(), pe = getComputedStyle(b, '::after'); return { size: cs.fontSize, weight: cs.fontWeight, h: Math.round(tr.height), hit: [parseFloat(pe.width), parseFloat(pe.height)], inRow: r.right <= tr.right + 1 && r.left >= tr.left - 1, wide: document.documentElement.scrollWidth <= innerWidth }; })()`);
             assert.equal(g.size, '12px'); assert.equal(g.weight, '400'); assert.ok(g.inRow && g.wide, at + JSON.stringify(g));
             if (mobile) { assert.ok(g.hit[0] >= 44 && g.hit[1] >= 44, at + 'its 44 px target: ' + JSON.stringify(g)); assert.ok(g.h <= 80, at + 'a folded row stays compact: ' + g.h); }

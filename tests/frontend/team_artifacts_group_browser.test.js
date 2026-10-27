@@ -76,10 +76,10 @@ const BASE = require('./test_base').BASE;
         await shot('artifacts-goal-filter');
         console.log('   ✓');
 
-        console.log('4b. Ungrouped: a Goal column, the Task column is a link to the task page');
+        console.log('4b. Ungrouped: the Task column is a link to the task page (the goal is a filter and a group head, not a column)');
         await pick('ta-goal', ''); await pick('ta-group', '');
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 4`, 'all four, ungrouped', 8000);
-        assert.ok((await heading()).includes('goal') && (await heading()).includes('task'), JSON.stringify(await heading()));
+        assert.ok(!(await heading()).includes('goal') && (await heading()).includes('task'), JSON.stringify(await heading()));
         await ev(`document.querySelector('#team-panel-artifacts [data-task-link="${t1}"]').click(); true`);
         await waitFor(`!!document.getElementById('team-task-title') && document.getElementById('team-task-title').textContent.includes('Write the report')`, 'the task page', 15000);
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
