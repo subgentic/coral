@@ -29,7 +29,7 @@ var updateTaskOutcomes = map[string]int{
 	"removing blockers mixed with other edits":   20,
 	"not a planner (assign or remove blockers)":  20,
 	"title or priority of a missing task":        10,
-	"title or priority by a non-creator":         20,
+	"title or priority by a non-planner":         20,
 	"title or priority without an actor":         10,
 	"archived assignee":                          10,
 	"bad blocked_by":                             10,
@@ -265,7 +265,7 @@ func runUpdateTaskOracle(t *testing.T, seed int64, counts map[string]int) {
 		case msg == "Task not found":
 			counts["title or priority of a missing task"]++
 		case strings.Contains(msg, "change its title or priority"):
-			counts["title or priority by a non-creator"]++
+			counts["title or priority by a non-planner"]++
 		case msg == "subscriber_id required":
 			counts["title or priority without an actor"]++
 		case code == "assignee_archived":
@@ -419,7 +419,7 @@ func (h *BoardHandler) updateTaskBefore4756(w http.ResponseWriter, r *http.Reque
 	if raw.AssignedTo != nil && h.refuseArchivedAssignee(w, r.Context(), project, *raw.AssignedTo) {
 		return
 	}
-	// #8951 deliberately changes text-only edits: creator authority, immutable
+	// #8951 deliberately changes text-only edits: planner authority, immutable
 	// versions and edits during review. This adapter applies that new contract;
 	// the oracle below still compares the legacy reassignment/blocker behavior.
 	if (raw.Title != nil || raw.Priority != nil) && raw.AssignedTo == nil && len(raw.BlockedBy) == 0 && !removingBlockers {

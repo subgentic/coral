@@ -36,13 +36,10 @@ func (h *BoardHandler) requireTaskTextEditor(w http.ResponseWriter, r *http.Requ
 	if actor == "Operator" {
 		return h.requireTaskPlanner(w, r, project, actor)
 	}
-	if actor == t.CreatedBy {
-		return true
-	}
 	if h.isTaskPlanner(r.Context(), project, actor) {
 		return true
 	}
-	errForbidden(w, "only the task creator, Operator or an active registered orchestrator may change its title or priority")
+	errForbidden(w, "only Operator or an active registered orchestrator may change its title or priority, or restore task text")
 	return false
 }
 func (h *BoardHandler) announceTaskTextEdit(ctx context.Context, project, editor string, before, task *board.Task) {
@@ -71,7 +68,7 @@ func (h *BoardHandler) announceTaskTextEdit(ctx context.Context, project, editor
 		parts = append(parts, fmt.Sprintf("%s %q → %q", k, d.Before, d.After))
 	}
 	// Bounded diffs keep a long body/title from exceeding a board message limit.
-	diff := strings.Join(parts, "; ")
+	diff := taskNoticeText(strings.Join(parts, "; "))
 	if len([]rune(diff)) > 3000 {
 		diff = string([]rune(diff)[:3000]) + "… (full diff: task history)"
 	}
@@ -119,3 +116,6 @@ func (h *BoardHandler) taskVersionRead(w http.ResponseWriter, r *http.Request, i
 	errNotFound(w, "task version not found")
 	return true
 }
+
+// Task text is quoted data, not an invitation to notify its embedded @names.
+func taskNoticeText(text string) string { return strings.ReplaceAll(text, "@", "(at)") }

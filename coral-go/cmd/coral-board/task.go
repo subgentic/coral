@@ -138,7 +138,7 @@ Subcommands:
   goal <task-id> <goal-id|none>    Put a task on a goal of this board, move it, or take it off (coral-board goal ... manages the goals)
   claim [id]                       Claim a specific task or the next available one
   current                          Show your current in-progress task
-  edit <id> --title TEXT [--priority P]  Edit text as a new version (creator, orchestrator or Operator)
+  edit <id> --title TEXT [--priority P]  Edit text as a new version (Operator or active orchestrator only)
   edit <id> --restore-version K     Restore old text as a new version; --base-version K refuses a concurrent edit
   history <id>                     Immutable text versions, editors, times and field diffs
   detail <id> [--version K] [--json]             Read task instructions, inputs and results (always JSON; --json is accepted)

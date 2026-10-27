@@ -18,7 +18,7 @@ import (
 // 2. Orchestrator creation (job_title=Orchestrator or can_peek=1)
 // 3. Worker denial (create, reassign, PATCH assigned_to)
 // 4. Mismatched actor spoofing (created_by != subscriber_id)
-// 5. Worker title-only edit allowed without planner check
+// 5. Worker title-only edit refused without planner authority
 // 6. Cross-board and inactive registration denial
 // 7. Preserved worker claim and completion
 func TestTaskAuthorization_ComprehensiveIndependentVerification(t *testing.T) {
