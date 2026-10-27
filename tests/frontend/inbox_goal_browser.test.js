@@ -57,7 +57,10 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`location.pathname`), `/inbox/tasks/${B}/${t1.json.id}`, 'Inbox task row stays in the Inbox');
         await ev(`[...document.querySelectorAll('#inbox-page .goals-facts dt')].find(x => x.textContent === 'Goal').nextElementSibling.querySelector('button').click(); true`);
         await waitFor(`document.querySelector('#inbox-page #goals-detail-title')?.textContent === 'Ship the new installer' && location.pathname.startsWith('/inbox/goals/')`, 'task Goal link opens the goal in the Inbox (#8861)', 10000);
-        await shot('inbox-task-goal');
+        await shot('inbox-task-goal'); // the landing screen: the goal in the Inbox
+        await ev(`document.querySelector('#inbox-page .goals-back').click(); true`); // Back returns to the task it was opened from, not the folder
+        await waitFor(`location.pathname.startsWith('/inbox/tasks/') && !!document.querySelector('#inbox-page .team-task-page')`, 'Back returns to the task (#8861)', 10000);
+        await shot('inbox-task-goal-back');
         console.log('PASS the goal a waiting agent or task serves');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(err => { console.error(err); process.exit(1); });
