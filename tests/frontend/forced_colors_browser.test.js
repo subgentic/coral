@@ -81,7 +81,7 @@ const MD = '# Migration plan\n\n## Steps\n\n1. Add the new columns behind a flag
             await ev(`window.hideLaunchModal(); true`);
 
             console.log(`8. ${mode}: count and status chips keep a shape, and a pressed toggle is marked (#5735)`);
-            const chips = await ev(`(() => { const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:0;top:0'; const names = ['nav-tab-badge', 'agentic-tab-count', 'live-job-badge live-job-badge-cron', 'badge session-state-pill', 'wf-status-badge failed', 'section-count-badge', 'terminal-state-pill'];
+            const chips = await ev(`(() => { const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:0;top:0'; const names = ['nav-tab-badge', 'agentic-tab-count', 'dt-chip goal-chip team-state-bad sched-status', 'badge session-state-pill', 'wf-status-badge failed', 'section-count-badge', 'terminal-state-pill'];
                 host.innerHTML = names.map(n => '<span class="' + n + '">3</span>').join('') + '<button class="perm-chip" aria-pressed="true">on</button><button class="perm-chip" aria-pressed="false">off</button>'; document.body.append(host);
                 const out = { chips: {}, on: null, off: null }; names.forEach((n, i) => { out.chips[n] = getComputedStyle(host.children[i]).borderTopWidth; });
                 out.on = getComputedStyle(host.children[names.length]).borderTopWidth + ' ' + getComputedStyle(host.children[names.length]).borderTopColor; out.off = getComputedStyle(host.children[names.length + 1]).borderTopWidth + ' ' + getComputedStyle(host.children[names.length + 1]).borderTopColor; host.remove(); return out; })()`);
