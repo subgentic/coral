@@ -81,13 +81,13 @@
 
 /* ── New job / Edit job (#6540, #6578) ─────────────────────── */
 
-.sched-cron-field { display: block; font-size: var(--fs-md); color: var(--text-secondary); font-weight: 500; margin-bottom: 12px; }
+.sched-cron-field { display: block; font-size: var(--fs-md); color: var(--text-secondary); font-weight: var(--fw-medium); margin-bottom: 12px; }
 .job-help code { margin: 0 .2em; }
 .job-help { font-size: var(--fs-base); color: var(--text-secondary); margin: -6px 0 12px; }
 .job-no-workflows { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: var(--fs-md); color: var(--text-secondary); margin: -4px 0 12px; }
 .job-no-workflows .btn { margin: 0; }
 .job-more { margin-top: 4px; }
-.job-more > summary { color: var(--text-primary); font-weight: 600; }
+.job-more > summary { color: var(--text-primary); font-weight: var(--fw-strong); }
 .sched-limit-fields { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 8px; }
 .sched-limit-fields > * { margin-top: 4px; }
 .sched-limit-fields input, .sched-limit-fields select { margin-top: 0; }
@@ -123,7 +123,7 @@
     background: transparent;
     color: var(--text-secondary);
     font-size: var(--fs-md);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
 }
@@ -147,7 +147,7 @@
 .sched-header h2 {
     margin: 0;
     font-size: 1.0625rem; /* an item's page title: 17/700 (#7443) */
-    font-weight: 700;
+    font-weight: var(--fw-strong);
 }
 
 /* The job's page fills the view, so its bar is at the foot of the screen and, on a long page, stays there; the view's padding is taken back so the page does not show under it */
@@ -199,7 +199,7 @@
 .sched-prompt-shown h3,
 .sched-prompt-section > summary {
     font-size: var(--fs-lg); /* a section heading: 14/600 */
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     margin-bottom: 8px;
 }
 
@@ -213,7 +213,7 @@
 
 
 /* A run that failed because the agent's CLI is not signed in (#5471): the words, what to do, and a tag after the status in a table */
-.run-failure-text { font-weight: 600; }
+.run-failure-text { font-weight: var(--fw-strong); }
 .run-failure-hint { color: var(--text-secondary); }
 
 .sched-prompt-section > summary { display: flex; align-items: center; gap: 4px; list-style: none; }
@@ -228,7 +228,7 @@
 .sched-path { font-family: var(--font-mono, monospace); font-size: var(--fs-md); }
 .sched-link { color: var(--accent); }
 .sched-settings { margin: 6px 0 12px; }
-.sched-settings > summary { cursor: pointer; color: var(--text-secondary); min-height: 28px; font-size: var(--fs-md); font-weight: 500; }
+.sched-settings > summary { cursor: pointer; color: var(--text-secondary); min-height: 28px; font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .sched-more { position: relative; }
 .sched-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 120px; padding: 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
 .sched-more-menu[hidden] { display: none; }

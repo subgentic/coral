@@ -1,13 +1,13 @@
 /* Auto-update UI (#5275), from the approved mockup (#5270). Tokens are the dashboard's own, so both themes follow. No animation anywhere: the state is a colour, a word and a number of days. */
 
 /* the control in the top bar: before the icons. One state at a time: fresh (green), warm (orange, ready for 2 days or more), stale (red, 7 days or more). The text is the dashboard's text colour on a faint tint; the colour is the dot and the border, and the age is said in words too, so colour is never the only signal. */
-.update-pill { --update-c: var(--success); display: inline-flex; align-items: center; gap: 8px; margin-right: 8px; padding: 4px 12px 4px 10px; min-height: 32px; border-radius: 999px; border: 1px solid var(--update-c); background: color-mix(in srgb, var(--update-c) 12%, var(--bg-secondary)); color: var(--text-primary); font: inherit; font-size: var(--fs-sm, 0.8125rem); font-weight: 600; white-space: nowrap; cursor: pointer; }
+.update-pill { --update-c: var(--success); display: inline-flex; align-items: center; gap: 8px; margin-right: 8px; padding: 4px 12px 4px 10px; min-height: 32px; border-radius: 999px; border: 1px solid var(--update-c); background: color-mix(in srgb, var(--update-c) 12%, var(--bg-secondary)); color: var(--text-primary); font: inherit; font-size: var(--fs-sm, 0.8125rem); font-weight: var(--fw-strong); white-space: nowrap; cursor: pointer; }
 .update-pill[data-age="warm"] { --update-c: var(--warning); }
 .update-pill[data-age="stale"] { --update-c: var(--error); }
 .update-pill:hover { background: color-mix(in srgb, var(--update-c) 22%, var(--bg-secondary)); }
 .update-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .update-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--update-c); flex: none; }
-.update-age { font-weight: 500; } /* the dashboard's text colour like the label: the secondary colour on the red tint was 4.36:1 (light theme) */
+.update-age { font-weight: var(--fw-medium); } /* the dashboard's text colour like the label: the secondary colour on the red tint was 4.36:1 (light theme) */
 .update-pill[hidden] { display: none; }
 .update-pill[aria-disabled="true"] { border-style: dashed; cursor: default; color: var(--text-secondary); } /* not available now (#7338): drawn as unavailable, no hover lift; it stays focusable so its label says why */
 .update-pill[aria-disabled="true"]:hover { background: color-mix(in srgb, var(--update-c) 12%, var(--bg-secondary)); }
@@ -27,7 +27,7 @@
 .update-agents { list-style: none; margin: var(--space-sm, 6px) 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .update-agents li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 var(--space-lg, 12px); }
 .update-agent-note { flex: 1 0 100%; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
-.update-agent-name { font-weight: 600; overflow-wrap: anywhere; }
+.update-agent-name { font-weight: var(--fw-strong); overflow-wrap: anywhere; }
 .update-agent-state { color: var(--text-secondary); white-space: nowrap; }
 .update-keep, .update-later-note, .update-calm { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .update-confirm { max-width: none; width: 100%; } .update-confirm .modal-actions { flex-direction: column-reverse; } .update-confirm .modal-actions .btn { width: 100%; min-height: 44px; } }
@@ -81,7 +81,7 @@
 
 /* The update channel and the releases waiting for approval (#5558) */
 .update-waiting { margin: 0 0 var(--space-lg, 12px); }
-.update-waiting > summary { cursor: pointer; font-weight: 600; min-height: var(--control-height, 32px); display: flex; align-items: center; color: var(--text-primary); }
+.update-waiting > summary { cursor: pointer; font-weight: var(--fw-strong); min-height: var(--control-height, 32px); display: flex; align-items: center; color: var(--text-primary); }
 .update-waiting > .update-calm { margin: 2px 0 8px; }
 .update-waiting .update-status { margin: 0 0 8px; }
 .update-waiting code { font-family: var(--font-mono, monospace); }

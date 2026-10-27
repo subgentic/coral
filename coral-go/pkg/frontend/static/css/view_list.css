@@ -21,7 +21,7 @@
 }
 .view-list-item:hover:not(:disabled) { background: var(--bg-hover); }
 .view-list-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.view-list-current { background: var(--bg-hover); color: var(--text-primary); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.view-list-current { background: var(--bg-hover); color: var(--text-primary); font-weight: var(--fw-strong); box-shadow: inset 3px 0 0 var(--accent); }
 .view-list-current .view-list-count { color: var(--text-primary); } /* on the hover-coloured current row the secondary colour is under 4.5:1 in the light theme */
 /* the red count pill: the same make as the tab strip's unread badge (layout.css .nav-tab-badge) */
 .view-list-count.view-list-alert {
@@ -30,7 +30,7 @@
     border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--rail-badge-unread) 82%, black);
     color: var(--rail-badge-text);
-    font-weight: 700;
+    font-weight: var(--fw-strong);
     line-height: 16px;
     text-align: center;
 }
@@ -42,8 +42,8 @@
 .view-list-icon svg { width: 1.125rem; height: 1.125rem; }
 .view-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .view-list-dot { width: 9px; height: 9px; border-radius: var(--radius-xs); flex: none; background: var(--view-list-dot); }
-.view-list-count { flex: none; font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); }
-.view-list-select { display: none; width: 100%; height: 44px; padding: 0 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); font-family: var(--font-sans); font-size: var(--fs-lg); font-weight: 600; }
+.view-list-count { flex: none; font-size: var(--fs-base); font-weight: var(--fw-regular); color: var(--text-secondary); }
+.view-list-select { display: none; width: 100%; height: 44px; padding: 0 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); font-family: var(--font-sans); font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .view-list-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 767px) {
     .view-list-nav { display: none; }
