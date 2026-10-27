@@ -133,7 +133,7 @@ func (s *WorkflowStore) SeedDemoWorkflow(ctx context.Context, schedStore *Schedu
 	// Mark as seeded before creating so we never re-seed even if creation fails
 	s.db.ExecContext(ctx, "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('demo_workflows_seeded', '1')")
 
-	stepsJSON := `[{"name":"generate-message","type":"agent","prompt":"Generate a single short, unique, and inspiring motivational message (2-3 sentences max). Output ONLY the message text, nothing else — no quotes, no labels, no explanation."},{"name":"show-notification","type":"shell","command":"MSG=$(cat {{prev_stdout}}) && curl -s -X POST http://localhost:${CORAL_PORT}/api/notifications -H 'Content-Type: application/json' -d \"{\\\"title\\\":\\\"☀️ Daily Motivation\\\",\\\"message\\\":\\\"$MSG\\\",\\\"type\\\":\\\"alert\\\",\\\"level\\\":\\\"success\\\",\\\"link\\\":{\\\"label\\\":\\\"Learn about Workflows →\\\",\\\"url\\\":\\\"docs://workflow-quickstart\\\"}}\""}]`
+	stepsJSON := `[{"name":"generate-message","type":"agent","prompt":"Generate a single short, unique, and inspiring motivational message (2-3 sentences max). Output ONLY the message text, nothing else — no quotes, no labels, no explanation."},{"name":"show-notification","type":"shell","command":"MSG=$(cat {{prev_stdout}}) && coral-agent notify --title \"☀️ Daily Motivation\" --message \"$MSG\" --level success --alert"}]`
 	defaultAgentJSON := `{"agent_type":"claude"}`
 
 	wf, err := s.CreateWorkflow(ctx, &Workflow{
