@@ -1,0 +1,67 @@
+// The phone Inbox's rows read like mail (#9545, UI/UX's spec #9529): a 44 px leading target around a 32 px avatar, the title and the first words of what it says on one line, the time at the right, 56 px a row
+// (Needs you, a list of agents: the ask is a second line, 64 px, the title bold, an amber dot). Tasks: a state glyph in a square, the title, the state. No unread marker anywhere else (a read state exists only for Needs you).
+// A desktop keeps its table. 390 and 412 px with touch, isolated dev server, the Inbox's census world and two waiting agents.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { connect } = require('./agent_view_harness');
+const { INBOX_WORLD } = require('./helpers/inbox_world');
+const BASE = require('./test_base').BASE;
+
+const iso = ms => new Date(Date.now() - ms).toISOString();
+const AGENTS = [
+    { name: 'ag-one', session_id: '00000001-0000-4000-8000-000000000001', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Agent One', working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Wants to run: go test ./pkg/... -run TestMailRows with a command long enough to be cut', waiting_since: iso(300000), board_project: 'team-a', sleeping: false },
+    { name: 'ag-two', session_id: '00000002-0000-4000-8000-000000000002', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Agent Two', working_directory: '/repo/b', waiting_for_input: true, waiting_kind: 'permission', waiting_since: iso(120000), board_project: 'team-b', sleeping: false },
+];
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const T = '#group-table-view';
+    const rows = () => ev(`(() => [...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const r = e => e && e.getBoundingClientRect(), q = s => tr.querySelector(s), box = r(tr);
+        return { h: Math.round(box.height), lead: Math.round(r(q('.dt-mail-lead')).height), leadW: Math.round(r(q('.dt-mail-lead')).width), avatar: Math.round(r(q('.dt-mail-avatar')).width), title: q('.dt-mail-title').textContent, snippet: q('.dt-mail-snippet').textContent, ask: q('.dt-mail-ask') && q('.dt-mail-ask').textContent,
+            time: q('.dt-mail-time').textContent, bold: getComputedStyle(q('.dt-mail-title')).fontWeight, dot: !!q('.dt-mail-dot'), sameLine: Math.abs(r(q('.dt-mail-title')).top - r(q('.dt-mail-snippet')).top) < 4, timeRight: Math.round(box.right - r(q('.dt-mail-time')).right), open: !!q('button.dt-mail-open') }; }))()`);
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true]]) {
+            const at = `${w}px: `;
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await ev(INBOX_WORLD);
+            await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS)}; m.updateInboxTab(); return true; })()`);
+            await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
+            await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
+            await waitFor(`document.querySelectorAll('${T} .dt-table tbody tr').length === 2 && document.querySelector('${T}').getClientRects().length > 0`, at + 'the two waiting agents', 10000);
+            if (!mobile) {
+                assert.equal(await ev(`document.querySelectorAll('${T} tr.dt-mailed').length`), 0, at + 'a desktop keeps its table');
+                console.log('PASS ' + at + 'no mail rows on a desktop');
+                continue;
+            }
+            let r = await rows();
+            await shot(`inbox-mail-needs-${w}`);
+            assert.equal(r.length, 2, at + 'two mail rows ' + JSON.stringify(r));
+            for (const x of r) {
+                assert.ok(x.leadW >= 44 && x.lead >= 44 && x.avatar === 32, at + 'a 44 px target around a 32 px avatar ' + JSON.stringify(x));
+                assert.ok(x.open && x.dot && x.bold >= 600, at + 'a button, the amber dot, the title bold ' + JSON.stringify(x));
+                assert.ok(x.h >= 64 && x.h <= 72 && x.ask, at + 'Needs you is two lines, 64 px or more ' + JSON.stringify(x));
+                assert.ok(x.timeRight <= 16 && /ago|min|\d/.test(x.time), at + 'the time is at the right ' + JSON.stringify(x));
+            }
+            assert.ok(r.some(x => /^Wants to run: go test/.test(x.ask)) && r.some(x => x.ask && x.title === 'Agent Two'), at + 'the ask is the second line, the state when there is none ' + JSON.stringify(r));
+            assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
+            await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
+            await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 3`, at + 'the three tasks as mail rows', 10000);
+            r = await rows();
+            for (const x of r) {
+                assert.ok(x.h >= 56 && x.h <= 60 && !x.ask && !x.dot && x.sameLine && x.leadW >= 44 && x.open, at + 'a task is one 56 px line, no dot ' + JSON.stringify(x));
+                assert.ok(x.bold <= 500, at + 'no unread bold where nothing is unread ' + JSON.stringify(x));
+            }
+            assert.deepEqual(r.map(x => x.snippet), ['Queued', 'In progress', 'In review'], at + 'the state is the first words');
+            assert.deepEqual(r.map(x => x.title), ['Pick the release date', 'Check <img src=x onerror="window.__pwn=1"> the logo', 'Approve the budget'], at + 'the titles, as text');
+            assert.equal(await ev(`window.__pwn`), undefined, at + 'a title is text, never markup');
+            await shot(`inbox-mail-tasks-${w}`);
+            await ev(`document.querySelector('${T} tr.dt-mailed button.dt-mail-open').click(); true`);
+            await waitFor(`document.getElementById('inbox-page').getClientRects().length > 0 && !!document.querySelector('#inbox-page .ibx-reply-input')`, at + 'a tap opens the task', 10000);
+            console.log('PASS ' + at + 'mail rows: Needs you and Tasks');
+        }
+    } finally { await client.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

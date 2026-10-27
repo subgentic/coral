@@ -376,3 +376,34 @@
 
 /* A one-line table on a phone (#8931, #8982, #9051): a name (a row's primary button) and a row's own link are 44 px targets, as they are in the folded rows */
 @media (max-width: 760px), (pointer: coarse) { .dt-box.dt-one-line .dt-link, .dt-box.dt-one-line .dt-primary { display: inline-flex; align-items: center; min-height: var(--table-touch); min-width: var(--table-touch); } }
+
+/* The phone's mail row (#9545; data_table.js mail option, UI/UX's spec #9529): 56 px (64 with an ask), a 44 px leading target around a 32 px avatar, the title and the first words on one line, the time at the right. Only a phone draws it. */
+.dt-mail-cell { display: flex; flex: 1 1 auto; align-items: stretch; min-width: 0; padding: 0; }
+.dt-mail-lead { flex: none; display: grid; place-items: center; width: var(--table-touch); min-height: var(--table-touch); }
+.dt-mail-avatar { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--on-avatar); font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.dt-mail-avatar.material-icons { font-size: var(--fs-lg); }
+.dt-mail-square { border-radius: var(--radius-lg); }
+.dt-box .dt-mail-open.dt-primary, .dt-box .dt-mail-open { display: flex; width: auto; overflow: visible; white-space: normal; flex: 1; align-items: center; gap: 8px; min-width: 0; min-height: calc(var(--table-touch) + 12px); margin: 0; padding: 0 12px 0 4px; border: 0; background: none; color: var(--table-primary-color); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.dt-mail-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dt-mail-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dt-mail-line { display: flex; gap: 8px; min-width: 0; font-size: var(--fs-md); }
+.dt-mail-title { flex: 0 1 auto; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-regular); color: var(--table-primary-color); }
+.dt-mail-snippet { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); }
+.dt-mail-ask { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--table-secondary-color); }
+.dt-mail-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.dt-mail-time { font-size: var(--fs-base); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dt-mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.dt-mail-dot.dt-mail-attention { background: var(--warning); }
+.dt-mail-unread .dt-mail-title { font-weight: var(--fw-strong); }
+.dt-mail-unread .dt-mail-snippet { color: var(--table-secondary-color); }
+.dt-mail-unread .dt-mail-time { font-weight: var(--fw-strong); color: var(--table-primary-color); }
+.dt-box.dt-mail-on thead { display: none; }
+.dt-box.dt-mail-on .dt-table, .dt-box.dt-mail-on tbody { display: block; }
+.dt-box.dt-mail-on tr.dt-mailed { display: flex; align-items: stretch; flex-wrap: nowrap; padding: 0 0 0 4px; min-height: 56px; }
+.dt-box.dt-mail-on tr.dt-mailed > td.dt-mail-cell { display: flex; }
+.dt-box.dt-mail-on .dt-check { display: none; }
+.dt-box.dt-mail-on.dt-selecting .dt-check { display: block; flex: none; width: var(--table-touch); }
+.dt-box .dt-mail-open.dt-primary:has(.dt-mail-two) { padding-block: 12px; min-height: 64px; }
+.dt-box.dt-mail-on tr.dt-mailed, .dt-box.dt-mail-on td.dt-mail-cell { height: auto; overflow: visible; }
+.dt-box.dt-mail-on td.dt-mail-cell { max-width: none; padding: 0; border: 0; }
+.dt-box.dt-mail-on tr.dt-mailed::before { content: none; } /* the folded column row's line break is not a part of a mail row */
