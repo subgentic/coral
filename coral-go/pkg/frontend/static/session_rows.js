@@ -3,7 +3,6 @@ import { getDotClass, resolveSessionIdentity, sessionStateInfo, sessionUnreadCou
 import { _saveSessionOrder } from './list_order.js';
 import { MORE_DOTS_SVG, escapeHtml, escapeAttr, agentNameColor } from './utils.js';
 import { autoAcceptChip, autoAcceptMenuItem } from './auto_accept.js';
-import { formatTokens } from './format.js';
 import { getCachedAgentAvailability } from './team_availability.js';
 import { isGoneAsleep, isExitedAsleep } from './terminal_gone.js';
 import { isStaleSession, staleReason, serversShown } from './server_status.js';
@@ -251,7 +250,6 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // A message the paste gate held (the last automated one Coral did not type, #7727) is a state a person must see: the row's one chip, "Message held", when no attention chip owns it (Needs you wins; the hold stays in the tip and on the page).
     const skipped = s.sleeping || !(Number(s.board_unread) > 0) ? null : skippedOf(s);
     const heldChip = !waitingBadge && skipped ? ` <span class="chip chip-caps session-state-pill neutral session-held-chip" title="${escapeAttr(skipped.why)}">Message held</span>` : '';
-    const ctxPill = waitingBadge || heldChip ? '' : _renderCtxPill(s);
     const ctxHigh = s.context_pct !== null && s.context_pct !== undefined && s.context_pct >= 80;
     const isTerminal = s.agent_type === "terminal";
     const sid = s.session_id || ""; // raw: every use below escapes it (it was escaped here too, and a second time at each use: an id with a quote or an ampersand reached the click handlers as "&#39;")
@@ -308,7 +306,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
                 <span class="session-dot ${dotClass}${ctxHigh ? ' ctx-high' : ''}" title="${escapeAttr(stateInfo.label)}" aria-hidden="true"></span>
                 <span class="session-label list-row-title${nameTail ? ' session-label-split' : ''}" title="${escapeAttr(displayLabel)}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}
                 <span class="session-name-spacer"></span>
-                ${stale ? '' : waitingBadge + heldChip + ctxPill}
+                ${stale ? '' : waitingBadge + heldChip}
                 ${stale ? '' : kebabMenu}
             </div>
         </div>
@@ -497,14 +495,3 @@ export function _attachDragListeners(list, roots = [list]) {
     }
 }
 
-/** Line-1 context pill, only at >=80% (D3 thresholds; explicit null = unknown = nothing). */
-function _renderCtxPill(s) {
-    const pct = s.context_pct;
-    if (pct === null || pct === undefined || pct < 80) return '';
-    const label = pct >= 100 ? 'ctx full' : `ctx ${Math.round(pct)}%`;
-    const win = s.context_window || 0;
-    const title = win > 0
-        ? `Context: ${formatTokens(Math.round(win * pct / 100))} / ${formatTokens(win)} tokens (${pct}%)`
-        : `Context: ${pct}%`;
-    return ` <span class="chip chip-caps session-ctx-pill${pct >= 100 ? ' ctx-full' : ''}" title="${escapeAttr(title)}">${label}</span>`;
-}

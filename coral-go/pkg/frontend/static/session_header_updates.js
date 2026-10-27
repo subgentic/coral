@@ -35,19 +35,20 @@ function _syncHeaderFolder() {
 export function updateSessionModel(s) {
     const model = s ? modelName(s.agent_type, s.model, sessionServer(s)) : '';
     const level = s ? sessionLevel(s) : null;
-    _details.model = model; _details.thinking = level ? `${level.name}${level.requested ? ' (as started)' : ''}` : '';
+    const pct = s && s.context_pct, ctx = pct === null || pct === undefined ? '' : pct >= 100 ? 'ctx full' : `ctx ${Math.round(pct)}%`; // the context window's use (the row's pill moved here, #9686)
+    _details.model = model; _details.thinking = level ? `${level.name}${level.requested ? ' (as started)' : ''}` : ''; _details.context = ctx;
     _syncPhoneDetails();
     const el = document.getElementById("terminal-header-model");
     if (!el) return;
-    const text = [model, level && level.name].filter(Boolean).join(' \u00b7 ');
+    const text = [model, level && level.name, ctx].filter(Boolean).join(' \u00b7 ');
     setHidden(el, !text);
     if (!text) return;
     setText(el.querySelector(".terminal-folder-text"), text);
-    setTitle(el, [model && `Model ${model}`, level && `Thinking ${level.name}${level.requested ? ' (as started)' : ''}`].filter(Boolean).join(', '));
+    setTitle(el, [model && `Model ${model}`, level && `Thinking ${level.name}${level.requested ? ' (as started)' : ''}`, ctx && `Context ${ctx.replace('ctx ', '')}`].filter(Boolean).join(', '));
 }
 
 // A phone's Details disclosure (#9686): the four facts the agent row no longer says, one tap away; a row with no value is not drawn, and with none the disclosure is not either.
-const _details = { folder: '', branch: '', model: '', thinking: '' };
+const _details = { folder: '', branch: '', model: '', thinking: '', context: '' };
 function _syncPhoneDetails() {
     const box = document.getElementById('agent-phone-details');
     if (!box) return;

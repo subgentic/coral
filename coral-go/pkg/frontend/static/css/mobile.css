@@ -808,10 +808,6 @@
         font-weight: var(--fw-medium); /* agents are children of the 600-weight group header */
     }
 
-    #mobile-session-list .waiting-badge,
-    #mobile-session-list .session-state-pill {
-        display: none; /* the phone shows the state chip in the meta row */
-    }
 
     
 
