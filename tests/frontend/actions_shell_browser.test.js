@@ -126,7 +126,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const del = await spy(['showConfirmModal'], `
             const sel = document.getElementById('theme-load-select'); const o = document.createElement('option'); o.value = 'qa-3645'; sel.appendChild(o); sel.value = 'qa-3645';
             document.querySelector('#theme-configurator-modal [data-on-click="theme-delete"]').click(); o.remove();`);
-        check('the theme editor’s Delete still asks first', del.length === 1 && del[0][1] === 'Delete Theme', JSON.stringify(del.map(c => c.slice(0, 2))));
+        check('the theme editor’s Delete still asks first', del.length === 1 && del[0][1] === 'Delete theme', JSON.stringify(del.map(c => c.slice(0, 2))));
         await ev(`document.querySelector('#theme-configurator-modal [data-on-click="theme-close"]').click(); true`);
         check('the theme editor’s Cancel closes it', await ev(`getComputedStyle(document.getElementById('theme-configurator-modal')).display === 'none'`));
 

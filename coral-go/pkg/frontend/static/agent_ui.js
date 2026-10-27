@@ -197,7 +197,7 @@ export async function refreshAgentUI() {
                 showActivePanel(); // at once, like a row click: no need to wait for a request in flight
                 refreshAgentUI();
             };
-            remove.onclick = () => window.showConfirmModal('Delete Panel', `Delete “${panel.title}”? This removes the panel and its saved responses.`, async () => {
+            remove.onclick = () => window.showConfirmModal('Delete panel', `Delete “${panel.title}”? This removes the panel and its saved responses.`, async () => {
                 remove.disabled = true;
                 try {
                     const response = await serverFetch(serverForSession(null, sid), endpoint(sid, panel.id), { method: 'DELETE' });

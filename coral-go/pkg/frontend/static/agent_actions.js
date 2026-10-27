@@ -26,7 +26,7 @@ export function killCount(n) {
 export function killSessionDirect(name, agentType, sessionId) {
     const server = serverForSession(name, sessionId);
     const row = (state.liveSessions || []).find(s => s.session_id === sessionId);
-    showConfirmModal('Kill Session', `Kill session "${name}"? This will terminate the agent. ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
+    showConfirmModal('Kill session', `Kill session "${name}"? This will terminate the agent. ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
         const result = await killLiveSession({ name, agent_type: agentType, session_id: sessionId }, server);
         if (!result) throw new Error('the kill answer was not JSON');
         if (result.error) { showToast(result.error, true); return; }
@@ -99,7 +99,7 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep Agent', `Put "${name}" to sleep?`, doIt, undefined, { danger: false, label: 'Sleep agent' });
+        showConfirmModal('Sleep agent', `Put "${name}" to sleep?`, doIt, undefined, { danger: false, label: 'Sleep agent' });
         return Promise.resolve(false);
     }
     return doIt();
@@ -140,7 +140,7 @@ export function toggleAgentArchive(name, agentType, sessionId, action) {
     if (action === 'archive') {
         const s = state.liveSessions.find(s => s.session_id === sessionId && sessionServer(s) === server);
         const stops = s && !s.sleeping ? ' It will be stopped.' : '';
-        return new Promise(resolve => showConfirmModal('Archive Agent',
+        return new Promise(resolve => showConfirmModal('Archive agent',
             `Archive "${name}"?${stops} Archived agents are not woken with their team or by Wake All.`,
             async () => resolve(await doIt()), () => resolve(false), { danger: false, label: 'Archive' }));
     }

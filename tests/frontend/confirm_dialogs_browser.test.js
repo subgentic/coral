@@ -62,7 +62,7 @@ const MOD = `(window.__coralStatic || '/static/')`;
         await ev(closeDirty);
         await until(dialogOpen, 'the discard confirmation');
         const asked = await dialogText();
-        check('closing an edited tab asks first, naming the file', asked.title === 'Discard Changes' && /^Discard unsaved changes to [ab]-3702\.txt\?$/.test(asked.message), JSON.stringify(asked));
+        check('closing an edited tab asks first, naming the file', asked.title === 'Discard changes' && /^Discard unsaved changes to [ab]-3702\.txt\?$/.test(asked.message), JSON.stringify(asked));
         check('...and the tab stays while the dialog is open', (await tabCount()) === 2);
         await cancel();
         await sleep(300); // sleep-ok: shows that Cancel closes nothing (no condition to wait for)
@@ -88,7 +88,7 @@ const MOD = `(window.__coralStatic || '/static/')`;
         await ev(`window.__form.input.value = 'edited'; window.__form.sv.dataset.dirty = '1'; window.__answer = null; window.__tw.confirmTeamWorkspaceChange().then(v => { window.__answer = v; }); true`);
         await until(dialogOpen, 'the unsaved-settings confirmation');
         const askedTeam = await dialogText();
-        check('leaving with unsaved settings asks first', askedTeam.title === 'Unsaved Team Settings' && askedTeam.message === 'Team settings have unsaved changes. Leave without saving?', JSON.stringify(askedTeam));
+        check('leaving with unsaved settings asks first', askedTeam.title === 'Unsaved team settings' && askedTeam.message === 'Team settings have unsaved changes. Leave without saving?', JSON.stringify(askedTeam));
         check('...and stays undecided while the dialog is open', (await ev(`window.__answer`)) === null);
         await cancel();
         await until(`window.__answer !== null`, 'the answer');

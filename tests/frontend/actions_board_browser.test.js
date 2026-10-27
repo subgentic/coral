@@ -139,7 +139,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         await ev(`document.querySelector('#mb-messages [data-on-click="mb-msg-delete"]').click(); true`);
         await until(`!!document.getElementById('confirm-modal') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog');
         const asked = await modalState();
-        check('a message\'s × asks first, naming what is deleted', asked.open && asked.title === 'Delete Message' && /Delete the message from .+\? This cannot be undone\./.test(asked.message), JSON.stringify(asked));
+        check('a message\'s × asks first, naming what is deleted', asked.open && asked.title === 'Delete message' && /Delete the message from .+\? This cannot be undone\./.test(asked.message), JSON.stringify(asked));
         check('...and nothing is deleted while it is open', (await countMsgs()) === before);
         await ev(`document.querySelector('#confirm-modal .btn:not(#confirm-modal-yes)').click(); true`);
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: shows that Cancel deletes nothing (no condition to wait for)
@@ -161,7 +161,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__confirmModal = null; document.getElementById('mb-delete-btn').click(); true`);
         await new Promise(r => setTimeout(r, 300)); // sleep-ok: shows that nothing is deleted without a Yes
         const still = await boardListed();
-        check('with nothing running, deleting the board asks first; without a Yes it stays', (await ev(`window.__confirmModal`)) === 'Delete Board' && still, JSON.stringify({ modal: await ev(`window.__confirmModal`), still }));
+        check('with nothing running, deleting the board asks first; without a Yes it stays', (await ev(`window.__confirmModal`)) === 'Delete board' && still, JSON.stringify({ modal: await ev(`window.__confirmModal`), still }));
 
         const inline = await ev(`[...document.querySelectorAll('#messageboard-view *, #team-page-view *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.tagName + '.' + el.className + ' ' + a.name))`);
         check('no inline handler left in the board view or its sheet', inline.length === 0, JSON.stringify(inline.slice(0, 5)));

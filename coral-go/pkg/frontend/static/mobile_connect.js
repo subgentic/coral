@@ -31,7 +31,7 @@ function renderState(message, actions = [], error = false) {
     const controls = byId('mobile-connect-actions');
     const hadFocus = controls.contains(document.activeElement);
     controls.replaceChildren(...actions);
-    if (hadFocus) (actions[0] || byId('mobile-connect-modal').querySelector('.modal-close-btn')).focus();
+    if (hadFocus) (actions[0] || byId('mobile-connect-modal').querySelector('.modal-content')).focus();
 }
 
 function failure(message) {
@@ -163,6 +163,6 @@ export async function showMobileConnectModal() {
     if (!modal) return;
     if (modal.style.display === 'none') opener = document.activeElement;
     modal.style.display = 'flex'; saving = false;
-    modal.querySelector('.modal-close-btn')?.focus();
+    (modal.querySelector('#mobile-connect-actions button') || modal.querySelector('.modal-content'))?.focus();
     await checkAccess();
 }

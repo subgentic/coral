@@ -693,16 +693,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border-bottom: 1px solid var(--border);
 }
 
-.modal-content:has(.modal-body) .modal-header:has(> .modal-close-btn) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-lg);
-}
-.modal-header:has(> .modal-close-btn) h3 { min-width: 0; overflow-wrap: anywhere; }
-/* The dialog's close: a quiet dense .btn-icon (#9332); the class stays as the hook the dialogs find it by. */
-.modal-close-btn { flex-shrink: 0; }
-
 .modal-body {
     padding: 12px 24px;
 }
