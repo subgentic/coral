@@ -22,6 +22,7 @@ const BASE = require('./test_base').BASE;
             { ...base, id: 2, name: 'summarize-the-day', cron_expr: '0 18 * * 1-5', prompt: 'Summarize what changed today.', next_fire_at: inn(30), last_run: { id: 12, status: 'completed', started_at: ago(5), finished_at: ago(5) } },
             { ...base, id: 3, name: 'weekly-cleanup', cron_expr: '0 9 * * 1', prompt: 'Tidy.', enabled: 0, next_fire_at: null, last_run: null },
         ];
+        window.__jobs = jobs;
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
             if (method === 'GET' && /\\/api\\/scheduled\\/jobs$/.test(url)) return json({ jobs });
@@ -94,6 +95,12 @@ const BASE = require('./test_base').BASE;
                 return { chip: chip.textContent.trim(), whole: chip.scrollWidth <= chip.clientWidth + 1 && cb.left >= tb.left - 1 && cb.right <= tb.right + 1, link: !!link && link.getAttribute('aria-label'), linkOn: !!lb && lb.width > 0 && lb.left >= 0 && lb.right <= innerWidth && lb.height > 0 && lb.right <= td2.getBoundingClientRect().right + 1, reason: (r.querySelector('.dt-run-reason') || {}).textContent }; })`);
             assert.deepEqual(runs.map(r => [r.chip, r.whole, r.link, r.linkOn]), [['Failed', true, 'Open the conversation', true], ['Passed', true, 'Open the conversation', true]], `${at}the Result is readable whole beside Started and the conversation link: ${JSON.stringify(runs)}`);
             assert.match(runs[0].reason, /agent exited with 1/, `${at}the failed run's reason is said to assistive technology`);
+            // a long prompt is folded behind a heading that is the same group head as the short one's (#9458)
+            await ev(`window.__jobs[1].prompt = 'a line of the prompt\\n'.repeat(12); import((window.__coralStatic || '/static/') + 'scheduler.js').then(async m => { await m.refreshJobs(); await m.selectScheduledJob(2); }).then(() => true)`);
+            await waitFor(`!!document.querySelector('#scheduler-detail .sched-prompt-section > summary')`, `${at}the long prompt's folded heading`, 8000);
+            assert.equal(await ev(`(() => { const h = document.querySelector('#scheduler-detail .sched-prompt-section > summary'), p = document.createElement('i'); p.style.color = 'var(--text-secondary)'; document.body.append(p); const want = getComputedStyle(p).color; p.remove(); const cs = getComputedStyle(h); return h.classList.contains('group-head-lg') && cs.color === want && cs.fontWeight === '600'; })()`), true, `${at}a long prompt's heading is the group head (14/600, the secondary colour) like the short Prompt heading`);
+            await ev(`window.__jobs[1].prompt = 'Summarize what changed today.'; import((window.__coralStatic || '/static/') + 'scheduler.js').then(async m => { await m.refreshJobs(); await m.selectScheduledJob(2); }).then(() => true)`);
+            await waitFor(`!!document.querySelector('#scheduler-detail .sched-prompt-shown h3')`, `${at}the short prompt again`, 8000);
             await themed('job-page', w);
             assert.equal(await ev(`!!document.querySelector('#scheduler-detail [data-on-click="automations-back"]')`), true, `${at}the page has its way back to the folder`);
             await ev(`[...document.querySelectorAll('#scheduler-detail [data-on-click="automations-back"]')].find(b => b.getClientRects().length).click(); true`);
