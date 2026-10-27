@@ -50,6 +50,8 @@ const ITEMS = [
             check(`${label}: the column is Goal, not Task`, t.heads.includes('goal') && !t.heads.includes('task'), JSON.stringify(t.heads));
             const lg = by('long-goal-report.md').goal;
             check(`${label}: a long goal is one line with an ellipsis, its whole title the tooltip and the accessible name`, lg && lg.cut && lg.overflow === 'ellipsis' && lg.ws === 'nowrap' && lg.title === LONG_GOAL && lg.aria === 'Goal: ' + LONG_GOAL && lg.h <= 24, JSON.stringify(lg));
+            const upd = await ev(`(() => [...document.querySelectorAll('#group-table-view tbody tr td[data-key="updated"]')].map(td => [td.textContent.trim(), [td, ...td.querySelectorAll('*')].some(e => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible')]))()`);
+            check(`${label}: the Updated column is whole (the Goal column does not take its room)`, upd.length === ITEMS.length && upd.every(([, cut]) => !cut), JSON.stringify(upd));
             check(`${label}: a short goal is whole`, by('short-goal.md').goal && !by('short-goal.md').goal.cut && by('short-goal.md').goal.text === 'Ship the beta');
             check(`${label}: a file with no task, and a task with no goal, have an empty Goal cell`, by('no-task-notes.md').goal === null && by('no-task-notes.md').cell === '' && by('no-goal-task.md').goal === null && by('no-goal-task.md').cell === '', JSON.stringify([by('no-task-notes.md'), by('no-goal-task.md')]));
             await shot(`artifact-goal-column-${label}`);
