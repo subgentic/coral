@@ -2833,22 +2833,12 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     max-height: 40vh;
 }
 
-.mb-post-send-btn {
-    flex: none;
-    width: 36px;
-    min-width: 36px;
-    height: 36px;
-    padding: 0;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
+/* The board composer's Send: a primary .btn-icon (#9332). */
+.mb-post-send-btn { flex: none; }
 
 @media (pointer: coarse), (max-width: 767px) {
     .mb-post-card { padding: 3px 3px 3px 16px; align-items: center; }
     .mb-post-input { min-height: var(--control-touch-height, 44px); box-sizing: border-box; padding: 10px 0; }
-    .mb-post-send-btn { width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); }
 }
 
 /* ── Modal Width Variants ──────────────────────────────────── */

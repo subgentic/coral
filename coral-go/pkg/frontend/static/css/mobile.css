@@ -77,18 +77,9 @@
 
 /* ── Mobile Send Button (hidden on desktop) ──────────────── */
 
+/* A primary .btn-icon (#9332); it is drawn only where the phone composer is. */
 .mobile-send-btn {
     display: none;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
-    border-radius: 50%;
-    background: var(--accent-dim);   /* white on the dark theme's light accent was 2.5:1; the dim accent is 5:1 or better (#4023) */
-    color: var(--text-on-accent);
-    border: none;
-    cursor: pointer;
     flex-shrink: 0;
     -webkit-tap-highlight-color: transparent;
 }
@@ -1332,7 +1323,6 @@
     .live-view-toggle-btn, .terminal-header-actions .terminal-header-btn, .terminal-header-actions .terminal-header-btn.terminal-fit-width-btn, .terminal-header-actions .terminal-header-btn.terminal-copy-screen-btn, #terminal-open-window-link, #popout-panel-toggle-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); justify-content: center; }
     .attach-image-btn { right: 2px; top: 0; }
     .command-editor:has(> .attach-image-btn) textarea { padding-right: 50px !important; }
-    .mobile-send-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); }
     .mobile-send-options-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); }
 }
 
