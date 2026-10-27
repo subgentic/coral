@@ -458,8 +458,6 @@
 1	task_detail_html.js	uriDisplay ? `<div>${uriDisplay}</div>` : ''
 2	task_detail_html.js	warningClass
 1	task_detail_html.js	workflow.artifacts.map(artifactHtml).join('')
-1	task_verify_marks.js	v.icon
-1	task_verify_marks.js	v.state
 1	team_availability.js	(data.health_report || []).map(item => `<li>${escapeHtml(item)}</li>`).join('')
 1	team_availability.js	Object.entries(labels).filter(([key]) => data.summary[key] || key === 'available').map(([key,label]) => `<div 
 1	team_availability.js	a.tasks.length ? `<ul>${tasks(a.tasks)}</ul>` : ''

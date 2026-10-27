@@ -29,6 +29,7 @@ const board = 'task-one-line-' + Date.now().toString(36);
     assert.ok(row.status.x < row.title.x && row.title.x < row.avatar.x, 'status, title, avatar order');
     assert.ok(!row.id && !row.subtitle && !row.files, 'secondary row metadata removed');
     assert.ok(row.row.h <= 56, 'one-line row height: '+row.row.h);
+    if (width === 390) assert.ok(row.title.w >= 44 && row.title.h >= 44, 'title owns the touch target without an ID box');
     assert.equal(row.ellipsis, 'ellipsis'); assert.equal(row.overflow, false);
    }
    const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out'));

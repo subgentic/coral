@@ -2199,7 +2199,3 @@ body.panel-dragging .agentic-state {
 .list-bar-extras[hidden] { display: none; }
 .list-bar-menu-grid > .list-bar-extras { grid-column: 1 / -1; }
 .board-task-solo { display: flex; justify-content: flex-end; padding: 6px 12px; } /* + Task alone, when there are no tasks to search (#7924) */
-
-/* The dock's task list stays one line, including on phones (#8792). */
-#board-task-list .dt-box { --table-row-h: var(--table-touch); }
-#board-task-list .dt-primary { display: block; width: 100%; min-width: var(--table-touch); min-height: var(--table-touch); }

@@ -217,7 +217,6 @@ svg[width="48"][height="48"] { width: 3rem; height: 3rem; }
 @media (pointer: coarse) {
     .command-pane-toolbar .btn-nav, #command-pane .btn-nav, #board-chat-input-pane .btn-nav, #board-chat-input-pane .command-pane-toolbar.board-chat-toolbar .btn-nav.board-mention-chip:not(.btn-send) { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); }
     #history-search { min-height: var(--control-touch-height, 44px); }
-    .board-task-id { min-width: var(--control-touch-height, 44px); justify-content: center; }
 }
 
 /* The phone pass (#5219): controls the first walk of the new views found under 44 px on a coarse pointer. */
