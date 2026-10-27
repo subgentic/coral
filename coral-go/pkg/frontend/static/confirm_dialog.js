@@ -32,7 +32,4 @@ export function hideConfirmModal() {
     _dismissConfirm();
     const modal = document.getElementById("confirm-modal");
     modal.style.display = "none";
-    // Remove any extra width classes added by export modal
-    const content = modal.querySelector('.modal-content');
-    if (content) content.classList.remove('modal-content-wide', 'modal-content-extra-wide');
 }

@@ -384,7 +384,7 @@
 .team-page-no-team .team-tabs-row, .team-page-no-team .team-tabs, .team-page-no-team .team-page-row, .team-page-no-team .team-page-actions, .team-page-no-team .team-page-health, .team-page-no-team .team-page-status { display: none !important; }
 
 /* Team settings in a popout (#8853): a wide dialog over the page, its body scrolls under a fixed head; on a phone it fills the screen */
-.team-settings-modal .modal-content { width: min(960px, 94vw); max-width: none; height: min(780px, 90vh); max-height: none; }
+.team-settings-modal .modal-content { max-width: none; height: min(780px, 90vh); max-height: none; }
 .team-settings-dialog-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 12px 24px 0; } /* the form's own panes scroll; its save bar stays at the dialog's foot */
 .team-settings-host { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .team-settings-host > .team-settings-workspace { flex: 1 1 auto; min-height: 0; height: auto; padding: 0; background: transparent; } /* the dialog gives the margins and the surface: no inner card, so the foot sits at the dialog's bottom edge */

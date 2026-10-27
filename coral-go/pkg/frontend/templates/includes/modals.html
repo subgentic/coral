@@ -2,7 +2,7 @@
     <!-- Launch Modal -->
     <template data-lazy="launch-modal">
     <div id="launch-modal" class="modal" role="dialog" aria-labelledby="launch-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-content-wide">
+        <div class="modal-content dlg-flow">
             <p id="launch-access-note" class="launch-access-note" role="status"></p>
             <!-- Hub only: launch target server (hidden unless hub mode has a usable remote) -->
             <div id="launch-server-row" class="launch-server-row" style="display:none;align-items:center;gap:8px;margin-bottom:12px;font-size:var(--fs-md)">
@@ -312,7 +312,7 @@
 
     <!-- Open folder (#3630): pins a folder to the Agents list (empty is fine), ready to launch into. -->
     <div id="open-folder-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="open-folder-title" style="display:none" data-on-click="m-open-folder-backdrop">
-        <div class="modal-content modal-content-wide">
+        <div class="modal-content dlg-form">
             <h3 id="open-folder-title">Open folder</h3>
             <p class="open-folder-help">The folder is pinned to the Agents list, ready to launch agents into. It stays there with no agents until you unpin it.</p>
             <label for="open-folder-dir">Folder:</label>
@@ -339,7 +339,7 @@
     </div>
 
     <div id="save-template-modal" class="modal" role="dialog" aria-labelledby="save-template-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-md">
+        <div class="modal-content dlg-confirm">
             <div class="modal-header">
                 <h3 id="save-template-title">Save Team Template</h3>
             </div>
@@ -357,7 +357,7 @@
     </div>
 
     <div id="team-wizard-modal" class="modal" role="dialog" aria-labelledby="team-wizard-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-content-wide">
+        <div class="modal-content dlg-flow">
             <div class="modal-header">
                 <h3 id="team-wizard-title">Create Your Own Team</h3>
                 <p class="team-wizard-subtitle">Tell Coral what the team should achieve and how you want it staffed. You can review and edit every generated agent before launch.</p>
@@ -390,7 +390,7 @@
 
     <!-- Generic Prompt Modal (reusable replacement for browser prompt()) -->
     <div id="prompt-modal" class="modal" role="dialog" aria-labelledby="prompt-modal-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-md">
+        <div class="modal-content dlg-confirm">
             <div class="modal-header">
                 <h3 id="prompt-modal-title">Enter value</h3>
             </div>
@@ -410,7 +410,7 @@
     </div>
 
     <div id="alert-modal" class="modal" role="dialog" aria-labelledby="alert-modal-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-md">
+        <div class="modal-content dlg-confirm">
             <div class="modal-header">
                 <h3 id="alert-modal-title">Notice</h3>
             </div>
@@ -425,7 +425,7 @@
 
     <!-- Board Export dialog (its own dialog: it used to rewrite the shared confirm dialog, #3701) -->
     <div id="mb-export-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="mb-export-title" style="display:none">
-        <div class="modal-content modal-md modal-content-wide">
+        <div class="modal-content dlg-form">
             <div class="modal-header">
                 <h3 id="mb-export-title">Export the board</h3>
             </div>
@@ -436,7 +436,7 @@
 
     <!-- Confirm Modal (reusable) -->
     <div id="confirm-modal" class="modal" role="dialog" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message" aria-modal="true" style="display:none">
-        <div class="modal-content modal-md">
+        <div class="modal-content dlg-confirm">
             <div class="modal-header">
                 <h3 id="confirm-modal-title">Are you sure?</h3>
             </div>
@@ -452,7 +452,7 @@
 
     <!-- Restart Modal -->
     <div id="restart-modal" class="modal" role="dialog" aria-labelledby="restart-title" aria-modal="true" style="display:none">
-        <div class="modal-content sd-modal-content launch-wizard restart-wizard-content" id="restart-wizard" data-stage="persona">
+        <div class="modal-content dlg-flow sd-modal-content launch-wizard restart-wizard-content" id="restart-wizard" data-stage="persona">
             <div class="modal-header sd-step-header">
                 <h3 id="restart-title">Restart agent</h3>
                 <p id="restart-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 2: Persona</p>
@@ -481,7 +481,7 @@
     <!-- Info Modal -->
     <template data-lazy="info-modal">
     <div id="info-modal" class="modal" role="dialog" aria-labelledby="info-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-content-wide session-info-modal">
+        <div class="modal-content dlg-flow session-info-modal">
             <div class="modal-header">
                 <h3 id="info-title">Session Info</h3>
             </div>
@@ -525,7 +525,7 @@
 
     <!-- Resume Modal -->
     <div id="resume-modal" class="modal" role="dialog" aria-labelledby="resume-title" aria-modal="true" style="display:none">
-        <div class="modal-content" style="width:480px">
+        <div class="modal-content dlg-confirm" style="width:480px">
             <div class="modal-header">
                 <h3 id="resume-title">Resume Session</h3>
             </div>
@@ -565,7 +565,7 @@
     <!-- Settings Modal -->
     <template data-lazy="settings-modal">
     <div id="settings-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" style="display:none">
-        <div class="modal-content settings-modal-content">
+        <div class="modal-content dlg-flow settings-modal-content">
             <div class="modal-header">
                 <h3 id="settings-title">Settings</h3>
             </div>
@@ -803,7 +803,7 @@
     <!-- Default Prompts Modal -->
     <template data-lazy="default-prompts-modal">
     <div id="default-prompts-modal" class="modal" role="dialog" aria-labelledby="default-prompts-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-xl">
+        <div class="modal-content dlg-form">
             <div class="modal-header">
                 <h3 id="default-prompts-title">Edit Default Prompts</h3>
             </div>
@@ -858,7 +858,7 @@
     <!-- Scheduled Job Modal -->
     <template data-lazy="job-modal">
     <div id="job-modal" class="modal" role="dialog" aria-labelledby="job-modal-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-content-wide">
+        <div class="modal-content dlg-form">
             <div class="modal-header">
                 <h3 id="job-modal-title">New job</h3>
                 <button type="button" class="modal-close-btn" data-on-click="m-hide-job-modal" aria-label="Close dialog"><span class="material-icons" aria-hidden="true">close</span></button>
@@ -871,7 +871,7 @@
 
     <!-- Add Macro Modal -->
     <div id="macro-modal" class="modal" role="dialog" aria-labelledby="macro-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-sm">
+        <div class="modal-content dlg-confirm">
             <div class="modal-header">
                 <h3 id="macro-title">Add Macro</h3>
             </div>
@@ -883,7 +883,7 @@
     <!-- Create/Edit Custom View Modal -->
     <template data-lazy="custom-view-modal">
     <div id="custom-view-modal" class="modal" role="dialog" aria-labelledby="custom-view-modal-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-content-extra-wide">
+        <div class="modal-content dlg-flow">
             <div class="modal-header">
                 <h3 id="custom-view-modal-title">Create Custom View</h3>
             </div>
@@ -918,7 +918,7 @@
 
     <!-- Mobile Connect Modal -->
     <div id="mobile-connect-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="mobile-connect-title" style="display:none" data-on-click="m-mobile-connect-backdrop">
-        <div class="modal-content modal-sm" style="text-align:center;position:relative">
+        <div class="modal-content dlg-confirm" style="text-align:center;position:relative">
             <button class="modal-close-btn" data-on-click="m-hide-mobile-connect-modal" aria-label="Close" style="position:absolute;top:12px;right:16px"><span class="material-icons" aria-hidden="true">close</span></button>
             <h3 id="mobile-connect-title">Coral Mobile</h3>
             <p id="mobile-connect-status" role="status" aria-live="polite" style="margin:12px 0"></p>
@@ -944,7 +944,7 @@
     <!-- Task Detail Modal -->
     <template data-lazy="create-task-modal">
     <div id="create-task-modal" class="modal" role="dialog" aria-labelledby="create-task-heading" aria-modal="true" style="display:none">
-        <div class="modal-content modal-content-wide">
+        <div class="modal-content dlg-form">
             <div class="modal-header">
                 <h3 id="create-task-heading">Create task</h3>
                 <button class="modal-close-btn" data-on-click="m-hide-create-task-modal" aria-label="Close dialog"><span class="material-icons" aria-hidden="true">close</span></button>
@@ -956,7 +956,7 @@
     </template>
 
     <div id="task-detail-modal" class="modal" role="dialog" aria-labelledby="task-detail-modal-title" aria-modal="true" style="display:none">
-        <div class="modal-content modal-content-extra-wide">
+        <div class="modal-content dlg-flow">
             <div class="modal-header">
                 <h3 id="task-detail-modal-title">Task Details</h3>
                 <button class="modal-close-btn" data-on-click="task-close" aria-label="Close dialog"><span class="material-icons" aria-hidden="true">close</span></button>

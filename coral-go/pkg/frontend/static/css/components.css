@@ -668,7 +668,6 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     padding: var(--space-2xl);
-    width: 400px;
     max-width: 90vw;
     max-height: 85vh;
     display: flex;
@@ -724,13 +723,10 @@
     border-top: 1px solid var(--border);
 }
 
-.modal-content-wide {
-    width: 520px;
-}
-
-.modal-content-extra-wide {
-    width: 820px;
-}
+/* The three dialog sizes by kind (#9185): a confirmation, a short form, a flow or settings. A dialog wears one; its width is nowhere else. */
+.dlg-confirm { width: var(--dlg-w-confirm); }
+.dlg-form { width: var(--dlg-w-form); }
+.dlg-flow { width: var(--dlg-w-flow); }
 
 .modal-content h3 {
     margin: 0;
@@ -917,10 +913,6 @@
     font-size: var(--fs-base);
 }
 
-.session-info-modal {
-    width: min(1120px, calc(100vw - 48px));
-    max-width: 1120px;
-}
 
 .session-info-grid {
     grid-template-columns: minmax(170px, 210px) minmax(0, 1fr);
@@ -1032,11 +1024,6 @@
 }
 
 @media (max-width: 760px) {
-    .session-info-modal {
-        width: min(100%, calc(100vw - 20px));
-        max-width: none;
-    }
-
     .session-info-grid {
         grid-template-columns: 1fr;
         gap: 8px;
@@ -2197,11 +2184,6 @@
     padding: 4px; /* room for a card's focus ring: the step scrolls (overflow), which clips what a card draws outside itself (#7066) */
 }
 
-/* The chooser's four choices in a row (#3630). */
-.modal-content-wide.launch-choosing {
-    width: 640px;
-    max-width: 95vw;
-}
 
 /* Open folder (#3630) */
 .open-folder-help {
@@ -3027,9 +3009,6 @@
 
 /* ── Modal Width Variants ──────────────────────────────────── */
 
-.modal-sm { width: 400px; }
-.modal-md { width: 420px; }
-.modal-xl { width: 600px; }
 
 /* ── Default Prompts Modal ─────────────────────────────────── */
 
@@ -3417,7 +3396,6 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 /* ── Artifact viewer (#3540): a board, chat or team artifact opens here ── */
 .artifact-viewer[hidden] { display: none; }
 .artifact-viewer-content {
-    width: min(900px, 94vw);
     max-height: 88vh;
     padding: 0;
     overflow: hidden;
@@ -3821,7 +3799,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
    and the terminal form are small forms: they keep their narrow width and take the same height rule. A phone's own rule
    (mobile.css: 95vw wide) still applies. */
 .modal-content.settings-modal-content,
-.modal-content.sd-modal-content { width: clamp(360px, 92vw, 960px); max-width: 100vw; }
+.modal-content.sd-modal-content { max-width: 100vw; }
 .modal-content.settings-modal-content,
 .modal-content.sd-modal-content,
 #launch-modal .modal-content { height: auto; max-height: 90dvh; }
@@ -4073,7 +4051,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
    Step 1 the folder (and, above, the machine), step 2 the persona page, step 3 the tabs Agent, Permissions and Advanced. The dialog has ONE size for every step and
    tab (the smaller of 640 px and the window minus 32 px; a full-height sheet on a phone): the body scrolls inside it, the header, the recap and the footer stay put, and
    the notes a provider adds sit in a slot already as tall as the longest one, so nothing moves when a note comes or goes. Cancel is leftmost on every step. */
-#launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content { width: min(60rem, 94vw); height: min(640px, calc(100dvh - 32px)); max-height: none; min-height: 0; }
+#launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content { height: var(--dlg-h-flow); max-height: none; min-height: 0; }
 .launch-wizard .settings-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: auto; }
 .launch-page-folder { flex: none; padding: 20px 24px; }
 .launch-page-agent { flex: 1; min-height: 0; display: flex; flex-direction: column; }

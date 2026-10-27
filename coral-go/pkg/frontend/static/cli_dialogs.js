@@ -64,7 +64,7 @@ function _showCLINotFoundModal(agentType, server = LOCAL_SERVER, { retry = null 
     modal.className = 'modal';
     modal.style.display = 'flex';
     modal.innerHTML = `
-        <div class="modal-content" style="width:480px">
+        <div class="modal-content dlg-confirm">
             <h3>${label} is not installed</h3>
             <p style="color:var(--text-secondary);font-size:var(--fs-md);line-height:1.5;margin:8px 0 12px">
                 Coral starts ${label} for you, but it is not installed ${where}. Run this in a terminal, then press Check again.
@@ -127,7 +127,7 @@ function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER, picked
         modal.className = 'modal';
         modal.style.display = 'flex';
         modal.innerHTML = `
-            <div class="modal-content" style="width:460px">
+            <div class="modal-content dlg-confirm">
                 <h3>Permission Prompt Warning</h3>
                 <p style="color:var(--text-secondary);font-size:var(--fs-md);line-height:1.5;margin:8px 0 16px">
                     Agents may get stuck on permission prompts without <code>${escapeHtml(permFlag)}</code>. Would you like to enable it?

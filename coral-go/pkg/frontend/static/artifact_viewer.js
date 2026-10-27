@@ -49,7 +49,7 @@ function _build() {
     d.setAttribute('aria-modal', 'true');
     d.setAttribute('aria-labelledby', 'artifact-viewer-title');
     d.hidden = true;
-    d.innerHTML = `<div class="modal-content artifact-viewer-content">
+    d.innerHTML = `<div class="modal-content dlg-flow artifact-viewer-content">
         <div class="artifact-viewer-header">
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
             <a class="btn artifact-viewer-download" rel="noopener noreferrer" download>Download</a>
