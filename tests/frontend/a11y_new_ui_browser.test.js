@@ -47,11 +47,8 @@ const LABELS = ['Feels like a slideshow', "Doesn't show the game", 'Tone/story i
         const { nodeId } = await DOM.querySelector({ nodeId: root.nodeId, selector: sel });
         if (!nodeId) return null;
         const { node } = await DOM.describeNode({ nodeId });
-        const { nodes } = await Accessibility.getFullAXTree();
-        const byId = new Map(nodes.map(n => [n.nodeId, n]));
-        const start = nodes.find(n => n.backendDOMNodeId === node.backendNodeId);
-        if (!start) return { nodes: [], missing: true };
-        const out = []; const walk = n => { if (!n.ignored) out.push(n); for (const c of n.childIds || []) { const k = byId.get(c); if (k) walk(k); } }; walk(start);
+        const out = await require('./helpers/ax_tree').axNodes(Accessibility, { from: node.backendNodeId });
+        if (!out) return { nodes: [], missing: true };
         const prop = (n, k) => { const p = (n.properties || []).find(x => x.name === k); return p ? p.value.value : undefined; };
         return { nodes: out.map(n => ({ role: n.role && n.role.value, name: (n.name && n.name.value) || '', checked: prop(n, 'checked'), live: prop(n, 'live'), expanded: prop(n, 'expanded'), pressed: prop(n, 'pressed'), id: n.backendDOMNodeId })) };
     };

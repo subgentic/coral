@@ -75,7 +75,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await shot('health-rules-1280');
         // The fields' accessible names and descriptions as the browser computes them (#5790: the number boxes and the reviewers box come from field_row.js): the label and the unit name a number, the limits describe it.
         await waitFor(`!!document.querySelector('${P} [name=claim_nudge_after_min]')?.getClientRects().length`, 'the rules showing', 5000);
-        const axNodes = (await client.Accessibility.getFullAXTree()).nodes.filter(n => !n.ignored && ['spinbutton', 'combobox', 'textbox'].includes(n.role && n.role.value));
+        const axNodes = (await require('./helpers/ax_tree').axNodes(client.Accessibility)).filter(n => ['spinbutton', 'combobox', 'textbox'].includes(n.role && n.role.value)); // in page order: the flat getFullAXTree list is not (helpers/ax_tree.js, #9222)
         const axPairs = axNodes.map(n => [n.name && n.name.value, n.description && n.description.value]).filter(([name]) => name);
         assert.deepEqual(axPairs.filter(([name]) => /min|nudges|^Default reviewers$|tasks in a goal/.test(name)).map(([name, d]) => [name, /^Names of agents/.test(d) ? 'Names of agents' : d]), [
             ['Check every minutes', '5 to 1440'], ['Default reviewers', 'Names of agents'], ['After minutes idle', '5 to 1440'], ['Nudges before telling the orchestrator nudges', '1 to 5'],
