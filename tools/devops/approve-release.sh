@@ -41,7 +41,10 @@ do_check() {
     [ "$(jq -r .immutable <<<"$rel")" = true ] || die "$TAG is not an immutable release"
     body="$(jq -r .body <<<"$rel")"   # not a pipe into grep -q: an early exit would fail jq under pipefail and hide the match
     if grep -q '^Revoked: ' <<<"$body"; then die "$TAG was revoked and cannot be approved"; fi
-    sha="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq .object.sha)" || die "no tag $TAG"
+    # The COMMIT the tag names: commits/<tag> peels an annotated tag (whose git/ref/tags/<tag> .object.sha is the tag OBJECT, not a commit: comparing that with main fails) and
+    # takes a lightweight one as it is (#9397, v2.0.1 was the first annotated tag).
+    sha="$(gh api "repos/$REPO/commits/$TAG" --jq .sha)" || die "no tag $TAG"
+    [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || die "the commit of $TAG is not a commit id ($sha)"
     st="$(gh api "repos/$REPO/compare/main...$sha" --jq .status)" || die "cannot compare $TAG with main"
     case "$st" in behind|identical) ;; *) die "the commit of $TAG is not on main (compare says $st)" ;; esac
     cur="$(gh api "repos/$REPO/releases/latest" --jq .tag_name)" || die "cannot read the current latest"
