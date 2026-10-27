@@ -19,13 +19,14 @@ const ITEMS = ['plan.md', 'notes.md'].map((name, i) => ({ name, media_type: 'tex
         for (const [label, w, h, mobile] of [['1280', 1280, 900, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             // Cold deep link: the artifact answer arrives before the board list can teach the page its label (#8804).
-            const coldLabel = LABEL + ' cold ' + w;
+            for (const mode of ['delayed', 'timeout']) {
+            const coldLabel = LABEL + ' cold ' + w + ' ' + mode;
             const delayed = await Page.addScriptToEvaluateOnNewDocument({ source: `(() => {
                 const R = window.fetch; const json = b => new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } });
                 let release; const labels = new Promise(r => { release = r; });
-                window.__releaseLabels = () => release(); window.__artifactReads = 0;
+                window.__releaseLabels = () => release(); window.__artifactReads = 0; window.__projectReads = 0;
                 window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
-                    if (url.pathname === '/api/board/projects') return labels.then(() => json([{ project: ${JSON.stringify(ID)}, board_label: ${JSON.stringify(coldLabel)} }]));
+                    if (url.pathname === '/api/board/projects') { window.__projectReads++; return labels.then(() => json([{ project: ${JSON.stringify(ID)}, board_label: ${JSON.stringify(coldLabel)} }])); }
                     if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname)) { window.__artifactReads++; return Promise.resolve(json({ project: ${JSON.stringify(ID)}, artifacts: ${JSON.stringify(ITEMS)}, total: 2, all: 2 })); }
                     return R(u, o); };
             })()` });
@@ -33,10 +34,22 @@ const ITEMS = ['plan.md', 'notes.md'].map((name, i) => ({ name, media_type: 'tex
             await waitFor(`window.__artifactReads > 0 && !!document.querySelector('#team-panel-artifacts .team-count-line')`, `${label}: the cold artifact answer`, 10000);
             await waitFor(`!!document.querySelector('#team-panel-artifacts .team-artifacts-error') || /Loading/.test(document.querySelector('#team-panel-artifacts .team-count-line')?.textContent || '')`, `${label}: the first answer is handled`, 5000);
             check(`${label}: no scope error and no unverified rows while the label is unknown`, (await rows()) === 0 && (await err()) === '', `${await rows()} rows; ${await err()}`);
-            await ev(`window.__labelRead = import((window.__coralStatic || '/static/') + 'board_fetch.js').then(m => m.fetchProjects()); window.__releaseLabels(); true`);
+            if (mode === 'timeout') {
+                const began = Date.now();
+                // No list reply: this used to leave the cold link Loading forever (#8825).
+                await ev(`window.__labelRead = import((window.__coralStatic || '/static/') + 'board_fetch.js').then(m => m.fetchProjects()); true`);
+                await waitFor(`!!document.querySelector('#team-panel-artifacts .team-artifacts-error')`, `${label}: missing labels time out`, 15000);
+                check(`${label}: after about ten seconds, a missing label shows the scope error and Retry without exposing rows`, (await rows()) === 0 && /unexpected response scope/.test(await err()) && Date.now() - began >= 8500 && await ev(`!!document.querySelector('#team-panel-artifacts .team-artifacts-retry')`), `${Date.now() - began} ms; ${await err()}`);
+                const reads = await ev(`window.__projectReads`);
+                await ev(`window.__releaseLabels(); document.querySelector('#team-panel-artifacts .team-artifacts-retry').click(); true`);
+                await waitFor(`window.__projectReads > ${reads}`, `${label}: Retry rereads the board lists`, 5000);
+            } else {
+                await ev(`window.__labelRead = import((window.__coralStatic || '/static/') + 'board_fetch.js').then(m => m.fetchProjects()); window.__releaseLabels(); true`);
+            }
             await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr').length === 2 || !!document.querySelector('#team-panel-artifacts .team-artifacts-error')`, `${label}: artifacts after the labels arrive`, 10000);
             check(`${label}: labels arriving recover the cold link automatically, without navigation or Refresh`, (await rows()) === 2 && (await err()) === '', `${await rows()} rows; ${await err()}`);
             await Page.removeScriptToEvaluateOnNewDocument({ identifier: delayed.identifier });
+            }
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
             for (const answerId of [ID, 'b-someoneelse0']) {
