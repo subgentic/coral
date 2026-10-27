@@ -297,12 +297,12 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         : '';
     let goalLine = "";
     if (goalText) {
-        goalLine = `<span class="session-goal${isCompact ? ' session-goal-compact' : ''}" title="${escapeAttr(goalText)}">${escapeHtml(goalText)}</span>`;
+        goalLine = `<span class="session-goal list-row-meta${isCompact ? ' session-goal-compact' : ''}" title="${escapeAttr(goalText)}">${escapeHtml(goalText)}</span>`;
     } else if (!isTerminal) {
         // The "No goal yet" label is PASSIVE text: it sits where users click to
         // select a row, so it must bubble to the row's click handler. Only the
         // sparkle button requests a goal.
-        goalLine = `<span class="session-goal session-goal-empty${isCompact ? ' session-goal-compact' : ''}">
+        goalLine = `<span class="session-goal list-row-meta session-goal-empty${isCompact ? ' session-goal-compact' : ''}">
                 <button class="sidebar-goal-btn sidebar-goal-btn-inline" data-on-click="goal-request" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="Generate goal" aria-label="Generate goal for ${escapeAttr(identity)}"><span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">auto_awesome</span></button>
                 <span class="session-goal-empty-label">No goal yet</span>
             </span>`;
@@ -342,7 +342,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         + (ctxHigh ? `, context ${s.context_pct >= 100 ? 'full' : Math.round(s.context_pct) + '%'}` : '')
         + (unreadCount > 0 ? `, ${unreadCount} unread` : '');
     const stuckClass = stateInfo.key === 'stuck' ? ' is-stuck' : '';
-    return `<li class="session-group-item list-row${isActive ? ' active' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
+    return `<li class="session-group-item list-row${isActive ? ' active list-row-current' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
         draggable="${stale ? 'false' : 'true'}"${stale ? ` aria-disabled="true" title="${escapeAttr(staleReason(s))}"` : ''}
         data-state="${escapeAttr(stateInfo.key)}"
         tabindex="0"
@@ -355,7 +355,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         <div class="session-info">
             <div class="session-name-row">
                 <span class="session-dot ${dotClass}${ctxHigh ? ' ctx-high' : ''}" title="${escapeAttr(stateInfo.label)}" aria-hidden="true"></span>
-                <span class="session-label${nameTail ? ' session-label-split' : ''}" title="${escapeAttr(displayLabel)}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}
+                <span class="session-label list-row-title${nameTail ? ' session-label-split' : ''}" title="${escapeAttr(displayLabel)}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}
                 <span class="session-name-spacer"></span>
                 ${stale ? '' : waitingBadge + ctxPill}
                 ${goalBtn}

@@ -945,6 +945,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .list-row:hover:not(:disabled) { background: var(--bg-hover); }
 .list-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .list-row-current { background: var(--bg-hover); box-shadow: inset 3px 0 0 var(--accent); }
+.list-row-title { font-size: var(--fs-md); font-weight: 400; } /* the row's name: 13/400, like a table title (#9270) */
+.list-row-meta { font-size: var(--fs-base); font-weight: 400; } /* the line under it, and a count at the right: 12/400 */
 @media (forced-colors: active) { .list-row-current { outline: 2px solid Highlight; outline-offset: -2px; box-shadow: none; } }
 /* The group head (#9245, Goal #88 slice 5): the heading of a group of rows or of a section of a page. 12/600 in capitals with a little tracking in the muted colour (a sidebar's "Needs attention", "Starred");
  * -lg is a section title of a page (Analytics' "Tokens per commit"): 14/600 in the secondary colour, in the case it is written. A count beside it is a count chip. A table's own group row (dt-group) and column heads are the table's. */
