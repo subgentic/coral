@@ -44,7 +44,7 @@ export async function openTeamSettings(team) {
     document.addEventListener('keydown', keepIn, true); document.addEventListener('keyup', keepIn, true);
     open = { team: key, modal };
     try {
-        await showTeamWorkingMode(key, { page: modal.querySelector('.team-settings-host') });
+        await showTeamWorkingMode(key, { page: modal.querySelector('.team-settings-host'), closeDialog: () => close() });
     } catch (e) {
         console.error('team settings', e);
         modal.querySelector('.team-settings-host').textContent = 'Team settings could not be shown. Close this and try again.';

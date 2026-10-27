@@ -369,9 +369,11 @@
 .team-settings-modal .modal-content { width: min(960px, 94vw); max-width: none; height: min(780px, 90vh); max-height: none; }
 .team-settings-dialog-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 12px 24px 0; } /* the form's own panes scroll; its save bar stays at the dialog's foot */
 .team-settings-host { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.team-settings-host > .team-settings-workspace { flex: 1 1 auto; min-height: 0; height: auto; }
+.team-settings-host > .team-settings-workspace { flex: 1 1 auto; min-height: 0; height: auto; padding: 0; background: transparent; } /* the dialog gives the margins and the surface: no inner card, so the foot sits at the dialog's bottom edge */
 @media (max-width: 760px) {
-    .team-settings-modal .modal-content { width: 100% !important; max-width: 100% !important; height: 100% !important; max-height: none !important; border: 0; border-radius: 0; } /* the whole screen: mobile.css gives every dialog 95vw with !important */
-    .team-settings-modal .modal-content:has(.modal-body) .modal-header { padding: 12px 16px; }
-    .team-settings-dialog-body { padding: 8px 16px 0; }
+    .team-settings-modal .modal-content { width: 100% !important; max-width: 100% !important; height: 100% !important; max-height: none !important; padding: 0 !important; border: 0; border-radius: 0; } /* the whole screen: mobile.css gives every dialog 95vw with !important */
+    .team-settings-modal .modal-content:has(.modal-body) .modal-header { margin: 0 !important; padding: 12px 16px !important; } /* the content has no padding of its own on a phone, so mobile.css's -16px header margin goes: the header keeps its 16 px edge */
+    .team-settings-modal .board-rename-toggle { justify-content: flex-start; padding-left: 0 !important; margin-left: 0 !important; } /* the link's text starts at its label's left edge, not centred in its 44 px target */
+    .team-settings-dialog-body { padding: 8px 0 0; } /* the form has its own 16px margins: the full 390 px is its width, so it keeps the bar-at-the-foot layout (a container under 24rem scrolls as a whole) */
 }
+
