@@ -30,7 +30,10 @@ async function inboxRows(path, field) {
         noteBoardLabels(rows, 'board_id', server);
         return rows.map(row => ({ ...row, board_id: identityKey(server, row.board_id) }));
     }));
-    return results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+    // Each source is ordered independently; merge by update time, not server order.
+    const updated = row => { const time = Date.parse(row.updated_at); return Number.isFinite(time) ? time : -Infinity; };
+    return results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
+        .sort((a, b) => updated(a) === updated(b) ? 0 : updated(b) - updated(a));
 }
 
 /** Open goals from this Coral and its registered machines, preserving team identity. */

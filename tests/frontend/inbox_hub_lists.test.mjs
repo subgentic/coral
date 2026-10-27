@@ -35,5 +35,28 @@ try {
     assert.equal((await inbox.coralInboxAdapter.listTasks()).length,1);
     assert.equal((await inbox.listInboxGoals()).length,1);
     assert.ok(!calls.some(p=>p.startsWith('/api/remote/')),'standalone Coral stays local');
+    // #8732: each machine's newest-first response must become one chronological list.
+    state.hub = true;
+    globalThis.fetch = window.fetch = async url => {
+        const remote = new URL(url,'https://hub.example').pathname.startsWith('/api/remote/');
+        if(String(url).includes('/broken/'))throw new Error('unreachable');
+        const rows = (remote ? [
+            {id:3,updated_at:'2026-10-26T12:00:00+02:00'},
+            {id:4,updated_at:'2026-10-26T07:00:00Z'},
+            {id:6,updated_at:'invalid'},
+        ] : [
+            {id:1,updated_at:'2026-10-26T09:00:00Z'},
+            {id:2,updated_at:'2026-10-26T07:00:00Z'},
+            {id:5},
+        ]).map(row=>({...row,board_id:'same-team',title:'Item '+row.id}));
+        return Response.json({tasks:rows,goals:rows});
+    };
+    const orderedTasks = await inbox.coralInboxAdapter.listTasks();
+    const orderedGoals = await inbox.listInboxGoals();
+    for(const [kind,rows] of [['tasks',orderedTasks],['goals',orderedGoals]]) {
+        assert.deepEqual(rows.map(r=>r.id),[3,1,2,4,5,6],kind+' sort across sources by update instant, preserve ties, and put missing/invalid dates last');
+    }
+    assert.equal(orderedTasks[0].project,'@box-2/same-team','sorting keeps task source identity');
+    assert.equal(orderedGoals[0].board_id,'@box-2/same-team','sorting keeps goal source identity');
     console.log('inbox_hub_lists: PASS');
 } finally { dom.window.close(); }
