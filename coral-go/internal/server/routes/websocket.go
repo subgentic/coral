@@ -453,7 +453,7 @@ func (h *SessionsHandler) buildSessionListForWS(r *http.Request) ([]map[string]a
 	return rows, err
 }
 
-// getActiveRuns fetches active job runs for the Jobs sidebar.
+// getActiveRuns fetches active job runs for Automations' Running now folder.
 func (h *SessionsHandler) getActiveRuns(ctx context.Context) []map[string]any {
 	if h.schedStore == nil {
 		return []map[string]any{}
