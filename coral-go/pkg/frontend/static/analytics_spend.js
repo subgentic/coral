@@ -10,6 +10,7 @@ import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 
 const { dataTable } = await importOnce('./data_table.js'); // the shared table (#7743)
+const { phoneOneLine } = await importOnce('./analytics_views.js'); // a phone: one line a row (#8982)
 
 const TEAM_KEY = 'coral-spend-team';
 const HOURLY_WHY = 'Hourly is for the last 24 hours.';
@@ -171,14 +172,14 @@ function table(data) {
     const agents = (Array.isArray(data.agents) ? data.agents : []).slice().sort((a, b) => (a.name === 'Unattributed') - (b.name === 'Unattributed') || (a.tokens == null) - (b.tokens == null) || (b.tokens || 0) - (a.tokens || 0));
     const none = a => a.name === 'Unattributed' || a.tokens == null; // one note under the name, not five empty or zero cells
     const figure = fn => a => (none(a) ? '' : fn(a));
-    return dataTable({ label: 'Who spends', fold: 'labeled', rows: agents, rowKey: a => a.name || '', columns: [
+    return dataTable({ label: 'Who spends', fold: 'labeled', rows: agents, rowKey: a => a.name || '', ...phoneOneLine([
         { key: 'name', label: 'Agent', tone: 'primary', cell: a => a.name || '', subtitle: a => (a.name === 'Unattributed' ? 'Commits whose author matches no agent' : a.tokens == null ? 'Not measured' : '') },
         { key: 'tokens', label: 'Tokens', numeric: true, cell: figure(a => fmtTokens(a.tokens)) },
         { key: 'share_pct', label: 'Share', numeric: true, cell: figure(a => (a.share == null ? '' : `${Math.round(a.share * 100)}%`)) },
         { key: 'commits', label: 'Commits', numeric: true, cell: figure(a => (a.orchestrator ? 'team' : a.commits == null ? '—' : a.commits === 0 ? 'none' : String(a.commits))) },
         { key: 'cache_reads', label: 'Cache reads', numeric: true, cell: figure(a => (a.cache_reads == null ? '—' : fmtTokens(a.cache_reads))) },
         { key: 'tool_calls', label: 'Tool calls', numeric: true, cell: figure(a => (a.tool_calls == null ? (a.tool_calls_measured === false ? 'Not measured' : '—') : String(a.tool_calls))) },
-    ] }).el;
+    ], ['tokens']) }).el;
 }
 
 function drawSpend() {
@@ -253,12 +254,12 @@ function drawTime() {
     if (agents.length) {
         sec = el('section', 'spend-who'); sec.append(el('h4', 'spend-box-title', 'By agent'));
         const rows = agents.slice().sort((x, y) => (y.done || 0) - (x.done || 0));
-        sec.append(dataTable({ label: 'Task time by agent', fold: 'labeled', rows, rowKey: a => a.name || '', columns: [
+        sec.append(dataTable({ label: 'Task time by agent', fold: 'labeled', rows, rowKey: a => a.name || '', ...phoneOneLine([
             { key: 'name', label: 'Agent', tone: 'primary', cell: a => a.name || '' },
             { key: 'done', label: 'Tasks done', numeric: true, cell: a => String(a.done || 0) },
             { key: 'median', label: 'Median time', numeric: true, cell: a => (num(a.median_s) != null ? fmtDur(a.median_s) : '—') },
             { key: 'sent_back', label: 'Sent back', numeric: true, cell: a => (num(a.sent_back) != null ? String(a.sent_back) : '—') },
-        ] }).el);
+        ], ['median']) }).el);
     }
     shape(body, { sub: `Team ${teamLabel(model.team)} · ${word} against the 7 days before`, headline: timeHeadline(w, u, word), cards, chart: box, how: SHAPE_HOW(TIME_HOW), table: sec });
 }

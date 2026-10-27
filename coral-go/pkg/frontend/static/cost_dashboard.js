@@ -10,7 +10,7 @@ import { formatTokens, formatDuration, formatCost } from './format.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 const { dataTable, tableState, link: dtLink, chip, tag, avatar } = await importOnce('./data_table.js'); // the shared table (#7743)
-const { showViews, syncRangeLine } = await importOnce('./analytics_views.js'); // the sidebar's list of views and the page's title (#7473)
+const { showViews, syncRangeLine, phoneOneLine } = await importOnce('./analytics_views.js'); // the sidebar's list of views and the page's title (#7473)
 const agentDetail = await importOnce('./analytics_agent.js'); // one agent over the range, opened from By agent (#7930)
 const series = await importOnce('./analytics_series.js'); // the lines over time above By provider, By model, By team and By agent (#7857)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
@@ -257,7 +257,7 @@ async function _refreshCallMetrics(period, hours) {
         const st = _tables.calls || (_tables.calls = tableState());
         if (!st.sort) st.sort = { key: 'calls', dir: 'desc' };
         const dash = v => v || '—';
-        el.append(dataTable({ label: 'Tool and API calls', fold: 'labeled', scroll: true, state: st, rows, rowKey: r => `${r.operation}|${r.call_type}|${r.agent_name}|${r.board_name}`, columns: [
+        el.append(dataTable({ label: 'Tool and API calls', fold: 'labeled', scroll: true, state: st, rows, rowKey: r => `${r.operation}|${r.call_type}|${r.agent_name}|${r.board_name}`, ...phoneOneLine([
             { key: 'operation', label: 'Operation', sort: true, tone: 'primary', field: 'operation' },
             { key: 'call_type', label: 'Type', sort: true, field: 'call_type' },
             { key: 'agent', label: 'Agent', sort: true, sortValue: r => r.agent_name || '', cell: r => dash(r.agent_name) },
@@ -265,7 +265,7 @@ async function _refreshCallMetrics(period, hours) {
             _numCol('calls', 'Calls', r => r.calls || 0, String, { foldFirst: true }),
             _numCol('errors', 'Errors', r => r.errors || 0, String, { foldFirst: true }),
             _numCol('avg_ms', 'Avg ms', r => Math.round(r.avg_duration_ms || 0), String, { foldFirst: true }),
-        ] }).el);
+        ], ['calls']) }).el);
     } catch { emptyState(el, 'Call metrics unavailable', 'cost-empty'); }
 }
 
@@ -513,7 +513,7 @@ function _drawTable(container, table, columns, rows, empty, extra) {
     const st = _tables[table] || (_tables[table] = tableState());
     if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
     if (!rows.length) { emptyState(container, empty || NO_DATA, 'cost-empty'); return; }
-    const t = dataTable({ label: TABLE_TITLES[table], columns, rows, rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...extra });
+    const t = dataTable({ label: TABLE_TITLES[table], rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...phoneOneLine(columns, ['cost_usd']), rows, ...extra }); // a phone: one line a row, the name and Cost (#8982)
     container.replaceChildren(t.el);
     if (SERIES_VIEWS[table]) _drawSeries(table); // the line under the chart compares its total with these rows
 }
