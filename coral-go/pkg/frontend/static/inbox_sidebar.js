@@ -715,11 +715,15 @@ export async function openInboxGoal(team, id) {
     const body = el('div', 'goals-body'); view.append(body); host.append(view);
     goalMount = mountGoal(body, { team, id, status: sayLive,
         teamLink: build(keyRoute('team', team, 'goals', id)), focusOnOpen: false,
+        onTask: task => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: task.id }), // a task of the goal opens in the Inbox, never on the team page (#8861)
         back: () => { if (backIs(folderRoute)) history.back(); else go(folderRoute); },
     });
     renderInboxNav(true);
 }
 
+
+/** The screen before this one in the history is an Inbox address (the goal a task was opened from): Back goes there. */
+const cameFromInbox = () => /^\/inbox(\/|$)/.test(String(history.state?.prev || ''));
 
 /** Task and Board details share their team renderers, with an Inbox-owned address and way back. */
 export async function openInboxItem(kind, team, id) {
@@ -733,7 +737,7 @@ export async function openInboxItem(kind, team, id) {
     showView('inbox-view'); $('inbox-view')?.setAttribute('data-phone-item', '');
     host.append(VL.build({ id: 'inbox-item-folders', label: 'Inbox views', sections: folderSections(), current: key, onPick: pickFolder }));
     const body = el('div', 'inbox-item-body'); host.append(body);
-    itemMount = mountInboxItem(body, { kind, team, id, onChanged: refreshTasks, back: () => { if (backIs(route)) history.back(); else go(route); } });
+    itemMount = mountInboxItem(body, { kind, team, id, onChanged: refreshTasks, back: () => { if (backIs(route) || cameFromInbox()) history.back(); else go(route); } }); // Back returns to the Inbox screen it was opened from (a goal, another task), else to the folder
     renderInboxNav(true);
 }
 
