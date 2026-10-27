@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const { connect } = require('./agent_view_harness');
+const { framesJs } = require('./helpers/wait');
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { setTheme } = require('./helpers/contrast');
@@ -20,19 +21,19 @@ const board = 'preview-room-' + Date.now().toString(36);
         })()`);
         await openBoardTasksTab({ ev, waitFor }, board);
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-open').length === 2`, 'two tasks');
-        await ev(`document.querySelectorAll('#board-task-list .board-task-open')[0].click(); true`);
+        await ev(`[...document.querySelectorAll('#board-task-list .board-task-open')].find(b => b.textContent.startsWith('First task')).click(); true`);
         await waitFor(`!!document.querySelector('#preview-pane .team-task-page')`, 'first preview');
-        await ev(`document.querySelector('#preview-pane .preview-tab-keep').click(); document.querySelectorAll('#board-task-list .board-task-open')[1].click(); true`);
+        await ev(`document.querySelector('#preview-pane .preview-tab-keep').click(); [...document.querySelectorAll('#board-task-list .board-task-open')].find(b => b.textContent.startsWith('Second task')).click(); true`);
         await waitFor(`document.querySelectorAll('#preview-tabs .preview-tab').length === 2 && document.querySelector('#preview-pane #team-task-title')?.textContent.includes('Second task')`, 'second preview');
         // Select the full-height preference explicitly, as in the reported screenshot.
         await ev(`document.getElementById('preview-dock-btn').click(); true`);
-        await ev(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+        await ev(framesJs(2));
         const narrow = await ev(`({ parent: document.getElementById('preview-pane').parentElement.id, chat: document.querySelector('.live-left-column').getBoundingClientRect().width })`);
         if (narrow.parent !== 'agentic-state' || narrow.chat < 420) failures.push('1280 must fall back to sidebar with chat >=420: ' + JSON.stringify(narrow));
         for (const width of [1920, 1280, 390]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
             await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
-            await ev(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+            await ev(framesJs(2));
             const seen = await ev(`(() => { const bar = document.getElementById('preview-tabs'), b = bar.getBoundingClientRect(), tab = bar.querySelector('.preview-tab.active'), t = tab.querySelector('.preview-tab-name'), r = t.getBoundingClientRect(); return { text: t.textContent, titleWidth: r.width, visibleWidth: Math.max(0, Math.min(r.right, b.right) - Math.max(r.left, b.left)), parent: document.getElementById('preview-pane').parentElement.id, chat: document.querySelector('.live-left-column').getBoundingClientRect().width }; })()`);
             if (!seen.text.includes('Second task') || seen.titleWidth < 50 || seen.visibleWidth < 50) failures.push(width + ': active tab title must remain readable: ' + JSON.stringify(seen));
             if (width === 1920 && (seen.parent !== 'preview-column' || seen.chat < 420)) failures.push('wide screen retains column preference: ' + JSON.stringify(seen));
