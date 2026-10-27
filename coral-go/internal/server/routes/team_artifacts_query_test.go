@@ -253,8 +253,17 @@ func TestTeamArtifactsQuerySortAndPaging(t *testing.T) {
 	assert.Equal(t, "huge.log", all[0])
 	assert.ElementsMatch(t, []string{"archive.zip", "ghost"}, all[len(all)-2:])
 
+	// both directions for name and size (#8945)
+	assert.Equal(t, []string{"Zeta notes.txt", "huge.log", "bob-file.md", "axb.md", "a_b.md", "100% done.md"}, e.names("?sort=name_desc"+up), "Z to A, ignoring case")
+	asc := e.names("?sort=size_asc" + up)
+	assert.Equal(t, "100% done.md", asc[0], "smallest first")
+	assert.Equal(t, "huge.log", asc[len(asc)-1], "largest last")
+	allAsc := e.names("?sort=size_asc")
+	assert.ElementsMatch(t, []string{"archive.zip", "ghost"}, allAsc[len(allAsc)-2:], "rows with no size are last in both directions")
+	assert.Equal(t, "huge.log", e.names("?sort=size" + up)[0], "size is still largest first")
+
 	// every sort, paged by cursor with a small limit: no gaps, no repeats, the same order as one big page
-	for _, sortBy := range []string{"newest", "oldest", "name", "size"} {
+	for _, sortBy := range []string{"newest", "oldest", "name", "name_desc", "size", "size_asc", "type", "type_desc", "tags", "tags_desc"} {
 		base := "?sort=" + sortBy + "&q=%2E" // q="." keeps everything that has a dot (all but "ghost")
 		full := e.names(base)
 		require.NotEmpty(t, full)
@@ -530,4 +539,25 @@ func TestTeamArtifactsQueryCursorCarriesNoNeedlessText(t *testing.T) {
 	var c teamArtifactCursor
 	require.NoError(t, json.Unmarshal(raw, &c))
 	assert.NotEmpty(t, c.Name)
+}
+
+// The text sorts (type, tags) put a row with no text last in both directions, and a cursor holds only what its sort compares (#8945).
+func TestArtifactSortTextOrdersEmptyLast(t *testing.T) {
+	a := artifactSortKey{Type: "image/png", Tags: "alpha", At: "2026-10-01T00:00:00Z", ID: "a"}
+	b := artifactSortKey{Type: "text/plain", Tags: "beta", At: "2026-10-02T00:00:00Z", ID: "b"}
+	none := artifactSortKey{At: "2026-10-03T00:00:00Z", ID: "n"}
+	for _, field := range []string{"type", "tags"} {
+		assert.True(t, artifactAfter(field, b, a), field+": B after A")
+		assert.False(t, artifactAfter(field, a, b))
+		assert.True(t, artifactAfter(field+"_desc", a, b), field+"_desc: A after B")
+		assert.True(t, artifactAfter(field, none, b), field+": a row with none is after one with")
+		assert.True(t, artifactAfter(field+"_desc", none, b), field+"_desc: still last")
+		assert.False(t, artifactAfter(field, b, none))
+		assert.False(t, artifactAfter(field+"_desc", b, none))
+	}
+	assert.Equal(t, "short", clipKey("short", 64))
+	assert.Len(t, []rune(clipKey(strings.Repeat("\u00e9", 100), 64)), 64, "clipped by runes")
+	for _, name := range []string{"name_desc", "size_asc", "type_desc", "tags_desc"} {
+		assert.Contains(t, teamArtifactSorts, name)
+	}
 }
