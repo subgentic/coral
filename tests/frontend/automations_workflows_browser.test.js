@@ -125,7 +125,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
                 assert.equal(await ev(`document.querySelector('#wf-detail .wf-phone-back').textContent.trim()`), '\u2190 Workflows', at + 'with the way back');
             } else assert.equal(await ev(`document.getElementById('wf-back-btn').textContent`), '\u2190 Workflows', at + 'back names the folder');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.getElementById('wf-title')); return [t.fontSize, t.fontWeight]; })()`), ['20px', '700'], at + 'the name is 20/700 (the 20 px title step, #9207)');
-            assert.match(await ev(`document.querySelector('#wf-detail .wf-facts-line').textContent`), /^Folder \/work\/app \u00b7 Time limit .* \u00b7 Created /, at + 'one facts line under the name');
+            assert.match(await ev(`[...document.querySelectorAll('#wf-detail .wf-facts dt, #wf-detail .wf-facts dd')].map(e => e.textContent.trim()).join('|')`), /^Folder\|\/work\/app\|Time limit\|.+\|Created\|/, at + 'the facts list under the name, as the job page has it (#9458)');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#wf-detail .wf-steps-table th')].map(h => h.textContent)`), ['Step', 'Type', 'Command'], at + 'Steps are a table');
             await oneLinePerRow(ev, '#wf-detail .wf-steps-table tbody tr', `${at}the steps`, assert, { min: 2 }); // Goal #79: a step and a run are one line at both widths; a long command is cut with an ellipsis, a narrow list drops Type
             await oneLinePerRow(ev, '#wf-detail .wf-runs-table tbody tr', `${at}the runs`, assert, { min: 2 });
@@ -135,6 +135,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on the workflow');
             assert.equal(await ev(`(() => { const r = document.querySelector('#wf-detail .item-bar').getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.top >= 0; })()`), true, at + 'the bar is on screen without scrolling');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('wf-detail'), ${SCALE})`), [], at + "every text of the workflow's page is on the scale");
+            assert.equal(await ev(`(() => { const hs = [...document.querySelectorAll('#wf-detail .wf-steps-section h3, #wf-detail .wf-runs-section h3')], p = document.createElement('i'); p.style.color = 'var(--text-secondary)'; document.body.append(p); const want = getComputedStyle(p).color; p.remove(); return hs.length === 2 && hs.every(h => h.classList.contains('group-head-lg') && getComputedStyle(h).color === want && getComputedStyle(h).fontWeight === '600'); })()`), true, at + "the Steps and Runs headings are the shared group head (14/600, the secondary colour) as Analytics' section headings are (#9458)");
             await ev(`document.querySelectorAll('#toast-host > .toast').forEach(t => t.remove()); true`); await themed('automations-workflows-page', w);
 
             // a run's page

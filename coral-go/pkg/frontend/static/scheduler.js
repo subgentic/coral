@@ -160,7 +160,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
     const promptHtml = !isWorkflow && job.prompt
         ? (longPrompt
             ? `<details class="disclosure sched-prompt-section"><summary>Prompt</summary><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></details>`
-            : `<section class="sched-prompt-section sched-prompt-shown"><h3>Prompt</h3><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></section>`)
+            : `<section class="sched-prompt-section sched-prompt-shown"><h3 class="group-head group-head-lg">Prompt</h3><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></section>`)
         : '';
     container.innerHTML = `
         <button type="button" class="back-link" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
@@ -186,7 +186,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             <dl class="facts sched-facts">${settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
         </details>
         <div class="sched-runs-section">
-            <h3>${workflowHistory ? 'Workflow runs' : 'Runs'}</h3>
+            <h3 class="group-head group-head-lg">${workflowHistory ? 'Workflow runs' : 'Runs'}</h3>
             <div id="sched-run-history"></div>
         </div>
         <div class="item-bar sched-actions">

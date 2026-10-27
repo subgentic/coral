@@ -9,7 +9,7 @@ import { note } from './nav.js';
 import { KILL_LOG_NOTE } from './render.js';
 import { formatDuration } from './format.js';
 import { runFailureHtml, runFailure } from './run_failure.js';
-import { resultWords, limitWords } from './job_words.js'; // the Jobs pages' words: one set for both
+import { resultWords, limitWords, lastWords } from './job_words.js'; // the Jobs pages' words: one set for both
 import { foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { importOnce } from './import_once.js';
@@ -193,21 +193,23 @@ function renderWorkflowDetail(wf, runs) {
             The last run ${last.status === 'killed' ? 'was stopped' : 'failed'}${last.started_at ? ' ' + esc(whenText(last.started_at)) : ''}${last.failed_step ? `: step ${Number(last.failed_step.number)} (${esc(last.failed_step.name)})${last.failure_reason ? ': ' + esc(last.failure_reason) : ''}` : ''}.
             <button class="btn-link" data-on-click="wf-run" data-run-id="${Number(last.id)}">Open the failed run</button></p>` : '';
 
-    // One facts line under the name (folder, time limit, when it was made, and that it is off)
-    const facts = [`Folder ${wf.repo_path || 'not set'}`, `Time limit ${limitWords(wf.max_duration_s || 3600)}`, wf.created_at ? `Created ${formatTime(wf.created_at)}` : '', wf.enabled ? '' : 'Disabled'].filter(Boolean).join(' \u00b7 ');
+    // The page describes itself as the job page does (#9458): a status line (on or off, the last result), then the facts list (folder, time limit, when it was made)
+    const status = [wf.enabled ? 'Active' : 'Disabled', lastWords(last)].filter(Boolean).join(' \u00b7 ');
+    const factRows = [['Folder', wf.repo_path || 'not set'], ['Time limit', limitWords(wf.max_duration_s || 3600)], ...(wf.created_at ? [['Created', formatTime(wf.created_at)]] : [])];
     container.innerHTML = `
         <button type="button" class="back-link" id="wf-back-btn" data-on-click="automations-back" data-folder="workflows">\u2190 Workflows</button>
         <button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
         <h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2>
-        <p class="item-meta wf-facts-line">${esc(facts)}</p>
+        <p class="item-meta wf-status-line">${esc(status)}</p>
         ${wf.description ? `<p class="wf-desc">${esc(wf.description)}</p>` : ''}
+        <dl class="facts wf-facts"></dl>
         ${lastHtml}
         <div class="wf-steps-section">
-            <h3>Steps (${steps.length})</h3>
+            <h3 class="group-head group-head-lg">Steps (${steps.length})</h3>
             <div id="wf-step-table"></div>
         </div>
         <div class="wf-runs-section">
-            <h3>Runs</h3>
+            <h3 class="group-head group-head-lg">Runs</h3>
             <div id="wf-run-table"></div>
         </div>
         <div class="item-bar wf-detail-actions">
@@ -226,6 +228,7 @@ function renderWorkflowDetail(wf, runs) {
             </button>
         </div>
     `;
+    for (const [k, v] of factRows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; container.querySelector('.wf-facts').append(dt, dd); } // text, not markup
     container.querySelector('#wf-step-table').append(workflowStepsTable(steps));
     container.querySelector('#wf-run-table').append(workflowRunsTable(runsPage));
     foldWayBack(container, '.wf-phone-back', '#wf-title');

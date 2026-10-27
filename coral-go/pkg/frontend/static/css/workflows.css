@@ -17,7 +17,8 @@
 
 /* An item's page: its link back, its name at 17/700 and one facts line under it (#7471) */
 .wf-item-title { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); overflow-wrap: anywhere; }
-.wf-facts-line { margin-bottom: var(--space-lg); overflow-wrap: anywhere; }
+.wf-status-line { overflow-wrap: anywhere; }
+.wf-facts { margin: 8px 0 var(--space-lg); overflow-wrap: anywhere; } /* the job page's facts list (.sched-facts), the same words for the same things (#9458) */
 .wf-desc { margin: 0 0 var(--space-lg); font-size: var(--fs-md); color: var(--text-secondary); }
 .wf-phone-back { display: none; }
 
@@ -38,12 +39,7 @@
     margin-bottom: 20px;
 }
 
-.wf-steps-section h3 {
-    font-size: var(--fs-lg); /* a section heading: 14/600 */
-    font-weight: var(--fw-strong);
-    margin: 0 0 8px;
-    color: var(--text-primary);
-}
+.wf-steps-section h3 { margin: 0 0 8px; } /* the heading's look is .group-head-lg's, as Analytics' section headings (#9458) */
 .wf-last-failed { margin: 6px 0 var(--space-xl); font-size: var(--fs-md); color: var(--error-text); overflow-wrap: anywhere; }
 .wf-last-failed button { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
 @media (max-width: 768px) { .wf-last-failed button { min-height: var(--control-touch-height, 44px); } }
@@ -59,12 +55,7 @@
 
 /* ── Runs table ───────────────────────────────────────────── */
 
-.wf-runs-section h3 {
-    font-size: var(--fs-lg);
-    font-weight: var(--fw-strong);
-    margin: 0 0 8px;
-    color: var(--text-primary);
-}
+.wf-runs-section h3 { margin: 0 0 8px; }
 
 /* ── Progress bar ─────────────────────────────────────────── */
 
