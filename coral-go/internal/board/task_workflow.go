@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -622,6 +623,9 @@ func (s *Store) completeTaskWithArtifacts(ctx context.Context, project string, t
 	if err := saveWorkflow(ctx, tx, taskID, w); err != nil {
 		return nil, err
 	}
+	if err := closeReviewTasks(ctx, tx, project, taskID, w, subscriberID, "completed"); err != nil {
+		return nil, err
+	}
 	if err := resolveCompletedTask(ctx, tx, taskID); err != nil {
 		return nil, err
 	}
@@ -630,6 +634,31 @@ func (s *Store) completeTaskWithArtifacts(ctx context.Context, project string, t
 	}
 	s.computeAndStoreTaskCost(ctx, project, taskID)
 	return s.getTaskByID(ctx, project, taskID)
+}
+
+// closeReviewTasks ends the open review tasks of a task that has just finished (#8875): completed by hand, or cancelled, while it was in review, its reviewers' review tasks stayed pending
+// for ever (#8865 stayed critical after #8838 was completed) and kept offering work that no longer exists. Each open one (pending, in progress, blocked, a draft) is skipped, with a note
+// saying why, by whoever finished the task; a review task already done (a verdict given, an earlier round's) is left as it is.
+func closeReviewTasks(ctx context.Context, tx *sqlx.Tx, project string, id int64, w TaskWorkflow, actor, how string) error {
+	var ids []int64
+	seen := map[int64]bool{}
+	for _, r := range w.ReviewRounds {
+		for _, rv := range r.Reviewers {
+			if rv.ReviewTaskID > 0 && !seen[rv.ReviewTaskID] {
+				seen[rv.ReviewTaskID] = true
+				ids = append(ids, rv.ReviewTaskID)
+			}
+		}
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	note := fmt.Sprintf("#%d was %s by %s: this review is no longer needed", id, how, actor)
+	for _, rid := range ids {
+		if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status='skipped', completed_by=?, completion_message=?, completed_at=?
+			WHERE id=? AND board_id=? AND status IN ('pending','in_progress','blocked','draft')`, actor, note, nowUTC(), rid, project); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func isLocalArtifactPath(uri string) bool {
