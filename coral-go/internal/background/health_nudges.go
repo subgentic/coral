@@ -40,6 +40,8 @@ type HealthNudges struct {
 	heldDialogs func() map[string]time.Time
 	// heldDrafts: since when each session's automated input waits behind text in its input box that isn't Coral's (#247).
 	heldDrafts func() map[string]time.Time
+	// limit says whether a live agent is stopped by a usage limit; nothing is typed to one (#9267). nil: nothing is.
+	limit func(ctx context.Context, a AgentInfo) (resets time.Duration, blocked bool)
 
 	Interval   time.Duration
 	TeamBudget int // automatic actions per board per hour
@@ -77,6 +79,7 @@ func NewHealthNudges(bs *board.Store, ts *store.TaskStore, rt AgentRuntime, disc
 		Interval: 5 * time.Minute, TeamBudget: 20, heldDialogs: ptymanager.SkippedAtPrompt, heldDrafts: ptymanager.SkippedAtDraft,
 	}
 	h.signal = hookSignal(ts)
+	h.limit = screenLimit(rt)
 	h.deliver = func(ctx context.Context, a AgentInfo, _ string, text string) error {
 		_, err := deliverAutomated(ctx, h.runtime, h.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, board.OneLine(text), "health nudge", false, false)
 		return err
@@ -242,7 +245,7 @@ func (r *healthRun) claimNudge(ctx context.Context, sub board.Subscriber, a Agen
 			r.escalated = append(r.escalated, fmt.Sprintf("%s has not claimed #%d after %d nudges", teamhealth.Name(sub.SubscriberID), t.ID, c.Count))
 		}
 	case r.take(ctx, ruleClaimNudge, sub.SubscriberID, claimAfter):
-		if h.deliver(ctx, a, "health-claim:"+project, claimNudgeText(t.ID)) == nil {
+		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-claim:"+project, claimNudgeText(t.ID)) == nil {
 			h.store.BumpHealthCounter(ctx, project, ruleClaimNudge, sub.SubscriberID, subject, r.now)
 			r.claimed = append(r.claimed, fmt.Sprintf("%s (#%d)", teamhealth.Name(sub.SubscriberID), t.ID))
 		}
@@ -287,7 +290,7 @@ func (r *healthRun) statusNudges(ctx context.Context, sub board.Subscriber, a Ag
 			}
 		}
 		if silent := r.now.Sub(last); silent >= statusAfter && r.take(ctx, ruleStatusNudge, sub.SubscriberID, statusAfter) {
-			if h.deliver(ctx, a, "health-status:"+project, statusNudgeText(t.ID, int(silent.Minutes()))) == nil {
+			if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-status:"+project, statusNudgeText(t.ID, int(silent.Minutes()))) == nil {
 				h.store.BumpHealthCounter(ctx, project, ruleStatusNudge, sub.SubscriberID, subject, r.now)
 				r.statused = append(r.statused, fmt.Sprintf("%s (#%d)", teamhealth.Name(sub.SubscriberID), t.ID))
 			}
@@ -393,7 +396,7 @@ func (h *HealthNudges) renudgeMentions(ctx context.Context, project, orch string
 		if !take(ruleMentionRenudge, sender, 30*time.Minute) {
 			continue
 		}
-		if h.deliver(ctx, a, "health-mention:"+project, mentionRenudgeText(teamhealth.Name(sender), p.n, p.first)) != nil {
+		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-mention:"+project, mentionRenudgeText(teamhealth.Name(sender), p.n, p.first)) != nil {
 			continue
 		}
 		for _, id := range p.ids {
@@ -447,7 +450,7 @@ func (h *HealthNudges) remindAsks(ctx context.Context, project string, bySession
 		if !r.take(ctx, ruleAskReminder, o.Member, time.Minute) {
 			continue
 		}
-		if h.deliver(ctx, a, "health-ask:"+project, askReminderText(o.Asker, int(now.Sub(o.At).Minutes()), o.MessageID, o.Content)) != nil {
+		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-ask:"+project, askReminderText(o.Asker, int(now.Sub(o.At).Minutes()), o.MessageID, o.Content)) != nil {
 			continue
 		}
 		_ = h.store.RecordHealthAction(ctx, project, ruleAskReminder+"-msg", key, now)

@@ -152,6 +152,13 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				r.Counts[teamhealth.StatePrompt]++
 				attention++
 			case sig.InTurn:
+				// a limit can cut a turn short with no hook event (Codex), so "in a turn" is not proof it works (#9267)
+				if resets, blocked := m.blockedByLimit(ctx, a); blocked {
+					r.Counts[teamhealth.StateBlocked]++
+					r.Blocked = append(r.Blocked, teamhealth.BlockedEntry{Name: name, Resets: resets})
+					attention++
+					break
+				}
 				r.Counts[teamhealth.StateWorking]++
 			default:
 				if resets, blocked := m.blockedByLimit(ctx, a); blocked {
