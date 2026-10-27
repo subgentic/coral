@@ -581,7 +581,7 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 // ListSessionArtifacts lists the files a standalone agent (one with no team
 // board) uploaded. Team agents use ListTeamArtifacts, which also covers task
 // results.
-// GET /api/session-artifacts?session_id=&limit=&offset=
+// GET /api/session-artifacts?session_id=&limit=&offset=[&sort=newest|oldest|name|name_desc|size|size_asc|type|type_desc|tags|tags_desc]
 func (h *BoardHandler) ListSessionArtifacts(w http.ResponseWriter, r *http.Request) {
 	if refuseNonOwner(w, r) { // through Coral Hub the owner's alone (#5575)
 		return
@@ -602,6 +602,22 @@ func (h *BoardHandler) ListSessionArtifacts(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	items := filterReadable(r, h.coralDir, h.uploads.merge(nil, h.coralDir, map[string]string{sessionID: ""})) // #5577
+	// the list's sort (#8945): the words of the team lists, over the whole list, then the page
+	if sortName := strings.TrimSpace(r.URL.Query().Get("sort")); sortName != "" {
+		known := false
+		for _, s := range teamArtifactSorts {
+			known = known || s == sortName
+		}
+		if !known {
+			errBadRequest(w, "unknown sort "+sortName)
+			return
+		}
+		for i := range items {
+			enrichTeamArtifact(&items[i], h.artifactObjectDir())
+			finishTeamArtifactName(&items[i])
+		}
+		sort.SliceStable(items, func(i, j int) bool { return artifactAfter(sortName, keyOf(items[j]), keyOf(items[i])) })
+	}
 	end := offset + limit
 	hasMore := end < len(items)
 	if offset > len(items) {
