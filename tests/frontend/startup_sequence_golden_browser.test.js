@@ -63,7 +63,7 @@ const RECORDER = `(() => {
         })()`);
         // sections: the log is cut at the handlers' markers
         // (the callbacks' own lines are left out, see the recorder; nor is the dock tabs' data-words: dock_tabs.js puts it on to measure and takes it off when the words do not fit, so it is one write or two by the platform's text widths, #7621)
-        const log = got.log.filter(l => !l.startsWith('~') && !/^mutation now attr div\.agentic-state-tabs data-words=/.test(l));
+        const log = got.log.filter(l => !l.startsWith('~') && !/^mutation now attr div(\.[\w-]+)*\.agentic-state-tabs data-words=/.test(l));
         const handlerStarts = log.map((l, i) => /^DOMContentLoaded handler \d+ starts$/.test(l) ? i : -1).filter(i => i >= 0);
         const handlerEnds = log.map((l, i) => /^DOMContentLoaded handler \d+ (ends|failed|threw)$/.test(l) ? i : -1).filter(i => i >= 0);
         const cases = {};
