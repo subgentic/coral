@@ -1,5 +1,5 @@
 // What waits for an agent (#7727): Coral types an agent's board nudges at once and holds nothing. The agent view says how many unread board messages the agent has and why the last automated send was not typed (the row's
-// board_unread and skipped_send), lists them on request (GET /waiting), and has Send now (POST /waiting/send) for the Operator. The row says only why the last send was not typed. A sleeping agent and a row with neither say nothing.
+// board_unread and skipped_send), lists them on request (GET /waiting), and has Send now (POST /waiting/send) for the Operator. The row says only that the last send was not typed: its one chip is "Message held" and the reason is its tooltip (#9686: an agent row is the dot, the name and at most one chip). A sleeping agent and a row with neither say nothing.
 // At 1280 and 390 px. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -23,19 +23,19 @@ const BASE = require('./test_base').BASE;
             const feed = extra => ev(`(() => { const rows = window._coralGetLiveSessions().map(r => r.session_id === 'wait-agent-id' ? { ...r, board_unread: 0, skipped_send: null, ...${JSON.stringify(extra)} } : r); window._coralSetLiveSessions(rows);
                 return import(${S} + 'waiting.js').then(m => { m.syncWaitingNotice(rows.find(r => r.session_id === 'wait-agent-id')); return true; }); })()`);
             const view = () => ev(`(() => { const n = document.getElementById('composer-waiting-notice'), t = document.getElementById('composer-waiting-text'), btn = id => { const b = document.getElementById(id); return !!b && !b.hidden && b.getBoundingClientRect().height > 0; };
-                const row = document.querySelector('.session-held-line');
-                return { shown: !!n && t.textContent !== '' && n.getBoundingClientRect().height > 1, text: t.textContent, role: t.getAttribute('role'), list: btn('composer-waiting-list'), send: btn('composer-waiting-send'), row: row ? row.textContent : null, fits: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 }; })()`);
+                const row = document.querySelector('.session-held-chip');
+                return { shown: !!n && t.textContent !== '' && n.getBoundingClientRect().height > 1, text: t.textContent, role: t.getAttribute('role'), list: btn('composer-waiting-list'), send: btn('composer-waiting-send'), row: row ? row.textContent.trim() : null, why: row ? row.title : null, fits: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 }; })()`);
 
             await feed({});
             let v = await view();
-            check(`${tag}: nothing waits and nothing was skipped: no line, no buttons, no row line`, !v.shown && !v.list && !v.send && v.row === null && v.role === 'status', JSON.stringify(v));
+            check(`${tag}: nothing waits and nothing was skipped: no line, no buttons, no row chip`, !v.shown && !v.list && !v.send && v.row === null && v.role === 'status', JSON.stringify(v));
             await feed({ board_unread: 2 });
             v = await view();
             check(`${tag}: two unread: the line says so, with What waits and Send now`, v.shown && v.text === '2 unread board messages for this agent' && v.list && v.send && v.row === null, JSON.stringify(v));
             await feed({ board_unread: 1, skipped_send: { why: 'a prompt is open', what: 'board message', at: '2026-10-25T11:41:00Z', since: '2026-10-25T11:40:00Z' } });
-            await waitFor(`!!document.querySelector('.session-held-line')`, 'the row line', 6000);
+            await waitFor(`!!document.querySelector('.session-held-chip')`, 'the row chip', 6000);
             v = await view();
-            check(`${tag}: one unread and a skipped send: both are said, and the row says why it was not typed`, /^1 unread board message for this agent\. Not typed: a prompt is open\.$/.test(v.text) && /^Not typed: a prompt is open$/.test(v.row) && v.fits, JSON.stringify(v));
+            check(`${tag}: one unread and a skipped send: both are said, and the row's chip says it was held, with why as its tooltip`, /^1 unread board message for this agent\. Not typed: a prompt is open\.$/.test(v.text) && v.row === 'Message held' && v.why === 'a prompt is open' && v.fits, JSON.stringify(v));
             const looks = await ev(`(() => { const n = document.getElementById('composer-waiting-notice'), t = document.getElementById('composer-waiting-text'), cs = getComputedStyle(t), h = id => document.getElementById(id).getBoundingClientRect().height, top = id => Math.round(document.getElementById(id).getBoundingClientRect().top);
                 return { size: cs.fontSize, weight: cs.fontWeight, colour: cs.color, secondary: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(), send: document.getElementById('composer-waiting-send').className, hs: [h('composer-waiting-list'), h('composer-waiting-send'), n.querySelector('[data-on-click=terminal-view-open]').getBoundingClientRect().height], tops: [top('composer-waiting-list'), top('composer-waiting-send')] }; })()`);
             check(`${tag}: the sentence is 12/400 secondary, Send now is a small button, and on a phone all three controls are 44 px high`, parseFloat(looks.size) <= 13 && looks.weight === '400' && /btn-small/.test(looks.send) && (!mobile || looks.hs.every(x => x >= 43.5)), JSON.stringify(looks));
