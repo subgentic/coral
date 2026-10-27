@@ -44,6 +44,23 @@ assert.deepEqual(AF.chips({ ...AF.EMPTY, q: 'x', state: 'paused', result: 'faile
 assert.equal(AF.isFiltered({ ...AF.EMPTY, result: 'failed' }), true);
 assert.equal(AF.isFiltered({ ...AF.EMPTY, sort: 'name' }), false, 'the order alone does not narrow');
 
+// workflows are items too: the step types are the ones their steps have (no type is shell)
+const wfs = [
+    { id: 1, name: 'nightly-build', description: 'Build and test', enabled: 1, steps: [{ name: 'Install' }, { name: 'Test', type: 'shell' }], last_run: { status: 'failed', started_at: at(2) } },
+    { id: 2, name: 'review-pass', description: '', enabled: 1, step_count: 3, steps: [{ type: 'agent' }, { type: 'shell' }, { type: 'agent' }], last_run: { status: 'completed', started_at: at(5) } },
+    { id: 3, name: 'old-flow', enabled: 0, steps: [], last_run: null },
+];
+const wi = wfs.map((w, i) => AF.workflowItem(w, i));
+const wids = f => wi.filter(i => AF.matches(i, { ...AF.EMPTY, ...f })).map(i => i.id).join();
+assert.deepEqual(wi.map(i => [i.stepCount, i.stepTypes.join('+'), i.usedBy, i.result]), [[2, 'shell', 0, 'failed'], [3, 'agent+shell', 1, 'passed'], [0, '', 2, 'never']]);
+assert.equal(wids({ step: 'agent' }), '2', 'Step type: a workflow with an agent step');
+assert.equal(wids({ step: 'shell' }), '1,2', 'a step with no type is a shell step');
+assert.equal(wids({ state: 'paused' }), '3');
+assert.equal(wids({ q: 'build and test' }), '1', 'the search covers the description');
+assert.equal(AF.ordered(wi, AF.EMPTY).map(i => i.id).join(), '1,3,2', 'workflows have no next run: by name');
+assert.equal(AF.ordered(wi, { ...AF.EMPTY, sort: 'last' }).map(i => i.id).join(), '1,2,3'.split(',').sort((a, b) => wi.find(i => i.id == b).last - wi.find(i => i.id == a).last || a - b).join(), 'by last run, newest first');
+assert.deepEqual(AF.chips({ ...AF.EMPTY, step: 'agent' }).map(c => c.label), ['Step type: Agent']);
+
 AF.saveFilters('jobs', { ...AF.EMPTY, result: 'failed', q: 'gone' });
 assert.deepEqual(AF.loadFilters('jobs'), { ...AF.EMPTY, result: 'failed' }, 'what is chosen is kept for the folder; the search words are not');
 assert.deepEqual(AF.loadFilters('workflows'), AF.EMPTY, 'another folder has its own');
