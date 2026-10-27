@@ -211,6 +211,12 @@
       "type": "index"
     },
     {
+      "name": "idx_task_workflows_parent",
+      "sql": "CREATE INDEX idx_task_workflows_parent ON task_workflows(lst_parent) WHERE lst_parent \u003e 0",
+      "tbl_name": "task_workflows",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_artifact_tags_1",
       "sql": null,
       "tbl_name": "artifact_tags",
@@ -560,7 +566,7 @@
     },
     {
       "name": "task_workflows",
-      "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL, has_artifacts INTEGER NOT NULL DEFAULT 0, eff_state INTEGER NOT NULL DEFAULT 0, eff_review_of INTEGER NOT NULL DEFAULT 0, eff_author TEXT NOT NULL DEFAULT '', eff_submitted TEXT NOT NULL DEFAULT '', eff_rejected INTEGER NOT NULL DEFAULT 0, lst_state INTEGER NOT NULL DEFAULT 0, lst_outcome TEXT NOT NULL DEFAULT '', lst_author TEXT NOT NULL DEFAULT '', lst_review_requested INTEGER NOT NULL DEFAULT 0, lst_reviewers TEXT NOT NULL DEFAULT '[]', lst_review_areas TEXT NOT NULL DEFAULT '[]', lst_in_pool INTEGER NOT NULL DEFAULT 0, lst_wanted INTEGER NOT NULL DEFAULT 0, lst_artifacts INTEGER NOT NULL DEFAULT 0)",
+      "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL, has_artifacts INTEGER NOT NULL DEFAULT 0, eff_state INTEGER NOT NULL DEFAULT 0, eff_review_of INTEGER NOT NULL DEFAULT 0, eff_author TEXT NOT NULL DEFAULT '', eff_submitted TEXT NOT NULL DEFAULT '', eff_rejected INTEGER NOT NULL DEFAULT 0, lst_state INTEGER NOT NULL DEFAULT 0, lst_outcome TEXT NOT NULL DEFAULT '', lst_author TEXT NOT NULL DEFAULT '', lst_review_requested INTEGER NOT NULL DEFAULT 0, lst_reviewers TEXT NOT NULL DEFAULT '[]', lst_review_areas TEXT NOT NULL DEFAULT '[]', lst_in_pool INTEGER NOT NULL DEFAULT 0, lst_wanted INTEGER NOT NULL DEFAULT 0, lst_artifacts INTEGER NOT NULL DEFAULT 0, lst_parent INTEGER NOT NULL DEFAULT 0)",
       "tbl_name": "task_workflows",
       "type": "table"
     },
@@ -674,13 +680,13 @@
     },
     {
       "name": "task_workflows_lst_ai",
-      "sql": "CREATE TRIGGER task_workflows_lst_ai AFTER INSERT ON task_workflows BEGIN UPDATE task_workflows SET lst_outcome = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.outcome'), '') ELSE '' END, lst_author = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.original_author'), '') ELSE '' END, lst_review_requested = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_type(NEW.data, '$.completion_review') = 'object', 0) ELSE 0 END, lst_reviewers = CASE WHEN json_valid(NEW.data) THEN COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(NEW.data, '$.review_rounds[#-1].reviewers') v WHERE v.type = 'object'), '[]') ELSE '[]' END, lst_review_areas = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.review_areas'), '[]') ELSE '[]' END, lst_in_pool = CASE WHEN json_valid(NEW.data) THEN CASE WHEN COALESCE(json_extract(NEW.data, '$.review_in_pool'), 0) = 1 THEN 1 ELSE 0 END ELSE 0 END, lst_wanted = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.reviewers_wanted'), 0) ELSE 0 END, lst_artifacts = CASE WHEN json_valid(NEW.data) THEN CASE WHEN NEW.data LIKE '%\"artifacts\":[%' THEN (SELECT COUNT(DISTINCT u) FROM (SELECT json_extract(a.value, '$.uri') AS u FROM json_each(NEW.data, '$.artifacts') a UNION ALL SELECT json_extract(a.value, '$.uri') FROM json_each(NEW.data, '$.completion_review.artifacts') a) WHERE COALESCE(u, '') != '') + (SELECT COUNT(*) FROM json_each(NEW.data, '$.artifacts') a WHERE COALESCE(json_extract(a.value, '$.uri'), '') = '' AND COALESCE(json_extract(a.value, '$.content'), '') != '') + (SELECT COUNT(*) FROM json_each(NEW.data, '$.completion_review.artifacts') a WHERE COALESCE(json_extract(a.value, '$.uri'), '') = '' AND COALESCE(json_extract(a.value, '$.content'), '') != '') ELSE 0 END ELSE 0 END, lst_state = 1 WHERE task_id = NEW.task_id; END",
+      "sql": "CREATE TRIGGER task_workflows_lst_ai AFTER INSERT ON task_workflows BEGIN UPDATE task_workflows SET lst_outcome = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.outcome'), '') ELSE '' END, lst_author = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.original_author'), '') ELSE '' END, lst_review_requested = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_type(NEW.data, '$.completion_review') = 'object', 0) ELSE 0 END, lst_reviewers = CASE WHEN json_valid(NEW.data) THEN COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(NEW.data, '$.review_rounds[#-1].reviewers') v WHERE v.type = 'object'), '[]') ELSE '[]' END, lst_review_areas = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.review_areas'), '[]') ELSE '[]' END, lst_in_pool = CASE WHEN json_valid(NEW.data) THEN CASE WHEN COALESCE(json_extract(NEW.data, '$.review_in_pool'), 0) = 1 THEN 1 ELSE 0 END ELSE 0 END, lst_wanted = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.reviewers_wanted'), 0) ELSE 0 END, lst_artifacts = CASE WHEN json_valid(NEW.data) THEN CASE WHEN NEW.data LIKE '%\"artifacts\":[%' THEN (SELECT COUNT(DISTINCT u) FROM (SELECT json_extract(a.value, '$.uri') AS u FROM json_each(NEW.data, '$.artifacts') a UNION ALL SELECT json_extract(a.value, '$.uri') FROM json_each(NEW.data, '$.completion_review.artifacts') a) WHERE COALESCE(u, '') != '') + (SELECT COUNT(*) FROM json_each(NEW.data, '$.artifacts') a WHERE COALESCE(json_extract(a.value, '$.uri'), '') = '' AND COALESCE(json_extract(a.value, '$.content'), '') != '') + (SELECT COUNT(*) FROM json_each(NEW.data, '$.completion_review.artifacts') a WHERE COALESCE(json_extract(a.value, '$.uri'), '') = '' AND COALESCE(json_extract(a.value, '$.content'), '') != '') ELSE 0 END ELSE 0 END, lst_parent = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.parent_task_id'), 0) ELSE 0 END, lst_state = 1 WHERE task_id = NEW.task_id; END",
       "tbl_name": "task_workflows",
       "type": "trigger"
     },
     {
       "name": "task_workflows_lst_au",
-      "sql": "CREATE TRIGGER task_workflows_lst_au AFTER UPDATE OF data ON task_workflows BEGIN UPDATE task_workflows SET lst_outcome = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.outcome'), '') ELSE '' END, lst_author = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.original_author'), '') ELSE '' END, lst_review_requested = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_type(NEW.data, '$.completion_review') = 'object', 0) ELSE 0 END, lst_reviewers = CASE WHEN json_valid(NEW.data) THEN COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(NEW.data, '$.review_rounds[#-1].reviewers') v WHERE v.type = 'object'), '[]') ELSE '[]' END, lst_review_areas = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.review_areas'), '[]') ELSE '[]' END, lst_in_pool = CASE WHEN json_valid(NEW.data) THEN CASE WHEN COALESCE(json_extract(NEW.data, '$.review_in_pool'), 0) = 1 THEN 1 ELSE 0 END ELSE 0 END, lst_wanted = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.reviewers_wanted'), 0) ELSE 0 END, lst_artifacts = CASE WHEN json_valid(NEW.data) THEN CASE WHEN NEW.data LIKE '%\"artifacts\":[%' THEN (SELECT COUNT(DISTINCT u) FROM (SELECT json_extract(a.value, '$.uri') AS u FROM json_each(NEW.data, '$.artifacts') a UNION ALL SELECT json_extract(a.value, '$.uri') FROM json_each(NEW.data, '$.completion_review.artifacts') a) WHERE COALESCE(u, '') != '') + (SELECT COUNT(*) FROM json_each(NEW.data, '$.artifacts') a WHERE COALESCE(json_extract(a.value, '$.uri'), '') = '' AND COALESCE(json_extract(a.value, '$.content'), '') != '') + (SELECT COUNT(*) FROM json_each(NEW.data, '$.completion_review.artifacts') a WHERE COALESCE(json_extract(a.value, '$.uri'), '') = '' AND COALESCE(json_extract(a.value, '$.content'), '') != '') ELSE 0 END ELSE 0 END, lst_state = 1 WHERE task_id = NEW.task_id; END",
+      "sql": "CREATE TRIGGER task_workflows_lst_au AFTER UPDATE OF data ON task_workflows BEGIN UPDATE task_workflows SET lst_outcome = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.outcome'), '') ELSE '' END, lst_author = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.original_author'), '') ELSE '' END, lst_review_requested = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_type(NEW.data, '$.completion_review') = 'object', 0) ELSE 0 END, lst_reviewers = CASE WHEN json_valid(NEW.data) THEN COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(NEW.data, '$.review_rounds[#-1].reviewers') v WHERE v.type = 'object'), '[]') ELSE '[]' END, lst_review_areas = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.review_areas'), '[]') ELSE '[]' END, lst_in_pool = CASE WHEN json_valid(NEW.data) THEN CASE WHEN COALESCE(json_extract(NEW.data, '$.review_in_pool'), 0) = 1 THEN 1 ELSE 0 END ELSE 0 END, lst_wanted = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.reviewers_wanted'), 0) ELSE 0 END, lst_artifacts = CASE WHEN json_valid(NEW.data) THEN CASE WHEN NEW.data LIKE '%\"artifacts\":[%' THEN (SELECT COUNT(DISTINCT u) FROM (SELECT json_extract(a.value, '$.uri') AS u FROM json_each(NEW.data, '$.artifacts') a UNION ALL SELECT json_extract(a.value, '$.uri') FROM json_each(NEW.data, '$.completion_review.artifacts') a) WHERE COALESCE(u, '') != '') + (SELECT COUNT(*) FROM json_each(NEW.data, '$.artifacts') a WHERE COALESCE(json_extract(a.value, '$.uri'), '') = '' AND COALESCE(json_extract(a.value, '$.content'), '') != '') + (SELECT COUNT(*) FROM json_each(NEW.data, '$.completion_review.artifacts') a WHERE COALESCE(json_extract(a.value, '$.uri'), '') = '' AND COALESCE(json_extract(a.value, '$.content'), '') != '') ELSE 0 END ELSE 0 END, lst_parent = CASE WHEN json_valid(NEW.data) THEN COALESCE(json_extract(NEW.data, '$.parent_task_id'), 0) ELSE 0 END, lst_state = 1 WHERE task_id = NEW.task_id; END",
       "tbl_name": "task_workflows",
       "type": "trigger"
     }
@@ -5336,6 +5342,15 @@
           "notnull": 1,
           "pk": 0,
           "type": "INTEGER"
+        },
+        {
+          "cid": 17,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "lst_parent",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
         }
       ],
       "indexes": [
@@ -5359,6 +5374,31 @@
             }
           ],
           "name": "idx_task_workflows_artifacts",
+          "origin": "c",
+          "partial": 1,
+          "seq": 1,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 17,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "lst_parent",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_task_workflows_parent",
           "origin": "c",
           "partial": 1,
           "seq": 0,
