@@ -60,6 +60,7 @@ const GOLDEN = path.join(__dirname, 'settings_html_pin.golden.json');
         else {
             const want = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'));
             assert.deepEqual(Object.keys(got), Object.keys(want), 'the same snapshots');
+            for (const k of Object.keys(want)) { if (got[k] !== want[k]) { let i = 0; while (i < got[k].length && got[k][i] === want[k][i]) i++; console.log('DIAG', k, 'first diff at', i, 'of', got[k].length, want[k].length, '\n got:', JSON.stringify(got[k].slice(Math.max(0, i - 120), i + 160)), '\n want:', JSON.stringify(want[k].slice(Math.max(0, i - 120), i + 160))); } }
             for (const k of Object.keys(want)) assert.equal(got[k], want[k], `${k}: the markup is the golden's, string for string`);
             console.log('PASS settings html pin: ' + Object.keys(want).length + ' snapshots equal');
         }
