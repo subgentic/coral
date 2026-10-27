@@ -23,7 +23,7 @@ const pages = [turn(1, 'first'), turn(2, 'second')];
         await ev(`window.__coralReady.then(() => true)`);
         await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => { const b = document.createElement('div'); b.id = 'tt-box'; b.className = 'chat-messages chat-prose';
             b.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;overflow:auto;background:var(--bg-primary);z-index:99999;padding:12px';
-            document.body.appendChild(b); const more = document.createElement('button'); more.type = 'button'; more.className = 'load-more-btn'; more.textContent = 'Load older messages'; b.appendChild(more);
+            document.body.appendChild(b); const more = document.createElement('button'); more.type = 'button'; more.className = 'btn load-more-btn'; more.textContent = 'Load older messages'; b.appendChild(more);
             m.renderTranscript(${JSON.stringify(plain)}, b, 'claude'); return (async () => { for (const page of ${JSON.stringify(pages)}) { const tmp = document.createElement('div'); m.renderTranscript(page, tmp, 'claude'); while (tmp.firstChild) b.appendChild(tmp.firstChild); } (await import((window.__coralStatic || '/static/') + 'chat_content.js')).rollUpGroups(b); return true; })(); })`);
         const sizes = () => ev(`(() => { const h = el => Math.round(el.getBoundingClientRect().height * 10) / 10; const q = s => [...document.querySelectorAll('#tt-box ' + s)].filter(e => e.checkVisibility({ checkVisibilityCSS: true }));
             return { group: q('.work-group > summary').map(h), rollup: q('.work-rollup > summary').map(h), more: q('.load-more-btn').map(h), coarse: matchMedia('(pointer: coarse)').matches, w: innerWidth }; })()`);

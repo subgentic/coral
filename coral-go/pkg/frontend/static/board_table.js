@@ -122,10 +122,10 @@ export function dayDividerHtml(iso, { listItem = true } = {}) {
 function openParts(id, agent, moreLabel, more, tagHtml) {
     const replyText = `Reply to ${agent}`;
     const taskTag = /<span class="chip chip-tag mb-row-tag mb-row-task">#(\d+)<\/span>/.exec(tagHtml);
-    const taskLink = taskTag ? `<button type="button" class="btn mb-row-btn mb-task-link" data-on-click="mb-task-open" data-task-id="${Number(taskTag[1])}">Open task #${Number(taskTag[1])}</button>` : '';
+    const taskLink = taskTag ? `<button type="button" class="btn btn-small mb-task-link" data-on-click="mb-task-open" data-task-id="${Number(taskTag[1])}">Open task #${Number(taskTag[1])}</button>` : '';
     return {
         tagsOpen: tagHtml ? `<div class="mb-row-tags-open">${tagHtml}</div>` : '',
-        actions: `<div class="mb-row-replies" hidden></div><div class="mb-row-actions">${taskLink}<button type="button" class="btn mb-row-btn" data-on-click="mb-msg-reply" data-msg-id="${Number(id)}" data-sender="${escapeAttr(agent)}" aria-label="${escapeAttr(replyText)}">Reply</button><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-copy-link" data-msg-id="${Number(id)}">Copy link</button>${more ? `<button type="button" class="btn mb-row-btn mb-row-more" data-on-click="mb-msg-more" aria-haspopup="dialog" aria-label="${escapeAttr(moreLabel)}">More</button>` : ''}</div>`,
+        actions: `<div class="mb-row-replies" hidden></div><div class="mb-row-actions">${taskLink}<button type="button" class="btn btn-small" data-on-click="mb-msg-reply" data-msg-id="${Number(id)}" data-sender="${escapeAttr(agent)}" aria-label="${escapeAttr(replyText)}">Reply</button><button type="button" class="btn btn-small" data-on-click="mb-msg-copy-link" data-msg-id="${Number(id)}">Copy link</button>${more ? `<button type="button" class="btn btn-small mb-row-more" data-on-click="mb-msg-more" aria-haspopup="dialog" aria-label="${escapeAttr(moreLabel)}">More</button>` : ''}</div>`,
     };
 }
 

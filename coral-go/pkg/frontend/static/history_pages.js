@@ -24,10 +24,10 @@ function syncButtons() {
     const c = box();
     if (!c || !win) return;
     let earlier = c.querySelector(':scope > .history-load-earlier');
-    if (win.lo > 0 && !earlier) c.insertAdjacentHTML('afterbegin', '<button type="button" class="load-more-btn history-load-earlier" data-on-click="history-load-earlier">Load earlier messages</button>');
+    if (win.lo > 0 && !earlier) c.insertAdjacentHTML('afterbegin', '<button type="button" class="btn load-more-btn history-load-earlier" data-on-click="history-load-earlier">Load earlier messages</button>');
     else if (win.lo <= 0 && earlier) earlier.remove();
     let later = c.querySelector(':scope > .history-load-later');
-    if (win.hi < win.total && !later) c.insertAdjacentHTML('beforeend', '<button type="button" class="load-more-btn history-load-later" data-on-click="history-load-later">Load later messages</button>');
+    if (win.hi < win.total && !later) c.insertAdjacentHTML('beforeend', '<button type="button" class="btn load-more-btn history-load-later" data-on-click="history-load-later">Load later messages</button>');
     else if (win.hi >= win.total && later) later.remove();
 }
 
