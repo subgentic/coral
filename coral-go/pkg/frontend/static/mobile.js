@@ -95,7 +95,7 @@ function _listHeader(agentList) {
                 <svg class="group-toggle-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg>
                 <svg class="group-toggle-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>
             </button>
-            <button class="btn btn-small btn-primary" data-on-click="launch-show">+ New</button>
+            <button class="btn btn-small btn-primary" data-on-click="launch-show">New</button>
             <div class="mobile-search-row" id="mobile-search-row">
                 <input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents" autocomplete="off" aria-label="Search agents" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
             </div>
