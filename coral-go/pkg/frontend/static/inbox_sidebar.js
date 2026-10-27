@@ -716,7 +716,7 @@ export async function openInboxGoal(team, id) {
     goalMount = mountGoal(body, { team, id, status: sayLive,
         teamLink: build(keyRoute('team', team, 'goals', id)), focusOnOpen: false,
         onTask: task => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: task.id }), // a task of the goal opens in the Inbox, never on the team page (#8861)
-        back: () => { if (backIs(folderRoute)) history.back(); else go(folderRoute); },
+        back: () => { if (backIs(folderRoute) || cameFromInbox()) history.back(); else go(folderRoute); }, // to the Inbox screen it was opened from (a task's Goal line), else the folder
     });
     renderInboxNav(true);
 }
