@@ -117,8 +117,10 @@ func TestPostAssignCreatesTheTaskAndPostsItsLink(t *testing.T) {
 	assert.EqualValues(t, 7, task["goal_id"])
 	assert.Equal(t, "high", task["priority"])
 	assert.Equal(t, "Tester", task["subscriber_id"], "the poster is the creator")
-	require.Len(t, srv.sentMessages(), 1)
-	msg := srv.sentMessages()[0]
+	require.Len(t, srv.sentMessages(), 2, "the server checks the post first (dry_run), then the post is made")
+	assert.Equal(t, true, srv.sentMessages()[0]["dry_run"])
+	assert.NotContains(t, srv.sentMessages()[1], "dry_run")
+	msg := srv.sentMessages()[1]
 	assert.EqualValues(t, 900, msg["task_id"], "the post is on the task")
 	content, _ := msg["content"].(string)
 	assert.Contains(t, content, "Fix the flaky test\nIt fails one run in ten under load.")

@@ -50,6 +50,15 @@ func TestPostRefusesAnUnknownMentionAndStoresNothing(t *testing.T) {
 	assert.Contains(t, out["message"], "coral-board send --board coral-hub")
 	assert.Zero(t, stored())
 
+	// a dry run answers the same refusal and stores nothing, and for a good post stores nothing either
+	resp := postJSON(t, server.URL+"/api/board/team/messages", map[string]any{"subscriber_id": "Orchestrator", "content": "@DO Expert hi", "dry_run": true})
+	assert.Equal(t, 400, resp.StatusCode)
+	resp.Body.Close()
+	resp = postJSON(t, server.URL+"/api/board/team/messages", map[string]any{"subscriber_id": "Orchestrator", "content": "@Digital Ocean Expert hi", "dry_run": true})
+	assert.Equal(t, 200, resp.StatusCode)
+	resp.Body.Close()
+	assert.Zero(t, stored(), "a dry run stores nothing")
+
 	ok := post("@Digital Ocean Expert the droplet is yours, @all", 200)
 	assert.NotContains(t, ok, "warnings")
 	assert.NotNil(t, ok["id"])

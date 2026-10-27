@@ -223,6 +223,17 @@ func cmdPost() {
 		body["reply_to"] = n
 	}
 	if assigned != nil { // --assign: the task is made now, and the post carries its link (#7791)
+		// The server checks the post first (its mentions): a refused post must leave no task behind (#9047).
+		dry := map[string]any{"subscriber_id": subscriberID, "content": message, "dry_run": true}
+		dryResult, dryStatus, dryErr := apiCall("POST", "/"+url.PathEscape(st.Project)+"/messages", dry)
+		if dryErr != nil {
+			fmt.Fprintln(os.Stderr, dryErr)
+			clierr.Exit1()
+		}
+		if e := serverError(dryStatus, dryResult); e != nil {
+			fmt.Fprintln(os.Stderr, e)
+			clierr.Exit1()
+		}
 		n := assigned.create(st, subscriberID)
 		body["task_id"] = n
 		body["content"] = strings.TrimSpace(message) + fmt.Sprintf("\n\n-> Task #%d, assigned to %s.", n, assignArg)

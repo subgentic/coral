@@ -137,7 +137,9 @@ type postMessageBody struct {
 	// TaskID makes the post an answer on that task (#7703): the agent's reply to a person's reply, listed with it by GET .../messages?task_id=N. The task must be on this board;
 	// no mention is added (the person reads the task's page), the sender is the one the request proves, exactly as for any post.
 	// Ask makes the post a question to the members it @mentions (#7794), open until each has answered; ReplyTo makes it an answer to that message of the board.
-	Ask     bool            `json:"ask,omitempty"`
+	Ask bool `json:"ask,omitempty"`
+	// DryRun checks the post (size, mentions) and answers {"ok": true, "dry_run": true} without storing anything: "post --assign" asks before it creates the task, so a refused post leaves nothing behind (#9047).
+	DryRun  bool            `json:"dry_run,omitempty"`
 	ReplyTo int64           `json:"reply_to,omitempty"`
 	TaskID  json.RawMessage `json:"task_id,omitempty"` // raw, so a task_id that is not a whole number is answered as that (invalid task_id), not as a body that failed to decode ("content required")
 }
@@ -219,6 +221,10 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 			"mentions": problems,
 			"not_sent": true,
 		})
+		return nil, false
+	}
+	if body.DryRun {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dry_run": true})
 		return nil, false
 	}
 
