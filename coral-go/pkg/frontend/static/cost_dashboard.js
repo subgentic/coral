@@ -258,6 +258,7 @@ async function _refreshCallMetrics(period, hours) {
         const st = _tables.calls || (_tables.calls = tableState());
         if (!st.sort) st.sort = { key: 'calls', dir: 'desc' };
         const dash = v => v || '—';
+        _callsPhone = isPhoneLayout();
         el.append(dataTable({ label: 'Tool and API calls', fold: 'labeled', scroll: true, state: st, rows, rowKey: r => `${r.operation}|${r.call_type}|${r.agent_name}|${r.board_name}`, ...phoneOneLine([
             { key: 'operation', label: 'Operation', sort: true, tone: 'primary', field: 'operation' },
             { key: 'call_type', label: 'Type', sort: true, field: 'call_type' },
@@ -509,12 +510,15 @@ document.addEventListener('cost-view-change', e => {
     if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); else if (e.detail === 'overview') _refreshOverview();
 });
 let _resizeTimer = null;
-window.addEventListener('resize', () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { const v = _currentView(); if (SERIES_VIEWS[v] && document.getElementById(`cost-series-${v}`)?.firstChild) _drawSeries(v); }, 150); });
+window.addEventListener('resize', () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { for (const [name, d] of Object.entries(_drawn)) if (d.container.isConnected && d.phone !== isPhoneLayout()) _drawTable(d.container, name, d.columns, d.rows, d.empty, d.extra); if (_callsPhone !== null && _callsPhone !== isPhoneLayout()) _refreshCostDashboard(); const v = _currentView(); if (SERIES_VIEWS[v] && document.getElementById(`cost-series-${v}`)?.firstChild) _drawSeries(v); }, 150); });
 
+let _callsPhone = null; // the calls table's layout when it was drawn: crossing the phone breakpoint reads it again (#9051)
+const _drawn = {}; // table -> the arguments it was drawn with and whether it was drawn for a phone: crossing the phone breakpoint draws it again (#9051)
 const PHONE_LEAD = { model: 'model', thinking: 'level' }; // the column By model and By thinking are about, kept on a phone beside Cost: the Provider column before it is only a filter (#8982)
 function _drawTable(container, table, columns, rows, empty, extra) {
     const st = _tables[table] || (_tables[table] = tableState());
     if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
+    _drawn[table] = { container, columns, rows, empty, extra, phone: isPhoneLayout() };
     if (!rows.length) { emptyState(container, empty || NO_DATA, 'cost-empty'); return; }
     const t = dataTable({ label: TABLE_TITLES[table], rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...phoneOneLine(columns, ['cost_usd'], PHONE_LEAD[table]), rows, ...extra }); // a phone: one line a row, the name and Cost (#8982)
     container.replaceChildren(t.el);

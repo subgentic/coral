@@ -374,3 +374,6 @@
 /* a goal screen's one-line rows (#8952): the row button is a target of its own, 24 px, 44 px on a phone */
 .goal-list .dt-primary { display: block; min-height: 1.5rem; line-height: 1.5rem; }
 @media (max-width: 767px), (pointer: coarse) { .goal-list .dt-primary { min-height: var(--control-touch-height, 44px); line-height: var(--control-touch-height, 44px); } }
+
+/* A one-line table on a phone (#8931, #8982, #9051): a name (a row's primary button) and a row's own link are 44 px targets, as they are in the folded rows */
+@media (max-width: 760px), (pointer: coarse) { .dt-box.dt-one-line .dt-link, .dt-box.dt-one-line .dt-primary { display: inline-flex; align-items: center; min-height: var(--table-touch); min-width: var(--table-touch); } }
