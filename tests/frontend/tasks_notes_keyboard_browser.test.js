@@ -44,14 +44,19 @@ const { connect } = require('./agent_view_harness');
             await press(k, code, vk);
             await waitFor(`document.querySelector('#board-task-list .dt-sort[data-key="task"]').textContent !== ${JSON.stringify(before)}`, `${JSON.stringify(k)} sorts by the heading`, 4000);
         }
-        // a board task's name opens the team page's task page (#7644): the page needs a real board, so the opener is recorded here (task_page_actions_browser opens it for real)
-        await ev(`window.__opened = []; window.openTeamPage = (board, opts) => { window.__opened.push({ board, ...opts }); return Promise.resolve(true); }; document.querySelector('#board-task-list .board-task-open').focus(); true`);
+        // Exercise the shared preview; these list fixtures also supply its task read.
+        await ev(`(() => { const real = window.fetch; window.fetch = (u, o) => {
+            const match = String(u).match(/\\/api\\/board\\/task-bot\\/tasks\\/(11|12)(?:[?]|$)/);
+            if (match) return Promise.resolve(new Response(JSON.stringify(window.__qaState.currentBoardTasks.find(t => t.id === Number(match[1]))), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+            return real(u, o);
+        }; document.querySelector('#board-task-list .board-task-open').focus(); return true; })()`);
+        const title = await ev(`document.activeElement.textContent`);
         await press('Enter', 'Enter', 13);
-        await waitFor(`window.__opened.length === 1`, 'the task opens on Enter', 5000);
-        const opened = await ev(`window.__opened[0]`);
-        assert.ok(opened.tab === 'tasks' && [11, 12].includes(opened.item) && opened.board === 'task-bot', 'it opens that task on the team page: ' + JSON.stringify(opened));
+        await waitFor(`document.querySelector('#preview-pane #team-task-title')?.textContent.includes(${JSON.stringify(title)})`, 'the task opens in preview on Enter', 5000);
+        assert.equal(await ev(`document.querySelectorAll('#preview-pane .preview-tab').length`), 1, 'one task preview opens');
         assert.equal(await ev(`getComputedStyle(document.getElementById('task-detail-modal')).display`), 'none', 'and no dialog');
-        console.log('   ✓ Enter opens a task page, Enter and Space sort by a heading');
+        await ev(`document.querySelector('#preview-pane .preview-tab.active .preview-tab-close').click(); true`);
+        console.log('   ✓ Enter opens a task preview, Enter and Space sort by a heading');
 
         console.log('2. Notes');
         await ev(`window.switchAgenticTab('notes', 'top'); true`);
