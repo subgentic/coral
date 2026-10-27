@@ -44,7 +44,7 @@ export function showServerLabels() {
 /** Summary entry for a server id (local is synthesised as online). */
 export function serverEntry(id) {
     const sid = normServer(id);
-    if (sid === LOCAL_SERVER) return { id: LOCAL_SERVER, label: 'Local', status: 'online' };
+    if (sid === LOCAL_SERVER) return { id: LOCAL_SERVER, label: 'This computer', status: 'online' };
     const found = remoteServers().find(s => s.id === sid);
     return found || { id: sid, label: sid, status: 'unknown' };
 }

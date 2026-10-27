@@ -36,10 +36,10 @@ const { pathToFileURL } = require('url');
     assert.strictEqual(m.serverStatus('nope'), 'unknown');
     const badge = m.serverBadgeHtml('ws1');
     assert.ok(badge.includes('server-online') && badge.includes('Work &lt;b&gt;') && !badge.includes('<b>'));
-    assert.ok(m.serverBadgeHtml('local').includes('Local'));
+    assert.ok(m.serverBadgeHtml('local').includes('This computer'));
     assert.notStrictEqual(m.serverBadgeHtml('ws1'), m.serverBadgeHtml('ws2'));
     const strip = m.serverStripHtml();
-    assert.ok(strip.indexOf('Local') < strip.indexOf('Cloud'));
+    assert.ok(strip.indexOf('This computer') < strip.indexOf('Cloud'));
     assert.ok(strip.includes('Unreachable') && strip.includes('Key rejected'));
     assert.deepStrictEqual(m.localFirst([['@ws1/a', 1], ['b', 2], ['@ws2/c', 3], ['d', 4]]).map(e => e[0]), ['b', 'd', '@ws1/a', '@ws2/c']);
 

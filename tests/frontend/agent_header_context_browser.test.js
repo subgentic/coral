@@ -1,5 +1,5 @@
 // The agent header names the agent's team and server (#3653, the operator's phone report): at
-// 390x844 the line under the name shows the team, and on a hub with remotes the server ("Local"
+// 390x844 the line under the name shows the team, and on a hub with remotes the server ("This computer"
 // for the local one, as the sidebar says); neither is clipped, and a long team name is cut short while the
 // server stays whole. Text only: markup in a name is shown as text. Desktop shows the same line.
 // A real terminal agent on a team is launched (and killed at the end); the hub is faked in the
@@ -57,14 +57,15 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         check('the team label is whole and inside the header', m.team.whole && m.team.inside, JSON.stringify(m.team));
         check('no server on a Coral that is not a hub', !m.server.shown && m.server.text === '', JSON.stringify(m.server));
 
-        // A hub with one remote: the local agent's server reads "Local", as in the sidebar.
+        // A hub with one remote: the local agent's server reads "This computer", as the Inbox and Analytics say it.
         await ev(`import(${MOD} + 'state.js').then(({ state }) => { state.hub = true; state.servers = [{ id: 'build-box', label: 'build-box', status: 'online' }]; return true; })`);
         // A scene is set and measured in ONE evaluate: the live feed also calls updateHeaderContext
         // with the real session on its updates, and under load one landed between a separate set and
         // measure, so the made-up context was gone when measured (10 of 14 in a batch run).
         const scene = s => ev(`import(${MOD} + 'header_context.js').then(async m => { m.updateHeaderContext(${s}); return ${measure}; })`);
         m = await scene(`await ${LIVE}`);
-        check('on a hub with remotes the server shows: "Local" for the local agent', m.server.shown && m.server.text === 'Local' && m.team.shown, JSON.stringify(m));
+        check('on a hub with remotes the server shows: "This computer" for the local agent', m.server.shown && m.server.text === 'This computer' && m.team.shown, JSON.stringify(m));
+        if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/agent-header-this-computer-390.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } // the review shot
         check('team and server are whole and inside the header at 390 wide', m.team.whole && m.server.whole && m.team.inside && m.server.inside, JSON.stringify(m));
 
         // The race a slow runner hit (v1.4.51's run): the header filled before the list noted the
