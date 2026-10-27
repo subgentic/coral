@@ -171,7 +171,7 @@ function renderBoardItem(item, prev) {
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
                 ${messageTimeHtml(m.created_at)}
                 ${BOARD_SAVE_BUTTON(bs.currentProject || '', keyLabel(bs.currentProject || ''), String(m.created_at || ''), String(m.job_title || m.subscriber_id || ''))}
-                <button class="mb-delete-msg-btn" data-on-click="mb-msg-delete" data-msg-id="${Number(m.id)}" title="Delete message" aria-label="${escapeAttr(deleteLabel)}">&times;</button>
+                <button class="btn btn-quiet btn-icon btn-xs mb-delete-msg-btn" data-on-click="mb-msg-delete" data-msg-id="${Number(m.id)}" title="Delete message" aria-label="${escapeAttr(deleteLabel)}">&times;</button>
                 <button type="button" class="mb-msg-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}">&hellip;</button>
             </div>
             ${parts.tagsOpen}

@@ -64,6 +64,7 @@ body.popout-mode .terminal-session-label {
     gap: 4px;
     text-decoration: none;
     min-height: 26px;
+    margin: 0; /* the header's height is these buttons' 26 px: .btn-xs's negative margin is for a button in a row of text */
 }
 .terminal-header-actions .terminal-header-btn[hidden] { display: none !important; }
 .terminal-header-btn[aria-pressed="true"] { color: var(--accent); }

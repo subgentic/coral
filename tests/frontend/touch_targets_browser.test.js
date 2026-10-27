@@ -23,7 +23,10 @@ const UNDERSIZED = `(() => {
         const r = hit.getBoundingClientRect(); const cs = getComputedStyle(el);
         if (!r.width || !r.height || cs.visibility === 'hidden' || cs.display === 'none') continue;
         if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
-        if (r.width >= 44 && r.height >= 44) continue;
+        // A dense glyph button (.btn-xs) keeps a 24 px box and is a 44 px target through its transparent ::after (#9332).
+        const after = getComputedStyle(el, '::after'); let w = r.width, h = r.height;
+        if (after.content !== 'none' && after.position === 'absolute') { w = Math.max(w, parseFloat(after.width) || 0); h = Math.max(h, parseFloat(after.height) || 0); }
+        if (w >= 44 && h >= 44) continue;
         out.push(Math.round(r.width) + 'x' + Math.round(r.height) + ' ' + (el.id ? '#' + el.id : el.className) + ' [' + (el.getAttribute('aria-label') || el.title || el.textContent.trim()).slice(0, 30) + ']');
     }
     return out;

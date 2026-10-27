@@ -1217,10 +1217,6 @@
     .file-item .file-action-btns { display: none; }
     .file-item.actions-open .file-action-btns { display: flex; flex: 0 0 100%; justify-content: flex-end; opacity: 1 !important; }
 
-    .file-action-btn {
-        min-width: 32px;
-        min-height: 32px;
-    }
 }
 
 /* Shared controls keep readable labels and touch targets. Composer and

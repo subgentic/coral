@@ -1135,20 +1135,9 @@ body.panel-dragging .agentic-state {
 
 .starred-section-label { padding: 6px 12px 2px; }
 
-.file-star-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 2px;
-    font-size: var(--fs-lg);
-    line-height: 1;
-    opacity: 0.5;
-    color: var(--text-secondary);
-    transition: opacity 0.15s;
-}
-
-.file-star-btn:hover, .file-star-btn:focus { opacity: 0.85; outline: none; }
-.file-star-btn:focus-visible { opacity: 0.7; outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--radius-xs); }
+/* A quiet dense .btn-icon.btn-xs (#9332): the star dims until the row is hovered or the star is on. */
+.file-star-btn { opacity: 0.5; transition: opacity 0.15s; }
+.file-star-btn:hover, .file-star-btn:focus-visible { opacity: 1; }
 .file-star-btn.starred { opacity: 1; color: var(--warning); }
 
 .refresh-files-btn { color: var(--text-secondary); } /* the size, padding and shape are the tabs' icon button (team-artifact-icon-btn) */
@@ -1428,26 +1417,9 @@ body.panel-dragging .agentic-state {
     opacity: 1;
 }
 
-.file-more-btn { display: none; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; background: none; border: 0; border-radius: var(--radius-md); color: var(--text-muted); font: inherit; font-size: var(--fs-2xl); line-height: 1; cursor: pointer; flex: none; } /* a phone's one button for the row's Copy, Preview and Edit (mobile.css) */
-.file-more-btn:hover, .file-more-btn[aria-expanded="true"] { color: var(--text-primary); background: var(--bg-hover); }
-.file-more-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.file-action-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-muted);
-    padding: 2px;
-    line-height: 1;
-}
-
-.file-action-btn:hover {
-    color: var(--accent);
-}
-
-.file-action-btn .material-icons {
-    font-size: var(--icon-size);
-}
-
+.btn-icon.btn-xs.explorer-action-btn { margin-block: -2px; } /* a Browse row stays about 29 px high (measured, #9332): a 24 px box takes 20 of it */
+.file-more-btn { display: none; flex: none; } /* a phone's one button for the row's Copy, Preview and Edit (mobile.css); a dense .btn-icon.btn-xs (#9332) */
+.file-more-btn[aria-expanded="true"] { background: var(--bg-hover); color: var(--text-primary); }
 .file-type-icon { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex-shrink: 0; }
 
 /* Git status now shows on the name (the type icon replaced the status badge) */
@@ -1827,8 +1799,6 @@ body.panel-dragging .agentic-state {
 .explorer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .explorer-actions { display: flex; gap: 2px; margin-left: auto; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
 .explorer-item:hover .explorer-actions, .explorer-item:focus-within .explorer-actions { opacity: 1; }
-.explorer-action-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px; line-height: 1; border-radius: var(--radius-sm); }
-.explorer-action-btn:hover { color: var(--accent); }
 .explorer-status { padding: 6px 12px; color: var(--text-secondary); font-size: var(--fs-base); }
 .explorer-more { margin: 6px 12px; }
 .agent-ui-request label { display:block; font-size: var(--fs-xl); font-weight:600; margin-bottom:8px; }

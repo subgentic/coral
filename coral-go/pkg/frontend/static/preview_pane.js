@@ -169,7 +169,7 @@ function _renderToolbar(tab) {
     const starred = isFileStarred(tab.filepath);
     const binary = isImagePath(tab.filepath) || isMediaPath(tab.filepath);
     const buttons = [
-        `<button class="inline-preview-mode-btn file-star-btn${starred ? ' starred' : ''}" data-action="star" title="${starred ? 'Unstar' : 'Star'}">${starred ? '★' : '☆'}</button>`,
+        `<button class="btn btn-quiet btn-icon btn-xs inline-preview-mode-btn file-star-btn${starred ? ' starred' : ''}" data-action="star" title="${starred ? 'Unstar' : 'Star'}">${starred ? '★' : '☆'}</button>`,
         tab.canDiff ? _modeBtn('diff', 'difference', 'Diff', tab) : '',
         _modeBtn('preview', 'visibility', 'Preview', tab),
         binary ? '' : _modeBtn('edit', 'edit', 'Edit', tab),

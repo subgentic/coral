@@ -13,7 +13,7 @@ import { setInboxCount } from './inbox_tab.js'; // the count on the Inbox's Save
 // The bookmark is an inline SVG (the shape the Team Artifacts' Keep button uses), filled when saved: the Material Icons subset has no bookmark.
 const BOOKMARK_SVG = '<svg class="bm" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11L8 10.5l-4 3z"/></svg>';
 export const SAVE_BUTTON = `<button type="button" class="chat-save-btn" title="Save for later" aria-label="Save for later" aria-pressed="false">${BOOKMARK_SVG}</button>`;
-export const BOARD_SAVE_BUTTON = (ref, title, said, author = '') => `<button type="button" class="mb-save-btn" data-conv-ref="${escapeAttr(ref)}" data-conv-title="${escapeAttr(title)}" data-said="${escapeAttr(said)}" data-author="${escapeAttr(author)}" title="Save for later" aria-label="Save for later" aria-pressed="false">${BOOKMARK_SVG}</button>`;
+export const BOARD_SAVE_BUTTON = (ref, title, said, author = '') => `<button type="button" class="btn btn-quiet btn-icon btn-xs mb-save-btn" data-conv-ref="${escapeAttr(ref)}" data-conv-title="${escapeAttr(title)}" data-said="${escapeAttr(said)}" data-author="${escapeAttr(author)}" title="Save for later" aria-label="Save for later" aria-pressed="false">${BOOKMARK_SVG}</button>`;
 
 // The conversation a message button belongs to: {kind, ref, server, agentType, title}, or null where there is nothing to save to. ref is the id or name the server
 // that has the conversation knows it by (a board's bare name, not the hub's server/name key); server is that server ("local" for this one).

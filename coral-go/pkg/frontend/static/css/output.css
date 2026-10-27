@@ -371,24 +371,8 @@ body.panel-dragging .preview-pane {
     gap: 4px;
 }
 
-.terminal-header-btn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 2px 4px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    transition: color 0.15s, background 0.15s;
-}
-
-.terminal-header-btn:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-}
-/* #4344: the header's glyph buttons grow with the text: their drawn icons (svg width/height attributes are 14 and 16) are in rem */
-.terminal-header-btn svg { width: 0.875rem; height: 0.875rem; }
+/* The terminal header's glyph buttons are dense .btn-icon.btn-xs (#9332): the header's own rules (popout.css) keep its height. */
+/* #4344: the header's glyph buttons grow with the text: their drawn icons are in rem (.btn-icon.btn-xs, components.css) */
 .top-bar-btn svg { width: 1rem; height: 1rem; }
 
 /* ── Output Scroll ─────────────────────────────────────────── */
