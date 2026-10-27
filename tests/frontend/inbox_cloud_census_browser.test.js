@@ -16,10 +16,23 @@ const ADDED_KEYS = ['active', 'agent_name', 'archived', 'starred', 'with_notes']
 // The plan's "not called in cloud mode" list: none of these is asked for through the Hub by this Inbox.
 const NOT_CALLED = [/^\/api\/goals(\/|$)/, /^\/api\/team-artifacts(\/|$)/, /^\/api\/saved(\/|$)/, /^\/api\/board\/tasks$/, /^\/api\/scheduled\/runs\/recent$/, /^\/api\/workflows\/runs\/recent$/, /^\/api\/artifacts\//,
     /\/tasks\/\d+\/reply$/, /^\/api\/sessions\/history\/[^/]+\/flags$/];
-// What the dashboard itself asks the Hub for whatever tab is open (the stub's own answers): not the Inbox's, not counted.
-const PAGE_CHROME = new Set(['/auth/session', '/api/account', '/api/sessions/live', '/api/servers', '/api/settings']);
+// The routes the Chats and Board tabs call through the Hub, FIXED here (not recorded from the tabs in the same run: a key added to those tabs must fail, not widen the baseline). Placeholders: {id} a chat,
+// {team} a board. The history routes' keys are the plan's list; the rest is what the tabs send in the Hub's stubbed world (recorded once, 2026-10-27, main 9f9e5c7b5 and after).
+const BASELINE = Object.fromEntries(Object.entries({
+    '/api/sessions/history': HISTORY_KEYS, '/api/sessions/history/search': HISTORY_KEYS, '/api/sessions/history/{id}': ['limit'], '/api/sessions/history/{id}/agent-notes': [], '/api/sessions/history/{id}/events': ['limit'],
+    '/api/sessions/history/{id}/git': [], '/api/sessions/history/{id}/notes': [], '/api/sessions/history/{id}/tags': [], '/api/sessions/history/{id}/tasks': [], '/api/sessions/{id}/changes': [], '/api/tags': [], '/api/token-usage': ['session_id'],
+    '/api/board/projects': [], '/api/board/{team}': [], '/api/board/{team}/artifacts': ['limit'], '/api/board/{team}/goals': ['limit', 'state'], '/api/board/{team}/messages/all': ['format', 'limit', 'offset'], '/api/board/{team}/paused': [],
+    '/api/board/{team}/status': [], '/api/board/{team}/subscribers': [], '/api/board/{team}/tasks': ['counts'], '/api/sessions/live/team/{team}/sleep-status': [], '/api/teams/detail/{team}/knowledge': [],
+}).map(([k, v]) => [`GET ${k}`, v]));
+// What the dashboard itself asks the Hub (not through a computer) at boot and while a tab is open: counted and pinned too, so a new one from the Inbox shows. Keys are none but the ones listed.
+const CHROME = {
+    'GET /auth/session': [], 'GET /api/account': [], 'GET /api/folder-tags': [], 'GET /api/pinned-folders': [], 'GET /api/scheduled/jobs': [], 'GET /api/servers': [], 'GET /api/sessions/live': [], 'GET /api/settings': [],
+    'GET /api/system/status': [], 'GET /api/system/update-check': [], 'GET /api/views': [], 'POST /api/tracking/event': [],
+};
 
-const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/history\/(?!counts$|search$)[^/]+(\/|$)/, (m, b) => `/sessions/history/{id}${b}`);
+const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/history\/(?!counts$|search$)[^/]+(\/|$)/, (m, b) => `/sessions/history/{id}${b}`)
+    .replace(/^\/api\/sessions\/(?!history|live)[^/]+\/changes$/, '/api/sessions/{id}/changes').replace(/^\/api\/board\/(?!projects|tasks|remotes)[^/]+/, '/api/board/{team}')
+    .replace(/^\/api\/sessions\/live\/team\/[^/]+\//, '/api/sessions/live/team/{team}/').replace(/^\/api\/teams\/detail\/[^/]+\//, '/api/teams/detail/{team}/');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
@@ -33,7 +46,15 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         await ev(`window.__coralReady.startup('liveList', 'settings')`);
     };
     // the requests as a set of "METHOD path ?keys", the page's own chrome left out and a computer's id replaced
-    const shape = reqs => reqs.filter(r => !PAGE_CHROME.has(r.p)).map(r => ({ proxied: /^\/api\/remote\//.test(r.p), m: r.m, p: norm(r.p), keys: r.keys }));
+    const shape = reqs => reqs.map(r => { const proxied = /^\/api\/remote\//.test(r.p), p = norm(r.p); return { proxied, m: r.m, p, keys: r.keys, chrome: !proxied && `${r.m} ${p}` in CHROME }; });
+    // the requests that are neither the fixed baseline's (through a computer) nor the dashboard's own: the fixed lists above are the whole allowance
+    const outsideBaseline = (reqs, { localHistory = false } = {}) => reqs.filter(r => r.m !== 'MARK').flatMap(r => {
+        const key = `${r.m} ${r.p}`;
+        if (r.chrome) return r.keys.filter(k => !CHROME[key].includes(k)).map(k => `${key} ?${k} (the dashboard's own request sent a new key)`);
+        if (r.proxied) return !(key in BASELINE) ? [`${key} is not a route of the fixed baseline`] : r.keys.filter(k => !BASELINE[key].includes(k)).map(k => `${key} ?${k} is not a key of the fixed baseline`);
+        if (localHistory && /^\/api\/sessions\/history(\/|$)/.test(r.p)) return []; // plan risk 1, counted below
+        return [`${key} is a request to the Hub itself that is not the dashboard's own`];
+    });
     const keysByPath = reqs => { const out = new Map(); for (const r of reqs) { const s = out.get(`${r.m} ${r.p}`) || new Set(); r.keys.forEach(k => s.add(k)); out.set(`${r.m} ${r.p}`, s); } return out; };
     try {
         let bootNative = false; // the Hub's boot value for the Inbox: off while the baseline is recorded (the Chats and Board tabs as the Hub has them), on for the Inbox
@@ -42,7 +63,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
 
         // 1. the baseline: the cloud Chats tab, and the team page's Board tab, as the Hub's dashboard has them
         await open('/');
-        await take();
+        const bootA = shape(await take());
         await ev(`window.switchNavTab('history'); true`);
         await waitFor(`window.__census.some(r => /\\/api\\/sessions\\/history$/.test(r.p))`, 'the Chats tab reads the history', 15000);
         await ev(`window.__quiet()`);
@@ -54,16 +75,17 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         await waitFor(`window.__census.some(r => /\\/messages\\/all$/.test(r.p))`, 'the board read', 15000);
         await ev(`window.__quiet()`);
         const boardTab = shape(await take());
-        const baseline = new Map();
-        for (const [k, keys] of keysByPath([...chatsTab, ...boardTab])) baseline.set(k, keys);
-        const hk = baseline.get('GET /api/sessions/history') || new Set(); HISTORY_KEYS.forEach(k => hk.add(k)); baseline.set('GET /api/sessions/history', hk); // the plan's list of what the Chats tab sends
-        assert.ok(baseline.has('GET /api/sessions/history') && [...baseline.keys()].some(k => /\/messages\/all$/.test(k)), 'the baseline has the Chats tab and the Board tab: ' + JSON.stringify([...baseline.keys()]));
-        assert.ok(![...baseline.keys()].includes(`GET ${ADDED_ROUTE}`) , 'the Chats and Board tabs do not call the counts route');
+        // the tabs send nothing beyond the fixed baseline (and the dashboard's own chrome): a new route or key on the Chats or Board tab fails here, before the Inbox is looked at
+        const tabsOutside = outsideBaseline([...bootA, ...chatsTab, ...boardTab]);
+        assert.deepEqual(tabsOutside, [], 'the Chats and Board tabs stay inside the fixed baseline: ' + JSON.stringify(tabsOutside));
+        assert.ok(chatsTab.some(r => r.p === '/api/sessions/history') && boardTab.some(r => /\/messages\/all$/.test(r.p)), 'the baseline was driven: the Chats tab and the Board tab read');
+        assert.ok(![...chatsTab, ...boardTab].some(r => r.p === ADDED_ROUTE), 'the Chats and Board tabs do not call the counts route');
+        const baseline = new Map(Object.entries(BASELINE).map(([k, keys]) => [k, new Set(keys)]));
 
         // 2. the Inbox's chat folders, the way the Inbox reads them: the counts, every folder (and the CLI folders) on its first page, the Filters' parameters, a search, and a chat from a folder
         bootNative = true;
         await open('/');
-        await take();
+        const bootInbox = shape(await take());
         const driven = await ev(`(async () => {
             const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js');
             const sv = await import((window.__coralStatic || '/static/') + 'server_base.js');
@@ -133,6 +155,9 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         for (const r of inbox) for (const re of NOT_CALLED) assert.ok(!re.test(r.p), `${r.m} ${r.p} is on the plan's list of what the cloud Inbox does not call`);
         assert.ok(!inbox.some(r => r.keys.includes('tag_ids')), 'no tag_ids: the Tags folder is left out of the cloud Inbox');
         assert.ok(proxied.length >= 10, 'computers were asked: ' + proxied.length);
+        // the dashboard's own routes are counted: every one is on the fixed list with its keys, and the Inbox asks the Hub for nothing else, but the history reads of risk 1 below
+        const hubOwn = [...bootInbox, ...inbox].filter(r => !r.proxied), chromeSeen = hubOwn.filter(r => r.chrome), chromeOutside = outsideBaseline(hubOwn, { localHistory: true });
+        assert.deepEqual(chromeOutside, [], 'the requests to the Hub itself are the dashboard\'s own, from the fixed list: ' + JSON.stringify(chromeOutside));
         // coral-hub Security's conditions (#9551): the counts are read once per online computer per Inbox open, never polled; and typing in the search does not send the text, key by key, to the history list
         // (a typed search goes to /api/sessions/history/search).
         const uiAt = inboxAll.findIndex(r => r.m === 'MARK' && r.p === 'ui-open');
@@ -151,7 +176,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         // risk 1 (plan section 5): the Inbox's source list includes 'local', which in the Hub is the Hub itself: it has no history. Counted and said now; strict once slice 1 lands (nativeInbox exists).
         if (driven.nativeInbox !== null) assert.deepEqual(unproxied.map(r => `${r.m} ${r.p}`), [], 'with the native cloud Inbox no history read is made of the Hub itself (the online computers only)');
         else console.log(`   (plan risk 1, until slice 1: ${unproxied.length} history reads went to the Hub itself, not through a computer)`);
-        console.log(`   ${inbox.length} Inbox requests: ${proxied.length} through the Hub, in ${new Set(proxied.map(r => r.p)).size} routes; ${tabbed.join('; ') || 'folders driven through the module'}`);
+        console.log(`   ${inbox.length} Inbox requests: ${proxied.length} through the Hub, in ${new Set(proxied.map(r => r.p)).size} routes; ${chromeSeen.length} of the dashboard's own, in ${new Set(chromeSeen.map(r => r.m + r.p)).size} routes; ${tabbed.join('; ') || 'folders driven through the module'}`);
         console.log('   ✓');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
