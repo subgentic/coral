@@ -45,9 +45,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const initialMode = await ev(`window.__f('mode').value`);
     assert.equal(initialMode, 'none', 'Initial mode should be none');
 
-    // Verify initial preset options are the built-in ones: none, shared_checkout, worktrees, merge_queue
+    // Verify initial preset options are the built-in ones: none, shared_checkout, worktrees, merge_queue, task_queue (#8919)
     const initialPresets = await ev(`Array.from(window.__f('preset').options).map(o => o.value)`);
-    assert.deepEqual(initialPresets, ['none', 'shared_checkout', 'worktrees', 'merge_queue']);
+    assert.deepEqual(initialPresets, ['none', 'shared_checkout', 'worktrees', 'merge_queue', 'task_queue']);
 
     const settingsTabs = await ev(`Array.from(document.querySelectorAll('#team-settings-workspace .settings-tab')).map(tab => ({label: tab.querySelector('.settings-tab-name').textContent.trim(), selected: tab.getAttribute('aria-selected')}))`);
     assert.deepEqual(settingsTabs, [
