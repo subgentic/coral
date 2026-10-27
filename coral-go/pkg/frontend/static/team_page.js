@@ -147,6 +147,8 @@ const ATTENTION = ['needs_input', 'waiting']; // a person has to do something: a
 function drawStatus(data) {
     const s = $('team-page-status'); if (!s) return;
     if (!data || !Array.isArray(data.agents)) { s.textContent = ''; s.className = 'team-page-status'; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
+    // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
+    if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
     const n = data.agents.filter(a => ATTENTION.includes(a.availability)).length;
     const text = n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
