@@ -54,6 +54,7 @@ func TestPTYKillEndsAHelperThatDetachedSixSecondsIn(t *testing.T) {
 		{"quit", func(b *PTYBackend, session string) { b.Close() }},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel() // its own backend and folder; the helper takes ~6 s to detach, so the two wait together (#9432)
 			pidFile := filepath.Join(t.TempDir(), "pid")
 			b := NewPTYBackend()
 			t.Cleanup(func() { b.Close() })
@@ -98,6 +99,7 @@ func TestTmuxKillAndRestartEndAHelperThatDetachedSixSecondsIn(t *testing.T) {
 		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel() // its own tmux server (own socket) and folder; ~6 s of real time waiting for the helper to detach (#9432)
 			b := newTestTmuxBackend(t)
 			term := NewTmuxSessionTerminal(b.client)
 			dir := t.TempDir()
@@ -117,6 +119,7 @@ func TestTmuxKillAndRestartEndAHelperThatDetachedSixSecondsIn(t *testing.T) {
 
 // The same helper, with Coral killed (SIGKILL) instead of a Kill: the guardian ended what it saw of the tree while the helper was still a descendant.
 func TestAHelperThatDetachedSixSecondsInIsEndedWhenCoralIsKilled(t *testing.T) {
+	t.Parallel() // its own parent process and folder; ~6 s of real time waiting for the helper to detach (#9432)
 	child, guardianPID, parent, _ := runGuardParent(t, false, "CORAL_GUARD_TEST_LATE=1")
 	waitOrphaned(t, child)
 	if err := syscall.Kill(parent.Process.Pid, syscall.SIGKILL); err != nil {
