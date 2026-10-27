@@ -35,8 +35,9 @@ const BASE = require('./test_base').BASE;
                 if (!mobile) {
                     // a row the keyboard focuses just below the fold is scrolled clear of the pinned button, not left under it
                     const f = await ev(`(() => { const s = document.querySelector('.sidebar'); document.activeElement && document.activeElement.blur(); s.scrollTop = 0; const footer = document.querySelector('.sidebar-footer').getBoundingClientRect();
-                        const rows = [...document.querySelectorAll('[data-section="live-sessions"] .session-list > li')]; const below = rows.find(r => r.getBoundingClientRect().bottom > footer.top);
-                        const target = below && below.querySelector('button, [tabindex], a[href]'); if (!target) return { noTarget: true, rows: rows.length };
+                        const rows = [...document.querySelectorAll('[data-section="live-sessions"] .session-list > li')]; const seen = e => e.getClientRects().length > 0; const pick = r => [...r.querySelectorAll('button, [tabindex], a[href]')].find(seen); // a control that is on screen: a folder header's copy button is display: none on a desktop
+                        const below = rows.find(r => r.getBoundingClientRect().bottom > footer.top && pick(r));
+                        const target = below && pick(below); if (!target) return { noTarget: true, rows: rows.length };
                         target.focus(); const r = target.getBoundingClientRect(); const ft = document.querySelector('.sidebar-footer').getBoundingClientRect();
                         return { focused: document.activeElement === target, bottom: Math.round(r.bottom), footerTop: Math.round(ft.top), top: Math.round(r.top) }; })()`);
                     check(`${tag} ${theme}: a row focused by the keyboard below the fold is scrolled clear of the pinned button`, f.focused && f.bottom <= f.footerTop + 1 && f.top >= 0, JSON.stringify(f));
