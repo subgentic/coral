@@ -25,7 +25,7 @@ const { setTheme } = require('./helpers/contrast');
     const icon = () => ev(`(() => { const b = document.querySelector('.team-health-btn'); if (!b) return null; const r = b.getBoundingClientRect(), cs = getComputedStyle(b);
         const open = document.querySelector('.board-card-header .group-kebab').getBoundingClientRect();
         return { label: b.getAttribute('aria-label'), title: b.getAttribute('title'), on: b.classList.contains('is-on'), w: Math.round(r.width), h: Math.round(r.height), color: cs.color, opacity: cs.opacity,
-            beside: Math.abs(r.top - open.top) < 6 && r.right <= open.left + 1, board: b.dataset.board, bg: cs.backgroundColor, shadow: cs.boxShadow, border: cs.borderTopWidth, stroke: getComputedStyle(b.querySelector('svg')).strokeWidth }; })()`);
+            beside: Math.abs((r.top + r.bottom) / 2 - (open.top + open.bottom) / 2) < 6 && r.right <= open.left + 1, board: b.dataset.board, bg: cs.backgroundColor, shadow: cs.boxShadow, border: cs.borderTopWidth, stroke: getComputedStyle(b.querySelector('svg')).strokeWidth }; })()`);
     // The icon's contrast against what is behind it (the panel; the button has no fill of its own), 3:1 for a graphic (WCAG 1.4.11).
     const contrast = () => ev(`(() => { const b = document.querySelector('.team-health-btn'); const cv = document.createElement('canvas'); cv.width = cv.height = 1; const cx = cv.getContext('2d', { willReadFrequently: true });
         const rgba = c => { cx.clearRect(0, 0, 1, 1); cx.fillStyle = '#000'; cx.fillStyle = c; cx.fillRect(0, 0, 1, 1); const d = cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };

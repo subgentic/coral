@@ -355,10 +355,13 @@
 
 /* The kebab is a dense .btn-icon.btn-xs with the family's three-dot More icon, one size in every row type (#9332): 24 px, taking 16 px of the row so the row keeps its height, and a 44 px hit area on touch (components.css). It is hidden until the row is hovered or focused. */
 .sidebar-kebab-btn {
+    display: flex; /* a block-level box in its wrapper: an inline one sits on the wrapper's text baseline and adds a strut to the row's height (an agent row with a goal grew 2 px) */
     opacity: 0;
     transition: opacity 0.1s;
 }
 /* The machine menu's kebab is a <summary>: no disclosure marker in any engine (WebKit draws one unless the pseudo-element is hidden). */
+/* A row's kebab shows no fill on hover or focus, only its dots change colour (a fill on a selected or hovered row is the row's own surface, row_kebab_blend): the family's hover surface is for a button on a plain background. */
+.btn-icon.btn-xs.sidebar-kebab-btn:hover, .btn-icon.btn-xs.sidebar-kebab-btn:focus-visible { background: transparent; }
 summary.sidebar-kebab-btn { list-style: none; }
 summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
@@ -429,7 +432,10 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 @media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
     .session-team-group > .board-card-header .group-kebab { margin-right: -8px; }
 }
-.board-card-agents .session-name-row .sidebar-kebab-wrapper { margin-right: -8px; }
+/* The 24 px kebab's centre is in the one column of every kebab: the server's, the team's and the folder's (server_menu): a folder's agent row sits 2 px in, a team's agent row 2 px out of it. */
+.session-name-row .sidebar-kebab-wrapper { margin-right: 2px; }
+.board-card-agents .session-name-row .sidebar-kebab-wrapper { margin-right: -6px; }
+@media (max-width: 767px), (pointer: coarse) { .session-name-row .sidebar-kebab-wrapper { margin-right: -1px; } .board-card-agents .session-name-row .sidebar-kebab-wrapper { margin-right: -9px; } } /* the phone's header kebab sits 3 px further out */
 .session-team-group.team-sleeping > .board-card-header .group-name-line {
     color: var(--text-secondary);
 }
@@ -561,7 +567,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 }
 
 .group-kebab .sidebar-kebab-btn {
-    display: flex; /* a block-level box in its wrapper: an inline one would add the wrapper's text strut to the header's height */
     opacity: 0;
     align-self: center;
 }
@@ -1489,6 +1494,8 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    position: relative; /* above the 44 px hit areas of the header's dense buttons beside it (#9332): a tap on the name opens the name, not the neighbouring button */
+    z-index: 1;
 }
 
 /* A branch name is capped, in the live header and the history header alike (#5142): a real worktree's branch can be 60 characters or more. The whole name shows in place while the
