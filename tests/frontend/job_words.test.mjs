@@ -36,4 +36,9 @@ assert.equal(w.deleteJobWords({ name: 'greet-hourly' }, 0), 'Delete greet-hourly
 assert.equal(w.deleteJobWords({ name: 'greet-hourly' }, 1), 'Delete greet-hourly and its 1 run? This cannot be undone.');
 assert.equal(w.deleteJobWords({ name: 'greet-hourly' }, 12), 'Delete greet-hourly and its 12 runs? This cannot be undone.');
 assert.equal(w.deleteJobWords(null, 3), 'Delete this job and its 3 runs? This cannot be undone.');
+// one chip word for a list row, the Runs table's words (#9456); the reason is the tooltip, a job never run has no chip
+assert.equal(w.lastChip(null), null);
+for (const [status, word] of [['completed', 'Passed'], ['failed', 'Failed'], ['killed', 'Stopped'], ['running', 'Running'], ['pending', 'Waiting to start']]) assert.deepEqual(w.lastChip({ status }), { word, detail: '' }, status);
+assert.equal(w.lastChip({ status: 'completed', exit_reason: 'ended_while_coral_was_down' }).word, 'Result not seen');
+assert.equal(w.lastChip({ status: 'failed', exit_reason: 'never_started' }).word, 'Failed');
 console.log('PASS job_words');

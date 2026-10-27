@@ -59,7 +59,7 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             await ev(`window.__jobs[0] = { ...window.__jobs[0], last_run: { id: 2, status: 'failed', started_at: new Date().toISOString(), error_msg: ${JSON.stringify(MISSING)}, error_code: 'base_branch_missing' }, consecutive_failures: 1 }; window.__sched.refreshJobs().then(() => true)`);
             await waitFor(`/failed/.test((document.querySelector('#group-table-view tbody tr[data-key] .dt-chip') || {}).textContent || '')`, 'the failure on the row', 6000);
             const r = await ev(`({ chip: document.querySelector('#group-table-view tbody tr[data-key] .dt-chip').textContent, live: document.getElementById('jobs-live').textContent })`);
-            check(`${tag}: the row's chip says the last run failed`, /^last run failed/.test(r.chip), JSON.stringify(r));
+            check(`${tag}: the row's chip says the last run failed`, r.chip === 'Failed', JSON.stringify(r));
             check(`${tag}: and it is announced once, with the job's name, in the status`, r.live === `nightly-agent: the last run failed. ${MISSING}`, JSON.stringify(r.live));
             await ev(`document.getElementById('jobs-live').textContent = ''; window.__sched.refreshJobs().then(() => true)`);
             await sleep(300); // sleep-ok: a second look at the same failed run must say nothing
