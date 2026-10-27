@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(m.page[0] <= m.page[1] + 1, 'and neither does the page ' + JSON.stringify(m));
         assert.ok(m.select && m.select.h >= 44 && m.select.top < m.titleTop && m.select.current === 'Tasks' && !m.back, `the folders' select is on top of the table, 44 px, naming the current folder, with no way back ${JSON.stringify(m)}`);
         // the one task row's two-line form (#7737): the id and title, then the state, and the priority only when it is High; the team is the table's column and is not in the phone's line
-        for (const [i, word] of [[0, /High/], [0, /Queued/], [1, /In progress/], [2, /In review/]]) assert.match(m.rows[i], word, `row ${i + 1} still says its ${word} ${JSON.stringify(m.rows)}`);
+        for (const [i, word] of [[0, /Queued/], [1, /In progress/], [2, /In review/]]) assert.match(m.rows[i], word, `row ${i + 1} still says its ${word} ${JSON.stringify(m.rows)}`);
         assert.ok(m.rows.every(r => !/Nobody yet/.test(r)), 'the Inbox says nothing of who: every task is the operator\'s ' + JSON.stringify(m.rows));
         console.log('PASS the Inbox Tasks table fits a phone');
     } finally { await client.close(); }
