@@ -24,8 +24,12 @@ const UNDERSIZED = `(() => {
         if (!r.width || !r.height || cs.visibility === 'hidden' || cs.display === 'none') continue;
         if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
         // A dense glyph button (.btn-xs) keeps a 24 px box and is a 44 px target through its transparent ::after (#9332).
+        // It counts only when it is invisible (no fill, no border) and centred on the control: an inset of -10px on a 24 px box, not any absolute pseudo-element.
         const after = getComputedStyle(el, '::after'); let w = r.width, h = r.height;
-        if (after.content !== 'none' && after.position === 'absolute') { w = Math.max(w, parseFloat(after.width) || 0); h = Math.max(h, parseFloat(after.height) || 0); }
+        const left = parseFloat(after.left), top = parseFloat(after.top), aw = parseFloat(after.width), ah = parseFloat(after.height);
+        const invisible = after.backgroundColor === 'rgba(0, 0, 0, 0)' && parseFloat(after.borderTopWidth) === 0 && after.backgroundImage === 'none';
+        const centred = Math.abs((left + aw / 2) - r.width / 2) <= 1 && Math.abs((top + ah / 2) - r.height / 2) <= 1;
+        if (after.content !== 'none' && after.position === 'absolute' && invisible && centred) { w = Math.max(w, aw || 0); h = Math.max(h, ah || 0); }
         if (w >= 44 && h >= 44) continue;
         out.push(Math.round(r.width) + 'x' + Math.round(r.height) + ' ' + (el.id ? '#' + el.id : el.className) + ' [' + (el.getAttribute('aria-label') || el.title || el.textContent.trim()).slice(0, 30) + ']');
     }
@@ -282,7 +286,8 @@ const UNDERSIZED = `(() => {
             'the sidebar row controls', 150, { accept: v => JSON.parse(v).length >= 2 }).catch(() => {});
         const rows = await ev(`Array.from(document.querySelectorAll('.sidebar-kebab-btn, .folder-copy-btn')).map(e => e.getBoundingClientRect()).filter(r => r.width && r.height).map(r => [Math.round(r.width), Math.round(r.height)])`);
         assert.ok(rows.length >= 2, 'the sidebar shows row kebabs: ' + JSON.stringify(rows));
-        for (const [w, h] of rows) assert.ok(w >= 44 && h >= 44, `sidebar row control ${w}x${h} under 44px`);
+        // The row kebab is a 24 px .btn-xs box with a 44 px hit area (#9352): UNDERSIZED counts that area, so the open sidebar is checked with it.
+        assert.deepEqual(await ev(UNDERSIZED), [], 'iPad 820 with the sidebar open: every row control is at least 44x44');
         console.log(`PASS iPad 820 coarse: no control under 44px; ${rows.length} sidebar row controls >=44`);
 
         // Round 3 (#3131, Coral Hub v1.4.8 re-check at iPad 768x1024): the docked

@@ -23,3 +23,6 @@ export function tagColor(c) {
 export function escapeAttr(str) {
     return escapeHtml(str);
 }
+
+/** The family's three-dot More icon (#7686, the list bars'), as markup for a dense .btn-icon.btn-xs (the sidebar's kebab, #9332): a constant, never built from data. */
+export const MORE_DOTS_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';

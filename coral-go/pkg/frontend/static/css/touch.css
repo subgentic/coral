@@ -18,8 +18,7 @@
     .agent-ui-card button,
     .agent-ui-home-row,
     .agent-ui-actions .agent-ui-dismiss,
-    .folder-copy-btn,
-    .sidebar-kebab-btn {
+    .folder-copy-btn {
         min-width: var(--control-touch-height);
         min-height: var(--control-touch-height);
     }

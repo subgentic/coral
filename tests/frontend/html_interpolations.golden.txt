@@ -178,6 +178,7 @@
 1	folder_tags.js	tags.map(t => `<span class="sidebar-color-dot" style="background:${escapeAttr(tagColor(t.color))}" title="${es
 3	group_cards.js	CHEVRON_DECO
 2	group_cards.js	FOLDER_GROUP_ICON
+5	group_cards.js	MORE_DOTS_SVG
 2	group_cards.js	_chevron(boardName, boardCollapsed)
 2	group_cards.js	_collapseAttrs(collapsed)
 1	group_cards.js	_collapseAttrs(wfCollapsed)
@@ -287,6 +288,7 @@
 1	scheduler.js	savedLine
 1	scheduler.js	settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')
 1	scheduler.js	v
+1	server_status.js	MORE_DOTS_SVG
 1	server_status.js	count
 1	server_status.js	dd(r)
 1	server_status.js	extraClass ? ' ' + extraClass : ''
@@ -298,6 +300,7 @@
 1	server_status.js	serverLaunchActionsHtml(e)
 1	server_status.js	updateBadgeHtml(e)
 1	session_rows.js	(goalLine || unreadChip) ? `<div class="session-line2">${goalLine}${unreadChip}</div>` : ''
+1	session_rows.js	MORE_DOTS_SVG
 1	session_rows.js	_WORKTREE_ICON
 2	session_rows.js	_archiveItem
 1	session_rows.js	_gitStateSummary(gsWt)

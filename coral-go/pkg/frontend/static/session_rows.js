@@ -1,7 +1,7 @@
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { _WORKTREE_ICON, _gitStateSummary, getDotClass, getMobileStatusChip, resolveSessionIdentity, sessionGoalText, sessionStateInfo, sessionUnreadCount } from './session_state.js';
 import { _saveSessionOrder } from './list_order.js';
-import { escapeHtml, escapeAttr, agentNameColor } from './utils.js';
+import { MORE_DOTS_SVG, escapeHtml, escapeAttr, agentNameColor } from './utils.js';
 import { autoAcceptChip, autoAcceptMenuItem } from './auto_accept.js';
 import { formatTokens } from './format.js';
 import { getCachedAgentAvailability } from './team_availability.js';
@@ -324,7 +324,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     rememberRowMenu(s, kebabMenuContent);
     const rowMenuId = kebabId('agent', rowMenuKey(s.session_id, sessionServer(s), s.name));
     const kebabMenu = `<div class="sidebar-kebab-wrapper">
-        <button class="sidebar-kebab-btn" data-on-click="kebab-toggle" title="More actions" aria-label="More actions for ${escapeAttr(identity)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(rowMenuId)}">&#x22EE;</button>
+        <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn" data-on-click="kebab-toggle" title="More actions" aria-label="More actions for ${escapeAttr(identity)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(rowMenuId)}">${MORE_DOTS_SVG}</button>
         <div class="menu sidebar-kebab-menu" id="${escapeAttr(rowMenuId)}" style="display:none" data-lazy-menu="1" role="menu" aria-label="Actions for ${escapeAttr(identity)}"></div>
     </div>`;
     const compactClass = isCompact ? ' session-compact' : '';
