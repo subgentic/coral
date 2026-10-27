@@ -38,7 +38,7 @@ import { _handleTeamFolderImport, _importTeamFromFolder } from './team_folder_im
 import { closeSidebarKebabs, closeTopBarSettings, toggleSidebarKebab, toggleTopBarSettings } from './sidebar_menus.js';
 import { loadHistoryPage } from './history_filters.js';
 import { switchNavTab } from './app_navigation.js';
-import { showWorkflowsTab, selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, showResumeModal, hideResumeModal, resumeLaunchNew, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
+import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, showResumeModal, hideResumeModal, resumeLaunchNew, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
 
 registerActions({
     'mb-select-mode': () => toggleSelectMode(),
@@ -212,9 +212,8 @@ registerActions({
     'analytics-search-filter': el => { const v = el.value; importOnce('./analytics_views.js').then(m => m.filterViews(v)).catch(() => {}); }, // the Analytics sidebar's search box is in the page from the start; the views module loads with the tab
     'analytics-view': el => { const key = el.dataset.view; importOnce('./analytics_views.js').then(m => m.selectView(key, { focus: true })).catch(() => {}); },
     'analytics-phone-back': () => { importOnce('./analytics_views.js').then(m => m.phoneBack()).catch(() => {}); },
-    'workflows-search-filter': el => { const v = el.value; importOnce('./workflows.js').then(m => m.filterWorkflows(v)).catch(() => {}); }, // the Workflows sidebar's search box is in the page from the start; workflows.js loads with the tab
+    'automations-search-filter': el => { const v = el.value; importOnce('./automations.js').then(m => m.filterAutomations(v)).catch(() => {}); }, // the Automations sidebar's search box is in the page from the start; automations.js loads with the tab
     'inbox-search-filter': el => { const v = el.value; importOnce('./inbox_sidebar.js').then(m => m.filterInbox(v)).catch(() => {}); }, // the Inbox sidebar's search box is in the page from the start; inbox_sidebar.js loads with the tab
-    'wf-phone-back': () => { importOnce('./workflows.js').then(m => m.workflowsPhoneBack()).catch(() => {}); },
     'wf-build-agent': () => launchWorkflowAgent(),
     'wf-create': () => showWorkflowCreateModal(),
     'job-create-workflow': () => { hideJobModal(); showWorkflowCreateModal(); }, // New job with no workflow to run
@@ -296,7 +295,6 @@ Object.assign(window, {
     // message_board
     selectBoardProject,
     // workflows
-    showWorkflowsTab,
     selectWorkflow, selectWorkflowRun,
     // cost_dashboard
     showCostDashboard, 

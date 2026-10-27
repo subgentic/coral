@@ -223,11 +223,6 @@ export function openFirstGroupTable(kind) {
 // The view on screen is not the table: it is not open any more.
 onViewShown(id => { if (id !== 'group-table-view') open = null; });
 
-/** The link at the top of an item's page back to its group's table ("← Today"): the text link of the style guide, not a button of its own kind. */
-export function backLinkHtml(kind, key, label, id) {
-    return `<button type="button" class="group-back"${id ? ` id="${escapeAttr(id)}"` : ''} data-on-click="sgroup-open" data-kind="${escapeAttr(kind)}" data-group="${escapeAttr(key)}">\u2190 ${escapeHtml(label)}</button>`;
-}
-
 /** Sets an item page's static back link (history_session.html's #history-back) to a group, or hides it for an item that has none. */
 export function setBackLink(id, kind, group) {
     const el = document.getElementById(id);

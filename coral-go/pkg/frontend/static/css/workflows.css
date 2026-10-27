@@ -9,25 +9,17 @@
 
 /* The page: it fills the view, so a workflow's or a run's pinned bar is at the foot of the screen (the padding is taken back below so nothing shows under the bar) */
 .wf-page { display: flex; flex-direction: column; min-height: 100%; box-sizing: border-box; padding: 20px 24px; }
-#wf-detail-container:not([style*="none"]), #wf-run-detail-container:not([style*="none"]), .wf-list-container:not([style*="none"]) { flex: 1; display: flex; flex-direction: column; }
+#wf-detail-container:not([style*="none"]), #wf-run-detail-container:not([style*="none"]) { flex: 1; display: flex; flex-direction: column; }
 #wf-detail, #wf-run-detail { flex: 1; display: flex; flex-direction: column; }
 #wf-detail > *, #wf-run-detail > * { flex-shrink: 0; } /* a section keeps its height: a column that shrank them would let their content spill under the bar */
 .wf-page .item-bar { margin-top: auto; bottom: -20px; margin-bottom: -20px; padding-bottom: calc(var(--space-lg) + 20px); }
 .wf-page .item-bar.wf-run-actions { margin-top: var(--space-2xl); } /* a run's bar follows its steps: pinned to the foot it left a wide gap on a short page; sticky still keeps it in view on a long one (#7722) */
-.wf-page > .wf-list-container > .empty-pane { padding: var(--space-lg) 0; }
-.wf-empty-actions { margin-top: var(--space-md); }
-.wf-empty-actions .btn { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
 
 /* An item's page: its link back, its name at 17/700 and one facts line under it (#7471) */
 .wf-item-title { margin: 0; font-size: 1.0625rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .wf-facts-line { margin-bottom: var(--space-lg); overflow-wrap: anywhere; }
 .wf-desc { margin: 0 0 var(--space-lg); font-size: 0.8125rem; color: var(--text-secondary); }
 .wf-phone-back { display: none; }
-/* The sidebar's rows: the workflow's name, and its steps and last run under it */
-.wf-nav-row .row-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.wf-nav-row .row-btn > .sched-row-head { align-self: stretch; } /* the dot's slot and the name, as a job's row (scheduler.css) */
-.wf-nav-name { display: block; font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
-.wf-nav-meta { display: block; font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); overflow-wrap: anywhere; }
 
 @keyframes wf-pulse {
     0%, 100% { opacity: 1; }
@@ -491,18 +483,12 @@
     .wf-more-menu .btn, .wf-more-btn, .wf-step-files-more > summary { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); display: flex; align-items: center; }
 }
 
-/* Workflows on a phone (#7471): the pane is the page's list; a workflow or a run is the screen after it, with a way back to the list */
-#mobile-workflows-list { display: none; }
+/* Workflows on a phone (#7471; Goal #74): the folder's table is the page, and a workflow or a run is the screen after it, with a way back to the folder */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    #mobile-workflows-list { display: block; }
     #workflows-view:not([data-phone-item]) .wf-page { display: none; }
-    #workflows-view[data-phone-item] #mobile-workflows-list { display: none; }
-    #workflows-view[data-phone-empty]:not([data-phone-item]) .wf-page { display: flex; }
     #workflows-view .wf-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
     #workflows-view #wf-run-detail-container:has(#wf-run-back) .wf-phone-back { display: none; } /* a run's way back is its workflow, named; the list is one more step: a run without a workflow keeps the list link (#7734) */
-    #wf-back-btn { display: none; } /* a phone has its own back, to the list */
-    #mobile-workflows-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
-    #mobile-workflows-list .sidebar-header { padding: 12px; }
+    #wf-back-btn { display: none; } /* a phone has its own back, to the folder's table */
     .wf-page { padding: 12px; }
     .wf-page .item-bar { position: static; margin-bottom: 0; padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px)); } /* in the flow, after the page's content: a sticky bar pinned to a container that is not the screen would land over a long page */
 }

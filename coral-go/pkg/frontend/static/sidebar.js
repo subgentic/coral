@@ -314,7 +314,6 @@ const SIDEBAR_PANES = {
     history: { search: 'Search chats', action: null },
     automations: { search: 'Search jobs', action: null }, // Workflows and Jobs as one screen (Goal #74): its folders' toolbars carry the create action
     'hub-inbox': { search: 'Search the Inbox', action: null },
-    workflows: { search: 'Search workflows', action: { name: 'wf-create', label: 'New workflow' } },
     tokens: { search: 'Search views', action: null }, // Analytics: the tab's name is tokens
     docs: { search: 'Search docs', action: null },
 };
