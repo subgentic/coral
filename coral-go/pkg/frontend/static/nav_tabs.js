@@ -54,7 +54,7 @@ function makeItem(t) {
 function makeMore() {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'top-nav-tab nav-more-btn';
+    b.className = 'tab top-nav-tab nav-more-btn';
     b.dataset.onClick = 'm-nav-more';
     b.setAttribute('aria-haspopup', 'menu');
     b.setAttribute('aria-expanded', 'false');

@@ -88,10 +88,14 @@
 .tabs::-webkit-scrollbar { display: none; }
 .tab { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--text-secondary); font: inherit; font-size: var(--fs-md); font-weight: 500; cursor: pointer; white-space: nowrap; }
 .tab:hover { color: var(--text-primary); }
-.tab[aria-selected="true"], .tab.is-current { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--accent); }
+.tab[aria-selected="true"], .tab.is-current, .tab.active { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--accent); }
+.tab[aria-expanded="true"] { background: var(--bg-hover); color: var(--text-primary); } /* a tab that opens a panel (the dock's Customize), while it is open */
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-sm); }
 .tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-sm); font-weight: 600; line-height: 1.5; }
-.tab-count[hidden] { display: none; }
+.tab-count[hidden], .tab-count:empty { display: none; }
+/* the strip of a narrow panel (the dock's): icon tabs that share the width and wrap at large text (#4344) */
+.tabs-icons { flex-wrap: wrap; gap: 0; overflow-x: visible; }
+.tabs-icons .tab { flex: 1; min-width: 2em; min-height: 36px; padding: 0 4px; justify-content: center; gap: 4px; }
 @media (max-width: 767px), (pointer: coarse) { .tab { min-height: var(--control-touch-height); } }
 
 /* A segmented control (Goal #84, #9096): one choice among two to five buttons, joined in one box: one height (32, 44 on touch), one radius, one padding; the chosen one is the accent fill above. A text tab strip is not one. */

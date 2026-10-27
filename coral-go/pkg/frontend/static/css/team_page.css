@@ -24,7 +24,7 @@
 .team-more-menu > button:hover { background: var(--bg-hover); }
 .team-more-menu > button.mb-action-danger { color: var(--error-text); }
 
-.team-tabs { flex: none; padding: 6px 24px 0; scroll-padding-inline: 2rem; } /* one row that never changes height: when the tabs are wider than the window the strip scrolls sideways, the selected tab is scrolled into view, and a fade at the edge says there is more */
+.tabs.team-tabs { flex: none; padding: 6px 24px 0; scroll-padding-inline: 2rem; } /* one row that never changes height: when the tabs are wider than the window the strip scrolls sideways, the selected tab is scrolled into view, and a fade at the edge says there is more */
 /* the tab row: the tab list and, on a phone, the More button beside it (Artifacts, Knowledge and Settings behind it, #8648) */
 .team-tabs-row { flex: none; position: relative; display: flex; align-items: flex-end; }
 .team-tabs-row::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--border); pointer-events: none; } /* the strip's line runs under More too */

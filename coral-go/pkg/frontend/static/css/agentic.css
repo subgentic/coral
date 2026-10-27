@@ -115,41 +115,7 @@ body.panel-dragging .agentic-state {
 
 /* ── Tabs ──────────────────────────────────────────────────── */
 
-.agentic-state-tabs {
-    display: flex;
-    flex-wrap: wrap; /* #4344: at large text the tabs wrap to a second row instead of the last ones (Activity, Agent UI, Customize) running off the screen */
-    min-height: 36px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-}
-
-.agentic-tab {
-    flex: 1;
-    min-width: 2em; /* em: grows with the text, so the row wraps before a tab is squeezed to nothing */
-    padding: 8px 4px;
-    font-size: var(--fs-md);
-    font-weight: 600;
-    color: var(--text-secondary);
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: all 0.15s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-}
-
-.agentic-tab:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-}
-
-.agentic-tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-}
+.agentic-state-tabs { flex-shrink: 0; } /* the strip is the one tab strip's (.tabs .tabs-icons, components.css): the tabs share its width and wrap at large text (#4344) */
 
 .agentic-tab .material-icons {
     font-size: var(--icon-size);
@@ -160,21 +126,6 @@ body.panel-dragging .agentic-state {
 .agentic-tab[aria-label]:focus-visible::after { content: attr(aria-label) / ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 20; white-space: nowrap; padding: 4px 8px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-md); pointer-events: none; }
 .agentic-tab[aria-label]:nth-last-child(-n+3):focus-visible::after { left: auto; right: 0; transform: none; }
 
-.agentic-tab-count:empty {
-    display: none;
-}
-
-.agentic-tab-count {
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    background: var(--bg-hover);
-    color: var(--text-primary); /* not the tab's own colour: the muted tab text on this chip was 4.4:1 (the Files one 3.7:1) in the light theme */
-    border-radius: var(--radius-lg);
-    padding: 0 5px;
-    line-height: 16px;
-    min-width: 16px;
-    text-align: center;
-}
 
 /* ── Customize tabs (#4103) ────────────────────────────────── */
 
@@ -205,7 +156,6 @@ body.panel-dragging .agentic-state {
 .agentic-more-count { margin-left: auto; color: var(--text-secondary); font-size: var(--fs-base); }
 .agentic-more-count:empty { display: none; }
 @media (pointer: coarse), (max-width: 767px) { .agentic-more-item { min-height: var(--control-touch-height, 44px); } }
-.agentic-tab-customize[aria-expanded="true"] { background: var(--bg-hover); color: var(--text-primary); }
 
 .tab-customize {
     position: fixed;
@@ -1661,20 +1611,6 @@ body.panel-dragging .agentic-state {
 @media (pointer: coarse) { .note-edit-actions .btn-small { min-height: var(--control-touch-height, 44px); } }
 
 /* ── Custom Views ─────────────────────────────────────────── */
-
-.agentic-tab-add {
-    opacity: 0.5;
-    border: 1px dashed var(--control-border);
-    border-radius: var(--radius-sm);
-}
-
-.agentic-tab-add:hover {
-    opacity: 1;
-}
-
-.agentic-tab-add .material-icons {
-    font-size: var(--fs-xl);
-}
 
 
 .custom-view-iframe {

@@ -1,4 +1,4 @@
-// The text tab strip as the page draws it (Goal #88, #9210): the team page's tabs and the goal screen's Tasks | Artifacts tabs are one family: 13 px, weight 500 (600 chosen), a 2 px underline that is the accent on the chosen tab and
+// The text tab strip as the page draws it (Goal #88, #9210; the top bar, the dock and the history tabs join it in #9328): the team page's tabs and the goal screen's Tasks | Artifacts tabs are one family: 13 px, weight 500 (600 chosen), a 2 px underline that is the accent on the chosen tab and
 // transparent on the others, a count badge in one style, 40 px high (44 on touch), and the strip's own line under it. A real board and goal on the isolated dev server (removed again); 1280 and 390, both themes, with shots.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -40,6 +40,13 @@ const BASE = require('./test_base').BASE;
             }
             for (const [n, t] of [['team', m.teamOff], ['goal', m.goalOff]]) { assert.equal(t.weight, '500', at + `${n}: an unchosen tab is 500`); assert.match(t.line, /rgba\(0, 0, 0, 0\)|transparent/, at + `${n}: an unchosen tab's underline is transparent: ` + t.line); }
             assert.equal(new Set(m.counts.map(c => JSON.stringify(c))).size, 1, at + 'the counts are one style: ' + JSON.stringify(m.counts));
+            // the top bar's tabs (1280 only: a phone has the view list), the dock's and the history's are the same strip, found by their classes where they are not on screen (#9328)
+            const strips = await ev(`(() => { const on = document.querySelector('.top-nav-tabs .tab.active, .top-nav-tabs .tab[aria-current]'); const cs = on && getComputedStyle(on); const acc = (() => { const t = document.createElement('i'); t.style.color = 'var(--accent)'; document.body.append(t); const c = getComputedStyle(t).color; t.remove(); return c; })();
+                const bare = sel => [...document.querySelectorAll(sel)].filter(e => !e.classList.contains('tab')).map(e => e.id || e.className);
+                return { nav: on && { weight: cs.fontWeight, size: cs.fontSize, line: cs.borderBottomColor, acc, visible: !!on.getClientRects().length }, bareNav: bare('.top-nav-tab'), bareDock: bare('.agentic-tab'), bareHistory: bare('.history-tab-btn'), tabsNav: document.querySelector('.top-nav-tabs').classList.contains('tabs'), tabsDock: document.querySelector('.agentic-state-tabs').classList.contains('tabs'), tabsHistory: document.querySelector('.history-tabs').classList.contains('tabs') }; })()`);
+            assert.deepEqual([strips.bareNav, strips.bareDock, strips.bareHistory], [[], [], []], at + 'every top nav, dock and history tab is a .tab: ' + JSON.stringify(strips));
+            assert.ok(strips.tabsNav && strips.tabsDock && strips.tabsHistory, at + 'the three strips are .tabs: ' + JSON.stringify(strips));
+            if (!mobile) { assert.ok(strips.nav && strips.nav.visible, at + 'the top bar shows a current tab'); assert.equal(strips.nav.size, '13px'); assert.equal(strips.nav.weight, '600'); assert.equal(strips.nav.line, strips.nav.acc, at + 'the current top tab is underlined in the accent'); }
             for (const t of ['dark', 'light']) { await theme(t); await new Promise(r => setTimeout(r, 450)); await shot(`tabs-${t}-${w}`); } // sleep-ok: the theme's colour transition settles
         }
         console.log('PASS tab family: the team page tabs and the goal screen tabs are one strip style: 13/500 (600 chosen), the accent underline, one count style, 40 px (44 on touch)');
