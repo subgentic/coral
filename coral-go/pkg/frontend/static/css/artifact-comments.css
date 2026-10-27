@@ -165,7 +165,7 @@
 .av-spacer { flex: 1; }
 .av-notice { flex: 1 0 100%; margin: 0; } /* where it sits: the look is .notice's */
 .av-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
-.av-list { position: absolute; z-index: 6; top: calc(100% + 4px); left: 16px; min-width: 340px; max-width: calc(100% - 32px); max-height: 50vh; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
+.av-list { position: absolute; z-index: 6; top: calc(100% + 4px); left: 8px; min-width: 340px; max-width: calc(100% - 16px); max-height: 50vh; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
 .av-list[hidden] { display: none; }
 .av-option { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 8px; border-radius: var(--radius-sm); font-size: var(--fs-md); cursor: pointer; }
 .av-option:hover, .av-option:focus-visible { background: var(--bg-tertiary); outline: none; }
