@@ -305,6 +305,11 @@ export function sessionTeamKey(s) {
     return s && s.board_project ? identityKey(sessionServer(s), s.board_project) : '';
 }
 
+/** The team key of a waiting agent's goal: the session's own team (qualified for another server), else the goal's board; '' when neither. */
+export function goalTeamKey(s) {
+    return sessionTeamKey(s) || String((s && s.goal && s.goal.board) || '');
+}
+
 /** The team keys whose board spend can be read: every team with an agent on the list, and every team with a board (`boardKeys`, qualified keys). Through the Cloud Hub only this computer's teams: its tunnel never carries another computer's /api/board/<team>/spend, so a remote team would only say "Spend could not be read" (#8693). */
 export function spendTeamKeys(sessions, cloud, boardKeys = []) {
     const keys = new Set();
