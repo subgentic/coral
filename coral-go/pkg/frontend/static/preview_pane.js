@@ -32,12 +32,14 @@ const ICON_MAP = {
 };
 
 function _fileIcon(tab) {
+    if (tab.kind === 'task') return '☑';
     if (tab.kind === 'artifact') return '❖';
     if (tab.kind === 'chat-image') return '▣';
     return ICON_MAP[getLangFromPath(tab.filepath)] || '◻';
 }
 
 function _tabTitle(tab) {
+    if (tab.kind === 'task') return tab.title || `Task ${tab.taskId}`;
     if (tab.kind === 'artifact') return tab.title || tab.options.filename || 'Artifact';
     if (tab.kind === 'chat-image') return tab.filepath; // the image's label (its name in the chat)
     return _fileName(tab.filepath);
@@ -133,6 +135,7 @@ function _renderToolbar(tab) {
     if (!bar) return;
     if (!tab) { bar.innerHTML = ''; return; }
 
+    if (tab.kind === 'task') { bar.replaceChildren(); return; }
     if (tab.kind === 'artifact') {
         const src = resolveArtifactSource(tab.filepath, tab.options);
         // The managed-artifact url is server-relative; point it at the viewed server (the hub path) for the link/download.
@@ -265,6 +268,16 @@ export function openArtifactTab(uri, options = {}) {
     if (options.phoneFull && _isMobile()) _setPhoneFull(true); // a person's own open (a link, the Artifacts tab) gives an artifact a phone's whole screen, not a strip under the side panel; Back returns to the chat (#6116)
 }
 
+/** Board tasks share the artifact pane's tabs, placement, split and phone Back. */
+export function openTaskPreview(project, taskId, title, onClose) {
+    if (!state.currentSession || state.currentSession.type !== 'live') return;
+    let tab = _tabs.find(t => t.kind === 'task' && t.project === project && t.taskId === taskId);
+    if (!tab) { tab = _newTab({ kind: 'task', project, taskId, title, filepath: title, onClose }); _addTab(tab); }
+    else { tab.onClose = onClose; }
+    layout.showColumn();
+    _activate(tab);
+}
+
 function switchTab(tabId) {
     const tab = _tabs.find(t => t.id === tabId);
     if (!tab || tab.id === _activeId) return;
@@ -274,6 +287,7 @@ function switchTab(tabId) {
 function _disposeTab(tab) {
     tab.abort?.abort();
     tab.abort = null;
+    if (tab.kind === 'task') { tab.onClose?.(); tab.onClose = null; }
     tab.renderGen++;
 }
 
@@ -293,7 +307,7 @@ function _closeTabNow(tabId) {
     const idx = _tabs.findIndex(t => t.id === tabId);
     if (idx === -1) return;
     const tab = _tabs[idx];
-    if (tab.id === _activeId) { _destroyEditor(); }
+    if (tab.id === _activeId) { _destroyEditor(); _clearTaskPreview(); }
     _disposeTab(tab);
     _tabs.splice(idx, 1);
 
@@ -317,6 +331,7 @@ function _closeTabNow(tabId) {
 }
 
 export function closeAllTabs() {
+    _clearTaskPreview();
     _destroyEditor();
     _tabs.forEach(_disposeTab);
     _tabs = [];
@@ -351,15 +366,28 @@ async function _commentsApi() {
     return (_comments = attachComments(pane, body, main, { toggleHost: true, observe: main, sheet: () => main.clientWidth < SHEET_BELOW, shown: () => pane.style.display !== 'none' }));
 }
 
+function _clearTaskPreview() { const body = _body(); body?._taskPreviewDispose?.(); if (body) body._taskPreviewDispose = null; }
+
 async function _render(tab) {
     const body = _body();
     if (!body) return;
+    _clearTaskPreview();
     _destroyEditor();
     const gen = ++tab.renderGen;
     const current = () => _activeId === tab.id && tab.renderGen === gen;
     _renderToolbar(tab);
     const hex = tab.kind === 'artifact' ? (ARTIFACT_URI.exec(tab.filepath || '') || [])[1] : '';
     if (!hex) _comments?.close(); // this tab has no comments (a file, an image, a linked page)
+
+    if (tab.kind === 'task') {
+        body.replaceChildren();
+        const loading = document.createElement('p'); loading.className = 'goals-note'; loading.textContent = 'Loading task…'; body.append(loading);
+        try {
+            const { mountTaskPreview } = await importOnce('./task_preview.js');
+            if (current()) await mountTaskPreview(body, tab, { current, close: () => closeTab(tab.id), title: value => { tab.title = value; tab.filepath = value; _renderTabs(); } });
+        } catch { if (current()) loading.textContent = 'The task could not be loaded. Close it and try again.'; }
+        return;
+    }
 
     if (tab.kind === 'artifact') {
         tab.abort?.abort();
@@ -510,6 +538,7 @@ async function saveTab(tab, btn) {
 export function setPreviewSession(key) {
     key = key || null;
     if (key === _sessionKey) return;
+    _clearTaskPreview();
     _setMaximised(false); // another agent's page opens with its Chat
     _setPhoneFull(false);
     _captureEditor();
