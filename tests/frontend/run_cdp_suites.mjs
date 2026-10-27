@@ -569,7 +569,8 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   // port read back is the one this Chrome bound (no race with other shards or processes).
   const profile = path.join(dir, 'profile');
   const chromeArgs = ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-    '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,900', ...(process.env.CDP_NO_HOVER ? ['--blink-settings=primaryHoverType=1,availableHoverTypes=1,primaryPointerType=1,availablePointerTypes=1'] : []),
+    '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,900', // the desktop a suite names has a mouse (hover, a fine pointer) on any machine: a headless Chrome on a build server has no pointing device and reports no hover and no pointer, so a control shown only on (hover: hover) and (pointer: fine) was drawn at rest there (#9673). CDP_NO_HOVER=1 is that machine, to see how a suite does on it; a suite that wants touch turns touch emulation on.
+    ...(process.env.CDP_NO_HOVER ? ['--blink-settings=primaryHoverType=1,availableHoverTypes=1,primaryPointerType=1,availablePointerTypes=1'] : ['--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4']),
     ...(process.env.CI ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
     // A Windows runner has Animation effects off, so the browser answers prefers-reduced-motion: reduce on its own; the suites' own motion checks
     // assume the default (no preference) and emulate "reduce" when they want it.
