@@ -388,13 +388,13 @@ export function renderQuickActions() {
 
     const modeInfo = _modeLabelInfo();
     const modeButtons = `
-        <button class="btn-nav btn-mode" id="btn-mode-toggle" data-on-click="cmd-mode-toggle" data-tooltip="${escapeAttr(modeInfo.tooltip)}" aria-label="${escapeAttr(modeInfo.aria)}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h8a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/><line x1="6" y1="11" x2="8" y2="11"/></svg><span class="btn-label">${escapeHtml(modeInfo.label)}</span></button>
-        <button class="btn-nav btn-mode" data-on-click="cmd-quick" data-cmd="!" aria-label="Bash command" data-tooltip="Prefixes your input with ! so Claude runs it as a shell command instead of a prompt."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><polyline points="4 7 6 9 4 11"/><line x1="8" y1="11" x2="12" y2="11"/></svg><span class="btn-label">Bash</span></button>
-        <button class="btn-nav btn-mode" data-on-click="cmd-raw-keys" data-keys="Escape,Escape" aria-label="Undo" data-tooltip="Sends two Escape keys to Claude. Interrupts the current response, rejects a pending tool call, or backs out of a permission prompt."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg><span class="btn-label">Undo</span></button>
+        <button class="btn btn-quiet btn-small btn-nav btn-mode" id="btn-mode-toggle" data-on-click="cmd-mode-toggle" data-tooltip="${escapeAttr(modeInfo.tooltip)}" aria-label="${escapeAttr(modeInfo.aria)}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h8a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/><line x1="6" y1="11" x2="8" y2="11"/></svg><span class="btn-label">${escapeHtml(modeInfo.label)}</span></button>
+        <button class="btn btn-quiet btn-small btn-nav btn-mode" data-on-click="cmd-quick" data-cmd="!" aria-label="Bash command" data-tooltip="Prefixes your input with ! so Claude runs it as a shell command instead of a prompt."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><polyline points="4 7 6 9 4 11"/><line x1="8" y1="11" x2="12" y2="11"/></svg><span class="btn-label">Bash</span></button>
+        <button class="btn btn-quiet btn-small btn-nav btn-mode" data-on-click="cmd-raw-keys" data-keys="Escape,Escape" aria-label="Undo" data-tooltip="Sends two Escape keys to Claude. Interrupts the current response, rejects a pending tool call, or backs out of a permission prompt."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg><span class="btn-label">Undo</span></button>
     `;
 
     const macroButtons = macros.map((m, i) => {
-        const cls = m.danger ? "btn-nav btn-danger" : "btn-nav";
+        const cls = m.danger ? "btn btn-quiet btn-small btn-nav btn-danger" : "btn btn-quiet btn-small btn-nav";
         return `<span class="macro-btn-wrap">
             <button class="${escapeAttr(cls)}" data-on-click="cmd-macro" data-index="${Number(i)}" data-tooltip="${escapeAttr(m.command)}">${escapeHtml(m.label)}</button>
             <button class="macro-delete-btn" data-on-click="macro-delete" data-index="${Number(i)}" title="Remove macro">&times;</button>
@@ -402,10 +402,10 @@ export function renderQuickActions() {
     }).join("");
 
     const navButtons = `
-        <button class="btn-nav btn-esc" data-on-click="cmd-raw-keys" data-keys="Escape" title="Stop — sends Escape to interrupt the agent or dismiss its prompt" aria-label="Stop (Escape)"><span class="esc-label-terminal" aria-hidden="true">Esc</span><span class="esc-label-chat" aria-hidden="true"><span class="material-icons" aria-hidden="true">stop</span></span></button>
-        <button class="btn-nav btn-nav-key" data-on-click="cmd-raw-keys" data-keys="Up" title="Arrow Up" aria-label="Arrow Up">&uarr;</button>
-        <button class="btn-nav btn-nav-key" data-on-click="cmd-raw-keys" data-keys="Down" title="Arrow Down" aria-label="Arrow Down">&darr;</button>
-        <button class="btn-nav btn-enter btn-nav-key" data-on-click="cmd-raw-keys" data-keys="Enter" data-tooltip="Sends an Enter keypress to the terminal" aria-label="Enter">&#9166;</button>
+        <button class="btn btn-quiet btn-small btn-nav btn-esc" data-on-click="cmd-raw-keys" data-keys="Escape" title="Stop — sends Escape to interrupt the agent or dismiss its prompt" aria-label="Stop (Escape)"><span class="esc-label-terminal" aria-hidden="true">Esc</span><span class="esc-label-chat" aria-hidden="true"><span class="material-icons" aria-hidden="true">stop</span></span></button>
+        <button class="btn btn-quiet btn-small btn-nav btn-nav-key" data-on-click="cmd-raw-keys" data-keys="Up" title="Arrow Up" aria-label="Arrow Up">&uarr;</button>
+        <button class="btn btn-quiet btn-small btn-nav btn-nav-key" data-on-click="cmd-raw-keys" data-keys="Down" title="Arrow Down" aria-label="Arrow Down">&darr;</button>
+        <button class="btn btn-quiet btn-small btn-nav btn-enter btn-nav-key" data-on-click="cmd-raw-keys" data-keys="Enter" data-tooltip="Sends an Enter keypress to the terminal" aria-label="Enter">&#9166;</button>
     `;
 
     const chipBar = document.getElementById("model-chip-bar"); // the toolbar's first item (model_chip.js owns it): kept, with its listeners, across the rebuild
@@ -416,14 +416,14 @@ export function renderQuickActions() {
         <span class="toolbar-divider"></span>
         <div class="toolbar-group toolbar-group-macros">
             ${macroButtons}
-            <button class="btn-nav btn-add-macro" data-on-click="macro-show" title="Add macro" aria-label="Add macro">+</button>
+            <button class="btn btn-quiet btn-icon btn-small btn-nav btn-add-macro" data-on-click="macro-show" title="Add macro" aria-label="Add macro">+</button>
         </div>
         <span class="toolbar-spacer"></span>
         <div class="toolbar-group toolbar-group-nav">
             ${navButtons}
             <div class="toolbar-send-split">
-                <button class="btn-nav btn-send" data-on-click="cmd-send" data-tooltip="Sends the text from the input box below to the terminal" aria-label="Send command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-                <button class="btn-nav btn-send-dropdown" data-on-click="cmd-send-menu" aria-label="Send options" title="Send options" aria-haspopup="menu" aria-expanded="false">
+                <button class="btn btn-primary btn-small btn-nav btn-send" data-on-click="cmd-send" data-tooltip="Sends the text from the input box below to the terminal" aria-label="Send command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                <button class="btn btn-quiet btn-icon btn-small btn-nav btn-send-dropdown" data-on-click="cmd-send-menu" aria-label="Send options" title="Send options" aria-haspopup="menu" aria-expanded="false">
                     <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4z"/></svg>
                 </button>
                 <div class="menu send-btn-menu" role="menu" aria-label="Send options" style="display:none">
