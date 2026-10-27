@@ -65,7 +65,7 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         const row = id => `document.querySelector('#board-task-list [data-on-click="task-open"][data-task-id="${id}"]')`;
         const dlgOpen = () => ev(`(() => { const m = document.getElementById('task-detail-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`);
         let root = '#preview-pane';
-        const BAR = () => `[...document.querySelectorAll('${root} .goals-pinbar .btn')]`;
+        const BAR = () => `[...document.querySelectorAll('${root} .goals-pinbar .btn, ${root} .goals-pinbar [role=menuitem]')]`; // the bar's buttons and the More menu's items (#9076)
 
         // ── The list ───────────────────────────────────────────────────────
         const sorted = await ev(`(async () => { ${MODS}
@@ -101,9 +101,9 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         await ev(`document.querySelector('${root} .task-dep-link[data-on-click="task-open"]').click(); true`);
         check('a dependency link opens that task', await onPage(made.dep).then(() => true, () => false));
 
-        // The pinned bar follows the one rule (#7684): right-aligned, the primary (Complete) last, Cancel task alone at the left edge and first.
+        // The pinned bar follows the one rule (#7684): right-aligned, the primary (Complete) last; Cancel task is the last item of More (#9076).
         const pbar = await ev(pinnedBarProbe(`${root} .goals-pinbar`));
-        check('the task page\'s bar: right-aligned, Complete last, Cancel task first at the left edge', pbar && pbar.rightAligned && pbar.primaryLast && pbar.dangerFirst && pbar.dangerAlone && pbar.names[0] === 'Cancel task' && pbar.names.at(-1) === 'Complete', JSON.stringify(pbar));
+        check('the task page\'s bar: right-aligned, More then Complete last, no danger button in the bar', pbar && pbar.rightAligned && pbar.primaryLast && JSON.stringify(pbar.names) === JSON.stringify(['More', 'Complete']), JSON.stringify(pbar));
 
         // ── Cancel through its confirmation (on the dependency) ────────────
         await until(`!!${barBtn('Cancel task')}`, "the dependency's Cancel task");

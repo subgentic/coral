@@ -17,7 +17,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
     let _fullOpenerPath = ''; // the file row to restore when the original opener was redrawn (#7652)
     const _pathOf = el => (el && el.closest && el.closest('[data-path]') ? el.closest('[data-path]').dataset.path : '') || '';
     const _rowFor = p => (p ? document.querySelector(`.file-more-btn[data-path="${CSS.escape(p)}"]`) || document.querySelector(`[data-path="${CSS.escape(p)}"][tabindex]`) : null);
-    let _restoreBottom = false; // expanding a dock task returns to its sidebar split on restore
+    let _taskExpanded = false; // a task the person expanded from the sidebar into the column: the room rule for a column preference does not send it back (#9076); ends at the next dock move
     let _maximised = false;    // the column covers Chat (#4931): not saved (a reload opens with Chat); ends when the pane is hidden, moves to the bottom, or another agent is shown
 
     const DOCK_ICONS = {
@@ -57,10 +57,18 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
     const _effectiveDock = () => {
         if (_isMobile()) return 'bottom';
         const room = document.querySelector('.live-body')?.getBoundingClientRect().width || window.innerWidth;
-        // Keep the chosen column preference, but a task must leave a readable chat beside it (#8905).
-        if (_dock === 'column' && !_maximised && isTaskPreview() && room - _clampColumnWidth(_paneWidth) - HANDLE_W < 420) return 'bottom';
+        // Keep the chosen column preference, but a task must leave a readable chat beside it (#8905), unless the person expanded it into the column themselves (#9076).
+        if (_dock === 'column' && !_maximised && !_taskExpanded && isTaskPreview() && room - _clampColumnWidth(_paneWidth) - HANDLE_W < 420) return 'bottom';
         return _dock;
     };
+
+    /** The dock button's move, shared with a task's expand button: the pane goes between the sidebar's bottom and its own full-height column (the preference is kept). */
+    function _toggleDock(expanded = false) {
+        _dock = _dock === 'column' ? 'bottom' : 'column';
+        _taskExpanded = expanded && _dock === 'column';
+        browserLocal.set('coral-preview-pane-dock', _dock);
+        _placePane();
+    }
 
     function initPreviewPane() {
         const handle = document.getElementById('preview-pane-resize-handle');
@@ -128,7 +136,8 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
             if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (getTabs().length && !_maximised) { if (isTaskPreview()) _placePane(); else if (_effectiveDock() === 'column') _applyColumnWidth(); } }).observe(liveBody);
         }
 
-        document.getElementById('preview-max-btn')?.addEventListener('click', () => (_isMobile() ? _setPhoneFull(!_phoneFull) : _setMaximised(!_maximised)));
+        // A task's expand button, in the sidebar, does what a file's dock button does (#9076, the Operator): the preview goes to the full-height column beside the chat, with the column's handle and its width kept; one more press maximises it as for a file.
+        document.getElementById('preview-max-btn')?.addEventListener('click', () => { if (_isMobile()) _setPhoneFull(!_phoneFull); else if (isTaskPreview() && _dock === 'bottom') _toggleDock(true); else _setMaximised(!_maximised); });
         document.getElementById('preview-full-back')?.addEventListener('click', () => _setPhoneFull(false));
         // Escape gives the maximised pane back its place, unless something in it (the editor's own search box) already used the key.
         document.addEventListener('keydown', (e) => {
@@ -140,12 +149,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
             document.getElementById('preview-max-btn')?.focus();
         });
 
-        document.getElementById('preview-dock-btn')?.addEventListener('click', () => {
-            _restoreBottom = false;
-            _dock = _dock === 'column' ? 'bottom' : 'column';
-            browserLocal.set('coral-preview-pane-dock', _dock);
-            _placePane();
-        });
+        document.getElementById('preview-dock-btn')?.addEventListener('click', () => _toggleDock());
         window.addEventListener('resize', () => { if (getTabs().length) _placePane(); });
         _placePane();
         _setMaximised(false); // paints the toggle's icon and label
@@ -173,10 +177,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
 
     /** Maximise the column over Chat, or give Chat its place back (#4931). The width the column had is untouched: restoring is taking one class off. */
     function _setMaximised(on) {
-        if (on && !_isMobile() && _effectiveDock() === 'bottom' && isTaskPreview() && getTabs().length) { _restoreBottom = true; _dock = 'column'; }
         on = !!on && !_isMobile() && _dock === 'column' && getTabs().length > 0;
-        const restore = !on && _restoreBottom;
-        if (restore) { _restoreBottom = false; _dock = 'bottom'; }
         const body = document.querySelector('.live-body');
         const changed = on !== _maximised;
         _maximised = on;
@@ -192,7 +193,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         if (!btn) return;
         const phone = _isMobile(), on = phone ? _phoneFull : _maximised;
         btn.innerHTML = on ? MAX_ICON_ON : MAX_ICON_OFF;
-        btn.title = phone ? (on ? 'Leave full screen (Escape)' : 'Show the preview full screen') : (on ? (_restoreBottom ? 'Restore the preview in the sidebar (Escape)' : 'Restore the preview beside the chat (Escape)') : 'Maximise the preview over the chat');
+        btn.title = phone ? (on ? 'Leave full screen (Escape)' : 'Show the preview full screen') : (on ? 'Restore the preview beside the chat (Escape)' : isTaskPreview() && _dock === 'bottom' ? 'Dock preview as a full-height column' : 'Maximise the preview over the chat');
         btn.setAttribute('aria-label', btn.title);
         btn.setAttribute('aria-pressed', String(on));
     }
@@ -280,6 +281,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         _placePane();
     }
     function showBottom() {
+        _taskExpanded = false;
         _setMaximised(false);
         _dock = 'bottom';
         if (!_isMobile()) _paneHeight = Math.round((document.getElementById('agentic-state')?.getBoundingClientRect().height || window.innerHeight) / 2);

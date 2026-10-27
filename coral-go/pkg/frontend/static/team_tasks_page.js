@@ -414,7 +414,6 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
             host._taskConversation = I.mountInbox(conversation, adapter, { region: false, only: { project: ctx.project, id: task.id }, conversationOnly: true, poll: pollEvery });
         }).catch(() => { if (conversation.isConnected) conversation.textContent = 'The conversation could not be shown. Reload the page and try again.'; });
     }
-    const session = agentOf(ctx.project, task);
     if (mode === 'cancel') {
         page.append(bar);
         importOnce('./team_task_actions.js').then(A => bar.append(A.cancelConfirm(task, acts)));
@@ -427,8 +426,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         page.append(bar);
         focus = null;
     } else {
-        if (session) bar.append(btn('btn', 'Open the agent', () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); })); // the agent that has the task, when it runs here
-        importOnce('./team_task_actions.js').then(A => { for (const b of A.taskButtons(task, acts)) bar.append(b); const danger = bar.querySelector('.btn-danger'); if (danger) bar.prepend(danger); }); // the bar's one order (#7684): a danger button first, alone at the left edge, the primary last
+        importOnce('./team_task_actions.js').then(A => { for (const b of A.taskButtons(task, acts)) bar.append(b); }); // More, then the primary last; the agent that has the task is the Assigned-to link (#9076)
         page.append(bar);
     }
     foldWayBack(page, '.goals-back', '.goals-detail-title');
@@ -441,7 +439,7 @@ function factsOf(task, ctx) {
     const dl = el('dl', 'goals-facts');
     const who = agentOf(ctx.project, task); // the agent that has it, when it runs here: its name opens it (the old subagent row's "Launched by", for a board's tasks)
     const doer = doerOf(task); // who did the work: for a done task the one who built it (the server's worked_by)
-    fact(dl, isDoneTask(task) ? 'Done by' : 'Assigned to', who && !isDoneTask(task) && doer === task.assigned_to ? btn('team-link', doer, () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(who.name, who.agent_type, who.session_id, who.server); }) : (doer || (isDoneTask(task) ? 'Nobody recorded' : 'Nobody yet')));
+    fact(dl, isDoneTask(task) ? 'Done by' : 'Assigned to', who && !isDoneTask(task) ? btn('team-link', doer || task.assigned_to, () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(who.name, who.agent_type, who.session_id, who.server); }) : (doer || (isDoneTask(task) ? 'Nobody recorded' : 'Nobody yet')));
     if (task.goal_id) {
         const g = btn('team-link', (ctx.goalTitleOf && ctx.goalTitleOf(task.goal_id)) || task.goal_title || goalTitle(ctx.project, task.goal_id) || `Goal ${task.goal_id}`, () => ctx.openGoal(task.goal_id)); // a goal's page already knows the titles
         fact(dl, 'Goal', g);
