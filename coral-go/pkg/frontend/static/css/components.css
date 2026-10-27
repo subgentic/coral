@@ -121,7 +121,7 @@
 
 /* Message board — sleep banner */
 .mb-sleep-banner { margin: 8px 16px 12px; flex-shrink: 0; } /* above the message list, not in it (#8453); where it sits: what it looks like is the one notice's (.notice, layout.css) */
-.mb-sleep-banner .material-icons { font-size: var(--icon-size); }
+.mb-sleep-banner .material-icons { font-size: var(--icon); }
 
 .restart-spinner {
     display: inline-block;
@@ -327,7 +327,7 @@
 .mb-attachment:hover { background: var(--bg-hover); text-decoration: underline; }
 .mb-attachment.is-image { flex-direction: column; align-items: flex-start; padding: 6px; }
 .mb-attachment-thumb { display: block; max-width: min(100%, 220px); max-height: 140px; border-radius: var(--radius-sm); object-fit: contain; background: var(--bg-primary); }
-.mb-attachment-icon { font-size: var(--icon-size); color: var(--text-secondary); }
+.mb-attachment-icon { font-size: var(--icon); color: var(--text-secondary); }
 .mb-attachment-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28ch; }
 .mb-attachment-size { color: var(--text-secondary); font-size: var(--fs-sm, 11px); white-space: nowrap; }
 /* A link in a message from another Coral whose file did not come with it: plain muted text and a note, nothing to open. */
@@ -395,7 +395,7 @@
 .mb-actions-item { display: flex; width: 100%; justify-content: flex-start; min-height: var(--control-touch-height, 44px); margin: 0 0 6px; }
 .mb-actions-apart { margin: 14px 0 14px; padding-top: 14px; border-top: 1px solid var(--border); } /* set apart from Save: a destructive action is not one tap beside it */
 .mb-actions-danger { color: var(--error-text); border-color: var(--error); }
-.mb-save-btn svg { width: var(--icon-inline-size, 1rem); height: var(--icon-inline-size, 1rem); }
+.mb-save-btn svg { width: var(--icon-sm); height: var(--icon-sm); }
 .mb-message:hover .mb-save-btn,
 .mb-message:focus-within .mb-save-btn,
 .mb-save-btn[aria-pressed="true"] { opacity: 1; }
@@ -457,7 +457,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 /* The board panel's Pause and Export are icon buttons (#5491): a square target, the icon the only content; a paused board's play icon is in the warning colour. */
 .board-chat-header .board-icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: 0 var(--space-sm); }
-.board-chat-header .board-icon-btn .material-icons { font-size: var(--fs-2xl); line-height: 1; }
+.board-chat-header .board-icon-btn .material-icons { font-size: var(--icon); line-height: 1; }
 .board-chat-header .board-icon-btn.mb-action-danger { color: var(--warning); }
 @media (max-width: 767px), (pointer: coarse) { .board-chat-header .board-icon-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } }
 
@@ -718,7 +718,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     color: var(--text-secondary);
     cursor: pointer;
 }
-.modal-close-btn .material-icons { font-size: var(--icon-size); }
+.modal-close-btn .material-icons { font-size: var(--icon); }
 .modal-close-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 .modal-body {
@@ -813,7 +813,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     min-height: var(--control-height);
 }
 
-.btn .material-icons { font-size: var(--icon-size); vertical-align: middle; }
+.btn .material-icons { font-size: var(--icon); vertical-align: middle; }
 
 .modal-content input:focus,
 .modal-content select:focus,
@@ -1007,7 +1007,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .info-token-value {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
-    font-size: var(--icon-size);
+    font-size: var(--icon);
     line-height: 1.1;
 }
 
@@ -1265,12 +1265,12 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .alert-notification-icon {
-    font-size: 2.5rem;
+    font-size: var(--icon-xl);
     margin-bottom: 12px;
 }
 
 .alert-notification-title {
-    font-size: var(--icon-size);
+    font-size: var(--icon);
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 8px;
@@ -1438,7 +1438,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: var(--icon-size);
+    font-size: var(--icon);
     padding: 0;
     line-height: 1;
     flex-shrink: 0;
@@ -2354,12 +2354,12 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .team-wizard-success-icon {
-    font-size: 3rem;
+    font-size: var(--icon-xl);
     color: var(--success);
 }
 
 .team-wizard-success strong {
-    font-size: var(--icon-size);
+    font-size: var(--icon);
 }
 
 .team-wizard-success p {
@@ -2393,7 +2393,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: var(--icon-size);
+    font-size: var(--icon);
     padding: 0 8px 0 0;
     min-width: 24px; min-height: 24px; /* its own box, not only the invisible hit area around it (#8451, WCAG 2.2 AA 2.5.8) */
     vertical-align: middle;
@@ -2434,7 +2434,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 
 .template-browser-close {
-    font-size: var(--icon-size);
+    font-size: var(--icon);
     padding: 2px 8px !important;
     min-width: 0;
 }
@@ -3016,7 +3016,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .top-bar-icon {
-    font-size: var(--icon-size);
+    font-size: var(--icon);
 }
 
 .notes-panel-body {
@@ -3031,7 +3031,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .tmux-missing-banner-icon {
     color: var(--warning);
-    font-size: var(--fs-2xl);
+    font-size: var(--icon);
     flex-shrink: 0;
 }
 .tmux-missing-banner-body {
@@ -3075,7 +3075,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .servers-tag { border: 1px solid var(--warning); font-family: var(--font-sans); }
 .servers-row-error { margin-top: var(--space-xs); font-size: var(--fs-base); color: var(--error); overflow-wrap: anywhere; }
 .servers-row-warn { display: flex; align-items: flex-start; gap: var(--space-sm); margin-top: var(--space-xs); font-size: var(--fs-base); font-weight: 400; color: var(--text-primary); overflow-wrap: anywhere; min-width: 0; } /* #4301: icon and words, not only a colour */
-.servers-row-warn .material-icons { flex: none; font-size: 1.15em; color: var(--warning); }
+.servers-row-warn .material-icons { flex: none; font-size: var(--icon); color: var(--warning); }
 .servers-row-detail { display: inline; color: var(--text-secondary); }
 .servers-row-detail summary { display: inline; cursor: pointer; color: var(--text-secondary); text-decoration: underline; }
 .servers-row-detail[open] summary { display: block; margin: var(--space-xs) 0; }
@@ -3342,7 +3342,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .leftover-tmux-text { flex: 1; min-width: 0; }
 .local-auth-banner { flex: none; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */ /* #4291 */
 .local-auth-banner[hidden] { display: none; }
-.local-auth-banner .material-icons { flex: none; color: var(--error); font-size: var(--fs-2xl); }
+.local-auth-banner .material-icons { flex: none; color: var(--error); font-size: var(--icon); }
 .local-auth-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .leftover-tmux-banner { flex-wrap: wrap; } }
 /* Agents on an older hook set (#3665). One line (the count and three buttons); the list opens below it, bounded
@@ -3356,7 +3356,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 body[data-agent-cli]:not([data-agent-cli=""], [data-agent-cli="claude"]) .signin-line { display: none; }
 .main-content > .signin-line { flex: none; order: -1; }
 .signin-line-btn { display: inline-flex; align-items: center; gap: var(--space-sm); padding: 2px 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: help; }
-.signin-line-btn .material-icons { font-size: var(--fs-xl); }
+.signin-line-btn .material-icons { font-size: var(--icon-sm); }
 .signin-line-hint[hidden] { display: none; }
 /* A phone (#6737): the line is the short fact and its button opens the rest (what waits, and what to do): at 200% text the whole sentence was four lines. */
 .signin-line-why-hint { display: none; }
@@ -3367,7 +3367,7 @@ body[data-agent-cli]:not([data-agent-cli=""], [data-agent-cli="claude"]) .signin
 /* About Claude's background work: scheduled jobs and workflows. On those pages and the agents page; not on Chats, the Board, Docs, Analytics, the Inbox or Servers, where it says nothing a person can use (#6200). */
 body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .signin-line { display: none; }
 .signin-line-dismiss { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; padding: 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); cursor: pointer; }
-.signin-line-dismiss .material-icons { font-size: var(--fs-xl); }
+.signin-line-dismiss .material-icons { font-size: var(--icon-sm); }
 .signin-line-dismiss:hover { color: var(--text-primary); background: var(--bg-hover); }
 .signin-line-dismiss:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 767px), (pointer: coarse) { .signin-line-dismiss { min-width: 44px; min-height: 44px; } }
@@ -3456,7 +3456,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
     border: 1px solid var(--control-border); border-radius: var(--radius-md);
     background: none; color: var(--text-secondary); cursor: pointer;
 }
-.acf-model-refresh .material-icons { font-size: var(--fs-xl); }
+.acf-model-refresh .material-icons { font-size: var(--icon-sm); }
 .acf-model-refresh:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
 .acf-model-refresh:disabled { opacity: .5; cursor: progress; }
 .acf-model-id { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-sm, 11px); font-weight: 400; color: var(--text-muted); overflow-wrap: anywhere; }
@@ -3610,7 +3610,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-tab[aria-selected="true"] { background: var(--bg-hover); color: var(--text-primary); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
 .settings-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .settings-tab[hidden] { display: none; }
-.settings-tab .material-icons { font-size: var(--icon-size); flex: none; }
+.settings-tab .material-icons { font-size: var(--icon); flex: none; }
 .settings-panes { flex: 1; min-width: 0; overflow: auto; padding: 1.1rem 1.6rem 1.5rem; container: settingspane / inline-size; }
 .settings-pane[hidden] { display: none; }
 .settings-pane:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--radius-md); }
@@ -3632,7 +3632,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .tb-head > .settings-info-btn { align-self: center; margin-top: 0; } /* the head is one centred row (title, (i)): the (i) centres with the title (a wrapped title: centred on it as a block), not at the top of the row with a margin worked out for a body label's line height (the icon census, #6879) */
 /* (the phone used to put Coral Hub first with order: -1: the pane reads in the same order at every width now, #7040) */
 .settings-info-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; flex: none; border: 1px solid var(--control-border); border-radius: 50%; background: none; color: var(--text-secondary); cursor: pointer; }
-.settings-info-btn .material-icons { font-size: var(--fs-xl); }
+.settings-info-btn .material-icons { font-size: var(--icon-sm); }
 /* On its label's first line, not centred on the whole row: the circle's centre is the first line's centre (a label of two lines keeps it beside the first). */
 .settings-info-btn { align-self: flex-start; margin-top: calc((1lh - 1.5rem) / 2); }
 /* The touch target: on a phone or a touch screen the circle stays 1.5rem and an invisible 44 px square around it takes the tap (#6750: the visible circle was 44 px and sat below its label). */
@@ -3833,7 +3833,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .settings-cloud-more { margin-top: 10px; }
 #settings-cloud .settings-cloud-more > summary { color: var(--text-primary); font-weight: 600; overflow-wrap: anywhere; }
 #settings-cloud .settings-cloud-warn { display: block; color: var(--warning-text, var(--warning)); font-weight: 500; margin-top: 2px; }
-#settings-cloud .settings-cloud-warn .material-icons { font-size: var(--fs-xl); vertical-align: text-bottom; }
+#settings-cloud .settings-cloud-warn .material-icons { font-size: var(--icon-sm); vertical-align: text-bottom; }
 #settings-cloud .settings-cloud-saved { margin: 4px 0 0; }
 @media (pointer: coarse), (max-width: 767px) { #settings-cloud-link { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); } } /* the link to approve the code is a 44 px target on a phone */
 /* Network and Hub on the settings row (#7626): every switch is at the far end of its head (the Manage switch had lost its auto margin to a rule written for the old grid), Status is a group with the machine's state at the right of its row, the level question is the label with its hint at the left and the select at the right, and the Hub command is a full-width box with Copy at its end. */

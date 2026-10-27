@@ -22,7 +22,7 @@
 .docs-toolbar .back-link { margin: 0; }
 
 .docs-toolbar .btn { display: inline-flex; align-items: center; gap: 6px; margin: 0; } /* .btn-small carries a 20px margin for the sidebars */
-.docs-toolbar .material-icons { font-size: var(--fs-xl); }
+.docs-toolbar .material-icons { font-size: var(--icon-sm); }
 .docs-toolbar-hint { margin: 4px 32px 0; max-width: 736px; font-size: var(--fs-base); color: var(--text-secondary); min-width: 0; } /* a hint is 12/400 */
 
 @media (max-width: 600px) {

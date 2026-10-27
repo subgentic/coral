@@ -33,7 +33,7 @@
 .view-list-with-icon .view-list-label { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: 10px; flex: 1; }
 .view-list-with-icon .view-list-name { white-space: normal; overflow-wrap: break-word; }
 .view-list-icon { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; color: inherit; }
-.view-list-icon svg { width: 1.125rem; height: 1.125rem; }
+.view-list-icon svg { width: var(--icon); height: var(--icon); }
 .view-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .view-list-dot { width: 9px; height: 9px; border-radius: var(--radius-xs); flex: none; background: var(--view-list-dot); }
 .view-list-count { flex: none; font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); }

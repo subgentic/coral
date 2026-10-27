@@ -1,0 +1,14 @@
+{
+  "agentic.css: .agent-reminder-icon { font-size: var(--fs-base) }": 1,
+  "command-pane.css: .file-mention-dir-icon { font-size: var(--fs-sm) }": 1,
+  "components.css: .dir-icon { font-size: var(--fs-lg) }": 1,
+  "data_table.css: .dt-filter .material-icons { font-size: var(--fs-md) }": 1,
+  "data_table.css: .dt-box .dt-files .material-icons { font-size: var(--fs-lg) }": 1,
+  "data_table.css: .artifact-tag-remove .material-icons { font-size: var(--fs-base) }": 1,
+  "layout.css: .rail-tile .rail-tile-icon { font-size: var(--fs-xs) }": 1,
+  "output.css: .preview-tab-icon { font-size: var(--fs-sm) }": 1,
+  "output.css: .terminal-header-btn svg { width: 0.875rem }": 1,
+  "output.css: .terminal-header-btn svg { height: 0.875rem }": 1,
+  "session.css: .agent-icon { font-size: var(--fs-md) }": 1,
+  "settings_view.css: .sv-ctl-icon { font-size: var(--fs-lg) }": 1
+}

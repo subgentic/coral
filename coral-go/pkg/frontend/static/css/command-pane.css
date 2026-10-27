@@ -73,7 +73,7 @@
     z-index: 1;
 }
 .attach-image-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.attach-image-btn .material-icons { font-size: var(--fs-2xl); }
+.attach-image-btn .material-icons { font-size: var(--icon); }
 .command-editor:has(> .attach-image-btn) textarea { padding-right: 44px !important; }
 @media (pointer: coarse) {
     .attach-image-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); right: 2px; top: 0; }
@@ -447,8 +447,8 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 #board-chat-input-pane textarea:focus, #board-chat-input-pane textarea:focus-visible { outline: none; box-shadow: none; }
 
 /* Size composer glyphs independently of the established control boxes. */
-#command-pane .btn-nav svg { width: var(--icon-inline-size); height: var(--icon-inline-size); }
-#command-pane .btn-esc .material-icons { font-size: var(--icon-size); }
+#command-pane .btn-nav svg { width: var(--icon-sm); height: var(--icon-sm); }
+#command-pane .btn-esc .material-icons { font-size: var(--icon); }
 
 /* ── Sleeping agent: Wake / Restart… in place of the send controls ── */
 
@@ -566,7 +566,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 .model-chip-item:hover, .model-chip-item:focus-visible { background: var(--bg-tertiary); }
 .model-chip-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; } /* a tint alone is not a focus indicator (#5042) */
 .model-chip-item.checked { font-weight: 600; }
-.model-chip-item .material-icons { font-size: var(--fs-xl); }
+.model-chip-item .material-icons { font-size: var(--icon-sm); }
 /* "Add a model…" at the end of the model menu (#5938): a separated item, and its small form (the id, an optional name) in the same panel */
 .model-chip-add-row { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
 .model-chip-add-form { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding: 8px; border-top: 1px solid var(--border); }

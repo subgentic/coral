@@ -389,7 +389,7 @@ body.panel-dragging .preview-pane {
 }
 /* #4344: the header's glyph buttons grow with the text: their drawn icons (svg width/height attributes are 14 and 16) are in rem */
 .terminal-header-btn svg { width: 0.875rem; height: 0.875rem; }
-.top-bar-btn svg { width: 1rem; height: 1rem; }
+.top-bar-btn svg { width: var(--icon-sm); height: var(--icon-sm); }
 
 /* ── Output Scroll ─────────────────────────────────────────── */
 
