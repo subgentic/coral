@@ -273,6 +273,15 @@ export function boardLabel(key) {
     return _boardLabels.get(k) || splitKey(k).name;
 }
 
+/** Whether an answer that names the board `answered` is the answer for `project`: the key the page asked with is the board's id, or its label when the team was opened by name (/team/<name>, #8798),
+ *  which the server resolves to the board's id before it answers. A label the page does not know, or another board's id, is not it. */
+export function isBoardAnswer(project, answered) {
+    const { server, name } = splitKey(project), id = String(answered ?? '');
+    if (!id) return false;
+    if (id === name) return true;
+    return boardLabel(identityKey(server, id)).toLowerCase() === name.toLowerCase();
+}
+
 /** What people read for a board or team key: its label, or the key's name when no label is
  *  known; with a short id when another known board has the same label (#3536). */
 export function keyLabel(key) {

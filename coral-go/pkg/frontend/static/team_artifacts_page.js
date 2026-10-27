@@ -2,7 +2,7 @@ import { serverColumns, serverOf, readInboxArtifacts } from './inbox_servers.js'
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
-import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, LOCAL_SERVER } from './server_base.js';
+import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, LOCAL_SERVER } from './server_base.js';
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
@@ -126,7 +126,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (!r.ok) { if (await isOwnerLabelRefusal(r)) throw new Error(OWNER_LABEL_TEXT); throw new Error(`Unable to load ${inbox ? '' : scope ? 'agent ' : 'team '}artifacts (${r.status}).`); }
             const data = await r.json();
             if (gen !== model.gen || key !== model.key) return;
-            if ((!inbox && !(scope && scope.standalone) && data.project !== splitKey(project).name) || !Array.isArray(data.artifacts) || (scope && data.session_id !== scope.session)) throw new Error('Unable to load artifacts: unexpected response scope.');
+            if ((!inbox && !(scope && scope.standalone) && !isBoardAnswer(project, data.project)) || !Array.isArray(data.artifacts) || (scope && data.session_id !== scope.session)) throw new Error('Unable to load artifacts: unexpected response scope.');
             const rows = data.artifacts.filter(a => a && (a.uri || a.id || a.name));
             model.items = append ? model.items.concat(rows) : rows;
             if (!append) model.tagCounts = data.tag_counts && typeof data.tag_counts === 'object' ? data.tag_counts : {}; // the team's tags with how many files carry each (the whole list, not the page)
