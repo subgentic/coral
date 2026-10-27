@@ -16,8 +16,7 @@
     .mobile-send-options-btn,
     .agent-ui-card button,
     .agent-ui-home-row,
-    .agent-ui-actions .agent-ui-dismiss,
-    .folder-copy-btn {
+    .agent-ui-actions .agent-ui-dismiss {
         min-width: var(--control-touch-height);
         min-height: var(--control-touch-height);
     }
@@ -84,19 +83,13 @@
        agent row (it only showed in landscape), and the "Details" disclosure inside a Servers row's error line (the hit area grows, the
        line does not: padding and an equal negative margin). */
     .launch-back-btn,
-    .permissions-toggle-btn,
-    .sidebar-goal-btn {
+    .permissions-toggle-btn {
         min-width: var(--control-touch-height);
         min-height: var(--control-touch-height);
     }
     .permissions-toggle-btn {
         display: flex;
         align-items: center;
-    }
-    .session-group-item .sidebar-goal-btn-inline {
-        min-width: var(--control-touch-height);
-        min-height: var(--control-touch-height);
-        margin: -10px 0;   /* the row keeps its height: only the hit area grows */
     }
     .servers-row-detail summary {
         display: inline-block;

@@ -35,7 +35,7 @@ export function teamHealthBtn(boardName, boardSessions) {
     if (row) _healthSeen.set(boardName, row.team_health_on);
     if (!_healthSeen.get(boardName)) return '';
     const label = 'Team health monitor: on';
-    return `<button type="button" class="folder-copy-btn team-health-btn is-on" data-on-click="team-health" data-board="${escapeAttr(boardName)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></button>`;
+    return `<button type="button" class="btn btn-quiet btn-icon btn-xs folder-copy-btn team-health-btn is-on" data-on-click="team-health" data-board="${escapeAttr(boardName)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></button>`;
 }
 
 // A folder icon on folder groups, as teams have the people icon (#3507 v4, the operator's
