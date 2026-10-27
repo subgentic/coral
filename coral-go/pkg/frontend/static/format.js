@@ -35,14 +35,16 @@ export function compactFigure(n) {
 }
 
 /** The one duration format of the Analytics pages (UI/UX, #9540): 38 s, 2 min, 1 h 02 min: two parts at most, the minutes zero-padded only after an hour. Seconds in; '' for a figure that is not a number. */
-export function compactDuration(seconds) {
+export function compactDuration(seconds, { days = false } = {}) {
     const v = Number(seconds);
     if (!Number.isFinite(v)) return '';
     const s = Math.round(Math.max(v, 0));
     if (s < 60) return `${s} s`;
     const m = Math.round(s / 60);
     if (m < 60) return `${m} min`;
-    return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+    const h = Math.floor(m / 60);
+    if (days && h >= 24) return h % 24 ? `${Math.floor(h / 24)} d ${h % 24} h` : `${Math.floor(h / 24)} d`; // a wait or a claim that is days old keeps its days (two parts at most)
+    return `${h} h ${String(m % 60).padStart(2, '0')} min`;
 }
 
 /** An ISO timestamp as the local clock time (hh:mm:ss), or '' for none or a bad one. */
