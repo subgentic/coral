@@ -92,7 +92,11 @@ func (h *UpdateRelaunchHandler) addChannelFacts(r *http.Request, out map[string]
 	feeds := h.Feeds()
 	feed, err, ok := updatecheck.Default.PeekFeed(ch, feeds)
 	if !ok {
-		updatecheck.Default.WarmFeed(ch, feeds)
+		// A status read starts no request of its own while a check runs: the check asks GitHub for the same releases, and a person opening the update panel (or a script polling it) must not add
+		// traffic to it (#9063). The next read warms the feed once the check is over.
+		if !h.checking.Load() {
+			updatecheck.Default.WarmFeed(ch, feeds)
+		}
 		return
 	}
 	if err != nil || feed == nil {

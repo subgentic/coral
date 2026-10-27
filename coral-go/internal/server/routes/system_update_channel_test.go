@@ -301,3 +301,25 @@ func TestUpdateCheckNotesTheOfferedReleaseForTheDashboardsUpdateEvents(t *testin
 	require.Equal(t, true, got["available"])
 	assert.Equal(t, "1.4.142", tracking.OfferedRelease())
 }
+
+// #9063: a status read made while a check runs starts no request of its own to GitHub; once the check is over the next read warms the feed.
+func TestAStatusReadAsksGitHubForNothingWhileACheckRuns(t *testing.T) {
+	skipWhenUpdateCheckIsOff(t)
+	var hits atomic.Int32
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits.Add(1); w.WriteHeader(http.StatusForbidden) }))
+	defer s.Close()
+	orig := githubReleasesAPI
+	githubReleasesAPI = uniqueFeedURL(s.URL)
+	t.Cleanup(func() { githubReleasesAPI = orig })
+	e := newRelaunchEnv(t)
+	e.h.Feeds = releaseFeeds
+	e.h.checking.Store(true)
+	for i := 0; i < 5; i++ {
+		statusOn(t, e, nil)
+	}
+	time.Sleep(300 * time.Millisecond)
+	assert.EqualValues(t, 0, hits.Load(), "the check is running: the status reads asked for nothing")
+	e.h.checking.Store(false)
+	statusOn(t, e, nil)
+	require.Eventually(t, func() bool { return hits.Load() > 0 }, 5*time.Second, 20*time.Millisecond, "the check is over: the next read warms the feed")
+}
