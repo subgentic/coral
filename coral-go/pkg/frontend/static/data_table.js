@@ -4,7 +4,7 @@
  *   dataTable({ label, columns, rows, rowKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll, detail, decorate, decorateHead }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
- *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, when(row), subtitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
+ *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, when(row), subtitle(row), subtitleTitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
  *   column widths (#7949): every header has a resize handle on its right edge (drag, Left and Right keys, double-click or Enter to fit the content); the widths are kept per list in this browser (widthsKey, else the label without its row count), and "Reset column widths" appears while any are set. minWidth per column (64 px by default), resize: false for one that must not.
  *   detail = { id(row), open(row) -> bool, render(row) -> Node }: a second full-width row under each row (hidden while open(row) is false); the surface's own toggle in a cell opens it (Coral Hub's Servers: health, what applies).
  *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
@@ -288,7 +288,7 @@ export function dataTable(cfg) {
         if (typeof v === 'string' && c.primary) v = primaryButton(v, `Open ${v}`);
         if (v instanceof Node) td.append(v); else td.textContent = v == null ? '' : String(v);
         if (c.title) { const t = c.title(r); if (t) td.title = t; } // the full name or id on hover
-        if (c.subtitle) { const s = c.subtitle(r); if (s) td.append(el('span', 'dt-subtitle', s)); }
+        if (c.subtitle) { const s = c.subtitle(r); if (s) { const sub = el('span', 'dt-subtitle', s); if (c.subtitleTitle) { const t = c.subtitleTitle(r); if (t) sub.title = t; } td.append(sub); } } // subtitleTitle(row): the whole line on hover when the subtitle is cut with an ellipsis
         return td;
     }
 
