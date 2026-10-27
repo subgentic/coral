@@ -58,7 +58,7 @@ function card(s) {
         // Only the server's own reason says why nothing is ready (#5388): without it Coral does not claim to be up to date
         const t = notReadyText(s);
         title.textContent = t.title; sub.textContent = t.sub;
-        if (s.notReady === 'up_to_date') { dot.dataset.k = 'ok'; c.dataset.k = 'ok'; } else if (s.notReady === 'check_failed') { dot.dataset.k = 'warm'; c.dataset.k = 'warm'; }
+        if (s.notReady === 'up_to_date') { dot.dataset.k = 'ok'; c.dataset.k = 'ok'; } else if (s.notReady === 'check_failed' || s.notReady === 'rate_limited') { dot.dataset.k = 'warm'; c.dataset.k = 'warm'; }
         if (serverHas.check) act = mk('button', 'btn update-act', 'Check now');
         if (act) act.type = 'button';
         if (act) act.addEventListener('click', async () => { act.disabled = true; const ok = await requestCheckNow(); await refreshUpdateStatus(); showUpdatesPane(); if (!ok) showToast('Could not check for updates.', true); });

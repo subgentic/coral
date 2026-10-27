@@ -51,7 +51,7 @@ type State struct {
 }
 
 // StageState is the staging step's own record. NextAttempt is an RFC 3339 time before which no download is tried again for Version; Attempts
-// counts the failures in a row for it; ErrorKind is "network" or "verify".
+// counts the failures in a row for it; ErrorKind is "network", "verify" or "rate_limit" (GitHub's limit on anonymous requests: the next attempt is when it says it is over).
 type StageState struct {
 	Staged      string `json:"staged,omitempty"`
 	StagedAt    string `json:"staged_at,omitempty"`
