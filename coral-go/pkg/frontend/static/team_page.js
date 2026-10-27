@@ -250,7 +250,8 @@ export async function goTab(tab, { focus = false, user = false, item = 0, replac
     markTab(tab);
     adoptBoardActions();
     if (user || item) note(keyRoute('team', S.team, tab, item || null), { replace });
-    await fillTab(tab, item);
+    S.itemPending = !!item; // a task is being opened: the Tasks list must not rewrite its address meanwhile (#8898)
+    try { await fillTab(tab, item); } finally { S.itemPending = false; }
     if (focus) { const b = $(`team-tab-${tab}`); (b.getClientRects().length ? b : $('team-tab-more')).focus(); } // a tab behind More is not in the row
 }
 
@@ -276,7 +277,7 @@ async function fillTab(tab, item = 0) {
             const noGoal = S.noGoal; S.noGoal = false;
             const query = S.tasksQuery; S.tasksQuery = '';
             await m.showTasks(host, team, { ...teamHooks(), noGoal, query, onCount: (n) => { S.counts.tasks = n; drawCounts(); },
-                onFilters: (qs) => { if (!S.quiet && S.tab === 'tasks' && !S.item) note(keyRoute('team', S.team, 'tasks', null, qs), { replace: true }); } }); // the address keeps the filters (#7782)
+                onFilters: (qs) => { if (!S.quiet && S.tab === 'tasks' && !S.item && !S.itemPending) note(keyRoute('team', S.team, 'tasks', null, qs), { replace: true }); } }); // the address keeps the filters (#7782)
             if (stale()) return;
             if (item) await openTaskById(item);
         } else if (tab === 'artifacts') {
@@ -322,14 +323,17 @@ async function openTaskById(id) {
     if (!full || seq !== S.navSeq || team !== S.team || S.tab !== 'tasks') return;
     const origin = panel('tasks');
     S.item = { kind: 'task', id, origin };
-    const backLabel = 'Tasks';
+    // opened from a goal's task list: Back returns to that goal and says it (#8898); by address or from the Tasks tab it is the list
+    const fromGoal = /^\/team\/.+\/goals\/\d+$/.test(String(history.state?.prev || '').split('?')[0]);
+    const { shortLabel } = await importOnce('./inbox_back_label.js');
+    const backLabel = fromGoal ? (shortLabel(history.state?.from) || 'Goal') : 'Tasks';
     origin.hidden = true;
     host.hidden = false;
     m.renderTaskPage(host, full, {
         project: S.team, backLabel,
         openGoal: (id) => { closeItem(false); openGoalPage(id); },
         openTask: (t) => openTask(S.team, t.id), // a follow-up listed on the task's page
-        onBack: () => closeItem(true),
+        onBack: () => { if (fromGoal) history.back(); else closeItem(true); },
     });
     note(keyRoute('team', team, 'tasks', id));
 }
@@ -390,7 +394,7 @@ export async function openTeamPage(team, opts = {}) {
     }
     drawHeader();
     if (S.item) closeItem(false);
-    if (!opts.silent) note(keyRoute('team', team, tab, opts.item || null), { replace: !!opts.replace });
+    if (!opts.silent) note(keyRoute('team', team, tab, opts.item || null), { replace: !!opts.replace, from: opts.from || '' });
     startCounts();
     await goTab(tab, { item: opts.item || 0 });
     return true;
