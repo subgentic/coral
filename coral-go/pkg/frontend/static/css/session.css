@@ -795,6 +795,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .session-group-header:not(.board-card-header) {
     margin-top: 6px;
 }
+#live-sessions-list { line-height: normal; } /* the agent list's rows and headers keep the heights they had: the body's 1.4 made them 2 px taller (the 40 and 36 px rows, #9207) */
 #live-sessions-list > .session-group-header:first-child,
 #live-sessions-list > .session-board-card:first-child {
     margin-top: 2px !important;
@@ -1424,7 +1425,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .prompt-inspection-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; color: var(--text-secondary); font-size: var(--fs-base) !important; line-height: var(--lh-ui); } /* the line height is the label's own, so the (i) beside it (centred on its first line by 1lh) sits on that line in a settings page too */
 .prompt-inspection-fragment { margin-top: 10px; }
 .prompt-inspection-folded { --dz-width: auto; --dz-pad: 0; --dz-size: 0.75rem; --dz-color: var(--text-secondary); --dz-gap: 4px; }
-.prompt-inspection-folded > summary { display: flex; align-items: center; list-style: none; gap: 4px; }
+.prompt-inspection-folded > summary { display: flex; align-items: center; list-style: none; gap: 4px; line-height: normal; } /* like the other summaries: the body's 1.4 would make it 2 px taller (#9207) */
 .prompt-inspection-folded > summary::-webkit-details-marker { display: none; }
 .prompt-inspection-folded > summary::before { content: '▸' / ''; }
 .prompt-inspection-folded[open] > summary::before { content: '▾' / ''; }

@@ -3733,7 +3733,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* Agent Team (UI audit #5589, findings 5 and 6): the team name, which every launch needs, is above the sections; the template tools are one disclosure after the picker, so the members come first. */
 .modal-content:has(.settings-shell) #launch-step-team .settings-modal-body { flex-direction: column; overflow: auto; } /* the steps scroll inside the fixed dialog (#7407) */
 /* Folded section: one summary style. A user sets only the --dz-* variables that differ. */
-.disclosure > summary { cursor: pointer; width: var(--dz-width, fit-content); padding: var(--dz-pad, .25rem .5rem .25rem 0); color: var(--dz-color, inherit); font-size: var(--dz-size, var(--fs-md)); font-weight: var(--fw-strong); }
+.disclosure > summary { cursor: pointer; width: var(--dz-width, fit-content); padding: var(--dz-pad, .25rem .5rem .25rem 0); color: var(--dz-color, inherit); font-size: var(--dz-size, var(--fs-md)); font-weight: var(--fw-strong); line-height: normal; } /* a summary keeps the browser's line height: the body's 1.4 made each one 2 px taller (#9207) */
 .disclosure[open] > summary { margin-bottom: var(--dz-gap, .4rem); }
 .launch-type-glyph { font-size: var(--fs-display); } /* the agent card draws the same robot as the start page */
 
