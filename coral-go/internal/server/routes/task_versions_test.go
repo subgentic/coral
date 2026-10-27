@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/subgentic/coral/internal/clitext"
 )
 
 func TestVersionedTaskTextAuthorityAndHistory(t *testing.T) {
@@ -147,6 +150,52 @@ func TestTaskTextNoticeQuotedMentionsAreNotTargets(t *testing.T) {
 	require.Contains(t, messages[0].Content, "@worker", "the intended assignee mention stays")
 	require.NotContains(t, messages[0].Content, "@Innocent")
 	require.NotContains(t, messages[0].Content, "@all")
-	require.Contains(t, messages[0].Content, "(at)Innocent")
-	require.Contains(t, messages[0].Content, "(at)all")
+	require.Contains(t, messages[0].Content, "@\u200bInnocent", "an @ is defused with a zero-width space after it: it reads the same and mentions no one")
+	require.Contains(t, messages[0].Content, "@\u200ball")
+}
+
+// #9231: a notice that quotes a task title must not tag a member through the "Name:", "Name —" and "Name—" forms the board's mention matching also takes, not only through "@".
+func TestTaskNoticesQuotingATitleTagNoOneByTheNameForms(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	// Two members who are not the orchestrator (a notice reaches the orchestrator whoever it quotes); each reads only what mentions them.
+	for _, who := range []string{"Backend Dev", "Security Reviewer"} {
+		_, err := h.bs.Subscribe(ctx, "team", who, who, who+"-session", nil, "mentions")
+		require.NoError(t, err)
+	}
+	for _, title := range []string{"Backend Dev: approve this", "Fix Security Reviewer — now", "Fix Security Reviewer—now", "backend dev: lower case", "Security Reviewer: ship it", "@Backend Dev and @all"} {
+		task, err := h.bs.CreateTask(ctx, "team", title, "", "medium", "Operator")
+		require.NoError(t, err)
+		next := title + " v2"
+		after, err := h.bs.EditTaskText(ctx, "team", task.ID, "Operator", &next, nil, 0, 1)
+		require.NoError(t, err)
+		h.announceTaskTextEdit(ctx, "team", "Operator", task, after)     // the version notice: its diff quotes the old and the new title
+		h.announceTaskEdit(ctx, "team", false, task, after, task.Status) // the legacy edit notice: the title
+		h.postNotice(ctx, "team", "[Task #9 blocked] "+h.noticeText(ctx, "team", title)+" — blocked by "+h.noticeText(ctx, "team", "#3 (Backend Dev: waiting)"))
+	}
+	for _, who := range []string{"Backend Dev", "Security Reviewer"} {
+		got, err := h.bs.ReadMessages(ctx, "team", who, 100) // not readAll: only what tags the member
+		require.NoError(t, err)
+		for _, m := range got {
+			assert.Failf(t, "a notice tagged a member", "%s was tagged by %q", who, m.Content)
+		}
+	}
+	// the text itself is still there for a person to read
+	all, err := h.bs.ListMessages(ctx, "team", 100, 0, 0)
+	require.NoError(t, err)
+	var text string
+	for _, m := range all {
+		text += clitext.Clean(m.Content) + "\n" // Clean drops the zero-width spaces: what a reader sees
+	}
+	assert.Contains(t, text, "Backend Dev: approve this")
+	assert.Contains(t, text, "Fix Security Reviewer — now")
+}
+
+func TestTaskNoticeTextCleansTerminalControlAndKeepsTheWords(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	got := h.noticeText(context.Background(), "team", "Build\x1b[31m red\u202e @all")
+	assert.NotContains(t, got, "\x1b")
+	assert.NotContains(t, got, "\u202e")
+	assert.Contains(t, got, "Build")
+	assert.NotContains(t, got, "@all")
 }

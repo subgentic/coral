@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/clitext"
 	"net/http"
 	"sort"
 	"strconv"
@@ -68,7 +69,7 @@ func (h *BoardHandler) announceTaskTextEdit(ctx context.Context, project, editor
 		parts = append(parts, fmt.Sprintf("%s %q → %q", k, d.Before, d.After))
 	}
 	// Bounded diffs keep a long body/title from exceeding a board message limit.
-	diff := taskNoticeText(strings.Join(parts, "; "))
+	diff := h.noticeText(ctx, project, strings.Join(parts, "; "))
 	if len([]rune(diff)) > 3000 {
 		diff = string([]rune(diff)[:3000]) + "… (full diff: task history)"
 	}
@@ -92,7 +93,7 @@ func (h *BoardHandler) announceTaskTextEdit(ctx context.Context, project, editor
 		mentions = append(mentions, "@"+who)
 	}
 	sort.Strings(mentions)
-	h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("%s Task #%d edited to v%d by %s: %s. Read coral-board task detail %d; older-version approvals do not complete this task.", strings.Join(mentions, " "), task.ID, v.Version, editor, diff, task.ID), nil)
+	h.postNotice(ctx, project, fmt.Sprintf("%s Task #%d edited to v%d by %s: %s. Read coral-board task detail %d; older-version approvals do not complete this task.", strings.Join(mentions, " "), task.ID, v.Version, h.noticeText(ctx, project, editor), diff, task.ID))
 }
 func (h *BoardHandler) taskVersionRead(w http.ResponseWriter, r *http.Request, id int64) bool {
 	raw := r.URL.Query().Get("version")
@@ -117,5 +118,15 @@ func (h *BoardHandler) taskVersionRead(w http.ResponseWriter, r *http.Request, i
 	return true
 }
 
-// Task text is quoted data, not an invitation to notify its embedded @names.
-func taskNoticeText(text string) string { return strings.ReplaceAll(text, "@", "(at)") }
+// noticeText is text a task notice quotes (a title, a diff, an editor's name, a list of blockers) made unable to mention anyone on the board (#9231): cleaned of terminal control, then
+// board.DefuseMentions, which breaks the "@name" and broadcast forms and the "Name:", "Name —" and "Name—" forms the board's mention matching also takes (the old "@" to "(at)" left the last three).
+// Task text is quoted data, not an invitation to notify the members it names.
+func (h *BoardHandler) noticeText(ctx context.Context, project, text string) string {
+	return board.DefuseMentions(clitext.Clean(text), h.bs.BoardMentionNames(ctx, project))
+}
+
+// postNotice posts a task notice as Coral Task Queue. Everything quoted in it went through noticeText: it is stored as given, because cleaning it again would remove the zero-width spaces that
+// defuse it (the live @mentions of the people the notice is for are written by the caller from names it knows).
+func (h *BoardHandler) postNotice(ctx context.Context, project, content string) {
+	h.bs.PostSystemDefusedMessage(ctx, project, "Coral Task Queue", content, nil)
+}

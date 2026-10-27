@@ -20,6 +20,15 @@ export function resetSelection() { _selectMode = false; _selectedIds.clear(); }
 
 // ── Export ────────────────────────────────────────────────────────────────
 
+/** One agent's checkbox in the Export dialog: its id is the value, escaped once (it was escaped twice, so an id with an & was read back as another name, #9231). */
+export function agentCheckboxHtml(s) {
+    const role = escapeHtml(s.job_title || s.subscriber_id);
+    return `<label class="form-check form-check-compact">
+            <input type="checkbox" class="export-agent-cb" value="${escapeAttr(s.subscriber_id)}" data-role="${escapeAttr(s.job_title || s.subscriber_id)}">
+            <span style="font-weight:600;font-size:var(--fs-base)">${role}</span>
+        </label>`;
+}
+
 export async function showExportBoardModal() {
     if (!host.project()) return;
 
@@ -27,14 +36,7 @@ export async function showExportBoardModal() {
     const subs = await fetchSubscribers(host.project());
 
     // Build modal HTML
-    const agentCheckboxes = subs.map(s => {
-        const role = escapeHtml(s.job_title || s.subscriber_id);
-        const sid = escapeAttr(s.subscriber_id);
-        return `<label class="form-check form-check-compact">
-            <input type="checkbox" class="export-agent-cb" value="${escapeAttr(sid)}" data-role="${escapeAttr(s.job_title || s.subscriber_id)}">
-            <span style="font-weight:600;font-size:var(--fs-base)">${role}</span>
-        </label>`;
-    }).join('');
+    const agentCheckboxes = subs.map(agentCheckboxHtml).join('');
 
     const modal = document.getElementById('mb-export-modal');
     const body = document.getElementById('mb-export-body');

@@ -74,6 +74,12 @@ func (s *Store) PostDefusedMessage(ctx context.Context, project, subscriberID, c
 	return s.insertMessage(ctx, project, subscriberID, content, nil, "", "", false, nil)
 }
 
+// PostSystemDefusedMessage is PostSystemMessage for content the caller has already cleaned (clitext.Clean) and defused (DefuseMentions): it is stored as given, as PostDefusedMessage does, and marked
+// is_system. Only server code calls it, with text it built itself.
+func (s *Store) PostSystemDefusedMessage(ctx context.Context, project, sender, content string, targetGroupID *string) (*Message, error) {
+	return s.insertMessage(ctx, project, sender, content, targetGroupID, "", "", true, nil)
+}
+
 func (s *Store) postMessage(ctx context.Context, project, subscriberID, content string, targetGroupID *string, origin, hubUser string, system bool, taskID *int64) (*Message, error) {
 	// No terminal control is stored (#3580): a post is printed in agents' terminals by
 	// coral-board, and system posts quote task titles agents wrote.
