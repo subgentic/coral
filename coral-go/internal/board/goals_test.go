@@ -505,7 +505,7 @@ func TestGoalsSchemaIsIdempotentAndUpgradesAnOldDatabase(t *testing.T) {
 	for _, ddl := range []string{
 		`DROP TRIGGER board_tasks_goal_seq_insert`, `DROP TRIGGER board_tasks_goal_seq_state`, `DROP TRIGGER board_tasks_goal_seq_move`, `DROP TRIGGER board_tasks_goal_seq_delete`, // the task triggers, as #7355 split the update one
 		`DROP TRIGGER board_goals_seq_insert`, `DROP TRIGGER board_goals_seq_update`, `DROP TRIGGER board_goals_seq_closed`, `DROP TRIGGER board_goals_seq_reopened`, `DROP TRIGGER board_goals_seq_delete`, `DROP TRIGGER board_goals_uid_immutable`, `DROP TRIGGER boards_board_uid_immutable`,
-		`DROP INDEX idx_board_tasks_goal`, `DROP INDEX idx_boards_board_uid`, `DROP INDEX idx_board_goals_uid`, `DROP INDEX idx_board_goals_board`, `DROP INDEX idx_board_goal_events_board`,
+		`DROP INDEX idx_board_tasks_goal_status`, `DROP INDEX idx_boards_board_uid`, `DROP INDEX idx_board_goals_uid`, `DROP INDEX idx_board_goals_board`, `DROP INDEX idx_board_goal_events_board`,
 		// the goal-requests tables (#7361) are newer than this old database: it has none of them, and their triggers read board_goal_meta
 		`DROP TRIGGER board_goal_requests_out_seq_insert`, `DROP TRIGGER board_goal_requests_out_seq_update`, `DROP TABLE board_goal_requests_out`, `DROP TABLE board_goal_requests_in`,
 		`DROP INDEX idx_board_tasks_request_key`, `ALTER TABLE board_tasks DROP COLUMN request_server`, `ALTER TABLE board_tasks DROP COLUMN request_board`, `ALTER TABLE board_tasks DROP COLUMN remote_board_uid`, `ALTER TABLE board_tasks DROP COLUMN remote_goal_uid`, `ALTER TABLE board_tasks DROP COLUMN request_id`,
@@ -817,6 +817,6 @@ func TestAllGoalsRollupsUseTheBoardGoalIndexAndPageLimits(t *testing.T) {
 		plan = append(plan, detail)
 	}
 	joined := strings.Join(plan, " | ")
-	assert.Contains(t, joined, "idx_board_tasks_goal", "the rollup read is served by the (board_id, goal_id) index: %s", joined)
+	assert.Contains(t, joined, "COVERING INDEX idx_board_tasks_goal_status", "the rollup read is served by the (board_id, goal_id, status) index alone, no task row read: %s", joined)
 	assert.NotContains(t, joined, "SCAN board_tasks", "and does not scan every task: %s", joined)
 }

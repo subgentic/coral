@@ -61,7 +61,7 @@ func BenchmarkGoalPage(b *testing.B) {
 			}
 		}
 	})
-	b.Run("rollups_as_built", func(b *testing.B) {
+	b.Run("rollups", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			if _, err := s.goalRollups(ctx, "team", pageIDs); err != nil {
@@ -69,19 +69,7 @@ func BenchmarkGoalPage(b *testing.B) {
 			}
 		}
 	})
-	b.Run("rollups_by_ids", func(b *testing.B) {
-		b.ReportAllocs()
-		goals := page.Goals
-		for i := 0; i < b.N; i++ {
-			if _, err := s.goalRollupsByID(ctx, goals); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-	if _, err := s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_board_tasks_goal_status ON board_tasks(board_id, goal_id, status) WHERE goal_id IS NOT NULL`); err != nil {
-		b.Fatal(err)
-	}
-	b.Run("rollups_by_ids_covering_index", func(b *testing.B) {
+	b.Run("rollups_by_goals", func(b *testing.B) {
 		b.ReportAllocs()
 		goals := page.Goals
 		for i := 0; i < b.N; i++ {
