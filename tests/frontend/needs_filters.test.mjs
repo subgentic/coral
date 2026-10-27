@@ -42,4 +42,15 @@ const review = { name: 'Writer', team: 'team-a', waiting_kind: 'review', waiting
 assert.equal(NF.kindOf(review), 'review');
 assert.equal(NF.matches(review, { kind: 'review', team: 'team-a', longer: '15' }, ctx, NOW), true);
 assert.equal(NF.matches(review, { kind: 'other' }, ctx, NOW), false, 'review rows do not enter the input-request pill');
+// the goal a row's task serves, or "No goal" (#8917)
+const goals = { 1: 'Ship the installer', 2: 'No goal', 3: 'Ship the installer', 4: 'No goal' };
+const gctx = { ...ctx, goalOf: s => goals[s.id] };
+const gids = f => agents.filter(s => NF.matches(s, { ...NF.EMPTY, ...f }, gctx, NOW)).map(s => s.id).join();
+assert.equal(gids({ goal: 'Ship the installer' }), '1,3', 'the Goal filter keeps the rows of that goal');
+assert.equal(gids({ goal: 'No goal' }), '2,4', 'and "No goal" keeps the rows with none');
+assert.equal(gids({ goal: 'Ship the installer', team: 'team-b' }), '3', 'it narrows with the others');
+assert.equal(ids({ goal: 'Ship the installer' }), '1,2,3,4', 'a caller with no goalOf is not narrowed by it');
+assert.deepEqual(NF.chips({ ...NF.EMPTY, goal: 'No goal' }).map(c => c.label), ['Goal: No goal']);
+assert.deepEqual(NF.without({ ...NF.EMPTY, goal: 'No goal', team: 'team-a' }, 'goal'), { ...NF.EMPTY, team: 'team-a' });
+assert.equal(NF.isFiltered({ ...NF.EMPTY, goal: 'No goal' }), true);
 console.log('needs_filters: ok');

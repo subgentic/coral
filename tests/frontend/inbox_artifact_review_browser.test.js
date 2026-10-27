@@ -58,7 +58,7 @@ const BASE = require('./test_base').BASE;
                 assert.ok(layout.sameLine,'both actions stay on one line');
                 if(width===390){assert.equal(layout.team,team,'phone keeps the full team name');assert.ok(layout.teamHeight>0&&layout.teamFits,'team metadata is visible and wraps within the row');}
                 if(width===390)assert.ok(layout.actionsBesideName,'actions sit to the right of the filename on the same line');
-                assert.ok(layout.height<(width===390?80:41),'compact review row: '+JSON.stringify(layout));
+                assert.ok(layout.height<(width===390?96:41),'compact review row (a phone row has the goal on its second line, #8917, so its waiting time may be a third): '+JSON.stringify(layout));
                 assert.ok(layout.standard,'standard enabled button treatment');
                 if(width===390)assert.ok(await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('.inbox-review-actions button')].every(b=>b.getBoundingClientRect().height>=44)`),'review actions keep 44px touch targets');
 

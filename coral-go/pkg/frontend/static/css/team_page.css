@@ -360,6 +360,9 @@
 .inbox-review-error:empty { display: none; }
 .inbox-review-metadata { display: flex; flex-wrap: wrap; gap: 0 8px; }
 .inbox-review-team { display: none; }
+.inbox-review-goal { display: flex; flex-direction: column; min-width: 0; align-items: flex-start; } /* a review's goal, its task under it (#8917) */
+.inbox-review-task, .inbox-review-nogoal { font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
+.inbox-review-nogoal { color: var(--text-muted); }
 .inbox-review-more { margin: 12px 0; }
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {
