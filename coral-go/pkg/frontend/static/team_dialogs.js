@@ -20,7 +20,7 @@ const { modelName, levelName } = await importOnce('./model_labels.js');
 const { launchedMode } = await importOnce('./preset_enforcement.js');
 const { BUILTIN_TEAM_TEMPLATES, _renderTeamTemplateSelector, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
-const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings } = await importOnce('./team_launch_settings.js');
+const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings, setTeamLaunchMode } = await importOnce('./team_launch_settings.js');
 
 
 const _modeLabel = v => [...(document.getElementById('team-permission-mode')?.options || [])].find(o => o.value === v)?.textContent || v;
@@ -447,6 +447,7 @@ function _loadTeamTemplate(name) {
         const tfEl = document.getElementById("team-flags");
         if (tfEl) { tfEl.value = tmpl.flags; _syncFlagButtons("team-flags"); }
     }
+    setTeamLaunchMode(tmpl.mode || 'none'); // the template's working mode, None when it names none (the built-in Coding Team starts with Task queue, #8919)
     markTeamTemplate(name);
     _syncTeamMembers();
 }
