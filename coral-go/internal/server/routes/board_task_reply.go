@@ -31,7 +31,7 @@ func (h *BoardHandler) ReplyToTask(w http.ResponseWriter, r *http.Request) {
 	}
 	derr := decodeJSON(r, &in)
 	reply := &taskReply{taskID: taskID, creator: task.CreatedBy}
-	msg, warnings, ok := h.postMessageCore(w, r, project, derr, postMessageBody{Content: in.Content}, reply)
+	msg, ok := h.postMessageCore(w, r, project, derr, postMessageBody{Content: in.Content}, reply)
 	if !ok {
 		return
 	}
@@ -39,12 +39,9 @@ func (h *BoardHandler) ReplyToTask(w http.ResponseWriter, r *http.Request) {
 	if notified == nil {
 		notified = []string{}
 	}
-	if reply.prefix == "" {
-		warnings = append([]string{"creator_not_reachable"}, warnings...)
-	}
 	out := map[string]any{"ok": true, "message_id": msg.ID, "task_id": taskID, "notified": notified}
-	if len(warnings) > 0 {
-		out["warnings"] = warnings
+	if reply.prefix == "" {
+		out["warnings"] = []string{"creator_not_reachable"}
 	}
 	writeJSON(w, http.StatusOK, out)
 }

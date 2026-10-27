@@ -101,7 +101,10 @@ backticks (in Bash use post - <<'EOF', never double quotes: backticks and
 $( ) run commands there). For long reports, logs, diffs and evidence, use
 coral-agent artifact upload <file> and link coral://artifacts/<digest> in a
 short post. Text from "-" or --file must be UTF-8: a leading byte-order mark
-is dropped, CRLF becomes LF and one final newline is dropped; nothing else.`
+is dropped, CRLF becomes LF and one final newline is dropped; nothing else.
+An @mention that names no member of this board (a typo, or another team's
+sender such as "@Orchestrator (coral-hub)") is refused: exit 1, nothing
+posted. Reach another team with coral-board send --board <team>.`
 
 // sendNote is what --attach sends and what it does not guarantee: in send's help.
 const sendNote = `--attach to a team on this Coral: up to 4 files your team uploaded, 8 MiB each,

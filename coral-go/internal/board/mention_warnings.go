@@ -3,21 +3,23 @@ package board
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 )
 
-// Warnings about @mentions that name nobody on the board (#4583 rule 5). A post is never refused for one: the warning comes back with
-// the post, naming the closest member ("no subscriber named 'DO Expert'; did you mean 'Digital Ocean Expert'?").
+// @mentions that name nobody on the board (#4583 rule 5, #9047). A post with one is refused, nothing posted: the refusal names each one
+// and the closest member ("no subscriber named 'DO Expert'; did you mean 'Digital Ocean Expert'?"). A display name of another team's
+// sender ("Orchestrator (coral-hub)") is no member either: the refusal says to use "coral-board send --board <team>".
 
 // knownMentionWords are the tags that name no member and are still tags (mentionTerms).
 var knownMentionWords = []string{"all", "notify-all", "notify_all", "notifyall", "operator"}
 
-// MentionWarnings returns one warning for each @mention in content that matches no subscriber's name or role, no spaceless form of
+// UnknownMentions returns one problem for each @mention in content that matches no subscriber's name or role, no spaceless form of
 // one and no special tag. A mention at the start of the message (the run that "coral-board post --to" writes) is warned about with or
 // without a close name; one in the middle of the text only when a member's name is close to it (an "@param" or "@2x" in a message is
 // not a mistake). At most five warnings.
-func (s *Store) MentionWarnings(ctx context.Context, project, content string) []string {
+func (s *Store) UnknownMentions(ctx context.Context, project, content string) []string {
 	if !strings.Contains(content, "@") {
 		return nil
 	}
@@ -32,7 +34,75 @@ func (s *Store) MentionWarnings(ctx context.Context, project, content string) []
 			names = append(names, t)
 		}
 	}
-	return mentionWarnings(content, names)
+	out := crossTeamMentions(content, names, s.otherBoardNames(ctx, project))
+	for _, w := range mentionWarnings(content, names) {
+		if len(out) == 5 {
+			break
+		}
+		if !slices.Contains(out, w) {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// otherBoardNames are the ids and display names of the boards other than project, lower-cased.
+func (s *Store) otherBoardNames(ctx context.Context, project string) map[string]string {
+	projects, err := s.ListProjects(ctx)
+	if err != nil {
+		return nil
+	}
+	boards := map[string]string{}
+	for _, p := range projects {
+		if p.Project == project {
+			continue
+		}
+		boards[strings.ToLower(p.Project)] = p.Project
+		if l := strings.TrimSpace(p.BoardLabel); l != "" {
+			boards[strings.ToLower(l)] = p.Project
+		}
+	}
+	return boards
+}
+
+// crossTeamMentions finds "@Member (team)": a member's name followed by the name of another board in parentheses, the way a message
+// from another team shows its sender. It tags the member here, not the one there, so it is refused with the way to reach the other team.
+func crossTeamMentions(content string, names []string, boards map[string]string) []string {
+	if len(boards) == 0 {
+		return nil
+	}
+	known := map[string]bool{}
+	for _, n := range names {
+		if l := strings.ToLower(strings.TrimSpace(n)); l != "" {
+			known[l] = true
+			known[strings.ReplaceAll(l, " ", "")] = true
+		}
+	}
+	var out []string
+	for i := 0; i < len(content); i++ {
+		if content[i] != '@' || i > 0 && isMentionWordByte(content[i-1]) {
+			continue
+		}
+		rest := content[i+1:]
+		n := knownLen(strings.ToLower(rest), known)
+		if n == 0 || !strings.HasPrefix(rest[n:], " (") {
+			continue
+		}
+		end := strings.IndexByte(rest[n:], ')')
+		if end < 0 {
+			continue
+		}
+		team := strings.TrimSpace(rest[n+2 : n+end])
+		id, ok := boards[strings.ToLower(team)]
+		if !ok {
+			continue
+		}
+		w := fmt.Sprintf("no subscriber named '%s (%s)': that is a sender on another team's board; message it with: coral-board send --board %s \"...\"", rest[:n], team, id)
+		if !slices.Contains(out, w) {
+			out = append(out, w)
+		}
+	}
+	return out
 }
 
 func mentionWarnings(content string, names []string) []string {

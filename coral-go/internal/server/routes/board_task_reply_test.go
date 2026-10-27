@@ -349,3 +349,14 @@ func TestTheVerifiedActorRepliesInEitherIdentityMode(t *testing.T) {
 		})
 	}
 }
+
+// A reply is a post: a mention of nobody on the board refuses it and nothing is stored (#9047).
+func TestAReplyWithAnUnknownMentionIsRefused(t *testing.T) {
+	e := newReplyEnv(t)
+	e.join("p", "Backend Dev", "Frontend Dev")
+	id := e.task("p", "Backend Dev")
+	code, out, b := e.do("POST", "/api/board/p/tasks/"+itoa(id)+"/reply", `{"content":"thanks @Backend Dv, please look"}`, map[string]string{"X-Test-Actor": "token:Frontend Dev"})
+	require.Equal(t, 400, code, string(b))
+	assert.Equal(t, "unknown_mention", out["code"])
+	assert.Empty(t, e.messages("p", "?task_id="+itoa(id)), "nothing is posted on that error")
+}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clitext"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -249,21 +248,9 @@ func cmdPost() {
 		if a, ok := result["ask"].(map[string]any); ok {
 			fmt.Printf("  A question to %s: open until each has answered (they answer with  coral-board post --reply-to %.0f \"...\"  or a post that @mentions you).\n", joinAnyStrings(a["to"]), id)
 		}
-		printMentionWarnings(os.Stderr, result)
 	} else {
 		fmt.Fprintln(os.Stderr, "Error: Coral accepted the request but returned no message id")
 		clierr.Exit1()
-	}
-}
-
-// printMentionWarnings prints what the server said about @mentions that name no member (#4583): the post went out, and a name that
-// does not exist is the likeliest reason nobody answers it.
-func printMentionWarnings(w io.Writer, result map[string]any) {
-	list, _ := result["warnings"].([]any)
-	for _, x := range list {
-		if text, ok := x.(string); ok && text != "" {
-			fmt.Fprintf(w, "Warning: %s\n", text)
-		}
 	}
 }
 

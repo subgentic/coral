@@ -57,8 +57,40 @@ func TestStoreMentionWarningsUseTheBoardsMembers(t *testing.T) {
 	require.NoError(t, err)
 	_, err = s.Subscribe(ctx, "team", "Lead", "Lead Developer", "claude-"+"22222222-0000-0000-0000-000000000000", nil, "all")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"no subscriber named 'DO Expert'; did you mean 'Digital Ocean Expert'?"}, s.MentionWarnings(ctx, "team", "@DO Expert are you there"))
-	assert.Nil(t, s.MentionWarnings(ctx, "team", "@Lead @Cloud @Lead Developer hello"), "a name, a role and a spaced name are all members")
-	assert.Nil(t, s.MentionWarnings(ctx, "team", "no at-sign"))
-	assert.Nil(t, s.MentionWarnings(ctx, "elsewhere", "@Lead hello"), "a board with no members names nobody: nothing to compare with")
+	assert.Equal(t, []string{"no subscriber named 'DO Expert'; did you mean 'Digital Ocean Expert'?"}, s.UnknownMentions(ctx, "team", "@DO Expert are you there"))
+	assert.Nil(t, s.UnknownMentions(ctx, "team", "@Lead @Cloud @Lead Developer hello"), "a name, a role and a spaced name are all members")
+	assert.Nil(t, s.UnknownMentions(ctx, "team", "no at-sign"))
+	assert.Nil(t, s.UnknownMentions(ctx, "elsewhere", "@Lead hello"), "a board with no members names nobody: nothing to compare with")
+}
+
+// "@Orchestrator (coral-hub)" is how a message from another team shows its sender: it tags the member here, so it is a problem, with the
+// way to reach the other team. A parenthesis that is not another board's name is prose.
+func TestCrossTeamSenderMentions(t *testing.T) {
+	boards := map[string]string{"coral-hub": "coral-hub", "hub team": "coral-hub"}
+	for content, want := range map[string][]string{
+		"@Orchestrator (coral-hub) please look": {"no subscriber named 'Orchestrator (coral-hub)': that is a sender on another team's board; message it with: coral-board send --board coral-hub \"...\""},
+		"thanks @orchestrator (Hub Team)":       {"no subscriber named 'orchestrator (Hub Team)': that is a sender on another team's board; message it with: coral-board send --board coral-hub \"...\""},
+		"@Orchestrator (see above) is fine":     nil,
+		"@Orchestrator (coral-hub is unclosed":  nil,
+		"@Orchestrator is fine (coral-hub)":     nil,
+		"mail@Orchestrator (coral-hub)":         nil,
+		"@Nobody (coral-hub)":                   nil, // not a member: mentionWarnings names it
+	} {
+		assert.Equal(t, want, crossTeamMentions(content, warnNames, boards), content)
+	}
+	assert.Nil(t, crossTeamMentions("@Orchestrator (coral-hub)", warnNames, nil), "no other board: nothing to compare with")
+}
+
+func TestUnknownMentionsKnowsTheOtherBoards(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	_, err := s.Subscribe(ctx, "team", "Orchestrator", "Orchestrator", "claude-22222222-0000-0000-0000-000000000000", nil, "all")
+	require.NoError(t, err)
+	_, err = s.Subscribe(ctx, "coral-hub", "Lead", "Lead", "claude-33333333-0000-0000-0000-000000000000", nil, "all")
+	require.NoError(t, err)
+	got := s.UnknownMentions(ctx, "team", "@Orchestrator (coral-hub) hi")
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "coral-board send --board coral-hub")
+	assert.Nil(t, s.UnknownMentions(ctx, "team", "@Orchestrator (team) hi"), "its own board's name is no other team")
+	assert.Nil(t, s.UnknownMentions(ctx, "team", "@Orchestrator hi"))
 }
