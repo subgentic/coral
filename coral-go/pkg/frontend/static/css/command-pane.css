@@ -322,6 +322,13 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     :is(#command-pane, #board-chat-input-pane) .btn-send:hover { transform: none; }
     :is(#command-pane, #board-chat-input-pane) .toolbar-send-split:has(.btn-send-dropdown) .btn-send { border-radius: 0 16px 16px 0; }
     :is(#command-pane, #board-chat-input-pane) .toolbar-send-split .btn-send-dropdown { width: 28px; min-width: 28px; height: 32px; padding: 0; border-radius: 16px 0 0 16px; box-shadow: none; }
+    /* a wide touch screen (a tablet at 820 px and more, a coarse pointer) has 44 px targets: the caret and Send are 44 px, the halves' ends round at 22 px (#9648, Security Reviewer's SHOULD) */
+    @media (pointer: coarse) {
+        :is(#command-pane, #board-chat-input-pane) .btn-send, :is(#command-pane, #board-chat-input-pane) .toolbar-send-split .btn-send-dropdown { min-width: var(--control-touch-height); min-height: var(--control-touch-height); height: var(--control-touch-height); }
+        :is(#command-pane, #board-chat-input-pane) .btn-send { width: var(--control-touch-height); }
+        :is(#command-pane, #board-chat-input-pane) .toolbar-send-split:has(.btn-send-dropdown) .btn-send { border-radius: 0 22px 22px 0; }
+        :is(#command-pane, #board-chat-input-pane) .toolbar-send-split .btn-send-dropdown { border-radius: 22px 0 0 22px; }
+    }
     :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .btn-send-dropdown { order: -1; }
     :is(#command-pane, #board-chat-input-pane) .drop-overlay {
         border-radius: 16px;

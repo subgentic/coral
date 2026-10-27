@@ -280,6 +280,11 @@ const UNDERSIZED = `(() => {
 
         await open(820, 1180, false);
         assert.deepEqual(await ev(UNDERSIZED), [], 'iPad 820: every control is at least 44x44');
+        // #9648: the composer's options caret and Send (the split control) are 44 px targets on a tablet's touch screen too
+        await ev(`window.selectLiveSession(${JSON.stringify(sname)}, 'claude', ${JSON.stringify(sid)}); true`); // the chat view has the composer with its caret
+        await waitFor(`!!document.querySelector('#command-toolbar .btn-send-dropdown') && document.querySelector('#command-toolbar .btn-send-dropdown').getClientRects().length > 0`, 'the composer caret at 820', 8000);
+        const splitBox = await ev(`(() => { const o = document.querySelector('#command-toolbar .btn-send-dropdown'), s = document.querySelector('#command-toolbar .btn-send'); if (!o || !o.getClientRects().length) return null; const a = o.getBoundingClientRect(), b = s.getBoundingClientRect(); return { caret: [Math.round(a.width), Math.round(a.height)], send: [Math.round(b.width), Math.round(b.height)] }; })()`);
+        assert.ok(splitBox && splitBox.caret[0] >= 44 && splitBox.caret[1] >= 44 && splitBox.send[0] >= 44 && splitBox.send[1] >= 44, 'iPad 820: the caret and Send are 44 px: ' + JSON.stringify(splitBox));
         await ev(`document.querySelector('.tablet-sidebar-toggle')?.click()`);
         // The sidebar slides in: wait until its row controls are on screen and have stopped moving.
         await waitStable(`JSON.stringify(Array.from(document.querySelectorAll('.sidebar-kebab-btn, .folder-copy-btn')).map(e => e.getBoundingClientRect()).filter(r => r.width && r.height).map(r => [Math.round(r.x), Math.round(r.width), Math.round(r.height)]))`,
