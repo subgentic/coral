@@ -365,6 +365,10 @@
 
 .dt-one-line .dt-title-cell { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; min-width: 0; }
 .dt-one-line .team-artifact-badge { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A name keeps a 44 px target beside its badge (the badge gives way first), and the Details icon's cell has no side padding so the 44 px button fits the 3 rem column on a phone (phone_pass_130, #9052). */
+.dt-one-line .dt-title-cell > .dt-primary { min-width: 44px; }
+.dt-one-line .team-artifact-badge { flex: 0 1 auto; min-width: 0; max-width: 45%; }
+.artifact-table td[data-key="details"], .artifact-table th[data-key="details"] { padding-left: 0; padding-right: 0; text-align: center; }
 
 .artifact-name-icon { display: inline-flex; flex: 0 0 16px; }
 /* a goal screen's one-line rows (#8952): the row button is a target of its own, 24 px, 44 px on a phone */
