@@ -530,7 +530,6 @@ body.panel-dragging .sidebar {
     font-size: var(--fs-base);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: normal;
     color: var(--text-muted); /* the scheme's tertiary: every sidebar section title is this colour (#7883) */
     padding: 0 16px 8px;
 }
