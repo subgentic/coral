@@ -8,7 +8,7 @@
 ::highlight(ac-hover) { background-color: color-mix(in srgb, var(--accent) 40%, transparent); text-decoration: underline; text-decoration-color: var(--accent); }
 ::highlight(ac-active) { background-color: color-mix(in srgb, var(--accent) 55%, transparent); text-decoration: underline; text-decoration-color: var(--accent); }
 
-.ac-panel { flex: 0 0 340px; width: 340px; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; border-left: 1px solid var(--border); background: var(--bg-secondary); padding: var(--space-md); gap: var(--space-sm); box-sizing: border-box; }
+.ac-panel { flex: 0 0 340px; width: 340px; overflow-y: auto; padding: var(--space-md); gap: var(--space-sm); box-sizing: border-box; } /* a .pane .pane-aside (layout.css): the surface, the column and the left edge are the pane's */
 .ac-panel[hidden] { display: none; }
 .ac-head { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; position: sticky; top: calc(-1 * var(--space-md)); z-index: 1; margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) 0; padding: var(--space-md); background: var(--bg-secondary); }
 .ac-title { margin: 0; font-size: var(--fs-lg, 1rem); flex: 1 1 auto; }

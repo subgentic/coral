@@ -2,7 +2,8 @@
 // A page's own class for a pane (detail-pane, detail-head, detail-body, detail-foot ...) says only where it sits and how wide it is, never what a pane looks like. This census fails when
 //   1. a rule for one of those classes alone (".detail-pane { ... }") declares a look (display flex, flex direction, gap, padding, background, border, overflow);
 //   2. a script or template builds one of those classes without the family class beside it; or
-//   3. the family loses a part.
+//   3. the family loses a part; or
+//   4. a class named *-panel, *-sheet or *-drawer declares its own surface (three of background, border, padding, shadow in one rule) and is neither a pane instance nor in NOT_A_PANE with its reason (a new one is a new look: wear .pane, or say what it is).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +23,18 @@ const MOVED = new Map([['detail-pane', 'pane'], ['detail-head', 'pane-head'], ['
 const LOOK = /^(display|flex-direction|flex-wrap|gap|padding(-[a-z]+)*|background(-[a-z]+)*|border(-[a-z]+)*|justify-content|align-items)$/;
 const problems = [];
 
+// pane instances that keep their own size and padding and, in a sheet, their own edges: their markup must wear the family
+const INSTANCES = new Map([['ac-panel', 'pane']]);
+export const NOT_A_PANE = {
+    'eff-panel': 'the Analytics efficiency section\'s frame; its figures are the eff-cards inside it',
+    'ibx-panel': 'an inset inside an Inbox folder page, drawn from the --ibx-inset-* tokens',
+    'list-bar-sheet': 'a sheet or popover opened from the list bar\'s button (the menus slice)',
+    'list-display-panel': 'a popover opened from a button (the menus slice)',
+    'server-switcher-panel': 'a popover opened from the server switcher (the menus slice)',
+    'mb-actions-sheet': 'a dialog (the dialog sizes, dlg-*)',
+};
+const SURFACE = /^(background(?:-color)?|border(?:-top|-left|-right|-bottom)?|padding(?:-[a-z]+)?|box-shadow)$/;
+
 const css = walk(path.join(root, 'static', 'css'), ['.css']).map(f => fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');
 for (const f of FAMILY) if (!new RegExp(`\\.${f}(?![A-Za-z0-9_-])[^{}]*\\{`).test(css)) problems.push(`css: the family class .${f} has no rule`);
 for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
@@ -32,12 +45,22 @@ for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
     }
 }
 
+for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    const props = new Set(m[2].split(/;(?![^()]*\))/).map(d => d.split(':')[0].trim()).filter(p => SURFACE.test(p)));
+    if (props.size < 3) continue;
+    for (const raw of m[1].split(',')) {
+        const cm = /^(?:[#.][\w-]+)*\.([\w-]+-(?:panel|sheet|drawer))$/.exec(raw.trim().split(/[\s>+~]+/).pop().split(':')[0]);
+        if (cm && !INSTANCES.has(cm[1]) && !(cm[1] in NOT_A_PANE) && !MOVED.has(cm[1])) problems.push(`css: .${cm[1]} declares its own surface: wear .pane (and only place it), or add it to NOT_A_PANE with what it is`);
+    }
+}
+for (const cls of Object.keys(NOT_A_PANE)) if (!new RegExp(`\\.${cls}(?![\\w-])[^{}]*\\{`).test(css)) problems.push(`NOT_A_PANE: .${cls} has no rule any more: take it off the list`);
+
 for (const f of [...walk(path.join(root, 'static'), ['.js']), ...walk(path.join(root, 'templates'), ['.html'])]) {
     const text = fs.readFileSync(f, 'utf8');
     for (const m of text.matchAll(/(['"`])((?:(?!\1)[^\n\\])*?)\1/g)) {
         const before = text.slice(Math.max(0, m.index - 60), m.index);
         if (!/(?:class=|className\s*=\s*|\bel\(\s*'[a-z0-9]+',\s*|\bDT\.el\(\s*'[a-z0-9]+',\s*)$/.test(before)) continue;
-        for (const [cls, fam] of MOVED) {
+        for (const [cls, fam] of [...MOVED, ...INSTANCES]) {
             if (new RegExp(`(^|\\s)${cls}(\\s|$)`).test(m[2]) && !new RegExp(`(^|\\s)${fam}(\\s|$)`).test(m[2])) problems.push(`${path.relative(root, f)}: "${cls}" without "${fam}" (${m[2].slice(0, 60)})`);
         }
     }
