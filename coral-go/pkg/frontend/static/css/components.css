@@ -4185,12 +4185,13 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .restart-wizard-content > .modal-actions .btn-warning:hover { background: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); border-color: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); color: var(--text-on-accent); }
 
 /* The provider's mark on its button, from CSS so it is no text for a reader or a word count (the design's v4). */
-#launch-agent-pick .launch-agent-opt::before, .acf-provider-label .seg-btn::before { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; margin-right: 6px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: .6875rem; font-weight: 700; }
+#launch-agent-pick .launch-agent-opt::before, .acf-provider-label .seg-btn::before, .agent-type-mark::before { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; margin-right: 6px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: .6875rem; font-weight: 700; }
 #launch-agent-pick .launch-agent-opt:has(input:checked)::before, .acf-provider-label .seg-btn[aria-checked="true"]::before { background: color-mix(in srgb, var(--text-on-accent) 22%, transparent); color: var(--text-on-accent); }
-#launch-agent-pick .launch-agent-opt:has(input[value="claude"])::before, .acf-provider-label .seg-btn[data-value="claude"]::before { content: "C"; }
-#launch-agent-pick .launch-agent-opt:has(input[value="codex"])::before, .acf-provider-label .seg-btn[data-value="codex"]::before { content: "X"; }
-#launch-agent-pick .launch-agent-opt:has(input[value="agy"])::before, .acf-provider-label .seg-btn[data-value="agy"]::before { content: "A"; }
-#launch-agent-pick .launch-agent-opt:has(input[value="pi"])::before, .acf-provider-label .seg-btn[data-value="pi"]::before { content: "P"; }
+#launch-agent-pick .launch-agent-opt:has(input[value="claude"])::before, .acf-provider-label .seg-btn[data-value="claude"]::before, .agent-type-mark[data-agent-type="claude"]::before { content: "C"; }
+#launch-agent-pick .launch-agent-opt:has(input[value="codex"])::before, .acf-provider-label .seg-btn[data-value="codex"]::before, .agent-type-mark[data-agent-type="codex"]::before { content: "X"; }
+#launch-agent-pick .launch-agent-opt:has(input[value="agy"])::before, .acf-provider-label .seg-btn[data-value="agy"]::before, .agent-type-mark[data-agent-type="agy"]::before { content: "A"; }
+#launch-agent-pick .launch-agent-opt:has(input[value="pi"])::before, .acf-provider-label .seg-btn[data-value="pi"]::before, .agent-type-mark[data-agent-type="pi"]::before { content: "P"; }
+.agent-type-mark::before { margin-right: 0; color: inherit; }
 .acf-provider-label .seg-btn[data-value="terminal"]::before { content: "T"; }
 .launch-persona-row .persona-files > summary::after { content: ""; margin-left: 8px; border: 4px solid transparent; border-top-color: currentColor; border-bottom-width: 0; } /* the menu's caret */
 .launch-persona-row .persona-files[open] > summary::after { transform: rotate(180deg); }
