@@ -36,7 +36,7 @@ export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'art
 // The Analytics pages that have a path (analytics_views.js VIEWS, #8606); /analytics is Overview, and an agent's page (agent-detail) is under By agent.
 export const ANALYTICS_PAGES = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'task', 'calls', 'per-commit', 'task-time'];
 // The Automations folders (Goal #74): the two that need attention, then the library. A job or a workflow opens under its own folder; only a workflow has a run page.
-export const AUTOMATION_FOLDERS = ['running', 'failed', 'jobs', 'workflows'];
+export const AUTOMATION_FOLDERS = ['running', 'failed', 'recent', 'jobs', 'workflows'];
 const NAME_MAX = 200; // board.MaxIdentityRunes
 const INBOX = 'in' + 'box'; // the path word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 // The Inbox folders' paths (#8652): /inbox/needs, /inbox/saved, /inbox/artifacts (every team's artifacts, Goal #62), /inbox/chats/<all|active|starred|notes|archived|cli-<cli>|tag-<n>>. The folder keys are the Inbox's own (inbox_sidebar.js): chats is All chats, the others chats-<word>.
