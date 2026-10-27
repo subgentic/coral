@@ -25,6 +25,8 @@
     /* What an agent is doing: a shape for each state, since a colour is not available. Working a filled circle, needs input a filled diamond, stuck a filled
        square, idle a hollow ring; ready for input has no dot and sleeping is the moon glyph, as before. */
     .session-dot { box-sizing: border-box; border: 1.5px solid CanvasText; }
+    .team-agent-dot { box-sizing: border-box; border: 1.5px solid CanvasText; }
+    .team-agent-dot-ok { background: CanvasText; }
     .session-dot.working { background: CanvasText; }
     .session-dot.waiting { background: CanvasText; border-radius: 0; transform: rotate(45deg); animation: none; }
     .session-dot.stuck { background: CanvasText; border-radius: 0; }

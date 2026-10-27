@@ -4011,6 +4011,11 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-allworkers { margin: 0 0 14px; }
 .team-allworkers[hidden] { display: none; }
 .team-allworkers select { min-width: 0; max-width: 100%; width: min(12em, 100%); }
+/* The state as a dot beside the agent's name, only where the one-line row has dropped its Status column (a phone at 200% text, under 16 rem): green working or ready, amber needs you, grey asleep or ended; its word is its name and its tooltip (#9588). */
+.team-agent-dot { display: none; flex: none; width: 0.5rem; height: 0.5rem; margin-inline-end: 6px; border-radius: 50%; background: var(--text-muted); vertical-align: middle; }
+.team-agent-dot-ok { background: var(--success); }
+.team-agent-dot-ask { background: var(--warning); }
+@container (max-width: 16rem) { .team-agent-dot { display: inline-block; } }
 .team-agents-count { margin: 0 0 6px; color: var(--text-secondary); font-size: var(--fs-sm); }
 .team-agents-count:empty { display: none; }
 .team-agents-list { display: flex; flex-direction: column; }
