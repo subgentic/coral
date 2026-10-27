@@ -443,10 +443,11 @@
 .viz-legend-plain { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
 
 /* Tokens per commit and Task time: the Group by switch and the comparison (Goal #77, analytics_efficiency.js) */
-.eff-switch { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; }
+.eff-switch { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; container-type: inline-size; }
 .eff-switch-label { font-size: var(--fs-base); color: var(--text-secondary); }
 .eff-pick { display: none; width: 100%; min-height: var(--control-touch-height, 44px); }
-@media (max-width: 760px) { .eff-seg { display: none; } .eff-pick { display: block; } }
+/* Eight buttons need about 40em: below 44em of the control's own width (a phone, a tablet at 200% text: the em is the text's, so the switch follows the text size) it is the select (#9317). */
+@container (max-width: 44em) { .eff-seg { display: none; } .eff-pick { display: block; } }
 .eff-view { display: flex; flex-direction: column; gap: 16px; }
 .eff-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 760px) { .eff-cards { grid-template-columns: 1fr; } }
