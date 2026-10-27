@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // The message search index (#9451): an FTS5 trigram index over board_messages.content that narrows a text search to the messages that
@@ -79,6 +81,7 @@ func (s *Store) applyMessageSearchIndexSetting() {
 	}
 	if s.messageIndexExists(ctx) {
 		go func() {
+			defer safego.Recover("board/message_fts:drop")
 			if _, err := s.DisableMessageSearchIndex(context.Background(), false); err != nil {
 				log.Printf("board: dropping the message search index: %v", err)
 			}
@@ -107,6 +110,7 @@ func (s *Store) startMessageSearchIndexBuild() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.msgIndexStop.Store(&cancel)
 	go func() {
+		defer safego.Recover("board/message_fts:build")
 		if err := s.buildMessageSearchIndex(ctx); err != nil {
 			s.msgIndex.Store(messageIndexOff)
 			if ctx.Err() == nil {
