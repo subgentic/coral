@@ -46,7 +46,7 @@ const WORLD = `(() => {
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
     const shot = require('./helpers/scene_shots')(Page); // the gate's uploaded output in CI, CORAL_SCREENSHOT_DIR locally
-    const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => (r.querySelector('.dt-primary') || {}).textContent || '')`);
+    const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => (r.querySelector('.dt-mail-title') || r.querySelector('.dt-primary') || {}).textContent || '')`); // a phone's row is a mail row (#9583): the file's name is its title, the team and task follow it
     const pane = () => ev(`(() => { const p = document.querySelector('.inbox-detail-pane'); return p && !p.hidden ? { title: (p.querySelector('.detail-title') || {}).textContent || '', back: (p.querySelector('.detail-back') || {}).textContent || '', fixed: getComputedStyle(p).position, body: p.textContent } : null; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -65,6 +65,7 @@ const WORLD = `(() => {
             } else await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
             await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: five rows`, 10000);
             if (!mobile) check(`${label}: a folder opened by the person puts the keyboard on the page's search box, not on the heading`, (await ev(`document.activeElement && document.activeElement.classList.contains('list-bar-search')`)) && !(await ev(`document.getElementById('group-table-title').matches(':focus, [tabindex]')`)));
+            if (mobile) check(`${label}: no second Artifacts heading under the folder button (it names the page and its count), still in the page for a screen reader`, await ev(`(() => { const h = document.getElementById('group-table-title'), b = h && h.parentElement.getBoundingClientRect(), t = document.querySelector('#group-table-view .view-list-trigger'); return !!h && b.width <= 1 && b.height <= 1 && !!t && /Artifacts/.test(t.textContent); })()`));
             check(`${label}: the page is titled Artifacts with the count`, (await ev(`(document.getElementById('group-table-title') || {}).textContent + '|' + (document.querySelector('.inbox-artifacts-count') || {}).textContent`)) === 'Artifacts|5');
             check(`${label}: the rows of both teams are one list, newest first`, (await rows()).join() === 'beta-notes.txt,alpha-report.md,beta-data.json,alpha-chart.png,alpha-plan.md', (await rows()).join());
             check(`${label}: a Team column names each row's team`, (await ev(`[...document.querySelectorAll('#group-table-view thead th')].some(t => /Team/.test(t.textContent)) && /beta/.test(document.querySelector('#group-table-view tbody tr').textContent)`)));

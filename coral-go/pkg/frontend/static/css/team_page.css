@@ -382,3 +382,8 @@
 @media (pointer: coarse), (max-width: 767px) {
     .task-version-history summary { min-height: var(--control-touch-height, 44px); }
 }
+
+/* On a phone the folder button already names the page and its count: the Artifacts heading and number under it are not drawn, and stay in the page for a screen reader (the page's name, and what the focus lands on; #9631). */
+@media (max-width: 767px) {
+    .inbox-artifacts-main > .group-table-head { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+}
