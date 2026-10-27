@@ -171,7 +171,7 @@ func (h *SessionsHandler) loadBoardStatus(r *http.Request, trace *phaseTrace, na
 		return nil, &statusError{forbidden: true, msg: "activity context requires an active Orchestrator or Operator subscription"}
 	}
 	// Only open tasks matter here; see ListOpenTasks for why not ListTasks.
-	if snap.tasks, err = h.bs.ListOpenTasks(ctx, name); err != nil {
+	if snap.tasks, err = h.bs.ListOpenTaskStates(ctx, name); err != nil {
 		return nil, internal(err)
 	}
 	if snap.underReview, err = h.bs.TasksUnderReview(ctx, name); err != nil {

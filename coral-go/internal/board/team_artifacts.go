@@ -168,11 +168,13 @@ func (s *Store) ListTeamArtifactTasksQuery(ctx context.Context, q TeamArtifactQu
 		GoalTitle   string  `db:"goal_title"`
 		Data        string  `db:"data"`
 	}
-	// Prefilter in SQL so tasks without any artifacts are not decoded.
+	// Prefilter in SQL so tasks without any artifacts are not read at all: has_artifacts is kept by saveWorkflow and indexed (#9114).
+	// The flagged rows lead (CROSS JOIN fixes the order of the loops, INDEXED BY the index): the walk is down the partial index of tasks that have artifacts, joining each to its task and keeping this board's,
+	// not over every task of the board with a lookup of its workflow blob each.
 	query := `SELECT t.id, t.title, t.created_at, t.completed_at, t.assigned_to, t.completed_by, t.session_id, t.goal_id, COALESCE(g.title, '') AS goal_title, w.data
-		FROM board_tasks t JOIN task_workflows w ON w.task_id = t.id
+		FROM task_workflows w INDEXED BY idx_task_workflows_artifacts CROSS JOIN board_tasks t ON t.id = w.task_id
 		LEFT JOIN board_goals g ON g.board_id = t.board_id AND g.id = t.goal_id
-		WHERE t.board_id = ? AND w.data LIKE '%"artifacts":[%'`
+		WHERE t.board_id = ? AND w.has_artifacts = 1`
 	args := []any{project}
 	if q.SessionID != "" {
 		// Only tasks this session could own: recorded at claim, completed by
@@ -189,7 +191,7 @@ func (s *Store) ListTeamArtifactTasksQuery(ctx context.Context, q TeamArtifactQu
 		}
 		query += " AND (" + strings.Join(preds, " OR ") + ")"
 	}
-	query += " ORDER BY t.id DESC LIMIT ?"
+	query += " ORDER BY w.task_id DESC LIMIT ?"
 	args = append(args, limit+1)
 	err = s.reader().SelectContext(ctx, &rows, query, args...)
 	if err != nil {

@@ -112,6 +112,40 @@ func (s *Store) initTaskWorkflows(ctx context.Context) error {
 	 PRIMARY KEY(task_id, upstream_id));
 	 CREATE TABLE IF NOT EXISTS task_ready_notifications (
 	 task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id));`)
+	if err != nil {
+		return err
+	}
+	return s.ensureWorkflowArtifactFlag(ctx)
+}
+
+// artifactsMark is the text a workflow's JSON holds when any result of the task (its completion's, its review's) lists an artifact: the team artifacts read used to find those tasks by a LIKE over every
+// task's whole workflow blob (a leading-wildcard scan, no index, on each call) (#9114).
+const artifactsMark = `"artifacts":[`
+
+// ensureWorkflowArtifactFlag adds task_workflows.has_artifacts, set when the workflow's JSON holds artifactsMark, and an index of the flagged rows, so the team artifacts read walks only the tasks that have
+// artifacts. A database that has no such column gets it and one backfill (a single pass over the blobs, in one transaction); saveWorkflow keeps it after that.
+func (s *Store) ensureWorkflowArtifactFlag(ctx context.Context) error {
+	var n int
+	if err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM pragma_table_info('task_workflows') WHERE name = 'has_artifacts'`); err != nil {
+		return err
+	}
+	if n == 0 {
+		tx, err := s.db.BeginTxx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE task_workflows ADD COLUMN has_artifacts INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE task_workflows SET has_artifacts = 1 WHERE data LIKE '%`+artifactsMark+`%'`); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	_, err := s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_task_workflows_artifacts ON task_workflows(task_id) WHERE has_artifacts = 1`)
 	return err
 }
 
@@ -291,8 +325,12 @@ func saveWorkflow(ctx context.Context, db sqlx.ExecerContext, id int64, w TaskWo
 	if err != nil {
 		return err
 	}
-	_, err = db.ExecContext(ctx, `INSERT INTO task_workflows(task_id, data) VALUES (?, ?)
-	 ON CONFLICT(task_id) DO UPDATE SET data = excluded.data`, id, string(data))
+	has := 0
+	if strings.Contains(string(data), artifactsMark) {
+		has = 1
+	}
+	_, err = db.ExecContext(ctx, `INSERT INTO task_workflows(task_id, data, has_artifacts) VALUES (?, ?, ?)
+	 ON CONFLICT(task_id) DO UPDATE SET data = excluded.data, has_artifacts = excluded.has_artifacts`, id, string(data), has)
 	return err
 }
 
