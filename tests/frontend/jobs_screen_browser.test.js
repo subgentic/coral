@@ -44,8 +44,8 @@ const S = `(window.__coralStatic || '/static/')`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'settings')`);
-            await ev(`window.switchNavTab('jobs'); true`);
-            await waitFor(`document.querySelectorAll('#scheduled-jobs-list .sched-row').length === 3`, `${at}: the three jobs listed at once`, 8000);
+            await ev(`window.switchNavTab('automations'); true`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, `${at}: the three jobs listed at once`, 8000);
 
             if (!mobile) {
                 await waitFor(`document.querySelectorAll('#group-table-view .dt-chip').length >= 3`, at + 'status chips in group tables', 4000);
@@ -53,37 +53,20 @@ const S = `(window.__coralStatic || '/static/')`;
                 assert.equal(await ev(`document.querySelectorAll('#group-table-view .dt-chip .goal-dot[aria-hidden="true"]').length`), 3, at + 'words convey state; dots are decorative');
                 await shot('jobs-state-chips');
             }
-            console.log(`${at}: one list, every job, in words`);
+            console.log(`${at}: one table, every job, in words`);
             assert.equal(await ev(`document.querySelectorAll('.sidebar-subtab').length`), 0, `${at}: no Active / Scheduled tabs`);
-            assert.equal(await ev(`/No active jobs/.test(document.querySelector('[data-section="jobs"]').textContent)`), false, `${at}: nothing says "No active jobs" over jobs that exist`);
-            assert.equal(await ev(`[...document.querySelectorAll('[data-pane="jobs"] .session-group-count')].reduce((n, c) => n + Number(c.textContent), 0)`), 3, `${at}: the groups' counts are the jobs`);
-            const rows = await ev(`[...document.querySelectorAll('#scheduled-jobs-list .sched-row')].map(r => [r.querySelector('.sched-row-name').textContent.trim() + (r.querySelector('.sched-chip') ? ' ' + r.querySelector('.sched-chip').textContent.trim() : ''), r.querySelector('.sched-row-meta').textContent.replace(/\\s+/g, ' ').trim()])`);
-            assert.equal(rows[0][0], 'nightly-build-job');
-            assert.match(rows[0][1], /^Every day at 02:00 \(UTC\) · last run failed · next /);
-            assert.match(rows[1][1], /^Weekdays at 18:00 \(UTC\) · last run passed · next /);
-            assert.equal(rows[2][0], 'weekly-cleanup paused'); assert.match(rows[2][1], /^Mondays at 09:00 \(UTC\) · never run$/);
             assert.equal(await ev(vis('#live-jobs-group')), false, `${at}: no "Running now" while nothing runs`);
             await ev(`import(${S} + 'live_jobs.js').then(m => m.renderLiveJobs([{ id: 99, job_name: 'summarize-the-day', status: 'running', started_at: new Date().toISOString(), session_id: 'abc', agent_type: 'claude', trigger_type: 'cron' }])).then(() => true)`);
             assert.equal(await ev(vis('#live-jobs-group')), true, `${at}: "Running now" while one runs`);
             assert.match(await text('#live-jobs-group'), /Running now/);
-            assert.equal(await ev(`[...document.querySelectorAll('[data-pane="jobs"] .session-group-count')].reduce((n, c) => n + Number(c.textContent), 0)`), 3, `${at}: a running job is one of the jobs, not another`);
             assert.equal(await text('#live-jobs-status'), '1 job running now', `${at}: said once, politely`);
             await ev(`import(${S} + 'live_jobs.js').then(m => m.renderLiveJobs([])).then(() => true)`);
             assert.equal(await ev(vis('#live-jobs-group')), false);
             assert.equal(await text('#live-jobs-status'), '', `${at}: and cleared when it ends`);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduled-jobs-list .sched-dot')].map(d => [d.textContent, getComputedStyle(d).borderRadius, Math.round(d.getBoundingClientRect().width), getComputedStyle(d).backgroundImage])`), [['', '50%', 8, 'none'], ['', '50%', 8, 'none'], ['', '50%', 8, 'none']], `${at}: the dots are flat 8 px circles (no emoji, no gradient)`);
-            // UI/UX's #7588 item 2: every name starts at one left edge (the dot has a slot of its own) and the paused pill is on the name's line
-            const edges = await ev(`(() => { const n = [...document.querySelectorAll('#scheduled-jobs-list .sched-row-name')].filter(e => e.getClientRects().length); const pill = document.querySelector('#scheduled-jobs-list .sched-row-head > .sched-chip'); const pn = pill && pill.parentElement.querySelector('.sched-row-name');
-                return { lefts: [...new Set(n.map(e => Math.round(e.getBoundingClientRect().left)))], n: n.length, pillOnLine: !!pill && Math.abs((pill.getBoundingClientRect().top + pill.getBoundingClientRect().bottom) / 2 - (pn.getBoundingClientRect().top + pn.getBoundingClientRect().bottom) / 2) < 8 }; })()`);
-            assert.ok(edges.n >= 3 && edges.lefts.length === 1 && edges.pillOnLine, `${at}: the names start at one left edge and the paused pill is on the name's line: ${JSON.stringify(edges)}`);
-            if (mobile) {
-                const left = await ev(`(() => { const h = [...document.querySelectorAll('h2')].find(e => e.textContent.trim() === 'Jobs' && e.getClientRects().length); const d = document.querySelector('#scheduled-jobs-list .sched-dot'); const pad = e => getComputedStyle(e).paddingLeft + '/' + getComputedStyle(e).marginLeft; const row = d.closest('li'); return [Math.round(h.getBoundingClientRect().left), Math.round(d.getBoundingClientRect().left), pad(row), pad(row.parentElement), pad(row.parentElement.parentElement), pad(row.parentElement.parentElement.parentElement), row.parentElement.parentElement.className, row.parentElement.parentElement.parentElement.className, row.parentElement.parentElement.parentElement.parentElement.className + '/' + pad(row.parentElement.parentElement.parentElement.parentElement)]; })()`);
-                assert.ok(Math.abs(left[0] - left[1]) <= 4, `${at}: the rows start where the heading does (heading ${left[0]} px, first dot ${left[1]} px; paddings/margins li,ul,body,section ${left.slice(2)})`);
-            }
             await shot(`jobs-list-${w}`);
 
             console.log(`${at}: the job page, failure first`);
-            await ev(`document.querySelector('#scheduled-jobs-list .sched-row').click(); true`);
+            await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click(); true`);
             await waitFor(vis('#scheduler-detail .sched-fail-banner'), `${at}: the job page`, 8000);
             const order = (await ev(`[...document.querySelectorAll('#scheduler-detail > *:not(.sched-back):not(.group-back)')].map(e => e.className.split(' ')[0])`)).filter(c => c !== 'phone-title-row'); // the phone's back row (#7121) and the row that holds it with the title (#7734) are not content
             assert.equal(order[0], 'sched-fail-banner', `${at}: the failure is the first thing on the page: ${JSON.stringify(order)}`);

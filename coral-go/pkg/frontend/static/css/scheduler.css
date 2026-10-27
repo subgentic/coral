@@ -203,23 +203,6 @@
     margin-bottom: 8px;
 }
 
-/* ── Failing job indicators ────────────────────────────────────────────── */
-
-/* A job that fires on schedule and fails every run looks healthy in the list:
-   enabled, with a next fire time. These two make the failure visible without
-   opening the run history. */
-.sched-fail-badge {
-    margin-left: 6px;
-    padding: 1px 6px;
-    border-radius: var(--radius-lg);
-    font-size: 0.625rem;
-    font-weight: 600;
-    white-space: nowrap;
-    color: var(--error, var(--error));
-    background: rgba(var(--fx-red-rgb), 0.14);
-    border: 1px solid rgba(var(--fx-red-rgb), 0.3);
-}
-
 .sched-fail-banner {
     margin: 0 0 14px;
     padding: 10px 12px;
@@ -250,15 +233,11 @@
 .sidebar-jobs-heading { margin: 4px 8px; font-size: var(--fs-md); color: var(--text-secondary); font-weight: 600; }
 .sidebar-jobs-group { margin-bottom: 8px; }
 .sidebar-jobs-group[hidden] { display: none; }
-.sched-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
 .sched-row-head { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; min-width: 0; } /* the paused pill and the failed count follow the name on its line and wrap under it at a large text size: the name keeps the row's width, no word is broken */
 .sched-row-title { display: grid; grid-template-columns: 14px minmax(0, 1fr); align-items: baseline; min-width: 0; max-width: 100%; } /* the dot has a slot of its own, so every name starts at one left edge (UI/UX #7588 item 2); 14 px is the meta line's indent */
 .sched-row-title > .sched-dot { align-self: center; }
 .sched-row-name { font-weight: 600; min-width: 0; overflow-wrap: break-word; }
 .sched-row-meta { color: var(--text-secondary); font-size: var(--fs-md); padding-left: 14px; }
-.sched-row-problem { display: block; color: var(--error); font-size: var(--fs-md); padding-left: 14px; overflow-wrap: anywhere; } /* a run that failed for its folder or branch, in words (#6707) */
-.sched-row-note { display: block; color: var(--text-secondary); font-size: var(--fs-md); padding-left: 14px; overflow-wrap: anywhere; } /* what a run's exit_reason adds to its status: Coral was stopped when its agent ended, or restarted before it launched (#6907) */
-.sched-chip { border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; font-size: .75rem; color: var(--text-secondary); white-space: nowrap; }
 .sched-header { flex-wrap: wrap; gap: 8px; }
 .sched-header h2 { margin-right: auto; overflow-wrap: anywhere; min-width: 0; }
 .sched-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0 12px; font-size: .8125rem; font-weight: 400; } /* labels 13/500, values 13/400 */
@@ -275,8 +254,6 @@
 .item-bar .btn { margin: 0; } /* the bar's gap is the bar's own */
 @media (pointer: coarse), (max-width: 767px) {
     .sched-actions .btn, .sched-more-menu .btn { min-height: var(--control-touch-height, 44px); }
-    #scheduled-jobs-list .sched-row { min-height: var(--control-touch-height, 44px); padding-inline: 0; } #scheduled-jobs-list .sched-row > .row-btn { padding-inline: 0; } /* the button is the row (session.css): on a phone its text starts where the heading does */
-    #scheduled-jobs-list { padding-inline: 0; } /* the rows start where the page heading does */
     .sched-settings > summary { min-height: var(--control-touch-height, 44px); }
 }
 /* the last-result dot: flat, like the agent list's (the coloured-circle emoji it was were glossy) */

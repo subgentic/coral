@@ -312,7 +312,7 @@ export function toggleAgenticPanel(forceState) {
 const SIDEBAR_PANES = {
     agents: { search: 'Search agents', action: { name: 'launch-show', label: 'New agent' } },
     history: { search: 'Search chats', action: null },
-    jobs: { search: 'Search jobs', action: { name: 'job-new', label: 'New job' } },
+    automations: { search: 'Search jobs', action: null }, // Workflows and Jobs as one screen (Goal #74): its folders' toolbars carry the create action
     'hub-inbox': { search: 'Search the Inbox', action: null },
     workflows: { search: 'Search workflows', action: { name: 'wf-create', label: 'New workflow' } },
     tokens: { search: 'Search views', action: null }, // Analytics: the tab's name is tokens
