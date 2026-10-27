@@ -153,8 +153,8 @@ export function chatsSpec(key, ctx) {
             open: s => ctx.open(s),
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, extra, ctx.redraw) } },
             columns: [
-                ...serverColumns(),
                 { key: 'agent', label: key === 'chats-group' ? 'Name' : 'Agent', primary: true, line: 1, cell: s => { const n = name(s); const w = isGroup(s) ? DT.primaryButton(n || 'Board') : DT.personButton(n || 'Agent', `Open the chat of ${n || 'the agent'}`); const b = w.matches('button') ? w : w.querySelector('.dt-primary'); b.dataset.sessionId = s.session_id; if (isGroup(s)) { const wrap = DT.el('span', 'dt-person'); wrap.append(b, DT.tag('Board')); return wrap; } return w; } },
+                ...serverColumns(),
                 { key: 'chat', label: 'Chat', width: 'grow', line: 2, cell: s => { /* a board's name is the agent column's: its line says only what happened in it */ const c = DT.el('span', 'dt-chat-line'); const sn = snippetOf(s); if (isGroup(s)) { if (sn) c.append(DT.el('span', 'dt-chat-snippet', sn)); } else { c.append(DT.el('span', 'dt-chat-title', historyLabel(s))); if (sn) c.append(DT.el('span', 'dt-chat-snippet', ` \u2013 ${sn}`)); } if (s.active) { const live = DT.el('span', 'dt-chat-live', ' · active now'); c.append(live); } /* an archived board stays in Board history, marked */ if (s.archived && key !== 'chats-archived') c.append(DT.tag('Archived')); return c; } },
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', line: 1, cell: s => DT.timeCell(stampOf(s)) },
                 { key: 'ran', label: 'Ran', tone: 'tertiary', align: 'end', line: 0, cell: s => ran(s.duration_sec) },
