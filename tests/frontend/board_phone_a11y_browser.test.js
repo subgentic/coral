@@ -25,7 +25,7 @@ const BASE = require('./test_base').BASE;
             return { dup: [...new Set(names.filter((n, i) => names.indexOf(n) !== i))], n: names.length, header: names.filter(n => n === 'More').length, tabs: names.filter(n => /^(?:More tabs|.+, more tabs)$/.test(n)).length }; })()`);
         assert.ok(dup.n >= 8, 'the team page has its buttons: ' + JSON.stringify(dup));
         assert.deepEqual(dup.dup, [], 'no two visible buttons on the team page share a name');
-        assert.deepEqual([dup.header, dup.tabs], [1, 1], "the header's button is named More and the tab row's is named More tabs, or "<open tab>, more tabs" while a tab behind it is open (#8648; Board is behind it since #8791): " + JSON.stringify(dup));
+        assert.deepEqual([dup.header, dup.tabs], [1, 1], "the header's button is named More and the tab row's is named More tabs, or '<open tab>, more tabs' while a tab behind it is open (#8648; Board is behind it since #8791): " + JSON.stringify(dup));
 
         // the More menu in the light theme: the team page's More holds the board's Select, Export, Pause and Delete
         await installAudit(ev); await setTheme(ev, 'light');
