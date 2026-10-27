@@ -13,7 +13,7 @@ import { syncMobileAgentList } from './mobile.js';
 import { sessionServer } from './server_base.js';
 import { refreshGroupTable } from './sidebar_groups.js';
 import { loadAutomations, loadCostDashboard, loadDocs } from './lazy_panels.js';
-import { isCloud } from './server_base.js';
+import { isCloud, nativeInbox } from './server_base.js';
 import { getHistoryPage } from './history_state.js';
 import { loadHistoryFiltered } from './history_filters.js';
 import { historyRoute } from './history_source.js';
@@ -23,7 +23,9 @@ let _navGeneration = 0;
 
 export function switchNavTab(tab, opts = {}) {
     // The Chats tab is the Inbox's chat folders (#7776) on a local Coral: an old link, a shortcut or a Back to the chats opens the Inbox on the folder (All chats unless one is named), and an open chat shows under the Inbox. The hub keeps its Chats tab.
-    const routeTab = tab, chatsInInbox = tab === 'history' && !isCloud();
+    // The Hub's native Inbox (Goal #100, nativeInbox()) is the same: its Chats and Board tabs are gone from the top bar, so a link, a shortcut or Back to either opens the Inbox (the chat folders, or the Boards folder).
+    const routeTab = tab, toBoards = tab === 'board' && nativeInbox(), chatsInInbox = (tab === 'history' && (!isCloud() || nativeInbox())) || toBoards;
+    if (toBoards) opts = { ...opts, folder: 'chats-group' };
     if (chatsInInbox) tab = 'hub-inbox';
     // A panel that loads on first use (lazy_panels.js) shows its view only if
     // nothing else was selected or shown while it loaded. Once loaded it shows at once.
