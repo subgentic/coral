@@ -118,6 +118,8 @@
 }
 .nav-more-item:hover, .nav-more-item.active { background: var(--bg-tertiary); }
 .nav-more-item .material-icons { color: var(--text-secondary); font-size: 1.25rem; }
+.nav-more-item .nav-more-drawn { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; flex: none; color: var(--text-secondary); } /* a drawn icon, the size of the font's (#9160) */
+.nav-more-item .nav-more-drawn svg { width: 1.25rem; height: 1.25rem; }
 /* Icons only in the phone's list of views. */
 .nav-more-menu:not(.nav-all) .nav-more-item .material-icons { display: none; }
 
