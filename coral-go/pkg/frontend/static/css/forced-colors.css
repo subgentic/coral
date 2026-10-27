@@ -15,7 +15,7 @@
     :is(.task-bar-resize-handle, .sidebar-resize-handle, .preview-pane-resize-handle, .agentic-block-resize-handle):is(:hover, .dragging, :focus-visible) { background: Highlight; }
 
     /* The state pills of the team tabs' toolbar: the chosen one is a fill, which forced colors drop, so every pill looked the same. The chosen one has a Highlight border and text, heavier. */
-    .goals-chip[aria-pressed="true"] { border-color: Highlight; color: Highlight; font-weight: 600; }
+    .goals-chip[aria-pressed="true"] { border-color: Highlight; color: Highlight; font-weight: var(--fw-strong); }
     /* Every tab strip (.tabs .tab): every tab has an underline in the text colour, so the open one differs by weight alone; its underline and text are Highlight. */
     .tab[aria-selected="true"], .tab.is-current, .tab.active { border-bottom-color: Highlight; color: Highlight; }
 

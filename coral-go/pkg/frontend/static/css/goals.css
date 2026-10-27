@@ -57,7 +57,7 @@
 
 /* Close, Reopen and the all-done prompt (#7272). */
 .goals-close-dialog { max-height: calc(100dvh - 24px); overflow-y: auto; }
-.goals-close-goal { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.goals-close-goal { margin: 0; font-weight: var(--fw-strong); overflow-wrap: anywhere; }
 .goals-warning { border: 1px solid var(--warning); border-radius: var(--radius-lg); padding: 8px 10px; background: rgba(var(--warning-rgb), 0.1); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .goals-radios { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .goals-radios legend { font-size: var(--fs-md); padding: 0; margin-bottom: 2px; }
