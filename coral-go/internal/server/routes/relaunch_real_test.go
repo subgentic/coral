@@ -141,6 +141,14 @@ func TestTheRecordSaysWhatTheUpdaterSaysInTheRoutesWords(t *testing.T) {
 			o.Staged = nil
 			o.Backoff = &status.Back{Waiting: true, Until: "2026-10-22T07:00:00Z"}
 		}, relaunchState{}, updNone, "backoff", true, true},
+		"waiting for GitHub's rate limit to be over": {func(o *status.Out) {
+			o.Staged = nil
+			o.Backoff = &status.Back{Waiting: true, Until: "2026-10-22T07:00:00Z", Kind: "rate_limit"}
+		}, relaunchState{}, updNone, "rate_limited", true, true},
+		"the rate limit's wait is over (a plain failure, if any, is the last one's)": {func(o *status.Out) {
+			o.Staged = nil
+			o.Backoff = &status.Back{Waiting: false, Until: "2026-10-22T05:00:00Z", Kind: "rate_limit"}
+		}, relaunchState{}, updNone, "up_to_date", true, true},
 		"the last check failed":          {func(o *status.Out) { o.Staged = nil; o.LastFailure = &status.Fail{Stage: "verify"} }, relaunchState{}, updNone, "check_failed", true, true},
 		"up to date":                     {func(o *status.Out) { o.Staged = nil }, relaunchState{}, updNone, "up_to_date", true, true},
 		"the apply switch is off":        {func(o *status.Out) { o.Staged = nil; o.ApplyEnabled = false }, relaunchState{}, updNone, "switch_off", true, false},

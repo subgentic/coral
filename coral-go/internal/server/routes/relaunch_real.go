@@ -209,6 +209,8 @@ func notReady(out status.Out, rec UpdaterRecord, now time.Time) string {
 		return "unsupported_install"
 	case out.StateFile != "present" || out.LastCheck == "":
 		return "not_checked"
+	case out.Backoff != nil && out.Backoff.Waiting && out.Backoff.Kind == "rate_limit":
+		return "rate_limited" // GitHub's limit on anonymous requests: the wait is until it is over (#9704)
 	case out.Backoff != nil && out.Backoff.Waiting:
 		return "backoff"
 	case out.LastFailure != nil:
