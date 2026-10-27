@@ -3,6 +3,7 @@
 // agent first by default. At 1280 and at 390, where the pills are one select and the search keeps at least 10rem. Four agents are made to wait through the live list. Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { FOLDER_ROWS } = require('./helpers/folder_rows');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const BASE = require('./test_base').BASE;
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const names = () => ev(`[...document.querySelectorAll('#group-table-view button.dt-primary, #group-table-view button.dt-person')].filter(b => b.getClientRects().length).map(b => b.textContent.trim())`);
-    const folders = () => ev(`[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' ')).join('|')`);
+    const folders = () => ev(`${FOLDER_ROWS}.join('|')`);
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0;
         return { qName: q.getAttribute('aria-label'), sameRow: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 6, right: b.left >= a.right - 1, searchW: Math.round(a.width), pills: vis(r.querySelector('.team-tb-pills')), select: vis(r.querySelector('.team-tb-select')), toggleName: t.getAttribute('aria-label'), over: document.documentElement.scrollWidth - innerWidth }; })()`);

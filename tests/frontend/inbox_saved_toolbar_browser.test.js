@@ -3,6 +3,7 @@
 // and the search keeps at least 10rem. GET /api/saved is stood in (it answers q, kind and conv as the server does, and its totals are the whole list's; the Team and Saved since filters are the page's). Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { FOLDER_ROWS } = require('./helpers/folder_rows');
 
 const ITEMS = [
     { id: 1, kind: 'agent', ref: 'sid-a', key: '0123456789abcdef0123', title: 'Frontend Dev', snippet: 'About the importer', saved_at: '2026-10-20T10:00:00Z', team: 'team-a' },
@@ -17,7 +18,7 @@ const ITEMS = [
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const rows = () => ev(`[...document.querySelectorAll('button.dt-primary')].filter(b => b.getClientRects().length).map(b => b.textContent.trim()).sort()`);
-    const folders = () => ev(`[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' ')).join('|')`);
+    const folders = () => ev(`${FOLDER_ROWS}.join('|')`);
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0;
         return { qName: q.getAttribute('aria-label'), sameRow: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 6, right: b.left >= a.right - 1, searchW: Math.round(a.width), pills: vis(r.querySelector('.team-tb-pills')), select: vis(r.querySelector('.team-tb-select')), toggleName: t.getAttribute('aria-label'), over: document.documentElement.scrollWidth - innerWidth }; })()`);
@@ -43,7 +44,7 @@ const ITEMS = [
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'saved'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="saved"]').click(); true`);
             await waitRows(3, 'the three open saved messages');
-            await waitFor(`/Saved3/.test([...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' ')).join('|')) && /All chats\\d/.test([...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim()).join('|'))`, 'the folder counts', 10000);
+            await waitFor(`/Saved3/.test(${FOLDER_ROWS}.join('|')) && /All chats\\d/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
             const before = await folders();
 
             check(`${label}: opening the folder puts the focus on the page's search box, not on the heading`, await ev(`(() => { const a = document.activeElement; return !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));

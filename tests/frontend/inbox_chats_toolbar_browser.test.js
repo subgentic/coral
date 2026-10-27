@@ -4,6 +4,7 @@
 // (the requests are recorded). Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { FOLDER_ROWS } = require('./helpers/folder_rows');
 
 const ROWS = [
     { session_id: 'sess-1', source_type: 'claude', agent_name: 'Frontend Dev', display_name: 'Frontend Dev', summary: 'Working on the importer', last_timestamp: '2026-10-25T10:00:00Z', duration_sec: 600, starred: false, archived: false, active: false, tags: [] },
@@ -16,7 +17,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
     const { settle } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
-    const folders = () => ev(`[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' ')).join('|')`);
+    const folders = () => ev(`${FOLDER_ROWS}.join('|')`);
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect();
         return { qName: q.getAttribute('aria-label'), sameRow: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 6, right: b.left >= a.right - 1, searchW: Math.round(a.width), toggleName: t.getAttribute('aria-label'), over: document.documentElement.scrollWidth - innerWidth }; })()`);
@@ -46,7 +47,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
             await openFolder('chats', mobile, 'All chats');
-            await waitFor(`/All chats\\d/.test([...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim()).join('|')) || !!document.querySelector('.view-list select')`, 'the folder counts', 10000);
+            await waitFor(`/All chats\\d/.test(${FOLDER_ROWS}.join('|')) || !!document.querySelector('.view-list select')`, 'the folder counts', 10000);
             const before = await folders();
 
             check(`${label}: opening the folder puts the focus on the page's search box, not on the heading`, await ev(`(() => { const a = document.activeElement; return !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));

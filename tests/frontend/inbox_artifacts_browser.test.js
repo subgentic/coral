@@ -8,6 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { ROW_WORDS } = require('./helpers/folder_rows');
 
 const hex = n => String(n).padStart(64, '0');
 const WORLD = `(() => {
@@ -58,7 +59,7 @@ const WORLD = `(() => {
             await ev(`window.switchNavTab('hub-inbox'); true`);
             if (!mobile) {
                 await waitFor(`!!document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]')`, 'the Artifacts folder in the sidebar', 10000);
-                const f = await ev(`(() => { const b = document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]'); let h = b.previousElementSibling; while (h && !h.matches('h2')) h = h.previousElementSibling; return { text: b.textContent.replace(/\\s+/g, ' ').trim(), section: h ? h.textContent : '' }; })()`);
+                const f = await ev(`(() => { const b = document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]'); let h = b.previousElementSibling; while (h && !h.matches('h2')) h = h.previousElementSibling; return { text: (${ROW_WORDS})(b), section: h ? h.textContent : '' }; })()`);
                 check('desktop: the sidebar has a Files section with the Artifacts folder and its count (5)', /Artifacts\s*5/.test(f.text) && f.section === 'Files', JSON.stringify(f));
                 await ev(`document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]').click(); true`);
             } else await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);

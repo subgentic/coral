@@ -3,6 +3,7 @@
 // select and the search keeps at least 10rem. The goals are stood in at GET /api/goals. Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { FOLDER_ROWS } = require('./helpers/folder_rows');
 
 const GOALS = [
     { id: 1, board_id: 'team-a', title: 'Ship the importer', outcome: 'Importer is live', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-20T10:00:00Z', rollup: { done: 2, active: 1, blocked: 0, queued: 1 } },
@@ -18,7 +19,7 @@ const GOALS = [
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const titles = () => ev(`[...document.querySelectorAll('button.dt-primary')].filter(b => b.getClientRects().length).map(b => b.textContent.trim()).sort()`);
-    const folders = () => ev(`[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' ')).join('|')`);
+    const folders = () => ev(`${FOLDER_ROWS}.join('|')`);
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), p = r.querySelector('.team-tb-pills'), s = r.querySelector('.team-tb-select');
         const vis = e => !!e && e.getClientRects().length > 0;
@@ -36,7 +37,7 @@ const GOALS = [
             await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)} }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
-            await waitFor(`/Goals5/.test([...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' ')).join('|')) && /All chats\\d/.test([...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim()).join('|'))`, 'the folder counts', 10000);
+            await waitFor(`/Goals5/.test(${FOLDER_ROWS}.join('|')) && /All chats\\d/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
             const before = await folders();
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
