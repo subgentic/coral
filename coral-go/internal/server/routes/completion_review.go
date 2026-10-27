@@ -195,7 +195,7 @@ func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, app
 		}
 		v, err = h.bs.ApproveReviewTextVersion(ctx, project, id, body.SubscriberID, body.Note, body.Round, rev, body.TaskVersion)
 	} else {
-		v, err = h.bs.RejectReview(ctx, project, id, body.SubscriberID, body.Note, body.Round)
+		v, err = h.bs.RejectReviewTextVersion(ctx, project, id, body.SubscriberID, body.Note, body.Round, body.TaskVersion)
 	}
 	if err != nil {
 		if strings.Contains(err.Error(), "only the reviewers") {

@@ -146,6 +146,11 @@ func cmdTaskReviewFlow(st *boardState, args []string, action string) {
 		}
 		body["note"] = *note
 		body["round"] = *round
+		if *taskVersion > 0 {
+			body["task_version"] = *taskVersion
+		} else {
+			body["task_version"] = loadSeenRounds()[fmt.Sprintf("%s/%d#task-version", st.Project, id)]
+		}
 	default:
 		body["note"] = *note
 		body["round"] = *round

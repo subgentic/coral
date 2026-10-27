@@ -152,3 +152,29 @@ func TestTaskTextInstructionsAreVersionedAndRestored(t *testing.T) {
 	require.Equal(t, original, history[0].Snapshot.Instructions, "v1 stays immutable")
 	require.Contains(t, history[1].Snapshot.Instructions, "Use fixture B.")
 }
+
+func TestTaskTextRejectionRecordsTheVersionRead(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for _, who := range []string{"Orchestrator", "QA"} {
+		_, err := s.Subscribe(ctx, "team", who, who, who+"-session", nil, "all")
+		require.NoError(t, err)
+	}
+	task, err := s.CreateTask(ctx, "team", "Before", "", "medium", "creator", "worker")
+	require.NoError(t, err)
+	_, err = s.ClaimTask(ctx, "team", "worker", task.ID)
+	require.NoError(t, err)
+	_, err = s.SubmitCompletionReview(ctx, "team", task.ID, "worker", "done", "success", "review", nil)
+	require.NoError(t, err)
+	_, _, err = s.HandToOrchestrator(ctx, "team", task.ID, "worker")
+	require.NoError(t, err)
+	_, _, err = s.DelegateReview(ctx, "team", task.ID, "Orchestrator", []string{"QA"})
+	require.NoError(t, err)
+	title := "After"
+	_, err = s.EditTaskText(ctx, "team", task.ID, "creator", &title, nil, 0, 1)
+	require.NoError(t, err)
+	verdict, err := s.RejectReviewTextVersion(ctx, "team", task.ID, "QA", "v1 needs changes", 1, 1)
+	require.NoError(t, err)
+	require.True(t, verdict.Rejected)
+	require.Equal(t, 1, verdict.Task.Workflow.ReviewRounds[0].Reviewers[0].TaskVersion)
+}
