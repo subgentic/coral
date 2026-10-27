@@ -150,7 +150,7 @@ const TASKS = { tasks: [{ id: 4242, board_id: 'cost-board', title: 'A costly tas
             window.openTeamPage = keep;
             return shown;
         })()`);
-        check('a task row opens its page on its team', task === JSON.stringify(['cost-board', { tab: 'tasks', item: 4242 }]), String(task));
+        check('a task row opens its page on its team', task === JSON.stringify(['cost-board', { tab: 'tasks', item: 4242, from: '' }]), String(task));
     } catch (e) {
         check('the test ran', false, e.stack || String(e));
     } finally {
