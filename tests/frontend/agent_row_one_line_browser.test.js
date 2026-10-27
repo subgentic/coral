@@ -21,7 +21,7 @@ const { connect } = require('./agent_view_harness');
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(ROWS)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
             await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 5`, `${label}: the rows`, 6000);
-            const rows = await ev(`[...document.querySelectorAll('${root} .session-group-item')].map(li => { const r = li.getBoundingClientRect(), name = li.querySelector('.session-label'); return { id: li.dataset.sessionId, h: Math.round(r.height), weight: name ? getComputedStyle(name).fontWeight : null, nameLines: name ? Math.round(name.getBoundingClientRect().height / parseFloat(getComputedStyle(name).lineHeight || '16')) : 0, chips: [...li.querySelectorAll('.chip')].map(c => c.textContent.trim()), extra: ['.session-goal', '.session-model', '.session-worktree-line', '.session-line2', '.session-held-line', '.session-mobile-meta', '.session-mobile-banner-row'].filter(s => li.querySelector(s)), dot: !!li.querySelector('.session-dot') }; })`);
+            const rows = await ev(`[...document.querySelectorAll('${root} .session-group-item')].map(li => { const r = li.getBoundingClientRect(), name = li.querySelector('.session-label'); return { id: li.dataset.sessionId, h: Math.round(r.height), weight: name ? getComputedStyle(name).fontWeight : null, nameLines: name ? Math.round(name.getBoundingClientRect().height / parseFloat(getComputedStyle(name).lineHeight || '16')) : 0, chips: [...li.querySelectorAll('.chip')].filter(c => c.getClientRects().length).map(c => c.textContent.trim()), extra: ['.session-goal', '.session-model', '.session-worktree-line', '.session-line2', '.session-held-line', '.session-mobile-meta', '.session-mobile-banner-row', '.session-ctx-pill'].filter(s => li.querySelector(s)), dot: !!li.querySelector('.session-dot') }; })`);
             const by = id => rows.find(r => r.id === id);
             for (const r of rows) {
                 assert.ok(r.h >= rowH[0] && r.h <= rowH[1], `${label}: ${r.id} is one line, ${rowH[0]} to ${rowH[1]} px (${r.h}) ${JSON.stringify(r)}`);
@@ -42,14 +42,14 @@ const { connect } = require('./agent_view_harness');
                 assert.equal(sum.text, 'Details'); assert.equal(sum.open, false, 'closed until asked'); assert.ok(sum.h >= 44, `a 44 px target ${JSON.stringify(sum)}`);
                 await ev(`document.querySelector('#agent-phone-details > summary').click(); true`);
                 const dd = await ev(`[...document.querySelectorAll('#agent-phone-details .facts-row')].filter(r => !r.hidden).map(r => r.querySelector('dt').textContent + ': ' + r.querySelector('dd').textContent)`);
-                assert.ok(dd.some(x => /^Folder: .*coral-project/.test(x)) && dd.some(x => /^Branch: .*long-branch-name/.test(x)) && dd.some(x => /^Model: .*Opus/.test(x)), `Details has the folder, the branch and the model ${JSON.stringify(dd)}`);
+                assert.ok(dd.some(x => /^Context: ctx 10%/.test(x)) && dd.some(x => /^Folder: .*coral-project/.test(x)) && dd.some(x => /^Branch: .*long-branch-name/.test(x)) && dd.some(x => /^Model: .*Opus/.test(x)), `Details has the folder, the branch and the model ${JSON.stringify(dd)}`);
                 console.log('PASS 390: Details shows the folder, branch and model');
             }
             if (!mobile) { // nothing is lost: the agent's own page header has the branch, the folder and the model with its level (the row says none of them)
                 await ev(`window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
                 await waitFor(`!document.getElementById('terminal-header-model')?.hidden && !document.getElementById('terminal-header-folder')?.hidden && !document.getElementById('terminal-header-branch')?.hidden`, 'the header: model, folder and branch', 8000);
                 const hd = await ev(`({ model: document.querySelector('#terminal-header-model .terminal-folder-text').textContent, folder: document.querySelector('#terminal-header-folder .terminal-folder-text').textContent, folderTip: document.getElementById('terminal-header-folder').title, branch: document.querySelector('#terminal-header-branch .terminal-branch-text').textContent })`);
-                assert.match(hd.model, /Opus/, `the header names the model ${JSON.stringify(hd)}`);
+                assert.match(hd.model, /Opus/, `the header names the model ${JSON.stringify(hd)}`); assert.match(hd.model, /ctx 10%/, `and the context use (the row's pill moved here) ${JSON.stringify(hd)}`);
                 assert.ok(hd.folder.includes('coral-project') && hd.folderTip === '/work/coral-project', `and the folder, with its full path on hover ${JSON.stringify(hd)}`);
                 assert.ok(hd.branch.includes('long-branch-name'), `and the branch beside it ${JSON.stringify(hd)}`);
                 console.log('PASS 1280: the header has the branch, the folder and the model');
