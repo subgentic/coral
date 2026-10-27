@@ -405,7 +405,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
         const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label" hidden><span class="acf-provider-head">Provider</span>');
         container.innerHTML = [
             `<div class="acf-persona-page"><p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="acf-prompt-host" data-rows="8"></div></div>`,
-            pane('agent', 'Model', 'smart_toy', '', `<p class="settings-hint acf-provider-fixed"></p>${agentHTML}`),
+            pane('agent', 'Model', 'smart_toy', '', `<div class="acf-pick-head"><span id="${escapeAttr(uid)}-pick-label">Provider</span></div><div class="launch-agent-pick acf-agent-pick" role="radiogroup" aria-labelledby="${escapeAttr(uid)}-pick-label" hidden></div>${agentHTML}`),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
             pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
         ].join('');
@@ -492,12 +492,10 @@ function wireAcfAgentType(container) {
 }
 
 function finishAcfControls(container, opts) {
-    if (opts.restart) { // Restart's controls (#7391): the provider fixed and said in a line, the name read-only
-        const type = container.querySelector('.acf-agent-type');
-        type.disabled = true;
-        const fixed = container.querySelector('.acf-provider-fixed');
-        if (fixed) fixed.textContent = `Runs on ${type.options[type.selectedIndex]?.textContent.trim() || type.value}. To change the provider, launch a new agent.`;
+    if (opts.restart) { // Restart's controls (#7391, #8973): the name read-only, and the provider is New Agent's own picker (launch_agent_pick.js): a restart may switch it, keeping the name, role, board and prompt
         const nm = container.querySelector('.acf-restart-name'); if (nm) nm.textContent = opts.restartName || '';
+        const group = container.querySelector('.acf-agent-pick');
+        if (group) importOnce('./launch_agent_pick.js').then(m => m.buildAgentPick({ group, form: container, server: _acfServer(container) })).catch(e => console.error('provider picker', e));
     }
     if (opts.sections && !opts.wizard && !opts.restart) segmentSelect(container.querySelector('.acf-agent-type'), { label: 'Provider' }); // the member and board dialogs: the provider as segments, as in Restart (#7407)
     if (opts.wizard || opts.restart || opts.sections) { // the controls drawn over the selects (#7391): the thinking levels as segments, the Mode as cards (or the select, launch_flags.js)
