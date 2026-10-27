@@ -28,7 +28,7 @@ const { connect } = require('./agent_view_harness');
         return [...box.querySelectorAll('.chat-bubble.human')].map(b => {
             const r = b.getBoundingClientRect();
             return { text: b.querySelector('.message-text').innerText, html: b.innerHTML, right: r.right, boxRight: box.getBoundingClientRect().right,
-                chips: [...b.querySelectorAll('.chat-attachment-chip')].map(c => ({ text: c.innerText, right: c.getBoundingClientRect().right })), bubbleRight: r.right, scroll: box.scrollWidth > box.clientWidth };
+                chips: [...b.querySelectorAll('.chat-attachment-chip')].map(c => ({ text: c.innerText.replace(/\\s+/g, ' ').trim(), right: c.getBoundingClientRect().right })), bubbleRight: r.right, scroll: box.scrollWidth > box.clientWidth };
         });
     })()`);
     try {
