@@ -109,8 +109,8 @@ export function showBoardChatTab(boardName, agent = null) {
         panel.innerHTML = `
             <div class="board-chat-header">
                 <a class="board-chat-title" href="#" data-on-click="board-chat-open" data-board="${escapeAttr(boardName)}" title="Open full board view">${escapeHtml(keyLabel(boardName))}</a>
-                <button class="btn-nav board-icon-btn" id="board-chat-pause-btn" data-on-click="board-chat-pause" data-board="${escapeAttr(boardName)}" aria-label="Pause board" title="Pause board: stops agents from receiving new messages until resumed"><span class="material-icons" aria-hidden="true">pause</span></button>
-                <button class="btn-nav board-select-btn board-icon-btn" data-on-click="board-chat-select" aria-label="Export messages" aria-pressed="false" title="Export: select messages to export as Markdown"><span class="material-icons" aria-hidden="true">download</span></button>
+                <button class="btn btn-quiet btn-icon btn-small btn-nav board-icon-btn" id="board-chat-pause-btn" data-on-click="board-chat-pause" data-board="${escapeAttr(boardName)}" aria-label="Pause board" title="Pause board: stops agents from receiving new messages until resumed"><span class="material-icons" aria-hidden="true">pause</span></button>
+                <button class="btn btn-quiet btn-icon btn-small btn-nav board-select-btn board-icon-btn" data-on-click="board-chat-select" aria-label="Export messages" aria-pressed="false" title="Export: select messages to export as Markdown"><span class="material-icons" aria-hidden="true">download</span></button>
             </div>
             <div class="notice notice-error notice-bar notice-center board-paused-banner" id="board-chat-paused-banner" style="display:none">Board reads are paused — agents cannot see new messages</div>
             <div class="board-chat-msgs-wrap">
@@ -129,9 +129,9 @@ export function showBoardChatTab(boardName, agent = null) {
                 </div>
                 <!-- After the text box in the DOM so Tab reaches the box first, then @all, then Send; CSS order draws them under it, as the chat's composer does -->
                 <div class="toolbar toolbar-pad command-pane-toolbar board-chat-toolbar">
-                    <button type="button" class="btn-nav board-mention-chip" data-on-click="board-chat-all" title="Notify all agents">@all</button>
+                    <button type="button" class="btn btn-quiet btn-small btn-nav board-mention-chip" data-on-click="board-chat-all" title="Notify all agents">@all</button>
                     <span class="toolbar-spacer"></span>
-                    <button type="button" class="btn-nav btn-send" data-on-click="board-chat-send" data-board="${escapeAttr(boardName)}" aria-label="Send message" title="Send message (Enter)">
+                    <button type="button" class="btn btn-primary btn-small btn-nav btn-send" data-on-click="board-chat-send" data-board="${escapeAttr(boardName)}" aria-label="Send message" title="Send message (Enter)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     </button>
                 </div>
