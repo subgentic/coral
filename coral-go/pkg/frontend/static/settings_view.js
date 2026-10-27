@@ -96,14 +96,14 @@ export function mountSettingsView(host, spec) {
             return { node: hit, input, get: () => input.checked, set: v => { input.checked = !!v; }, focus: () => input.focus(), disable: on => { input.disabled = on; }, labelledBy: true };
         }
         if (t === 'select') {
-            const sel = node('select', 'sv-input sv-select'); sel.id = field.id || `${id}-c`; sel.name = field.key;
+            const sel = node('select', 'field field-dense sv-input sv-select'); sel.id = field.id || `${id}-c`; sel.name = field.key;
             let want = '';
             const draw = list => { sel.replaceChildren(...list.map(o => { const op = node('option', '', o.label); op.value = String(o.value); return op; })); sel.value = want; if (sel.value !== want && sel.options.length) sel.selectedIndex = 0; };
             draw(optionsOf(field, draw));
             return { node: sel, input: sel, get: () => sel.value, set: v => { want = v === undefined || v === null ? '' : String(v); sel.value = want; if (sel.value !== want && sel.options.length) sel.selectedIndex = 0; }, focus: () => sel.focus(), disable: on => { sel.disabled = on; } };
         }
         if (t === 'textarea') {
-            const ta = common(node('textarea', 'sv-input sv-textarea')); ta.id = field.id || `${id}-c`; ta.name = field.key; ta.rows = field.rows || 4;
+            const ta = common(node('textarea', 'field field-dense sv-input sv-textarea')); ta.id = field.id || `${id}-c`; ta.name = field.key; ta.rows = field.rows || 4;
             if (field.placeholder) ta.placeholder = field.placeholder;
             return { node: ta, input: ta, get: () => ta.value, set: v => { ta.value = v ?? ''; }, focus: () => ta.focus(), disable: on => { ta.disabled = on; } };
         }
@@ -125,7 +125,7 @@ export function mountSettingsView(host, spec) {
             const api = field.render ? field.render(slot, { field, host: root }) || {} : {};
             return { node: slot, get: api.get || (() => undefined), set: api.set || (() => {}), focus: api.focus || (() => (slot.querySelector('input, select, textarea, button') || slot).focus?.()), disable: on => { api.disable?.(on); for (const e of slot.querySelectorAll('input, select, textarea, button')) e.disabled = on; }, onChange: api.onChange, invalid: api.invalid, custom: true };
         }
-        const input = common(node('input', 'sv-input')); input.id = field.id || `${id}-c`; input.name = field.key;
+        const input = common(node('input', 'field field-dense sv-input')); input.id = field.id || `${id}-c`; input.name = field.key;
         input.type = t === 'secret' ? 'password' : t === 'number' ? 'number' : 'text';
         if (t === 'secret') input.autocomplete = 'off';
         if (t === 'path') { input.spellcheck = false; input.autocapitalize = 'none'; }

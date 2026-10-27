@@ -12,7 +12,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 /** The pills of a tab as one group of buttons, and the same choice as a compact select (shown instead of the group when the line is narrow). */
 function pillElements(p) {
     const group = el('div', 'goals-chips goals-chips-row team-tb-pills'); group.setAttribute('role', 'group'); group.setAttribute('aria-label', p.label);
-    const select = el('select', 'list-bar-select team-tb-select'); select.setAttribute('aria-label', p.label);
+    const select = el('select', 'field list-bar-select team-tb-select'); select.setAttribute('aria-label', p.label);
     for (const it of p.items) {
         const text = `${it.label} ${it.count}`;
         const b = el('button', 'goals-chip', text); b.type = 'button'; b.dataset.filter = it.key; b.setAttribute('aria-pressed', String(p.current === it.key));
@@ -51,7 +51,7 @@ export function adopt(row, { pills = null, chips = [], action = null } = {}) {
 export function build({ id = '', label, placeholder, value = '', onSearch = null, pills = null, action = null }) {
     const row = el('div', 'toolbar list-bar-search-row team-toolbar-row');
     const wrap = el('div', 'list-bar-search-wrap');
-    const q = el('input', 'list-bar-search'); q.type = 'search'; q.placeholder = placeholder; q.maxLength = 200; q.autocomplete = 'off'; q.spellcheck = false; q.value = value; if (id) q.id = id;
+    const q = el('input', 'field field-clear list-bar-search'); q.type = 'search'; q.placeholder = placeholder; q.maxLength = 200; q.autocomplete = 'off'; q.spellcheck = false; q.value = value; if (id) q.id = id;
     q.setAttribute('aria-label', label);
     wrap.append(q);
     row.append(wrap);

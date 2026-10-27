@@ -43,8 +43,7 @@
 .view-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .view-list-dot { width: 9px; height: 9px; border-radius: var(--radius-xs); flex: none; background: var(--view-list-dot); }
 .view-list-count { flex: none; font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); }
-.view-list-select { display: none; width: 100%; height: 44px; padding: 0 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); font-family: var(--font-sans); font-size: var(--fs-lg); font-weight: 600; }
-.view-list-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.view-list-select { display: none; width: 100%; }
 @media (max-width: 767px) {
     .view-list-nav { display: none; }
     .view-list-select { display: block; margin-bottom: 8px; } /* the field under it (the page's search) does not touch it */

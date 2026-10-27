@@ -107,7 +107,7 @@ function draw() {
         const at = new Map(st.times.map((t, i) => [t, i])), vals = new Array(st.times.length).fill(0);
         for (const b of st.buckets) { const i = at.get(b.t); if (i != null) vals[i] += b.s.cost_usd || 0; }
         const pick = el('div', 'viz-ctl'); pick.append(el('label', 'viz-ctl-label', 'Turns in'));
-        const sel = el('select', 'viz-select'); sel.id = 'cost-agent-window'; pick.firstChild.htmlFor = sel.id;
+        const sel = el('select', 'field field-dense viz-select'); sel.id = 'cost-agent-window'; pick.firstChild.htmlFor = sel.id;
         const whole = el('option', null, 'The whole range'); whole.value = ''; sel.append(whole);
         st.times.map((t, i) => ({ t, i, v: vals[i] })).filter(x => x.v > 0).sort((a, b) => b.t - a.t).slice(0, 72).forEach(x => { const o = el('option', null, `${series.timeLabel(x.t, r.interval)} · ${money(x.v)}`); o.value = String(x.i); sel.append(o); });
         sel.value = st.picked >= 0 ? String(st.picked) : '';

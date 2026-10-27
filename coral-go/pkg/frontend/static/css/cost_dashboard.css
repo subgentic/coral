@@ -126,17 +126,7 @@
     max-width: 100%;
 }
 
-.cost-time-select {
-    min-height: var(--control-compact-height);
-    font-family: var(--font-sans);
-    background: var(--bg-secondary);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
-    padding: 4px 8px;
-    font-size: var(--fs-md);
-    cursor: pointer;
-}
+.cost-time-select { cursor: pointer; }
 
 /* Summary Cards */
 .cost-summary-cards {
@@ -418,8 +408,7 @@
 .viz-tile-sub { font-size: var(--fs-base); color: var(--text-muted); }
 .viz-card-stack { margin: 0 0 12px; position: relative; }
 .viz-hint { margin: 0 0 8px; font-size: var(--fs-base); color: var(--text-muted); }
-.viz-select { min-height: 32px; max-width: 100%; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-md, 6px); font: inherit; font-size: var(--fs-base); padding: 0 8px; }
-@media (pointer: coarse) { .viz-select { min-height: var(--control-touch-height, 44px); } }
+.viz-select { max-width: 100%; }
 .viz-table-title { margin: 4px 0 6px; }
 .viz-more { margin: 12px 0 0; }
 .viz-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

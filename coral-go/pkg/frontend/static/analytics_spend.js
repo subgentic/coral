@@ -300,7 +300,7 @@ export function showSpend(host, period, timeHost, force = false) {
         host.dataset.built = '1';
         const head = el('div', 'spend-head');
         const label = el('label', 'spend-team'); label.append(el('span', null, 'Team '));
-        const sel = el('select', 'cost-time-select spend-team-select'); sel.setAttribute('aria-label', 'Team for tokens per commit and task time');
+        const sel = el('select', 'field field-dense cost-time-select spend-team-select'); sel.setAttribute('aria-label', 'Team for tokens per commit and task time');
         sel.addEventListener('change', () => { model.team = sel.value; try { browserLocal.set(TEAM_KEY, sel.value); } catch { /* the choice lasts until the page closes */ } model.data = null; loadSpend(); });
         label.append(sel); head.append(label);
         host.replaceChildren(head, el('div', 'spend-body'));

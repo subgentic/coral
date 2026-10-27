@@ -1880,7 +1880,7 @@
 .sidebar-header .sidebar-search { flex: 1 1 5em; min-width: 5em; }
 /* In a box that narrow (at 200% text the header's buttons leave it 5em) the magnifier goes and the placeholder takes its room: the whole word "Search" is shown, and the box's name is the same. */
 .sidebar-header .sidebar-search { container-type: inline-size; }
-@container (max-width: 10rem) { .sidebar-search-icon { display: none; } .sidebar-search-input { padding-left: 0.625rem; padding-right: 0.25rem; } }
+@container (max-width: 10rem) { .sidebar-search-icon { display: none; } .sidebar-search-input.field-search { padding-left: 0.625rem; padding-right: 0.25rem; } }
 /* Status text for screen readers only (the dot carries it visually). */
 .row-server-prefix .sr-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;

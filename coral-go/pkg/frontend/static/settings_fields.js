@@ -129,7 +129,7 @@ export const CLEANUP_FIELDS = [
 const apiKeyLine = slot => {
     const mk = (tag, cls, attrs = {}, text = '') => { const e = document.createElement(tag); if (cls) e.className = cls; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text) e.textContent = text; return e; };
     const line = mk('div', 'sv-ctl-line', { id: 'settings-api-key-live' });
-    const input = mk('input', 'sv-input settings-mono-input', { type: 'password', id: 'settings-api-key', readonly: '', autocomplete: 'off', placeholder: 'Loading...', 'aria-label': 'API key' });
+    const input = mk('input', 'field field-dense sv-input settings-mono-input', { type: 'password', id: 'settings-api-key', readonly: '', autocomplete: 'off', placeholder: 'Loading...', 'aria-label': 'API key' });
     const show = mk('button', 'btn btn-small settings-copy-btn', { type: 'button', id: 'settings-api-key-show', 'aria-pressed': 'false' }, 'Show'); show.hidden = true;
     const copy = mk('button', 'btn btn-small settings-copy-btn', { type: 'button', id: 'settings-api-key-copy' }, 'Copy'); copy.disabled = true;
     const qr = mk('button', 'btn btn-small', { type: 'button', title: 'Show QR code for mobile connection' });

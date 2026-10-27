@@ -74,7 +74,7 @@ function wireKeys(nav) {
 export function build({ id, label, sections, current, onPick }) {
     const root = el('div', 'view-list'); root.dataset.viewList = id;
     const nav = el('nav', 'view-list-nav'); nav.setAttribute('aria-label', label);
-    const select = el('select', 'view-list-select'); select.setAttribute('aria-label', label);
+    const select = el('select', 'field view-list-select'); select.setAttribute('aria-label', label);
     root.append(nav, select);
     wireKeys(nav);
     nav.addEventListener('click', e => { const b = e.target instanceof Element && e.target.closest('.view-list-item'); if (b && !b.disabled) onPick(b.dataset.key); });

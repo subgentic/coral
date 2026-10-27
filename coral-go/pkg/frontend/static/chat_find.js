@@ -28,7 +28,7 @@ function ensureBar() {
     bar.hidden = true;
     bar.setAttribute('role', 'search');
     bar.innerHTML = `
-        <input type="text" class="chat-find-input" placeholder="Find in conversation" aria-label="Find in conversation" spellcheck="false">
+        <input type="text" class="field field-dense chat-find-input" placeholder="Find in conversation" aria-label="Find in conversation" spellcheck="false">
         <span class="chat-find-count" aria-live="polite"></span>
         <button type="button" class="chat-find-older" hidden title="Load the rest of the conversation so older messages are searched too">Search older</button>
         <button type="button" class="chat-find-prev" title="Previous match (Shift+Enter)" aria-label="Previous match">&#x2191;</button>
