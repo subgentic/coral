@@ -214,7 +214,7 @@ export function dataTable(cfg) {
     function drawHead() {
         thead.replaceChildren();
         const tr = el('tr'); tr.setAttribute('role', 'row');
-        if (sel) { const th = el('th', 'dt-check'); th.setAttribute('role', 'columnheader'); const all = el('input'); all.type = 'checkbox'; all.className = 'dt-check-all'; all.setAttribute('aria-label', 'Select all rows on this page'); all.addEventListener('change', () => { for (const r of rows.filter(eligible)) (all.checked ? st.selected.add(keyOf(r)) : st.selected.delete(keyOf(r))); st.anchor = null; syncSelection(); }); th.append(all); tr.append(th); }
+        if (sel) { const th = el('th', 'dt-check'); th.setAttribute('role', 'columnheader'); const all = el('input'); all.type = 'checkbox'; all.className = 'check dt-check-all'; all.setAttribute('aria-label', 'Select all rows on this page'); all.addEventListener('change', () => { for (const r of rows.filter(eligible)) (all.checked ? st.selected.add(keyOf(r)) : st.selected.delete(keyOf(r))); st.anchor = null; syncSelection(); }); th.append(all); tr.append(th); }
         for (const c of columns) {
             const th = el('th', `dt-th${c.numeric || c.align === 'end' ? ' dt-end' : ''}`); th.scope = 'col'; th.setAttribute('role', 'columnheader'); th.dataset.key = c.key;
             if (cfg.oneLine && c.dropAt) th.setAttribute('data-drop-at', String(c.dropAt));
@@ -313,7 +313,7 @@ export function dataTable(cfg) {
             if (cfg.quiet && cfg.quiet(r)) tr.classList.add('dt-quiet'); // a row that is not a finding (usage whose level was not recorded): quieter than the rest
             if (sel) {
                 const td = el('td', 'dt-check'); td.setAttribute('role', 'cell');
-                const cb = el('input'); cb.type = 'checkbox'; cb.setAttribute('aria-label', `Select ${nameOf(r)}`); cb.dataset.idx = String(i); cb.disabled = !eligible(r); if (cb.disabled) cb.hidden = true;
+                const cb = el('input', 'check'); cb.type = 'checkbox'; cb.setAttribute('aria-label', `Select ${nameOf(r)}`); cb.dataset.idx = String(i); cb.disabled = !eligible(r); if (cb.disabled) cb.hidden = true;
                 cb.addEventListener('click', (e) => {
                     if (!eligible(r)) return;
                     const on = cb.checked;

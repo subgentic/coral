@@ -67,7 +67,7 @@
 .ac-panel .ac-replybox { display: block; width: 100%; box-sizing: border-box; text-align: left; margin-top: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); cursor: text; }
 .ac-panel .ac-replybox:hover { border-color: var(--text-muted); color: var(--text-secondary); }
 .ac-composer { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
-.ac-input { width: 100%; box-sizing: border-box; resize: vertical; padding: 8px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
+.ac-input { width: 100%; resize: vertical; }
 .ac-composer-row { display: flex; align-items: center; gap: 8px; }
 .ac-counter { flex: 1; color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); }
 .ac-error { margin: 0; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); }

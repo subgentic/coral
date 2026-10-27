@@ -41,9 +41,6 @@
         min-height: var(--control-touch-height);
     }
 
-    .diff-mode-select {
-        min-height: var(--control-touch-height);
-    }
 
     /* Round 2 (#3098). The phone side-panel overlay fixes its tabs at 40px
        (mobile.css, more specific than .agentic-tab above); its strip grows to fit. */
@@ -185,7 +182,7 @@
     /* Browse and Team Artifacts rows, the file filter, the list actions and
        the Servers tab's Access select. */
     .explorer-item,
-    .list-bar-search, .list-bar-filter-btn, .list-bar-clear-all, .list-bar-select, .list-bar-by, .list-bar-chip, .list-bar-field input[type="date"],
+    .list-bar-filter-btn, .list-bar-clear-all, .list-bar-by, .list-bar-chip, .list-bar-field input[type="date"],
     .team-artifacts-action,
     .cs-launch select {
         min-height: var(--control-touch-height);

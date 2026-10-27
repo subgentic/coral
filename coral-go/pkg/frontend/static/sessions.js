@@ -644,7 +644,7 @@ function showEmojiPicker(onSelect) {
     picker.className = "emoji-picker";
     picker.innerHTML = `
         <div class="emoji-picker-header">
-            <input type="text" class="emoji-picker-search" placeholder="Search or paste emoji..." autofocus>
+            <input type="text" class="field emoji-picker-search" placeholder="Search or paste emoji..." autofocus>
             <button class="emoji-picker-clear" title="Clear icon">✕ Clear</button>
         </div>
         <div class="emoji-picker-grid">

@@ -99,7 +99,7 @@ function renderHistoryTaskList() {
         const statusClass = t.completed === 1 ? 'completed' : t.completed === 2 ? 'in-progress' : '';
         const icon = t.completed === 2
             ? '<span class="task-spinner" title="In progress"></span>'
-            : `<input type="checkbox" class="task-checkbox" ${t.completed === 1 ? 'checked' : ''} disabled>`;
+            : `<input type="checkbox" class="check task-checkbox" ${t.completed === 1 ? 'checked' : ''} disabled>`;
         return `
         <div class="task-item ${statusClass}">
             ${icon}

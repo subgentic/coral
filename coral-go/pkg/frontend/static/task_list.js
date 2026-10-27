@@ -404,7 +404,7 @@ function _syncTaskBar(show, counts) {
         // The one top row (#7924): the search, the Filters icon, then + Task; Hide done is a control of the Filters panel, not a title row
         _taskBar.setHeader(null, [TV.newTaskButton({ small: true })]);
         const hide = document.createElement('div');
-        hide.innerHTML = '<label class="board-task-hide-toggle"><input type="checkbox" data-on-change="task-hide-done"> <span class="board-task-hide-text">Hide done</span></label>';
+        hide.innerHTML = '<label class="board-task-hide-toggle"><input type="checkbox" class="check" data-on-change="task-hide-done"> <span class="board-task-hide-text">Hide done</span></label>';
         _hideDoneEl = hide.firstElementChild;
         _taskBar.setExtras([_hideDoneEl]);
         _syncHideDone(_hideDoneLast.count, _hideDoneLast.hidden);

@@ -552,7 +552,7 @@ export function editGoal() {
     // Replace text span and buttons with an input
     const input = document.createElement("input");
     input.type = "text";
-    input.className = "goal-edit-input";
+    input.className = "field field-dense goal-edit-input";
     input.value = currentText;
 
     textEl.style.display = "none";

@@ -69,7 +69,7 @@ export function tagEditor({ project, hex, tags, editable, offer = () => [], onCh
             box.append(row);
         }
         const form = mk('form', 'artifact-tag-form');
-        const input = mk('input', 'artifact-tag-input'); input.type = 'text'; input.maxLength = MAX_LEN; input.setAttribute('aria-label', 'New tag'); input.placeholder = 'Another tag';
+        const input = mk('input', 'field artifact-tag-input'); input.type = 'text'; input.maxLength = MAX_LEN; input.setAttribute('aria-label', 'New tag'); input.placeholder = 'Another tag';
         const go = mk('button', 'btn btn-small', 'Add'); go.type = 'submit';
         form.append(input, go);
         form.addEventListener('submit', (e) => { e.preventDefault(); addTag(input.value); });

@@ -206,7 +206,7 @@ function hubBlock(st, origins, hubSessions) {
         ul.append(li);
     }
     const add = el('div', 'sec-add');
-    const input = el('input', 'pw-input'); input.type = 'text'; input.id = 'sec-hub-origin'; input.placeholder = 'https://host:port'; input.setAttribute('aria-label', 'New return address'); input.style.paddingRight = '11px';
+    const input = el('input', 'field pw-input'); input.type = 'text'; input.id = 'sec-hub-origin'; input.placeholder = 'https://host:port'; input.setAttribute('aria-label', 'New return address'); input.style.paddingRight = '11px';
     const addBtn = el('button', 'btn btn-small', 'Add'); addBtn.type = 'button'; addBtn.id = 'sec-hub-origin-add';
     const err = el('p', 'pw-error'); err.id = 'sec-hub-origin-error'; err.setAttribute('role', 'alert'); err.hidden = true;
     addBtn.addEventListener('click', () => {

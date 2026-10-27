@@ -59,7 +59,7 @@ export async function showTemplateBrowser(type, onSelect) {
         <div class="modal-content dlg-form template-browser">
             <div class="template-browser-header">
                 <h3>${type === 'agents' ? 'Agent Templates' : 'Command Templates'}</h3>
-                <input type="text" class="template-browser-search" placeholder="Filter templates...">
+                <input type="text" class="field template-browser-search" placeholder="Filter templates...">
                 <button class="btn template-browser-close" data-on-click="template-browser-close">&times;</button>
             </div>
             <div style="font-size:var(--fs-sm);color:var(--text-muted);padding:4px 0 8px">

@@ -137,7 +137,7 @@ function _openFilter(table, field, anchorEl) {
         const filtered = q ? uniqueVals.filter(v => v.toLowerCase().includes(q)) : uniqueVals;
         itemsContainer.innerHTML = filtered.map(val => {
             const checked = selected.size === 0 || selected.has(val) ? 'checked' : '';
-            return `<label class="cost-filter-item"><input type="checkbox" ${checked} data-val="${escapeHtml(val)}"><span>${escapeHtml(val)}</span></label>`;
+            return `<label class="cost-filter-item"><input type="checkbox" class="check" ${checked} data-val="${escapeHtml(val)}"><span>${escapeHtml(val)}</span></label>`;
         }).join('');
     }
 

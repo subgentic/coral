@@ -261,7 +261,7 @@ export function mountInbox(host, adapter, options) {
         const id = uid('ibx-reply');
         const label = el('label', 'ibx-reply-label', `Your reply to ${task.title || 'this task'} (the task stays open)`);
         label.setAttribute('for', id);
-        const ta = el('textarea', 'ibx-reply-input');
+        const ta = el('textarea', 'field ibx-reply-input');
         ta.id = id; ta.rows = 1; ta.maxLength = REPLY_MAX; // one line that grows as the reply does
         ta.value = _drafts.get(key) || '';
         _boxes.add(ta);

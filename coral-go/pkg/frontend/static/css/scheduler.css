@@ -74,10 +74,7 @@
 }
 
 
-.sched-tz-input {
-    width: 80px;
-    font-size: var(--fs-md);
-}
+.sched-tz-input { width: 80px; }
 
 /* ── New job / Edit job (#6540, #6578) ─────────────────────── */
 
