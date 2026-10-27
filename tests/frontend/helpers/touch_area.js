@@ -5,7 +5,9 @@ const TOUCH_AREA = `(e => { const r = e.getBoundingClientRect(); let l = r.left,
     // the ::after is the target only when it is positioned against the control (a positioned control), invisible, and bigger than the box on both axes; its place is its own offsets, not an assumption that it is centred
     if (a.content !== 'none' && a.position === 'absolute' && getComputedStyle(e).position !== 'static' && a.backgroundColor === 'rgba(0, 0, 0, 0)' && parseFloat(a.width) > w && parseFloat(a.height) > h) {
         const aw = parseFloat(a.width), ah = parseFloat(a.height), ox = parseFloat(a.left), oy = parseFloat(a.top);
-        if (Number.isFinite(ox) && Number.isFinite(oy)) { l = r.left + e.clientLeft + ox + (parseFloat(a.marginLeft) || 0); t = r.top + e.clientTop + oy + (parseFloat(a.marginTop) || 0); w = aw; h = ah; after = true; } }
+        if (Number.isFinite(ox) && Number.isFinite(oy)) { l = r.left + e.clientLeft + ox + (parseFloat(a.marginLeft) || 0); t = r.top + e.clientTop + oy + (parseFloat(a.marginTop) || 0); w = aw; h = ah; after = true;
+            // centred by a translate (left: 50%; transform: translate(-50%, -50%)): the computed transform is in px, and it moves the box
+            if (a.transform && a.transform !== 'none') { const m = new DOMMatrixReadOnly(a.transform); l += m.m41; t += m.m42; } } }
     return { l, t, r: l + w, b: t + h, w, h, after }; })`;
 const TOUCH_AFTER = `(e => { const a = (${TOUCH_AREA})(e); return a.after && a.w >= 43.5 && a.h >= 43.5; })`;
 // how far the control's own ::after hit area sticks out below its box (0 without one): a scroll-height test must not count it as text that spills
