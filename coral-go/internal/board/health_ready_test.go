@@ -225,3 +225,34 @@ func TestReviewTasksAreNotUnownedWork(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, ready)
 }
+
+// A review task is not work: if one carries the goal (the review of a task of this goal), the goal is still ready to close when its work is done, review pending or not (#8975, review pin).
+func TestAGoalWithAReviewTaskIsStillReadyToClose(t *testing.T) {
+	s, ctx := readyStore(t), context.Background()
+	goal := readyGoal(t, s, "g")
+	work := goalTask(t, s, goal, true)
+	review, err := s.CreateTaskWithOpts(ctx, "team", "Review #1: work", "", "medium", "Coral Task Queue",
+		&CreateTaskOpts{GoalID: &goal, Workflow: TaskWorkflow{ReviewOf: work, ReviewRound: 1}, reviewTask: true}, "Dev")
+	require.NoError(t, err)
+	got, err := s.GetTask(ctx, "team", review.ID)
+	require.NoError(t, err)
+	require.Equal(t, "pending", got.Status, "the review is open")
+	require.NotNil(t, got.GoalID, "the review carries the goal, or this pins nothing")
+	ready, err := s.GoalsReadyToClose(ctx, "team", time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, []int64{goal}, readyIDs(ready), "an open review does not hold the goal open")
+	assert.Equal(t, 1, ready[0].Tasks, "and a review is not counted as one of its tasks")
+}
+
+// A draft is not yet anyone's to own: with no goal and no assignee it is still not listed (#8975, review pin).
+func TestADraftTaskIsNeverUnowned(t *testing.T) {
+	s, ctx := readyStore(t), context.Background()
+	draft, err := s.CreateTaskWithOpts(ctx, "team", "idea", "", "medium", "Lead", &CreateTaskOpts{Draft: true})
+	require.NoError(t, err)
+	got, err := s.GetTask(ctx, "team", draft.ID)
+	require.NoError(t, err)
+	require.Equal(t, "draft", got.Status)
+	unowned, err := s.UnownedOpenTasks(ctx, "team", time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	assert.Empty(t, unowned, "a draft with no goal and no assignee is not unowned work")
+}
