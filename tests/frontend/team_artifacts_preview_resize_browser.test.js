@@ -47,10 +47,12 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64);
             assert.equal(await ev(`localStorage.getItem('coral-detail-width')`), String(kept), 'the width is remembered');
             await openRow('/build-log/'); await settle(200); assert.equal(await width(), kept, 'another artifact opens at the kept width');
         });
-        await S.run('End maximises it to the page\'s room, Home takes it to the narrowest, a double click puts it back', async () => {
+        await S.run('End maximises it to the page\'s room less 380 (the list keeps Name and Updated), Home takes it to the narrowest, a double click puts it back', async () => {
             await ev(`document.querySelector('.detail-grip').focus(); true`); await key('End', 'End', 35);
-            const max = await ev(`Math.round(document.getElementById('team-page-row').getBoundingClientRect().width) - 240`);
-            assert.ok(Math.abs((await width()) - max) <= 1, `End is the page's room less 240 (${await width()} / ${max})`); assert.ok(max > 900, 'and that is wide: ' + max);
+            const max = await ev(`Math.round(document.getElementById('team-page-row').getBoundingClientRect().width) - 380`);
+            assert.ok(Math.abs((await width()) - max) <= 1, `End is the page's room less 380 (${await width()} / ${max})`); assert.ok(max > 800, 'and that is wide: ' + max);
+            const list = await ev(`(() => { const t = document.querySelector('#team-panel-artifacts table'); return { w: Math.round(t.getBoundingClientRect().width), th: [...t.querySelectorAll('th')].filter(h => h.getClientRects().length).map(h => h.textContent.trim().replace(/[\\u2195\\u2191\\u2193]/g, '')) }; })()`);
+            assert.ok(list.th.some(h => /^Name/i.test(h)) && list.th.some(h => /^Updated/i.test(h)), `the list keeps its Name and Updated at the widest: ${JSON.stringify(list)}`);
             await shot('team-artifacts-preview-maximised');
             await key('Home', 'Home', 36); assert.equal(await width(), 280, 'Home is the narrowest');
             await ev(`document.querySelector('.detail-grip').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); true`);
