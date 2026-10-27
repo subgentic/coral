@@ -351,6 +351,7 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 
 	serveListeners(httpServer, lns, cfg, tlsConfig != nil, opts.OnServerError)
 
+	recordLaunch(coralDir, cfg.Port)
 	releaseOnError = false
 	return &RunningServer{
 		stopFirewall: fwCancel,

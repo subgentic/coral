@@ -31,12 +31,3 @@ func recordRun(dataDir string, args []string) {
 		log.Printf("[update] how Coral was started is not recorded (a Linux update will not be able to restart it): %v", err)
 	}
 }
-
-// recordLaunch writes where this Coral lives (its data folder, home folder and port) for the macOS and Windows relaunch after an update to carry over (#9056); every platform writes it, only those two read it.
-// A failure only logs: the relaunch then starts the app as before.
-func recordLaunch(dataDir string, port int) {
-	home, _ := os.UserHomeDir()
-	if err := runrecord.WriteLaunch(dataDir, runrecord.Launch{DataDir: dataDir, Home: home, Port: port}); err != nil {
-		log.Printf("[update] where Coral lives is not recorded (an update will restart it as the app starts by default): %v", err)
-	}
-}
