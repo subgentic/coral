@@ -141,6 +141,8 @@
     --fs-md:   0.8125rem;  /* 13px */
     --fs-lg:   0.875rem;   /* 14px */
     --fs-xl:   1rem;       /* 16px */
+    --fs-2xl:  1.25rem;    /* 20px: a page title, an item page title, a big figure (Goal #84) */
+    --fs-display: 2rem;    /* 32px: the welcome title only */
 
     /* Shared UI roles. User themes may override the prose family and size. */
     --type-page-size: 1.25rem;   /* 20px */

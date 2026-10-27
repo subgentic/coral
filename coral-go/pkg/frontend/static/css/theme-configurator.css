@@ -155,7 +155,7 @@
     background: var(--accent-dim);
     border: 1px solid var(--accent);
     border-radius: var(--radius-md);
-    font-size: 0.75rem;
+    font-size: var(--fs-base);
     color: var(--text-primary);
 }
 

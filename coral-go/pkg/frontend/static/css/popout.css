@@ -32,7 +32,7 @@ body.popout-mode .main-content {
 
 body.popout-mode .terminal-session-label {
     font-family: inherit;
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
     font-weight: 600;
     color: var(--text-primary);
     overflow: hidden;
@@ -42,7 +42,7 @@ body.popout-mode .terminal-session-label {
 }
 
 .terminal-state-pill {
-    font-size: 0.625rem;
+    font-size: var(--fs-xs);
     line-height: 16px;
     padding: 0 6px;
     flex-shrink: 0;
@@ -63,7 +63,7 @@ body.popout-mode .terminal-session-label {
 .terminal-state-pill[data-state="reconnecting"] { background: rgba(var(--fx-amber-rgb), 0.18); color: var(--warning); }
 
 .terminal-header-actions .terminal-header-btn {
-    font-size: 0.6875rem;
+    font-size: var(--fs-sm);
     gap: 4px;
     text-decoration: none;
     min-height: 26px;
