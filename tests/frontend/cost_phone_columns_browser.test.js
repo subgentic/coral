@@ -1,5 +1,5 @@
-// The Cost tables on a phone (#5056, #7743): at 390 px the tables fold (data_table's labeled fold) and Cost, the figure the page is opened for, follows the name lines, so it is on screen without a scroll;
-// everything else keeps its order after it. A wider window puts the table's columns back in their original order (also while the page is open), and the sort still works on the Cost column.
+// The Cost tables on a phone (#5056, #7743, #8982): at 390 px the tables are one line a row (the shared one-line table): the name column the table is about and Cost, the figure the page is opened for, on screen without a scroll;
+// the other columns drop. A wider window puts the table's columns back in their original order (also while the page is open), and the sort still works on the Cost column.
 // By Provider, By Model, By Thinking Level, By Team, By Branch and By Agent, from stubbed answers.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -54,37 +54,39 @@ const WIDE = {
             const inside = e => { const r = e.getBoundingClientRect(); return r.left >= card.left - 1 && r.right <= card.right + 1; };
             const cells = [...box.querySelectorAll('tbody tr:first-child td')].filter(td => td.getClientRects().length).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left);
             const labels = cells.map(td => td.dataset.label), ci = cells.findIndex(td => td.dataset.key === 'cost_usd');
-            out[id] = { folded: dt.classList.contains('dt-folded'), labels, ci, inside: cells.every(inside), heads: [...box.querySelectorAll('thead th:not(.dt-check)')].map(th => th.dataset.key ? th.querySelector('.dt-sort, .dt-head-text').firstChild.textContent.trim() : ''),
+            out[id] = { folded: dt.classList.contains('dt-folded'), labels, ci, inside: cells.every(inside), allHeads: [...box.querySelectorAll('thead th:not(.dt-check)')].map(th => th.dataset.key ? th.querySelector('.dt-sort, .dt-head-text').firstChild.textContent.trim() : ''), heads: [...box.querySelectorAll('thead th:not(.dt-check)')].filter(th => th.getClientRects().length).map(th => th.dataset.key ? th.querySelector('.dt-sort, .dt-head-text').firstChild.textContent.trim() : ''),
                 costs: [...box.querySelectorAll('tbody tr')].map(tr => tr.querySelector('td[data-key="cost_usd"]').textContent.trim()) };
         } return out; })()`);
 
-        console.log('1. At 390 px the tables fold and Cost follows the name lines, on screen without a scroll');
-        await waitFor(`${JSON.stringify(IDS)}.every(id => document.querySelector('#' + id + ' .dt-box').classList.contains('dt-folded'))`, 'the tables fold', 6000);
+        console.log('1. At 390 px the tables are one line a row: the name and Cost (#8982), on screen without a scroll');
+        await waitFor(`${JSON.stringify(IDS)}.every(id => document.querySelector('#' + id + ' .dt-box').classList.contains('dt-one-line'))`, 'the tables are one line a row', 6000);
         let t = await look();
-        const names = { 'cost-by-provider': 1, 'cost-by-model': 2, 'cost-by-thinking': 3, 'cost-by-agent': 1, 'cost-by-team': 1, 'cost-by-branch': 1 };
-        for (const [id, n] of Object.entries(names)) {
-            assert.ok(t[id].folded, `${id}: the table is folded: ${JSON.stringify(t[id])}`);
-            assert.equal(t[id].ci, n, `${id}: Cost comes right after its ${n} name line(s): ${JSON.stringify(t[id].labels)}`);
+        const LEAD = { 'cost-by-provider': 'Provider', 'cost-by-model': 'Model', 'cost-by-thinking': 'Thinking level', 'cost-by-agent': 'Agent', 'cost-by-team': 'Team', 'cost-by-branch': 'Branch' };
+        for (const id of IDS) {
+            assert.ok(!t[id].folded, `${id}: not folded: ${JSON.stringify(t[id])}`);
+            assert.ok(/^cost/i.test(t[id].heads.filter(Boolean).find(h => /^cost/i.test(h)) || ''), `${id}: Cost stays: ${JSON.stringify(t[id].heads)}`);
+            assert.ok(t[id].heads.filter(Boolean)[0].replace(/[\u2191\u2193\u2195]/g, '').trim().startsWith(LEAD[id]), `${id}: the first column is the table's own (${LEAD[id]}): ${JSON.stringify(t[id].heads)}`);
             assert.ok(t[id].inside, `${id}: every cell is inside the card without scrolling: ${JSON.stringify(t[id])}`);
         }
         console.log('   ✓');
 
-        console.log('2. The Cost cells hold costs, and sorting by the Cost column works');
+        console.log('2. The Cost cells hold costs, and a click on the Cost header sorts by it');
         for (const id of IDS) assert.ok(t[id].costs.every(x => /^\$/.test(x)), `${id}: the cells under Cost are costs: ${JSON.stringify(t[id].costs)}`);
-        await ev(`(() => { const s = document.querySelector('#cost-by-thinking .dt-sortbar-select'); s.value = 'input_tokens'; s.dispatchEvent(new Event('change', { bubbles: true })); s.value = 'cost_usd'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        const before = t['cost-by-thinking'].costs.slice();
+        await ev(`(() => { const th = document.querySelector('#cost-by-thinking th[data-key="cost_usd"]'); (th.querySelector('.dt-sort') || th).click(); return true; })()`);
         t = await look();
         const dollars = t['cost-by-thinking'].costs.map(x => Number(x.replace(/[$,]/g, '')));
-        assert.ok(dollars.every((v, i) => i === 0 || v <= dollars[i - 1]) || dollars.every((v, i) => i === 0 || v >= dollars[i - 1]), 'the rows are in cost order after the select: ' + JSON.stringify(dollars));
-        assert.equal(t['cost-by-thinking'].ci, 3, 'and Cost stays after the name lines');
+        assert.ok(dollars.every((v, i) => i === 0 || v >= dollars[i - 1]) || dollars.every((v, i) => i === 0 || v <= dollars[i - 1]), 'the rows are in cost order: ' + JSON.stringify(dollars));
+        assert.notDeepEqual(t['cost-by-thinking'].costs, before, 'and the click reversed the order');
         console.log('   ✓');
 
-        console.log('3. A wider window puts the original column order back, with the page open; narrowing folds the tables again');
+        console.log('3. A wider window puts the original column order back, with the page open; narrowing makes the tables one line again');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 844, deviceScaleFactor: 1, mobile: false });
-        await waitFor(`!document.querySelector('#cost-by-thinking .dt-box').classList.contains('dt-folded')`, 'the wide table', 6000);
+        await waitFor(`!document.querySelector('#cost-by-thinking .dt-box').classList.contains('dt-one-line')`, 'the wide table', 6000);
         t = await look();
-        for (const [id, heads] of Object.entries(WIDE)) assert.deepEqual(t[id].heads.map(h => h.replace(/[↕↑↓]/g, '').trim()), heads, `${id}: the wide order is back`);
+        for (const [id, heads] of Object.entries(WIDE)) assert.deepEqual(t[id].allHeads.map(h => h.replace(/[↕↑↓]/g, '').trim()), heads, `${id}: the wide order is back`);
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-        await waitFor(`document.querySelector('#cost-by-thinking .dt-box').classList.contains('dt-folded')`, 'folded again', 6000);
+        await waitFor(`document.querySelector('#cost-by-thinking .dt-box').classList.contains('dt-one-line')`, 'one line again', 6000);
         console.log('   ✓');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
