@@ -295,7 +295,7 @@
     }
 
     /* The tab row gives way to one current-view dropdown (nav_tabs.js, #3816): it names the view and opens the list of all; 44 px tall on a touch screen (touch.css). */
-    .top-nav-tabs { display: none; }
+    .tabs.top-nav-tabs { display: none; } /* as specific as the strip's own rule in layout.css */
     .top-bar-brand,
     .top-bar-actions {
         flex-shrink: 0;
