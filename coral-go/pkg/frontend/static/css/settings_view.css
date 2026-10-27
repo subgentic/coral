@@ -99,7 +99,7 @@
 .sv-fold[open] > summary { margin-bottom: 8px; }
 @media (pointer: coarse) { .sv-fold > summary { min-height: var(--control-touch-height, 44px); } }
 .sv-form-bar { flex: 1 1 auto; border-top: 0; padding: 0; background: none; } /* a form's bar sits in the dialog's own footer (spec.form.barHost): that footer has the rule and the padding */
-.sv-bar .btn:disabled { opacity: .5; cursor: not-allowed; } /* nothing changed: both are off, the status says why */
+/* nothing changed: both are off (the family's disabled look), the status says why */
 
 /* a touch screen: every control is a 44 px target */
 @media (pointer: coarse), (max-width: 767px) {

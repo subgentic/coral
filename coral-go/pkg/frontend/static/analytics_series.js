@@ -196,8 +196,8 @@ export function setData(view, data, error) { const st = seriesState(view); st.da
 
 function seg(label, items, isOn, onToggle, multi) {
     const wrap = el('div', 'viz-ctl'); wrap.append(el('span', 'viz-ctl-label', label));
-    const g = el('div', multi ? 'viz-seg viz-multi' : 'viz-seg'); g.setAttribute('role', 'group'); g.setAttribute('aria-label', label);
-    for (const [k, t] of items) { const b = el('button', null, t); b.type = 'button'; b.setAttribute('aria-pressed', String(isOn(k))); b.addEventListener('click', () => onToggle(k)); g.append(b); }
+    const g = el('div', multi ? 'viz-seg btn-seg viz-multi' : 'viz-seg btn-seg'); g.setAttribute('role', 'group'); g.setAttribute('aria-label', label);
+    for (const [k, t] of items) { const b = el('button', 'btn', t); b.type = 'button'; b.setAttribute('aria-pressed', String(isOn(k))); b.addEventListener('click', () => onToggle(k)); g.append(b); }
     wrap.append(g); watchMore(g); return wrap;
 }
 /** A scrolling row says there is more beyond its edge: data-more (end, start, both) is what the stylesheet fades. */
