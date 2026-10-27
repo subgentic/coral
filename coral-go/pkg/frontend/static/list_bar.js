@@ -115,7 +115,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
         tog = make('button', 'sidebar-collapse-btn list-bar-toggle'); tog.type = 'button'; tog.id = `${p}-toggle`;
         tog.setAttribute('aria-expanded', 'false'); tog.setAttribute('aria-controls', `${p}-menu`); tog.title = panelName; tog.setAttribute('aria-label', panelName);
         const icon = make('span', 'material-icons', 'notes'); icon.setAttribute('aria-hidden', 'true');
-        badge = make('span', 'display-badge display-badge-count'); badge.hidden = true;
+        badge = make('span', 'chip chip-count display-badge'); badge.hidden = true;
         tog.append(icon, badge);
         if (spec.expandAll) {
             chev = make('button', 'sidebar-collapse-btn group-toggle-btn list-bar-expand-all'); chev.type = 'button'; chev.dataset.next = 'expand';

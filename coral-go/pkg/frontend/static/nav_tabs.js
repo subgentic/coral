@@ -43,7 +43,7 @@ function makeItem(t) {
     const badge = t.el.querySelector('.nav-tab-badge');
     if (badge && !badge.hidden && badge.textContent) {
         const c = document.createElement('span');
-        c.className = 'nav-tab-badge nav-more-badge';
+        c.className = 'chip chip-count nav-tab-badge nav-more-badge';
         c.textContent = badge.textContent;
         b.append(c);
         b.setAttribute('aria-label', t.el.getAttribute('aria-label') || `${t.label}, ${badge.textContent}`);

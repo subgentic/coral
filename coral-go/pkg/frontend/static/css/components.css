@@ -1632,7 +1632,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     flex-wrap: wrap;
 }
 
-.sidebar-tag-pill {
+.sidebar-color-dot {
     display: inline-block;
     width: 8px;
     height: 8px;

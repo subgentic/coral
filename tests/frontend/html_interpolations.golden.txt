@@ -175,7 +175,7 @@
 1	folder_tags.js	createHtml
 1	folder_tags.js	currentHtml
 1	folder_tags.js	currentTags.map(t => `<span class="chip tag-pill" style="background:${escapeAttr(tagColor(t.color))}"> ${escap
-1	folder_tags.js	tags.map(t => `<span class="sidebar-tag-pill" style="background:${escapeAttr(tagColor(t.color))}" title="${esc
+1	folder_tags.js	tags.map(t => `<span class="sidebar-color-dot" style="background:${escapeAttr(tagColor(t.color))}" title="${es
 3	group_cards.js	CHEVRON_DECO
 2	group_cards.js	FOLDER_GROUP_ICON
 2	group_cards.js	_chevron(boardName, boardCollapsed)
@@ -402,7 +402,7 @@
 1	switch_row.js	title
 1	tab_customize.js	iconHtml
 1	tab_customize.js	svg.outerHTML
-1	tags.js	tags.map(t => `<span class="sidebar-tag-pill" style="background:${escapeAttr(tagColor(t.color))}" title="${esc
+1	tags.js	tags.map(t => `<span class="sidebar-color-dot" style="background:${escapeAttr(tagColor(t.color))}" title="${es
 1	task_dep_picker.js	checked
 1	task_dep_picker.js	t.id
 1	task_detail.js	requiredLabel

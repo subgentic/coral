@@ -228,7 +228,7 @@ const HOOK = `(() => {
             const clicked = await crawl('T' + path);
             await snapT();
             const got = await ev(`({ sinks: (window.__pwnSinks || []).filter(s => !/\\/vendor\\//.test(s.stack)), dom: [...document.querySelectorAll('[data-pwn]')].map(e => ({ f: e.getAttribute('data-pwn'), tag: e.tagName, in: (e.parentElement && (e.parentElement.id || e.parentElement.className || e.parentElement.tagName)) + '' })) })`);
-            const pills = await ev(`[...document.querySelectorAll('.tag-pill, .sidebar-tag-pill, .folder-tag-full, .tag-dropdown-item')].map(e => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), pos: getComputedStyle(e).position, bg: getComputedStyle(e).backgroundColor }; })`);
+            const pills = await ev(`[...document.querySelectorAll('.tag-pill, .sidebar-color-dot, .folder-tag-full, .tag-dropdown-item')].map(e => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), pos: getComputedStyle(e).position, bg: getComputedStyle(e).backgroundColor }; })`);
             pillCount += pills.length;
             for (const q of pills) {
                 if (q.bg === 'rgb(255, 0, 0)' || q.pos === 'fixed') findings.push(`[tainted] ${path}: a tag pill took the CSS from its colour: ${q.w}x${q.h} position ${q.pos}, background ${q.bg}`);

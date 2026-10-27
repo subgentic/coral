@@ -1743,7 +1743,10 @@
 .list-display-panel .agent-list-bar:not([hidden]) + .list-display-options { border-top: 1px solid var(--border); padding-top: var(--space-xs); }
 /* What is on while the panel is shut: a count on the button, and a line under the search saying which filters and which sort. */
 /* A dot on the corner of the button, hanging off it so it never covers the icon (at 200% text too); the count is its data-count, and the button's name says it (agent_list_bar.js). */
-.display-badge { position: absolute; top: -0.125rem; right: -0.125rem; width: 0.5rem; height: 0.5rem; padding: 0; overflow: hidden; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg-secondary, var(--bg-primary)); }
+.display-dot { position: absolute; top: -0.125rem; right: -0.125rem; width: 0.5rem; height: 0.5rem; padding: 0; overflow: hidden; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg-secondary, var(--bg-primary)); }
+.display-dot[hidden] { display: none; }
+/* the number on the Filters icon (#9329): a count chip (its size is .chip-count's) in the corner of the icon */
+.display-badge { position: absolute; top: -0.375rem; right: -0.375rem; box-shadow: 0 0 0 2px var(--bg-secondary, var(--bg-primary)); color: var(--text-on-accent); background: var(--accent-dim); }
 .display-badge[hidden] { display: none; }
 .sidebar-collapse-btn[data-display-button] { position: relative; }
 /* The header's one Collapse / Expand toggle: its icon is the next action. */

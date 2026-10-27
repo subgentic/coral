@@ -67,19 +67,10 @@
     position: absolute;
     top: 2px;
     left: calc(100% - 2px); /* just past the word's top-right corner: it covers the last letter by 2 px at most, and a pill of three or four characters stays in the tabs' 24 px gap */
-    box-sizing: border-box;
-    padding: 0 4px;
-    min-width: 16px;
-    height: 16px;
-    border-radius: var(--radius-lg);
-    /* 11px text: the unread red alone is 3.9:1 with white in the dark theme, so it is darkened here (5.5:1 dark, higher in light). */
+    /* 11px text: the unread red alone is 3.9:1 with white in the dark theme, so it is darkened here (5.5:1 dark, higher in light). Its size is the count chip's (#9329). */
     background: color-mix(in srgb, var(--rail-badge-unread) 82%, #000);
     box-shadow: 0 0 0 1px var(--topbar-bg); /* a ring in the bar's colour, so it reads on the active tab's underline */
     color: var(--rail-badge-text);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    line-height: 16px;
-    text-align: center;
 }
 .nav-tab-badge[hidden] { display: none; }
 .nav-more-item .nav-more-badge { margin-left: auto; }
@@ -387,13 +378,6 @@ body.panel-dragging .sidebar {
         position: absolute;
         top: -5px;
         right: -4px;
-        min-width: 14px;
-        height: 14px;
-        padding: 0 3px;
-        box-sizing: border-box;
-        border-radius: 7px;
-        font: 700 0.5625rem/0.875rem var(--font-sans);
-        text-align: center;
         color: var(--rail-badge-text);
         border: 1.5px solid var(--bg-secondary);
     }

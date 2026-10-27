@@ -114,11 +114,11 @@ function splitLabel(name) {
 function _mobileRowParts(s, stateInfo) {
     const mobileStatus = getMobileStatusChip(s);
     const mobileStatusChip = mobileStatus.className
-        ? `<span class="session-status-chip ${escapeAttr(mobileStatus.className)}">${escapeHtml(mobileStatus.label)}</span>`
+        ? `<span class="chip chip-caps session-status-chip ${escapeAttr(mobileStatus.className)}">${escapeHtml(mobileStatus.label)}</span>`
         : '';
     const mobileUnread = sessionUnreadCount(s);
     const unreadBoardBadge = mobileUnread > 0
-        ? `<span class="session-mobile-meta-pill">${mobileUnread} unread</span>`
+        ? `<span class="chip chip-caps session-mobile-meta-pill">${mobileUnread} unread</span>`
         : '';
     const mobileAttentionBanner = stateInfo.key === 'needs_input'
         ? '<div class="chip chip-attn session-mobile-banner">Waiting for your input</div>'

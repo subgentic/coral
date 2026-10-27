@@ -16,18 +16,12 @@ const NOT_CHIPS = {
     'model-chip-item': 'a row of the model menu', 'model-chip-menu': 'the model menu', 'model-chip-note': 'a note in the model menu',
     'folder-tag-dropdown': 'a dropdown', 'tag-dropdown-header': 'a dropdown heading', 'hf-tag-remove': 'a remove button',
     'artifact-tag-add': 'a button', 'artifact-tag-list': 'the editor row', 'artifact-tag-offer': 'a suggestion row', 'artifact-tag-remove': 'a remove button',
-    'artifact-tag-status': 'a status line under the tag editor', 'chat-attachment-chip': 'a link to a file in a chat', 'folder-tag-current': 'a row that holds tags',
+    'artifact-tag-status': 'a status line under the tag editor', 'folder-tag-current': 'a row that holds tags',
     'goals-chips': 'the row of filter toggles', 'group-chip': 'a button', 'group-chip-count': 'the count inside the group button', 'keys-chip': 'a key button',
     'list-bar-chip': 'a removable filter: a button', 'live-pills': 'a container', 'live-pills-stack': 'a container', 'mb-new-pill-btn': 'a button', 'mb-row-tags-open': 'a container',
     'model-chip-add-err': 'a message in the model menu', 'model-chip-add-form': 'a form in the model menu', 'model-chip-add-row': 'a row in the model menu', 'model-chip-caret': 'an icon',
     'options-chip': 'a toggle button', 'perm-chip': 'a toggle button', 'tag-dropdown': 'a dropdown', 'tag-dropdown-create': 'a dropdown row',
     'tag-dropdown-item': 'a dropdown row', 'terminal-gone-chip': 'a button that restarts the terminal',
-    // a count dot over a corner of a tile or a tab (positioned, 14 to 16 px): moves to .chip-count with the tab and rail census
-    'nav-tab-badge': 'a count dot over a tab corner', 'rail-tile-badge': 'a count dot over a tile corner (an icon too)',
-    // another label that is not a chip: the board task type's own
-    'subagent-detail-chip': 'the board task type label (board-task-type)',
-    // dots: no text
-    'display-badge': 'a dot', 'sidebar-tag-pill': 'a dot',
 };
 const SIZED = /(?:^|;)\s*(?:font-size|font-weight|padding(?:-[a-z]+)?|border-radius|height|min-height|line-height)\s*:/;
 const NAME = /(?:^|-)(?:chip|tag|pill|badge)s?(?:-|$)/; // a word of the name, so stage is not a tag

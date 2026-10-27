@@ -859,14 +859,7 @@
 
     #mobile-session-list .session-status-chip,
     #mobile-session-list .session-mobile-meta-pill {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        padding: 3px 8px;
-        font-size: var(--fs-xs);
-        font-weight: 700;
-        letter-spacing: 0.02em;
-        text-transform: uppercase;
+        display: inline-flex; /* the chip's size, caps and weight (#9329); shown on a phone only */
     }
 
     #mobile-session-list .session-status-chip.running {

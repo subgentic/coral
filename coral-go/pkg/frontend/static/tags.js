@@ -166,7 +166,7 @@ export async function createTag() {
 export function renderSidebarTagDots(tags) {
     if (!tags || tags.length === 0) return "";
     return '<span class="sidebar-tag-pills">' +
-        tags.map(t => `<span class="sidebar-tag-pill" style="background:${escapeAttr(tagColor(t.color))}" title="${escapeHtml(t.name)}"></span>`).join("") +
+        tags.map(t => `<span class="sidebar-color-dot" style="background:${escapeAttr(tagColor(t.color))}" title="${escapeHtml(t.name)}"></span>`).join("") +
         '</span>';
 }
 

@@ -43,7 +43,7 @@ function isCoralDelivery(msg) {
 // from an upload by the file's name (chat_thumbs.js, #5028, #5032).
 function attachmentChips(attachments) {
     const chips = (Array.isArray(attachments) ? attachments : []).filter(a => a && a.name).map(a =>
-        `<span class="chat-attachment-chip">${escapeHtml(a.name)}${a.file ? ` <span class="chat-attachment-file">${escapeHtml(a.file)}</span>` : ""}</span>${thumbHtml(a)}`);
+        `<span class="chip chip-tag chat-attachment-chip">${escapeHtml(a.name)}${a.file ? ` <span class="chat-attachment-file">${escapeHtml(a.file)}</span>` : ""}</span>${thumbHtml(a)}`);
     return chips.length ? `<div class="chat-attachments">${chips.join("")}</div>` : "";
 }
 

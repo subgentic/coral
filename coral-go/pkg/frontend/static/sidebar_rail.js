@@ -45,8 +45,8 @@ function _railTile(s, active) {
         ? `<span class="rail-tile-emoji">${escapeHtml(s.icon)}</span>`
         : (_railRoleIcon(s) ? `<span class="material-icons rail-tile-icon" aria-hidden="true">${_railRoleIcon(s)}</span>` : '');
     let badge = '';
-    if (unread > 0) badge = `<span class="rail-tile-badge rail-tile-unread" aria-hidden="true">${unread > 9 ? '9+' : unread}</span>`; // the tile's name says the count (below)
-    else if (dot === 'done') badge = '<span class="rail-tile-badge rail-tile-done material-icons" aria-hidden="true">check</span>';
+    if (unread > 0) badge = `<span class="chip chip-count rail-tile-badge rail-tile-unread" aria-hidden="true">${unread > 9 ? '9+' : unread}</span>`; // the tile's name says the count (below)
+    else if (dot === 'done') badge = '<span class="chip chip-count rail-tile-badge rail-tile-done material-icons" aria-hidden="true">check</span>';
     // The dot is colour only: the tile's own name says the state, in the words the sidebar uses, so it is read once and the dot is skipped (#4276).
     else badge = `<span class="rail-tile-dot avatar-status-dot ${dot}" aria-hidden="true"></span>`;
     const railStale = isStaleSession(s);
