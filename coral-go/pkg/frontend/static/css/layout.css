@@ -972,7 +972,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-chip[aria-pressed="true"] { color: var(--text-primary); border-color: var(--accent); background: var(--bg-tertiary); }
 .group-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .group-chip-count { font-size: var(--fs-sm); font-weight: 600; color: var(--text-secondary); }
-.group-table-note { margin-top: var(--space-md); }
+.group-table-note { margin-top: var(--space-md); font-size: 0.8125rem; font-weight: 400; line-height: 1.4; color: var(--text-secondary); text-align: left; } /* one quiet note under every Inbox folder (a computer that did not answer, the search note): the Artifacts line's size and colour (#8922) */
 /* A page that lists several groups (the landing, #7722): their tables share one column grid, and each next head has room above it */
 .group-table-head ~ .group-table-head { margin-top: var(--space-2xl); }
 @media (pointer: coarse) { .group-chip { min-height: 44px; } }
