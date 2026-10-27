@@ -37,10 +37,11 @@ type LazyGroup struct {
 	Members []string
 }
 
-// LazyGroups are the tab families a first visit loads whole: Workflows (the panel, its editor, its run page and Build with Agent) and Analytics
-// (the dashboard, its views, charts, an agent's page and the two team views). Each was 4 to 6 files plus their stubs.
+// LazyGroups are the tab families a first visit loads whole: Automations (the folders, the workflows' pages, their editor, run page and Build with Agent, and the folders' filters)
+// and Analytics (the dashboard, its views, charts, an agent's page and the two team views). Each was 4 to 6 files plus their stubs. The shared pieces the Inbox loads too
+// (the folder list, the toolbar) stay files of their own, so the Inbox's first visit does not load Automations.
 var LazyGroups = []LazyGroup{
-	{Main: "workflows.js", Members: []string{"workflow_run_html.js", "workflow_agent.js", "workflow_editor.js"}},
+	{Main: "automations.js", Members: []string{"workflow_run_html.js", "workflow_agent.js", "workflow_editor.js", "workflows.js", "automation_filters.js"}},
 	{Main: "cost_dashboard.js", Members: []string{"cost_data.js", "analytics_views.js", "analytics_series.js", "analytics_agent.js", "analytics_spend.js"}},
 }
 
