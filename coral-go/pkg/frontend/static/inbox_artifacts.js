@@ -1,4 +1,5 @@
 import { readInboxArtifacts } from './inbox_servers.js';
+import { teamLabel } from './server_status.js';
 /* The Inbox's Artifacts folder (Goal #62): every file the agents of every team made, in one list, as the team page's Artifacts tab draws it (team_artifacts_page.js, its search, Filters and
  * table) with a Team filter and column, and the document in a pane on the page's right: a click on a row opens it there and the list stays. The server merges the teams (GET /api/team-artifacts);
  * this file is the folder: its count for the sidebar, its page, and the search the sidebar's box feeds. Lazy: inbox_sidebar.js imports it. */
@@ -45,7 +46,7 @@ export function artifactsToolbar(redraw) {
     if (redraw) onCount = redraw; // the list tells the folder when it has read (its count, its teams, its names): the toolbar is drawn again
     const teams = list.teams();
     const pills = list.reviewPills();
-    const node = folderBar.draw({ filters: list.filters(), pills, options: { team: { values: teams.map(t => t.board_id), labels: Object.fromEntries(teams.map(t => [t.board_id, `${t.team || t.board_id} (${t.all})`])) } } });
+    const node = folderBar.draw({ filters: list.filters(), pills, options: { team: { values: teams.map(t => t.board_id), labels: Object.fromEntries(teams.map(t => [t.board_id, `${teamLabel(t.board_id, t.team)} (${t.all})`])) } } });
     folderBar.bar.names(list.names());
     return { node, signature: JSON.stringify([list.filters(), teams.map(t => [t.board_id, t.all]), pills && pills.items.map(i => i.count)]) };
 }
