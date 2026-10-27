@@ -97,7 +97,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'goals', item: ${goal} }); true`);
             await waitFor(`!!document.querySelector('.goal-split')`, 'the goal page', 15000);
-            if (mobile) await ev(`document.querySelector('.goal-tasks-open').click(); true`);
+            if (mobile) {
+                // The goal shell is drawn before its tasks finish loading; the phone's Tasks button comes with those rows.
+                await waitFor(`!!document.querySelector('.goal-tasks-open') && document.querySelector('.goal-tasks-open').getClientRects().length > 0`, 'the phone goal Tasks button', 10000);
+                await ev(`document.querySelector('.goal-tasks-open').click(); true`);
+            }
             await waitFor(`document.querySelectorAll('.goal-side .dt-table tbody tr').length >= 5`, 'the goal column', 10000);
             await waitFor(`!!document.querySelector('.goal-side .dt-box.dt-folded')`, 'the goal column folds to two lines', 5000);
             const gc = await ev(`(() => { const rows = [...document.querySelectorAll('.goal-side .dt-table tbody tr')]; return { words: [...new Set(rows.map(r => r.querySelector('.goal-chip').textContent))].sort(), idFirst: rows.every(r => r.querySelector('.dt-title-cell > .dt-id + .dt-primary')), high: rows.filter(r => getComputedStyle(r.querySelector('td[data-key="priority"]')).display !== 'none').length, h: rows.map(r => Math.round(r.getBoundingClientRect().height)), folded: document.querySelector('.goal-side .dt-box').classList.contains('dt-folded') }; })()`);
