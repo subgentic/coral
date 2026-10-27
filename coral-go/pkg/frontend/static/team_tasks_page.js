@@ -22,6 +22,7 @@ const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's re
 const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 
 const PAGE = 50;
+const REREAD_PAGES = 5; // a refresh reads at most this many loaded pages again: a person who scrolled a big board to its end does not make 30 requests every 10 s (#9121)
 const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['needs_review', 'Needs review'], ['done', 'Done']];
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css)
 let phoneWatched = false, newTask = null; // one New task button, moved between the search row and the chips' row
@@ -65,12 +66,18 @@ export async function loadTasks() {
         if (project !== model.project) return;
         let rows = Array.isArray(json && json.tasks) ? json.tasks : [];
         let cursor = typeof json.next_cursor === 'string' ? json.next_cursor : '';
-        for (let i = 0; i < (model.moreLoaded ? model.extraPages : 0) && cursor; i++) { // the pages the person loaded are read again with the first, so an open task that finished does not stay open on screen
+        const depth = model.moreLoaded ? model.extraPages : 0, reread = Math.min(depth, REREAD_PAGES);
+        for (let i = 0; i < reread && cursor; i++) { // the pages the person loaded are read again with the first, so an open task that finished does not stay open on screen
             const next = await readJson(`/tasks?limit=${PAGE}&cursor=${encodeURIComponent(cursor)}`);
             if (project !== model.project) return;
             const have = new Set(rows.map(t => t.id));
             rows = rows.concat((next.tasks || []).filter(t => !have.has(t.id)));
             cursor = typeof next.next_cursor === 'string' ? next.next_cursor : '';
+        }
+        if (depth > reread) { // the pages beyond the cap keep what the person had on screen, and "Load more" continues after them
+            const have = new Set(rows.map(t => t.id));
+            rows = rows.concat(model.rows.filter(t => !have.has(t.id)));
+            cursor = model.cursor;
         }
         model.rows = rows;
         model.cursor = cursor;

@@ -107,3 +107,44 @@ func TestDefaultTaskListPageSizeOnABigOpenSet(t *testing.T) {
 	assert.Len(t, page.Tasks, 50)
 	assert.Less(t, len(body)*20, len(full), "a poll costs a small part of the whole open set")
 }
+
+// The page boundary (the review of #9121): a board with exactly `limit` open tasks gets them and the first page of done tasks, as it always did; one more open task makes the page the first `limit` open tasks and a cursor, with
+// no done task in it. A mutant that treats "limit rows" as "more to come" fails the first case.
+func TestDefaultTaskListPageBoundaries(t *testing.T) {
+	ctx := context.Background()
+	for _, c := range []struct {
+		name         string
+		open, done   int
+		limit        int
+		wantRows     int
+		wantDoneRows int
+		wantCursor   bool
+	}{
+		{"one under the limit", 49, 20, 50, 69, 20, false},
+		{"exactly the limit", 50, 20, 50, 70, 20, false},
+		{"one over the limit", 51, 20, 50, 50, 0, true},
+		{"exactly the limit with more done than a page", 50, 60, 50, 100, 50, true},
+		{"limit 1, one open task", 1, 2, 1, 2, 1, true},
+		{"limit 1, two open tasks", 2, 2, 1, 1, 0, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			s, err := NewStoreWithKey(filepath.Join(t.TempDir(), "board_boundary.db"), "")
+			require.NoError(t, err)
+			t.Cleanup(func() { s.Close() })
+			seedTaskBoard(t, s, c.open, c.done)
+			p, err := s.ListTaskPage(ctx, "team", TaskListQuery{Limit: c.limit})
+			require.NoError(t, err)
+			doneRows := 0
+			for _, it := range p.Tasks {
+				if it.Status == "completed" {
+					doneRows++
+				}
+			}
+			assert.Len(t, p.Tasks, c.wantRows)
+			assert.Equal(t, c.wantDoneRows, doneRows, "done tasks on the first page")
+			assert.Equal(t, c.wantCursor, p.NextCursor != "", "a cursor when there is more")
+			assert.Equal(t, c.open, p.TotalOpen)
+			assert.Equal(t, c.done, p.TotalCompleted)
+		})
+	}
+}

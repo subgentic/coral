@@ -940,6 +940,7 @@ A page of the board's task list. Items carry list fields only: no `body`,
 | `status=all` | Every task, newest ID first. |
 | `limit` | Page size: default `50`, maximum `200`. With no `status`, it is the page of open tasks, and of done tasks after them. |
 | `cursor` | The `next_cursor` of the previous page, with the same `status`. Opaque. |
+| *(open cursor)* | With no `status`, the cursor that continues the open tasks is a keyset on (priority, ID): a task whose priority changes between two page reads can be missed or seen twice until the next read from the first page; a client that refreshes from the first page (the dashboard does) never keeps the difference. |
 | `full=1` | Every task in full (body, completion message, workflow), unpaged, as before pagination. For tools that need everything at once; it is slow on a large board. |
 
 An unknown `status`, a bad `limit` or a cursor from another `status` returns `400`.
