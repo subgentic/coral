@@ -1,11 +1,16 @@
 // The phone's composer is one row (UI/UX's 170 list, item 3, task 7623): the box, Send and one Options button side by side, about 90 px of the screen where it was about 190 (the box, then the Model and
 // Thinking chips, then Keys). Options opens a sheet that says what each holds ("Model: CLI default", "Thinking: Default"); a choice opens that chip's own menu; Escape goes back to Options. Keys is only
 // in the terminal view (agent_keys covers it there). At 200% text the row gives up the width and Options goes under the box. A desktop keeps its chips and has no Options button.
-// Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
+// Drives Chrome over CDP through agent_view_harness.js against an isolated dev server. PHONE_COMPOSER_SHOTS=<dir> writes pictures of the phone's split Send at 390 px, light and dark: the row and the open menu
+// (UI/UX's check of the batch shots, #9644: the batch never takes them).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
+const fs = require('node:fs');
+const { swapTheme } = require('./helpers/theme');
+const { nextFrame } = require('./helpers/wait');
+const SHOTS = process.env.PHONE_COMPOSER_SHOTS;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -50,6 +55,21 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.ok(sm.surface && sm.filled && sm.border, 'the send options menu has the menu surface (a fill and a border): ' + JSON.stringify(sm));
         assert.ok(sm.menuBottom <= sm.boxTop + 0.5 && sm.onScreen, `it opens whole above the composer's row, on the screen: ${JSON.stringify(sm)}`);
         assert.ok(sm.seam >= 0 && sm.seam <= 2 && Math.abs(sm.oh - sm.sh) < 1, `the chevron and Send are one box, no gap (seam ${sm.seam}px): ${JSON.stringify(sm)}`);
+        if (SHOTS) { // the split Send at 390 px in each theme, the row and the menu open above it
+            fs.mkdirSync(SHOTS, { recursive: true });
+            const shoot = async name => fs.writeFileSync(`${SHOTS}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+            for (const theme of ['light', 'dark']) {
+                await swapTheme(ev, theme);
+                await nextFrame(ev);
+                await shoot(`phone-send-menu-390-${theme}`);
+                await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+                await waitFor(`getComputedStyle(document.querySelector('.mobile-send-menu')).display === 'none' || document.querySelector('.mobile-send-menu').hidden`, 'the menu closed', 3000);
+                await shoot(`phone-send-row-390-${theme}`);
+                await ev(`document.querySelector('.mobile-send-options-btn').click(); true`);
+                await waitFor(`getComputedStyle(document.querySelector('.mobile-send-menu [data-on-click=\"send-menu-options\"]')).display !== 'none'`, 'the menu open again', 3000);
+            }
+            await swapTheme(ev, 'dark'); // the theme the suite runs in
+        }
         await ev(`document.querySelector('.mobile-send-menu [data-on-click=\"send-menu-options\"]').click(); true`);
         await waitFor(`!document.getElementById('options-chip-menu').hidden`, 'the Options sheet', 3000);
         assert.equal(await ev(`document.getElementById('options-chip').getAttribute('aria-expanded')`), 'true');
