@@ -347,7 +347,13 @@ func (s *Store) reviewVerdictAt(ctx context.Context, project string, id int64, a
 	if approve && currentVersion > 1 && (len(textVersions) == 0 || textVersions[0] != currentVersion) {
 		return nil, fmt.Errorf("task #%d changed to v%d; read task detail and approve with --task-version %d", id, currentVersion, currentVersion)
 	}
+	if len(textVersions) > 0 && textVersions[0] > currentVersion {
+		return nil, fmt.Errorf("task version %d does not exist", textVersions[0])
+	}
 	me.TaskVersion = currentVersion
+	if !approve && len(textVersions) > 0 && textVersions[0] > 0 {
+		me.TaskVersion = textVersions[0]
+	}
 	me.State, me.Note, me.At = verdict, note, now
 	msg := fmt.Sprintf("%s task #%d", strings.ToUpper(verdict[:1])+verdict[1:], id)
 	if note != "" {
@@ -483,4 +489,12 @@ func lastRoundRejected(w TaskWorkflow) bool {
 // ApproveReviewTextVersion names both the patch revision and the task text read.
 func (s *Store) ApproveReviewTextVersion(ctx context.Context, project string, id int64, actor, note string, round, revision, version int) (*ReviewVerdict, error) {
 	return s.reviewVerdictAt(ctx, project, id, actor, note, true, round, revision, version)
+}
+
+// RejectReviewTextVersion keeps the version actually read, including an older rejection.
+func (s *Store) RejectReviewTextVersion(ctx context.Context, project string, id int64, actor, note string, round, taskVersion int) (*ReviewVerdict, error) {
+	if strings.TrimSpace(note) == "" {
+		return nil, fmt.Errorf("say why: a rejection needs --note")
+	}
+	return s.reviewVerdictAt(ctx, project, id, actor, note, false, round, NoRevisionStated, taskVersion)
 }
