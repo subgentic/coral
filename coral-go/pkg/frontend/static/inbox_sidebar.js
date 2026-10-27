@@ -411,13 +411,18 @@ function savedListSpec(where = '') {
             open: (f, row) => dock ? openDockSavedSheet(f.id, row.querySelector('.dt-primary')) : openSavedPage(f.id),
             mail: f => ({ lead: { text: f.title || f.which, name: f.title || f.which }, title: f.title || f.which, snippet: f.snippet, time: f.saved }), // a phone's row (#9583): who it is from, the message, when it was saved
             columns: [
-                { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; if (multi && f.serverName) b.title = `${f.which} · ${f.serverName}`; return b; } }, // a narrow row drops the Computer column (#8981): its name stays one hover or one sheet away
+                { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { // the sender (14/600), then the message in the secondary colour: a list of who said what reads at a glance; the button's name is still the whole words
+                    const b = DT.primaryButton('', f.which); b.dataset.id = f.id; b.title = multi && f.serverName ? `${f.which} · ${f.serverName}` : f.which;
+                    b.classList.add('dt-saved-message');
+                    const lead = f.title && f.which.startsWith(`${f.title}, `) ? f.title : ''; // the button's text stays the whole words (f.which: "Agent One, The release plan"): the comma between is read by a screen reader and not drawn
+                    if (lead) { const sep = DT.el('span', 'sr-only', ', '); b.append(DT.el('span', 'dt-saved-who', lead), sep, DT.el('span', 'dt-saved-text', f.which.slice(lead.length + 2))); } else b.append(DT.el('span', 'dt-saved-text', f.which));
+                    return b; } }, // a narrow row drops the Computer column (#8981): its name stays one hover or one sheet away
                 ...(dock ? (multi ? [{ key: 'machine', label: 'Computer', line: 0, cell: f => f.serverName || '' }] : []) : serverColumns().map(c => ({ ...c, line: 0 }))), // a folded row is one line: the message, when it was saved and its action (#8981); the machine and the state stay as columns where the table is wide
                 { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, tiny: true, cell: f => f.saved },
-                { key: 'state', label: 'State', line: 0, cell: f => (f.state ? DT.tag(f.state) : '') },
+                ...(rows.some(f => f.state && f.state.toLowerCase() !== v.tab) ? [{ key: 'state', label: 'State', line: 0, cell: f => (f.state ? DT.tag(f.state) : '') }] : []), // the Open and Done filter already says it: a State column that repeats it on every row is drawn only when a row's state is something else (gone)
                 { key: 'action', label: 'Action', hideLabel: true, line: 1, tiny: true, cell: f => {
                     if (f.gone) return '';
-                    const b = DT.el('button', 'btn btn-small dt-quiet', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`);
+                    const b = DT.el('button', 'btn btn-small dt-quiet dt-hover-action', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`); // drawn on the row's hover and keyboard focus (css); always on a touch screen
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
                     return b; } },
             ] }).el };
