@@ -469,6 +469,6 @@ export function dataTable(cfg) {
         new ResizeObserver(syncFold).observe(box);
         if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(syncFold); // fonts already in: the observer's first call settles it before the paint; calling it now read the width of a box not yet laid out, a forced layout (#9450)
     }
-    mailQuery?.addEventListener?.('change', () => { box.classList.toggle('dt-mail-on', mailOn()); drawBody(); }); // the window crosses the phone's width: the rows are drawn again in the other form
+    mailQuery?.addEventListener?.('change', () => { box.classList.toggle('dt-mail-on', mailOn()); drawBody(); cfg.onModeChange?.(); }); // the window crosses the phone's width: the rows are drawn again in the other form; a list whose selection exists on a phone only (selectable is decided when the spec is drawn) asks its owner to draw the table again
     return { el: box, bar, selectButton, selection: () => new Set(st.selected), clear, state: st };
 }

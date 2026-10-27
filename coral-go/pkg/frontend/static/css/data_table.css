@@ -195,7 +195,7 @@
 }
 
 .dt-bar-choice, .dt-bar-text { min-width: 0; max-width: 100%; min-height: var(--table-control-h); padding: var(--table-control-pad-y) var(--table-control-pad-x); border: var(--table-track-border-w) solid var(--table-control-border); border-radius: var(--table-control-radius); color: var(--table-primary-color); background: var(--table-control-bg); font: inherit; font-size: var(--table-secondary-size); }
-@media (max-width: 760px) { .dt-bar-choice, .dt-bar-text, .dt-select-toggle { min-height: var(--table-touch); } }
+@media (max-width: 760px), (pointer: coarse) { .dt-bar-choice, .dt-bar-text, .dt-select-toggle, .dt-bar .btn { min-height: var(--table-touch); } } /* the selection bar's actions (Mark done, Star, Archive, Clear) are 44 px targets under touch (#9545) */
 
 /* Value entry belongs below the selection summary, so Clear and search keep their places. */
 .dt-bar-step { order: 1; flex: 1 1 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--table-value-gap); }
