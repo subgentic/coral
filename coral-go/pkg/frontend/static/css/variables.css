@@ -409,10 +409,15 @@
    token here or above, or add one. */
 :root {
     /* a person's avatar in a table (data_table.js): eight fixed colours, white text on each is 4.5:1 or more, the same in both themes (#7743) */
-    --avatar-1: #4f46c8; --avatar-2: #b04a00; --avatar-3: #0f7665; --avatar-4: #1a7f37; --avatar-5: #1d4ed8; --avatar-6: #7c3aed; --avatar-7: #be123c; --avatar-8: #a21caf;
+    --avatar-1: #4f46c8;
+    --avatar-2: #b04a00;
+    --avatar-3: #0f7665;
+    --avatar-4: #1a7f37;
+    --avatar-5: #1d4ed8;
+    --avatar-6: #7c3aed;
+    --avatar-7: #be123c;
+    --avatar-8: #a21caf;
     --on-avatar: #fff;
-}
-:root {
     --black-rgb:         0, 0, 0;
     --white-rgb:         255, 255, 255;
     --fx-red-rgb:        248, 81, 73;
@@ -436,23 +441,30 @@
     --fx-navy-ink:       #0a0e14;
     --radius-xs:         3px;
     --radius-ml:         10px;
-}
-
-/* Dialog type scale (#7405, UI/UX): the sizes and weights every sectioned dialog uses (Settings, and New agent and New team as they adopt it): a text is one of these eight and Plus Jakarta Sans */
-:root {
     /* the three dialog sizes by kind and the one radius (#9185, Goal #84): a confirmation, a short form, a flow or settings */
     --dlg-w-confirm: 28rem;
     --dlg-w-form: 40rem;
     --dlg-w-flow: min(60rem, 94vw);
-    --dlg-max: 95vw;   /* no dialog is wider than the screen less a margin, whatever its size */
+    --dlg-max: 95vw;
+    /* no dialog is wider than the screen less a margin, whatever its size */
     --dlg-h-flow: min(640px, calc(100dvh - 32px));
     --dlg-radius: var(--radius-xl);
-    --dlg-title: 700 1rem/1.3 var(--font-sans);          /* 16: the dialog's title */
-    --dlg-pane: 700 1.0625rem/1.3 var(--font-sans);      /* 17: a pane's title */
-    --dlg-section: 600 0.875rem/1.35 var(--font-sans);   /* 14: a section heading */
-    --dlg-label: 500 0.8125rem/1.4 var(--font-sans);     /* 13: a row's label */
-    --dlg-control: 400 0.8125rem/1.4 var(--font-sans);   /* 13: a control's value */
-    --dlg-button: 500 0.8125rem/1.2 var(--font-sans);    /* 13: a button */
-    --dlg-hint: 400 0.75rem/1.4 var(--font-sans);        /* 12: a hint, one short line */
-    --dlg-badge: 600 0.6875rem/1.2 var(--font-sans);     /* 11: a badge */
+    --dlg-title: 700 1rem/1.3 var(--font-sans);
+    /* 16: the dialog's title */
+    --dlg-pane: 700 1.0625rem/1.3 var(--font-sans);
+    /* 17: a pane's title */
+    --dlg-section: 600 0.875rem/1.35 var(--font-sans);
+    /* 14: a section heading */
+    --dlg-label: 500 0.8125rem/1.4 var(--font-sans);
+    /* 13: a row's label */
+    --dlg-control: 400 0.8125rem/1.4 var(--font-sans);
+    /* 13: a control's value */
+    --dlg-button: 500 0.8125rem/1.2 var(--font-sans);
+    /* 13: a button */
+    --dlg-hint: 400 0.75rem/1.4 var(--font-sans);
+    /* 12: a hint, one short line */
+    --dlg-badge: 600 0.6875rem/1.2 var(--font-sans);
+    /* 11: a badge */
 }
+
+/* Dialog type scale (#7405, UI/UX): the sizes and weights every sectioned dialog uses (Settings, and New agent and New team as they adopt it): a text is one of these eight and Plus Jakarta Sans */
