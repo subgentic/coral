@@ -76,7 +76,7 @@
     background: color-mix(in srgb, var(--rail-badge-unread) 82%, #000);
     box-shadow: 0 0 0 1px var(--topbar-bg); /* a ring in the bar's colour, so it reads on the active tab's underline */
     color: var(--rail-badge-text);
-    font-size: 0.6875rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     line-height: 16px;
     text-align: center;
@@ -87,7 +87,7 @@
 .nav-more-wrap { display: flex; flex: 0 0 auto; }
 /* The row is text only; More shows a small chevron. */
 .top-nav-tab .material-icons { display: none; }
-.nav-more-btn .material-icons { display: inline-block; font-size: 1rem; vertical-align: -3px; margin-left: 2px; }
+.nav-more-btn .material-icons { display: inline-block; font-size: var(--fs-xl); vertical-align: -3px; margin-left: 2px; }
 
 /* The More menu (the row's, when tabs do not fit) and the phone's view list share one element. */
 .nav-more-menu {
@@ -117,7 +117,7 @@
     text-align: left;
 }
 .nav-more-item:hover, .nav-more-item.active { background: var(--bg-tertiary); }
-.nav-more-item .material-icons { color: var(--text-secondary); font-size: 1.25rem; }
+.nav-more-item .material-icons { color: var(--text-secondary); font-size: var(--fs-2xl); }
 .nav-more-item .nav-more-drawn { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; flex: none; color: var(--text-secondary); } /* a drawn icon, the size of the font's (#9160) */
 .nav-more-item .nav-more-drawn svg { width: 1.25rem; height: 1.25rem; }
 /* Icons only in the phone's list of views. */
@@ -143,13 +143,13 @@ a.nav-more-item { text-decoration: none; }
 }
 
 .top-bar h1 {
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
     font-weight: 600;
     color: var(--text-secondary);
 }
 
 .top-bar .btn-primary {
-    font-size: 0.75rem;
+    font-size: var(--fs-base);
     padding: 5px 14px;
 }
 
@@ -158,7 +158,7 @@ a.nav-more-item { text-decoration: none; }
     align-items: center;
     gap: 6px;
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
     padding: 4px 12px;
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
@@ -297,7 +297,7 @@ body.panel-dragging .sidebar {
     border-radius: var(--radius-lg);
     color: var(--text-primary);
     font: inherit;
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
 }
 
 .sidebar-search-input:focus { border-color: var(--accent); }
@@ -394,7 +394,7 @@ body.panel-dragging .sidebar {
     .sidebar-rail-item.active .rail-tile { background: rgba(var(--accent-rgb), 0.14); }
     .sidebar-rail-item.active .rail-tile:not([style]) { color: var(--text-primary); }
     .sidebar-rail-item.active:hover .rail-tile { background: rgba(var(--accent-rgb), 0.17); }
-    .rail-tile .rail-tile-icon { font-size: 0.625rem !important; width: 10px; height: 10px; line-height: 10px; }
+    .rail-tile .rail-tile-icon { font-size: var(--fs-xs) !important; width: 10px; height: 10px; line-height: 10px; }
     .rail-tile-emoji { font-size: 0.5625rem; line-height: 1; }
     .rail-tile-badge {
         position: absolute;
@@ -411,7 +411,7 @@ body.panel-dragging .sidebar {
         border: 1.5px solid var(--bg-secondary);
     }
     .rail-tile-unread { background: var(--rail-badge-unread); }
-    .rail-tile-done { background: var(--rail-badge-done); font-size: 0.625rem; line-height: 11px; }
+    .rail-tile-done { background: var(--rail-badge-done); font-size: var(--fs-xs); line-height: 11px; }
     .rail-tile-dot { bottom: -3px; right: -3px; width: 9px; height: 9px; }
     /* The rail's agent tiles are the Agents tab's; the other tabs' rail is the three buttons */
     .layout:not([data-sidebar-pane="agents"]) .sidebar-rail-list { display: none; }
@@ -607,7 +607,7 @@ body.panel-dragging .sidebar {
     gap: 3px;
     padding: 1px 7px;
     border-radius: var(--radius-ml);
-    font-size: 0.6875rem;
+    font-size: var(--fs-sm);
     background: var(--accent-dim);
     color: var(--text-on-accent);
 }
@@ -615,7 +615,7 @@ body.panel-dragging .sidebar {
 .hf-tag-remove {
     cursor: pointer;
     opacity: 0.75;
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
     line-height: 1;
 }
 
@@ -742,14 +742,14 @@ body.panel-dragging .sidebar {
 .welcome > :last-child { margin-bottom: auto; }
 
 .welcome h2 {
-    font-size: 1.25rem;
+    font-size: var(--fs-2xl);
     margin-bottom: 4px;
     font-weight: 600;
     color: var(--text-primary);
 }
 
 .welcome p {
-    font-size: 0.875rem;
+    font-size: var(--fs-lg);
     color: var(--text-muted);
     margin-bottom: 16px;
 }
@@ -757,9 +757,9 @@ body.panel-dragging .sidebar {
 /* Simplified launch page */
 .welcome-shell { width: min(640px, 100%); margin: 0 auto; }
 .welcome-header { margin-bottom: 30px; }
-.welcome-eyebrow { display: block; margin-bottom: 10px; color: var(--accent); font-size: 0.6875rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.welcome-eyebrow { display: block; margin-bottom: 10px; color: var(--accent); font-size: var(--fs-sm); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .welcome-header h1 { margin: 0 0 8px; color: var(--text-primary); font-size: clamp(1.625rem, 3.4vw, 2.375rem); line-height: 1.15; letter-spacing: -.035em; }
-.welcome-header p { margin: 0; color: var(--text-secondary); font-size: 0.875rem; }
+.welcome-header p { margin: 0; color: var(--text-secondary); font-size: var(--fs-lg); }
 .welcome-launch:hover { border-color: var(--border-light); background: var(--bg-tertiary); } /* --bg-hover takes the muted line under 4.5:1 (#4218) */
 .welcome-connect { display: none; align-items: center; flex-wrap: wrap; gap: 14px 16px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
 /* Coral Hub with no machine connected (#4586): the connect card stands in for the launch cards, which have nowhere to launch. */
@@ -769,8 +769,8 @@ body.hub-no-machine .welcome-launch-list, body.hub-no-machine .welcome-header p,
 .welcome-connect-copy { flex: 1 1 14rem; min-width: 0; }
 .welcome-connect-copy h2 { margin: 0 0 4px; font-size: 0.9375rem; color: var(--text-primary); }
 .welcome-connect-copy p + p { margin-top: 4px; }
-.welcome-connect-copy p { margin: 0; font-size: 0.8125rem; line-height: 1.45; color: var(--text-secondary); }
-.welcome-connect-another { display: none; justify-self: start; font-size: 0.8125rem; color: var(--link-text, var(--accent)); text-decoration: underline; }
+.welcome-connect-copy p { margin: 0; font-size: var(--fs-md); line-height: 1.45; color: var(--text-secondary); }
+.welcome-connect-another { display: none; justify-self: start; font-size: var(--fs-md); color: var(--link-text, var(--accent)); text-decoration: underline; }
 body.cloud-mode:not(.hub-no-machine) .welcome-connect-another { display: block; width: max-content; margin-top: 16px; } /* its own line, after the three cards */
 @media (pointer: coarse), (max-width: 767px) { body.cloud-mode:not(.hub-no-machine) .welcome-connect-another { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); } }
 .welcome-connect-btn, .hub-connect-empty a.btn { text-decoration: none; }
@@ -780,7 +780,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .hub-connect-short { display: none; }
 @media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) { .hub-connect-none > :not(.hub-connect-short) { display: none; } .hub-connect-none > .hub-connect-short { display: block; color: var(--text-secondary); } }
 .hub-connect-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 12px; font-style: normal; }
-.hub-connect-empty strong { color: var(--text-primary); font-size: 0.8125rem; }
+.hub-connect-empty strong { color: var(--text-primary); font-size: var(--fs-md); }
 .session-list li.hub-connect-empty { font-style: normal; }
 .session-list li.hub-connect-empty .btn { margin: 0; } /* in line with the text above it */
 .welcome-launch-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } /* agent, team, Open folder (#3630) */
@@ -789,7 +789,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .welcome-launch .welcome-launch-icon { display: flex; align-items: center; justify-content: center; width: 2.625rem; height: 2.625rem; border-radius: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 1.3125rem; line-height: 1; }
 .welcome-launch-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .welcome-launch-copy strong { color: var(--text-primary); font-size: 0.9375rem; }
-.welcome-launch-copy span { color: var(--text-muted); font-size: 0.75rem; line-height: 1.45; }
+.welcome-launch-copy span { color: var(--text-muted); font-size: var(--fs-base); line-height: 1.45; }
 .welcome-launch .welcome-launch-arrow { position: absolute; top: 20px; right: 20px; color: var(--text-muted); font-size: 1.1875rem; }
 .welcome-launch:hover .welcome-launch-arrow { color: var(--accent); }
 /* Home: one obvious start (#6042). Launch agent, the first card, carries the accent (border, tint, a filled icon); Launch team and Open folder stay as they were. */
@@ -799,7 +799,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .welcome-launch-list > .welcome-launch:first-child .welcome-launch-copy span { color: var(--text-secondary); } /* 4.5:1 on the tint in the light theme */
 .welcome-links { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 28px; }
 .welcome-links a,
-.welcome-links button { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.8125rem; text-decoration: none; background: none; border: none; padding: 0; font-family: inherit; cursor: pointer; }
+.welcome-links button { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: var(--fs-md); text-decoration: none; background: none; border: none; padding: 0; font-family: inherit; cursor: pointer; }
 .welcome-links a:hover,
 .welcome-links button:hover { color: var(--accent); }
 .welcome-links .material-icons { font-size: 1.0625rem; color: var(--text-muted); }
@@ -810,44 +810,44 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .editions-home { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
 .editions-home[hidden] { display: none; }
 .editions-home-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.editions-home-head h2 { margin: 0; color: var(--text-secondary); font-size: 0.75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.editions-home-head h2 { margin: 0; color: var(--text-secondary); font-size: var(--fs-base); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .editions-home-hide { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: none; border-radius: var(--radius-md); background: none; color: var(--text-muted); cursor: pointer; }
 .editions-home-hide:hover, .editions-home-hide:focus-visible { color: var(--text-primary); background: var(--bg-hover); }
-.editions-home-hide .material-icons { font-size: 1.125rem; }
+.editions-home-hide .material-icons { font-size: var(--icon-size); }
 @media (pointer: coarse), (max-width: 1024px) { .editions-home-hide { width: 44px; height: 44px; margin: -8px -8px -8px 0; } }
 .editions-home-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .editions-home-item { position: relative; display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 14px 40px 14px 14px; border: 1px solid var(--border); border-radius: var(--radius-xl); color: var(--text-secondary); font-family: inherit; text-align: left; text-decoration: none; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
 /* "Use Coral from anywhere" is a quiet row under the launch cards, not two more cards of their weight (#6042); its border returns on hover and focus. */
 .editions-home-item { border-color: transparent; background: transparent; }
 .editions-home-item:hover, .editions-home-item:focus-visible { border-color: var(--border-light); background: var(--bg-tertiary); } /* as .welcome-launch (#4218) */
-.editions-home-icon { flex-shrink: 0; color: var(--text-muted); font-size: 1.25rem; }
+.editions-home-icon { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-2xl); }
 .editions-home-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.editions-home-copy strong { color: var(--text-primary); font-size: 0.875rem; font-weight: 600; }
-.editions-home-copy span { color: var(--text-muted); font-size: 0.75rem; line-height: 1.45; }
+.editions-home-copy strong { color: var(--text-primary); font-size: var(--fs-lg); font-weight: 600; }
+.editions-home-copy span { color: var(--text-muted); font-size: var(--fs-base); line-height: 1.45; }
 .editions-home-copy code, .editions-content code { white-space: nowrap; padding: 0 4px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: .95em; }
 .editions-home-arrow { position: absolute; top: 14px; right: 14px; color: var(--text-muted); font-size: 1.0625rem; }
 .editions-home-item:hover .editions-home-arrow { color: var(--accent); }
 
 /* The first-launch "Connect to Coral Hub" screen */
 .editions-modal .editions-content { width: 520px; gap: 0; }
-.editions-title { margin: 0 0 6px; color: var(--text-primary); font-size: 1.25rem; line-height: 1.25; }
-.editions-sub { margin: 0 0 18px; color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.5; }
+.editions-title { margin: 0 0 6px; color: var(--text-primary); font-size: var(--fs-2xl); line-height: 1.25; }
+.editions-sub { margin: 0 0 18px; color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.5; }
 .editions-cloud { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--bg-primary); }
-.editions-status { color: var(--text-primary); font-size: 0.875rem; line-height: 1.45; }
-.editions-code { color: var(--text-secondary); font-size: 0.8125rem; }
+.editions-status { color: var(--text-primary); font-size: var(--fs-lg); line-height: 1.45; }
+.editions-code { color: var(--text-secondary); font-size: var(--fs-md); }
 .editions-code[hidden], .editions-cloud [hidden] { display: none; }
 .editions-code a { color: var(--accent); word-break: break-all; }
 .editions-usercode-row, .settings-cloud-usercode-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .editions-usercode-row .editions-usercode { margin-top: 0; }
 .editions-copy-code { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; }
-.editions-copy-code .material-icons { font-size: 1.25rem; }
+.editions-copy-code .material-icons { font-size: var(--fs-2xl); }
 @media (pointer: coarse) { .editions-copy-code { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); } }
 .editions-usercode { margin-top: 6px; color: var(--text-primary); font: 600 1.5rem/1.2 var(--font-mono, monospace); letter-spacing: .12em; user-select: all; }
 .editions-cloud-actions { display: flex; gap: 8px; }
 .editions-cloud-actions:not(:has(> :not([hidden]))) { display: none; }
 .cloud-command-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cloud-command-row[hidden] { display: none; }
-.cloud-command-row code { white-space: pre-line; padding: 4px 8px; border-radius: var(--radius-md); background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.8125rem; user-select: all; }
+.cloud-command-row code { white-space: pre-line; padding: 4px 8px; border-radius: var(--radius-md); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-md); user-select: all; }
 .editions-ask { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; }
 .editions-ask legend { padding: 0; margin-bottom: 2px; color: var(--text-primary); font-size: 0.9375rem; font-weight: 600; }
 .editions-ask label.editions-ask-opt { display: flex; margin: 0; align-items: flex-start; gap: 10px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; }
@@ -856,17 +856,17 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .editions-ask label.editions-auto-accept { display: flex; align-items: flex-start; margin: 0; font-weight: 500; color: var(--text-primary); }
 .editions-ask div.editions-ask-desc { margin: 0 0 0 26px; }
 .editions-ask-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.editions-ask-name { color: var(--text-primary); font-size: 0.875rem; font-weight: 500; }
-.editions-ask-desc { color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.4; }
-.editions-ask-note { color: var(--text-secondary); font-size: 0.8125rem; }
-.editions-auto-accept { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 0.8125rem; }
+.editions-ask-name { color: var(--text-primary); font-size: var(--fs-lg); font-weight: 500; }
+.editions-ask-desc { color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.4; }
+.editions-ask-note { color: var(--text-secondary); font-size: var(--fs-md); }
+.editions-auto-accept { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: var(--fs-md); }
 .editions-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .editions-actions-spacer { flex: 1; }
 .editions-actions .btn.editions-own { padding-left: 0; padding-right: 0; background: none; border-color: transparent; box-shadow: none; color: var(--link-text); /* the accent is 4.44:1 on the light panel */ }
 .editions-actions .btn.editions-own:hover, .editions-actions .btn.editions-own:focus-visible { background: none; text-decoration: underline; }
-.editions-steps { margin: 0 0 16px; padding-left: 20px; color: var(--text-secondary); font-size: 0.875rem; line-height: 1.55; }
+.editions-steps { margin: 0 0 16px; padding-left: 20px; color: var(--text-secondary); font-size: var(--fs-lg); line-height: 1.55; }
 .editions-steps li + li { margin-top: 8px; }
-.editions-guide { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; color: var(--accent); font-size: 0.8125rem; text-decoration: none; }
+.editions-guide { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; color: var(--accent); font-size: var(--fs-md); text-decoration: none; }
 .editions-guide:hover { text-decoration: underline; }
 .editions-guide .material-icons { font-size: 0.9375rem; }
 .editions-actions { margin-top: 20px; }
@@ -922,7 +922,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 }
 
 /* Through the Coral Hub, a launch the machine's access level refuses says so as the form opens (#4586). */
-.launch-access-note { margin: 0 0 12px; padding: 8px 10px; border-radius: var(--radius-md); border: 1px solid var(--warning, var(--fx-amber)); background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.8125rem; line-height: 1.4; }
+.launch-access-note { margin: 0 0 12px; padding: 8px 10px; border-radius: var(--radius-md); border: 1px solid var(--warning, var(--fx-amber)); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-md); line-height: 1.4; }
 .launch-access-note:empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */ /* in the page with nothing to say: no room, still a live region */
 
 /* ── A sidebar group opened as a table in the centre (sidebar_groups.js, #7443) ── */
@@ -937,7 +937,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .gt-toolbar .gt-menu + .team-tb-action { margin-left: 0; }
 .gt-toolbar .list-bar-search { min-height: 32px; width: 100%; box-sizing: border-box; }
 .gt-toolbar .group-table-chips { flex: 0 0 auto; margin: 0; }
-.gt-toolbar .team-tb-action { flex: none; margin-left: auto; min-height: 32px; padding: 0 12px; font-size: 0.8125rem; }
+.gt-toolbar .team-tb-action { flex: none; margin-left: auto; min-height: 32px; padding: 0 12px; font-size: var(--fs-md); }
 @media (pointer: coarse), (max-width: 767px) {
     .gt-toolbar { flex-wrap: wrap; }
     .gt-toolbar .list-bar-search, .gt-toolbar .team-tb-action, .gt-toolbar .list-bar-more-btn, .gt-toolbar .group-chip { min-height: var(--control-touch-height, 44px); }
@@ -945,12 +945,12 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 }
 .group-table-head { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl); min-height: 36px; } /* one fixed row on every tab, with a header button or without: the title does not move between tabs (UI/UX #7588 item 8) */
 @media (pointer: coarse), (max-width: 767px) { .group-table-head { min-height: var(--control-touch-height, 44px); } }
-.group-table-head h2 { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
+.group-table-head h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
 #group-table-title:focus { outline: none; } /* it takes the focus by script when a group opens: a mouse click on a group header shows no box, a keyboard start does (QA Reviewer 2's #7577 note) */
 #group-table-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
 .group-table-head .session-group-count { font-weight: 600; }
 .group-table-head .group-table-extra { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 0 auto; }
-.group-table-head .group-table-extra .material-icons { font-size: 1rem; }
+.group-table-head .group-table-extra .material-icons { font-size: var(--fs-xl); }
 /* One empty line on every tab: 14/400 in the primary colour, with an optional 12/400 hint under it; what to do is the sidebar's pinned action */
 .empty-pane { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-2xl); }
 .welcome > .empty-pane { margin: 0; align-self: stretch; }
