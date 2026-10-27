@@ -423,24 +423,24 @@ export function renderQuickActions() {
             ${navButtons}
             <div class="toolbar-send-split">
                 <button class="btn-nav btn-send" data-on-click="cmd-send" data-tooltip="Sends the text from the input box below to the terminal" aria-label="Send command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-                <button class="btn-nav btn-send-dropdown" data-on-click="cmd-send-menu" aria-label="Send options" title="Send options">
+                <button class="btn-nav btn-send-dropdown" data-on-click="cmd-send-menu" aria-label="Send options" title="Send options" aria-haspopup="menu" aria-expanded="false">
                     <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4z"/></svg>
                 </button>
-                <div class="send-btn-menu" style="display:none">
-                    <button class="send-menu-item" data-on-click="send-menu-send">
+                <div class="send-btn-menu" role="menu" aria-label="Send options" style="display:none">
+                    <button class="send-menu-item" role="menuitem" data-on-click="send-menu-send">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                         Send
                         <span class="send-menu-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
                     </button>
-                    <button class="send-menu-item" data-on-click="send-menu-team">
+                    <button class="send-menu-item" role="menuitem" data-on-click="send-menu-team">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M17 11a4 4 0 0 1 4 4v2"/></svg>
                         Send + Team Reminder
                     </button>
-                    <button class="send-menu-item" data-on-click="send-menu-resend">
+                    <button class="send-menu-item" role="menuitem" data-on-click="send-menu-resend">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                         Resend Prompt
                     </button>
-                    <button class="send-menu-item" data-on-click="send-menu-protocol">
+                    <button class="send-menu-item" role="menuitem" data-on-click="send-menu-protocol">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
                         Send Board Protocol
                     </button>
@@ -778,7 +778,7 @@ registerActions({
     'macro-show': () => showMacroModal(),
     'cmd-send': () => sendCommand({ nudge: true }),
     'attach-image': () => openImagePicker(),
-    'cmd-send-menu': el => window.toggleSendMenu(el),
+    'cmd-send-menu': (el, event) => window.toggleSendMenu(el, event),
     'send-menu-send': () => { sendCommand({ nudge: true }); window.closeSendMenu(); },
     'send-menu-team': () => { sendCommandWithTeam(); window.closeSendMenu(); },
     'send-menu-options': () => { window.closeSendMenu(); setTimeout(() => document.getElementById('options-chip')?.click(), 0); }, // after this click has passed the outside-click handlers that would close the sheet at once, // under 640 px the Model and thinking chip is not drawn: the chevron's menu opens its sheet (#9021)

@@ -171,6 +171,7 @@ function layoutSelect() {
     const cur = availableTabs().find(t => t.active);
     label.textContent = cur ? cur.label : '';
     const top = document.getElementById('top-menu-label'); if (top) top.textContent = cur ? cur.label : '';
+    const hamburger = document.getElementById('top-menu-btn'); if (hamburger) hamburger.setAttribute('aria-label', cur ? `${cur.label}, menu` : 'Menu'); // its name has the words it shows: the open view first (#9116)
     if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || _menuFor.id === 'top-menu-btn' && !window.matchMedia('(max-width: 639px)').matches)) closeMenu();
 }
 
@@ -211,9 +212,32 @@ if (typeof document !== 'undefined') {
         window.matchMedia('(max-width: 639px)').addEventListener('change', syncNav);
         document.addEventListener('click', e => {
             if (!_menuFor) return;
-            if (e.target.closest('#nav-more-menu .nav-more-item') || !e.target.closest('#nav-more-menu, [data-on-click="m-nav-more"], [data-on-click="m-top-menu"]')) closeMenu();
+            if (e.target.closest('#nav-more-menu .nav-more-item')) {
+                const button = _menuFor; closeMenu();
+                const a = document.activeElement; // a choice gives the focus back to the button, unless what it opened (a dialog) has taken it (#9116)
+                if (button && (!a || a === document.body)) button.focus();
+            } else if (!e.target.closest('#nav-more-menu, [data-on-click="m-nav-more"], [data-on-click="m-top-menu"]')) closeMenu();
         });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape' && _menuFor) { const b = _menuFor; closeMenu(); b.focus(); } });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && _menuFor) { const b = _menuFor; closeMenu(); b.focus(); return; }
+            if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+            // the menu keyboard (#9116): the arrows and Home/End move among the entries; on the button, ArrowDown and ArrowUp open the menu on its first or last entry
+            const menu = document.getElementById('nav-more-menu');
+            const entries = () => [...(menu ? menu.querySelectorAll('.nav-more-item') : [])].filter(x => x.getClientRects().length);
+            if (menu && !menu.hidden && menu.contains(e.target)) {
+                const items = entries(), at = items.indexOf(document.activeElement);
+                if (!items.length) return;
+                e.preventDefault();
+                items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : e.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length].focus();
+                return;
+            }
+            const button = e.target.closest?.('[data-on-click="m-top-menu"], [data-on-click="m-nav-more"]');
+            if (!button || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+            e.preventDefault();
+            if (_menuFor !== button) { closeMenu(); openMenu(button); }
+            const items = entries();
+            (e.key === 'ArrowUp' ? items[items.length - 1] : items[0])?.focus();
+        });
         syncNav();
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
