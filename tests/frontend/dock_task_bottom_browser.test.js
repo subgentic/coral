@@ -1,4 +1,4 @@
-// #8879: dock tasks share the bottom-half artifact preview; expanding uses the centre, never a narrow third column.
+// #8879: dock tasks share the bottom-half artifact preview; expanding does what a file's dock button does: the column beside the chat, resizable with its width kept (#9076).
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -46,12 +46,25 @@ const board = 'task-bottom-' + Date.now().toString(36);
                 }
                 for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await shot('task-bottom-' + name + '-' + theme); }
                 if (width !== 390) {
+                    // Expand (#9076, the Operator): the task does what a file does when it is popped into the centre from the sidebar (the dock button's move): the full-height column beside the chat, with the column's own handle and its width kept per browser.
                     await ev(`document.getElementById('preview-max-btn').click(); true`);
-                    await waitFor(`document.querySelector('.live-body').classList.contains('preview-maximised')`, 'expand uses the centre view');
-                    assert.equal(await ev(`document.getElementById('preview-pane').parentElement.id`), 'preview-column');
+                    await waitFor(`document.getElementById('preview-pane').parentElement.id === 'preview-column' && getComputedStyle(document.getElementById('preview-column')).display !== 'none'`, 'expand uses the column, as a file does');
+                    const ex = await ev(`(() => { const c = document.getElementById('preview-column').getBoundingClientRect(), chat = document.querySelector('.live-left-column').getBoundingClientRect(), h = document.getElementById('preview-column-resize-handle'); return { maximised: document.querySelector('.live-body').classList.contains('preview-maximised'), col: Math.round(c.width), chat: Math.round(chat.width), handle: h.getAttribute('role'), handleShown: h.getClientRects().length > 0, dock: localStorage.getItem('coral-preview-pane-dock') }; })()`);
+                    assert.equal(ex.maximised, false, 'the chat is not covered: ' + JSON.stringify(ex));
+                    assert.ok(ex.chat >= 240 && ex.handleShown && ex.handle === 'separator' && ex.dock === 'column', 'the column has its resize handle, the chat keeps its room and the dock is kept: ' + JSON.stringify(ex));
+                    await ev(`document.getElementById('preview-column-resize-handle').focus(); true`);
+                    await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+                    const narrower = await ev(`Math.round(document.getElementById('preview-column').getBoundingClientRect().width)`);
+                    assert.ok(narrower < ex.col, 'the handle resizes the column (ArrowRight narrows it): ' + ex.col + ' to ' + narrower);
+                    assert.equal(await ev(`localStorage.getItem('coral-preview-column-width')`), String(narrower), 'and the width is kept, as for a file');
                     for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await shot('task-expanded-' + name + '-' + theme); }
+                    // one more press maximises it over the chat as for a file; the dock button returns it to the sidebar
                     await ev(`document.getElementById('preview-max-btn').click(); true`);
-                    await waitFor(`document.getElementById('preview-pane').parentElement.id === 'agentic-state' && !document.querySelector('.live-body').classList.contains('preview-maximised')`, 'restore returns to sidebar split');
+                    await waitFor(`document.querySelector('.live-body').classList.contains('preview-maximised')`, 'a second press maximises it, as for a file');
+                    await ev(`document.getElementById('preview-max-btn').click(); true`);
+                    await waitFor(`!document.querySelector('.live-body').classList.contains('preview-maximised')`, 'and restores it beside the chat');
+                    await ev(`document.getElementById('preview-dock-btn').click(); true`);
+                    await waitFor(`document.getElementById('preview-pane').parentElement.id === 'agentic-state'`, 'the dock button returns it to the sidebar');
                 } else await ev(`document.getElementById('preview-full-back').click(); true`);
             } catch (e) { errors.push(name + ': ' + e.message); }
         }

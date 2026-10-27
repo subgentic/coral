@@ -15,7 +15,8 @@ const BASE = require('./test_base').BASE;
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true }); await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); new Promise(r => setTimeout(r, 350))`); /* sleep-ok: a screenshot waits out transitions; the toasts of the steps before are not the picture */ fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const barButtons = () => ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].map(b => b.textContent)`);
     const open = async (id) => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks', item: ${id} }); true`); await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.startsWith('#${id} ')`, 'the task page', 12000); await waitFor(`document.querySelectorAll('#team-panel-item .goals-pinbar .btn').length >= 0 && !!document.querySelector('#team-panel-item .goals-pinbar')`, 'the bar'); };
-    const click = (text) => ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === ${JSON.stringify(text)}).click(); true`);
+    const menuItems = () => ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar [role=menuitem]')].map(b => b.textContent)`); // the More menu's (#9076)
+    const click = (text) => ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn, #team-panel-item .goals-pinbar [role=menuitem]')].find(b => b.textContent === ${JSON.stringify(text)}).click(); true`);
     const set = (id, value) => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); e.value = ${JSON.stringify(value)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
     const task = async (id) => (await api('GET', `/api/board/${B}/tasks/${id}`)).body;
     try {
@@ -40,13 +41,18 @@ const BASE = require('./test_base').BASE;
         await open(open1);
         await shot('task-page-view');
         const bar = await barButtons();
-        check('an open task: the danger Cancel task first, alone at the left, then Edit, Nudge, Remind, Stop reminders, and Complete last (the one pinned-bar rule, #7684)', bar[0] === 'Cancel task' && bar[bar.length - 1] === 'Complete' && ['Edit', 'Nudge', 'Remind', 'Stop reminders', 'Complete'].every(t => bar.includes(t)), JSON.stringify(bar));
-        check('Cancel task is a danger button', await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Cancel task').classList.contains('btn-danger')`));
+        check('an open task: two buttons, More then Complete last (#9076, the Operator: fewer buttons); no Open the agent button (the agent is the Assigned-to link)', JSON.stringify(bar) === JSON.stringify(['More', 'Complete']), JSON.stringify(bar));
+        check('More holds Edit, Nudge, Remind, Stop reminders and, last, Cancel task (the danger item)', JSON.stringify(await menuItems()) === JSON.stringify(['Edit', 'Nudge', 'Remind', 'Stop reminders', 'Cancel task']) && await ev(`document.querySelector('#team-panel-item .goals-pinbar [role=menuitem]:last-child').classList.contains('mb-action-danger')`), JSON.stringify(await menuItems()));
+        await ev(`document.querySelector('#team-panel-item .goals-pinbar .task-more-btn').click(); true`);
+        check('More opens its menu (aria-expanded, first item focused)', await waitFor(`document.querySelector('#team-panel-item .task-more-btn').getAttribute('aria-expanded') === 'true' && document.activeElement && document.activeElement.textContent === 'Edit'`, 'the menu opens', 3000).then(() => true).catch(() => false));
+        await shot('task-page-more-open');
+        await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+        check('Escape closes the menu and the focus is back on More', await waitFor(`document.querySelector('#team-panel-item .task-more-btn').getAttribute('aria-expanded') === 'false' && document.activeElement === document.querySelector('#team-panel-item .task-more-btn')`, 'closed', 3000).then(() => true).catch(() => false));
         await open(draft);
         const dbar = await barButtons();
-        check('a draft: Publish, no Complete', dbar.includes('Publish') && !dbar.includes('Complete') && dbar.includes('Edit'), JSON.stringify(dbar));
+        check('a draft: Publish, no Complete, Edit under More', dbar.includes('Publish') && !dbar.includes('Complete') && (await menuItems()).includes('Edit'), JSON.stringify(dbar));
         await open(done);
-        check('a finished task: no actions', (await barButtons()).every(t => !['Edit', 'Complete', 'Cancel task', 'Publish', 'Nudge'].includes(t)), JSON.stringify(await barButtons()));
+        check('a finished task: no actions', (await barButtons()).every(t => !['More', 'Complete', 'Publish'].includes(t)) && (await menuItems()).length === 0, JSON.stringify(await barButtons()));
 
         console.log('2. Edit');
         await open(open1);
@@ -91,11 +97,11 @@ const BASE = require('./test_base').BASE;
         check('the safe answer, Keep task, has the focus', await ev(`document.activeElement && document.activeElement.textContent === 'Keep task'`));
         await ev(`[...document.querySelectorAll('#team-panel-item .task-confirm-buttons .btn')].find(b => b.textContent === 'Keep task').click(); true`);
         await waitFor(`!document.querySelector('#team-panel-item .task-confirm-text')`, 'back to the bar');
-        check('Keep task returns to the bar and cancels nothing', (await task(doomed)).status !== 'skipped' && (await barButtons()).includes('Cancel task'));
+        check('Keep task returns to the bar and cancels nothing', (await task(doomed)).status !== 'skipped' && (await menuItems()).includes('Cancel task'));
         await click('Cancel task'); await waitFor(`!!document.querySelector('#team-panel-item .task-confirm-text')`, 'the question again');
         await ev(`[...document.querySelectorAll('#team-panel-item .task-confirm-buttons .btn')].find(b => b.textContent === 'Cancel task').click(); true`);
         await waitFor(`!document.querySelector('#team-panel-item .task-confirm-text') && /Cancelled/i.test(document.getElementById('team-panel-item').innerText)`, 'the cancelled task', 8000);
-        check('Cancel task in the question cancels it and the page shows it, with no actions left', (await task(doomed)).status === 'skipped' && !(await barButtons()).includes('Cancel task'));
+        check('Cancel task in the question cancels it and the page shows it, with no actions left', (await task(doomed)).status === 'skipped' && !(await menuItems()).includes('Cancel task'));
 
         console.log('5. Complete');
         assert.equal((await api('POST', `/api/board/${B}/tasks/claim`, { subscriber_id: 'qa', task_id: finish })).status, 200);

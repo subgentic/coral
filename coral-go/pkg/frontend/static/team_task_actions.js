@@ -30,18 +30,32 @@ export function taskButtons(task, ctx) {
     const out = [];
     const canComplete = task.status !== 'blocked' && task.status !== 'draft';
     const canNudge = (task.status === 'pending' || task.status === 'in_progress') && !!task.assigned_to;
-    const cancel = btn('btn btn-danger', 'Cancel task', () => ctx.redraw(task, 'cancel')); cancel.classList.add('team-task-cancel'); // one danger button, alone at the left edge of the bar, first (#7684)
-    out.push(cancel);
-    out.push(btn('btn', 'Edit', () => ctx.redraw(task, 'edit')));
+    // The bar has two buttons, the primary last (#9076, the Operator: fewer buttons): everything else is under More, Cancel last. The agent is the Assigned-to link on the page (team_tasks_page.js factsOf).
+    const items = [{ label: 'Edit', run: () => ctx.redraw(task, 'edit') }];
+    if (canNudge) items.push(
+        { label: 'Nudge', title: `Remind ${task.assigned_to} about this task in their terminal`, run: () => nudgeBoardTask(task.id) },
+        { label: 'Remind', title: `Send periodic reminders to ${task.assigned_to}`, run: () => remindBoardTask(task.id) },
+        { label: 'Stop reminders', title: 'Stop periodic reminders', run: () => stopBoardTaskReminder(task.id) });
+    items.push({ label: 'Cancel task', danger: true, className: 'team-task-cancel', run: () => ctx.redraw(task, 'cancel') });
+    out.push(moreMenu(`task-more-${task.id}`, items));
     if (task.status === 'draft') out.push(btn('btn btn-primary', 'Publish', () => publish(task, ctx)));
-    if (canNudge) {
-        const nudge = btn('btn', 'Nudge', () => nudgeBoardTask(task.id)); nudge.title = `Remind ${task.assigned_to} about this task in their terminal`;
-        const remind = btn('btn', 'Remind', () => remindBoardTask(task.id)); remind.title = `Send periodic reminders to ${task.assigned_to}`;
-        const stop = btn('btn', 'Stop reminders', () => stopBoardTaskReminder(task.id)); stop.title = 'Stop periodic reminders';
-        out.push(nudge, remind, stop);
-    }
     if (canComplete) out.push(btn('btn btn-success', 'Complete', () => ctx.redraw(task, 'complete')));
     return out;
+}
+
+/** A text More button and its menu (menu_button.js: arrow keys, Escape, the menu opens upward where the bar leaves no room below). items: [{ label, title, danger, className, run }]. */
+function moreMenu(id, items) {
+    const wrap = el('span', 'task-more');
+    const toggle = btn('btn task-more-btn', 'More'); toggle.id = id; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `${id}-menu`);
+    const menu = el('div', 'team-more-menu task-more-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More task actions');
+    for (const it of items) {
+        const b = btn(it.danger ? 'mb-action-danger' : '', it.label, async () => { (await importOnce('./menu_button.js')).closeMenus(); it.run(); });
+        b.setAttribute('role', 'menuitem'); if (it.title) b.title = it.title; if (it.className) b.classList.add(it.className);
+        menu.append(b);
+    }
+    toggle.addEventListener('click', async () => (await importOnce('./menu_button.js')).toggleMenu(toggle));
+    wrap.append(toggle, menu);
+    return wrap;
 }
 
 /** The bar while Cancel asks: the question and its two answers. */
