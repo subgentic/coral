@@ -47,16 +47,20 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
    })()`);
    for(const folder of folders){try{
     await open(folder);
-    await waitFor(`!!document.querySelector('#group-table-view th[data-key="server"]')`,'Server column in '+folder,5000);
-    if(['tasks','goals','needs','artifacts'].includes(folder))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('server')>0&&keys.indexOf('server')===keys.indexOf('team')-1;})()`),'Server immediately precedes Team');
+    // Artifacts (#8839): the Team column's words carry the computer ("alpha · Remote box"), so there is no Server column while Team shows; the Server filter stays in the panel
+    const artifacts=folder==='artifacts',col=artifacts?'team':'server',is=t=>artifacts?`e.textContent.includes('${t}')`:`e.textContent==='${t}'`;
+    if(!artifacts)await waitFor(`!!document.querySelector('#group-table-view th[data-key="server"]')`,'Server column in '+folder,5000);
+    else await waitFor(`!!document.querySelector('#group-table-view th[data-key="team"]')`,'Team column in '+folder,5000);
+    if(artifacts)assert.ok(await ev(`!document.querySelector('#group-table-view th[data-key="server"]')`),'no Server column while the Team column says the computer');
+    if(['tasks','goals','needs'].includes(folder))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('server')>0&&keys.indexOf('server')===keys.indexOf('team')-1;})()`),'Server immediately precedes Team');
     if(folder.startsWith('chats'))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('server')===keys.indexOf('agent')+1;})()`),'Server follows Agent/Name');
-    const cells=`[...document.querySelectorAll('#group-table-view td[data-key="server"]')]`;
-    await waitFor(`${cells}.some(e=>e.textContent==='This computer')&&${cells}.some(e=>e.textContent==='Remote box')`,'both origins in '+folder,8000);
-    if(width===390)assert.ok(await ev(`${cells}.every(e=>e.getClientRects().length>0)`),'Server visible on phone');
+    const cells=`[...document.querySelectorAll('#group-table-view td[data-key="${col}"]')]`;
+    await waitFor(`${cells}.some(e=>${is('This computer')})&&${cells}.some(e=>${is('Remote box')})`,'both origins in '+folder,8000);
+    if(width===390)assert.ok(await ev(`${cells}.every(e=>e.getClientRects().length>0)`),(artifacts?'Team':'Server')+' visible on phone');
     assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
     const sortable=await ev(`(() => {const s=[...document.querySelectorAll('#group-table-view .dt-sortbar select')].find(s=>[...s.options].some(o=>o.value==='server'));if(s&&s.getClientRects().length){s.value='server';s.dispatchEvent(new Event('change',{bubbles:true}));return true;}const h=document.querySelector('#group-table-view th[data-key="server"]');const b=h?.querySelector('button');if(b){b.click();return true;}return false;})()`);
-    assert.ok(sortable,'Server sort control in '+folder);
-    await waitFor(`(()=>{const values=${cells}.map(e=>e.textContent);return values.length>1&&values.every((v,i)=>!i||values[i-1].localeCompare(v)<=0);})()`,'Server ascending order in '+folder);
+    if(!artifacts)assert.ok(sortable,'Server sort control in '+folder);
+    if(!artifacts)await waitFor(`(()=>{const values=${cells}.map(e=>e.textContent);return values.length>1&&values.every((v,i)=>!i||values[i-1].localeCompare(v)<=0);})()`,'Server ascending order in '+folder);
     const shotDir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
     if(shotDir){fs.mkdirSync(shotDir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(shotDir,`inbox-server-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
     await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);
@@ -64,7 +68,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     await waitFor(`!!(${select})&&(${select}).getClientRects().length>0`,'Server filter in '+folder);
     if(shotDir&&['tasks','goals'].includes(folder)){for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(shotDir,`inbox-server-filter-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
     await ev(`(()=>{const s=${select};s.value='box-2';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
-    await waitFor(`${cells}.length>0&&${cells}.every(e=>e.textContent==='Remote box')`,'Server filter narrows '+folder);
+    await waitFor(`${cells}.length>0&&${cells}.every(e=>${is('Remote box')})`,'Server filter narrows '+folder);
     // Clear the choice before testing mode changes or the next folder.
     await ev(`(()=>{const s=${select};s.value='';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
     console.log('PASS server '+folder+' '+width);
