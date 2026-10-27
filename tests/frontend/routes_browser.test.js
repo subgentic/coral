@@ -242,6 +242,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         boards.push(climb);
         await open(`/board/${encodeURIComponent(climb)}`);
         await until(`${TITLE} === ${JSON.stringify(climb)}`, 'the ../../api board');
+        await until(`performance.getEntriesByType('resource').some(r => new URL(r.name).pathname.startsWith('/api/board/..%2F..%2Fapi'))`, 'the board asked for its own name under /api/board/'); // the title can show before the board's requests are made: read the entries once the encoded-name request is in them (a flake, 1 in 10)
         const reqs = await ev(`performance.getEntriesByType('resource').map(r => new URL(r.name).pathname).filter(p => p.startsWith('/api/'))`);
         const outside = reqs.filter(p => /^\/api\/(subscribe|messages|api)\b/.test(p));
         check('a name with ../ stays inside /api/board/', outside.length === 0 && reqs.some(p => p.startsWith('/api/board/..%2F..%2Fapi')), JSON.stringify(outside.length ? outside : reqs.filter(p => p.startsWith('/api/board/')).slice(0, 4)));
