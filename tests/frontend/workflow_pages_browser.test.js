@@ -58,8 +58,9 @@ const BASE = require('./test_base').BASE;
             const run = await ev(`(() => { const steps = [...document.querySelectorAll('.wf-run-step')]; const pass = steps[0], fail = steps[1]; const vis = e => !!e && e.getClientRects().length > 0 && !e.closest('details:not([open]) > :not(summary)');
                 return { title: document.querySelector('.wf-run-title').textContent.replace(/\\s+/g, ' ').trim(), error: (document.querySelector('.wf-run-error') || {}).textContent || '', peek: (pass.querySelector('.wf-run-step-peek') || {}).textContent || '', peekFailed: !!fail.querySelector('.wf-run-step-peek') && getComputedStyle(fail.querySelector('.wf-run-step-peek')).display !== 'none',
                     filesDetails: steps.map(s => { const d = s.querySelector('details.wf-step-files-more'); return d ? { open: d.open, summary: d.querySelector(':scope > summary').textContent.trim(), chipsVisible: [...d.querySelectorAll('.wf-step-file')].some(c => vis(c)) } : null; }), looseChips: steps.some(s => [...s.querySelectorAll('.wf-step-file')].some(c => !c.closest('details') && vis(c))) }; })()`);
-            assert.equal(run.title, `Run #1`, `${tag}: the run page says the run once: ` + run.title);
-            assert.ok(/step 2 \(Test\) failed/.test(run.error) && !/ :/.test(run.error), `${tag}: the run page names step 2 with no stray space: ` + run.error);
+            const backName = await ev(`(document.querySelector('#wf-run-back') || {}).textContent || ''`).then(t => t.replace(/^\u2190\s*/, '').trim());
+            assert.equal(run.title, backName ? `${backName}, run #1` : `Run #1`, `${tag}: the run page names the workflow and the run once: ` + run.title);
+            assert.ok(/^Step 2 \(Test\) exited with 3/.test(run.error.trim()) && !/ :/.test(run.error), `${tag}: the run page names step 2 in the Jobs pages' words with no stray space: ` + run.error);
             assert.equal(run.peek.trim(), 'installing packages', `${tag}: a closed step shows its output's first line: ` + JSON.stringify(run.peek));
             assert.ok(!run.peekFailed, `${tag}: an open (failed) step shows no peek`);
             assert.ok(run.filesDetails.every(d => d && d.open === false && d.summary === 'Files' && d.chipsVisible === false) && !run.looseChips, `${tag}: the file chips are in a closed Files disclosure per step: ` + JSON.stringify(run.filesDetails));

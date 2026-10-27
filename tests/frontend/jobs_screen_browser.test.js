@@ -80,14 +80,16 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.match(facts[1], /^Next=(today|tomorrow|[A-Z][a-z]{2} \d+) \d\d:\d\d your time$/);
             assert.match(await ev(`document.querySelector('#scheduler-detail > .sched-facts dd:nth-of-type(2)').title`), /^in (\d+ h|\d+ min|now)$/, `${at}: the relative part is a title, the absolute time is the text`); // hours, or minutes in the hour before 02:00 UTC (the schedule's own time): the gate failed 01:00 to 02:00Z on /^in \d+ h$/
             assert.equal(facts[2], 'Does=Workflow nightly-build (2 steps)');
-            assert.equal(facts.length, 3, `${at}: three facts, the rest is in Settings: ${JSON.stringify(facts)}`);
+            assert.equal(facts[3], 'Folder=/work/project', `${at}: the folder is a fact, not folded away (#9294)`);
+            assert.equal(facts.length, 4, `${at}: four facts (Schedule, Next, Does, Folder), the rest is in Settings: ${JSON.stringify(facts)}`);
+            assert.doesNotMatch(await ev(`document.querySelector('#scheduler-detail .sched-status-line').textContent`), /next/i, `${at}: the status line does not say the next run twice`);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-settings').open`), false, `${at}: Settings is closed`);
             { const cs = await ev(`(() => { const c = getComputedStyle(document.querySelector('#scheduler-detail .sched-settings > summary')); return [c.display, c.listStyleType, c.listStylePosition]; })()`); assert.ok(cs[0] === 'list-item' || (cs[1] !== 'none'), `${at}: Settings is a disclosure with its arrow (${cs})`); }
             await shot(`jobs-page-closed-${w}`);
             assert.equal(await ev(`/Cleanup|Base branch/.test(document.querySelector('#scheduler-detail .sched-settings').textContent) && !/Cleanup/.test(document.querySelector('#scheduler-detail .sched-settings').textContent)`), false);
             await ev(`document.querySelector('#scheduler-detail .sched-settings > summary').click(); true`);
             assert.match(await text('#scheduler-detail .sched-settings'), /Time limit\s*1 hour/);
-            assert.match(await text('#scheduler-detail .sched-settings'), /Folder\s*\/work\/project/);
+            assert.doesNotMatch(await text('#scheduler-detail .sched-settings'), /Folder/, `${at}: the folder left Settings for the facts`);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-runs-table th')].map(t => t.textContent.trim())`), ['Started', 'Result', 'Duration', 'Conversation']);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-runs-table th:last-child .sr-only')?.textContent`), 'Conversation', 'the optional conversation column has a screen-reader heading');
             assert.equal(await ev(`document.querySelectorAll('#scheduler-detail .dt-table').length`), 1, 'job history uses the shared table');

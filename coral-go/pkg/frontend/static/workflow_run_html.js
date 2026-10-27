@@ -2,7 +2,7 @@
 
 import { escapeHtml as esc, escapeAttr as escAttr } from './utils.js';
 import { formatDuration } from './format.js';
-import { stepWords } from './job_words.js';
+import { reasonWords } from './job_words.js';
 
 export function formatTime(ts) {
     if (!ts) return '';
@@ -29,6 +29,26 @@ function statusIconChar(status) {
         case 'skipped': return '&#8212;';
         default: return '&#8226;';
     }
+}
+
+/** Why a run failed, as the run page says it: the Jobs pages' words with a capital ("Step 2 (Test) exited with 3"). */
+export function runErrorWords(msg) {
+    const w = reasonWords({ error_msg: String(msg || '').trim() });
+    return w ? w.charAt(0).toUpperCase() + w.slice(1) : '';
+}
+
+/** How a run was started, in words (the server's trigger_type is a code: "ui", "schedule", "api"). */
+export function triggerWords(type) {
+    const t = String(type || '').trim();
+    return ({ ui: 'Run by you', manual: 'Run by you', schedule: 'On schedule', api: 'Started by an API call', job: 'Run by a job' })[t] || (t ? `Started by ${t}` : 'Started by an API call');
+}
+
+/** The run's elapsed time as words for the meta line: "took 2s" when it has ended, "running 5s" while it goes; '' for a run that has not started. */
+export function runElapsedWords(run) {
+    if (!run.started_at) return '';
+    const end = run.finished_at ? new Date(run.finished_at) : new Date();
+    const sec = Math.max(0, Math.round((end - new Date(run.started_at)) / 1000));
+    return `${run.finished_at ? 'took' : 'running'} ${formatDuration(sec, { unit: 's', dropZeroSeconds: true })}`;
 }
 
 /** The run's elapsed time, or '' for a run that has not started. */
@@ -136,14 +156,13 @@ export function runStepHtml(run, s, i, count) {
 
 /** The run's meta line: its state, trigger, start, duration, finish and why it failed. */
 export function runMetaHtml(run, signInFailure, errorExcerpt) {
-    const durationHtml = runDurationHtml(run);
+    // One line of words: the state, how it started, "Started 05:40, took 2s" (the finish time is the line's tooltip), and why it failed (#9294, the Operator's audit)
+    const elapsed = runElapsedWords(run);
     return `
         <div class="wf-run-meta">
             <span><span class="chip wf-status-badge ${esc(run.status)}">${esc(run.status)}</span></span>
-            <span><span class="material-icons" aria-hidden="true">bolt</span> ${esc(run.trigger_type || 'api')}</span>
-            ${run.started_at ? `<span><span class="material-icons" aria-hidden="true">schedule</span> ${formatTime(run.started_at)}</span>` : ''}
-            ${durationHtml}
-            ${run.finished_at ? `<span><span class="material-icons" aria-hidden="true">check_circle</span> ${formatTime(run.finished_at)}</span>` : ''}
-            ${signInFailure ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> ${signInFailure}</span>` : run.error_msg ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> <span class="wf-run-error-text">${esc(stepWords(String(run.error_msg).trim()))}${errorExcerpt ? `<span class="wf-run-error-excerpt">: ${esc(errorExcerpt)}</span>` : ''}</span></span>` : ''}
+            <span>${esc(triggerWords(run.trigger_type))}</span>
+            ${run.started_at ? `<span${run.finished_at ? ` title="${escAttr('Finished ' + formatTime(run.finished_at))}"` : ''}>Started ${esc(formatTime(run.started_at))}${elapsed ? `, ${esc(elapsed)}` : ''}</span>` : ''}
+            ${signInFailure ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> ${signInFailure}</span>` : run.error_msg ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> <span class="wf-run-error-text">${esc(runErrorWords(run.error_msg))}${errorExcerpt ? `<span class="wf-run-error-excerpt">: ${esc(errorExcerpt)}</span>` : ''}</span></span>` : ''}
         </div>`;
 }

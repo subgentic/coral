@@ -120,6 +120,8 @@
     gap: 4px;
 }
 
+.wf-run-meta .wf-run-error-text, .wf-run-meta .wf-run-error-excerpt { display: inline; } /* the reason and its excerpt are one sentence, not two flex items with a gap between them (#9294) */
+
 .wf-run-meta .material-icons {
     font-size: var(--icon-inline-size);
     color: var(--text-muted);

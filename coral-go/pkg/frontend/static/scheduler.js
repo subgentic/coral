@@ -141,7 +141,6 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         : '';
 
     const settingsRows = [
-        job.repo_path ? ['Folder', `<span class="sched-path">${escapeHtml(job.repo_path)}</span>`] : null,
         !isWorkflow ? ['Base branch', escapeHtml(job.base_branch || "The repo's current branch")] : null,
         ['Time limit', escapeHtml(limitWords(job.max_duration_s) || `${job.max_duration_s} seconds`)],
         !isWorkflow ? ['Cleanup worktree', job.cleanup_worktree ? 'Yes' : 'No'] : null,
@@ -154,7 +153,8 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
     const savedLine = saved ? `<p class="item-meta sched-saved" role="status">${escapeHtml(savedWords)}</p>` : '';
 
     const moreId = `sched-more-${Number(job.id)}`;
-    const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Paused'), lastWords(job.last_run), job.enabled && job.next_fire_at ? `next ${awayWords(job.next_fire_at)}` : ''].filter(Boolean).join(' \u00b7 ');
+    // One status line: the state and the last result. When it runs next is the Next fact below, not said twice (#9294, the Operator's audit).
+    const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Paused'), lastWords(job.last_run)].filter(Boolean).join(' \u00b7 ');
     // A short prompt is shown; a long one is folded (it would push the runs off the page)
     const longPrompt = (job.prompt || '').length > 600 || (job.prompt || '').split('\n').length > 10;
     const promptHtml = !isWorkflow && job.prompt
@@ -178,10 +178,11 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
                 ? (job.next_fire_at ? `<dt>Next</dt><dd title="${escapeAttr(awayWords(job.next_fire_at))}">${escapeHtml(atWords(job.next_fire_at))} your time</dd>` : '<dt>Next</dt><dd>not scheduled</dd>')
                 : `<dt>Paused</dt><dd>${job.paused_reason ? `${escapeHtml(job.paused_reason)}. Fix the cause, then Enable to resume.` : 'Enable it to run on schedule.'}</dd>`}
             <dt>Does</dt><dd>${doesHtml}</dd>
+            ${job.repo_path ? `<dt>Folder</dt><dd><span class="sched-path">${escapeHtml(job.repo_path)}</span></dd>` : ''}
         </dl>
         ${promptHtml}
         <details class="disclosure sched-settings">
-            <summary>Settings: ${isWorkflow ? 'folder, time limit' : 'folder, branch, time limit'}</summary>
+            <summary>Settings: ${isWorkflow ? 'time limit' : 'branch, time limit'}</summary>
             <dl class="facts sched-facts">${settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
         </details>
         <div class="sched-runs-section">
@@ -299,8 +300,16 @@ async function runScheduledJobNow(jobId, btn) {
     }
 }
 
+/** The question names the job and how many runs go with it ("Delete greet-hourly and its 12 runs?"). */
+function deleteWords(job, runCount) {
+    const name = job && job.name ? job.name : 'this job';
+    return runCount > 0 ? `Delete ${name} and its ${runCount} run${runCount === 1 ? '' : 's'}? This cannot be undone.` : `Delete ${name}? It has no runs yet.`;
+}
+
 function deleteScheduledJob(jobId) {
-    window.showConfirmModal('Delete Job', 'Delete this scheduled job and all its run history?', async () => {
+    const job = scheduledJobs.find(j => Number(j.id) === Number(jobId));
+    const runCount = runsPage && Number(runsPage.jobId) === Number(jobId) ? Number(runsPage.total) || 0 : 0;
+    window.showConfirmModal('Delete job', deleteWords(job, runCount), async () => {
         try {
             const gone = (scheduledJobs.find(j => j.id === jobId) || {}).name || 'the job';
             await fetch(`/api/scheduled/jobs/${jobId}`, { method: 'DELETE' });
@@ -312,7 +321,7 @@ function deleteScheduledJob(jobId) {
         } catch (e) {
             showToast('Failed to delete job', true);
         }
-    });
+    }, undefined, { label: 'Delete job' }); // the button says what it does, not Yes
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────

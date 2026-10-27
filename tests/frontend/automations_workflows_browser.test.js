@@ -22,10 +22,10 @@ const WFS = [
         steps: [{ name: 'Ship', type: 'shell', command: 'make ship' }], last_run: null },
 ];
 const RUNS = [
-    { id: 2, workflow_id: 1, status: 'failed', trigger_type: 'schedule', started_at: iso(3700000), finished_at: iso(3600000), duration_seconds: 100, failed_step: { number: 2, name: 'Test' }, failure_reason: 'exit code 3' },
+    { id: 2, workflow_id: 1, status: 'failed', trigger_type: 'schedule', started_at: iso(3700000), finished_at: iso(3600000), error_msg: 'step 1 (Test) failed: exit code 3', duration_seconds: 100, failed_step: { number: 2, name: 'Test' }, failure_reason: 'exit code 3' },
     { id: 1, workflow_id: 1, status: 'completed', trigger_type: 'manual', started_at: iso(90000000), finished_at: iso(89990000), duration_seconds: 10 },
 ];
-const RUN2 = { id: 2, workflow_id: 1, workflow_name: 'nightly-build', status: 'failed', trigger_type: 'schedule', started_at: iso(3700000), finished_at: iso(3600000),
+const RUN2 = { id: 2, workflow_id: 1, workflow_name: 'nightly-build', status: 'failed', trigger_type: 'schedule', started_at: iso(3700000), finished_at: iso(3600000), error_msg: 'step 1 (Test) failed: exit code 3',
     steps: [{ name: 'Install', type: 'shell', status: 'completed', exit_code: 0, started_at: iso(3700000), finished_at: iso(3690000) }, { name: 'Test', type: 'shell', status: 'failed', exit_code: 3, started_at: iso(3690000), finished_at: iso(3600000), output_tail: 'FAIL src/a.test.js', error_tail: 'exit 3' }] };
 const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     window.fetch = (u, o) => { const s = String(u); const get = !(o && o.method && o.method !== 'GET');
@@ -106,7 +106,11 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.deepEqual(await ev(`(() => { const b = document.querySelector('#wf-detail .item-bar [data-on-click="wf-trigger"]'); return [b.textContent.trim(), b.disabled]; })()`), ['Starting\u2026', true], at + 'Run reads Starting\u2026 and is disabled while the run is being made');
             await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title')`, at + "the run's page", 8000);
             assert.equal(await ev(`document.getElementById('wf-status').textContent`), 'Started nightly-build', at + 'a status line says what started');
-            assert.equal(await ev(`(document.querySelector('#wf-run-detail .wf-started-line') || {}).textContent`), 'Started nightly-build', at + "and the run's page shows it");
+            assert.equal(await ev(`document.querySelector('#wf-run-detail .wf-run-title').textContent`), 'nightly-build, run #2', at + "the run's title names the workflow and the run (#9294)");
+            assert.equal(await ev(`!!document.querySelector('#wf-run-detail .wf-started-line')`), false, at + "no 'Started <name>' line under the title: the title says it");
+            { const meta = await ev(`[...document.querySelectorAll('#wf-run-detail .wf-run-meta > span')].map(s => s.textContent.replace(/\\s+/g, ' ').trim())`);
+              assert.equal(meta[0], 'failed', at + 'the state'); assert.equal(meta[1], 'On schedule', at + 'how it started, in words, not the code'); assert.match(meta[2], /^Started .+, took 1m 40s$/, at + 'one line: when it started and how long it took: ' + meta[2]);
+              assert.match(meta[3].replace(/^error /, ''), /^Step 2 \(Test\) exited with 3/, at + 'the failure line is in the Jobs pages\' words: ' + meta[3]); assert.doesNotMatch(meta[3], / :/, at + 'no stray space before the colon'); }
             assert.equal(await pathname(), '/automations/workflows/1/runs/2', at + "the address is the run's");
             await ev(`window.workflowsBackToList(); true`);
             await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'back on the table', 8000);

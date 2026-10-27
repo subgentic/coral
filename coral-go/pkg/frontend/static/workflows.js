@@ -313,8 +313,7 @@ function renderRunDetail(run) {
     container.innerHTML = `
         ${backHtml}
         <button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
-        <h2 class="wf-item-title wf-run-title">Run #${run.id}</h2>
-        ${startedNote && startedNote.runId === Number(run.id) ? `<p class="item-meta wf-started-line">${esc(startedNote.text)}</p>` : ''}
+        <h2 class="wf-item-title wf-run-title">${esc(run.workflow_name ? `${run.workflow_name}, run #${run.id}` : `Run #${run.id}`)}</h2>
         ${runMetaHtml(run, signInFailure, errorExcerpt)}
         ${progressBarHtml}
         <div class="wf-run-steps wf-timeline">${stepsHtml}</div>
@@ -360,7 +359,7 @@ export async function triggerWorkflow(id, btn) {
     }
 }
 
-let startedNote = null; // { runId, text }: "Started <name>", shown on the run's page it opened
+let startedNote = null; // { runId, text }: "Started <name>", said once in the status line for a screen reader (the run's title names the workflow and the run)
 function sayStarted(text) { const s = document.getElementById('wf-status'); if (s) s.textContent = text; }
 
 // ── Kill ───────────────────────────────────────────────────────────────
