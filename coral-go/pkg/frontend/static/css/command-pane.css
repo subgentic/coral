@@ -124,20 +124,6 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 }
 
 
-.btn-add-macro {
-    font-size: var(--fs-xl);
-    font-weight: var(--fw-regular);
-    color: var(--text-muted);
-    border-style: dashed;
-    min-width: 28px;
-}
-
-.btn-add-macro:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-    background: rgba(var(--fx-blue-rgb), 0.1);
-}
-
 /* ── Command Hint ──────────────────────────────────────────── */
 
 /* ── Split Send Button ─────────────────────────────────────── */
@@ -146,12 +132,6 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     display: flex;
     position: relative;
     flex-shrink: 0;
-}
-
-.btn-send-dropdown {
-    padding: 4px 5px !important;
-    border-radius: 0 6px 6px 0 !important;
-    border-left: 1px solid rgba(var(--white-rgb), 0.15);
 }
 
 .send-btn-menu {
@@ -330,51 +310,14 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     }
 
     /* Toolbar buttons read as quiet icons inside the card */
-    :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .btn-nav:not(.btn-send) {
-        height: var(--control-compact-height);
-        background: transparent;
-        border: 1px solid transparent;
-        border-radius: 15px;
-        color: var(--text-secondary);
-        font-weight: var(--fw-medium);
-    }
-    :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .btn-nav:not(.btn-send):hover {
-        background: var(--bg-hover);
-        color: var(--text-primary);
-    }
     /* Macros keep an outline so they read as chips */
-    :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .macro-btn-wrap .btn-nav,
-    :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .btn-nav.btn-add-macro {
-        border-color: var(--control-border);
-        padding: 0 12px;
-    }
-    :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .btn-nav.btn-add-macro {
-        border-style: dashed;
-        padding: 0;
-        min-width: 30px;
-    }
 
     :is(#command-pane, #board-chat-input-pane) .toolbar-send-split {
         align-items: center;
         gap: 2px;
         margin-left: 4px;
     }
-    :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .btn-send-dropdown {
-        order: -1;
-        min-width: 24px;
-        border-radius: 15px !important;
-    }
-    :is(#command-pane, #board-chat-input-pane) .btn-send {
-        width: 32px;
-        min-width: 32px;
-        height: 32px;
-        padding: 0;
-        border-radius: 50%;
-        box-shadow: none;
-    }
-    :is(#command-pane, #board-chat-input-pane) .btn-send:hover {
-        transform: none;
-    }
+    :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .btn-send-dropdown { order: -1; }
     :is(#command-pane, #board-chat-input-pane) .drop-overlay {
         border-radius: 16px;
     }
@@ -403,9 +346,6 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
         overflow-y: auto;
     }
     #board-chat-input-pane .command-pane-toolbar { order: 1; gap: 4px; border-bottom: none; padding: 6px 8px 8px; }
-    #board-chat-input-pane .command-pane-toolbar .btn-nav:not(.btn-send) { height: var(--control-compact-height); background: transparent; border: 1px solid transparent; border-radius: 15px; color: var(--text-secondary); font-weight: var(--fw-medium); }
-    #board-chat-input-pane .btn-send { width: 32px; min-width: 32px; height: 32px; padding: 0; border-radius: 50%; box-shadow: none; }
-    #board-chat-input-pane .btn-send:hover { transform: none; }
 }
 /* @all is an outlined chip in the bottom row, as the chat's macros are */
 #board-chat-input-pane .command-pane-toolbar .btn-nav.board-mention-chip:not(.btn-send) { height: auto; min-height: var(--control-compact-height); border-color: var(--control-border); padding: 0 12px; } /* min-height, not height: at 200% text the chip grows with its label */ /* beats the quiet-icon rule above, as the chat's macro chips do */

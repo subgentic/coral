@@ -542,44 +542,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 /* Keyboard-key style buttons */
-.btn-nav {
-    border: 1px solid var(--control-border);
-    border-bottom: 2px solid var(--border-light);
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    min-width: 34px;
-    height: var(--control-compact-height);
-    text-align: center;
-    font-weight: var(--fw-strong);
-    font-size: var(--fs-md);
-    border-radius: var(--radius-md);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 8px;
-    margin: 0;
-    white-space: nowrap;
-    font-family: var(--font-sans);
-}
-
-.btn-nav:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--text-muted);
-}
-
-.btn-enter {
-    border-color: var(--accent-dim);
-    border-bottom-color: var(--accent-dim);
-    background: rgba(var(--fx-blue-rgb), 0.15);
-    color: var(--accent);
-}
-
-.btn-enter:hover {
-    background: rgba(var(--fx-blue-rgb), 0.25);
-    border-color: var(--accent);
-    color: var(--accent);
-}
+.btn-nav { margin: 0; min-width: 34px; } /* a composer button wears the family (.btn .btn-quiet .btn-small): this is only its place (#9509) */
 
 .btn-mode {
     gap: 5px;
@@ -589,32 +552,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     flex-shrink: 0;
 }
 
-.btn-mode:hover {
-    background: rgba(124, 58, 237, 0.15);
-    border-color: var(--badge-claude);
-    color: var(--badge-claude);
-}
-
-.btn-send {
-    background: var(--accent) !important;
-    color: var(--text-on-accent) !important;
-    font-weight: var(--fw-strong);
-    padding: 6px 20px;
-    border-radius: var(--radius-lg);
-    box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.25);
-    transition: all 0.15s;
-    border: none !important;
-    border-bottom: none !important;
-    flex-shrink: 0;
-    font-size: var(--fs-md);
-}
-
-.btn-send:hover {
-    background: var(--accent-light) !important;
-    box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.35);
-    transform: translateY(-1px);
-    color: var(--text-on-accent) !important;
-}
+.btn-send { flex-shrink: 0; } /* the family's primary (.btn-primary .btn-small) is its look */
 
 
 /* ── Badges ────────────────────────────────────────────────── */
