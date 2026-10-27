@@ -1,4 +1,4 @@
-import { serverColumns, serverOf, readInboxArtifacts } from './inbox_servers.js';
+import { serverOf, readInboxArtifacts } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
@@ -11,6 +11,7 @@ import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { showToast } from './utils.js';
 const DT = await importOnce('./data_table.js');
+const { artifactTable, serverArtifactSort } = await importOnce('./artifact_table.js');
 const Toolbar = await importOnce('./team_toolbar.js');
 const { el } = DT; // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
@@ -127,6 +128,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         model.loadingMore = append; model.error = ''; model.notFound = false;
         draw();
         try {
+            model.filters.sort = serverArtifactSort(artifactState.sort || undefined);
             const params = new URLSearchParams({ limit: String(PAGE) });
             if (!(scope && scope.standalone)) for (const [k, v] of Object.entries(toParams(model.filters))) params.set(k, v); // the search, the filters and the sort are the server's to apply
             if (!append) params.set('offset', '0'); else if (model.cursor) params.set('cursor', model.cursor); else params.set('offset', String(model.items.length));
@@ -172,6 +174,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     /** What the filters are remembered under: the board, or for an agent the board and the agent (the key the old agent tab used). */
     const filterKey = () => (model.scope ? `${model.project}::agent::${model.scope.session}` : model.project);
     function setFilters(next) {
+        if (next.sort !== model.filters.sort) artifactState.sort = next.sort === 'name' ? { key: 'name', dir: 'asc' } : next.sort === 'size' ? { key: 'size', dir: 'desc' } : { key: 'updated', dir: next.sort === 'oldest' ? 'asc' : 'desc' };
         model.filters = next;
         F.save(filterKey(), next);
         loadArtifacts();
@@ -300,39 +303,24 @@ export function createArtifactsList({ inbox = false } = {}) {
         if (model.items.length || artifactState.selected.size) {
             const by = !model.scope && !inbox ? model.filters.group : ''; // the team's list read by task or goal: a head per group, its files together (an agent's list is not grouped)
             const shown = by ? orderByGroup(model.items, by) : model.items;
-            const table = DT.dataTable({
+            const table = artifactTable({
                 label: `Artifacts, ${model.items.length}`, ...(inbox ? { layout: 'fixed' } : {}), bare: !!model.scope, compact: !!model.scope, fold: model.scope ? 'none' : 'column', foldAt: 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
                 selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
-                columns: [
-                    { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1,
-                        cell: item => {
-                            const first = el('span', model.scope ? 'dt-title-cell' : 'dt-title-stack');
-                            const b = DT.primaryButton(readableName(item)); b.dataset.artifactId = itemKey(item); first.append(b);
-                            const badge = originBadge(item);
-                            if (badge) { const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`); if (isUnverified(item)) note.classList.add('dt-warning'); first.append(note); }
-                            const tagged = model.scope ? null : Tags.rowTags(item.tags); if (tagged) first.append(tagged);
-                            return first;
-                        } },
-                    // The Inbox's list is crowded (a computer, a team, a task, a goal): the team's words carry its computer ("alpha · Box Two"), so the Server column is only there when one team is chosen and the Team column is not;
-                    // every other column has a fixed width and the file's name takes what is left (it was cut to 60 px at 1280, #8839)
-                    ...(inbox && model.filters.team ? serverColumns().map(c => ({ ...c, width: '7rem' })) : []),
-                    ...(inbox && !model.filters.team ? [{ key: 'team', label: 'Team', width: '8rem', nowrap: false, line: 2, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }] : []), // the Inbox's list spans teams; one team chosen, the column says nothing new
-                { key: 'type', label: 'Type', ...(inbox ? { width: '6.5rem' } : {}), line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
-                    { key: 'size', label: 'Size', ...(inbox ? { width: '4.5rem' } : {}), line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
-                    // the head says the task or goal a group is: its own column would say it on every row (#8617)
-                    ...(by === 'task' ? [] : [{ key: 'task', label: 'Task', ...(inbox ? { width: '9rem', nowrap: false } : {}), line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskCell }]),
-                    ...(by === 'goal' || model.scope || !shown.some(i => i.goal_id) ? [] : [{ key: 'goal', label: 'Goal', ...(inbox ? { width: '7rem' } : {}), line: 2, tone: 'tertiary', cell: item => (item.goal_id && item.goal_title ? String(item.goal_title) : '') }]),
-                    { key: 'created', label: 'Created', ...(inbox ? { width: '8rem' } : {}), line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
-                    // An agent's list opens an artifact in the preview panel; its sheet (the facts, Keep, Delete, Copy link, who can read it) is one quiet link away (#8539)
-                    ...(model.scope ? [{ key: 'details', label: 'Details', hideLabel: true, line: 2, tone: 'tertiary', align: 'end', cell: item => detailsLink(item) }] : []), // only an agent's list has the column: a `when` kept its head and its links on the team's and the Inbox's list at a wide width
-                ].filter(c => !model.scope || !['type', 'task'].includes(c.key)).map(c => model.scope && c.key !== 'name' ? { ...c, width: 'content' } : c),
+                paged: model.hasMore || model.truncated,
+                noPageSort: !!model.scope?.standalone,
+                onPageSort: sort => setFilters({ ...model.filters, sort }),
+                details: model.scope ? detailsLink : null,
+                nameBadge: item => {
+                    const badge = originBadge(item); if (!badge) return null;
+                    const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
+                    if (isUnverified(item)) note.classList.add('dt-warning'); return note;
+                },
+                nameTitle: item => [readableName(item), inbox ? teamLabel(item.board_id, item.team) : '', taskText(item), originBadge(item)].filter(Boolean).join(' · '),
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
             });
-            // Keep row heights stable while the new ResizeObserver settles the dock width.
-            // Restoring scroll against an unfolded table first makes browser anchoring jump.
-            if (tableBox && !model.scope) table.el.classList.toggle('dt-folded', tableBox.classList.contains('dt-folded'));
+            // This table never folds: optional columns disappear as its container narrows.
             body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
             if (!model.scope && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton);
         }
@@ -355,14 +343,6 @@ export function createArtifactsList({ inbox = false } = {}) {
     }
 
     const sources = (list) => (Array.isArray(list) ? list.map(v => { const at = String(v).indexOf('/'); const server = at < 0 ? String(v) : String(v).slice(0, at), board = at < 0 ? '' : String(v).slice(at + 1); return board ? `${server}, board ${board} (claimed by the sender)` : server; }).join('\n') : '');
-
-    /** The Task column: a link that opens the task's page (#8617); "No task" for a file no task holds. */
-    function taskCell(item) {
-        if (!item.task_id) return taskText(item);
-        const b = DT.link(taskText(item), () => { importOnce('./task_navigation.js').then(m => m.openTask(inbox ? item.board_id : model.project, item.task_id)).catch(() => {}); });
-        b.dataset.taskLink = String(item.task_id);
-        return b;
-    }
 
     /** The sheet's own link on an agent's row (the row itself opens the preview): the item's facts and actions, as the team page's rows open them. */
     function detailsLink(item) {
@@ -451,6 +431,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         forgetChoices();
         model.controller?.abort();
         Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, tagCounts: {}, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...F.EMPTY } : F.load(scope ? `${project}::agent::${scope.session}` : project), kept: new Set() });
+        model.filters = { ...model.filters, sort: serverArtifactSort() };
         if (!external) bar = null;
     }
     /** The Inbox folder's bar (a list bar built by the folder toolbar) is this list's bar: the list neither builds nor places one, and tells it what it holds (names, counts, filters). */
