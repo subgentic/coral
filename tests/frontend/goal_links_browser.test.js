@@ -27,7 +27,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const landed = async (where) => {
             await waitFor(`location.pathname === ${JSON.stringify(WANT)} && document.querySelector('#team-panel-goals #goals-detail-title') && document.querySelector('#team-panel-goals #goals-detail-title').textContent === ${JSON.stringify(TITLE)}`, `${where}: the team page's goal ${TITLE} at ${WANT}`, 15000);
             assert.equal(await ev(`location.pathname.startsWith('/board/')`), false, `${where}: not the board page`);
-            await waitFor(`document.activeElement === document.querySelector('#team-panel-goals #goals-detail-title') && !!document.activeElement`, `${where}: the keyboard starts at the goal's heading`, 6000);
+            await waitFor(`document.activeElement === document.querySelector('#team-panel-goals .goal-main .goals-back') && !!document.activeElement`, `${where}: the keyboard starts at the goal's Back link`, 6000);
+            assert.equal(await ev(`document.activeElement === document.querySelector('#team-panel-goals #goals-detail-title')`), false, `${where}: not at the heading (no ring round plain words, #7404)`);
             assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-view')).display !== 'none'`), true, `${where}: the team page is on screen`);
         };
         const inboxFolder = async (key, rowsSel) => {

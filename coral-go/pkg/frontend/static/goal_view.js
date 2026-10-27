@@ -26,7 +26,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const closeGoal = () => back();
     const drawPage = () => { if (!disposed && current) drawGoalPageRaw(root); };
     const drawDetail = drawPage;
-    const focusDetail = () => root.querySelector('#goals-detail-title')?.focus({ preventScroll: true });
+    const focusDetail = () => (root.querySelector('.goal-main .goals-back') || root.querySelector('.goals-back') || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true }); // the keyboard starts at the way back, not at the heading: no ring round plain words (#7404)
     const loadGoals = () => refresh ? refresh() : reload();
     const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
@@ -305,7 +305,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     function drawGoalPageRaw(col) {
         const g = goalById(model.openId);
-        const keep = document.activeElement && document.activeElement.id === 'goals-detail-title';
+        const keep = document.activeElement && document.activeElement.id === 'goals-detail-title', keepBack = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('goals-back') && col.contains(document.activeElement);
         col.replaceChildren();
         const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.classList.toggle('goal-split-open', !previewEl.hidden);
         const main = el('div', 'goal-main');
@@ -313,6 +313,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const h = drawGoalMain(main, g);
         markPreviewRow();
         if (keep) h.focus();
+        else if (keepBack) main.querySelector('.goals-back')?.focus({ preventScroll: true });
     }
 
     // ── closing, reopening, and the all-done prompt (#7272, UI/UX's #7270) ─────

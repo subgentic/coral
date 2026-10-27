@@ -112,10 +112,10 @@ export async function openGoalOnTeamPage(team, id) {
     window.switchNavTab?.('agents', { fromHistory: true }); // the team page lives under Agents; the page writes its own address
     const m = await importOnce('./team_page.js');
     await m.openTeamPage(team, { tab: 'goals', item: Number(id) });
-    // a person chose the goal: the keyboard starts at its heading once the page has drawn it (the goals are read first when the page is new)
+    // a person chose the goal: the keyboard starts at its way back once the page has drawn it, not at its heading (no ring round plain words, #7404; the goals are read first when the page is new)
     for (let i = 0; i < 40; i++) {
-        const heading = document.querySelector('#team-panel-goals #goals-detail-title');
-        if (heading && heading.textContent) { heading.focus({ preventScroll: true }); return; }
+        const heading = document.querySelector('#team-panel-goals #goals-detail-title'), back = document.querySelector('#team-panel-goals .goal-main .goals-back');
+        if (heading && heading.textContent && back) { back.focus({ preventScroll: true }); return; }
         await new Promise(r => setTimeout(r, 50));
     }
 }
