@@ -47,7 +47,7 @@ type EfficiencyCommit struct {
 	Hash string
 	At   time.Time // the commit's own (author) time: a rebased, amended or cherry-picked copy keeps it
 	Seen []CommitSighting
-	// AuthorName and AuthorHash are who made it (a name, and IdentityHash of their email); empty for a commit snapshotted before they were recorded.
+	// AuthorName and AuthorHash are who made it (a name, and the IdentityHasher pseudonym of their email); empty for a commit snapshotted before they were recorded.
 	AuthorName string
 	AuthorHash string
 }

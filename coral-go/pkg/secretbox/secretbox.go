@@ -15,7 +15,9 @@ package secretbox
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -63,6 +65,8 @@ const (
 type Box struct {
 	aead   cipher.AEAD
 	source Source
+	// macRoot is derived from the master key (never the key itself) and keys MAC: a pseudonym of a value that cannot be recomputed without this install's key.
+	macRoot []byte
 }
 
 // New builds a Box from a raw 32-byte key.
@@ -78,7 +82,19 @@ func New(key []byte) (*Box, error) {
 	if err != nil {
 		return nil, ErrKeyInvalid
 	}
-	return &Box{aead: aead}, nil
+	root := hmac.New(sha256.New, key)
+	root.Write([]byte("coral/secretbox/mac-root/v1"))
+	return &Box{aead: aead, macRoot: root.Sum(nil)}, nil
+}
+
+// MAC is a keyed pseudonym of msg under label: HMAC-SHA256 with a key derived from the master key and the label, so a value (an email address, say) cannot be matched to its pseudonym without this install's
+// key, and one label's pseudonyms say nothing about another's. It changes when the master key is rotated.
+func (b *Box) MAC(label string, msg []byte) []byte {
+	k := hmac.New(sha256.New, b.macRoot)
+	k.Write([]byte(label))
+	m := hmac.New(sha256.New, k.Sum(nil))
+	m.Write(msg)
+	return m.Sum(nil)
 }
 
 // Source reports where the key was loaded from (file by default).

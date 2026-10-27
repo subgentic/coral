@@ -198,6 +198,7 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 	// turn it off without restarting.
 	gitPoller := background.NewGitPoller(gitStore, agentRT, time.Duration(cfg.GitPollerIntervalS)*time.Second)
 	gitPoller.SetLandingWatch(landingWatch)
+	gitPoller.SetIdentityHasher(store.NewIdentityHasher(store.NewRemoteServerStore(sessStore.DB(), cfg.CoralDir()))) // a keyed pseudonym of a commit author's email (#8996, #9046)
 	gitPoller.SetIntervalFn(func() time.Duration {
 		return gitPollInterval(ctx, sessStore, cfg.GitPollerIntervalS)
 	})
