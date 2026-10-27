@@ -357,7 +357,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     host.replaceChildren();
     host.setAttribute('aria-label', `Task ${task.id}`);
     const acts = { project: ctx.project, redraw: (t, m) => renderTaskPage(host, t || task, ctx, m), reload: (message) => reloadTask(host, task.id, ctx, message) };
-    const back = el('button', 'goals-back'); back.type = 'button';
+    const back = el('button', 'goals-back'); back.type = 'button'; back.hidden = !!ctx.hideBack;
     const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true');
     back.append(arrow, document.createTextNode(` ${ctx.backLabel}`));
     back.addEventListener('click', () => ctx.onBack());
@@ -377,7 +377,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     const parentId = task.workflow && Number(task.workflow.parent_task_id);
     if (parentId > 0) page.append(followUpOfLine(parentId, ctx)); // a follow-up says which task it is the follow-up of (#7829)
     const bar = el('div', 'goals-pinbar');
-    let focus = ctx.teamLink || ctx.focusBack ? back : h; // the Inbox's page opens on its Back link: a ring round the title's plain words is never drawn (#7404)
+    let focus = ctx.focusTarget ? ctx.focusTarget() : ctx.teamLink ? back : h; // the Inbox's page opens on its Back link: a ring round the title's plain words is never drawn (#7404)
     if (mode === 'edit') {
         const loading = el('p', 'goals-note', 'Loading the task’s form…'); page.append(loading, bar);
         foldWayBack(page, '.goals-back', '.goals-detail-title');
