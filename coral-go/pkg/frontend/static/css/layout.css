@@ -49,6 +49,8 @@
     color: var(--rail-badge-text);
 }
 .nav-tab-badge[hidden] { display: none; }
+/* Room for the badge (#9629): the tab that carries it keeps 1.25rem after its box, so a count of up to three characters (99+) ends before the next tab's word, at 200% text too (rem scales with it). The room is there with or without a count: a badge showing or going moves no tab (#8497). */
+.top-nav-tab:has(> .nav-tab-badge) { margin-inline-end: 1.25rem; }
 .nav-more-item .nav-more-badge { margin-left: auto; }
 .top-nav-tab.nav-overflowed { display: none; }
 .nav-more-wrap { display: flex; flex: 0 0 auto; }

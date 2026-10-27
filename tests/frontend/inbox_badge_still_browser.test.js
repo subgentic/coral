@@ -39,6 +39,15 @@ const BASE = require('./test_base').BASE;
                 }
                 if (n === 3) await shot(`inbox-badge-${w}`);
             }
+            if (!mobile) { // the badge ends before the next tab's word, with the biggest count ("99+"), at 100% and at 200% text (#9629)
+                await waiting(120);
+                for (const zoom of [1, 2]) {
+                    await ev(`document.documentElement.style.fontSize = '${zoom * 16}px'; true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the text size settles the tabs
+                    const g = await ev(`(() => { const t = document.getElementById('nav-tab-hub-inbox'), e = document.getElementById('nav-tab-hub-inbox-badge'); let next = t.nextElementSibling; while (next && (!next.classList.contains('top-nav-tab') || next.classList.contains('nav-overflowed') || !next.getClientRects().length)) next = next.nextElementSibling; if (!next) return null; const n = next.getBoundingClientRect(); return { badgeRight: Math.round(e.getBoundingClientRect().right), nextWord: Math.round(n.left + parseFloat(getComputedStyle(next).paddingLeft)), next: next.id, wide: document.documentElement.scrollWidth <= innerWidth }; })()`);
+                    if (g) assert.ok(g.badgeRight <= g.nextWord && g.wide, at + `${zoom * 100}% text: the "99+" badge ends before the next tab's word: ` + JSON.stringify(g));
+                }
+                await ev(`document.documentElement.style.fontSize = ''; true`);
+            }
             await waiting(0);
             assert.deepEqual(await tabs(), none, at + 'and the tabs are where they were when the badge goes');
             console.log(`   ✓ ${at}`);
