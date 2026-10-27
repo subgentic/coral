@@ -18,7 +18,7 @@
     white-space: nowrap;
     min-height: var(--control-height);
     font-family: var(--font-sans);
-    line-height: 1.4;
+    line-height: var(--lh-ui);
     text-decoration: none; /* an <a class="btn"> (the history Download, Open dashboard) is a button: no link underline on its words */
 }
 
@@ -109,7 +109,7 @@
 .tab[aria-selected="true"], .tab.is-current, .tab.active { color: var(--text-primary); font-weight: var(--fw-strong); border-bottom-color: var(--accent); }
 .tab[aria-expanded="true"] { background: var(--bg-hover); color: var(--text-primary); } /* a tab that opens a panel (the dock's Customize), while it is open */
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-sm); }
-.tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 1.5; }
+.tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: var(--lh-body); }
 .tab-count[hidden], .tab-count:empty { display: none; }
 /* the strip of a narrow panel (the dock's): icon tabs that share the width and wrap at large text (#4344) */
 .tabs-icons { flex-wrap: wrap; gap: 0; overflow-x: visible; }
@@ -318,7 +318,7 @@
 .mb-message-body {
     font-size: var(--fs-lg);
     color: var(--mb-text);
-    line-height: 1.6;
+    line-height: var(--lh-body);
     /* A long unbroken token (a hash, a URL, a path) wraps instead of widening the whole feed;
        fenced code keeps its own horizontal scroll (pre below). */
     overflow-wrap: anywhere;
@@ -633,7 +633,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border-radius: var(--radius-xl);
     font-size: var(--fs-sm);
     font-weight: var(--fw-strong);
-    line-height: 1.2;
+    line-height: var(--lh-label);
     white-space: nowrap;
 }
 .chip-tag { font-size: var(--fs-base); font-weight: var(--fw-regular); }
@@ -891,7 +891,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-base);
     color: var(--text-secondary);
     font-weight: var(--fw-regular);
-    line-height: 1.3;
+    line-height: var(--lh-label);
     margin-top: -2px;
 }
 
@@ -915,7 +915,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .session-info-grid dt {
     padding-top: 8px;
-    line-height: 1.35;
+    line-height: var(--lh-ui);
 }
 
 .session-info-grid dd {
@@ -945,7 +945,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .info-value-path {
     font-family: var(--font-mono);
     font-size: var(--fs-base);
-    line-height: 1.45;
+    line-height: var(--lh-ui);
 }
 
 .info-command-row {
@@ -967,7 +967,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .info-text-block {
     white-space: pre-wrap;
-    line-height: 1.45;
+    line-height: var(--lh-ui);
 }
 
 .info-token-grid {
@@ -985,14 +985,14 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-weight: var(--fw-strong);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    line-height: 1.2;
+    line-height: var(--lh-label);
 }
 
 .info-token-value {
     font-variant-numeric: tabular-nums;
     font-weight: var(--fw-strong);
     font-size: var(--icon-size);
-    line-height: 1.1;
+    line-height: var(--lh-label);
 }
 
 .settings-grid {
@@ -1003,7 +1003,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .settings-grid dt {
     white-space: normal;
-    line-height: 1.35;
+    line-height: var(--lh-ui);
     padding-top: 8px;
 }
 
@@ -1173,7 +1173,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .notification-toast-detail {
     font-size: var(--fs-base);
     color: var(--text-secondary);
-    line-height: 1.4;
+    line-height: var(--lh-ui);
     padding: 6px 8px;
     background: var(--bg-tertiary);
     border-radius: var(--radius-md);
@@ -1248,7 +1248,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .alert-notification-message {
     font-size: var(--fs-lg);
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     margin-bottom: 16px;
 }
 
@@ -1307,7 +1307,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 .security-warning-text {
     margin: 0;
-    line-height: 1.45;
+    line-height: var(--lh-ui);
     overflow-wrap: anywhere;
     white-space: pre-line; /* the firewall warning is a line, then one line per rule: they ran together as one block */
     max-height: 50vh;
@@ -1434,7 +1434,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     margin: 0;
     font-size: var(--fs-base);
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: var(--lh-body);
 }
 
 .update-toast-notes li::before {
@@ -1464,7 +1464,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border-radius: var(--radius-md);
     padding: 8px 12px;
     font-size: var(--fs-base);
-    line-height: 1.4;
+    line-height: var(--lh-ui);
     text-align: left;
     white-space: normal;
     width: 280px;
@@ -2119,7 +2119,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-base);
     color: var(--text-secondary);
     text-align: center;
-    line-height: 1.4;
+    line-height: var(--lh-ui);
 }
 
 .acf-name,
@@ -2159,7 +2159,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     margin-top: 4px;
     font-size: var(--fs-base);
     color: var(--text-secondary);
-    line-height: 1.45;
+    line-height: var(--lh-ui);
 }
 
 .acf-auto-permissions-flag {
@@ -2181,7 +2181,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     margin: -4px 0 12px;
     font-size: var(--fs-base);
     color: var(--text-muted);
-    line-height: 1.4;
+    line-height: var(--lh-ui);
 }
 
 .team-field-hint.error {
@@ -2236,7 +2236,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .team-wizard-subtitle {
     margin: 10px 0 0;
     font-size: var(--fs-md);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     color: var(--text-secondary);
 }
 
@@ -2278,14 +2278,14 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .team-wizard-intro p {
     margin: 0;
     font-size: var(--fs-base);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     color: var(--text-secondary);
 }
 
 .team-wizard-body textarea {
     min-height: 120px;
     resize: vertical;
-    line-height: 1.5;
+    line-height: var(--lh-body);
 }
 
 .team-wizard-error {
@@ -2295,7 +2295,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     background: rgba(255, 107, 107, 0.08);
     color: var(--error);
     font-size: var(--fs-base);
-    line-height: 1.5;
+    line-height: var(--lh-body);
 }
 
 .team-wizard-success {
@@ -2495,7 +2495,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-sm);
     font-family: var(--font-mono);
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: var(--lh-body);
 }
 
 .template-use-btn {
@@ -2816,7 +2816,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-lg);
     resize: none;
     font-family: inherit;
-    line-height: 1.5;
+    line-height: var(--lh-body);
     max-height: 40vh;
 }
 
@@ -3092,7 +3092,7 @@ input.switch:disabled { opacity: .5; cursor: not-allowed; }
     input.switch:disabled { opacity: 1; border-color: GrayText; }
     input.switch:disabled::before { background: GrayText; }
 }
-.field-error { margin: 4px 0 .9rem; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); line-height: 1.4; overflow-wrap: anywhere; }
+.field-error { margin: 4px 0 .9rem; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); line-height: var(--lh-ui); overflow-wrap: anywhere; }
 
 /* Auto-accept (#3182): the AUTO chip (agent row and header), the menu switch's state and the warning dialog. */
 .auto-accept-chip {
@@ -3122,7 +3122,7 @@ dialog.auto-accept-confirm {
 dialog.auto-accept-confirm::backdrop { background: rgba(var(--black-rgb), 0.55); }
 dialog.auto-accept-confirm h3 { margin: 0 0 6px; font-size: var(--fs-xl); }
 .auto-accept-confirm-agent { margin: 0 0 10px; color: var(--text-secondary); font-weight: var(--fw-strong); }
-#auto-accept-confirm-text { margin: 0 0 18px; line-height: 1.5; color: var(--text-secondary); }
+#auto-accept-confirm-text { margin: 0 0 18px; line-height: var(--lh-body); color: var(--text-secondary); }
 #auto-accept-confirm-text p { margin: 0 0 8px; }
 #auto-accept-confirm-text p:last-child { margin: 0; }
 #auto-accept-confirm-text strong { color: var(--text-primary); font-weight: var(--fw-strong); }
@@ -3277,7 +3277,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .tb-now b { color: var(--text-primary); }
 .tb-learn { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--link-text, var(--accent)); font: inherit; font-size: var(--fs-base); cursor: pointer; text-decoration: underline; }
 @media (pointer: coarse) { .acf-learn { min-height: var(--control-touch-height, 44px); } } /* the member form's Learn more (the Codex network line) is a 44 px target on touch */
-.tb-note { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; margin: var(--space-xs) 0 0; }
+.tb-note { font-size: var(--fs-sm); color: var(--text-muted); line-height: var(--lh-ui); margin: var(--space-xs) 0 0; }
 .leftover-tmux-banner { align-items: center; margin: var(--space-md) var(--space-xl) 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 .leftover-tmux-banner[hidden] { display: none; }
 #update-banner:has(#update-banner-text:empty) { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */
@@ -3338,7 +3338,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 @media (max-width: 767px) { .tb-learn { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } } /* a phone is 44 px wherever the Learn more is, in the page or the dialog (the coarse-pointer rule is in touch.css; a narrow window is not coarse) (#8079) */
 
 /* ── Browser password (#3948): the set-password prompt and Settings > Browser sign-in ─────────────────────────── */
-.pw-lead { margin: 8px 0 14px; line-height: 1.5; color: var(--text-secondary); font-size: var(--fs-lg); }
+.pw-lead { margin: 8px 0 14px; line-height: var(--lh-body); color: var(--text-secondary); font-size: var(--fs-lg); }
 .pw-field { display: block; margin: 0 0 12px; font-size: var(--fs-md); }
 .pw-label { display: block; margin-bottom: 5px; font-weight: var(--fw-medium); color: var(--text-primary); }
 .pw-input-row { display: flex; align-items: center; gap: 6px; } /* the Show button is beside the field, never over its text (a longer word or 200% text would run under it) */
@@ -3351,10 +3351,10 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .pw-meter > i { display: block; height: 100%; width: 0; border-radius: var(--radius-xs); background: #d4a72c; transition: width .15s; }
 .pw-strength[data-level="strong"] .pw-meter > i { background: var(--fx-green); }
 .pw-strength[data-level="weak"] .pw-meter > i { background: var(--fx-red); }
-.pw-hint { font-size: var(--fs-base); color: var(--text-secondary); margin: 0 0 12px; min-height: 1.3em; line-height: 1.45; }
+.pw-hint { font-size: var(--fs-base); color: var(--text-secondary); margin: 0 0 12px; min-height: 1.3em; line-height: var(--lh-ui); }
 .pw-hint b { color: var(--text-primary); font-weight: var(--fw-strong); }
 .pw-error { color: var(--fx-red); font-size: var(--fs-md); margin: 0 0 10px; }
-.pw-note { font-size: var(--fs-base); color: var(--text-secondary); margin: 8px 0 0; line-height: 1.5; }
+.pw-note { font-size: var(--fs-base); color: var(--text-secondary); margin: 8px 0 0; line-height: var(--lh-body); }
 .sec-row details { margin: 10px 0; }
 .sec-row summary { cursor: pointer; font-weight: var(--fw-strong); font-size: var(--fs-md); margin-bottom: 10px; }
 .sec-sessions { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 12px; }
@@ -3373,7 +3373,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .sec-muted { color: var(--text-secondary); font-weight: var(--fw-regular); }
 #settings-modal .sec-switch { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; font-size: var(--fs-md); margin: 6px 0; cursor: pointer; }
 #settings-modal .sec-switch input[type="checkbox"] { width: 16px; height: 16px; flex: none; margin: 2px 0 0; padding: 0; }
-.sec-warn { display: flex; gap: 8px; align-items: flex-start; background: rgba(212, 167, 44, .13); border: 1px solid rgba(212, 167, 44, .55); border-radius: var(--radius-lg); padding: 10px 12px; font-size: var(--fs-base); line-height: 1.5; margin: 8px 0; }
+.sec-warn { display: flex; gap: 8px; align-items: flex-start; background: rgba(212, 167, 44, .13); border: 1px solid rgba(212, 167, 44, .55); border-radius: var(--radius-lg); padding: 10px 12px; font-size: var(--fs-base); line-height: var(--lh-body); margin: 8px 0; }
 .sec-add { display: flex; gap: 8px; align-items: center; }
 .sec-add .btn { margin: 0; }
 #settings-modal .sec-sessions .btn { margin: 0; }   /* .btn-small's 20 px side margin pushed these buttons off their row */
@@ -3467,7 +3467,7 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .ibx-thread-list { list-style: none; margin: 0; padding: 0; }
 .ibx-thread-item { padding: 10px 0; border-top: 1px solid var(--border); min-width: 0; }
 .ibx-thread-who { margin: 0 0 4px; font-size: var(--fs-base); color: var(--text-secondary); }
-.ibx-thread-text .md { overflow-wrap: anywhere; line-height: 1.5; font-size: var(--fs-md, 0.875rem); color: var(--text-primary); }
+.ibx-thread-text .md { overflow-wrap: anywhere; line-height: var(--lh-body); font-size: var(--fs-md, 0.875rem); color: var(--text-primary); }
 .ibx-thread-earlier, .ibx-thread-new { margin: 0 0 8px; }
 .ibx-thread-earlier[hidden], .ibx-thread-new[hidden] { display: none; }
 @media (pointer: coarse) { .ibx-thread-earlier, .ibx-thread-new { min-height: var(--control-touch-height, 44px); } }
@@ -3486,7 +3486,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .ibx-open-link { background: none; border: 0; padding: 0; color: var(--link-text); font: inherit; font-size: var(--fs-sm, 0.8125rem); text-decoration: underline; cursor: pointer; } /* "Open the task" on a task's own page (mountInbox's only option): a plain link under the title line (#7572); the box is for lists */
 .ibx-open-link:hover { text-decoration-thickness: 2px; }
 .ibx-open-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
-.ibx .md, .ibx-saved-body .md { overflow-wrap: anywhere; line-height: 1.5; font-size: var(--fs-md, 0.875rem); color: var(--text-primary); }
+.ibx .md, .ibx-saved-body .md { overflow-wrap: anywhere; line-height: var(--lh-body); font-size: var(--fs-md, 0.875rem); color: var(--text-primary); }
 .md > :first-child { margin-top: 0; }
 .md p, .md ul, .md ol, .md blockquote, .md pre { margin: 0 0 8px; }
 .md ul, .md ol { padding-left: 22px; }
@@ -3537,7 +3537,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .acf-cli-warning .cli-install-link, .acf-cli-warning .cli-install-note { margin: 6px 0 0; }
 .acf-cli-warning .cli-install-link a { display: block; min-height: 24px; color: var(--accent); overflow-wrap: anywhere; } /* a link on a line of its own is a 24 px target (#6038) */
 @media (pointer: coarse), (max-width: 767px) { .acf-cli-warning .cli-install-link a { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); } } /* and a 44 px row on touch and at phone width (#6094) */
-.acf-cli-warning .cli-install-note { color: var(--text-secondary); font-size: var(--fs-base); line-height: 1.5; }
+.acf-cli-warning .cli-install-note { color: var(--text-secondary); font-size: var(--fs-base); line-height: var(--lh-body); }
 /* ── Settings: a wide dialog with its groups down the left (#4566) ──────────────────────────────────────────────────────────
    The dialog is 60rem wide at most (the one size rule, 92vw below that). Under 50rem of its own width (a phone, a small window, or large text) the group list is a
    selector at the top and the rows stack; the sizes are rem, so large text takes the narrow layout by itself. Every explanation sits
@@ -3589,7 +3589,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-cloud-head > label { flex: 0 1 auto; min-width: 0; }
 .settings-cloud-mode { width: 100%; }
 .settings-cloud-switch-text > .settings-info-text, .settings-cloud-mode > .settings-info-text { margin-top: .4rem; }
-.settings-info-text { grid-column: 1 / -1; background: var(--bg-elevated, var(--bg-tertiary)); border: 1px solid var(--border); border-radius: var(--radius-md); padding: .6rem .8rem; color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.5; max-width: 46rem; }
+.settings-info-text { grid-column: 1 / -1; background: var(--bg-elevated, var(--bg-tertiary)); border: 1px solid var(--border); border-radius: var(--radius-md); padding: .6rem .8rem; color: var(--text-secondary); font-size: var(--fs-md); line-height: var(--lh-body); max-width: 46rem; }
 .settings-info-text[hidden] { display: none; }
 .settings-info-text > * + * { margin-top: .4rem; }
 .settings-pane > .settings-theme-btn, .settings-pane > .settings-prompts-btn { margin-top: 1rem; }
@@ -3744,7 +3744,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 
 /* The missing-CLI line of the New Agent dialog sits under the folder, outside More options (#5835): nothing shows while it has nothing to say. */
 .launch-cli-slot:empty { display: none; }
-.launch-cli-slot { margin: 10px 26px 0; font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
+.launch-cli-slot { margin: 10px 26px 0; font-size: var(--fs-md); line-height: var(--lh-body); color: var(--text-secondary); }
 .launch-cli-slot .acf-cli-warning { margin: 0 !important; } /* the form gave it a margin inline */
 .acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px 12px; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* a row like any other: the status as its label (13/500), the button at the right, a link or note under it */
 .acf-cli-warning > span { flex: 0 1 auto; }
@@ -3760,7 +3760,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #launch-tmux-slot .btn, #team-tmux-slot .btn { margin: 8px 0 0; }
 
 /* The Not Found dialog's Check again answer (#5835): a live region that is always there and only gets its text, so it is announced; empty, it takes no room. */
-.cli-recheck-status { color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.5; margin: 0; }
+.cli-recheck-status { color: var(--text-secondary); font-size: var(--fs-md); line-height: var(--lh-body); margin: 0; }
 .cli-recheck-status:not(:empty) { margin-top: 10px; }
 
 /* Network and Hub layout nits (#5985): a status line that is empty takes no room; "Run as a hub" is label left, switch right like every other row; Disconnect aligns with the row's left edge. */
@@ -3912,8 +3912,8 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 /* a tile is the badge and two lines: the name, and under it "not installed" (11/400, tertiary) when the CLI probe says so; the line is always there, so the answer moves nothing (#8033) */
 #launch-agent-pick .launch-agent-opt { display: grid !important; grid-template-columns: auto minmax(0, 1fr); column-gap: 6px; align-items: center; }
 #launch-agent-pick .launch-agent-opt::before { grid-row: 1 / span 2; }
-#launch-agent-pick .launch-agent-name { grid-column: 2; grid-row: 1; align-self: end; line-height: 1.25; }
-#launch-agent-pick .launch-agent-missing { grid-column: 2; grid-row: 2; align-self: start; height: 1.1em; line-height: 1.1; }
+#launch-agent-pick .launch-agent-name { grid-column: 2; grid-row: 1; align-self: end; line-height: var(--lh-label); }
+#launch-agent-pick .launch-agent-missing { grid-column: 2; grid-row: 2; align-self: start; height: 1.1em; line-height: var(--lh-label); }
 #launch-agent-pick label.launch-agent-opt { min-height: 52px; } /* the same height with or without the mark (the badge, the name and the mark fit in it), so the answer moves nothing */
 #launch-agent-pick .launch-agent-opt:not(.has-mark) .launch-agent-name { grid-row: 1 / span 2; align-self: center; } /* no mark: the name is centred against the badge; with one, the name and the mark are centred together */
 #launch-agent-pick .launch-agent-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -4093,7 +4093,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 /* The Servers tab of a self-hosted hub (#7638): a table (Server, Status, Agents), and a server's page with its facts and Test, Edit and Remove in a bar pinned at its foot */
 .servers-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .servers-page > * { flex-shrink: 0; }
-.servers-page-name { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
+.servers-page-name { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-page .item-meta { display: flex; align-items: center; gap: var(--space-md); }
 .servers-facts { gap: 6px var(--space-xl); margin: var(--space-lg) 0; }
 .servers-fact { display: contents; }
@@ -4102,13 +4102,13 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .servers-view.servers-view-page .servers-tab-body { flex: 1 1 auto; display: flex; flex-direction: column; }
 
 /* the install and permission dialogs of cli_dialogs.js (#9186): classes, not style attributes */
-.cli-dialog-text { margin: 8px 0 12px; font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
+.cli-dialog-text { margin: 8px 0 12px; font-size: var(--fs-md); line-height: var(--lh-body); color: var(--text-secondary); }
 .cli-dialog-text-roomy { margin-bottom: 16px; }
 .cli-dialog-command { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-family: var(--font-mono); font-size: var(--fs-md); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .cli-dialog-command code { flex: 1; user-select: all; }
 .cli-dialog-alt { margin: 10px 0 0; font-size: var(--fs-md); }
 .cli-dialog-alt a { color: var(--link-text); overflow-wrap: anywhere; }
-.cli-dialog-note { margin: 8px 0 0; font-size: var(--fs-base); line-height: 1.5; color: var(--text-secondary); }
+.cli-dialog-note { margin: 8px 0 0; font-size: var(--fs-base); line-height: var(--lh-body); color: var(--text-secondary); }
 .cli-dialog-actions { margin-top: 16px; }
 .cli-dialog-actions-tight { gap: 8px; }
 

@@ -345,7 +345,7 @@ body.panel-dragging .agentic-state {
     border-radius: var(--radius-md);
     padding: 6px 10px;
     font-size: var(--fs-base);
-    line-height: 1.4;
+    line-height: var(--lh-ui);
     white-space: pre-wrap;
     max-width: 320px;
     word-break: break-word;
@@ -788,7 +788,7 @@ body.panel-dragging .agentic-state {
 .subagent-detail-md h3,
 .subagent-detail-md h4 {
     margin: 14px 0 6px;
-    line-height: 1.3;
+    line-height: var(--lh-label);
     color: var(--text-primary);
 }
 .subagent-detail-md h1 { font-size: var(--fs-xl); }
@@ -869,7 +869,7 @@ body.panel-dragging .agentic-state {
 .task-detail-title {
     font-size: var(--fs-xl);
     font-weight: var(--fw-strong);
-    line-height: 1.4;
+    line-height: var(--lh-ui);
     margin-bottom: 12px;
 }
 
@@ -1029,12 +1029,12 @@ body.panel-dragging .agentic-state {
 .task-detail-revision { border-left: 2px solid var(--accent); padding-left: 10px; }
 .task-amendment-history { margin-top: 8px; }
 .task-amendment-history summary { cursor: pointer; color: var(--text-secondary); font-size: var(--fs-base); }
-.task-amendment-entry { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary); font-size: var(--fs-base); line-height: 1.45; }
+.task-amendment-entry { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary); font-size: var(--fs-base); line-height: var(--lh-ui); }
 .task-amendment-entry div { margin-top: 4px; overflow-wrap: anywhere; }
 
 .task-detail-body {
     font-size: var(--fs-md);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     color: var(--text-secondary);
     white-space: pre-wrap;
     background: var(--bg-primary, rgba(var(--black-rgb), 0.15));
@@ -1395,7 +1395,7 @@ body.panel-dragging .agentic-state {
     height: 100%;
     padding: 8px 12px;
     font-size: var(--fs-base);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     font-family: var(--font-mono);
     color: var(--text-primary);
     background: var(--bg-primary);
@@ -1515,7 +1515,7 @@ body.panel-dragging .agentic-state {
     color: var(--text-primary);
     font-family: var(--font-sans); /* the note's own reading font and size: editing looks like the note */
     font-size: var(--fs-lg);
-    line-height: 1.6;
+    line-height: var(--lh-body);
     resize: none;
     outline: none;
 }
@@ -1650,7 +1650,7 @@ body.panel-dragging .agentic-state {
 .agent-reminder-icon { margin-left: 6px; color: var(--warning); font-size: var(--fs-base); line-height: 1; }
 .agent-ui-home { flex:1; min-height:0; overflow:auto; }
 .agent-ui-home h3 { margin:8px 0 12px; font-size: var(--type-page-size); }
-.agent-ui-help { max-width:620px; margin:0 0 14px; color:var(--text-secondary); font-size:var(--fs-lg); line-height:1.5; }
+.agent-ui-help { max-width:620px; margin:0 0 14px; color:var(--text-secondary); font-size:var(--fs-lg); line-height:var(--lh-body); }
 .agent-ui-notice { overflow-wrap:anywhere; } /* a .notice-line (layout.css): it says what the line looks like */
 .agent-ui-guide { max-width:760px; margin:20px 0; padding:16px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-lg); }
 .agent-ui-guide h4 { margin:0 0 8px; font-size:var(--fs-lg); }
@@ -1769,7 +1769,7 @@ body.panel-dragging .agentic-state {
 }
 
 /* Human-readable JSON artifacts, without changing their source/download. */
-.artifact-report { padding: 0 16px 20px; color: var(--text-primary); font-size: var(--fs-md); line-height: 1.6; min-width: 0; }
+.artifact-report { padding: 0 16px 20px; color: var(--text-primary); font-size: var(--fs-md); line-height: var(--lh-body); min-width: 0; }
 .artifact-report-controls { display: flex; gap: 6px; padding: 12px 0; position: sticky; top: 0; background: var(--bg-primary); z-index: 1; }
 .artifact-report-controls [aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); font-weight: var(--fw-strong); } /* the one selected style: the accent fill (#9096) */
 .artifact-report-title { font-size: var(--type-page-size); margin: 10px 0 4px; }
@@ -1782,7 +1782,7 @@ body.panel-dragging .agentic-state {
 .artifact-report-fields { margin: 4px 0; padding-left: 12px; border-left: 2px solid var(--border); }
 .artifact-report-fields dt { font-weight: var(--fw-strong); margin-top: 8px; }
 .artifact-report-fields dd { margin: 2px 0 8px; }
-.artifact-report-raw { margin: 8px 0; white-space: pre-wrap; font-size: var(--fs-base); line-height: 1.5; }
+.artifact-report-raw { margin: 8px 0; white-space: pre-wrap; font-size: var(--fs-base); line-height: var(--lh-body); }
 .artifact-report :is(h1, h2, p, span, li, dt, dd, pre) { overflow-wrap: anywhere; word-break: break-word; }
 .artifact-report [hidden] { display: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
@@ -1806,8 +1806,8 @@ body.panel-dragging .agentic-state {
 .explorer-status { padding: 6px 12px; color: var(--text-secondary); font-size: var(--fs-base); }
 .explorer-more { margin: 6px 12px; }
 .agent-ui-request label { display:block; font-size: var(--fs-xl); font-weight:var(--fw-strong); margin-bottom:8px; }
-.agent-ui-request .agent-ui-prompt { font:inherit; font-size:var(--fs-lg); line-height:1.5; min-height:110px; }
-.agent-ui-request-status { font-size:var(--fs-md); line-height:1.5; overflow-wrap:anywhere; margin:10px 0 0; }
+.agent-ui-request .agent-ui-prompt { font:inherit; font-size:var(--fs-lg); line-height:var(--lh-body); min-height:110px; }
+.agent-ui-request-status { font-size:var(--fs-md); line-height:var(--lh-body); overflow-wrap:anywhere; margin:10px 0 0; }
 .agent-ui-request-status:empty { display:none; }
 .agent-ui-send:disabled { opacity:.55; cursor:default; }
 .agent-ui-request :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
