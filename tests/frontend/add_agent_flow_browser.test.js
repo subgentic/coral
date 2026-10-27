@@ -93,7 +93,7 @@ const DIR = '/work/crew';
             await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); true`); await settle(200);
             assert.equal(await title(), 'New agent'); assert.equal(await stage(), 'folder'); assert.match(await sub(), /^Step 1 of 3:/);
             assert.equal(await ev(`document.getElementById('launch-modal').hasAttribute('data-add-to')`), false);
-            assert.equal(await ev(`document.getElementById('launch-board-select').closest('label').hidden`), false, `${label}: New Agent still offers the Message Board`);
+            assert.equal(await ev(`document.getElementById('launch-board-select').closest('.form-row').hidden`), false, `${label}: New Agent still offers the Message Board`);
             await ev(`window.hideLaunchModal(); true`);
         }
         console.log('PASS add_agent_flow');
