@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	instpkg "github.com/subgentic/coral/internal/updater/install"
+	"github.com/subgentic/coral/internal/updater/runrecord"
 	"github.com/subgentic/coral/internal/windowmark"
 )
 
@@ -246,11 +248,29 @@ func (m *Mac) CanRestart(string) string {
 }
 
 func (m *Mac) Start(ctx context.Context, install string) error {
+	// The relaunch is the same Coral: the data folder, the home folder and the port it ran with, as the server recorded them (#9056). open starts the app from launchd's environment, so
+	// without them an isolated or non-default install came back against the login home and ~/.coral on the default port.
+	var args []string
+	launch, _ := runrecord.ReadLaunch(m.DataDir) // none recorded: the app starts as it always did
+	if launch.DataDir != "" {
+		args = append(args, "--env", "CORAL_DATA_DIR="+launch.DataDir)
+	}
+	if launch.Home != "" {
+		args = append(args, "--env", "HOME="+launch.Home)
+	}
 	// The relaunch reopens what the person had (#5827): the window, if it was open when the update began; the tray alone stays in the background (--no-browser), with no window
 	// popping up. The window opens when the app is opened again.
-	args := []string{install}
+	args = append(args, install)
+	var appArgs []string
 	if !windowmark.Present(m.DataDir) {
-		args = append(args, "--args", "--no-browser")
+		appArgs = append(appArgs, "--no-browser")
+	}
+	if launch.Port != 0 {
+		appArgs = append(appArgs, "--port", strconv.Itoa(launch.Port))
+	}
+	if len(appArgs) > 0 {
+		args = append(args, "--args")
+		args = append(args, appArgs...)
 	}
 	_, err := m.Run.Run(ctx, open, args...)
 	return err

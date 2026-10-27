@@ -385,3 +385,19 @@ func TestLinuxLicensesTreeIsCoralsOwnAndCheckedLikeTheRest(t *testing.T) {
 	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(newPath, "licenses", "go", "link")))
 	assert.Error(t, l.Verify(context.Background(), newPath, "1.4.130"), "a link in the tree")
 }
+
+// #9056: the Linux relaunch carries the port, the home and the data folder the server ran with, as its run record holds them: a non-default install comes back as itself.
+func TestLinuxRestartCarriesThePortHomeAndDataFolderOfTheRecordedRun(t *testing.T) {
+	l := newLinux(t)
+	install := linuxInstall(t, linuxPrograms, emX86_64)
+	var spawned, spawnedEnv []string
+	l.Spawn = func(argv, env []string, c string) error { spawned, spawnedEnv = argv, env; return nil }
+	l.Manager = func() bool { return false }
+	dir := filepath.Join(l.DataDir, "updates")
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	rec := `{"argv":["` + install + `/coral","--port","8461","--home","/srv/iso/data"],"env":["CORAL_DATA_DIR=/srv/iso/data","HOME=/srv/iso","PATH=/usr/bin"],"cwd":"/srv/iso"}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, runrecord.File), []byte(rec), 0o600))
+	require.NoError(t, l.Start(context.Background(), install))
+	assert.Equal(t, []string{install + "/coral", "--port", "8461", "--home", "/srv/iso/data"}, spawned)
+	assert.Equal(t, []string{"CORAL_DATA_DIR=/srv/iso/data", "HOME=/srv/iso", "PATH=/usr/bin"}, spawnedEnv)
+}

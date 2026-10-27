@@ -402,6 +402,7 @@ func main() {
 	}
 	defer rs.Close()
 	recordRun(cfg.CoralDir(), os.Args)
+	recordLaunch(cfg.CoralDir(), cfg.Port)
 
 	// Anonymous install/upgrade tracking (non-blocking)
 	tracking.TrackInstallAsync()

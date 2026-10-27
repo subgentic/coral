@@ -62,3 +62,15 @@ func TestRecordRunNeverRecordsASecretFlagAndNeverStopsCoral(t *testing.T) {
 	recordRun(dir, nil)
 	recordRun(filepath.Join(dir, "no", "such", "\x00bad"), []string{"coral"})
 }
+
+// #9056: every platform records where Coral lives, for the macOS and Windows relaunch.
+func TestRecordLaunchWritesTheDataFolderHomeAndPort(t *testing.T) {
+	dir := t.TempDir()
+	recordLaunch(dir, 8461)
+	got, err := runrecord.ReadLaunch(dir)
+	require.NoError(t, err)
+	assert.Equal(t, dir, got.DataDir)
+	assert.Equal(t, 8461, got.Port)
+	home, _ := os.UserHomeDir()
+	assert.Equal(t, home, got.Home)
+}

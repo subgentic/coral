@@ -137,3 +137,39 @@ func TestRestartableIsTheRecordBeingOneStartWouldAccept(t *testing.T) {
 	require.NoError(t, os.Chmod(filepath.Join(data, "updates", File), 0o644))
 	assert.Error(t, Restartable(data, exe), "a record others can read is not trusted")
 }
+
+// #9056: the launch record round-trips, keeps only valid fields, and is read only from a private regular file.
+func TestLaunchRecordRoundTripsAndKeepsOnlyValidFields(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, "home")
+	require.NoError(t, WriteLaunch(dir, Launch{DataDir: dir, Home: home, Port: 8461}))
+	got, err := ReadLaunch(dir)
+	require.NoError(t, err)
+	assert.Equal(t, Launch{DataDir: dir, Home: home, Port: 8461}, got)
+
+	require.NoError(t, WriteLaunch(dir, Launch{DataDir: "relative", Home: "/a\nb", Port: 99999}))
+	got, err = ReadLaunch(dir)
+	require.NoError(t, err)
+	assert.Equal(t, Launch{}, got, "a relative folder, a folder with a newline and a port out of range are dropped")
+
+	_, err = ReadLaunch(t.TempDir())
+	assert.Error(t, err, "none recorded")
+}
+
+func TestLaunchRecordIsNotReadThroughALinkOrFromALooseFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("modes")
+	}
+	dir := t.TempDir()
+	require.NoError(t, WriteLaunch(dir, Launch{DataDir: dir, Port: 8461}))
+	p := filepath.Join(dir, "updates", LaunchFile)
+	require.NoError(t, os.Chmod(p, 0o644))
+	_, err := ReadLaunch(dir)
+	assert.Error(t, err, "a file others can read is not the server's own")
+	require.NoError(t, os.Remove(p))
+	other := filepath.Join(dir, "elsewhere")
+	require.NoError(t, os.WriteFile(other, []byte(`{"port":1}`), 0o600))
+	require.NoError(t, os.Symlink(other, p))
+	_, err = ReadLaunch(dir)
+	assert.Error(t, err, "a link is not followed")
+}

@@ -92,6 +92,18 @@ func Write(dataDir string, argv, environ []string, cwd string) error {
 			return ErrSecretFlag
 		}
 	}
+	b, err := json.Marshal(Record{Argv: argv, Env: AllowedEnv(environ), Cwd: cwd})
+	if err != nil {
+		return err
+	}
+	if len(b) > maxSize {
+		return errors.New("the command line is too long to record")
+	}
+	return writePrivate(dataDir, File, b)
+}
+
+// writePrivate writes b as <dataDir>/updates/<name>, atomically, 0600, in an owner-only folder of the updater's own (not a link).
+func writePrivate(dataDir, name string, b []byte) error {
 	dir := filepath.Join(dataDir, "updates")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -110,19 +122,12 @@ func Write(dataDir string, argv, environ []string, cwd string) error {
 			return err
 		}
 	}
-	b, err := json.Marshal(Record{Argv: argv, Env: AllowedEnv(environ), Cwd: cwd})
-	if err != nil {
-		return err
-	}
-	if len(b) > maxSize {
-		return errors.New("the command line is too long to record")
-	}
 	tmp, err := os.CreateTemp(dir, ".run-*")
 	if err != nil {
 		return err
 	}
-	name := tmp.Name()
-	defer os.Remove(name)
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
 	if err := tmp.Chmod(0o600); err != nil {
 		tmp.Close()
 		return err
@@ -134,5 +139,5 @@ func Write(dataDir string, argv, environ []string, cwd string) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(name, filepath.Join(dir, File))
+	return os.Rename(tmpName, filepath.Join(dir, name))
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/updater/runrecord"
 	"github.com/subgentic/coral/internal/windowmark"
 )
 
@@ -347,4 +348,31 @@ func TestMacRelaunchOpensTheWindowOnlyIfItWasOpen(t *testing.T) {
 	fr.cmds = nil
 	require.NoError(t, m.Start(context.Background(), install))
 	assert.Equal(t, []string{"/usr/bin/open " + install + " --args --no-browser"}, fr.cmds, "no data folder known: quiet")
+}
+
+// #9056: the relaunch is the same Coral: the data folder, the home folder and the port the server recorded go to the opened app (open --env, and the tray's --port), in the same order whatever
+// the window; none recorded, the app starts as it always did.
+func TestMacRelaunchCarriesTheRecordedDataFolderHomeAndPort(t *testing.T) {
+	m, fr, install := newMac(t)
+	m.DataDir = t.TempDir()
+	require.NoError(t, runrecord.WriteLaunch(m.DataDir, runrecord.Launch{DataDir: "/srv/iso/data", Home: "/srv/iso", Port: 8461}))
+	require.NoError(t, m.Start(context.Background(), install))
+	assert.Equal(t, []string{"/usr/bin/open --env CORAL_DATA_DIR=/srv/iso/data --env HOME=/srv/iso " + install + " --args --no-browser --port 8461"}, fr.cmds, "the tray alone, on the recorded port")
+	windowmark.Set(m.DataDir)
+	fr.cmds = nil
+	require.NoError(t, m.Start(context.Background(), install))
+	assert.Equal(t, []string{"/usr/bin/open --env CORAL_DATA_DIR=/srv/iso/data --env HOME=/srv/iso " + install + " --args --port 8461"}, fr.cmds, "the window was open: no --no-browser, still the port")
+}
+
+// A record a relaunch should not trust is not used: relative or odd folders and a port out of range are dropped one by one.
+func TestMacRelaunchUsesOnlyTheValidPartsOfTheRecord(t *testing.T) {
+	m, fr, install := newMac(t)
+	m.DataDir = t.TempDir()
+	require.NoError(t, runrecord.WriteLaunch(m.DataDir, runrecord.Launch{DataDir: "relative/data", Home: "/srv/iso", Port: 70000}))
+	require.NoError(t, m.Start(context.Background(), install))
+	assert.Equal(t, []string{"/usr/bin/open --env HOME=/srv/iso " + install + " --args --no-browser"}, fr.cmds)
+	fr.cmds = nil
+	m.DataDir = t.TempDir() // nothing recorded
+	require.NoError(t, m.Start(context.Background(), install))
+	assert.Equal(t, []string{"/usr/bin/open " + install + " --args --no-browser"}, fr.cmds)
 }

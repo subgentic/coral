@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sys/windows"
 
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/internal/updater/runrecord"
 	"github.com/subgentic/coral/internal/windowmark"
 )
 
@@ -461,13 +462,12 @@ func trayEnv(environ []string) []string {
 // Start starts coral-tray from the install folder as this user (this process is never elevated), detached, as the Start Menu does: the window
 // opens only if it was open when the update began.
 func (w *WindowsMSI) Start(ctx context.Context, install string) error {
-	args := []string{}
-	if !windowmark.Present(w.DataDir) {
-		args = append(args, "--no-browser")
-	}
+	// The same Coral: the port and the data folder it ran with, as the server recorded them (#9056).
+	launch, _ := runrecord.ReadLaunch(w.DataDir)
+	args := trayStartArgs(windowmark.Present(w.DataDir), launch)
 	cmd := exec.Command(filepath.Join(install, "coral-tray.exe"), args...)
 	cmd.Dir = install
-	cmd.Env = trayEnv(os.Environ())
+	cmd.Env = withDataDir(trayEnv(os.Environ()), launch.DataDir)
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.DETACHED_PROCESS | windows.CREATE_NEW_PROCESS_GROUP}
 	if err := cmd.Start(); err != nil {
 		return err
