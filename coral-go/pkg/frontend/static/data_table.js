@@ -101,6 +101,30 @@ const compareBy = (col) => {
     };
 };
 
+/** The phone's mail row (#9545, UI/UX's spec): a 44 px leading target holding a 32 px avatar, the title and the first words of what it says on one line, the time at the right, and under the line (Needs you only) the ask.
+ *  A caller opts in with `mail(row) -> { lead: { text, name?, square?, icon? }, title, snippet?, ask?, time?, unread?, mark? }`; on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
+ *  `unread` makes the title bold and the time primary: a list says it only where a read state exists today. `mark: 'attention'` is the amber dot under the time. Text is set with textContent only. */
+const MAIL_QUERY = '(max-width: 767px)';
+const mailCell = (m, label, open) => {
+    const td = el('td', 'dt-mail-cell'); td.setAttribute('role', 'cell');
+    const lead = el('span', 'dt-mail-lead'); lead.setAttribute('aria-hidden', 'true');
+    const l = m.lead || {}, shape = l.icon ? el('span', 'dt-mail-avatar material-icons', l.icon) : el('span', 'dt-mail-avatar', [...String(l.text || m.title || '?')][0].toUpperCase());
+    if (l.square) shape.classList.add('dt-mail-square');
+    shape.style.background = `var(--avatar-${(hash(String(l.name || m.title || '').toLowerCase()) % 8) + 1})`;
+    lead.append(shape);
+    const body = el(open ? 'button' : 'span', `dt-mail-open${m.unread ? ' dt-mail-unread' : ''}${open ? ' dt-primary' : ''}`);
+    if (open) { body.type = 'button'; body.setAttribute('aria-label', label); body.addEventListener('click', open); }
+    const text = el('span', 'dt-mail-text'), line = el('span', 'dt-mail-line');
+    line.append(el('span', 'dt-mail-title', m.title || ''), el('span', 'dt-mail-snippet', m.snippet || ''));
+    text.append(line);
+    if (m.ask) { text.classList.add('dt-mail-two'); text.append(el('span', 'dt-mail-ask', m.ask)); }
+    const side = el('span', 'dt-mail-side'); side.append(el('span', 'dt-mail-time', m.time || ''));
+    if (m.mark) { const dot = el('span', `dt-mail-dot dt-mail-${m.mark}`); dot.setAttribute('aria-hidden', 'true'); side.append(dot); }
+    body.append(text, side);
+    td.append(lead, body);
+    return td;
+};
+
 export function dataTable(cfg) {
     if (cfg.oneLine) cfg = { ...cfg, fold: 'none', layout: 'fixed', resize: false };
     const st = cfg.state || tableState();
@@ -110,6 +134,8 @@ export function dataTable(cfg) {
     const hasContent = cfg.columns.some(c => c.width === 'content');
     const box = el('div', `dt-box${cfg.compact ? ' dt-compact' : ''}${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     if (cfg.oneLine) box.classList.add('dt-one-line');
+    const mailQuery = cfg.mail && typeof window.matchMedia === 'function' ? window.matchMedia(MAIL_QUERY) : null, mailOn = () => !!mailQuery && mailQuery.matches; // a phone's rows are mail rows
+    box.classList.toggle('dt-mail-on', mailOn());
     const bar = el('div', 'dt-bar'); bar.hidden = true;
     const selectButton = button('btn btn-small dt-select-toggle', 'Select', () => { st.select = !st.select; syncSelectMode(); });
     selectButton.setAttribute('aria-pressed', 'false'); selectButton.hidden = !sel;
@@ -327,7 +353,10 @@ export function dataTable(cfg) {
                 });
                 td.append(cb); tr.append(td);
             }
-            for (const c of columns) tr.append(cellOf(c, r, tr));
+            if (mailOn()) {
+                const m = cfg.mail(r), tap = () => { if (sel && st.select) { const cb = tr.querySelector('.dt-check input'); if (cb) cb.dispatchEvent(new MouseEvent('click', { bubbles: true })); return; } cfg.open(r, tr); };
+                tr.classList.add('dt-mailed'); tr.append(mailCell(m, nameOf(r), cfg.open ? tap : null));
+            } else for (const c of columns) tr.append(cellOf(c, r, tr));
             if (cfg.open) {
                 tr.classList.add('dt-row-open');
                 tr.addEventListener('click', (e) => {
@@ -434,5 +463,6 @@ export function dataTable(cfg) {
         new ResizeObserver(syncFold).observe(box);
         if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(syncFold); // fonts already in: the observer's first call settles it before the paint; calling it now read the width of a box not yet laid out, a forced layout (#9450)
     }
+    mailQuery?.addEventListener?.('change', () => { box.classList.toggle('dt-mail-on', mailOn()); drawBody(); }); // the window crosses the phone's width: the rows are drawn again in the other form
     return { el: box, bar, selectButton, selection: () => new Set(st.selected), clear, state: st };
 }

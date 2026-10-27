@@ -134,6 +134,7 @@ function inboxNeedsToolbar() {
 
 // ── Tasks ────────────────────────────────────────────────────────────────
 const RANK = { high: 0, medium: 1, low: 2 };
+const TASK_GLYPH = { Queued: 'schedule', 'In progress': 'hourglass_top', Blocked: 'block', 'In review': 'rate_review', Done: 'check_circle' }; // a phone row's leading glyph: the task's state
 const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
@@ -502,7 +503,7 @@ registerGroupSource('hub-inbox', {
                         } }] : []),
                         ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', width: rows.some(s => s.review && isRead(s.review)) ? '19rem' : '14rem', line: 1, cell: s => (s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : '') }] : []),
                         { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '8rem' } : {}), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
-                    ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}) }); // one line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
+                    ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), ask: askOf(s) || sessionStateInfo(s).label, time: DT.timeCell(s.waiting_since).textContent, unread: true, mark: 'attention' }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el);
                     for (const g of needsOverflow()) {
                         const p = DT.el('p', 'inbox-review-more', `${g.name}: ${g.more.length} more for review. `);
@@ -518,7 +519,7 @@ registerGroupSource('hub-inbox', {
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
                     const t = TV.tasksTable('mine', rows, { tweak: columns => columns.flatMap(c => c.key === 'team' ? [...serverColumns(), c] : [c]), ctx: { teamOf: t => teamLabel(t.project) }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
-                        open: t => openItemRoute('tasks', t.project, t.id, `${t.project}#${t.id}`), state: inboxTasksState,
+                        open: t => openItemRoute('tasks', t.project, t.id, `${t.project}#${t.id}`), state: inboxTasksState, mail: t => ({ lead: { icon: TASK_GLYPH[stateOf(t)] || 'pending', square: true, name: stateOf(t) }, title: t.title, snippet: stateOf(t), time: DT.timeCell(t.updated_at || t.created_at).textContent }),
                         selectable: { contextKey: 'inbox-tasks', actions: TB.inboxTaskActions(() => { inboxTasksState.selected.clear(); refreshTasks(); }), onChange: keys => row && Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the bar takes the toolbar's line while tasks are selected
                     if (row) { Toolbar.mountSelection(row, inboxTasksState.selected.size ? t.bar : null); row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (isPhoneLayout()) row.append(t.selectButton); }
                     return t.el;
