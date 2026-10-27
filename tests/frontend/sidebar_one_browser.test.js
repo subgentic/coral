@@ -64,7 +64,7 @@ const STUB = `(() => {
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('history')} .sgroup-header .session-group-count')].map(e => e.textContent)`), ['2', '1'], at + 'with their counts');
             await openTab('automations');
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'three jobs', 10000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('automations')} .view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['Jobs3'], at + 'Automations holds the Jobs folder with its count');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('automations')} .view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['Running now0', 'Failed0', 'Jobs3', 'Workflows0'], at + 'Automations holds its folders with their counts');
 
             // no sideways scroll
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll on Jobs');

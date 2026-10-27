@@ -13,7 +13,7 @@ const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
 
-const MODULES = ['workflows.js', 'cost_dashboard.js', 'docs.js', 'theme_config.js', 'template_browser.js', 'chat_search.js'];
+const MODULES = ['automations.js', 'cost_dashboard.js', 'docs.js', 'theme_config.js', 'template_browser.js', 'chat_search.js'];
 
 (async () => {
     const { client, Page, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -72,7 +72,8 @@ const MODULES = ['workflows.js', 'cost_dashboard.js', 'docs.js', 'theme_config.j
             await waitFor(`(() => { const v = document.getElementById(${JSON.stringify(view)}); return !!v && getComputedStyle(v).display !== 'none'; })()`, `${view} after switching to ${tab}`, 8000);
             assert.equal(count(mod), 1, `${mod} fetched once`);
             const after = await ev(`String(window[${JSON.stringify({ automations: 'selectWorkflow', docs: 'showDocsTab', tokens: 'showCostDashboard' }[tab])}])`);
-            assert.notEqual(after, stubBefore, `${tab}: the window function is now the module's own`);
+            if (tab === 'automations') assert.equal(await ev(`typeof window.selectWorkflow`), 'function', 'automations: the workflows hook is still there (a stub until a page asks for the workflows module; the folders load it themselves)');
+            else assert.notEqual(after, stubBefore, `${tab}: the window function is now the module's own`);
             await ev(`window.switchNavTab('agents'); true`); await waitFor(`document.querySelector('.top-nav-tab.active')?.id === 'nav-tab-agents'`, 'the Agents tab', 3000);
             await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`);
             assert.ok(await visible(view), `${tab}: shows at once the second time`);
@@ -94,19 +95,19 @@ const MODULES = ['workflows.js', 'cost_dashboard.js', 'docs.js', 'theme_config.j
 
         console.log('3. Switching away while a panel loads keeps the newer choice');
         await fresh();
-        plan['workflows.js'] = 'hold';
-        await ev(`window.openAutomationsFolder('workflows'); true`);
+        plan['automations.js'] = 'hold'; // Automations is one file with the workflows' pages (LazyGroups): its main is what a first visit asks for
+        await ev(`window.switchNavTab('automations'); true`);
         for (let i = 0; i < 40 && !held.length; i++) await sleep(25);
-        assert.ok(held.length > 0, 'the workflows import was requested and held');
+        assert.ok(held.length > 0, 'the automations import was requested and held');
         await ev(`window.switchNavTab('agents'); true`);
         await sleep(100);
-        delete plan['workflows.js'];
+        delete plan['automations.js'];
         await release();
-        await waitFor(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'lazy_panels.js'); return !!m.loadWorkflows.module; })()`, 'workflows module loaded', 8000);
+        await waitFor(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'lazy_panels.js'); return !!m.loadAutomations.module; })()`, 'automations module loaded', 8000);
         await nextFrame(); await quietSeen(); // the view would have switched by now
-        assert.equal(await visible('workflows-view'), false, 'the workflows view did not take over');
-        assert.equal(await ev(`document.querySelector('.top-nav-tab.active, [data-tab].active')?.textContent?.trim() || ''`).then(t => /workflow/i.test(t)), false, 'the Workflows tab is not marked active');
-        console.log('   ✓ held import, switched to Agents, released: Workflows did not take over');
+        assert.equal(await visible('group-table-view'), false, 'the Automations folder did not take over');
+        assert.equal(await ev(`document.querySelector('.top-nav-tab.active, [data-tab].active')?.textContent?.trim() || ''`).then(t => /automations/i.test(t)), false, 'the Automations tab is not marked active');
+        console.log('   ✓ held import, switched to Agents, released: Automations did not take over');
 
         console.log('4. A failed import shows a toast; the next use fetches again (?retry=1) and works');
         await fresh();

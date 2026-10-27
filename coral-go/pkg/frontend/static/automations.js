@@ -5,7 +5,7 @@
  *
  * The address follows what is on screen (/automations/<folder>[/<id>[/runs/<run>]]): a folder or an item is opened by going to its route, and the route handler (app_routes.js) calls
  * openAutomationsRoute, so a link, Back and a reload all end in the same place. */
-import { go, note, backIs } from './nav.js';
+import { go, note, backIs, currentRoute } from './nav.js';
 import { registerActions, textOf } from './actions.js';
 import { registerGroupSource, openGroupTable, refreshGroupTable } from './sidebar_groups.js';
 import { setHidden } from './dom_write.js';
@@ -174,7 +174,7 @@ function attentionTable(key, rows, narrowed) {
         node: () => DT.dataTable({
             label: `${f.label}, ${rows.length}`, rows, layout: 'fixed', rowKey: itemKey, rowName: i => i.name, state: stateOf(key), open: openItem,
             columns: [
-                { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: i => i.name, cell: i => DT.primaryButton(i.name), subtitle: whatWords },
+                { key: 'name', label: 'Name', primary: true, width: 'grow', nowrap: false, line: 1, sort: true, sortValue: i => i.name, cell: i => DT.primaryButton(i.name), subtitle: whatWords },
                 { key: 'kind', label: 'Kind', width: '7rem', line: 2, sort: true, sortValue: i => KIND_WORD[i.kind], cell: i => DT.tag(KIND_WORD[i.kind]) },
                 { key: 'schedule', label: 'Schedule', width: '12rem', line: 2, sort: true, sortValue: scheduleWords, cell: scheduleWords },
                 { key: 'last-run', label: 'Last run', width: '12rem', line: 2, tone: 'tertiary', sort: 'date', sortValue: i => i.last, cell: lastCell },
@@ -192,7 +192,7 @@ function folderTable(key) {
             node: () => DT.dataTable({
                 label: `Jobs, ${rows.length}`, rows, layout: 'fixed', rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
                 columns: [
-                    { key: 'job', label: 'Job', primary: true, width: 'grow', line: 1, sort: true, sortValue: i => i.name, cell: i => DT.primaryButton(i.name), subtitle: runsWords },
+                    { key: 'job', label: 'Job', primary: true, width: 'grow', nowrap: false, line: 1, sort: true, sortValue: i => i.name, cell: i => DT.primaryButton(i.name), subtitle: runsWords },
                     { key: 'schedule', label: 'Schedule', width: '12rem', line: 2, sort: true, sortValue: i => scheduleOf(i.job), cell: i => scheduleOf(i.job) },
                     { key: 'last-run', label: 'Last run', width: '9rem', line: 2, tone: 'tertiary', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: lastRunCell },
                     { key: 'next', label: 'Next', width: '7rem', line: 1, tone: 'tertiary', sort: 'date', sortValue: i => (i.enabled ? i.job.next_fire_at : ''), cell: i => {
@@ -207,7 +207,7 @@ function folderTable(key) {
         node: () => DT.dataTable({
             label: `Workflows, ${rows.length}`, rows, layout: 'fixed', rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
             columns: [
-                { key: 'workflow', label: 'Workflow', primary: true, width: 'grow', line: 1, sort: true, sortValue: i => i.name, cell: i => DT.primaryButton(i.name), subtitle: i => i.does },
+                { key: 'workflow', label: 'Workflow', primary: true, width: 'grow', nowrap: false, line: 1, sort: true, sortValue: i => i.name, cell: i => DT.primaryButton(i.name), subtitle: i => i.does },
                 { key: 'steps', label: 'Steps', width: '6rem', line: 2, tone: 'tertiary', sort: 'number', sortValue: i => i.stepCount, cell: stepsWords },
                 { key: 'last-run', label: 'Last run', width: '14rem', line: 2, sort: 'date', sortValue: i => i.run && i.run.started_at, cell: i => {
                     if (!i.run) return 'Never run';
@@ -254,7 +254,8 @@ export function showAutomationsTab() {
     $('scheduler-view')?.removeAttribute('data-phone-item');
     $('workflows-view')?.removeAttribute('data-phone-item');
     setFolder(folder);
-    note(routeOf(folder));
+    const at = currentRoute();
+    note(routeOf(folder), { replace: !!at && at.view === 'automations' && !at.folder }); // the tab's click wrote /automations: the folder's address takes its place, one entry for one click
     openGroupTable('automations', folder);
 }
 

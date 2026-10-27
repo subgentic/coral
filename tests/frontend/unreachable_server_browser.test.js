@@ -122,7 +122,7 @@ const STUB = `(() => {
         console.log('   ✓ recovered: banner cleared, polling resumed within ~1 s');
 
         // 5. Not on screen: no polls while another top tab is shown.
-        await ev(`window.switchNavTab('automations'); true`);
+        await ev(`window.openAutomationsFolder('jobs'); true`);
         const c7 = await counts();
         await sleep(2000); // sleep-ok: proves a negative, no polls while the agent view is not shown
         const c8 = await counts();
