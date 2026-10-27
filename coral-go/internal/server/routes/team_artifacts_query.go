@@ -38,6 +38,16 @@ var (
 	teamArtifactSorts   = []string{"newest", "oldest", "name", "name_desc", "size", "size_asc", "type", "type_desc", "tags", "tags_desc"} // name: A to Z, size: largest first, the others have the direction in the name (#8945)
 )
 
+// validTeamArtifactSort reports whether s is one of the sort words (the team lists' and the standalone agent's list take the same ones, #8945).
+func validTeamArtifactSort(s string) bool {
+	for _, w := range teamArtifactSorts {
+		if s == w {
+			return true
+		}
+	}
+	return false
+}
+
 const (
 	maxTeamArtifactQLen   = 200
 	maxTeamArtifactValues = 50
@@ -245,11 +255,7 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	if v, ok, serr := taSingle("sort", vals["sort"]); serr != nil {
 		return nil, serr
 	} else if ok {
-		found := false
-		for _, s := range teamArtifactSorts {
-			found = found || v == s
-		}
-		if !found {
+		if !validTeamArtifactSort(v) {
 			return nil, taErr("unknown sort %s (one of %s)", v, strings.Join(teamArtifactSorts, ", "))
 		}
 		q.sortName = v

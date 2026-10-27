@@ -689,3 +689,16 @@ func TestTeamArtifactsUnknownBoardIsNotFound(t *testing.T) {
 	assert.Equal(t, "board_not_found", body["code"])
 	assert.Equal(t, "No team named no-such-team", body["error"])
 }
+
+// The sort words are one list for the team routes and the standalone agent's, and an upload record's size is the list's size before any file is touched (#9031).
+func TestSessionArtifactSortSharesTheWordsAndRecordSizes(t *testing.T) {
+	for _, w := range []string{"newest", "oldest", "name", "name_desc", "size", "size_asc", "type", "type_desc", "tags", "tags_desc"} {
+		require.True(t, validTeamArtifactSort(w), w)
+	}
+	for _, w := range []string{"", "bogus", "NAME", "size_desc"} {
+		require.False(t, validTeamArtifactSort(w), w)
+	}
+	require.Nil(t, sizeOfRecord(0))
+	require.Nil(t, sizeOfRecord(-1))
+	require.Equal(t, int64(42), *sizeOfRecord(42))
+}
