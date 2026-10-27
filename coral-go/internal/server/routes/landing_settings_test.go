@@ -50,3 +50,40 @@ func TestLandingSettingDefaultsWhenABodyDoesNotCarryIt(t *testing.T) {
 	assert.Equal(t, 15, board.HealthSettings{Landing: board.HealthLanding{WaitMin: 3}}.Clamp().Landing.WaitMin)
 	assert.Equal(t, "main", board.HealthSettings{Landing: board.HealthLanding{Branch: "-x"}}.Clamp().Landing.Branch)
 }
+
+// The release alert's settings are checked on save too (#8948).
+func TestReleaseSettingsAreCheckedOnSave(t *testing.T) {
+	e := newAttachEnv(t, false)
+	ctx := context.Background()
+	save := func(l board.HealthRelease) (int, map[string]any) {
+		hs := e.h.bs.GetHealthSettings(ctx, "beta")
+		hs.Release = l
+		return e.put("/api/board/beta/settings", opHdr, map[string]any{"subscriber_id": "Operator", "health": hs})
+	}
+	for name, c := range map[string]struct {
+		in   board.HealthRelease
+		want string
+	}{
+		"a branch with a space":    {board.HealthRelease{On: true, Branch: "ma in", TagPattern: "v*", WaitMin: 1440}, "release.branch"},
+		"a pattern with a space":   {board.HealthRelease{On: true, Branch: "main", TagPattern: "v 1*", WaitMin: 1440}, "release.tag_pattern"},
+		"a pattern led by a dash":  {board.HealthRelease{On: true, Branch: "main", TagPattern: "--sort=x", WaitMin: 1440}, "release.tag_pattern"},
+		"a pattern with a $":       {board.HealthRelease{On: true, Branch: "main", TagPattern: "v$(x)", WaitMin: 1440}, "release.tag_pattern"},
+		"a wait under an hour":     {board.HealthRelease{On: true, Branch: "main", TagPattern: "v*", WaitMin: 30}, "release.wait_min"},
+		"a wait over thirty days":  {board.HealthRelease{On: true, Branch: "main", TagPattern: "v*", WaitMin: 50000}, "release.wait_min"},
+		"a nudge who is no member": {board.HealthRelease{On: true, Branch: "main", TagPattern: "v*", WaitMin: 1440, Nudge: "Nobody"}, "release.nudge"},
+	} {
+		code, out := save(c.in)
+		assert.Equal(t, http.StatusBadRequest, code, name)
+		assert.Contains(t, strings.ToLower(asString(out["error"])), c.want, name)
+	}
+	assert.False(t, e.h.bs.GetHealthSettings(ctx, "beta").Release.On, "nothing was applied")
+	code, out := save(board.HealthRelease{On: true, Branch: "release/2.0", TagPattern: "v2.*", WaitMin: 2880, Nudge: "Orchestrator"})
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, board.HealthRelease{On: true, Branch: "release/2.0", TagPattern: "v2.*", WaitMin: 2880, Nudge: "Orchestrator"}, e.h.bs.GetHealthSettings(ctx, "beta").Release)
+}
+
+func TestReleaseSettingDefaultsWhenABodyDoesNotCarryIt(t *testing.T) {
+	assert.Equal(t, board.HealthRelease{Branch: "main", TagPattern: "v*", WaitMin: 1440}, board.HealthSettings{}.Clamp().Release)
+	assert.Equal(t, 60, board.HealthSettings{Release: board.HealthRelease{WaitMin: 5}}.Clamp().Release.WaitMin)
+	assert.Equal(t, "v*", board.HealthSettings{Release: board.HealthRelease{TagPattern: "-x"}}.Clamp().Release.TagPattern)
+}

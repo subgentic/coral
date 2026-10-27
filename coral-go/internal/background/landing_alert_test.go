@@ -207,3 +207,108 @@ func TestGitPollerFeedsTheLandingWatch(t *testing.T) {
 	require.Len(t, r.w.roots["team"], 1)
 	assert.Equal(t, gitutil.ResolveGitRoot(context.Background(), repo), r.w.roots["team"][0])
 }
+
+// The release alert (#8948): the branch has been past the newest release tag it contains for longer than the wait, with tasks completed since the tag.
+func (r *landingRig) releaseState(tag string, commits int, tagAgo, aheadAgo time.Duration) {
+	r.w.release = func(_ context.Context, _, branch, pattern string) (releaseState, error) {
+		if branch != "main" || pattern != "v*" {
+			return releaseState{}, errors.New("no such branch or tag")
+		}
+		return releaseState{Repo: "/repo/.git", Tag: tag, TagTime: r.now.Add(-tagAgo), Commits: commits, AheadSince: r.now.Add(-aheadAgo)}, nil
+	}
+}
+
+func (r *landingRig) releaseOn() {
+	r.settings(func(hs *board.HealthSettings) {
+		hs.Landing.On = false
+		hs.Release = board.HealthRelease{On: true, Branch: "main", TagPattern: "v*", WaitMin: 1440}
+	})
+}
+
+func TestReleaseAlertIsOneLineOncePerWait(t *testing.T) {
+	assert.False(t, board.DefaultHealthSettings().Release.On)
+	assert.Equal(t, board.HealthRelease{Branch: "main", TagPattern: "v*", WaitMin: 1440}, board.DefaultHealthSettings().Release)
+	r := newLandingRig(t)
+	r.releaseOn()
+	r.finish("work")
+	r.releaseState("v2.0.0", 12, 40*time.Hour, 30*time.Hour)
+	first := r.check()
+	assert.Contains(t, first, "Board: main is 12 commits and 1 task past v2.0.0 for 30 h")
+	assert.NotContains(t, r.check(), "past v2.0.0", "said once, not at the next check")
+	r.releaseState("v2.0.0", 15, 90*time.Hour, 80*time.Hour) // a further wait (and then some) later
+	assert.Contains(t, r.check(), "main is 15 commits and 1 task past v2.0.0 for 80 h")
+	assert.NotContains(t, r.check(), "past v2.0.0")
+}
+
+func TestReleaseAlertNeedsTheWaitFinishedTasksAndACommit(t *testing.T) {
+	r := newLandingRig(t)
+	r.releaseOn()
+	r.releaseState("v2.0.0", 3, 40*time.Hour, 5*time.Hour) // ahead only 5 h
+	r.finish("work")
+	assert.NotContains(t, r.check(), "past v2.0.0", "the wait is 24 h")
+	r.releaseState("v2.0.0", 3, 5*time.Minute, 30*time.Hour) // the tag is newer than every finished task
+	assert.NotContains(t, r.check(), "past v2.0.0", "no task was completed since the tag")
+	r.releaseState("v2.0.0", 0, 40*time.Hour, 30*time.Hour)
+	assert.NotContains(t, r.check(), "past v2.0.0", "no commit past the tag")
+	r.releaseState("", 0, 0, 0)
+	assert.NotContains(t, r.check(), "past", "no tag at all")
+}
+
+func TestReleaseAlertIsOffUnlessSwitchedOnAndNudgesAnotherMemberOnce(t *testing.T) {
+	r := newLandingRig(t)
+	r.finish("work")
+	r.releaseState("v2.0.0", 12, 40*time.Hour, 30*time.Hour)
+	r.settings(func(hs *board.HealthSettings) { hs.Landing.On = false })
+	assert.NotContains(t, r.check(), "past v2.0.0", "off")
+	r.releaseOn()
+	r.settings(func(hs *board.HealthSettings) { hs.Release.Nudge = "Dev" })
+	assert.Contains(t, r.check(), "past v2.0.0")
+	r.check()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	require.Len(t, r.sent["Dev"], 1)
+	assert.Contains(t, r.sent["Dev"][0], "main is 12 commits and 1 task past v2.0.0 for 30 h")
+}
+
+func TestGitReleaseReadsTheNewestMatchingTagTheBranchContains(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	commit := func(name string) {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600))
+		run("add", name)
+		run("commit", "-q", "-m", name)
+	}
+	run("init", "-q")
+	commit("a")
+	run("tag", "v1.0.0")
+	commit("b")
+	run("tag", "v2.0.0")
+	run("tag", "nightly-1")
+	commit("c")
+	commit("d")
+	run("checkout", "-q", "-b", "side", "v1.0.0")
+	commit("e")
+	run("tag", "v9.9.9") // newest, but on another branch: main does not contain it
+	run("checkout", "-q", "main")
+
+	st, err := gitRelease(context.Background(), dir, "main", "v*")
+	require.NoError(t, err)
+	assert.Equal(t, "v2.0.0", st.Tag, "the newest matching tag main contains")
+	assert.Equal(t, 2, st.Commits)
+	assert.False(t, st.AheadSince.IsZero())
+	assert.WithinDuration(t, time.Now(), st.TagTime, time.Minute)
+	none, err := gitRelease(context.Background(), dir, "main", "x*")
+	require.NoError(t, err)
+	assert.Equal(t, "", none.Tag)
+	_, err = gitRelease(context.Background(), dir, "nobranch", "v*")
+	assert.Error(t, err)
+}
