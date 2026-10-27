@@ -344,3 +344,9 @@
 /* The dock's task list stays one line, including on phones (#8792). */
 #board-task-list .dt-box { --table-row-h: var(--table-touch); }
 #board-task-list .dt-primary { display: block; width: 100%; min-width: var(--table-touch); min-height: var(--table-touch); }
+
+/* Artifact rows use the same one-line density as Tasks; facts stay in Details. */
+#agentic-panel-artifacts .dt-box { --table-row-h: var(--table-touch); --table-pad-x: 6px; }
+#agentic-panel-artifacts .dt-primary { display: block; min-width: 0; min-height: var(--table-touch); flex: 1; }
+#agentic-panel-artifacts .artifact-details { display: inline-flex; align-items: center; justify-content: center; width: var(--table-touch); height: var(--table-touch); }
+#agentic-panel-artifacts .artifact-details::after { content: none; } /* the icon itself is 44px; no overlapping hit-area extension */
