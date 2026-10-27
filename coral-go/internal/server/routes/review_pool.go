@@ -118,13 +118,13 @@ func (h *BoardHandler) putReviewInPool(ctx context.Context, project string, id i
 		mentions[i] = "@" + f
 	}
 	line := fmt.Sprintf("[Task #%d in the review pool] %s submitted %q (candidate: %s; %s). It waits for %s (%s). A reviewer that matches claims it with 'coral-board task claim', then reads it with 'coral-board task detail %d'.",
-		id, author, title, candidate, reason, count, areaText, id)
+		id, h.noticeText(ctx, project, author), h.noticeText(ctx, project, title), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, reason), count, areaText, id)
 	if len(mentions) > 0 {
 		line = strings.Join(mentions, " ") + " " + line
 	} else {
 		line += " No reviewer on this board covers those areas yet: the orchestrator can name one with 'coral-board task review " + fmt.Sprint(id) + " --to \"...\"'."
 	}
-	h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", line, nil)
+	h.postNotice(ctx, project, line)
 	for _, f := range fits {
 		if busy, err := h.bs.HasActiveTaskForAssignee(ctx, project, f, 0); err == nil && !busy {
 			h.sendTaskNudge(ctx, project, f, "[A review is waiting in the pool] Run 'coral-board task claim' to take the oldest one that matches your areas.")

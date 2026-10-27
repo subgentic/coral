@@ -67,8 +67,8 @@ func (h *BoardHandler) AttachPatches(w http.ResponseWriter, r *http.Request) {
 		for _, rv := range reopened.Reviewers {
 			mentions = append(mentions, "@"+rv.Reviewer)
 		}
-		h.bs.PostSystemMessage(r.Context(), project, "Coral Task Queue", fmt.Sprintf("%s [Task #%d has new patch revisions from %s, round %d] an approval of the earlier bytes does not carry over: review it again (coral-board task detail %d), then coral-board task approve %d --round %d or coral-board task reject %d --round %d --note \"...\"",
-			strings.Join(mentions, " "), id, body.SubscriberID, reopened.Round, id, id, reopened.Round, id, reopened.Round), nil)
+		h.postNotice(r.Context(), project, fmt.Sprintf("%s [Task #%d has new patch revisions from %s, round %d] an approval of the earlier bytes does not carry over: review it again (coral-board task detail %d), then coral-board task approve %d --round %d or coral-board task reject %d --round %d --note \"...\"",
+			strings.Join(mentions, " "), id, h.noticeText(r.Context(), project, body.SubscriberID), reopened.Round, id, id, reopened.Round, id, reopened.Round))
 	}
 	if h.notifyFn != nil {
 		h.notifyFn(project)
@@ -115,8 +115,8 @@ func (h *BoardHandler) SendBack(w http.ResponseWriter, r *http.Request) {
 	if task.AssignedTo != nil {
 		author = *task.AssignedTo
 	}
-	h.bs.PostSystemMessage(r.Context(), project, "Coral Task Queue", fmt.Sprintf("@%s [Task #%d sent back by %s] %s. Fix it and submit-review again: the same reviewers review the new revision (the full note: coral-board task detail %d)", author, id, body.SubscriberID, oneLine(body.Note, 300), id), nil)
-	h.bs.PostSystemMessage(r.Context(), project, "Coral Task Queue", h.buildAssignmentNotification(r.Context(), project, task, author, true), nil)
+	h.postNotice(r.Context(), project, fmt.Sprintf("@%s [Task #%d sent back by %s] %s. Fix it and submit-review again: the same reviewers review the new revision (the full note: coral-board task detail %d)", author, id, h.noticeText(r.Context(), project, body.SubscriberID), h.noticeText(r.Context(), project, oneLine(body.Note, 300)), id))
+	h.postNotice(r.Context(), project, h.buildAssignmentNotification(r.Context(), project, task, author, true))
 	if h.notifyFn != nil {
 		h.notifyFn(project)
 	}

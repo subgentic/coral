@@ -66,8 +66,9 @@ func (h *BoardHandler) ClaimTask(w http.ResponseWriter, r *http.Request) {
 	h.recordClaimThinking(r.Context(), project, body.SubscriberID, task.ID)
 	// Post board notification asynchronously to avoid DB contention
 	h.goBG(func() {
-		notification := fmt.Sprintf("[Task #%d claimed by %s] %s", task.ID, body.SubscriberID, task.Title)
-		h.bs.PostSystemMessage(context.Background(), project, "Coral Task Queue", notification, nil)
+		ctx := context.Background()
+		notification := fmt.Sprintf("[Task #%d claimed by %s] %s", task.ID, h.noticeText(ctx, project, body.SubscriberID), h.noticeText(ctx, project, task.Title))
+		h.postNotice(ctx, project, notification)
 	})
 	writeJSON(w, http.StatusOK, task)
 }
@@ -163,8 +164,8 @@ func (h *BoardHandler) afterTaskCompleted(project, subscriberID string, complete
 		if how != "" {
 			by += " (" + how + ")"
 		}
-		notification := fmt.Sprintf("[Task #%d completed by %s] Outcome: %s; %d artifacts. %s", completedTask.ID, by, completedTask.Workflow.Outcome, len(completedTask.Workflow.Artifacts), msg)
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", notification, nil)
+		notification := fmt.Sprintf("[Task #%d completed by %s] Outcome: %s; %d artifacts. %s", completedTask.ID, h.noticeText(ctx, project, by), h.noticeText(ctx, project, completedTask.Workflow.Outcome), len(completedTask.Workflow.Artifacts), h.noticeText(ctx, project, msg)) // the completion message is whatever the worker wrote
+		h.postNotice(ctx, project, notification)
 		h.notifyOrchestratorsTaskCompleted(ctx, project, subscriberID, completedTask, fmt.Sprintf("Outcome: %s. %s", completedTask.Workflow.Outcome, msg))
 
 		// Resolve downstream blocked tasks
@@ -228,13 +229,13 @@ func (h *BoardHandler) CancelTaskByID(w http.ResponseWriter, r *http.Request) {
 	}
 	h.goBG(func() {
 		ctx := context.Background()
-		notification := fmt.Sprintf("[Task #%d cancelled by %s] %s", task.ID, body.SubscriberID, task.Title)
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", notification, nil)
+		notification := fmt.Sprintf("[Task #%d cancelled by %s] %s", task.ID, h.noticeText(ctx, project, body.SubscriberID), h.noticeText(ctx, project, task.Title))
+		h.postNotice(ctx, project, notification)
 		// Reconcile the full descendant graph immediately. Pending descendants
 		// become blocked/stalled and retain their owner for orchestrator repair.
 		if stallErr == nil {
 			for _, child := range stalled {
-				h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("@Orchestrator [Task #%d stalled] %s depends on cancelled task #%d; rewire or create a retry before claiming it.", child.ID, child.Title, task.ID), nil)
+				h.postNotice(ctx, project, fmt.Sprintf("@Orchestrator [Task #%d stalled] %s depends on cancelled task #%d; rewire or create a retry before claiming it.", child.ID, h.noticeText(ctx, project, child.Title), task.ID))
 			}
 		}
 		h.notifyOrchestratorOfCancelledDependency(ctx, project, body.SubscriberID, task)
@@ -267,11 +268,11 @@ func (h *BoardHandler) notifyUnblockedTasks(ctx context.Context, project string,
 		if t.AssignedTo != nil {
 			assignee = *t.AssignedTo
 		}
-		msg := fmt.Sprintf("[Task #%d unblocked] %s", t.ID, t.Title)
+		msg := fmt.Sprintf("[Task #%d unblocked] %s", t.ID, h.noticeText(ctx, t.BoardID, t.Title))
 		if assignee != "" {
 			msg += fmt.Sprintf(" — @%s your task is now ready", assignee)
 		}
-		h.bs.PostSystemMessage(ctx, t.BoardID, "Coral Task Queue", msg, nil)
+		h.postNotice(ctx, t.BoardID, msg)
 
 		// Send terminal nudge to assignee
 		if assignee != "" {

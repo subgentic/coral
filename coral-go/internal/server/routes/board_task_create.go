@@ -205,21 +205,21 @@ func (h *BoardHandler) announceCreatedTask(project string, task *board.Task) {
 	}
 	if task.Status == "draft" {
 		h.goBG(func() {
-			notification := fmt.Sprintf("[Task #%d (draft)] %s", task.ID, task.Title)
-			h.bs.PostSystemMessage(context.Background(), project, "Coral Task Queue", notification, nil)
+			notification := fmt.Sprintf("[Task #%d (draft)] %s", task.ID, h.noticeText(context.Background(), project, task.Title))
+			h.postNotice(context.Background(), project, notification)
 		})
 	} else if task.Status == "blocked" {
 		h.goBG(func() {
 			deps, _ := h.bs.GetTaskDependencies(context.Background(), task.ID)
 			blockerList := formatBlockerList(deps)
-			notification := fmt.Sprintf("[Task #%d (blocked)] %s — blocked by %s", task.ID, task.Title, blockerList)
-			h.bs.PostSystemMessage(context.Background(), project, "Coral Task Queue", notification, nil)
+			notification := fmt.Sprintf("[Task #%d (blocked)] %s — blocked by %s", task.ID, h.noticeText(context.Background(), project, task.Title), h.noticeText(context.Background(), project, blockerList))
+			h.postNotice(context.Background(), project, notification)
 		})
 	} else {
 		h.goBG(func() {
 			ctx := context.Background()
 			notification := h.buildAssignmentNotification(ctx, project, task, assignee, false)
-			h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", notification, nil)
+			h.postNotice(ctx, project, notification)
 
 			// Send direct terminal nudge
 			if h.terminal != nil {
