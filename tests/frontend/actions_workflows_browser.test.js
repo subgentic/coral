@@ -65,6 +65,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await coralReady();
         const reqs = () => ev(`window.__req.slice()`);
         const clear = () => ev(`window.__req.length = 0; true`);
+        const openJob = id => ev(`import((window.__coralStatic || '/static/') + 'scheduler.js').then(m => m.selectScheduledJob(${id})).then(() => true)`); // a job's page opens from its row in the folder's table; with a page open the table is not on screen
         const click = sel => ev(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); if (!el) return false; el.click(); return true; })()`);
         const sent = async (want, what) => { await until(`window.__req.includes(${JSON.stringify(want)})`, what, 5000); return (await reqs()).includes(want); };
 
@@ -163,10 +164,10 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         check('the Workflows view and its dialog have no inline handler left', wfInline.length === 0, JSON.stringify(wfInline.slice(0, 5)));
 
         // ── Scheduled jobs ─────────────────────────────────────────────────
-        await ev(`window.switchNavTab('jobs'); true`);
-        await until(`!!document.querySelector('#scheduled-jobs-list [data-on-click="job-select"]')`, 'the jobs list');
+        await ev(`window.switchNavTab('automations'); true`);
+        await until(`!!document.querySelector('#group-table-view button.dt-primary')`, 'the jobs list');
         await clear();
-        await click('#scheduled-jobs-list [data-on-click="job-select"]');
+        await click('#group-table-view button.dt-primary');
         await until(`!!document.querySelector('#scheduler-view [data-on-click="job-toggle"]')`, 'the job');
         check('a job opens it', await ev(`!!document.querySelector('#scheduler-view [data-on-click="job-edit"]')`));
         await clear();
@@ -178,7 +179,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await sleep(300); // sleep-ok: shows that nothing is sent (no condition to wait for)
         check('Delete still asks first, and nothing is sent without a Yes', (await ev(`window.__confirmModal`)) === 'Delete Job' && !(await reqs()).some(r => r.startsWith('DELETE')), JSON.stringify(await reqs()));
         await ev(`window.__hist = []; window.selectHistorySession = id => window.__hist.push(id); true`);
-        await click('#scheduled-jobs-list [data-on-click="job-select"][data-job-id="6"]');
+        await openJob(6);
         await until(`!!document.querySelector('#scheduler-view [data-on-click="job-run-session"]')`, 'the agent job\'s runs', 5000);
         check('the full job prompt starts folded', await ev(`(() => { const d=document.querySelector('.sched-prompt-section');return !d.open && !d.querySelector('pre').checkVisibility() && d.querySelector('pre').textContent==='${LONG_PROMPT}'; })()`));
         await ev(`document.querySelector('.sched-prompt-section > summary').focus();true`);
@@ -189,7 +190,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         check('a run\'s session link opens that session\'s history', JSON.stringify(await ev(`window.__hist`)) === JSON.stringify([SID]), JSON.stringify(await ev(`window.__hist`)));
         await ev(`(() => { const b = document.createElement('a'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = '../../etc'; document.body.appendChild(b); b.click(); b.remove(); return true; })()`);
         check('...and a session link that is not a session id does nothing', (await ev(`window.__hist.length`)) === 1);
-        await click('#scheduled-jobs-list [data-on-click="job-select"][data-job-id="5"]');
+        await openJob(5);
         await until(`!!document.querySelector('#scheduler-view .sched-runs-table tr.dt-row[data-key="31"]')`, 'the workflow job again', 5000);
         await clear();
         const rowSel = '#scheduler-view .sched-runs-table tr.dt-row[data-key="31"]';
@@ -199,18 +200,19 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await clear();
         await click('#scheduler-view [data-on-click="job-workflow"]');
         check('the job\'s workflow link opens the workflow', await sent('GET /api/workflows/7', 'the workflow'));
-        await ev(`window.switchNavTab('jobs'); true`);
-        await click('#scheduled-jobs-list [data-on-click="job-select"][data-job-id="5"]');
+        await openJob(5);
         await until(`!!document.querySelector('#scheduler-view [data-on-click="job-edit"]')`, 'the job again');
         await click('#scheduler-view [data-on-click="job-edit"]');
         check('Edit opens the job dialog', await until(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'the job dialog', 5000).then(() => ev(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`)));
         await ev(`window.hideJobModal && window.hideJobModal(); true`);
-        await click('.sidebar-pane[data-pane="jobs"] [data-on-click="job-new"]'); // New job is the Jobs sidebar's pinned action (#7443)
+        await click('#scheduler-view [data-on-click="automations-back"]'); // back to the Jobs folder, whose toolbar has New job (Goal #74)
+        await until(`!!document.querySelector('#group-table-view .team-tb-action')`, 'the folder toolbar');
+        await click('#group-table-view .team-tb-action');
         check('New job opens an empty job dialog', await until(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'the new job dialog', 5000).then(() => ev(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`)));
         await ev(`window.hideJobModal && window.hideJobModal(); true`);
 
-        const jobInline = await ev(`[...document.querySelectorAll('#scheduled-jobs-list *, #scheduler-view *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.tagName + ' ' + a.name))`);
-        check('the jobs list and job view have no inline handler left', jobInline.length === 0, JSON.stringify(jobInline.slice(0, 5)));
+        const jobInline = await ev(`[...document.querySelectorAll('#group-table-view *, #scheduler-view *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.tagName + ' ' + a.name))`);
+        check('the Jobs folder and job view have no inline handler left', jobInline.length === 0, JSON.stringify(jobInline.slice(0, 5)));
     } catch (e) {
         check('the test ran', false, e.stack || String(e));
     } finally {

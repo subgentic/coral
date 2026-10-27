@@ -1,4 +1,4 @@
-// A tab that opens on its page shows every group its sidebar has (#7722, the #7720 audit's findings 8 and 10): Workflows and Jobs have Active and Paused groups, and the page they open on used to
+// A tab that opens on its page shows every group its sidebar has (#7722, the #7720 audit's findings 8 and 10): Workflows has Active and Paused groups (Jobs became a folder of Automations, Goal #74), and the page they open on used to
 // list the first group only (Active 2) while the sidebar counted 3. Now the page lists each group under its own head with its own count, so the two agree; a group's name in the sidebar still opens that group
 // alone. 1280 px, isolated dev server, the workflows and jobs of the census world stubbed.
 const assert = require('node:assert/strict');
@@ -14,7 +14,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         const page = () => ev(`(() => { const v = document.getElementById('group-table-view'); if (!v || v.offsetParent === null) return null; return { heads: [...v.querySelectorAll('.group-table-head')].map(h => h.textContent.replace(/\\s+/g, '')), rows: v.querySelectorAll('tbody tr').length, ids: [...v.querySelectorAll('#group-table-title')].length }; })()`);
         const side = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].map(h => h.textContent.replace(/\\s+/g, ''))`);
-        for (const [tab, listSel, label] of [['workflows', '#wf-nav-list .sgroup-header', 'Workflows'], ['jobs', '#scheduled-jobs-list .sgroup-header', 'Jobs']]) {
+        for (const [tab, listSel, label] of [['workflows', '#wf-nav-list .sgroup-header', 'Workflows']]) {
             await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`);
             await waitFor(`document.querySelectorAll(${JSON.stringify(listSel)}).length === 2 && !!document.querySelector('#group-table-view tbody tr')`, `${label}: the sidebar's groups and the page`, { timeout: 10000, diag: `({ groups: document.querySelectorAll(${JSON.stringify(listSel)}).length, rows: document.querySelectorAll('#group-table-view tbody tr').length, tab: document.body.getAttribute('data-nav-tab') })` });
             const heads = await side(listSel);
@@ -35,6 +35,6 @@ const BASE = require('./test_base').BASE;
             const one = await page();
             assert.deepEqual(one.heads.map(h => h.replace(/(smart_toy)?BuildwithAgent$/, '')), ['Paused1'], `${label}: the group's own page ${JSON.stringify(one)}`);
         }
-        console.log('PASS Workflows and Jobs pages list every group the sidebar has');
+        console.log('PASS the Workflows page lists every group the sidebar has');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
