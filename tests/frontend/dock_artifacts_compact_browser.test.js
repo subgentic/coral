@@ -92,8 +92,8 @@ const STUB = `(() => {
             await ev(`window.__data = window.__data.map((r,i) => ({...r, name: 'File '+i, task_id: null, created_at: new Date().toISOString()})); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({keep:true})); true`);
             await settled(); await settle(400);
             if (!view.phone) {
-                // A readable name needs 200 px (--table-fit-name-min, #8539), so the default dock folds a row into its two compact lines; a dock wide enough for the name and the facts does not fold it.
-                check(`${view.w}: the default dock folds a row into its two compact lines`, await ev(`document.querySelector('${panel} .dt-box').classList.contains('dt-folded')`));
+                // A readable name needs 200 px (--table-fit-name-min, #8539), so the default dock keeps a one-line artifact row; a dock wide enough for the name and the facts does not fold it.
+                check(`${view.w}: the default dock keeps a one-line artifact row`, await ev(`!document.querySelector('${panel} .dt-box').classList.contains('dt-folded')`));
                 await ev(`document.getElementById('agentic-state').style.width = '760px'; true`); await settle(500);
                 check(`${view.w}: compact columns fit without folding in a wide dock`, await ev(`!document.querySelector('${panel} .dt-box').classList.contains('dt-folded')`));
                 await ev(`document.getElementById('agentic-state').style.width = ''; true`); await settle(500);
