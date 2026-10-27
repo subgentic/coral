@@ -13,6 +13,8 @@ const update = process.argv.includes('--update');
 export const FAMILY = new Set(['field', 'field-search', 'field-error', 'switch']);
 const NAMES = /(input|select|search|textarea)$/;
 const NOT_FIELDS = new Set(['chat-needs-input', 'tt-state-needs-input', 'capture-user-input']); // a state or a label, not a control
+// the named exceptions (Goal #88 spec: the composer's box stays its own): a box with no border of its own that is the page's text surface, and the phone's navigation drop-down, which is a button that looks like a select
+export const EXCEPTIONS = new Set(['mb-post-input', 'board-chat-textarea', 'notes-textarea', 'cost-filter-search', 'nav-select', 'board-chat-search']);
 const LOOK = /(^|[;\s])(background|border|padding|font-size|font-weight|color|min-height|height|border-radius)\s*:/g;
 
 /** Every plain class selector (with a pseudo suffix) that names a field and gives it a look: { class: number of look declarations }. */
@@ -24,7 +26,7 @@ export function scan(css) {
         if (!n) continue;
         for (const sel of m[1].split(',')) {
             const c = /^\s*\.([a-z0-9_-]+)(?::[a-z-]+(?:\([^)]*\))?|\[[^\]]*\])*\s*$/.exec(sel);
-            if (c && NAMES.test(c[1]) && !NOT_FIELDS.has(c[1]) && !FAMILY.has(c[1])) out[c[1]] = (out[c[1]] || 0) + n;
+            if (c && NAMES.test(c[1]) && !NOT_FIELDS.has(c[1]) && !EXCEPTIONS.has(c[1]) && !FAMILY.has(c[1])) out[c[1]] = (out[c[1]] || 0) + n;
         }
     }
     return out;

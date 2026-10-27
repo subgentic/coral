@@ -482,7 +482,7 @@ export async function refreshChangedFiles() {
             (acc, f) => ({ adds: acc.adds + (f.additions || 0), dels: acc.dels + (f.deletions || 0) }),
             { adds: 0, dels: 0 }
         );
-        const modeSelect = `<select class="diff-mode-select" data-on-change="diff-mode" title="Diff comparison mode">${options}</select>`;
+        const modeSelect = `<select class="field field-dense diff-mode-select" data-on-change="diff-mode" title="Diff comparison mode">${options}</select>`;
         const stats = files.length > 0
             ? `<span class="file-adds">+${totals.adds}</span><span class="file-dels">-${totals.dels}</span>`
             : '';

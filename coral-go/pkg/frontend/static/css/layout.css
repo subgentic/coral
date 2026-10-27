@@ -596,21 +596,8 @@ body.panel-dragging .sidebar {
     opacity: 1;
 }
 
-.hf-tag-add-select {
-    max-width: 90px;
-    padding: 2px 4px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-sm);
-    color: var(--text-secondary);
-    font-size: var(--fs-md);
-    outline: none;
-    cursor: pointer;
-}
+.hf-tag-add-select { max-width: 90px; cursor: pointer; }
 
-.hf-tag-add-select:focus {
-    border-color: var(--accent);
-}
 
 .hf-date {
     flex: 1;
@@ -628,20 +615,8 @@ body.panel-dragging .sidebar {
     border-color: var(--accent);
 }
 
-.hf-dur-input {
-    width: 50px;
-    padding: 3px 5px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: var(--fs-md);
-    outline: none;
-}
+.hf-dur-input { width: 50px; }
 
-.hf-dur-input:focus {
-    border-color: var(--accent);
-}
 
 .hf-dur-sep,
 .hf-dur-unit {

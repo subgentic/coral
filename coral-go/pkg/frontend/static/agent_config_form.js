@@ -341,7 +341,7 @@ function acfPermEditorHtml(uid, open) {
                 </div>
                 <div class="perms-shell-patterns" style="display:none">
                     <label class="perms-label">Shell patterns <span style="color:var(--text-muted);font-weight:normal">(comma-separated)</span> <span class="perms-patterns-note settings-hint"></span></label>
-                    <input type="text" class="perms-shell-input" aria-label="Shell patterns, comma-separated" placeholder="e.g. git *, npm *, npx *">
+                    <input type="text" class="field perms-shell-input" aria-label="Shell patterns, comma-separated" placeholder="e.g. git *, npm *, npx *">
                 </div>
             </div>`;
 }

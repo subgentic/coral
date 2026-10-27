@@ -130,7 +130,6 @@
 .dt-row.dt-quiet td { color: var(--table-tertiary-color); }
 .dt-row.dt-selected td { background: var(--table-selected); }
 .dt-table .dt-check { width: var(--table-check-w); padding: 0; text-align: center; overflow: visible; }
-.dt-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
 .dt-bar { flex: 1 1 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
 .dt-bar > * { margin: 0; }
 .dt-bar-count { font-size: var(--table-secondary-size); font-weight: 600; color: var(--table-primary-color); }
@@ -307,11 +306,11 @@
 .artifact-tag-offers { display: flex; flex-wrap: wrap; gap: 6px; }
 .artifact-tag-offer { min-height: 28px; padding: 0 8px; border: 1px solid var(--table-outer); border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-base); cursor: pointer; }
 .artifact-tag-form { display: flex; gap: 6px; }
-.artifact-tag-input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: var(--fs-md); }
+.artifact-tag-input { flex: 1 1 auto; min-width: 0; }
 .artifact-tag-status { margin: 0; flex-basis: 100%; font-size: var(--fs-base); }
 .artifact-tag-error { color: var(--table-danger); }
 @media (pointer: coarse) { /* the buttons of the tag editor are 44 px targets on a phone (phone_targets_census): + Tag, the offers, Add and the box */
-    .artifact-tag-add, .artifact-tag-offer, .artifact-tag-form .btn, .artifact-tag-input { min-height: 44px; }
+    .artifact-tag-add, .artifact-tag-offer, .artifact-tag-form .btn { min-height: 44px; }
     .artifact-tag-add, .artifact-tag-offer { padding: 0 12px; }
     .artifact-tag-offers { gap: 8px; }
 }

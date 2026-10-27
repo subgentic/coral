@@ -674,13 +674,6 @@ body.panel-dragging .agentic-state {
     display: inline-block;
 }
 
-.task-checkbox {
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
-    cursor: pointer;
-    accent-color: var(--accent);
-}
 
 .task-title {
     flex: 1;
@@ -923,12 +916,6 @@ body.panel-dragging .agentic-state {
     user-select: none;
 }
 
-.board-task-hide-toggle input[type="checkbox"] {
-    display: inline-block;
-    width: auto;
-    margin: 0;
-    cursor: pointer;
-}
 
 .task-detail-verification { margin: -4px 0 10px; font-size: var(--fs-md); color: var(--text-muted); }
 
@@ -1088,12 +1075,6 @@ body.panel-dragging .agentic-state {
     background: var(--bg-hover);
 }
 
-.modal-content .dep-picker-item input[type="checkbox"] {
-    display: inline-block;
-    width: auto;
-    margin: 0;
-    cursor: pointer;
-}
 
 
 .task-detail-section {
@@ -1239,23 +1220,9 @@ body.panel-dragging .agentic-state {
     color: var(--text-secondary);
 }
 
-.diff-mode-select {
-    font: 400 0.8125rem/1.4 var(--font-sans);
-    color: var(--text-primary);
-    background-color: var(--bg-primary);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-md);
-    padding: 4px 8px;
-    cursor: pointer;
-    margin-left: 4px;
-    vertical-align: middle;
-}
+.diff-mode-select { cursor: pointer; margin-left: 4px; vertical-align: middle; }
 
-.diff-mode-select:hover,
-.diff-mode-select:focus {
-    color: var(--text-primary);
-    border-color: var(--accent);
-}
+.diff-mode-select:hover { border-color: var(--accent); }
 
 .changed-files-list {
     flex: 1;

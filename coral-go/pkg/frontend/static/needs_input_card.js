@@ -141,7 +141,7 @@ function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
     for (const o of texts) {
         const placeholder = /^type something/i.test(o.label) ? "Or type your own answer…" : `${o.label.replace(/\.$/, "")}…`;
         body += `<form class="cni-text-form" data-n="${Number(o.n)}" data-label="${escapeHtml(o.label)}" data-action="text">`
-            + `<input type="text" class="cni-text-input" placeholder="${escapeHtml(placeholder)}" aria-label="${escapeHtml(o.label)}">`
+            + `<input type="text" class="field cni-text-input" placeholder="${escapeHtml(placeholder)}" aria-label="${escapeHtml(o.label)}">`
             + `<button type="submit" class="btn btn-sm">Send</button></form>`;
     }
     for (const o of chats) {

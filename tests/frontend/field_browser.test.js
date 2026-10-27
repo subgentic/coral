@@ -32,6 +32,8 @@ const BASE = require('./test_base').BASE;
             assert.ok(sw.length >= 1, at + 'a switch is drawn: ' + sw.length);
             for (const x of sw) { assert.equal(x.appearance, 'none', at + 'a switch is drawn, not native'); assert.equal(x.w, mobile ? '44px' : '40px', at + 'one switch width: ' + x.w); assert.ok(Math.abs(parseFloat(x.h) - 22.4) < 0.1, at + 'one switch height: ' + x.h); assert.equal(x.radius, '16px', at + 'one switch radius'); }
             assert.equal(await ev(`document.querySelectorAll('.sv-switch').length`), 0, at + 'no second switch class');
+            const ck = await ev(`(() => { const d = document.createElement('div'); d.className = 'modal-content'; const p = document.createElement('input'); p.type = 'checkbox'; p.className = 'check'; d.append(p); document.body.append(d); const c = getComputedStyle(p); return { w: c.width, h: c.height, m: c.marginTop }; })()`);
+            assert.deepEqual([ck.w, ck.h, ck.m], ['16px', '16px', '0px'], at + 'a plain checkbox is 16 px, also inside a dialog: ' + JSON.stringify(ck));
             const inDialog = await ev(`(() => { const d = document.createElement('div'); d.className = 'modal-content'; const p = document.createElement('input'); p.type = 'checkbox'; p.className = 'switch'; d.append(p); document.body.append(d); const c = getComputedStyle(p); return { w: c.width, mt: c.marginTop }; })()`);
             assert.equal(inDialog.w, mobile ? '44px' : '40px', at + 'a switch inside a dialog (.modal-content input) is not stretched: ' + inDialog.w); assert.equal(inDialog.mt, '0px', at + 'and has no margin above it');
             await ev(`(() => { const e = document.querySelector('#agent-search-input'); if (e) e.focus(); return true; })()`);

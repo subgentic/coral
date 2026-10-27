@@ -1262,25 +1262,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     gap: 8px;
     margin: 0 0 12px;
 }
-.cni-text-input {
-    flex: 1;
-    min-width: 0;
-    padding: 7px 10px;
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-lg);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font: inherit;
-    font-size: var(--fs-lg);
-}
-.cni-text-input::placeholder {
-    color: var(--text-muted);
-}
-.cni-text-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
-}
+.cni-text-input { flex: 1; min-width: 0; }
 
 /* Review step: each question with its answer */
 .cni-review {
@@ -1545,7 +1527,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 /* On touch or a phone-width window the find bar's controls are 44 px targets and the bar spans the screen: a 200 px input and three 44 px buttons do not fit one row at 390 (#6130) */
 @media (pointer: coarse), (max-width: 767px) {
     .chat-find-bar { left: 8px; right: 8px !important; gap: 4px; }
-    .chat-find-input { flex: 1 1 0; min-width: 0; width: auto; min-height: var(--control-touch-height, 44px); box-sizing: border-box; }
+    .chat-find-input { flex: 1 1 0; min-width: 0; width: auto; }
     .chat-find-bar button { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
     .chat-find-count { min-width: 0; }
 }

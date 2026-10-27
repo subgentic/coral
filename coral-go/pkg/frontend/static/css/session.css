@@ -1054,18 +1054,7 @@
     background: var(--bg-hover);
 }
 
-.goal-edit-input {
-    flex: 1;
-    min-width: 0;
-    background: var(--bg-primary);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: var(--fs-lg);
-    font-weight: 500;
-    padding: 2px 8px;
-    outline: none;
-}
+.goal-edit-input { flex: 1; min-width: 0; border-color: var(--accent); }
 
 .branch-chip {
     background: rgba(var(--accent-rgb), 0.1);

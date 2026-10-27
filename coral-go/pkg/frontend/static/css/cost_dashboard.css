@@ -78,10 +78,6 @@
     background: var(--bg-hover);
 }
 
-.cost-filter-item input[type="checkbox"] {
-    flex-shrink: 0;
-    accent-color: var(--accent);
-}
 
 .cost-dashboard-view {
     position: absolute;

@@ -17,7 +17,7 @@ export function createComposer({ st, render, run, ownHex }) {
         const cm = st.composing;
         const box = el('form', 'ac-composer'); box.noValidate = true;
         if (cm.anchor) { const a = cm.anchor; const q = el('blockquote', 'ac-quote', a.whole ? 'The whole document' : a.quote); box.append(q); }
-        const ta = el('textarea', 'ac-input'); ta.rows = 3; ta.maxLength = BODY_MAX; ta.value = editOf ? editOf.body : (cm.draft || '');
+        const ta = el('textarea', 'field ac-input'); ta.rows = 3; ta.maxLength = BODY_MAX; ta.value = editOf ? editOf.body : (cm.draft || '');
         ta.setAttribute('aria-label', editOf ? 'Edit your comment' : cm.parentId != null ? 'Your reply' : 'Your comment'); ta.placeholder = cm.parentId != null ? 'Write a reply…' : 'Add a comment…';
         const count = el('span', 'ac-counter', `${ta.value.length} / ${BODY_MAX}`);
         ta.addEventListener('input', () => { count.textContent = `${ta.value.length} / ${BODY_MAX}`; cm.draft = ta.value; });

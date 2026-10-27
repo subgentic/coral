@@ -25,7 +25,7 @@ export function passwordField({ id, label, autocomplete, name }) {
     const lab = el('label', 'pw-label', label); lab.htmlFor = id;
     wrap.append(lab);
     const row = el('span', 'pw-input-row');
-    const input = el('input', 'pw-input');
+    const input = el('input', 'field pw-input');
     input.type = 'password'; input.id = id; input.name = name || id; input.autocomplete = autocomplete;
     input.spellcheck = false; input.autocapitalize = 'off'; input.setAttribute('autocorrect', 'off');
     const toggle = el('button', 'pw-toggle', 'Show');

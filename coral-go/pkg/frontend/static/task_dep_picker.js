@@ -18,7 +18,7 @@ export function _renderDepPicker(containerId, selectedIds = [], excludeTaskId = 
     } else {
         tasks.forEach(t => {
             const checked = selected.has(t.id) ? ' checked' : '';
-            html += `<label class="dep-picker-item"><input type="checkbox" value="${Number(t.id)}"${checked} data-on-change="dep-picker-change" data-container="${escapeAttr(containerId)}"> #${t.id} — ${escapeHtml(t.title || '')}</label>`;
+            html += `<label class="dep-picker-item"><input type="checkbox" class="check" value="${Number(t.id)}"${checked} data-on-change="dep-picker-change" data-container="${escapeAttr(containerId)}"> #${t.id} — ${escapeHtml(t.title || '')}</label>`;
         });
     }
     html += `</div>`;

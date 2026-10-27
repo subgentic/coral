@@ -413,12 +413,7 @@
 }
 
 /* Message board multi-select */
-.mb-select-checkbox {
-    margin-right: 8px;
-    cursor: pointer;
-    accent-color: var(--accent);
-    flex-shrink: 0;
-}
+.mb-select-checkbox { margin-right: 8px; }
 
 .mb-message-selected {
     background: rgba(var(--accent-rgb), 0.08);
@@ -1543,20 +1538,8 @@
     border-bottom: 1px solid var(--border);
 }
 
-.emoji-picker-search {
-    flex: 1;
-    padding: 6px 10px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
-    font-size: var(--fs-md);
-    outline: none;
-}
+.emoji-picker-search { flex: 1; }
 
-.emoji-picker-search:focus {
-    border-color: var(--accent);
-}
 
 .emoji-picker-clear {
     padding: 4px 10px;
@@ -2001,10 +1984,7 @@
     box-sizing: border-box;
 }
 
-.settings-mono-input {
-    font-family: var(--font-mono);
-    font-size: var(--fs-base);
-}
+.settings-mono-input { font-family: var(--font-mono); }
 
 .settings-copy-btn {
     flex-shrink: 0;
@@ -2487,20 +2467,8 @@
     white-space: nowrap;
 }
 
-.template-browser-search {
-    flex: 1;
-    padding: 6px 10px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
-    font-size: var(--fs-md);
-    outline: none;
-}
+.template-browser-search { flex: 1; }
 
-.template-browser-search:focus {
-    border-color: var(--accent);
-}
 
 .template-browser-close {
     font-size: var(--icon-size);
@@ -2734,12 +2702,7 @@
     margin-top: 6px;
 }
 
-.perms-shell-input {
-    width: 100%;
-    box-sizing: border-box;
-    font-size: var(--fs-base);
-    font-family: var(--font-mono);
-}
+.perms-shell-input { width: 100%; font-family: var(--font-mono); }
 
 /* ── Team Agent Reorder ──────────────────────────────────── */
 
@@ -2994,11 +2957,7 @@
     padding: 2px 8px;
 }
 
-.prompt-textarea {
-    resize: vertical;
-    font-family: monospace;
-    font-size: var(--fs-base);
-}
+.prompt-textarea { resize: vertical; font-family: monospace; }
 
 .prompts-divider {
     border: none;
@@ -3207,6 +3166,8 @@ label:has(+ .field-error) { margin-bottom: 0; } /* the line sits after the label
 .field-search { padding-left: 1.875rem; }
 .field-clear { padding-right: 28px; }
 @media (max-width: 767px), (pointer: coarse) { .field { min-height: var(--control-touch-height); } }
+/* One plain checkbox (Goal #88, #9278): a native box, 16 px, the accent when ticked; its label is the touch target. Written as input.check so a dialog's own input rule (.modal-content input) does not stretch it. */
+input.check { display: inline-block; width: 16px; height: 16px; margin: 0; padding: 0; flex: none; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
 /* One switch (Goal #88, #9241): a native checkbox drawn as a track and a knob; 44 px wide on a phone or touch. Written as input.switch so a dialog's own input rule (.modal-content input, 0,1,1) does not stretch it. */
 input.switch { appearance: none; -webkit-appearance: none; position: relative; box-sizing: border-box; width: 2.5rem; height: 1.4rem; min-height: 0; margin: 0; padding: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
 input.switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
@@ -3475,9 +3436,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .pw-field { display: block; margin: 0 0 12px; font-size: var(--fs-md); }
 .pw-label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--text-primary); }
 .pw-input-row { display: flex; align-items: center; gap: 6px; } /* the Show button is beside the field, never over its text (a longer word or 200% text would run under it) */
-.pw-input { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; padding: 9px 11px; font-size: var(--fs-lg); border-radius: var(--radius-lg);
-    border: 1px solid var(--control-border); background: var(--bg-primary); color: var(--text-primary); }
-.pw-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pw-input { flex: 1 1 auto; min-width: 0; width: 100%; }
 [data-theme="light"] .pw-toggle { color: var(--accent-dim); }   /* AA on the light card (#4023) */
 .pw-toggle { flex: none; background: none; border: 0; color: var(--accent);
     font-size: var(--fs-md); cursor: pointer; padding: 6px 8px; }
@@ -3613,7 +3572,7 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .ibx-error { margin: 4px 0; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); }
 .ibx-reply { display: flex; flex-direction: column; gap: 6px; margin: 0; }
 .ibx-reply-label { font-weight: 600; font-size: var(--fs-sm, 0.8125rem); }
-.ibx-reply-input { min-height: 44px; width: 100%; box-sizing: border-box; resize: vertical; overflow-y: auto; max-height: 240px; padding: 8px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
+.ibx-reply-input { width: 100%; resize: vertical; overflow-y: auto; max-height: 240px; }
 .ibx-reply-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .ibx-reply-status { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); overflow-wrap: anywhere; }
 .ibx-open { margin: 0; font-size: var(--fs-sm, 0.8125rem); font-weight: 400; }

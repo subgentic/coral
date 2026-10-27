@@ -161,7 +161,7 @@ function renderBoardItem(item, prev) {
     const deleteLabel = `Delete the message from ${agent}, ${formatTime(m.created_at)}`; // names the message: the × alone is read as "times"
     const parent = m.reply_to ? bs._allMessages[indexOfId(bs._allMessages, m.reply_to)] : null;
     const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel, replyName: m.reply_to ? (parent ? (parent.job_title || 'Unknown') : 'an earlier message') : '', self: OPERATOR_ID.toLowerCase() }); // the table's head, actions and flags (board_table.js)
-    const checkbox = isSelectMode() ? `<input type="checkbox" class="mb-select-checkbox" data-msg-id="${Number(m.id)}" ${isSelected(m.id) ? 'checked' : ''} data-on-click="mb-msg-select">` : '';
+    const checkbox = isSelectMode() ? `<input type="checkbox" class="check mb-select-checkbox" data-msg-id="${Number(m.id)}" ${isSelected(m.id) ? 'checked' : ''} data-on-click="mb-msg-select">` : '';
     return `
         <div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}"${parts.attrs} role="listitem" data-message-id="${escapeAttr(String(m.id))}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
             ${parts.toggle}

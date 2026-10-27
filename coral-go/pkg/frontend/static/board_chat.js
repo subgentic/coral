@@ -376,7 +376,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
         const alignClass = isLeader ? ' board-msg-left' : ' board-msg-right';
 
         const selectedClass = _boardChatSelectMode && _boardChatSelectedIds.has(m.id) ? ' mb-message-selected' : '';
-        const checkbox = _boardChatSelectMode ? `<input type="checkbox" class="mb-select-checkbox" data-msg-id="${Number(m.id)}" ${_boardChatSelectedIds.has(m.id) ? 'checked' : ''} data-on-click="board-chat-msg-select">` : '';
+        const checkbox = _boardChatSelectMode ? `<input type="checkbox" class="check mb-select-checkbox" data-msg-id="${Number(m.id)}" ${_boardChatSelectedIds.has(m.id) ? 'checked' : ''} data-on-click="board-chat-msg-select">` : '';
         const parent = m.reply_to ? messages.find(x => x.id === m.reply_to) : null;
         const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel: '', replyName: m.reply_to ? (parent ? (parent.job_title || parent.sender_name || 'Unknown') : 'an earlier message') : '', more: false, idp: 'dbd' });
         return day + `<div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}"${parts.attrs} data-message-id="${Number(m.id)}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
