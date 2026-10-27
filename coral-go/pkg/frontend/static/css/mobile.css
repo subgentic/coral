@@ -1179,6 +1179,7 @@
         min-height: 36px;
         padding: 6px 14px;
     }
+    .btn-icon.btn-small { padding: 0; } /* an icon button has no side padding: 14 px either side of a 44 px box left its 16 px glyph 14 px, which did not grow with the text (#9674) */
 
     /* Task items: larger touch target */
     .task-item {
