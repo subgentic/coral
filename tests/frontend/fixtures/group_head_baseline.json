@@ -1,0 +1,9 @@
+{
+  "about": "Classes named like a group heading that still set their own type look, each with why. group_head_census.test.mjs fails on a new one and on one listed here that no longer sets a look: the list only goes down.",
+  "classes": {
+    "session-group-header": "the sidebar's group row (name, count, chevron): slice 4's list rows",
+    "group-name-line": "its name line, the same row",
+    "group-name-text": "its name text, the same row",
+    "theme-group-title": "a group title inside the theme editor dialog: the dialogs and form rows slices"
+  }
+}
