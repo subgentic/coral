@@ -121,7 +121,7 @@ func (s *WorkflowStore) DB() *DB {
 // SeedDemoWorkflow creates the daily-motivation example workflow and a scheduled
 // job that would run it every weekday morning. The job is created OFF: an enabled job on a new
 // install would start an agent and spend the person's CLI credit before they have asked for anything
-// (#6384); the person turns it on from the Jobs tab. Uses a user_settings flag so deleted examples
+// (#6384); the person turns it on from the Jobs folder of Automations. Uses a user_settings flag so deleted examples
 // won't re-appear on restart.
 func (s *WorkflowStore) SeedDemoWorkflow(ctx context.Context, schedStore *ScheduleStore) {
 	var seeded string
