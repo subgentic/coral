@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
             const c = getComputedStyle(e), px = parseFloat(c.fontSize); const label = e.tagName + '.' + e.className + ' "' + e.textContent.trim().slice(0, 24) + '" ' + c.fontSize + '/' + c.fontWeight;
             if (c.fontFamily !== want) out.push('family ' + label); else if (!sizes.includes(px)) out.push('size ' + label); else if (!['400', '500', '600', '700'].includes(c.fontWeight)) out.push('weight ' + label); }
         return out; }`;
-    const SCALE = '[11, 12, 13, 14, 17, 20]';
+    const SCALE = '[11, 12, 13, 14, 16, 20]'; // the type scale (Goal #84): 17 is retired, 16 is --fs-xl
     const openTab = async tab => {
         await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`);
         await waitFor(`!document.querySelector('${pane(tab)}').hidden`, `the ${tab} pane`, 8000);

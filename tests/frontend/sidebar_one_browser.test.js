@@ -179,7 +179,7 @@ const STUB = `(() => {
             await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-detail .item-bar') && document.querySelector('#scheduler-detail .back-link').checkVisibility()`, at + "the job's page", 8000);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .back-link').textContent`), '\u2190 Jobs', at + 'the job page has its way back');
-            assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#scheduler-detail .sched-header h2')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + "the job's name is 17/700");
+            assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#scheduler-detail .sched-header h2')); return [t.fontSize, t.fontWeight]; })()`), ['20px', '700'], at + "the job's name is 20/700 (the item page title, Goal #84)");
             assert.match(await ev(`document.querySelector('#scheduler-detail .sched-status-line').textContent`), /^Active \u00b7 /, at + 'a status line under the name');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-facts dt')].slice(0, 3).map(e => { const c = getComputedStyle(e), v = getComputedStyle(e.nextElementSibling); return [c.fontSize, c.fontWeight, v.fontSize, v.fontWeight].join(' '); })`), ['13px 500 13px 400', '13px 500 13px 400', '13px 500 13px 400'], at + 'facts: labels 13/500, values 13/400');
             assert.equal(await ev(`!!document.querySelector('#scheduler-detail .sched-prompt-shown .sched-prompt')`), true, at + 'a short prompt is shown, not folded');
