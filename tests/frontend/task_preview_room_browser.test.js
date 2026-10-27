@@ -34,6 +34,12 @@ const board = 'preview-room-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
             await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
             await ev(framesJs(2));
+            if (width === 390) {
+                await ev(`window.toggleAgenticPanel(true); window.switchAgenticTab('tasks', 'top'); true`);
+                await waitFor(`document.querySelector('#board-task-list .board-task-open')?.getClientRects().length > 0`, 'phone Tasks panel');
+                await ev(`[...document.querySelectorAll('#board-task-list .board-task-open')].find(b => b.textContent.startsWith('Second task')).click(); true`);
+                await waitFor(`document.getElementById('preview-pane').classList.contains('preview-phone-full') && document.querySelector('#preview-pane #team-task-title')?.textContent.includes('Second task')`, 'phone task preview is open');
+            }
             const seen = await ev(`(() => { const bar = document.getElementById('preview-tabs'), b = bar.getBoundingClientRect(), tab = bar.querySelector('.preview-tab.active'), t = tab.querySelector('.preview-tab-name'), r = t.getBoundingClientRect(); return { text: t.textContent, titleWidth: r.width, visibleWidth: Math.max(0, Math.min(r.right, b.right) - Math.max(r.left, b.left)), parent: document.getElementById('preview-pane').parentElement.id, chat: document.querySelector('.live-left-column').getBoundingClientRect().width }; })()`);
             if (!seen.text.includes('Second task') || seen.titleWidth < 50 || seen.visibleWidth < 50) failures.push(width + ': active tab title must remain readable: ' + JSON.stringify(seen));
             if (width === 1920 && (seen.parent !== 'preview-column' || seen.chat < 420)) failures.push('wide screen retains column preference: ' + JSON.stringify(seen));
