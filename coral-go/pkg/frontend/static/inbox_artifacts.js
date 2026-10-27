@@ -34,6 +34,7 @@ export function setArtifactSearch(text) {
 }
 
 let pageHost = null;
+document.addEventListener('coral-servers', () => { if (pageHost && pageHost.isConnected) list.loadArtifacts({ keep: true }); }); // the computers or their statuses changed: the open list is read again (#8922)
 const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { if (n !== count) { count = n; onCount(); } const c = pageHost && pageHost.querySelector('.inbox-artifacts-count'); if (c) c.textContent = String(n); } });
 
 let folderBar = null;
