@@ -4,6 +4,8 @@ import { splitKey, serverRead, identityKey } from './server_base.js';
 export const serverChoices = () => ['local', ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local').map(s => s.id) : [])];
 export const multipleServers = () => !!state.hub && serverChoices().length > 1;
 export const inboxSources = () => ['local', ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
+/** The registered computers the hub already knows are not answering (status not online): left out of every merged list, so each folder's quiet line names them too (#8904). */
+export const offlineSources = () => (state.hub ? (state.servers || []).filter(s => s && s.id && s.id !== 'local' && s.status !== 'online') : []);
 export function serverLabel(id) { return !id || id === 'local' ? 'This computer' : (state.servers || []).find(s => s.id === id)?.label || (state.servers || []).find(s => s.id === id)?.name || id; }
 export const serverOf = row => row.server || splitKey(row.project || row.board_id || row.team || '').server || 'local';
 export const serverMatches = (row, filters) => !multipleServers() || !filters.server || serverOf(row) === filters.server;
@@ -50,5 +52,5 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
     return { artifacts: results.flatMap(d => d.artifacts), teams: results.flatMap(d => d.teams || []),
         all: results.reduce((n,d) => n + (d.all || 0), 0), total: results.reduce((n,d) => n + (d.total || 0), 0),
         tag_counts: results.reduce((counts,d) => { for (const [tag,n] of Object.entries(d.tag_counts || {})) counts[tag] = (counts[tag] || 0) + n; return counts; }, Object.create(null)),
-        has_more: results.some(d => !d.failed && !d.done), down: results.filter(d => d.failed).map(d => ({ server: d.server, label: d.label })), next_cursor: JSON.stringify(next), truncated: results.some(d => d.truncated) };
+        has_more: results.some(d => !d.failed && !d.done), down: [...results.filter(d => d.failed).map(d => ({ server: d.server, label: d.label })), ...offlineSources().filter(s => (!multipleServers() || !filters.server || filters.server === s.id) && (!team || team.server === s.id)).map(s => ({ server: s.id, label: serverLabel(s.id) }))], next_cursor: JSON.stringify(next), truncated: results.some(d => d.truncated) };
 }

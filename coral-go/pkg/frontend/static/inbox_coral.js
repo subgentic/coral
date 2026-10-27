@@ -37,7 +37,8 @@ async function inboxRows(path, field) {
         noteBoardLabels(rows, 'board_id', server);
         return rows.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) }));
     }));
-    downLabels[field] = results.flatMap((r, i) => r.status === 'rejected' && servers[i] !== 'local' ? [serverName(servers[i])] : []); // the registered computers that did not answer, for the folder's quiet line (#8904)
+    downLabels[field] = [...results.flatMap((r, i) => r.status === 'rejected' && servers[i] !== 'local' ? [serverName(servers[i])] : []),
+        ...(state.hub ? (state.servers || []).filter(s => s && s.id && s.id !== 'local' && s.status !== 'online').map(s => serverName(s.id)) : [])]; // the registered computers that did not answer, for the folder's quiet line (#8904)
     // Each source is ordered independently; merge by update time, not server order.
     const updated = row => { const time = Date.parse(row.updated_at); return Number.isFinite(time) ? time : -Infinity; };
     return results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
