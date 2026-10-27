@@ -16,8 +16,9 @@ import (
 
 // The board message search (#4745): GET /api/board/{project}/messages/search. Like the Team Artifacts query it takes q, since, until,
 // sort and cursor, and answers with total and next_cursor (and prev_cursor: it pages both ways). The text and the names are matched in
-// Go on the rows the time bounds leave, on what a viewer sees (MessageQuery.Shown), never by SQL, so nothing a caller sends reaches a
-// statement or a pattern and % and _ are ordinary characters. The scan is bounded by rows and by text.
+// Go on the rows the time bounds leave, on what a viewer sees (MessageQuery.Shown). A plain ASCII text search is narrowed by SQL first
+// (queryTextInSQL: a bound, escaped LIKE parameter, so nothing a caller sends reaches a statement and % and _ are ordinary characters);
+// the Go scan answers every other query and every case where LIKE and Go's match could differ. The scan is bounded by rows and by text.
 
 const (
 	MessageQueryDefaultLimit = 50
@@ -362,7 +363,7 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 // queryTextInSQL answers a text search with LIKE (ASCII case-folded, as the Go match is for an ASCII needle) so only the ids of the
 // matches reach Go; the page's rows are read after. ok is false when the Go scan must answer instead: the scan caps would truncate the
-// board, or the needle has an i or k and a message holds U+0130 or U+212A (which Go's ToLower folds to i and k; LIKE does not).
+// board, a message holds a NUL byte, or the needle has an i or k and a message holds U+0130 or U+212A (which Go's ToLower folds to i and k; LIKE does not).
 func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []string, args []any, dir string) (*MessageQueryResult, bool, error) {
 	w := " WHERE " + strings.Join(where, " AND ")
 	var n, bytes int64
@@ -372,12 +373,15 @@ func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []str
 	if n > int64(messageScanRows) || bytes > int64(messageScanBytes) {
 		return nil, false, nil
 	}
+	// Where LIKE and Go's match differ, Go answers: a NUL byte (LIKE stops reading a text at it), and for a needle with an i or k, U+0130
+	// and U+212A (Go folds them to i and k; LIKE does not).
+	odd := "instr(CAST(m.content AS BLOB), CAST(char(0) AS BLOB)) > 0"
 	if strings.ContainsAny(q.Text, "ik") {
-		var odd int
-		err := s.reader().QueryRowxContext(ctx, "SELECT EXISTS(SELECT 1 FROM board_messages m"+w+" AND (instr(m.content, char(304)) > 0 OR instr(m.content, char(8490)) > 0))", args...).Scan(&odd)
-		if err != nil || odd != 0 {
-			return nil, false, err
-		}
+		odd += " OR instr(m.content, char(304)) > 0 OR instr(m.content, char(8490)) > 0"
+	}
+	var differs int
+	if err := s.reader().QueryRowxContext(ctx, "SELECT EXISTS(SELECT 1 FROM board_messages m"+w+" AND ("+odd+"))", args...).Scan(&differs); err != nil || differs != 0 {
+		return nil, false, err
 	}
 	likeArgs := append(append([]any{}, args...), "%"+likeEscaper.Replace(q.Text)+"%")
 	var ids []int64
