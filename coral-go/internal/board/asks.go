@@ -166,6 +166,9 @@ func (s *Store) fillAsks(ctx context.Context, project string, msgs []Message) er
 	if len(msgs) == 0 {
 		return nil
 	}
+	for i := range msgs { // how to answer a message from another board (#9054): from the message's own envelope, no query
+		msgs[i].ReplyWith = CrossReplyLine(msgs[i].External, msgs[i].ID)
+	}
 	ids := make([]any, 0, len(msgs)+1)
 	ids = append(ids, project)
 	for _, m := range msgs {

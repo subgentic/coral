@@ -27,7 +27,8 @@ const H1 = '1'.repeat(64), H2 = '2'.repeat(64), H3 = '3'.repeat(64);
                 { id: 'a'.repeat(64), name: '<img src=x onerror="window.__pwn=1">.txt', media_type: 'text/plain', size: 3 * 1024 * 1024 }] } }),
         msg(2, { content: `My own copy: [it](coral://artifacts/${H3})`, external: { direction: 'outbound', server_id: 'srv', board: 'me', target_board: 'other-team', target_server_id: 'srv' } }),
         msg(3, { content: `An ordinary post: [it](coral://artifacts/${H3})` }),
-        msg(4, { content: 'From another team, no files and no links', external: { direction: 'inbound', server_id: 'srv', board: 'other-team', sender: 'Orchestrator' } }),
+        msg(4, { content: 'From another team, no files and no links', external: { direction: 'inbound', server_id: 'srv', board: 'other-team', sender: 'Orchestrator' },
+            reply_with: 'Reply with: coral-board send --board other-team --reply-to 4 "..."' }),
     ];
     const snapshot = () => ev(`(() => { const by = id => [...document.querySelectorAll('#agentic-panel-board .mb-message')][id];
         const m = [0, 1, 2, 3].map(by);
@@ -39,6 +40,7 @@ const H1 = '1'.repeat(64), H2 = '2'.repeat(64), H3 = '3'.repeat(64);
             imgs0: [...m[0].querySelectorAll('.mb-message-body img')].length,
             links1: [...m[1].querySelectorAll('.mb-message-body a')].length, notHere1: m[1].querySelectorAll('.mb-not-here').length, chips1: m[1].querySelectorAll('.mb-attachment').length,
             links2: [...m[2].querySelectorAll('.mb-message-body a')].length, notHere2: m[2].querySelectorAll('.mb-not-here').length,
+            reply3: (m[3].querySelector('.mb-reply-with') || {}).textContent, replyElsewhere: [0, 1, 2].filter(i => m[i].querySelector('.mb-reply-with')).length,
             chips3: m[3].querySelectorAll('.mb-attachment').length, notHere3: m[3].querySelectorAll('.mb-not-here').length,
             pwn: !!window.__pwn, imgOnerror: document.querySelectorAll('#agentic-panel-board img[onerror]').length,
             overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth) }; })()`);
@@ -68,6 +70,7 @@ const H1 = '1'.repeat(64), H2 = '2'.repeat(64), H3 = '3'.repeat(64);
             check(`${tag}: the link to a file that did not come says "not on this machine" and is not a link (${JSON.stringify(s.notHere)}; links left ${JSON.stringify(s.links0)})`, s.notHere.length === 1 && /a file that did not come \(not on this machine\)/.test(s.notHere[0]) && s.links0.length === 1 && s.links0[0] === H1 && s.imgs0 >= 1);
             check(`${tag}: the sender's own mirror and an ordinary post keep their links and show no chips`, s.links1 === 1 && s.notHere1 === 0 && s.chips1 === 0 && s.links2 === 1 && s.notHere2 === 0);
             check(`${tag}: a message from another Coral with no files and no links shows nothing extra`, s.chips3 === 0 && s.notHere3 === 0);
+            check(`${tag}: a message from another board says how to answer it (the server's line, #9054), and no other message does (${JSON.stringify(s.reply3)})`, s.reply3 === 'Reply with: coral-board send --board other-team --reply-to 4 "..."' && s.replyElsewhere === 0);
             check(`${tag}: a name from the envelope is text, never markup`, !s.pwn && s.imgOnerror === 0);
             check(`${tag}: nothing makes the page wider (${s.overflow})`, s.overflow === 0);
             if (view.phone) check(`${tag}: a file chip is 44 px tall (${JSON.stringify(s.chips.map(c => c.size.h))})`, s.chips[0].size.h >= 44 && s.chips[2].size.h >= 44);

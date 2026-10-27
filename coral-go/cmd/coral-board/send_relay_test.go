@@ -48,7 +48,8 @@ func TestSendAddressAndTargets(t *testing.T) {
 
 	for _, args := range [][]string{
 		{"--address", "homelab/qa", "--board", "beta", "hi"},
-		{"--board", "beta", "--reply-to", "3", "hi"},
+		{"--board", "beta", "--reply-to", "x", "hi"},
+		{"--board", "beta", "--message-id", "m1", "hi"},
 		{"--address", "homelab/qa", "--reply-to", "x", "hi"},
 	} {
 		if err := runSend(args, id, &out); err == nil {
@@ -241,5 +242,37 @@ func TestAttachWaitCoversTheScanAndTheTransfer(t *testing.T) {
 	}
 	if got := attachWait(4); got != 1055*time.Second {
 		t.Errorf("four attachments: %v", got)
+	}
+}
+
+// #9054: send --board takes --reply-to, the id of the message (on this board) from that board that it answers.
+func TestSendBoardReplyTo(t *testing.T) {
+	isolateBoardEnv(t)
+	var gotPath string
+	var gotBody map[string]any
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotBody = nil
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"message":{"id":5},"delivered_to":["Orchestrator"]}`))
+	}))
+	defer ts.Close()
+	oldURL := serverURL
+	serverURL = ts.URL
+	defer func() { serverURL = oldURL }()
+	id := sendIdentity{Board: "alpha", SubscriberID: "Orchestrator", SessionName: "tmux-1"}
+	var out bytes.Buffer
+	if err := runSend([]string{"--board", "beta", "--reply-to", "812", "done"}, id, &out); err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/api/board/beta/external-messages" || gotBody["reply_to"] != float64(812) || gotBody["content"] != "done" {
+		t.Errorf("path %q body %v", gotPath, gotBody)
+	}
+	if err := runSend([]string{"--board", "beta", "hi"}, id, &out); err != nil {
+		t.Fatal(err)
+	}
+	if _, has := gotBody["reply_to"]; has {
+		t.Errorf("no --reply-to, no reply_to: %v", gotBody)
 	}
 }

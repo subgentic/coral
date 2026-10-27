@@ -39,6 +39,7 @@
 1	board_chat.js	parts.tagsOpen
 1	board_chat.js	parts.toggle
 1	board_chat.js	renderBoardMessageBody(m)
+1	board_chat.js	replyWithHtml(m)
 1	board_chat.js	selectedClass
 1	board_chat.js	spacing
 1	board_export.js	agentCheckboxes || '<p style="font-size:var(--fs-md);color:var(--text-muted)">No subscribers</p>'
@@ -77,6 +78,7 @@
 1	board_window.js	parts.tagsOpen
 1	board_window.js	parts.toggle
 1	board_window.js	renderBoardMessageBody(m)
+1	board_window.js	replyWithHtml(m)
 1	board_window.js	selectedClass
 1	board_window.js	spacing
 1	browser.js	machineBlock()

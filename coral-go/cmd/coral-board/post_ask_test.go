@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,4 +64,21 @@ func countOf(s, sub string) int {
 		}
 	}
 	return n
+}
+
+// #9054: read says, under a message from another board, how to answer it: the server's own line, printed as it is.
+func TestReadPrintsTheReplyLineOfAMessageFromAnotherBoard(t *testing.T) {
+	out := captureStdout(t, func() {
+		printMessages([]map[string]any{
+			{"id": float64(812), "created_at": "2026-10-27T10:00:00Z", "job_title": "Orchestrator (design-team)", "content": "can you expose the tokens API?",
+				"reply_with": `Reply with: coral-board send --board design-team --reply-to 812 "..."`},
+			{"id": float64(813), "created_at": "2026-10-27T10:01:00Z", "job_title": "Dev", "content": "an ordinary message"},
+		})
+	})
+	if !strings.Contains(out, `  (Reply with: coral-board send --board design-team --reply-to 812 "...")`) {
+		t.Errorf("the line is missing:\n%s", out)
+	}
+	if strings.Count(out, "Reply with:") != 1 {
+		t.Errorf("only the message from another board has one:\n%s", out)
+	}
 }

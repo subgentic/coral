@@ -4,7 +4,7 @@ import { isBusyStatus, busyRetryingText, machineOf, afterPause } from './overloa
 import { isCloud, keyLabel } from './server_base.js';
 import { nameSaveButton, aboutRow, BOARD_SAVE_BUTTON } from './saved_marks.js';
 import { renderTaskQueueRun, groupTaskQueueRuns } from './board_system_lines.js';
-import { getAgentColor, isOperatorId, OPERATOR_ID, escapeAttr, boardMessageColorStyle, escapeHtml, externalMessageBadge, hubUserBadge, askBadge, renderBoardMessageBody } from './utils.js';
+import { getAgentColor, isOperatorId, OPERATOR_ID, escapeAttr, boardMessageColorStyle, escapeHtml, externalMessageBadge, replyWithHtml, hubUserBadge, askBadge, renderBoardMessageBody } from './utils.js';
 import { isSelectMode, isSelected } from './board_export.js';
 import { rowParts, toggleRow, revealRow, sameDay, dayDividerHtml, refreshReplies } from './board_table.js';
 import { messageTimeHtml } from './message_time.js';
@@ -177,6 +177,7 @@ function renderBoardItem(item, prev) {
             ${parts.tagsOpen}
             <div class="mb-message-body" id="mbd-${Number(m.id)}">${renderBoardMessageBody(m)}</div>
             ${messageAttachmentsHtml(m)}
+            ${replyWithHtml(m)}
             ${parts.actions}
         </div>`;
 }
