@@ -547,7 +547,7 @@ registerGroupSource('hub-inbox', {
         if (key === 'saved') return savedListSpec();
         return null;
     },
-    lead: () => { const here = pageGroup(), sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder }) }; }, // a phone: the folders are one select on top of the table
+    lead: () => { const here = pageGroup(), sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true }) }; }, // a phone: the folders are one select on top of the table
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
     showList: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
     empty: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
@@ -760,7 +760,7 @@ export async function openInboxGoal(team, id) {
     host.hidden = false; host.classList.add('inbox-goal-page'); host.replaceChildren();
     showView('inbox-view');
     $('inbox-view')?.setAttribute('data-phone-item', '');
-    host.append(VL.build({ id: 'inbox-goal-folders', label: 'Inbox views', sections: folderSections(), current: 'goals', onPick: pickFolder }));
+    host.append(VL.build({ id: 'inbox-goal-folders', label: 'Inbox views', sections: folderSections(), current: 'goals', onPick: pickFolder, drawer: true }));
     const view = el('div', 'goals-page goals-table-page goals-open');
     const body = el('div', 'goals-body'); view.append(body); host.append(view);
     const before = String(history.state?.prev || '');
@@ -786,7 +786,7 @@ export async function openInboxItem(kind, team, id) {
     setGroup(key);
     const host = $('inbox-page'); host.hidden = false; host.classList.add('inbox-item-page'); host.replaceChildren();
     showView('inbox-view'); $('inbox-view')?.setAttribute('data-phone-item', '');
-    host.append(VL.build({ id: 'inbox-item-folders', label: 'Inbox views', sections: folderSections(), current: key, onPick: pickFolder }));
+    host.append(VL.build({ id: 'inbox-item-folders', label: 'Inbox views', sections: folderSections(), current: key, onPick: pickFolder, drawer: true }));
     const body = el('div', 'inbox-item-body'); host.append(body);
     const before = String(history.state?.prev || '');
     itemMount = mountInboxItem(body, { kind, team, id, onChanged: refreshTasks, backLabel: kind === 'tasks' ? backLabelFor('task', before, openedFrom()) : '', back: () => { if (backIs(route) || cameFromInbox()) history.back(); else go(route); } }); // Back returns to the Inbox screen it was opened from (a goal, another task), else to the folder
