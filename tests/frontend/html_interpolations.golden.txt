@@ -240,6 +240,7 @@
 1	needs_input_card.js	hint
 2	needs_input_card.js	kicker
 1	needs_input_card.js	o.n
+1	needs_input_card.js	optionsHtml
 1	needs_input_card.js	q.options.map(o => `<li>${escapeHtml(typeof o === "string" ? o : (o && o.label) || "")}</li>`).join("")
 1	needs_input_card.js	renderMarkdown(inp.plan, undefined, 'chat')
 1	notes.js	content.replace(/</g, '&lt;')
