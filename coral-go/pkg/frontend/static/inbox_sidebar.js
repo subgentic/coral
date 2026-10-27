@@ -13,6 +13,7 @@ import { reviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed }
 import { go, note, backIs, currentRoute } from './nav.js';
 import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
 import { sessionServer, keyLabel, identityKey, splitKey } from './server_base.js';
+import { teamLabel } from './server_status.js';
 import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
@@ -197,7 +198,7 @@ async function refreshTasks() {
 // ── Goals ────────────────────────────────────────────────────────────────
 let goals = []; // the open goals of every team (GET /api/goals): id, board_id, title, outcome, state, rollup, updated_at
 const goalKey = g => `${g.board_id}#${g.id}`;
-const goalTeam = g => keyLabel(g.board_id);
+const goalTeam = g => teamLabel(g.board_id); // with its computer when a hub has more than one: two teams called alpha are two (#8774)
 let goalFilters = GF.loadFilters(), goalBar = null;
 const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, goalFilters, goalTeam) && serverMatches(g, goalFilters)), goalFilters);
 /** The Goals folder's toolbar (#8596): the search, the Filters icon beside it (Team, Driver, Updated since, Sort), the state pills, and the chips of what is on. */

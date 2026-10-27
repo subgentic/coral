@@ -1,0 +1,56 @@
+// Two teams called alpha on two computers (#8774, Hub audit #8762): in hub mode with a remote, the Inbox's Goals and Tasks folders and Needs you tell them apart by their computer ("alpha · This computer",
+// "alpha · Box Two"), in the Team column and in the Team filter's choices and chips; Tasks has the Team filter. The goals, the tasks and the waiting agents are stood in (this computer's and the remote's
+// at /api/remote/box-2/...). 1280 and 390. Drives Chrome over CDP against the isolated dev server.
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+
+const GOALS = { local: [{ id: 1, board_id: 'alpha', title: 'Local goal', outcome: 'o', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-26T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }],
+    'box-2': [{ id: 1, board_id: 'alpha', title: 'Remote goal', outcome: 'o', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-25T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }] };
+const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priority: 'high', status: 'queued', assigned_to: 'Operator', updated_at: '2026-10-26T10:00:00Z' }],
+    'box-2': [{ id: 7, board_id: 'alpha', title: 'Remote task', priority: 'medium', status: 'queued', assigned_to: 'Operator', updated_at: '2026-10-25T10:00:00Z' }] };
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { settle } = require('./helpers/wait').bind(ev);
+    const results = [];
+    const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
+    const column = title => ev(`(() => { const th = [...document.querySelectorAll('#group-table-view th')].findIndex(h => h.textContent.replace(/[\\u2191\\u2193\\u2195]/g, '').trim() === ${JSON.stringify(title)}); if (th < 0) return null;
+        return [...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.querySelector('.dt-primary, td')).map(r => (r.children[th] || {}).textContent.replace(/\\s+/g, ' ').trim()); })()`);
+    const teamChoices = () => ev(`[...document.querySelectorAll('.inbox-folder-toolbar select[id$="-team"] option')].map(o => [o.value, o.textContent.trim()])`);
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [label, w, h, mobile] of [['1280', 1280, 900, false], ['390', 390, 844, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-inbox-')) localStorage.removeItem(k); } catch {} true`);
+            await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.hub = true; st.servers = [{ id: 'box-2', label: 'Box Two', status: 'online' }];
+                const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.href), where = url.pathname.startsWith('/api/remote/box-2/') ? 'box-2' : 'local', path = url.pathname.replace(/^\\/api\\/remote\\/box-2/, '');
+                    if (path === '/api/goals') return json({ goals: ${JSON.stringify(GOALS)}[where] });
+                    if (path === '/api/board/tasks') return json({ tasks: ${JSON.stringify(TASKS)}[where] });
+                    return R(u, o); }; return true; })()`);
+            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
+            const open = async key => {
+                if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); s.value = ${JSON.stringify(key)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                else await ev(`document.querySelector('.view-list-item[data-key="${key}"]').click(); true`);
+                await settle(600);
+            };
+            const panel = async () => { if (!(await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').getAttribute('aria-expanded')`) === 'true')) { await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`); await settle(250); } };
+
+            // Goals
+            await open('goals');
+            await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length >= 2`, `${label}: two goals`, 10000);
+            const gteams = await column('Team');
+            check(`${label}: Goals' Team column tells the two alpha teams apart`, gteams && gteams.length === 2 && gteams[0] !== gteams[1] && gteams.some(t => /alpha.*This computer/.test(t)) && gteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(gteams));
+            await panel();
+            const gchoices = await teamChoices();
+            check(`${label}: Goals' Team filter offers both, by their computer`, gchoices.filter(([v]) => v).length === 2 && new Set(gchoices.map(c => c[1])).size === gchoices.length && gchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)), JSON.stringify(gchoices));
+            await ev(`(() => { const s = document.getElementById('inbox-goals-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(400);
+            check(`${label}: choosing the remote one shows its goal, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => b.textContent.trim())`)) === '["Remote goal"]' && /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`)));
+        }
+    } finally { await client.close(); }
+    if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
+    console.log(`\nAll ${results.length} Inbox team label checks passed`);
+})().catch(e => { console.error(e); process.exit(1); });
