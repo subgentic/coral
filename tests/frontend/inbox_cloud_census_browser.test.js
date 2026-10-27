@@ -60,7 +60,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
     const keysByPath = reqs => { const out = new Map(); for (const r of reqs) { const s = out.get(`${r.m} ${r.p}`) || new Set(); r.keys.forEach(k => s.add(k)); out.set(`${r.m} ${r.p}`, s); } return out; };
     try {
         let bootNative = false; // the Hub's boot value for the Inbox: off while the baseline is recorded (the Chats and Board tabs as the Hub has them), on for the Inbox
-        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: () => bootNative, hubPages: true });
+        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: () => bootNative, hubPages: !!process.env.INBOX_CENSUS_SHOTS }); // the stand-in Hub page only for the pictures: a run without them answers the Hub's own pages as the isolated server does
         await Page.addScriptToEvaluateOnNewDocument({ source: RECORDER });
 
         // 1. the baseline: the cloud Chats tab, and the team page's Board tab, as the Hub's dashboard has them
