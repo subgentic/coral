@@ -100,6 +100,24 @@ func TestMessageQueryTextFoldedLettersUseGoScan(t *testing.T) {
 	}
 }
 
+// LIKE stops reading a text at a NUL byte; the Go scan does not, so a board holding one answers by the Go scan (Security Reviewer, #9249).
+func TestMessageQueryTextWithNULUsesGoScan(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	sub(s, ctx, "proj", "dev", "Backend Dev")
+	var ids []int64
+	for _, c := range []string{"needle one", "plain", "x needle two", "needle three"} {
+		m, err := s.PostMessage(ctx, "proj", "dev", c, nil)
+		require.NoError(t, err)
+		ids = append(ids, m.ID)
+	}
+	_, err := s.db.ExecContext(ctx, "UPDATE board_messages SET content = 'head' || char(0) || ' needle after the NUL' WHERE id = ?", ids[1])
+	require.NoError(t, err)
+	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"needle"}, Limit: []string{"50"}})
+	require.Equal(t, b, a)
+	assert.Equal(t, 4, a.Total, "the text after the NUL matches, as in the Go scan")
+}
+
 // 50,000 messages: the answer is the Go scan's and the time is logged. The assertion is a gross one (timing tests flake); the numbers are in the log.
 func TestMessageQueryTextAt50k(t *testing.T) {
 	if testing.Short() {
