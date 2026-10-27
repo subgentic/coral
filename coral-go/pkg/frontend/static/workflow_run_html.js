@@ -89,15 +89,15 @@ export function runStepHtml(run, s, i, count) {
             const peek = first ? `<span class="wf-run-step-peek">${esc(first.length > 120 ? first.slice(0, 119) + '…' : first)}</span>` : '';
             outputHtml = `
                 <button type="button" class="wf-run-step-output-toggle" aria-expanded="${escAttr(isFailed)}" aria-controls="${escAttr(outputId)}" aria-label="${escAttr('Output of ' + (s.name || 'step ' + (i + 1)))}" data-on-click="wf-output-toggle">
-                    <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">terminal</span> Output${peek}
-                    <span class="material-icons wf-toggle-arrow" style="font-size:0.875rem" aria-hidden="true">expand_more</span>
+                    <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">terminal</span> Output${peek}
+                    <span class="material-icons wf-toggle-arrow" style="font-size:var(--fs-lg)" aria-hidden="true">expand_more</span>
                 </button>
                 <div id="${escAttr(outputId)}" class="wf-run-step-output${autoExpand}">${esc(s.output_tail)}</div>`;
         }
         // Why a step failed: the end of its stderr, always shown (stderr.txt is still in the file list).
         if (isFailed && s.error_tail && s.error_tail.trim()) {
             outputHtml += `
-                <div class="wf-run-step-error-label"><span class="material-icons" style="font-size:0.875rem" aria-hidden="true">error_outline</span> Error output</div>
+                <div class="wf-run-step-error-label"><span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">error_outline</span> Error output</div>
                 <div class="wf-run-step-output wf-expanded wf-run-step-error">${esc(s.error_tail.replace(/\s+$/, ''))}</div>`;
         }
 
@@ -113,7 +113,7 @@ export function runStepHtml(run, s, i, count) {
         let agentHtml = '';
         if (s.type === 'agent' && s.session_id) {
             agentHtml = `<button type="button" class="wf-step-agent-link" data-on-click="wf-step-agent" data-session="${escAttr(s.session_name || s.session_id)}" aria-label="${escAttr('View agent of ' + (s.name || 'step ' + (i + 1)))}">
-                <span class="material-icons" style="font-size:0.8125rem" aria-hidden="true">open_in_new</span> View agent
+                <span class="material-icons" style="font-size:var(--fs-md)" aria-hidden="true">open_in_new</span> View agent
             </button>`;
         }
 

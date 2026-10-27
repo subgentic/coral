@@ -367,7 +367,7 @@ function drawAcfForm(container, uid, opts, f) {
         <div class="permissions-section">
             <button type="button" class="permissions-toggle-btn" data-on-click="perms-toggle" data-target="${escapeAttr(uid + '-perms')}">
                 <svg class="permissions-chevron" width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M6 4l4 4-4 4z"/></svg>
-                Permissions <span class="acf-perms-summary" style="color:var(--text-muted);font-weight:normal;font-size:0.6875rem">(${escapeHtml(permsSummary)})</span>
+                Permissions <span class="acf-perms-summary" style="color:var(--text-muted);font-weight:normal;font-size:var(--fs-sm)">(${escapeHtml(permsSummary)})</span>
             </button>
             ${permEditorHTML(false)}
         </div>
