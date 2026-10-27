@@ -80,7 +80,7 @@ const PATHS = ["src/a&b <x>.go", "docs/it's here.md"];
         const shown = await until(`getComputedStyle(document.getElementById('tag-dropdown')).display !== 'none'`, 'the tag dropdown', 3000).then(() => ev(`getComputedStyle(document.getElementById('tag-dropdown')).display !== 'none'`));
         await ev(`document.querySelector('[data-on-click="tag-dropdown-hide"]').click(); true`);
         const hidden = await ev(`getComputedStyle(document.getElementById('tag-dropdown')).display === 'none'`);
-        check('the tag dropdown shows on + Tag and hides on Close', shown && hidden, `${shown}/${hidden}`);
+        check('the tag dropdown shows on Add tag and hides on Close', shown && hidden, `${shown}/${hidden}`);
 
         await ev(`(() => { const chip = document.querySelector('#history-session-branch'); chip.querySelector('.branch-text').textContent = 'feature/x&y'; chip.querySelector('[data-on-click="copy-branch"]').click(); return true; })()`);
         await until(`window.__copied.includes('feature/x&y')`, 'the copied branch', 3000);

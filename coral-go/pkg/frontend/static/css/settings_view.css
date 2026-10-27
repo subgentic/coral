@@ -57,8 +57,8 @@
 #settings-modal .sv .telemetry-install-id code { font: var(--dlg-control); }
 .sv .sv-control > .telemetry-install-id { width: auto; max-width: none; justify-content: flex-start; } /* the value and its Copy start at the control column's left edge, as the API key's do */
 .sv .telemetry-install-id code { flex: 0 1 auto; } /* a value in the dialog is the dialog's control size, not the page's */
-.sv-ctl-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; } /* a control with its buttons: the key on its own full-width line, its buttons below (#3152, #8460) */
-.sv-ctl-line > .sv-input { flex: 1 1 100%; min-width: 0; }
+.sv-ctl-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; } /* a control with its buttons: the key takes the width the buttons leave, Show, Copy and the Mobile QR beside it as Install ID's Copy is; a narrow panel wraps them under (#3152, #8460, #9571) */
+.sv-ctl-line > .sv-input { flex: 1 1 14rem; min-width: 0; }
 .sv-ctl-icon { font-size: var(--fs-lg); vertical-align: middle; }
 .sv-live-wide { grid-column: 1 / -1; min-width: 0; } /* a live part under the whole row (field.live { wide: true }) */
 .sv-row[data-disabled] .sv-label { color: var(--sv-value-color); }
