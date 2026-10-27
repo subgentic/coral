@@ -34,9 +34,9 @@ function sqliteText(db, sql) {
     } finally { d.close(); }
 }
 
-/** Runs statements that change the database (several, separated by ;). */
+/** Runs statements that change the database (several, separated by ;). The tool reads them from its standard input: a long script (a suite's thousands of UPDATEs) does not fit one command-line argument. */
 function sqliteExec(db, sql) {
-    if (haveCli()) { execFileSync('sqlite3', [db, sql], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); return; }
+    if (haveCli()) { execFileSync('sqlite3', [db], { input: sql, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }); return; }
     const sqlite = nodeSqlite();
     if (!sqlite) throw new Error('neither the sqlite3 tool nor node:sqlite (Node 22.5+) is available');
     const d = new sqlite.DatabaseSync(db);
