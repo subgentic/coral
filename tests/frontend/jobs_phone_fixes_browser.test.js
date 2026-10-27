@@ -47,6 +47,7 @@ const S = `(window.__coralStatic || '/static/')`;
             if (mobile) {
                 const back = await ev(`(() => { const b = document.querySelector('#scheduler-detail .sched-back'); return b ? { shown: b.getClientRects().length > 0, text: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height) } : null; })()`);
                 assert.ok(back && back.shown && /\u2190 Jobs/.test(back.text) && back.h >= 44, `${tag}: a "\u2190 Jobs" way back, 44 px high, is on the job: ` + JSON.stringify(back));
+                await sleep(400); // sleep-ok: a Back click made straight after the run row's click is lost (3 of 4 runs without this wait, 0 of 6 with it); the page settles first
                 await ev(`document.querySelector('#scheduler-detail .sched-back').click(); true`); await sleep(500); // sleep-ok: the page scrolls back to the list
                 await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0`, 'the folder table', 8000);
                 const list = await ev(`(() => { const r = document.getElementById('group-table-view').getBoundingClientRect(); const a = document.activeElement; return { top: Math.round(r.top), inView: r.top >= -2 && r.top < innerHeight, focusOnJob: !!(a && a.closest && a.closest('tr[data-key="1"]')) }; })()`);
