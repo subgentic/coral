@@ -49,4 +49,60 @@ assert.equal(n(), 2, 'a 500 is not shared after it answered');
 status = 200; fail = true; calls = []; clock += 5000;
 await Promise.allSettled([get('/api/system/status'), get('/api/system/status')]); await get('/api/system/status').catch(() => {});
 assert.equal(n(), 2, 'a network error is shared while in flight, and not kept: ' + calls.join(', '));
+
+// a module instance of its own over a stub of its own, for the cases that need a different stub
+let instance = 0;
+async function over(stub, clockFn = () => clock) {
+    window.fetch = stub;
+    const m = await import(`../../coral-go/pkg/frontend/static/fetch_share.js?i=${++instance}`);
+    m.installFetchShare(clockFn);
+}
+
+// the Security Reviewer's probe: a write takes 50 ms; a poll at 10 ms gets the old state; after the write the UI's own read must be the new state
+let state = 'old';
+await over(async (input, init) => {
+    const method = (init && init.method) || 'GET';
+    if (method === 'POST') { await new Promise(r => setTimeout(r, 50)); state = 'new'; return new Response('{}'); }
+    const seen = state; await new Promise(r => setTimeout(r, 5)); return new Response(JSON.stringify({ state: seen }));
+});
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const write = window.fetch('/api/board/alpha/tasks', { method: 'POST' });
+await sleep(10);
+const poll = await (await window.fetch('/api/board/alpha/status')).json(); // made while the write is in flight, and answered before it lands
+assert.equal(poll.state, 'old');
+await write;
+await sleep(100);
+assert.equal((await (await window.fetch('/api/board/alpha/status')).json()).state, 'new', 'a read after the write is the state after it, not the poll made while it ran');
+// two reads while a write is in flight are two requests: nothing is shared with a read made during a write
+let during = 0;
+await over(async (input, init) => { if (init && init.method === 'POST') { await sleep(40); return new Response('{}'); } during++; return new Response('{}'); });
+const w2 = window.fetch('/api/board/alpha/tasks', { method: 'POST' });
+await Promise.all([window.fetch('/api/board/alpha/status'), window.fetch('/api/board/alpha/status')]);
+assert.equal(during, 2, 'no read is shared while a write is in flight');
+await w2;
+// a failed write forgets too
+await over(async (input, init) => { if (init && init.method === 'POST') throw new TypeError('down'); return new Response(JSON.stringify({ state })); });
+state = 'a'; await (await window.fetch('/api/board/alpha/status')).json();
+state = 'b'; await window.fetch('/api/board/alpha/tasks', { method: 'POST' }).catch(() => {});
+assert.equal((await (await window.fetch('/api/board/alpha/status')).json()).state, 'b', 'a write that failed also forgets');
+
+// a caller that asks for a fresh read is given one: cache, credentials, mode..., and a Request object
+let hits = 0;
+await over(async () => { hits++; return new Response('{}'); });
+for (const init of [{ cache: 'no-store' }, { credentials: 'same-origin' }, { mode: 'same-origin' }, { referrer: '' }, { redirect: 'error' }, { headers: { a: 'b' } }]) {
+    hits = 0; clock += 5000;
+    await Promise.all([window.fetch('/api/system/status', init), window.fetch('/api/system/status', init)]);
+    assert.equal(hits, 2, 'two reads with ' + JSON.stringify(init) + ' are two requests');
+}
+hits = 0; clock += 5000;
+await Promise.all([window.fetch(new Request('https://coral.test/api/system/status')), window.fetch(new Request('https://coral.test/api/system/status'))]);
+assert.equal(hits, 2, 'a Request object is its own request');
+hits = 0; clock += 5000;
+await Promise.all([window.fetch('/api/system/status'), window.fetch('/api/system/status')]);
+assert.equal(hits, 1, 'and a plain read is still shared');
+
+// a hub-proxied route and the plain one are never shared
+hits = 0; clock += 5000;
+await Promise.all([window.fetch('/api/sessions/live'), window.fetch('/api/remote/box-2/api/sessions/live'), window.fetch('/api/remote/box-2/api/sessions/live'), window.fetch('/api/remote/box-3/api/sessions/live')]);
+assert.equal(hits, 4, 'the plain read and each hub-proxied read are their own requests (the patterns are anchored)');
 console.log('fetch_share: ok');
