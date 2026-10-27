@@ -372,7 +372,7 @@ func TestEfficiencyAPulledCommitIsNotCreditedToTheSessionThatPulledIt(t *testing
 	snap := func(sid, typ, name string) {
 		s := sid
 		require.NoError(t, gs.UpsertGitSnapshot(ctx, &store.GitSnapshot{AgentName: name, AgentType: typ, WorkingDirectory: "/w", Branch: "main", CommitHash: "pulled1", CommitSubject: "Beta's work", CommitTimestamp: &at, SessionID: &s,
-			AuthorName: "Beta Dev", AuthorHash: store.IdentityHash("beta@example.invalid"), IdentName: "Operator", IdentHash: store.IdentityHash("op@example.invalid")}))
+			AuthorName: "Beta Dev", AuthorHash: "beta-pseudonym", IdentName: "Operator", IdentHash: "operator-pseudonym"}))
 	}
 	snap(effSessA, "claude", "Alpha Dev") // it pulled the commit and polled it first
 	snap(effSessB, "codex", "Beta Dev")   // the author's session

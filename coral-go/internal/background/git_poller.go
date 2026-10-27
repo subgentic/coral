@@ -66,6 +66,9 @@ type GitPoller struct {
 
 	// landing, when set, is told each pass where the agents' repositories are (the landing alert, #8942).
 	landing *LandingWatch
+
+	// identityHash makes the stored pseudonym of a git email address (store.IdentityHasher); nil stores none, and commits are then matched to sessions by name only.
+	identityHash store.IdentityHasher
 }
 
 // SetLandingWatch gives the poller the landing alert to feed.
@@ -127,6 +130,9 @@ func NewGitPoller(gitStore *store.GitStore, runtime AgentRuntime, interval time.
 		now:      time.Now,
 	}
 }
+
+// SetIdentityHasher gives the poller the keyed hasher of the commit authors' emails (#8996).
+func (p *GitPoller) SetIdentityHasher(h store.IdentityHasher) { p.identityHash = h }
 
 // SetIntervalFn supplies a user-configured poll interval, re-read before every
 // wait. Return a non-positive duration to pause polling.
@@ -261,6 +267,10 @@ func (p *GitPoller) pollDir(ctx context.Context, workdir string, dirAgents []Age
 	if gitInfo == nil {
 		return
 	}
+	if p.identityHash != nil {
+		gitInfo.AuthorHash, gitInfo.IdentHash = p.identityHash(gitInfo.authorEmail), p.identityHash(gitInfo.identEmail)
+	}
+	gitInfo.authorEmail, gitInfo.identEmail = "", ""
 	p.logger.Debug("git query", "workdir", logsafe.Dir(workdir), "branch", gitInfo.Branch, "duration_ms", queryDur.Milliseconds())
 
 	filesStart := time.Now()
@@ -388,9 +398,11 @@ func (p *GitPoller) discoverAgents(ctx context.Context) ([]AgentInfo, error) {
 type gitInfo struct {
 	Branch          string
 	AuthorName      string // who made the tip commit, and a hash of their email (never the email); the git identity configured in the checkout (#8996)
-	AuthorHash      string
+	AuthorHash      string // filled by the poller from the emails below with its IdentityHasher: the emails themselves are never stored
 	IdentName       string
 	IdentHash       string
+	authorEmail     string
+	identEmail      string
 	CommitHash      string
 	CommitSubject   string
 	CommitTimestamp string
@@ -423,19 +435,17 @@ func queryGit(ctx context.Context, workdir string) (*gitInfo, error) {
 
 	// Get latest commit
 	t1 := time.Now()
-	out, err = gitutil.Command(ctx, workdir, "log", "-1", "--format=%H%x1f%s%x1f%aI%x1f%an%x1f%ae").Output()
+	out, err = gitutil.Command(ctx, workdir, "log", "-1", "--format=%H%x1f%aI%x1f%an%x1f%ae%x1f%s").Output()
 	logger.Debug("git log", "duration_ms", time.Since(t1).Milliseconds())
 	if err != nil {
 		return nil, err
 	}
-	parts := strings.Split(strings.TrimSpace(string(out)), "\x1f")
-	if len(parts) < 3 {
+	// the subject is last and the split takes at most five parts: a subject that holds the separator cannot fill the author fields
+	parts := strings.SplitN(strings.TrimRight(string(out), "\r\n"), "\x1f", 5)
+	if len(parts) < 5 {
 		return nil, fmt.Errorf("unexpected git log format")
 	}
-	var authorName, authorEmail string
-	if len(parts) >= 5 {
-		authorName, authorEmail = parts[3], parts[4]
-	}
+	hash, authoredAt, authorName, authorEmail, subject := parts[0], parts[1], parts[2], parts[3], parts[4]
 
 	// Get remote URL (best-effort)
 	t2 := time.Now()
@@ -461,13 +471,13 @@ func queryGit(ctx context.Context, workdir string) (*gitInfo, error) {
 
 	info := &gitInfo{
 		AuthorName:      authorName,
-		AuthorHash:      store.IdentityHash(authorEmail),
+		authorEmail:     authorEmail,
 		IdentName:       identName,
-		IdentHash:       store.IdentityHash(identEmail),
+		identEmail:      identEmail,
 		Branch:          branch,
-		CommitHash:      parts[0],
-		CommitSubject:   parts[1],
-		CommitTimestamp: parts[2],
+		CommitHash:      hash,
+		CommitSubject:   subject,
+		CommitTimestamp: authoredAt,
 		RemoteURL:       remoteURL,
 	}
 	queryWorktreeState(ctx, workdir, info)

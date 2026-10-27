@@ -185,3 +185,22 @@ func TestReencrypt(t *testing.T) {
 	_, err = Reencrypt(a, b, []Row{{"one", e1}, {"two", "v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}})
 	assert.Error(t, err)
 }
+
+// MAC is a keyed pseudonym: stable under one key, different under another and under another label, and not the message.
+func TestMACIsAKeyedPseudonymPerLabel(t *testing.T) {
+	a, b := newBox(t), newBox(t)
+	m := []byte("someone@example.invalid")
+	assert.Equal(t, a.MAC("x", m), a.MAC("x", m))
+	assert.NotEqual(t, a.MAC("x", m), b.MAC("x", m), "another key")
+	assert.NotEqual(t, a.MAC("x", m), a.MAC("y", m), "another label")
+	assert.NotEqual(t, a.MAC("x", m), a.MAC("x", []byte("other@example.invalid")))
+	assert.Len(t, a.MAC("x", m), 32)
+	assert.NotContains(t, string(a.MAC("x", m)), "someone")
+	k, err := GenerateKey()
+	require.NoError(t, err)
+	one, err := New(k)
+	require.NoError(t, err)
+	two, err := New(k)
+	require.NoError(t, err)
+	assert.Equal(t, one.MAC("x", m), two.MAC("x", m), "the same master key: the same pseudonym after a restart")
+}
