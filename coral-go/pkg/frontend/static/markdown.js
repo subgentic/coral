@@ -392,7 +392,7 @@ export function renderMarkdownStrict(md) {
     if (!md) return '';
     if (!m) return escapeHtml(md);
     try {
-        return sanitizeHtml(m.parse(String(md)), DOMPURIFY_CONFIG, { links: 'file' });
+        return sanitizeHtml(m.parse(String(md)), DOMPURIFY_CONFIG, { links: 'file', headings: 2 }); // a viewed file sits under its dialog's h2 (the file name): its h1 is level 3 (UI/UX, #9522)
     } catch {
         return escapeHtml(md);
     }
