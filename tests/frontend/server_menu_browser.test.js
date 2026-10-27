@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
+const { TOUCH_AREA } = require('./helpers/touch_area');
 
 const NOW = new Date().toISOString();
 const SERVERS = [
@@ -155,7 +156,9 @@ const SERVERS = [
         assert.deepEqual([k.server.right, k.server.width, k.server.height], [k.team.right, k.team.width, k.team.height], `phone: server vs team kebab (${JSON.stringify(k)})`);
         assert.deepEqual([k.server.right, k.server.width, k.server.height], [k.folder.right, k.folder.width, k.folder.height], `phone: server vs folder kebab (${JSON.stringify(k)})`);
         for (const a of ['teamAgent', 'folderAgent']) assert.ok(Math.abs((k[a].left + k[a].right) / 2 - (k.server.left + k.server.right) / 2) <= 1, `phone: ${a} kebab in the column (${JSON.stringify(k)})`);
-        assert.ok(k.server.width >= 44 && k.server.height >= 44, `phone: a 44 px hit area (${JSON.stringify(k.server)})`);
+        // what a finger hits: the server kebab is a 24 px box with a 44 px ::after (#9332)
+        const hit = await ev(`(() => { const a = (${TOUCH_AREA})(document.querySelector('#mobile-agent-list li.server-group-header[data-server-group="m1"] .server-group-more-btn')); return { w: Math.round(a.w), h: Math.round(a.h), after: a.after }; })()`);
+        assert.ok(hit.w >= 44 && hit.h >= 44, `phone: a 44 px hit area (${JSON.stringify(hit)})`);
         const fit = await ev(`(() => {
             document.querySelector('#mobile-agent-list li.server-group-header[data-server-group="m1"] details').open = true;
             const p = document.querySelector('#mobile-agent-list li.server-group-header[data-server-group="m1"] .server-switcher-panel').getBoundingClientRect();
