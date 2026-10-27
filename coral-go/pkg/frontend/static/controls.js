@@ -397,7 +397,7 @@ export function renderQuickActions() {
         const cls = m.danger ? "btn-nav btn-danger" : "btn-nav";
         return `<span class="macro-btn-wrap">
             <button class="${escapeAttr(cls)}" data-on-click="cmd-macro" data-index="${Number(i)}" data-tooltip="${escapeAttr(m.command)}">${escapeHtml(m.label)}</button>
-            <button class="btn btn-quiet btn-icon btn-xs macro-delete-btn" data-on-click="macro-delete" data-index="${Number(i)}" title="Remove macro">&times;</button>
+            <button class="btn btn-quiet btn-icon btn-xs btn-danger macro-delete-btn" data-on-click="macro-delete" data-index="${Number(i)}" title="Remove macro">&times;</button>
         </span>`;
     }).join("");
 
