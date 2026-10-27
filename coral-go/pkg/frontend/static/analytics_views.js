@@ -96,9 +96,9 @@ export function showViews() {
  *  `details`), the others drop as the table narrows, the later columns first (the shared one-line table's dropAt, #8931). Returns the table's config to spread: { columns } as it was on a wider screen, or with
  *  oneLine and the columns' widths and dropAt on a phone. */
 const DROP_AT = [28, 36, 52]; // the one-line table's thresholds in rem (data_table.css): the 52 goes first as the table narrows, the 28 last
-export function phoneOneLine(columns, keep) {
+export function phoneOneLine(columns, keep, lead) { // lead: the key of the column the table is about, when it is not the primary one or the first (By model's is Model, a filter column Provider comes before it)
     if (!isPhoneLayout()) return { columns };
-    const first = (columns.find(c => c.primary) || columns[0]).key, kept = new Set([first, 'details', ...keep]);
+    const first = lead || (columns.find(c => c.primary) || columns[0]).key, kept = new Set([first, 'details', ...keep]);
     let later = 0;
     return { oneLine: true, columns: columns.map(c => (kept.has(c.key)
         ? { ...c, width: c.key === first ? 'grow' : c.key === 'details' ? '4.5rem' : '6rem' }
