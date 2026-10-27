@@ -247,7 +247,7 @@ Returns `{"error": "job not found"}, 404` if the job does not exist.
 ### Automatic pause
 
 A job whose last 3 runs all failed pauses itself (`enabled` becomes `0`) instead of starting a
-fourth. `paused_reason` on the job says why, with the newest run's error, and the Jobs view shows
+fourth. `paused_reason` on the job says why, with the newest run's error, and the Jobs folder of Automations shows
 it. Fix the cause, then resume the job (toggle or `enabled: 1`); that clears `paused_reason`.
 
 ---
