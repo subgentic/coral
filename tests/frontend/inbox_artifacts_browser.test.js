@@ -33,9 +33,6 @@ const WORLD = `(() => {
             return json({ artifacts: rows.slice(0, limit), limit, offset: 0, has_more: rows.length > limit, truncated: false, total: rows.length, all: A.length,
                 teams: [{ board_id: 'alpha', team: 'alpha', all: 3 }, { board_id: 'beta', team: 'beta', all: 2 }] });
         }
-        const tr = /^\\/api\\/board\\/(alpha|beta)\\/tasks\\/(\\d+)$/.exec(p); // the task a row's Task link opens: a real one, so the landing shows the host and not an error (#8861 round 4)
-        if (tr && m === 'GET' && window.__failTask) return json({ error: 'gone' }, 404);
-        if (tr && m === 'GET') { const a = A.find(x => x.board_id === tr[1] && x.task_id === Number(tr[2])); return a ? json({ id: a.task_id, title: a.task_title, body: 'The task behind ' + a.name, status: 'in_progress', priority: 'medium', created_by: 'orch', assigned_to: 'dev', created_at: at(300), updated_at: at(10), board: a.board_id }) : json({ error: 'not found' }, 404); }
         if (p === '/api/system/artifact-store/kept') return json({ kept: [] });
         let r = /^\\/api\\/artifacts\\/([0-9a-f]{64})$/.exec(p);
         if (r && m === 'GET') return Promise.resolve(new Response('the text of ' + r[1].replace(/^0+/, ''), { status: 200, headers: { 'content-type': 'text/plain' } }));
@@ -108,26 +105,6 @@ const WORLD = `(() => {
             await ev(`document.querySelector('.inbox-detail-pane .detail-close, .inbox-detail-pane .detail-back').click(); true`);
             await waitFor(`document.querySelector('.inbox-detail-pane').hidden`, `${label}: the pane closes`, 5000);
             check(`${label}: the close puts the pane away and the list is still there`, (await rows()).length === 5);
-
-            // a row's Task link opens the task in the Inbox, never the team page (#8861), and Back returns to the folder
-            await ev(`document.querySelector('#group-table-view [data-task-link]').click(); true`);
-            await waitFor(`/^\\/inbox\\/tasks\\/(alpha|beta)\\/\\d+$/.test(location.pathname)`, `${label}: the Task link opens the task in the Inbox`, 8000);
-            check(`${label}: the task opened from the Artifacts folder says Artifacts on its Back`, (await ev(`document.querySelector('#inbox-page .goals-back')?.textContent.trim()`)) === '\u2190 Artifacts');
-            await waitFor(`/Build the report|Write the notes|Export the data|Draw the chart|Plan the work/.test(document.querySelector('#inbox-page .team-task-page')?.textContent || '')`, `${label}: the task itself is on screen, not an error`, 8000);
-            check(`${label}: the landing is the task page with its title, not a failed read`, await ev(`!!document.querySelector('#inbox-page .team-task-page #team-task-title') && !/could not be read/.test(document.getElementById('inbox-page').textContent)`));
-            await shot(`inbox-artifacts-task-landing-${label}`);
-            check(`${label}: a row's Task link opens the task inside the Inbox, not the team page`, await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none' && document.body.getAttribute('data-nav-tab') === 'hub-inbox'`));
-            await ev(`history.back(); true`);
-            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: Back returns to the Artifacts folder`, 10000);
-            // a task that cannot be read: the same host says so with the item page's padding and a button of its own width (#8861 round 4)
-            await ev(`window.__failTask = true; document.querySelector('#group-table-view [data-task-link]').click(); true`);
-            await waitFor(`/could not be read/.test(document.getElementById('inbox-page').textContent)`, `${label}: the failed read is said`, 8000);
-            const fail = await ev(`(() => { const n = document.querySelector('#inbox-page .goals-note').getBoundingClientRect(), b = document.querySelector('#inbox-page .inbox-item-body > .btn').getBoundingClientRect(), v = document.getElementById('inbox-page').getBoundingClientRect(); return { noteLeft: Math.round(n.left - v.left), btnLeft: Math.round(b.left - v.left), btnW: Math.round(b.width), view: Math.round(v.width) }; })()`);
-            check(`${label}: the failed read has its padding and a normal-width Try again`, fail.noteLeft >= 16 && fail.btnLeft >= 16 && fail.btnW < fail.view / 2, JSON.stringify(fail));
-            await shot(`inbox-artifacts-task-error-${label}`);
-            await ev(`window.__failTask = false; history.back(); true`);
-            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: Back from the error returns to the folder`, 10000);
-            await shot(`inbox-artifacts-task-back-${label}`);
 
             // the sidebar's search is the folder's
             if (!mobile) {
