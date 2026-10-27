@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { ROW_WORDS } = require('./helpers/folder_rows');
 const { removeBoards } = require('./helpers/board_cleanup');
 
 (async () => {
@@ -25,11 +26,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const g1 = await mkGoal(A, 'Ship the mailbox', 'One Inbox'), g2 = await mkGoal(A, 'Explore goals', 'Two teams'), g3 = await mkGoal(B, 'Plan the notes', 'Notes ready');
         for (const t of ['One', 'Two', 'Three']) assert.ok((await api('POST', `/api/board/${A}/tasks`, { title: t, body: 'x', created_by: 'orch', priority: 'medium', goal_id: g1 })).status < 300);
 
-        console.log('1. Desktop: the Goals folder'); // a folder row's text is read without its icon (#8866: the icon's ligature name is text inside the row)
+        console.log('1. Desktop: the Goals folder');
         await open(1280, 800, false);
         const d = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { title: document.getElementById('group-table-title').textContent, heads: [...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()),
             rows: rows.map(r => ({ goal: r.querySelector('.dt-primary').textContent, team: r.querySelector('td[data-key="team"]').textContent.trim(), chip: r.querySelector('.goal-chip').textContent, progress: r.querySelector('td[data-key="progress"]').textContent.replace(/\\s+/g, ' ').trim() })),
-            sidebar: [...document.querySelectorAll('.view-list-item')].map(h => { const c = h.cloneNode(true); c.querySelectorAll('.view-list-icon').forEach(i => i.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); }).filter(t => /^(Needs you|Tasks|Goals|Saved)/.test(t)), goalsSoon: !!document.querySelector('.view-list-item[data-key="goals"].view-list-soon, .view-list-item[data-key="goals"][aria-disabled="true"]') }; })()`);
+            sidebar: [...document.querySelectorAll('.view-list-item')].map(${ROW_WORDS}).filter(t => /^(Needs you|Tasks|Goals|Saved)/.test(t)), goalsSoon: !!document.querySelector('.view-list-item[data-key="goals"].view-list-soon, .view-list-item[data-key="goals"][aria-disabled="true"]') }; })()`);
         assert.equal(d.title, 'Goals'); assert.deepEqual(d.heads, ['State', 'Goal', 'Team', 'Progress', 'Updated'], 'the team page\'s goal row plus a Team column');
         const mine = d.rows.filter(r => [A, B].includes(r.team));
         assert.deepEqual(mine.map(r => r.goal).sort(), ['Explore goals', 'Plan the notes', 'Ship the mailbox'], 'the open goals of both teams ' + JSON.stringify(d.rows));

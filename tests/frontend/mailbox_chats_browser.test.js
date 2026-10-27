@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { ROW_WORDS } = require('./helpers/folder_rows');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -37,7 +38,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual([k['chats'], k['chats-group'], k['chats-notes'], k['chats-starred'], k['chats-active'], k['chats-archived'], k['chats-cli-claude'], k['chats-cli-codex'], k['chats-cli-agy'], k['chats-tag-7']], ['119', '1', '9', '0', '1', '3', '90', '30', '27', '4'], 'counts from the one grouped read (Antigravity is the server\'s one shared count, not the sum of its three names, #8011; each count is its folder\'s total as the route sends it: All chats is the agents\') ' + JSON.stringify(f.items));
         assert.ok(f.dot, 'a tag has its colour dot');
         // the column for a screen reader and the keyboard (#8022): each view's name and count read apart and once, one Tab stop for the column, the arrows move between the views
-        const names = await ev(`[...document.querySelectorAll('.view-list-item')].map(b => [b.getAttribute('aria-label'), b.textContent.replace(/\\s+/g, ' ').trim()])`);
+        const names = await ev(`[...document.querySelectorAll('.view-list-item')].map(b => [b.getAttribute('aria-label'), (${ROW_WORDS})(b)])`);
         assert.ok(names.some(([a]) => a === 'All chats, 119') && names.some(([a]) => a === 'Board history, 1') && names.some(([a]) => a === 'Pi'), 'name and count apart: ' + JSON.stringify(names.slice(0, 8)));
         assert.equal(await ev(`[...document.querySelectorAll('.view-list-item')].filter(b => b.tabIndex === 0).map(b => b.dataset.key).join()`), 'chats', 'one Tab stop: the current view');
         await ev(`document.querySelector('.view-list-item[data-key="chats"]').focus(); true`);
