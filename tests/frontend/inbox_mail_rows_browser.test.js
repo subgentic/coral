@@ -70,6 +70,19 @@ const AGENTS = [
                 host.append(DT.dataTable({ label: 'dup', rows, rowKey: r => r.team + r.t, open: () => {}, columns: [{ key: 'title', label: 'Title', primary: true, cell: r => r.t }], mail: r => ({ lead: { text: r.t }, title: r.t, team: r.team, snippet: 'Queued', time: '1m' }) }).el);
                 const out = [...host.querySelectorAll('tr.dt-mailed')].map(tr => [tr.querySelector('.dt-mail-title').textContent, (tr.querySelector('.dt-mail-team') || {}).textContent || '']); host.remove(); return out; })()`);
             assert.deepEqual(dup, [['Ship it', ' - alpha'], ['Ship it', ' - beta'], ['Only one', '']], at + 'two rows with one title say their team after it, a unique one does not ' + JSON.stringify(dup));
+            // a narrow Needs you row cuts the agent's name before the team: the computer ends the team, and it is what tells two same-named teams apart; measured on what is drawn, at 100% and 200% text (#9664)
+            const FIT = `(async () => { const DT = await import((window.__coralStatic || '/static/') + 'data_table.js'); document.getElementById('zz-fit')?.remove(); const host = document.createElement('div'); host.id = 'zz-fit'; host.style.cssText = 'position:fixed;inset:0;z-index:50;background:var(--bg-primary);overflow:auto'; document.body.append(host);
+                const rows = [{ n: 'Orchestrator of the whole release team', team: 'alpha (Berlin office laptop A)' }, { n: 'Orchestrator of the whole release team', team: 'alpha (Berlin office laptop B)' }];
+                host.append(DT.dataTable({ label: 'fit', rows, rowKey: r => r.team, open: () => {}, columns: [{ key: 'n', label: 'Agent', primary: true, cell: r => r.n }], mail: r => ({ lead: { text: r.n }, title: r.n, team: r.team, teamAlways: true, ask: 'Wants to run a command', time: '12m', unread: true, mark: 'attention' }) }).el);
+                return [...host.querySelectorAll('tr.dt-mailed')].map(tr => { const t = tr.querySelector('.dt-mail-team'), n = tr.querySelector('.dt-mail-title'); return { team: t.textContent, teamCut: t.scrollWidth > t.clientWidth + 1, teamW: Math.round(t.clientWidth), agentW: Math.round(n.clientWidth) }; }); })()`;
+            const fit100 = await ev(FIT);
+            await shot(`inbox-mail-fit-${w}-100`);
+            assert.ok(fit100.every(x => !x.teamCut) && new Set(fit100.map(x => x.team)).size === 2, at + 'the team is whole on a narrow Needs you row, the two teams read differently ' + JSON.stringify(fit100));
+            await ev(`document.documentElement.style.fontSize = '200%'; true`);
+            const fit200 = await ev(FIT);
+            await shot(`inbox-mail-fit-${w}-200`);
+            await ev(`document.documentElement.style.fontSize = ''; document.getElementById('zz-fit')?.remove(); true`);
+            assert.ok(fit200.every(x => !x.teamCut), at + 'and at 200% text ' + JSON.stringify(fit200));
             await shot(`inbox-mail-tasks-${w}`);
             // a tap on the avatar selects (no gesture): the row takes the tint, the avatar is a check, the bar says how many; a tap on a row while selecting toggles it; the last one off ends selecting
             const sel = () => ev(`(() => { const trs = [...document.querySelectorAll('${T} tr.dt-mailed')]; const tick = e => e && getComputedStyle(e).display !== 'none'; return { on: trs.map(t => t.classList.contains('dt-selected')), pressed: trs.map(t => t.querySelector('button.dt-mail-lead').getAttribute('aria-checked')), tick: trs.map(t => tick(t.querySelector('.dt-mail-tick'))), bar: (document.querySelector('.team-tb-selection .dt-bar-count') || {}).textContent || '', lead: Math.round(trs[0].querySelector('button.dt-mail-lead').getBoundingClientRect().height), page: getComputedStyle(document.getElementById('inbox-page')).display }; })()`);

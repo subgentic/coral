@@ -435,6 +435,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .dt-hover-action { opacity: 0; }
     .dt-row:hover .dt-hover-action, .dt-row:focus-within .dt-hover-action, .dt-hover-action:focus-visible { opacity: 1; }
 }
-/* The team after a phone row's title (#9654): tertiary, cut before the title is. */
-.dt-mail-team { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); font-weight: var(--fw-regular); }
-@container dt (max-width: 20rem) { .dt-mail-team { flex: none; } }
+/* The team after a phone row's title (#9654): tertiary, never shrunk by the title's room (it is cut only past 70 percent of the line). */
+.dt-mail-line:has(> .dt-mail-team) > .dt-mail-title { flex-shrink: 100; min-width: 4ch; } /* the agent's name gives way before the team: the computer ends the team, and it tells two same-named teams apart (#9664) */
+.dt-mail-team { flex: 0 0 auto; max-width: 70%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); font-weight: var(--fw-regular); }
+@container dt (max-width: 20rem) { .dt-mail-line:has(> .dt-mail-team) { flex-wrap: wrap; } .dt-mail-line:has(> .dt-mail-team) > .dt-mail-title { max-width: 100%; flex-shrink: 1; } .dt-mail-team { flex: 1 0 100%; max-width: 100%; white-space: normal; overflow-wrap: anywhere; } } /* at large text the team has its own line and wraps whole instead of being cut (#9664) */
