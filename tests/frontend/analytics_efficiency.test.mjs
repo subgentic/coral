@@ -10,13 +10,13 @@ try {
       <section id="cost-task-time-section" data-cview="task-time"><h3 class="cost-section-title">Task time</h3><div id="cost-task-time">old time view</div></section></div>`;
     const reads = [];
     const answer = (metric, group) => metric === 'tokens_per_commit'
-        ? { metric, group_by: group, range: '7d', min_sample: 10, total: { n: 125 }, average: { value: 300000, usual: 310000 }, unmeasured: ['gemini'], groups: [
+        ? { metric, group_by: group, range: '7d', min_sample: 10, total: { n: 125 }, average: { value: 300000, usual: 310000 }, unmeasured: ['gemini', 'unknown'], groups: [
             { key: 'sonnet', label: 'claude-sonnet-5-5', provider: 'claude', value: 268000, n: 61, tokens: 16300000, cost_usd_per_unit: 2.2 },
             { key: 'opus', label: 'claude-opus-5-5', provider: 'claude', value: 412000, n: 38, tokens: 15700000, cost_usd_per_unit: 6.8 },
             { key: 'haiku', label: 'claude-haiku-5-5', provider: 'claude', value: 141000, n: 12, tokens: 1700000, cost_usd_per_unit: 0.6 },
             { key: 'pi', label: 'pi: qwen3-coder', provider: 'pi', value: 190000, n: 4, tokens: 800000, cost_usd_per_unit: 0.9, low_sample: true },
             { key: 'none', label: 'idle-model', provider: 'agy', n: 0 }] }
-        : { metric, group_by: group, range: '7d', min_sample: 10, total: { n: 260 }, average: { value: 1080 }, groups: [
+        : { metric, group_by: group, range: '7d', min_sample: 10, total: { n: 260 }, average: { value: 1080 }, unmeasured: ['unknown'], groups: [
             { key: 'low', label: 'Low', value: 540, n: 57, sent_back_share: 0.29, cost_usd_per_unit: 1.4 },
             { key: 'high', label: 'High', value: 1440, n: 64, sent_back_share: 0.12, cost_usd_per_unit: 5.3 },
             { key: 'max', label: 'Max', value: 2460, n: 5, sent_back_share: 0.1, cost_usd_per_unit: 9 }] };
@@ -38,7 +38,8 @@ try {
     assert.match(text, /141 K per commit, 53% under the 300 K average/, 'its figure against the average');
     assert.match(text, /Average, all commits300 KUsual last week: 310 K/);
     assert.match(text, /pi: qwen3-coder4 commits · too few to rank/, 'a group under 10 is said to be too few');
-    assert.match(text, /gemini writes no usage rows, so its commits are left out/);
+    assert.match(text, /gemini writes no usage rows, so its commits are left out\./);
+    assert.match(text, /Provider not recorded: commits of no recorded session are left out\./, 'work of no recorded session is named, not hidden');
     assert.equal(v.querySelectorAll('.eff-fill.eff-few').length, 1, 'one hatched bar');
     assert.equal(v.querySelectorAll('.eff-bar').length, 4, 'a group with no commits has no bar');
     assert.match(v.querySelector('table').textContent, /idle-model.*no data/s, 'but it is in the table');
@@ -49,6 +50,7 @@ try {
     click('cost-task-time-section', 'Thinking level'); await settle();
     const t = sec('cost-eff-task-time').textContent.replace(/\s+/g, ' ');
     assert.match(reads.at(-1), /metric=task_time&group_by=thinking/);
+    assert.match(t, /Provider not recorded: tasks of no recorded session are left out\./);
     assert.match(t, /Fastest \(at least 10 tasks\)Low/);
     assert.match(t, /Cheapest per taskLow\$1\.40 per task/);
     assert.match(t, /Max5 tasks · 10% sent back · too few to rank/);

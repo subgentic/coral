@@ -98,6 +98,15 @@ function card(label, value, detail, tone) {
     return c;
 }
 
+/** The sentence about what a grouping left out: a CLI named in `unmeasured` writes no usage rows ("gemini"); "unknown" is the work of no recorded session, whose provider is not recorded. */
+function unmeasuredWords(list, cfg) {
+    if (!Array.isArray(list) || !list.length) return '';
+    const clis = list.filter(w => w !== 'unknown'), parts = [];
+    if (clis.length) parts.push(`${clis.join(', ')} write${clis.length === 1 ? 's' : ''} no usage rows, so ${clis.length === 1 ? 'its' : 'their'} ${cfg.units} are left out.`);
+    if (list.includes('unknown')) parts.push(`Provider not recorded: ${cfg.units} of no recorded session are left out.`);
+    return parts.join(' ');
+}
+
 function draw(key) {
     const s = state[key], cfg = SECTIONS[key], view = document.getElementById(`cost-eff-${key}`); if (!s || !view || s.group === 'all') return;
     view.replaceChildren();
@@ -136,8 +145,9 @@ function draw(key) {
         row.append(lab, track, val); bars.append(row);
     }
     panel.append(bars);
-    if (cfg.metric === 'tokens_per_commit') panel.append(el('p', 'eff-note', `Counts all tokens, cache reads included.${Array.isArray(d.unmeasured) && d.unmeasured.length ? ` ${d.unmeasured.join(', ')} write${d.unmeasured.length === 1 ? 's' : ''} no usage rows, so ${d.unmeasured.length === 1 ? 'its' : 'their'} ${cfg.units} are left out.` : ''}`));
-    else panel.append(el('p', 'eff-note', 'Sent back is the share of tasks a reviewer returned for changes: fast is not efficient if the work comes back.'));
+    const left = unmeasuredWords(d.unmeasured, cfg); // what the answer says it left out: a CLI with no usage rows, tasks of no recorded session
+    if (cfg.metric === 'tokens_per_commit') panel.append(el('p', 'eff-note', `Counts all tokens, cache reads included.${left ? ' ' + left : ''}`));
+    else panel.append(el('p', 'eff-note', `Sent back is the share of tasks a reviewer returned for changes: fast is not efficient if the work comes back.${left ? ' ' + left : ''}`));
     view.append(panel);
 
     const vs = g => { if (!(avg > 0)) return '—'; const p = Math.round((g.value / avg - 1) * 100); return `${p > 0 ? '+' : ''}${p}%`; }; // an average of 0 has nothing to be above or under
