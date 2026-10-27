@@ -205,7 +205,7 @@ function applyBoardTable(project) {
     });
 }
 
-onRowActions('.mb-messages-scroll', { reply: replyToMessage, link: copyMessageLink, task: id => openTask(bs.currentProject, id) });
+onRowActions('.mb-messages-scroll', { reply: replyToMessage, link: copyMessageLink, task: (id, el) => openTask(bs.currentProject, id, el) });
 
 // ── Delete project ───────────────────────────────────────────────────────
 
