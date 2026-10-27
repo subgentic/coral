@@ -170,22 +170,6 @@ function syncMobileHistoryList() {
     }
 }
 
-// The Jobs list: on a phone the sidebar is not shown, so the section moves into the Jobs page (the same move as History's), above the job's detail; a wide screen puts it back (#6139).
-let _jobsHome = null;
-function syncMobileJobsList() {
-    const section = document.querySelector('[data-pane="jobs"]');
-    const host = document.getElementById('mobile-jobs-list');
-    if (!section || !host) return;
-    if (isMobile()) {
-        if (!_jobsHome) _jobsHome = { parent: section.parentElement, next: section.nextSibling };
-        if (section.parentElement !== host) host.appendChild(section);
-    } else if (_jobsHome) {
-        const { parent, next } = _jobsHome;
-        parent.insertBefore(section, next?.parentNode === parent ? next : null);
-        _jobsHome = null;
-    }
-}
-
 // The Inbox's lists: the same move (#7472).
 let _inboxHome = null;
 function syncMobileInboxList() {
@@ -501,7 +485,6 @@ export function initMobile() {
         return;
     }
     syncMobileHistoryList();
-    syncMobileJobsList();
     syncMobileDocsList();
     syncMobileWorkflowsList();
     syncMobileAnalyticsList();
@@ -527,7 +510,6 @@ export function initMobile() {
         const mobile = isMobile();
         if (mobile !== wasMobile) {
             syncMobileHistoryList();
-            syncMobileJobsList();
             syncMobileDocsList();
             syncMobileWorkflowsList();
             syncMobileAnalyticsList();

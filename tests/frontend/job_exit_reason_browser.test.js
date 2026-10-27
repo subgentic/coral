@@ -31,15 +31,15 @@ const RESTART = 'Coral restarted before this run launched its agent.';
                     return real(u, o); };
                 return true; })()`);
             await ev(`import(${S} + 'scheduler.js').then(m => { window.__sched = m; return true; })`);
-            await ev(`window.switchNavTab('jobs'); window.__sched.refreshJobs().then(() => true)`);
-            await waitFor(`document.querySelectorAll('#scheduled-jobs-list .sched-row').length === 7`, 'the seven job rows', 8000);
-            const rows = await ev(`[...document.querySelectorAll('#scheduled-jobs-list .sched-row')].map(r => ({ name: r.querySelector('.sched-row-name').textContent, meta: r.querySelector('.sched-row-meta').textContent, note: (r.querySelector('.sched-row-note') || r.querySelector('.sched-row-problem') || {}).textContent || '', dot: r.querySelector('.sched-dot').className.replace('sched-dot ', ''), dotWords: r.querySelector('.sched-dot').getAttribute('aria-label') }))`);
+            await ev(`window.switchNavTab('automations'); window.__sched.refreshJobs().then(() => true)`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 7`, 'the seven job rows', 8000);
+            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => ({ name: r.querySelector('.dt-primary').textContent, chip: (r.querySelector('.dt-chip') || {}).textContent || '', cls: (r.querySelector('.dt-chip') || {}).className || '' }))`);
             const by = n => rows.find(r => r.name === n);
-            check(`${tag}: a completed run whose agent ended while Coral was stopped says "result not seen" on its row, with its sentence as text, a grey dot and a dot name that says so`, /last run completed \(result not seen\)/.test(by('seen-not').meta) && by('seen-not').note === UNSEEN && by('seen-not').dot === 'sched-dot-none' && by('seen-not').dotWords === 'Last run completed, result not seen', JSON.stringify(by('seen-not')));
-            check(`${tag}: a run interrupted by a restart says Coral restarted on its row`, /^Coral restarted before this run launched its agent/.test(by('restarted').note), JSON.stringify(by('restarted')));
-            check(`${tag}: a plain pass and a reaped run read as before (no note, the green dot for the pass)`, by('plain-pass').note === '' && /last run passed/.test(by('plain-pass').meta) && by('plain-pass').dot === 'sched-dot-ok' && by('reaped').note === '', JSON.stringify([by('plain-pass'), by('reaped')]));
+            check(`${tag}: a completed run whose agent ended while Coral was stopped says "result not seen" in its chip, not in the green of a pass`, by('seen-not').chip === 'last run completed (result not seen)' && !/goal-state-task-done/.test(by('seen-not').cls), JSON.stringify(by('seen-not')));
+            check(`${tag}: a run interrupted by a restart says Coral restarted in its chip`, by('restarted').chip === 'last run failed (Coral restarted)' && /team-state-bad/.test(by('restarted').cls), JSON.stringify(by('restarted')));
+            check(`${tag}: a plain pass reads as before (green)`, by('plain-pass').chip === 'last run passed' && /goal-state-task-done/.test(by('plain-pass').cls), JSON.stringify([by('plain-pass'), by('reaped')]));
             // the Runs table
-            const table = async id => { await ev(`document.querySelector('#scheduled-jobs-list .sched-row[data-job-id="${id}"]').click(); true`); await waitFor(`!!document.querySelector('.sched-runs-section .sched-status')`, 'the runs table', 6000); await sleep(300); /* sleep-ok: the runs answer replaces the first draw */ return ev(`[...document.querySelectorAll('.sched-runs-section .sched-status')].map(s => ({ text: s.textContent, title: s.getAttribute('title') || '', cell: s.closest('td').textContent.replace(/\\s+/g, ' ').trim(), cls: s.className }))`); };
+            const table = async id => { await ev(`window.__sched.selectScheduledJob(${id}).then(() => true)`); await waitFor(`!!document.querySelector('.sched-runs-section .sched-status')`, 'the runs table', 6000); await sleep(300); /* sleep-ok: the runs answer replaces the first draw */ return ev(`[...document.querySelectorAll('.sched-runs-section .sched-status')].map(s => ({ text: s.textContent, title: s.getAttribute('title') || '', cell: s.closest('td').textContent.replace(/\\s+/g, ' ').trim(), cls: s.className }))`); };
             let t = await table(1);
             check(`${tag}: the Runs table says "Completed (result not seen)" in a neutral colour with the sentence as text, and a plain pass stays "Passed" in green with none`, t[0].text === 'Completed (result not seen)' && t[0].cell.includes(UNSEEN) && !/goal-state-task-done/.test(t[0].cls) && t[1].text === 'Passed' && t[1].cell === 'Passed' && /goal-state-task-done/.test(t[1].cls), JSON.stringify(t));
             t = await table(2);
@@ -48,7 +48,7 @@ const RESTART = 'Coral restarted before this run launched its agent.';
             for (const [id, name, words, msg] of starts) {
                 const row = by(name); await table(id);
                 const cell = await ev(`(() => { const c = document.querySelector('.sched-runs-section .sched-status'); return { text: c.textContent, line: (c.closest('td').querySelector('.dt-subtitle') || {}).textContent || '' }; })()`);
-                check(`${tag}: a run that failed to start ("${words}") says it on its row (last run failed (${words}), the server's sentence under the name) and in the Runs table (Failed, the sentence as the line under it)`, row.meta.includes(`last run failed (${words})`) && row.note === msg && cell.text === 'Failed' && cell.line === msg, JSON.stringify([row, cell]));
+                check(`${tag}: a run that failed to start ("${words}") says it in its row's chip (last run failed (${words})) and in the Runs table (Failed, the server's sentence as the line under it)`, row.chip === `last run failed (${words})` && cell.text === 'Failed' && cell.line === msg, JSON.stringify([row, cell]));
             }
         }
     } finally { await client.close(); }

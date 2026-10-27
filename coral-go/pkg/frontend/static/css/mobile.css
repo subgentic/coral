@@ -1333,26 +1333,17 @@
     .detail-sub-row .details-toggle { min-width: 44px; min-height: 44px; margin: -14px 0 -14px -6px; } /* the pane's own rule (a line's height) is more specific than the one above */
 }
 
-/* Jobs on phones: the Jobs list lives in the page above the job's detail, as History's does (#6139). */
-#mobile-jobs-list { display: none; }
+/* Automations on phones (Goal #74): the folders' tables are the group table view, with the folders' select on top (the Inbox's); the job's page is its own screen, shown once a job is chosen (data-phone-item,
+   scheduler.js), with a way back to its folder. The view is made a column here (the !important is over the inline display showView writes; a hidden view stays hidden). */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    /* The Jobs list IS the phone's screen (#7443): the pane fills the view, its list scrolls and its "+ New job" bar is at the foot of the screen; the job's page is another full screen,
-       shown once a job is chosen (data-phone-item, scheduler.js), with a way back to the list. The view is made a column here (the !important is over the inline display showView writes; a hidden view stays hidden). */
     #scheduler-view:not([style*="none"]) { display: flex !important; flex-direction: column; }
-    #mobile-jobs-list { display: flex; flex-direction: column; flex: 1; width: 100%; min-height: 0; }
-    #mobile-jobs-list > .sidebar-pane { flex: 1; min-height: 0; }
-    #mobile-jobs-list .sidebar-section { flex: 1; min-height: 0; overflow-y: auto; }
     #scheduler-view:not([data-phone-item]) #scheduler-detail { display: none; }
-    #scheduler-view[data-phone-item] #mobile-jobs-list, #scheduler-view[data-phone-item] .sched-view-header { display: none; }
+    #scheduler-view[data-phone-item] .sched-view-header { display: none; }
     #scheduler-view[data-phone-item] #scheduler-detail { flex: 1; display: flex; flex-direction: column; min-height: 0; } /* the job's bar is at the foot of its screen too */
     #history-back { display: none; } /* a phone has its own back (Chats) */
-    #scheduler-detail > .group-back { display: none; } /* and its own (the Jobs list above the job) */
-    #mobile-jobs-list .sidebar-header, #mobile-history-list .sidebar-header { padding: 12px; }
-    #mobile-jobs-list .sidebar-footer { position: static; padding: 12px; } /* in the page's flow: the page scrolls, not the column the footer is pinned in, so a pinned one would cover rows at large text */
-    #mobile-jobs-list .sidebar-hide-btn, #mobile-history-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide (#7443) */
-    #mobile-jobs-list .sidebar-section { padding: 12px 0; } /* the rows start where the page heading does (#6521) */
-    #mobile-jobs-list button, #mobile-jobs-list .session-list > li { min-height: 44px; }
-    #mobile-jobs-list button { min-width: 44px; }
+    #scheduler-detail > .group-back { display: none; } /* and its own (the folder's table above the job) */
+    #mobile-history-list .sidebar-header { padding: 12px; }
+    #mobile-history-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide (#7443) */
 }
 
 /* Chats on phones: the existing History controls live in the page (#6013). */

@@ -30,7 +30,7 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(await visible(), ['group-table-view'], 'Chats with nothing open is the Inbox on its chat folder (#7776), not the Agents home (#3152)');
             await evaluate(`window.switchNavTab('agents')`);
             assert.deepEqual(await visible(), ['mobile-agent-list']);
-            await evaluate(`window.switchNavTab('jobs')`);
+            await evaluate(`window.switchNavTab('automations')`);
             assert.deepEqual(await visible(), ['scheduler-view']);
             await evaluate(`window.mobileBack()`);
             assert.deepEqual(await visible(), ['mobile-agent-list']);

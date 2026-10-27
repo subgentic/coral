@@ -1,4 +1,4 @@
-// The rows that open something are reachable and openable by keyboard (#6976, UI Accessibility's #6962): a Workflows card, a Job row and a Chat row were plain div and li elements with a click action, so
+// The rows that open something are reachable and openable by keyboard (#6976, UI Accessibility's #6962): a Workflows card, a Job row (now a row of the Jobs folder's table, Goal #74) and a Chat row were plain div and li elements with a click action, so
 // Tab never landed on one and a screen reader could not open them. Each is a button for the keyboard (role=button, one Tab stop, Enter or Space opens it, a visible ring); a run row in a table keeps its table
 // semantics and holds a real button in its first cell. Drives Chrome over CDP through agent_view_harness.js; the scheduler's and the workflows' answers are stubbed.
 const assert = require('node:assert/strict');
@@ -27,22 +27,19 @@ const S = `(window.__coralStatic || '/static/')`;
                 if (m === 'GET' && /\\/api\\/workflows$/.test(url)) return json({ workflows: [{ id: 1, name: 'build', description: 'Build it', enabled: 1, steps: [{ name: 'a' }], last_run: null }, { id: 2, name: 'release', description: '', enabled: 1, steps: [], last_run: null }] });
                 return real(u, o); };
             return true; })()`);
-        // Jobs: a row is a button, one Tab stop, Enter opens it
+        // Jobs: a row of the folder's table holds a button, one Tab stop, Enter opens it
         await ev(`import(${S} + 'scheduler.js').then(m => { window.__sched = m; return true; })`);
-        await ev(`window.switchNavTab('jobs'); window.__sched.refreshJobs().then(() => true)`);
-        await waitFor(`document.querySelectorAll('#scheduled-jobs-list .sched-row').length === 2`, 'two job rows', 8000);
-        // a row of a list keeps its list item (a screen reader says "list of 2"): the button is inside the li, not the li's role (#7006)
-        const row = await ev(`(() => { const r = document.querySelector('#scheduled-jobs-list .sched-row'); const b = r.querySelectorAll('button.row-btn'); return { role: r.getAttribute('role'), liTab: r.getAttribute('tabindex'), buttons: b.length, btnTab: b[0] && b[0].tabIndex }; })()`);
-        assert.deepEqual(row, { role: null, liTab: null, buttons: 1, btnTab: 0 }, 'a job row is an li holding one real button: ' + JSON.stringify(row));
-        await ev(`document.querySelector('#scheduled-jobs-list .sched-row .row-btn').focus(); true`);
+        await ev(`window.switchNavTab('automations'); window.__sched.refreshJobs().then(() => true)`);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key] button.dt-primary').length === 2`, 'two job rows', 8000);
+        // a row of the folder's table holds one real button in its first cell, and Enter on it opens the job
+        const row = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr[data-key]'); const b = r.querySelectorAll('button.dt-primary'); return { role: r.getAttribute('role'), buttons: b.length, btnTab: b[0] && b[0].tabIndex }; })()`);
+        assert.deepEqual(row, { role: 'row', buttons: 1, btnTab: 0 }, 'a job row keeps its table semantics and holds one real button: ' + JSON.stringify(row));
+        await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].find(b => /nightly/.test(b.textContent)).focus(); true`);
         await key('Enter', 13, '\r');
         await waitFor(`!!document.querySelector('#scheduler-detail .sched-runs-section') && /nightly/.test(document.getElementById('scheduler-detail').textContent)`, 'the job opened by Enter', 6000);
-        const cur = () => ev(`[...document.querySelectorAll('#scheduled-jobs-list [aria-current="true"]')].map(e => e.closest('li').querySelector('.sched-row-name').textContent)`);
-        assert.deepEqual(await cur(), ['nightly'], 'the open job is the current one, and only it');
-        await ev(`document.querySelectorAll('#scheduled-jobs-list .sched-row')[1].querySelector('.row-btn').click(); true`);
+        await ev(`window.__sched.selectScheduledJob(window.__sched.jobList().find(j => /weekly/.test(j.name)).id).then(() => true)`);
         await waitFor(`/weekly/.test(document.getElementById('scheduler-detail').textContent)`, 'the second job opened', 6000);
-        assert.deepEqual(await cur(), ['weekly'], 'aria-current moved with the open job');
-        await ev(`document.querySelectorAll('#scheduled-jobs-list .sched-row')[0].querySelector('.row-btn').click(); true`);
+        await ev(`window.__sched.selectScheduledJob(window.__sched.jobList().find(j => /nightly/.test(j.name)).id).then(() => true)`);
         await waitFor(`!!document.querySelector('#scheduler-detail .sched-runs-section') && /nightly/.test(document.getElementById('scheduler-detail').textContent)`, 'the first job again', 6000);
         // its Runs table: the first cell holds a real button; Enter on it opens the run (the table keeps its rows)
         await waitFor(`!!document.querySelector('.sched-runs-table tbody tr button.dt-primary')`, 'the run row button', 6000);

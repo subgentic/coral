@@ -44,9 +44,9 @@ const { DATA_WORLD } = require('./helpers/census_world');
             await ev(`import(${S} + 'workflows.js').then(m => m.hideWorkflowCreateModal()).then(() => true)`);
 
             // the job editor
-            await ev(`window.switchNavTab('jobs'); true`);
-            await waitFor(`!!document.querySelector('#scheduled-jobs-list [data-on-click="job-select"]')`, `${tag}: jobs`, 10000);
-            await ev(`document.querySelector('#scheduled-jobs-list [data-on-click="job-select"]').click(); true`);
+            await ev(`window.switchNavTab('automations'); true`);
+            await waitFor(`!!document.querySelector('#group-table-view button.dt-primary')`, `${tag}: jobs`, 10000);
+            await ev(`document.querySelector('#group-table-view button.dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-detail [data-on-click="job-edit"]')`, `${tag}: job`, 10000);
             await ev(`document.querySelector('#scheduler-detail [data-on-click="job-edit"]').click(); true`);
             await waitFor(`!!document.getElementById('job-modal') && document.getElementById('job-modal').style.display === 'flex'`, `${tag}: the job editor`, 10000);

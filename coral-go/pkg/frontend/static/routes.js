@@ -11,6 +11,7 @@
      /inbox/needs, /inbox/saved, /inbox/artifacts, /inbox/chats[/<all|active|starred|notes|archived|cli-<cli>|tag-<n>]  { view: 'inbox-folder', folder }: an Inbox folder's page (#8652); goals, tasks and boards are their own page families (#8571, #8633)
      /board/[@<server>/]<name>            { view: 'board', server, id }
      /workflows[/<id>[/runs/<run>]]       { view: 'workflows', id, run }
+     /automations[/<folder>[/<id>[/runs/<run>]]]  { view: 'automations', folder, id, run }: Workflows and Jobs as one screen (Goal #74); <folder> is one of AUTOMATION_FOLDERS, <id> a job or a workflow, <run> a workflow's run
      /analytics[/<page>]                  { view: 'analytics', sub }: <page> is one of ANALYTICS_PAGES (none = Overview, #8606)
      /jobs, /docs[/<name>], /servers[/<id>]
 
@@ -34,6 +35,8 @@ const TEAM_ITEM_TABS = ['goals', 'tasks', 'messages']; // the tabs with an item:
 export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui'];
 // The Analytics pages that have a path (analytics_views.js VIEWS, #8606); /analytics is Overview, and an agent's page (agent-detail) is under By agent.
 export const ANALYTICS_PAGES = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'task', 'calls', 'per-commit', 'task-time'];
+// The Automations folders (Goal #74): the two that need attention, then the library. A job or a workflow opens under its own folder; only a workflow has a run page.
+export const AUTOMATION_FOLDERS = ['running', 'failed', 'jobs', 'workflows'];
 const NAME_MAX = 200; // board.MaxIdentityRunes
 const INBOX = 'in' + 'box'; // the path word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 // The Inbox folders' paths (#8652): /inbox/needs, /inbox/saved, /inbox/artifacts (every team's artifacts, Goal #62), /inbox/chats/<all|active|starred|notes|archived|cli-<cli>|tag-<n>>. The folder keys are the Inbox's own (inbox_sidebar.js): chats is All chats, the others chats-<word>.
@@ -139,6 +142,16 @@ export function parse(pathname, search = '') {
         }
         case 'jobs':
             return rest.length ? null : { view: top };
+        case 'automations': {
+            if (!rest.length) return { view: 'automations', folder: null };
+            if (!AUTOMATION_FOLDERS.includes(rest[0])) return null;
+            const folder = rest[0], route = { view: 'automations', folder };
+            if (rest.length === 1) return route;
+            if (!INT_RE.test(rest[1]) || (folder !== 'jobs' && folder !== 'workflows')) return null;
+            if (rest.length === 2) return { ...route, id: Number(rest[1]) };
+            if (folder === 'workflows' && rest.length === 4 && rest[2] === 'runs' && INT_RE.test(rest[3])) return { ...route, id: Number(rest[1]), run: Number(rest[3]) };
+            return null;
+        }
         case 'analytics': {
             if (!rest.length) return { view: 'analytics' };
             if (rest.length !== 1) return null;
@@ -215,6 +228,8 @@ export function build(r) {
             return r.id ? `/workflows/${r.id}${r.run ? '/runs/' + r.run : ''}` : '/workflows';
         case 'jobs':
             return '/jobs';
+        case 'automations':
+            return AUTOMATION_FOLDERS.includes(r.folder) ? `/automations/${r.folder}${r.id ? '/' + r.id + (r.run && r.folder === 'workflows' ? '/runs/' + r.run : '') : ''}` : '/automations';
         case 'analytics': {
             const page = r.sub === 'agent-detail' ? 'agent' : r.sub;
             return ANALYTICS_PAGES.includes(page) ? '/analytics/' + page : '/analytics';
