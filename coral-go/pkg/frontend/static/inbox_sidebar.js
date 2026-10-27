@@ -46,6 +46,7 @@ const NF = await importOnce('./needs_filters.js'); // the Needs you folder's sea
 const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
 const IA = await importOnce('./inbox_artifacts.js'); // the Artifacts folder (Goal #62): every team's files in one list
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
+const IR = await importOnce('./inbox_read.js'); // which chats, boards and tasks the person has opened since they changed (#9687)
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
 
@@ -483,6 +484,7 @@ export function drawDockSaved(host) {
 async function openChat(c) {
     if (nativeInbox() && !c.server) return; // a Hub's row names its computer: with none there is no "local" to fall back to, so nothing opens (fail closed)
     state.inboxFolder = { key: group, label: (groupMeta(group) || {}).label || 'All chats' };
+    IR.markRead(c.type === 'group' || String(c.session_id || '').startsWith('board:') ? 'board' : 'chat', `${c.server}:${c.session_id}`, c.last_timestamp || c.updated_at); // opened: read at the stamp it has now (#9687)
     const isGroup = c.type === 'group' || String(c.session_id || '').startsWith('board:');
     if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); openItemRoute('boards', identityKey(c.server || historyServer(), c.title || String(c.session_id).replace(/^board:/, '')), null, c.session_id); return; }
     const { setHistorySource } = await importOnce('./history_source.js');
@@ -562,11 +564,11 @@ registerGroupSource('hub-inbox', {
         if (key === 'tasks') {
             const rows = taskRows();
             return { title: 'Tasks', noun: ['task', 'tasks'], rows, empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No assigned tasks.', hint: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? undefined : 'Tasks given to you or to your agents are listed here.' },
-                signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count])]),
+                signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count, IR.isUnread('task', `${t.project}#${t.id}`, t.updated_at || t.created_at)])]), // the read state is part of what is drawn (#9687)
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
                     const t = TV.tasksTable('mine', rows, { tweak: columns => columns.flatMap(c => c.key === 'team' ? [...serverColumns(), c] : [c]), ctx: { teamOf: t => teamLabel(t.project) }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
-                        open: t => openItemRoute('tasks', t.project, t.id, `${t.project}#${t.id}`), state: inboxTasksState, mail: t => ({ lead: { icon: TASK_GLYPH[stateOf(t)] || 'pending', square: true, name: stateOf(t) }, title: t.title, team: teamLabel(t.project), snippet: stateOf(t), time: DT.shortTime(t.updated_at || t.created_at), data: { taskId: String(t.id) } }),
+                        open: t => { IR.markRead('task', `${t.project}#${t.id}`, t.updated_at || t.created_at); openItemRoute('tasks', t.project, t.id, `${t.project}#${t.id}`); }, unread: t => IR.isUnread('task', `${t.project}#${t.id}`, t.updated_at || t.created_at), state: inboxTasksState, mail: t => ({ unread: IR.isUnread('task', `${t.project}#${t.id}`, t.updated_at || t.created_at), lead: { icon: TASK_GLYPH[stateOf(t)] || 'pending', square: true, name: stateOf(t) }, title: t.title, team: teamLabel(t.project), snippet: stateOf(t), time: DT.shortTime(t.updated_at || t.created_at), data: { taskId: String(t.id) } }),
                         selectable: { contextKey: 'inbox-tasks', actions: TB.inboxTaskActions(() => { inboxTasksState.selected.clear(); refreshTasks(); }), onChange: keys => row && Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the bar takes the toolbar's line while tasks are selected
                     if (row) { Toolbar.mountSelection(row, inboxTasksState.selected.size ? t.bar : null); row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (isPhoneLayout()) row.append(t.selectButton); }
                     return t.el;

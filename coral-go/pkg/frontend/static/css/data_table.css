@@ -386,7 +386,7 @@
 .dt-mail-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dt-mail-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dt-mail-line { display: flex; gap: 8px; min-width: 0; font-size: var(--fs-md); }
-.dt-mail-title { flex: 0 1 auto; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-regular); color: var(--table-primary-color); }
+.dt-mail-title { flex: 0 1 auto; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-medium); color: var(--table-primary-color); }
 .dt-mail-snippet { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); }
 .dt-mail-ask { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--table-secondary-color); }
 .dt-mail-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
@@ -394,8 +394,6 @@
 .dt-mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .dt-mail-dot.dt-mail-attention { background: var(--warning); }
 .dt-mail-unread .dt-mail-title { font-weight: var(--fw-strong); }
-.dt-mail-unread .dt-mail-snippet { color: var(--table-secondary-color); }
-.dt-mail-unread .dt-mail-time { font-weight: var(--fw-strong); color: var(--table-primary-color); }
 .dt-box.dt-mail-on thead { display: none; }
 .dt-box.dt-mail-on .dt-table, .dt-box.dt-mail-on tbody { display: block; }
 .dt-box.dt-mail-on tr.dt-mailed { display: flex; align-items: stretch; flex-wrap: nowrap; padding: 0 0 0 4px; min-height: 56px; }
@@ -445,3 +443,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .dt-mail-line:not(:has(> .dt-mail-team)) > .dt-mail-title { max-width: 100%; }
     .dt-mail-line:not(:has(> .dt-mail-team)) > .dt-mail-snippet { flex: none; }
 }
+
+/* A row not opened since it changed (#9687; UI/UX): an 8 px accent dot and the name at 600 (a read name is 500); the snippet and the time do not change with it. A desktop row shows the dot before the name, named for a screen reader. */
+.dt-row.dt-unread:not(.dt-mailed) .dt-primary { font-weight: var(--fw-strong); }
+.dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: "" / "Unread"; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
