@@ -93,30 +93,9 @@
 .nav-more-menu {
     position: fixed;
     z-index: 60;
-    min-width: 180px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-ml);
-    padding: 4px;
-    box-shadow: 0 8px 24px rgba(var(--black-rgb), 0.4);
-}
-.nav-more-menu[hidden] { display: none; }
-.nav-more-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    min-height: 44px;
-    padding: 0 12px;
-    background: none;
-    border: none;
-    border-radius: var(--radius-lg);
-    color: var(--text-primary);
-    font: inherit;
-    cursor: pointer;
-    text-align: left;
-}
-.nav-more-item:hover, .nav-more-item.active { background: var(--bg-tertiary); }
+} /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
+.nav-more-item { gap: 12px; } /* its icon and its words */
+.nav-more-item.active { background: var(--bg-hover); } /* the open view */
 .nav-more-item .material-icons { color: var(--text-secondary); font-size: var(--fs-2xl); }
 .nav-more-item .nav-more-drawn { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; flex: none; color: var(--text-secondary); } /* a drawn icon, the size of the font's (#9160) */
 .nav-more-item .nav-more-drawn svg { width: 1.25rem; height: 1.25rem; }
@@ -128,7 +107,7 @@
 /* Under 640 px the whole top row is one hamburger (nav_tabs.js, #9021): it names the view and opens the views, Home, Saved, Settings and the account. */
 .top-menu-btn { display: none; }
 .nav-more-sep { height: 1px; margin: 4px 8px; background: var(--border); }
-a.nav-more-item { text-decoration: none; }
+
 @media (max-width: 639px) {
     .nav-select, .top-bar-actions > .top-bar-btn:not(.hub-indicator), .top-bar-actions .top-bar-settings-wrapper, .top-bar-actions .cloud-account-wrapper { display: none !important; }
     .top-menu-btn { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; min-height: 44px; margin: 0 8px; padding: 0 12px; background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-ml); color: var(--text-primary); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
@@ -1028,6 +1007,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
  * The keyboard is menu_keys.js. menu_census.test.mjs fails a class named *-menu that declares its own surface, with a down-only list of those still to move. */
 .menu { display: flex; flex-direction: column; gap: 2px; min-width: 12rem; padding: 4px; background: var(--bg-secondary); border: var(--card-border); border-radius: var(--card-radius); box-shadow: var(--shadow-md); }
 .menu[hidden] { display: none; }
+.menu-panel { flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 10px; box-shadow: var(--shadow-lg); } /* a menu that holds fields (the Filters popup): its rows lie side by side, with more room */
 .menu-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); font-weight: 500; text-align: left; text-decoration: none; cursor: pointer; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--bg-hover); }
 .menu-item[hidden] { display: none; }

@@ -13,7 +13,7 @@ const NOT_CHIPS = {
     // controls: the button family's sizes (#9096)
     'goals-chip': 'a filter toggle button', 'update-pill': 'a button', 'list-bar-chips': 'the row that holds the list bar chips', 'model-chip': 'the model menu button',
     'model-chip-add-field': 'a field in the model menu', 'model-chip-add-help': 'help text in the model menu', 'model-chip-head': 'a heading in the model menu',
-    'model-chip-item': 'a row of the model menu', 'model-chip-menu': 'the model menu', 'model-chip-note': 'a note in the model menu',
+    'model-chip-item': 'a row of the model menu', 'model-chip-note': 'a note in the model menu',
     'folder-tag-dropdown': 'a dropdown', 'tag-dropdown-header': 'a dropdown heading', 'hf-tag-remove': 'a remove button',
     'artifact-tag-add': 'a button', 'artifact-tag-list': 'the editor row', 'artifact-tag-offer': 'a suggestion row', 'artifact-tag-remove': 'a remove button',
     'artifact-tag-status': 'a status line under the tag editor', 'chat-attachment-chip': 'a link to a file in a chat', 'folder-tag-current': 'a row that holds tags',

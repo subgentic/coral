@@ -100,8 +100,8 @@
 1	changed_files.js	statusCls
 1	changed_files.js	totals.adds
 1	changed_files.js	totals.dels
-1	chat_bubbles.js	artifactRef ? '' : `<button type="button" role="menuitem" data-action="edit"><span class="material-icons" aria
-1	chat_bubbles.js	editors.map((ed, i) => `<button type="button" role="menuitem" data-action="editor" data-editor="${Number(i)}">
+1	chat_bubbles.js	artifactRef ? '' : `<button type="button" class="menu-item" role="menuitem" data-action="edit"><span class="ma
+1	chat_bubbles.js	editors.map((ed, i) => `<button type="button" class="menu-item" role="menuitem" data-action="editor" data-edit
 2	chat_bubbles.js	line > 0 ? ` (line ${line})` : ""
 1	chat_messages.js	COPY_BUTTON
 1	chat_messages.js	attachmentChips(msg.attachments)
