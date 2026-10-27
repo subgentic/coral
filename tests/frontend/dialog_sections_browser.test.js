@@ -75,6 +75,9 @@ const BASE = require('./test_base').BASE;
         assert.equal(pick.disabled, false, 'the provider can be changed'); assert.equal(pick.fixedLine, false, 'no "launch a new agent" line');
         await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="codex"]').click(); true`);
         assert.equal(await ev(`window.getAgentConfig('restart-acf').agentType`), 'codex', 'the restart carries the new provider');
+        // a provider has its own levels: Thinking goes back to Default (not sent) after a switch (#8990). A model the person typed or the catalog does not know stays in its field (it is theirs): if it is wrong for the
+        // new provider the server answers 400 naming it (restart_board_test.go) and the restart's toast says so (restart_flow.js shows result.error).
+        assert.equal(await ev(`window.getAgentConfig('restart-acf').thinking`), undefined, 'Thinking is back to Default after a switch');
         await ev(`document.querySelector('#restart-acf .acf-agent-pick input[value="claude"]').click(); true`);
         await shot('restart-agent-desktop');
         await go('#restart-modal', 'permissions'); await shot('restart-permissions-desktop');
