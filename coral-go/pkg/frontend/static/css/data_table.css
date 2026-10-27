@@ -334,7 +334,7 @@
 
     .dt-box.dt-compact.dt-fold-column.dt-folded .dt-table td.dt-line-1.dt-grow:has(> .dt-title-cell) { flex: 1 1 100%; min-width: 8rem; height: auto; }
     .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell { flex-wrap: wrap; align-items: baseline; row-gap: 0; }
-    .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { flex: 1 1 100%; min-width: 8rem; max-width: 100%; margin-block: 0; white-space: normal; overflow: visible; overflow-wrap: normal; word-break: normal; text-overflow: clip; }
+    .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { flex: 1 1 100%; min-width: 8rem; max-width: 100%; margin-block: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* the title keeps one line, cut with an ellipsis, at the narrowest and at 200% text (#8981; its words are on the hover and in the preview) */
 }
 
 /* The dock's task list stays one line, including on phones (#8792). */
