@@ -238,9 +238,11 @@
 /* a goal's screen (#8914, the Operator's layout): its details and one Tasks | Artifacts list on the left; the clicked task or artifact opens in the shared detail pane on the right (nothing is there until one is clicked: the list has the whole width) */
 .goal-split { position: relative; display: flex; align-items: stretch; flex: 1 1 auto; min-height: 0; }
 .goal-main { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 16px 24px 0; } /* the title has its gap under the back link, the state line under the title */
-.goal-detail-pane { flex: 0 0 min(46%, 640px); width: auto; max-width: none; min-height: 0; overflow-y: auto; }
+.goal-detail-pane { flex: 0 0 var(--detail-w, min(46%, 640px)); width: auto; max-width: none; min-height: 0; overflow-y: auto; }
 .goal-detail-pane[hidden] { display: none; }
 .goal-detail-pane .detail-back { display: none; }
+.goal-detail-pane #team-task-title { display: none; } /* the pane's own title is this heading (#8952) */
+.goal-detail-pane .team-task-page { padding: 0; min-height: 0; }
 .goals-page.goals-open.goals-table-page { max-width: none; padding: 0; gap: 0; min-height: 0; overflow: hidden; } /* an open goal fills the page area to the window's right edge: the padding belongs to the main pane */
 .goals-page.goals-open .goals-body { gap: 0; }
 .goal-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-top: 8px; }
@@ -256,6 +258,8 @@
 @media (max-width: 900px) { /* narrow: the pane covers the list, with a Back (the tabs and details stay behind it) */
     .goal-split-open .goal-detail-pane { position: absolute; inset: 0; z-index: 5; flex: none; border-left: 0; }
     .goal-detail-pane .detail-back { display: inline-flex; }
+    .goal-detail-pane .detail-grip { display: none; }
+    .goal-detail-pane .detail-body { padding: 12px 14px 16px; }
 }
 @media (max-width: 760px) {
     .goal-main { flex: 1; padding: 0; overflow: visible; }
