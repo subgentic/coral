@@ -1171,55 +1171,6 @@
     opacity: 0.7;
 }
 
-/* ── Status Dots ───────────────────────────────────────────── */
-
-.status-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 6px;
-    background: var(--success);
-}
-
-.status-dot.working {
-    background: var(--working);
-    animation: pulse-working 1.5s ease-in-out infinite;
-}
-
-.status-dot.waiting {
-    background: var(--warning);
-    animation: pulse-waiting 1.5s ease-in-out infinite;
-}
-
-.status-dot.done {
-    background: var(--success);
-}
-
-.status-dot.stuck {
-    background: var(--danger);
-    animation: pulse-stuck 3s ease-in-out infinite;
-}
-
-.status-dot-stale {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--fg-muted);
-    flex-shrink: 0;
-}
-
-.status-dot-working {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--success);
-    animation: pulse-working 1.5s ease-in-out infinite;
-    flex-shrink: 0;
-}
-
 /* ── Waiting / Done Banners ────────────────────────────────── */
 
 /* The two notices over the agent view are pills (#5287): inside .live-pills, which is absolute over the top of .live-left-column, so showing or hiding
@@ -1278,50 +1229,6 @@
     font-size: 0.6875rem;
     color: var(--text-muted);
     font-family: var(--font-mono);
-}
-
-/* ── Jobs Sidebar ──────────────────────────────────────────── */
-
-.live-job-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 0;
-    font-size: var(--fs-md);
-}
-
-.live-job-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--fg);
-}
-
-.live-job-badge {
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    padding: 1px 4px;
-    border-radius: var(--radius-xs);
-    text-transform: uppercase;
-    flex-shrink: 0;
-}
-
-.live-job-badge-api {
-    background: rgba(124, 58, 237, 0.2);
-    color: var(--badge-claude);
-}
-
-.live-job-badge-cron {
-    background: rgba(var(--accent-rgb), 0.2);
-    color: var(--accent);
-}
-
-.live-job-elapsed {
-    font-size: var(--fs-base);
-    color: var(--fg-muted);
-    flex-shrink: 0;
-    font-variant-numeric: tabular-nums;
 }
 
 /* Board card styles */
