@@ -8,6 +8,7 @@ import { needsInputAttention } from './display_activity_hint.js';
 
 import { state } from './state.js';
 import { unreadReviewItems, refreshReviews, onReviewsChanged } from './inbox_reviews.js';
+import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { isCloud, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
@@ -15,6 +16,7 @@ import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy In
 
 const INBOX_URL = '/inbox';
 onReviewsChanged(() => updateInboxTab());
+onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
 
 /** How many agents are waiting for input right now, from the feed's list. */
 export function waitingCount() {
@@ -29,13 +31,14 @@ export function updateInboxTab() {
     const badge = document.getElementById('nav-tab-hub-inbox-badge');
     if (!badge) return;
     refreshReviews();
-    const n = waitingCount() + unreadReviewItems().length; // a review artifact the operator has read stays listed but is not counted (#9277)
+    if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
+    const n = waitingCount() + unreadReviewItems().length + failedUnread().length; // a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
     const text = n > 99 ? '99+' : n > 0 ? String(n) : '';
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).
     if (badge.textContent !== text) badge.textContent = text;
     if (badge.hidden !== (n === 0)) badge.hidden = n === 0;
-    const label = n > 0 ? unreadReviewItems().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
+    const label = n > 0 ? unreadReviewItems().length || failedUnread().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
     _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen
