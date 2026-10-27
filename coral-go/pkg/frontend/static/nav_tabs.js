@@ -10,7 +10,7 @@ import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
 import { isHub } from './server_base.js';
 
-const ICONS = { agents: 'smart_toy', history: 'chat_bubble_outline', workflows: 'account_tree', jobs: 'schedule', tokens: 'insights',
+const ICONS = { agents: 'smart_toy', history: 'chat_bubble_outline', workflows: 'account_tree', jobs: 'schedule', automations: 'schedule', tokens: 'insights',
     docs: 'menu_book', servers: 'dns', 'hub-inbox': 'notifications', board: 'forum', artifacts: 'inventory_2' };
 
 const tabsEl = () => document.querySelector('.top-nav-tabs');

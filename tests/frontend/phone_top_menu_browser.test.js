@@ -37,6 +37,9 @@ const BASE = require('./test_base').BASE;
             const items = await ev(`[...document.querySelectorAll('#nav-more-menu [role=menuitem]')].map(i => ({ t: i.lastElementChild.textContent.trim(), h: Math.round(i.getBoundingClientRect().height) }))`);
             for (const want of ['Agents', 'Inbox', 'Home', 'Settings', 'Themes']) assert.ok(items.some(i => i.t === want), `the menu has ${want}: ` + JSON.stringify(items.map(i => i.t)));
             assert.ok(items.every(i => i.h >= 44), 'every entry is a 44 px target: ' + JSON.stringify(items));
+            const views = await ev(`[...document.querySelectorAll('#nav-more-menu [data-on-click="m-switch-nav-tab"]')].map(i => ({ t: i.lastElementChild.textContent.trim(), icon: i.firstElementChild.textContent.trim() }))`);
+            assert.ok(views.some(v => v.t === 'Automations'), 'the views list has Automations: ' + JSON.stringify(views));
+            assert.deepEqual(views.filter(v => !v.icon || v.icon === 'circle'), [], 'every view has its own glyph, none the plain circle that stands for a view with none: ' + JSON.stringify(views));
             assert.equal(await ev(`document.getElementById('top-menu-btn').getAttribute('aria-expanded')`), 'true');
             await shot('top-menu-open-390');
             // 3. Escape
