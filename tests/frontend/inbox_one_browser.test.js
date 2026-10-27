@@ -159,6 +159,11 @@ const AGENTS = (waiting) => waiting ? [
             await ev(`document.querySelector('#group-table-view tbody .dt-hover-action').focus(); true`);
             await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'Done shows when the keyboard is on it', 3000); // the button's own transition settles
             await ev(`document.activeElement.blur(); true`);
+            // on a touch screen (a coarse pointer) there is no hover and no focus ring to wait for: Done is always drawn (QA Engineer, #9634)
+            await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
+            await waitFor(`matchMedia('(pointer: coarse)').matches && getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'Done is shown on touch without hover or focus', 3000);
+            await Emulation.setTouchEmulationEnabled({ enabled: false });
+            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '0'`, at + 'and hidden again at rest on a pointer', 3000);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim() + (c.getAttribute('aria-pressed') === 'true' ? '*' : ''))`), ['Open 2*', 'Done 1'], at + 'Open and Done chips with counts');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-quiet')].map(b => b.textContent)`), ['Done', 'Done'], at + 'one quiet Done button per row');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the saved table is on the scale');
