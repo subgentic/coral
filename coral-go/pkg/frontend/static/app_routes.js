@@ -6,13 +6,13 @@ import { state } from './state.js';
 import { deserializeFromUrl } from './search_filters.js';
 import { selectHistorySession } from './sessions.js';
 import { startNav, go, note, onRoute, currentRoute } from './nav.js';
-import { liveRoute, keyRoute, routeKey, AGENT_SUBTABS, parse as parseRoute, cloudRedirect, folderForSub } from './routes.js';
+import { liveRoute, keyRoute, routeKey, AGENT_SUBTABS, parse as parseRoute, cloudRedirect, folderForSub, inboxRouteFor } from './routes.js';
 import { showTerminalView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { showView, showToast } from './utils.js';
 import { sessionServer } from './server_base.js';
 import { loadAutomations, loadDocs } from './lazy_panels.js';
-import { isCloud } from './server_base.js';
+import { isCloud, nativeInbox } from './server_base.js';
 import { setHistoryPage } from './history_state.js';
 import { syncFilterDomToState } from './history_filters.js';
 import { historyServer, setHistorySource } from './history_source.js';
@@ -56,6 +56,7 @@ function registerRouteHandlers() {
     });
 
     route('chats', async (r, opts) => {
+        if (nativeInbox()) return go(inboxRouteFor(r), { replace: true }); // the Hub's native Inbox has no Chats tab: an old address is the same chat or list in the Inbox, never a not-found page (Goal #100, #9549)
         await liveListReady;
         if ((r.server || !isCloud()) && !setHistorySource(r.server || 'local')) return notFound('That computer was not found', { view: 'chats' });
         if (r.id) {
@@ -92,6 +93,16 @@ function registerRouteHandlers() {
 
     route('inbox-folder', async r => { // /inbox/<folder> (#8652): the Inbox on that folder; the address stays (the folder notes the same route)
         await liveListReady;
+        if (r.id) { // /inbox/chats/<folder>/[@<server>/]<id> (Goal #100, #9549): a chat on screen in the Inbox, under its folder; one that is not there says so and leaves the folder on screen
+            if ((r.server || !isCloud()) && !setHistorySource(r.server || 'local')) { notFound('That computer was not found', { view: 'inbox-folder', folder: r.folder }); return; }
+            switchNavTab('hub-inbox', { fromHistory: true, folder: r.folder });
+            const cur = state.currentSession;
+            if (!(cur && cur.type === 'history' && cur.name === r.id && sessionServer(cur) === historyServer()) && (await selectHistorySession(r.id)) === false) {
+                state.currentSession = null;
+                notFound('That chat was not found', { view: 'inbox-folder', folder: r.folder });
+            }
+            return;
+        }
         switchNavTab('hub-inbox', { fromHistory: true, folder: r.folder });
     });
 
