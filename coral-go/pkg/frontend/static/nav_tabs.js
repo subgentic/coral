@@ -207,7 +207,11 @@ if (typeof document !== 'undefined') {
         const nav = tabsEl();
         if (!nav) return;
         const bar = document.querySelector('header.top-bar');
-        if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncNav).observe(bar);
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(syncNav);
+            ro.observe(bar);
+            for (const t of nav.querySelectorAll('.top-nav-tab')) ro.observe(t); // a change of text size widens the tabs and leaves the bar's height as it was (a tab is 40 px, not as high as its text): the row is laid out again
+        }
         // A tab appears or goes, or the active tab changes: redraw from the tabs.
         _obs = new MutationObserver(syncNav);
         _obs.observe(nav, { attributes: true, subtree: true, attributeFilter: ['class', 'hidden', 'style', 'aria-current'] });
