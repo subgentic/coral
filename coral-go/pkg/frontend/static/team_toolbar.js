@@ -36,11 +36,11 @@ function chipButton(c) {
 export function adopt(row, { pills = null, chips = [], action = null } = {}) {
     for (const old of row.querySelectorAll('.team-tb-pills, .team-tb-select, .team-tb-chip, .team-tb-chips, .team-tb-action')) old.remove();
     row.classList.add('team-toolbar-row');
-    const first = row.querySelector('.list-bar-toggle') || row.querySelector('.list-bar-more');
+    const first = row.querySelector('.list-bar-chips-inrow') || row.querySelector('.list-bar-toggle') || row.querySelector('.list-bar-more');
     if (pills) { const [group, select] = pillElements(pills); for (const e of [group, select]) { if (first) row.insertBefore(e, first); else row.append(e); } group.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
-    // every filter that is on, one removable chip each (#7782), on a line of their own under the row's controls, so the line itself never grows past the page
+    // every filter that is on, one removable chip each (#7782), in the row itself after the pills (ellipsis when they do not fit), so the toolbar never changes height
     row.classList.toggle('team-toolbar-chips', chips.length > 0);
-    if (chips.length) { const box = el('div', 'team-tb-chips'); for (const chip of chips) box.append(chipButton(chip)); row.append(box); }
+    if (chips.length) { const box = el('div', 'team-tb-chips'); for (const chip of chips) box.append(chipButton(chip)); row.insertBefore(box, row.querySelector('.list-bar-toggle, .list-bar-more, .team-tb-action')); } // in the row, after the pills, never on a line of its own (#9078)
     if (action) { action.classList.add('team-tb-action'); row.append(action); }
     return row;
 }

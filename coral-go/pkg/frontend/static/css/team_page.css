@@ -65,8 +65,8 @@
 .team-panel .list-bar-search-row .team-tb-pills { flex: 0 0 auto; min-width: auto; overflow: visible; } /* the pills keep their size: the field gives way first, and below 54 rem the select takes their place */
 .team-panel .team-tb-pills .goals-chip { min-height: 32px; }
 .team-panel .team-tb-chip { flex: none; min-height: 32px; white-space: nowrap; }
-.team-panel .team-toolbar-chips { flex-wrap: wrap; }
-.team-panel .team-tb-chips { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 100%; order: 99; } /* the chips of the filters that are on: their own line under the row (#7782) */ /* a filter that is on, removable ("No goal ×") */
+.team-panel .team-tb-chips { display: flex; flex-wrap: nowrap; gap: 8px; flex: 1 1 0; min-width: 5rem; overflow: hidden; } /* the chips of the filters that are on: in the row after the pills, one line, an ellipsis for what does not fit (#9078) */
+.team-panel .team-tb-chips .team-tb-chip { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .team-panel .team-tb-select { display: none; flex: 0 1 auto; min-height: 32px; max-width: 14em; }
 .team-panel .team-tb-action { flex: none; margin-left: auto; min-height: 32px; padding: 0 12px; font-size: 0.8125rem; }
 /* While something is selected the selection bar (team_toolbar.js mountSelection) replaces the line's controls (#7743); the field stays. */

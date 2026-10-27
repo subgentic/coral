@@ -1984,6 +1984,11 @@ body.panel-dragging .agentic-state {
 .list-bar-kept { justify-content: flex-start; cursor: pointer; }
 .list-bar-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .list-bar-chips[hidden] { display: none; }
+.list-bar-chips.list-bar-chips-inrow { flex: 1 1 0; flex-wrap: nowrap; min-width: 5rem; overflow: hidden; } /* in the search row (#9078): one line, the chip's text cut with an ellipsis; "Clear all" lives in the Filters panel */
+.list-bar-chips-inrow > li { min-width: 0; flex: 0 1 auto; display: flex; }
+.list-bar-chips-inrow .list-bar-chip { min-height: 32px; }
+.list-bar-chips-inrow .list-bar-chip-all { display: none; }
+@media (max-width: 760px) { .list-bar-chips-inrow .list-bar-chip { min-height: var(--control-touch-height, 44px); } }
 .list-bar-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 8px; font-size: 0.75rem; color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--control-border); border-radius: 999px; cursor: pointer; }
 .list-bar-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-bar-chip-x { color: var(--text-primary); } /* 4.4:1 in the light theme with the secondary text colour on the chip's fill (#4851) */
