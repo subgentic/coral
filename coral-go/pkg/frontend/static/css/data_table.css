@@ -86,6 +86,7 @@
 .dt-box.dt-has-content .dt-table td.dt-grow { width: 100%; }
 .dt-table td.dt-wrap { white-space: normal; }
 .dt-table td.dt-wrap .dt-chip, .dt-table td.dt-wrap .dt-subtitle { white-space: normal; overflow-wrap: anywhere; }
+.dt-table td.dt-wrap .dt-link { white-space: normal; overflow-wrap: anywhere; text-align: left; } /* a wrapping cell's link (the Inbox Artifacts' Task) shows the whole name on two lines, not cut with an ellipsis */
 .dt-table td.dt-wrap code { font-family: var(--table-code-font); font-size: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
 .dt-primary { display: inline; max-width: 100%; background: none; border: 0; padding: 0; text-align: left; font: inherit; font-size: var(--table-primary-size); font-weight: var(--table-primary-weight); color: var(--table-primary-color); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dt-primary:hover { color: var(--accent); text-decoration: underline; }
