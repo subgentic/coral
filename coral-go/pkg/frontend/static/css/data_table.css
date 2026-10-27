@@ -115,7 +115,7 @@
 .dt-chat-flags { display: inline-flex; gap: 2px; justify-content: flex-end; }
 .dt-flag { display: inline-flex; align-items: center; justify-content: center; width: var(--control-compact-height); height: var(--control-compact-height); padding: 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--table-tertiary-color); cursor: pointer; }
 .dt-row .dt-flag { opacity: 0; }
-.dt-flag .material-icons { font-size: var(--icon-size); }
+.dt-flag .material-icons { font-size: var(--icon); }
 .dt-row:hover .dt-flag, .dt-row:focus-within .dt-flag, .dt-row .dt-flag:focus-visible, .dt-row .dt-flag-on { opacity: 1; } /* a chat's Star and Archive show on its row's hover or focus; a starred chat keeps its star drawn */
 .dt-flag-on { color: var(--warning); }
 .dt-flag:hover { color: var(--table-primary-color); }

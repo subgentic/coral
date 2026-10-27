@@ -121,7 +121,7 @@
 }
 
 .wf-run-meta .material-icons {
-    font-size: var(--icon-inline-size);
+    font-size: var(--icon-sm);
     color: var(--text-muted);
 }
 

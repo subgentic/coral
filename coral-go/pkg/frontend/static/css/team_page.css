@@ -341,7 +341,7 @@
 .inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; }
 .inbox-review-actions-read { grid-template-columns: max-content max-content max-content; } /* a read item has Unread beside Open and Mark reviewed (#9277) */
 .inbox-review-icon { min-width: 44px; padding-inline: 0; justify-content: center; } /* a read item's two actions are icons: the row stays one line, also on a phone */
-.inbox-review-icon .material-icons { width: var(--icon-size); height: var(--icon-size); overflow: hidden; font-size: var(--icon-size); white-space: nowrap; } /* the icon's name is its ligature: without the font it must not widen the button */
+.inbox-review-icon .material-icons { width: var(--icon); height: var(--icon); overflow: hidden; font-size: var(--icon); white-space: nowrap; } /* the icon's name is its ligature: without the font it must not widen the button */
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
 .inbox-review-error:empty { display: none; }
 .inbox-review-metadata { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0 8px; min-width: 0; max-width: 9rem; } /* one line (#9060): For review, then the task, cut with an ellipsis when it is long (its full words are the link's tooltip) */

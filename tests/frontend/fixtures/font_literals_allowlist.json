@@ -24,7 +24,6 @@
       "font-size: 0.84em": 1,
       "font-size: 0.8rem": 1,
       "font-size: 1.12em": 1,
-      "font-size: 1.1rem": 1,
       "font-size: 1.3em": 1,
       "font-size: 1.5em": 1,
       "font-size: 1em": 1
@@ -45,11 +44,8 @@
       "font-size: 0.9375rem": 3,
       "font-size: 0.9em": 1,
       "font-size: 1.0625rem": 2,
-      "font-size: 1.15em": 1,
       "font-size: 1.6em": 1,
-      "font-size: 2.5rem": 1,
-      "font-size: 2rem": 1,
-      "font-size: 3rem": 1
+      "font-size: 2rem": 1
     },
     "coral-go/pkg/frontend/static/css/cost_dashboard.css": {
       "font-size: 0.9375rem": 1,
@@ -61,8 +57,7 @@
     },
     "coral-go/pkg/frontend/static/css/fonts.css": {
       "font-family: 'Material Icons'": 2,
-      "font-family: 'Plus Jakarta Sans'": 2,
-      "font-size: 1.5rem": 1
+      "font-family: 'Plus Jakarta Sans'": 2
     },
     "coral-go/pkg/frontend/static/css/goals.css": {
       "font-size: 1.0625rem": 1
@@ -74,11 +69,7 @@
     "coral-go/pkg/frontend/static/css/layout.css": {
       "font-size: .95em": 1,
       "font-size: 0.5625rem": 1,
-      "font-size: 0.9375rem": 4,
-      "font-size: 1.0625rem": 2,
-      "font-size: 1.1875rem": 1,
-      "font-size: 1.3125rem": 1,
-      "font-size: 1.5rem": 1,
+      "font-size: 0.9375rem": 3,
       "font-size: clamp(1.625rem, 3.4vw, 2.375rem)": 1
     },
     "coral-go/pkg/frontend/static/css/mobile.css": {
@@ -97,8 +88,6 @@
     "coral-go/pkg/frontend/static/css/session.css": {
       "font-size: 0.9375rem": 2,
       "font-size: 1.05em": 1,
-      "font-size: 1.1875rem": 1,
-      "font-size: 1.3125rem": 1,
       "font-size: 1.5rem": 1
     },
     "coral-go/pkg/frontend/static/css/team_page.css": {
