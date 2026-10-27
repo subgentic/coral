@@ -105,13 +105,13 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 			}
 			mentions = append(mentions, "@"+rv.Reviewer)
 		}
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("%s [Task #%d resubmitted for review, round %d] %s submitted %q again (candidate: %s; %s). Review it again: coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". @%s the same reviewers have it; change them with coral-board task review %d --to \"...\"",
-			strings.Join(mentions, " "), id, reopened.Round, author, task.Title, candidate, body.Reason, id, id, reopened.Round, id, reopened.Round, orch, id), nil)
+		h.postNotice(ctx, project, fmt.Sprintf("%s [Task #%d resubmitted for review, round %d] %s submitted %q again (candidate: %s; %s). Review it again: coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". @%s the same reviewers have it; change them with coral-board task review %d --to \"...\"",
+			strings.Join(mentions, " "), id, reopened.Round, h.noticeText(ctx, project, author), h.noticeText(ctx, project, task.Title), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, body.Reason), id, id, reopened.Round, id, reopened.Round, orch, id))
 	} else if h.autoDelegateReview(ctx, project, id, orch) { // #4175: Coral delegates to the named reviewers
 	} else if h.putReviewInPool(ctx, project, id, task.Title, author, areas, body.Reviewers, candidate, body.Reason) { // #8957: or the review waits in the board's pool for an agent that only reviews
 	} else {
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("@%s [Task #%d in review] %s submitted %q (candidate: %s; %s). Complete it with 'coral-board task complete %d', or delegate it: coral-board task review %d --to \"Security Reviewer,QA Engineer\"",
-			orch, id, author, task.Title, candidate, body.Reason, id, id), nil)
+		h.postNotice(ctx, project, fmt.Sprintf("@%s [Task #%d in review] %s submitted %q (candidate: %s; %s). Complete it with 'coral-board task complete %d', or delegate it: coral-board task review %d --to \"Security Reviewer,QA Engineer\"",
+			orch, id, h.noticeText(ctx, project, author), h.noticeText(ctx, project, task.Title), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, body.Reason), id, id))
 	}
 	h.nudgeNextTask(ctx, project, author)
 	if h.notifyFn != nil {
@@ -161,9 +161,9 @@ func (h *BoardHandler) DelegateReview(w http.ResponseWriter, r *http.Request) {
 	for _, rt := range reviews {
 		names = append(names, fmt.Sprintf("%s (#%d)", *rt.AssignedTo, rt.ID))
 	}
-	h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("[Task #%d delegated for review by %s] %s", id, body.SubscriberID, strings.Join(names, ", ")), nil)
+	h.postNotice(ctx, project, fmt.Sprintf("[Task #%d delegated for review by %s] %s", id, h.noticeText(ctx, project, body.SubscriberID), h.noticeText(ctx, project, strings.Join(names, ", "))))
 	for _, rt := range reviews {
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", h.buildAssignmentNotification(ctx, project, rt, *rt.AssignedTo, false), nil)
+		h.postNotice(ctx, project, h.buildAssignmentNotification(ctx, project, rt, *rt.AssignedTo, false))
 	}
 	if h.notifyFn != nil {
 		h.notifyFn(project)
@@ -233,14 +233,14 @@ func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, app
 	task := v.Task
 	note := ""
 	if body.Note != "" {
-		note = ": " + body.Note
+		note = ": " + h.noticeText(ctx, project, body.Note) // the reviewer's words, quoted: they tag no one
 	}
 	switch {
 	case v.Rejected:
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("@%s [Task #%d rejected by %s] back to you%s. Fix it and submit-review again: the same reviewers review the new revision", v.Author, task.ID, body.SubscriberID, note), nil)
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", h.buildAssignmentNotification(ctx, project, task, v.Author, true), nil)
+		h.postNotice(ctx, project, fmt.Sprintf("@%s [Task #%d rejected by %s] back to you%s. Fix it and submit-review again: the same reviewers review the new revision", v.Author, task.ID, h.noticeText(ctx, project, body.SubscriberID), note))
+		h.postNotice(ctx, project, h.buildAssignmentNotification(ctx, project, task, v.Author, true))
 	case v.Complete:
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("[Task #%d approved by %s] every reviewer approved: completing it%s", task.ID, body.SubscriberID, note), nil)
+		h.postNotice(ctx, project, fmt.Sprintf("[Task #%d approved by %s] every reviewer approved: completing it%s", task.ID, h.noticeText(ctx, project, body.SubscriberID), note))
 		msg := ""
 		var done *board.Task
 		var cerr error
@@ -252,13 +252,13 @@ func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, app
 			done, cerr = h.bs.CompleteTaskWithArtifactsAtRevisionAndCandidate(ctx, project, task.ID, v.Orchestrator, &msg, "success", nil, &task.Revision, "")
 		}
 		if cerr != nil {
-			h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("@%s [Task #%d approved, but it could not be completed: %s] complete it with 'coral-board task complete %d'", v.Orchestrator, task.ID, cerr.Error(), task.ID), nil)
+			h.postNotice(ctx, project, fmt.Sprintf("@%s [Task #%d approved, but it could not be completed: %s] complete it with 'coral-board task complete %d'", v.Orchestrator, task.ID, h.noticeText(ctx, project, cerr.Error()), task.ID))
 		} else {
 			task = done
 			h.afterTaskCompleted(project, v.Orchestrator, done, msg, "approved by "+strings.Join(v.Approvers, ", "))
 		}
 	default:
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("[Task #%d approved by %s] waiting for the other reviewers%s", task.ID, body.SubscriberID, note), nil)
+		h.postNotice(ctx, project, fmt.Sprintf("[Task #%d approved by %s] waiting for the other reviewers%s", task.ID, h.noticeText(ctx, project, body.SubscriberID), note))
 	}
 	// The reviewer's slot is free: their next task.
 	h.nudgeNextTask(ctx, project, body.SubscriberID)
@@ -298,10 +298,10 @@ func (h *BoardHandler) ReleaseCompletionReview(w http.ResponseWriter, r *http.Re
 		return
 	}
 	h.stopReminder(project, id)
-	h.bs.PostSystemMessage(r.Context(), project, "Coral Task Queue", fmt.Sprintf("[Task #%d pending completion review] %s released the worker slot. No completion outcome was accepted. Reason: %s", id, body.SubscriberID, body.Reason), nil)
+	h.postNotice(r.Context(), project, fmt.Sprintf("[Task #%d pending completion review] %s released the worker slot. No completion outcome was accepted. Reason: %s", id, h.noticeText(r.Context(), project, body.SubscriberID), h.noticeText(r.Context(), project, body.Reason)))
 	if task.AssignedTo != nil {
 		if next := h.bs.NextPendingTaskForSubscriber(r.Context(), project, *task.AssignedTo); next != nil {
-			h.bs.PostSystemMessage(r.Context(), project, "Coral Task Queue", h.buildAssignmentNotification(r.Context(), project, next, *task.AssignedTo, false), nil)
+			h.postNotice(r.Context(), project, h.buildAssignmentNotification(r.Context(), project, next, *task.AssignedTo, false))
 		}
 	}
 	if h.notifyFn != nil {

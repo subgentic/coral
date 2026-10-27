@@ -299,7 +299,7 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 	h.goBG(func() {
 		ctx := context.Background()
 		notification := h.buildAssignmentNotification(ctx, project, task, body.Assignee, true)
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", notification, nil)
+		h.postNotice(ctx, project, notification)
 		if body.Assignee != "" && task.Status == "pending" && !task.Parked(time.Now()) {
 			if hasActive, _ := h.bs.HasActiveTaskForAssignee(ctx, project, body.Assignee, task.ID); !hasActive {
 				h.sendTaskNudge(ctx, project, body.Assignee, taskClaimNudge(task.ID))

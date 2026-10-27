@@ -15,30 +15,33 @@ import (
 	"github.com/subgentic/coral/internal/safego"
 )
 
+// buildAssignmentNotification is the board post that tells who a task is for. The title and the park reason are quoted data: they go through noticeText, and the post goes out with postNotice (#9265);
+// the "@" mentions in it are the ones the notice means.
 func (h *BoardHandler) buildAssignmentNotification(ctx context.Context, project string, task *board.Task, assignee string, reassigned bool) string {
+	title := h.noticeText(ctx, project, task.Title)
 	if task.Status == "blocked" {
 		owner := "unassigned"
 		if assignee != "" {
 			owner = "@" + assignee
 		}
-		return fmt.Sprintf("[Task #%d assigned to %s; still blocked] %s — waiting for prerequisites; cannot be claimed yet", task.ID, owner, task.Title)
+		return fmt.Sprintf("[Task #%d assigned to %s; still blocked] %s — waiting for prerequisites; cannot be claimed yet", task.ID, owner, title)
 	}
 	// A parked task is set aside on purpose: no one is invited to claim it, and no one is told it is theirs to start (#5183).
 	if task.Parked(time.Now()) {
 		why := ""
 		if task.ParkedReason != nil {
-			why = *task.ParkedReason
+			why = h.noticeText(ctx, project, *task.ParkedReason)
 		}
 		if assignee == "" {
-			return fmt.Sprintf("[Task #%d now unassigned; parked, not for claiming yet: %s] %s", task.ID, why, task.Title)
+			return fmt.Sprintf("[Task #%d now unassigned; parked, not for claiming yet: %s] %s", task.ID, why, title)
 		}
-		return fmt.Sprintf("[Task #%d assigned to %s; parked, not to be started yet: %s] %s", task.ID, assignee, why, task.Title)
+		return fmt.Sprintf("[Task #%d assigned to %s; parked, not to be started yet: %s] %s", task.ID, assignee, why, title)
 	}
 	if assignee == "" {
 		if reassigned {
-			return fmt.Sprintf("@notify-all [Task #%d reassigned — now unassigned] %s — run 'coral-board task claim' to pick it up", task.ID, task.Title)
+			return fmt.Sprintf("@notify-all [Task #%d reassigned — now unassigned] %s — run 'coral-board task claim' to pick it up", task.ID, title)
 		}
-		return fmt.Sprintf("@notify-all [New Task #%d (%s)] %s — run 'coral-board task claim' to pick it up", task.ID, task.Priority, task.Title)
+		return fmt.Sprintf("@notify-all [New Task #%d (%s)] %s — run 'coral-board task claim' to pick it up", task.ID, task.Priority, title)
 	}
 
 	hasActiveTask, err := h.bs.HasActiveTaskForAssignee(ctx, project, assignee, task.ID)
@@ -47,15 +50,15 @@ func (h *BoardHandler) buildAssignmentNotification(ctx context.Context, project 
 	}
 	if hasActiveTask {
 		if reassigned {
-			return fmt.Sprintf("[Task #%d reassigned to %s — notification deferred while they have an active task] %s", task.ID, assignee, task.Title)
+			return fmt.Sprintf("[Task #%d reassigned to %s — notification deferred while they have an active task] %s", task.ID, assignee, title)
 		}
-		return fmt.Sprintf("[Task #%d (%s) assigned to %s — notification deferred while they have an active task] %s", task.ID, task.Priority, assignee, task.Title)
+		return fmt.Sprintf("[Task #%d (%s) assigned to %s — notification deferred while they have an active task] %s", task.ID, task.Priority, assignee, title)
 	}
 
 	if reassigned {
-		return fmt.Sprintf("@%s [Task #%d reassigned to you] %s — run 'coral-board task claim %d' to start", assignee, task.ID, task.Title, task.ID)
+		return fmt.Sprintf("@%s [Task #%d reassigned to you] %s — run 'coral-board task claim %d' to start", assignee, task.ID, title, task.ID)
 	}
-	return fmt.Sprintf("@%s [Task #%d (%s)] %s — assigned to you, run 'coral-board task claim %d' to start", assignee, task.ID, task.Priority, task.Title, task.ID)
+	return fmt.Sprintf("@%s [Task #%d (%s)] %s — assigned to you, run 'coral-board task claim %d' to start", assignee, task.ID, task.Priority, title, task.ID)
 }
 
 func taskAssignedToSubscriber(task *board.Task, subscriberID string) bool {
@@ -126,8 +129,8 @@ func (h *BoardHandler) notifyOrchestratorOfCancelledDependency(ctx context.Conte
 		if condition == "" {
 			continue
 		}
-		msg := fmt.Sprintf("[Task #%d stalled] %s depends on cancelled task #%d (%s); its %s dependency cannot be satisfied. Update or rewire the task.", task.ID, task.Title, cancelled.ID, cancelled.Title, condition)
-		h.bs.PostSystemMessage(ctx, task.BoardID, "Coral Task Queue", "@Orchestrator "+msg, nil)
+		msg := fmt.Sprintf("[Task #%d stalled] %s depends on cancelled task #%d (%s); its %s dependency cannot be satisfied. Update or rewire the task.", task.ID, h.noticeText(ctx, task.BoardID, task.Title), cancelled.ID, h.noticeText(ctx, task.BoardID, cancelled.Title), condition)
+		h.postNotice(ctx, task.BoardID, "@Orchestrator "+msg)
 		if h.terminal == nil {
 			continue
 		}
@@ -333,7 +336,7 @@ func (h *BoardHandler) nudgeNextTask(ctx context.Context, project, subscriberID 
 	if taskAssignedToSubscriber(next, subscriberID) {
 		audit = h.buildAssignmentNotification(ctx, project, next, subscriberID, false)
 	}
-	h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", audit, nil)
+	h.postNotice(ctx, project, audit)
 	text := taskNudge
 	if taskAssignedToSubscriber(next, subscriberID) {
 		text = taskClaimNudge(next.ID)
