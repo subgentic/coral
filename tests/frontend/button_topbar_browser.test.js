@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
                 assert.ok(rail.length === 3 && rail.every(([a, b]) => a >= 30 && a <= 34 && b >= 30 && b <= 34), `${at}the rail's three buttons are 32 px squares: ${JSON.stringify(rail)}`);
             }
             // Saved pressed: the accent glyph in the quiet box, not the accent fill (UI/UX #9494)
-            const saved = await ev(`(() => { const b = document.getElementById('saved-btn'); if (!b) return null; const idle = getComputedStyle(b).color; b.setAttribute('aria-pressed', 'true'); const cs = getComputedStyle(b); const on = { bg: cs.backgroundColor, color: cs.color }; b.setAttribute('aria-pressed', 'false'); return { idle, on }; })()`);
+            const saved = await ev(`(async () => { const b = document.getElementById('saved-btn'); if (!b) return null; const idle = getComputedStyle(b).color; b.setAttribute('aria-pressed', 'true'); await new Promise(r => setTimeout(r, 400)); /* the button's colour transition */ const cs = getComputedStyle(b); const on = { bg: cs.backgroundColor, color: cs.color }; b.setAttribute('aria-pressed', 'false'); return { idle, on }; })()`); // sleep-ok: the colour transition
             if (saved) { assert.equal(saved.on.bg, 'rgba(0, 0, 0, 0)', `${at}Saved pressed keeps its quiet box: ${saved.on.bg}`); assert.notEqual(saved.on.color, saved.idle, `${at}Saved pressed takes the accent glyph: ${saved.on.color} vs ${saved.idle}`); }
             for (const t of ['dark', 'light']) { await theme(t); await new Promise(r => setTimeout(r, 450)); await shot(`btn-topbar-${t}-${w}`); } // sleep-ok: the theme's colour transition settles
         }
