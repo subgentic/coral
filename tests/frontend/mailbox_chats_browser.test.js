@@ -35,11 +35,11 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         const f = await ev(`(() => ({ items: [...document.querySelectorAll('.view-list-item')].map(b => [b.dataset.key, (b.querySelector('.view-list-count') || {}).textContent || '']), titles: [...document.querySelectorAll('.view-list-title')].map(t => t.textContent), dot: !!document.querySelector('.view-list-item[data-key="chats-tag-7"] .view-list-dot') }))()`);
         assert.deepEqual(f.titles, ['Needs attention', 'Files', 'Chats', 'By CLI', 'Tags'], 'the sections');
         const k = Object.fromEntries(f.items);
-        assert.deepEqual([k['chats'], k['chats-group'], k['chats-notes'], k['chats-starred'], k['chats-active'], k['chats-archived'], k['chats-cli-claude'], k['chats-cli-codex'], k['chats-cli-agy'], k['chats-tag-7']], ['119', '1', '9', '0', '1', '3', '90', '30', '27', '4'], 'counts from the one grouped read (Antigravity is the server\'s one shared count, not the sum of its three names, #8011; each count is its folder\'s total as the route sends it: All chats is the agents\') ' + JSON.stringify(f.items));
+        assert.deepEqual([k['chats'], k['chats-group'], k['chats-notes'], k['chats-starred'], k['chats-active'], k['chats-archived'], k['chats-cli-claude'], k['chats-cli-codex'], k['chats-cli-agy'], k['chats-tag-7']], ['', '', '', '', '', '', '', '', '', ''], 'the number beside a folder is its unread chats (UI/UX #9687): the marker begins now, so nothing is unread and no folder shows a number; the totals are the tooltips and the table\'s heading ' + JSON.stringify(f.items));
         assert.ok(f.dot, 'a tag has its colour dot');
         // the column for a screen reader and the keyboard (#8022): each view's name and count read apart and once, one Tab stop for the column, the arrows move between the views
         const names = await ev(`[...document.querySelectorAll('.view-list-item')].map(b => [b.getAttribute('aria-label'), (${ROW_WORDS})(b)])`);
-        assert.ok(names.some(([a]) => a === 'All chats, 119') && names.some(([a]) => a === 'Board history, 1') && names.some(([a]) => a === 'Pi'), 'name and count apart: ' + JSON.stringify(names.slice(0, 8)));
+        assert.ok(names.some(([a]) => a === 'All chats') && names.some(([a]) => a === 'Board history') && names.some(([a]) => a === 'Pi'), 'a folder with nothing unread says only its name: ' + JSON.stringify(names.slice(0, 8)));
         assert.equal(await ev(`[...document.querySelectorAll('.view-list-item')].filter(b => b.tabIndex === 0).map(b => b.dataset.key).join()`), 'chats', 'one Tab stop: the current view');
         await ev(`document.querySelector('.view-list-item[data-key="chats"]').focus(); true`);
         const key = async k => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code: k }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code: k }); };
@@ -117,6 +117,15 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         console.log('   ✓');
         console.log('6. The read marker (#9687): a chat not opened since it changed is unread, opening one marks it read');
         await ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: Date.now() - 90 * 86400000, items: {} })); true`); // the marker was first used long ago: every chat here changed since
+        // the folder's number is its unread chats, its name says so, its tooltip has the total (UI/UX #9687); a chat opened lowers it
+        await open(1280, 800, false);
+        const nums = () => ev(`Object.fromEntries([...document.querySelectorAll('.sidebar-pane[data-pane="hub-inbox"] .view-list-item')].map(b => [b.dataset.key, [(b.querySelector('.view-list-count') || {}).textContent || '', b.getAttribute('aria-label'), b.title]]))`);
+        let nm = await nums();
+        assert.deepEqual([nm['chats'], nm['chats-group'], nm['chats-active'], nm['chats-archived'], nm['chats-starred'], nm['chats-cli-codex'], nm['chats-notes']],
+            [['119', 'All chats, 119 unread', '119 in all'], ['1', 'Board history, 1 unread', '1 in all'], ['1', 'Active now, 1 unread', '1 in all'], ['1', 'Archived, 1 unread', '3 in all'], ['', 'Starred', '0 in all'], ['30', 'Codex, 30 unread', '30 in all'], ['', 'With notes', '9 in all']], 'each folder\'s number is its unread chats, named so, the total in its tooltip; none at zero, and With notes (which this cannot tell) has none ' + JSON.stringify(nm));
+        await ev(`document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group) button.dt-primary').click(); true`);
+        await waitFor(`(document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="chats"] .view-list-count') || {}).textContent === '118'`, 'a chat opened lowers All chats\' number', 8000);
+        await ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: Date.now() - 90 * 86400000, items: {} })); true`);
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             await open(w, 844, mobile);
             const un = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; return { n: rows.length, unread: rows.filter(r => r.classList.contains('dt-unread') || !!r.querySelector('.dt-mail-new')).length, dot: rows.filter(r => !!r.querySelector('.dt-mail-new')).length, sr: rows[0].querySelector('.sr-only') ? rows[0].querySelector('.sr-only').textContent : '' }; })()`);

@@ -27,6 +27,7 @@ const FOLDERS = [
     { key: 'chats-archived', label: 'Archived', params: { type: 'agent', archived: '1' }, count: 'archived' },
 ];
 let counts = null; // the last answer of the counts route
+let unread = null; // the last count of unread chats per folder (#9687): { folder key: n }, from the chats changed since the marker began
 
 export function chatFolder(key, c = counts) {
     const f = FOLDERS.find(x => x.key === key);
@@ -48,17 +49,37 @@ export function folderCount(key, c = counts) {
     return undefined;
 }
 
-/** The view list's sections for the chat folders, with the counts the last read gave (a folder with none yet shows no number). */
+/** A folder's unread chats (undefined at none, and for a folder this count cannot tell: With notes, a tag): the number beside the folder in the sidebar and the drawer (UI/UX #9687); the table's heading keeps the total. */
+export const folderUnread = key => (unread && unread[key]) || undefined;
+
+/** The view list's sections for the chat folders: the number beside a folder is its unread chats, its total is the tooltip (a folder with none unread shows no number). */
 export function chatSections(c = counts) {
-    const out = [{ title: 'Chats', items: FOLDERS.map(f => ({ key: f.key, label: f.label, count: folderCount(f.key, c) })) },
-        { title: 'By CLI', items: CLIS.map(([t, label]) => ({ key: `chats-cli-${t}`, label, count: folderCount(`chats-cli-${t}`, c) })) }];
+    const item = (key, label) => ({ key, label, count: folderUnread(key), total: folderCount(key, c), unread: true });
+    const out = [{ title: 'Chats', items: FOLDERS.map(f => item(f.key, f.label)) },
+        { title: 'By CLI', items: CLIS.map(([t, label]) => item(`chats-cli-${t}`, label)) }];
     const tags = (c && c.tags) || [];
-    if (tags.length && !nativeInbox()) out.push({ title: 'Tags', items: tags.map(t => ({ key: `chats-tag-${t.id}`, label: t.name, count: t.count, dot: /^#[0-9a-f]{3,8}$/i.test(t.color || '') ? t.color : undefined })) });
+    if (tags.length && !nativeInbox()) out.push({ title: 'Tags', items: tags.map(t => ({ key: `chats-tag-${t.id}`, label: t.name, dot: /^#[0-9a-f]{3,8}$/i.test(t.color || '') ? t.color : undefined })) });
     return out;
 }
 
 /** The chat tags there are (from the last counts read): id, name, count, colour. */
 export const chatTags = () => (counts && counts.tags) || [];
+
+/** The chats changed since the marker began, read once (at most 200 a computer), counted by folder against the read marker: how many of each folder the person has not opened. The Chats list pages by folder, so the total the counts route gives cannot say it. */
+async function loadUnread() {
+    try {
+        const day = new Date(IR.readSince() - 86400000).toISOString().slice(0, 10); // a day early: the stamps are compared exactly below
+        const replies = await Promise.all(inboxSources().map(async server => {
+            const r = await serverFetch(server, `/api/sessions/history?${new URLSearchParams({ date_from: day, page: '1', page_size: '200' })}`);
+            if (!r.ok) return [];
+            const d = await r.json(); return (d.sessions || []).map(row => ({ ...row, server }));
+        }));
+        const rows = replies.flat().filter(s => IR.isUnread(readKind(s), readKey(s), stampOf(s)));
+        const next = { chats: rows.filter(s => !isGroup(s)).length, 'chats-group': rows.filter(isGroup).length, 'chats-starred': rows.filter(s => s.starred).length, 'chats-active': rows.filter(s => s.active).length, 'chats-archived': rows.filter(s => s.archived).length };
+        for (const [t] of CLIS) { const types = t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]; next[`chats-cli-${t}`] = rows.filter(s => !isGroup(s) && types.includes(s.source_type)).length; }
+        unread = next;
+    } catch { /* the folders keep their last numbers */ }
+}
 
 export async function loadChatCounts(redraw) {
     try {
@@ -71,6 +92,7 @@ export async function loadChatCounts(redraw) {
         for (const key of ['all','group','notes','starred','active','archived']) counts[key] = replies.reduce((sum, d) => sum + (Number(d[key]) || 0), 0);
         for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
     } catch { /* the folders keep their last counts */ }
+    await loadUnread();
     redraw?.();
     return counts;
 }

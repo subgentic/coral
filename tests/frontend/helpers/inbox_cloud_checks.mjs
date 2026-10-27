@@ -77,7 +77,7 @@ try {
         assert.ok(!document.getElementById('inbox-frame'), 'no frame for the whole tab: the Inbox is drawn');
         const nav = () => [...document.querySelectorAll('#inbox-nav-list button')];
         const words = nav().map(b => b.textContent.replace(/^[a-z_]+(?=[A-Z])/, '').trim());
-        for (const w of ['Needs you', 'Tasks', 'Saved for later', 'All chats2', 'Board history0', 'Starred0']) assert.ok(words.includes(w), `${w} is in the folder list: ${words}`);
+        for (const w of ['Needs you', 'Tasks', 'Saved for later', 'All chats', 'Board history', 'Starred']) assert.ok(words.includes(w), `${w} is in the folder list: ${words}`);
         for (const w of ['Goals', 'Artifacts', 'Saved']) assert.ok(!words.some(x => x === w || x.startsWith(w + ' ') && !x.startsWith('Saved for')), `${w} is not a cloud folder`);
         nav().find(b => /Needs you/.test(b.textContent)).click(); await settle(300);
         const frame = document.querySelector('#group-table-view iframe');
