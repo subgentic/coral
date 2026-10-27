@@ -15,12 +15,15 @@ const SECTIONS = {
     'per-commit': { section: 'cost-spend-section', old: 'cost-spend', metric: 'tokens_per_commit', unit: 'commit', units: 'commits', value: v => `${fmtTokens(v)}`, low: 'cheaper', best: 'Most efficient', word: 'tokens per commit', key: 'coral-eff-group-commit' },
     'task-time': { section: 'cost-task-time-section', old: 'cost-task-time', metric: 'task_time', unit: 'task', units: 'tasks', value: v => fmtDur(v), low: 'faster', best: 'Fastest', word: 'median task time', key: 'coral-eff-group-time' },
 };
+const groupsOf = cfg => (cfg.metric === 'task_time' ? GROUPS.filter(g => g[0] !== 'task') : GROUPS); // every task is a group of one: a task has no comparison to make with itself
 const state = {}; // view key -> { group, data, loading, error, seq }
 let range = '24h';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-const money = v => (num(v) == null ? '' : `$${v >= 100 ? Math.round(v) : v.toFixed(2)}`);
+const money = v => (num(v) == null ? '' : v > 0 && v < 0.01 ? '<$0.01' : `$${v >= 100 ? Math.round(v) : v.toFixed(2)}`);
+/** A cost per commit or task: a group with no recorded cost says so (a $0.00 would read as free); under a cent is "<$0.01". */
+const costWords = (v, unit) => (num(v) == null ? '' : v > 0 ? `${money(v)} per ${unit}` : 'no cost');
 const rangeOf = period => (period === 'week' ? '7d' : period === 'month' ? '30d' : '24h');
 const groupLabel = g => (GROUPS.find(x => x[0] === g) || [g, g])[1];
 
@@ -31,13 +34,13 @@ function build(key) {
     const cfg = SECTIONS[key], section = document.getElementById(cfg.section);
     if (!section || section.dataset.effBuilt) return !!section;
     section.dataset.effBuilt = '1';
-    let saved = 'all'; try { const v = browserLocal.get(cfg.key); if (GROUPS.some(g => g[0] === v)) saved = v; } catch { /* the choice lasts until the page closes */ }
+    let saved = 'all'; try { const v = browserLocal.get(cfg.key); if (groupsOf(cfg).some(g => g[0] === v)) saved = v; } catch { /* the choice lasts until the page closes */ }
     state[key] = { group: saved, data: null, loading: false, error: '', seq: 0 };
     const bar = el('div', 'eff-switch');
     bar.append(el('div', 'eff-switch-label', 'Group by'));
     const seg = el('div', 'eff-seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Group by');
     const pick = el('select', 'cost-time-select eff-pick'); pick.setAttribute('aria-label', 'Group by'); // a phone: one select
-    for (const [value, label] of GROUPS) {
+    for (const [value, label] of groupsOf(cfg)) {
         const b = el('button', 'eff-seg-btn', label); b.type = 'button'; b.dataset.group = value; b.addEventListener('click', () => choose(key, value)); seg.append(b);
         pick.append(new Option(label, value));
     }
@@ -107,6 +110,20 @@ function unmeasuredWords(list, cfg) {
     return parts.join(' ');
 }
 
+/** Tokens per commit by task: most tasks have one commit or none, so there is nothing to rank: a plain list, cheapest first, of the tasks that had a commit. */
+function drawTaskList(view, cfg, d, groups) {
+    const rows = [...groups].sort((a, b) => a.value - b.value), none = d.groups.length - groups.length;
+    view.append(el('p', 'eff-hint', `Tasks with at least one commit, fewest tokens per commit first.${none ? ` ${none} task${none === 1 ? ' has' : 's have'} no commit and ${none === 1 ? 'is' : 'are'} not listed.` : ''}`));
+    const columns = [
+        { key: 'label', label: 'Task', tone: 'primary', cell: g => g.label },
+        { key: 'value', label: 'Tokens per commit', numeric: true, cell: g => cfg.value(g.value) },
+        { key: 'n', label: 'Commits', numeric: true, cell: g => String(g.n) },
+        { key: 'tokens', label: 'Tokens', numeric: true, cell: g => (num(g.tokens) == null ? '—' : fmtTokens(g.tokens)) },
+        { key: 'cost', label: 'Cost per commit', numeric: true, cell: g => (num(g.cost_usd_per_unit) == null ? '—' : g.cost_usd_per_unit > 0 ? money(g.cost_usd_per_unit) : 'no cost') },
+    ];
+    view.append(dataTable({ label: 'Tokens per commit by task', fold: 'labeled', rows, rowKey: g => g.key || g.label, columns }).el);
+}
+
 function draw(key) {
     const s = state[key], cfg = SECTIONS[key], view = document.getElementById(`cost-eff-${key}`); if (!s || !view || s.group === 'all') return;
     view.replaceChildren();
@@ -115,21 +132,23 @@ function draw(key) {
     const d = s.data, min = num(d.min_sample) || 10, groups = d.groups.filter(g => num(g.value) != null && num(g.n) != null && g.n > 0), empty = d.groups.filter(g => !groups.includes(g)); // a group with no commits or tasks (n 0) is listed in the table, with no bar
     const isFewG = g => g.low_sample === true || g.n < min; // the endpoint says it (low_sample); older answers: under the minimum
     if (!groups.length) { view.append(el('p', 'goals-note', `No ${cfg.units} in this time range to compare.`)); return; }
+    if (s.group === 'task') { drawTaskList(view, cfg, d, groups); return; }
     const ranked = groups.filter(g => !isFewG(g)).sort((a, b) => a.value - b.value), few = groups.filter(isFewG).sort((a, b) => a.value - b.value), order = [...ranked, ...few];
     const total = num(d.total && d.total.n) != null ? d.total.n : groups.reduce((n, g) => n + g.n, 0);
     const avg = num(d.average && d.average.value) != null ? d.average.value : groups.reduce((sum, g) => sum + g.value * g.n, 0) / Math.max(1, groups.reduce((n, g) => n + g.n, 0));
     const usual = num(d.average && d.average.usual);
+    const avgWord = cfg.metric === 'task_time' ? 'median' : 'average'; // the answer's average of task time is the median of all tasks
     const cards = el('div', 'eff-cards');
     const best = ranked[0];
-    cards.append(card(`${cfg.best} (at least ${min} ${cfg.units})`, best ? best.label : 'Not enough data', best ? `${cfg.value(best.value)} ${cfg.metric === 'task_time' ? 'median' : 'per ' + cfg.unit}${avg > 0 && best.value < avg ? `, ${Math.round((1 - best.value / avg) * 100)}% under the ${cfg.value(avg)} average` : ''}` : `No group has ${min} ${cfg.units} yet.`, best ? 'good' : ''));
+    cards.append(card(`${cfg.best} (at least ${min} ${cfg.units})`, best ? best.label : 'Not enough data', best ? `${cfg.value(best.value)} ${cfg.metric === 'task_time' ? 'median' : 'per ' + cfg.unit}${avg > 0 && best.value < avg ? `, ${Math.round((1 - best.value / avg) * 100)}% under the ${cfg.value(avg)} ${avgWord}` : ''}` : `No group has ${min} ${cfg.units} yet.`, best ? 'good' : ''));
     if (cfg.metric === 'tokens_per_commit') cards.append(card('Average, all commits', cfg.value(avg), usual != null ? `Usual last week: ${cfg.value(usual)}` : 'tokens per commit'));
-    else { const cheap = ranked.filter(g => num(g.cost_usd_per_unit) != null).sort((a, b) => a.cost_usd_per_unit - b.cost_usd_per_unit)[0]; cards.append(card('Cheapest per task', cheap ? cheap.label : 'Not enough data', cheap ? `${money(cheap.cost_usd_per_unit)} per task, ${cfg.value(cheap.value)} median` : '')); }
+    else { const cheap = ranked.filter(g => num(g.cost_usd_per_unit) > 0).sort((a, b) => a.cost_usd_per_unit - b.cost_usd_per_unit)[0]; cards.append(card('Cheapest per task', cheap ? cheap.label : 'Not enough data', cheap ? `${costWords(cheap.cost_usd_per_unit, 'task')}, ${cfg.value(cheap.value)} median` : '')); }
     cards.append(card(cfg.metric === 'task_time' ? 'Tasks done' : 'Commits counted', String(total), few.length ? `${few.length} group${few.length === 1 ? '' : 's'} below ${min} ${cfg.units}, shown but not ranked` : `every group has at least ${min} ${cfg.units}`));
     view.append(cards);
 
     const panel = el('section', 'eff-panel');
     panel.append(el('h4', 'eff-panel-title', `${cfg.metric === 'task_time' ? 'Median task time' : 'Tokens per commit'}, ${groupLabel(s.group).toLowerCase()}`));
-    panel.append(el('p', 'eff-hint', `Bars: lower is ${cfg.low}. The line is the average across all ${cfg.units}. ${cfg.metric === 'task_time' ? 'Review time is not counted. ' : ''}A ${cfg.unit} belongs to the ${groupLabel(s.group).toLowerCase()} of the agent that did it.`));
+    panel.append(el('p', 'eff-hint', `Bars: lower is ${cfg.low}. The line is the ${avgWord} across all ${cfg.units}. ${cfg.metric === 'task_time' ? 'Review time is not counted. ' : ''}A ${cfg.unit} belongs to the ${groupLabel(s.group).toLowerCase()} of the agent that did it.`));
     const legend = el('div', 'eff-legend');
     const provs = [...new Set(order.filter(g => g.provider).map(g => String(g.provider)))];
     if (s.group === 'provider' || s.group === 'model') for (const p of provs) { const i = el('span', 'eff-legend-item'); const sw = el('i', 'eff-swatch'); sw.style.background = `var(${PROVIDER_VAR[p.toLowerCase()] || '--viz-other'})`; i.append(sw, document.createTextNode(p)); legend.append(i); }
@@ -141,7 +160,7 @@ function draw(key) {
         const lab = el('div', 'eff-bar-label', g.label); lab.append(el('small', null, `${g.n} ${g.n === 1 ? cfg.unit : cfg.units}${cfg.metric === 'task_time' && num(g.sent_back_share) != null ? ` · ${Math.round(g.sent_back_share * 100)}% sent back` : ''}${isFew ? ' · too few to rank' : ''}`));
         const track = el('div', 'eff-track'), fill = el('div', `eff-fill${isFew ? ' eff-few' : ''}`); fill.style.width = `${Math.max(1, g.value / max * 100)}%`; fill.style.background = (s.group === 'provider' || s.group === 'model') ? provVar(g) : 'var(--viz-other)';
         const line = el('div', 'eff-avg'); line.style.left = `${Math.max(0, avg) / max * 100}%`; track.append(fill, line);
-        const val = el('div', 'eff-bar-value', cfg.value(g.value)); if (num(g.cost_usd_per_unit) != null) val.append(el('small', null, `${money(g.cost_usd_per_unit)} per ${cfg.unit}`));
+        const val = el('div', 'eff-bar-value', cfg.value(g.value)); if (num(g.cost_usd_per_unit) != null) val.append(el('small', null, costWords(g.cost_usd_per_unit, cfg.unit)));
         row.append(lab, track, val); bars.append(row);
     }
     panel.append(bars);
@@ -154,12 +173,12 @@ function draw(key) {
     const columns = [
         { key: 'label', label: groupLabel(s.group), tone: 'primary', cell: g => { const c = document.createElement('span'); c.append(document.createTextNode(g.label)); if (g === best) c.append(el('span', 'eff-tag eff-tag-best', cfg.metric === 'task_time' ? 'fastest' : 'most efficient')); if (g.n > 0 && isFewG(g)) c.append(el('span', 'eff-tag', 'few')); if (!g.n) c.append(el('span', 'eff-tag', 'no data')); return c; } },
         { key: 'value', label: cfg.metric === 'task_time' ? 'Median time' : 'Tokens per commit', numeric: true, cell: g => (num(g.value) == null ? '—' : cfg.value(g.value)) },
-        { key: 'vs', label: 'vs average', numeric: true, cell: g => (num(g.value) == null ? '—' : vs(g)) },
+        { key: 'vs', label: `vs ${avgWord}`, numeric: true, cell: g => (num(g.value) == null ? '—' : vs(g)) },
         { key: 'n', label: cfg.metric === 'task_time' ? 'Tasks' : 'Commits', numeric: true, cell: g => String(num(g.n) == null ? 0 : g.n) },
         cfg.metric === 'task_time'
             ? { key: 'sent_back_share', label: 'Sent back', numeric: true, cell: g => (num(g.sent_back_share) == null ? '—' : `${Math.round(g.sent_back_share * 100)}%`) }
             : { key: 'tokens', label: 'Tokens', numeric: true, cell: g => (num(g.tokens) == null ? '—' : fmtTokens(g.tokens)) },
-        { key: 'cost', label: cfg.metric === 'task_time' ? 'Cost per task' : 'Cost per commit', numeric: true, cell: g => (num(g.cost_usd_per_unit) == null ? '—' : money(g.cost_usd_per_unit)) },
+        { key: 'cost', label: cfg.metric === 'task_time' ? 'Cost per task' : 'Cost per commit', numeric: true, cell: g => (num(g.cost_usd_per_unit) == null ? '—' : g.cost_usd_per_unit > 0 ? money(g.cost_usd_per_unit) : 'no cost') },
     ];
     view.append(dataTable({ label: `${cfg.metric === 'task_time' ? 'Task time' : 'Tokens per commit'} by ${groupLabel(s.group).toLowerCase()}`, fold: 'labeled', rows: [...order, ...empty], rowKey: g => g.key || g.label, columns }).el);
 }
