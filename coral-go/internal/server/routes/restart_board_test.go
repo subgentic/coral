@@ -205,3 +205,46 @@ func TestRestartProviderAliasesAreNotASwitch(t *testing.T) {
 	require.NotNil(t, ls)
 	assert.Contains(t, ptr.Value(ls.Flags), "--kept-flag", "gemini to agy is the same provider: the flags are kept")
 }
+
+// The alias pairs the first test does not cover: antigravity to agy and agy to gemini are not a switch either, and a real switch drops the flags (#9003, review pin).
+func TestRestartProviderAliasPairsKeepTheFlagsAndARealSwitchDropsThem(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		from, to string
+		kept     bool
+	}{
+		{"antigravity", "agy", true},
+		{"agy", "gemini", true},
+		{"agy", "antigravity", true},
+		{"gemini", "claude", false},
+		{"agy", "codex", false},
+	} {
+		t.Run(c.from+"_to_"+c.to, func(t *testing.T) {
+			t.Parallel()
+			server, _, term, ss := setupSessionsTestServer(t)
+			ctx := context.Background()
+			const id = "pair-worker"
+			term.addSession(c.from+"-"+id, t.TempDir())
+			require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{
+				SessionID: id, AgentType: c.from, AgentName: "coral-go", Flags: store.MarshalFlags([]string{"--kept-flag"}),
+			}))
+			resp, err := http.Post(server.URL+"/api/sessions/live/"+c.from+"-"+id+"/restart", "application/json",
+				bytes.NewBufferString(`{"session_id":"`+id+`","agent_type":"`+c.to+`","model":""}`))
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			var result struct {
+				SessionID string `json:"session_id"`
+			}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+			ls, err := ss.GetLiveSession(ctx, result.SessionID)
+			require.NoError(t, err)
+			require.NotNil(t, ls)
+			if c.kept {
+				assert.Contains(t, ptr.Value(ls.Flags), "--kept-flag", "%s to %s is one provider: the flags are kept", c.from, c.to)
+			} else {
+				assert.NotContains(t, ptr.Value(ls.Flags), "--kept-flag", "%s to %s is a switch: the flags belong to the old CLI", c.from, c.to)
+			}
+		})
+	}
+}
