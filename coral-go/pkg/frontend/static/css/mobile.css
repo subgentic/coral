@@ -1329,7 +1329,9 @@
     .chat-needs-input .cni-options-chips { position: sticky; bottom: 0; z-index: 2; margin: 12px -18px -12px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg-secondary); }
     .chat-needs-input .cni-options-chips .cni-answer:not(.btn):not(.cni-link) { flex: 1 1 8rem; justify-content: center; }
     .chat-needs-input .cni-options-chips .cni-key, .chat-needs-input .cni-standing .cni-key { display: none; } /* a digit is a keyboard's shortcut */
-    .chat-needs-input .cni-standing { margin: 8px 0 0; } /* the standing permission: a quiet text button above the bar, 44 px, no fill (#9583) */
+    .chat-needs-input .cni-sticky { position: sticky; bottom: 0; z-index: 2; margin: 12px -18px -12px; padding: 0 12px 8px; border-top: 1px solid var(--border); background: var(--bg-secondary); } /* the standing answer above the bar, stuck with it */
+    .chat-needs-input .cni-sticky .cni-options-chips { position: static; margin: 0; padding: 8px 0 0; border: 0; background: none; }
+    .chat-needs-input .cni-standing { margin: 4px 0 0; } /* the standing permission: a quiet text button above the bar, 44 px, no fill (#9583) */
     .chat-needs-input .cni-standing .cni-answer { min-height: var(--control-touch-height, 44px); padding: 0 4px; border: 0; background: none; color: var(--text-secondary); text-decoration: underline; text-underline-offset: 3px; font: inherit; font-size: var(--fs-md); }
 }
 
