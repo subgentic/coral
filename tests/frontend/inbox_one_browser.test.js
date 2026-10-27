@@ -46,6 +46,8 @@ const AGENTS = (waiting) => waiting ? [
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { Input } = client;
+    const mouseTo = (x, y) => Input.dispatchMouseEvent({ type: 'mouseMoved', x, y }); // the runner's Chrome has a mouse: where it last was is where it is, so a test of what is shown at rest puts it somewhere neutral first (the page's empty corner)
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const pane = '.sidebar-pane[data-pane="hub-inbox"]';
     const attn = `${pane} .view-list-item:is([data-key="needs"], [data-key="tasks"], [data-key="goals"], [data-key="saved"])`; // the Needs attention folders; the chat folders under them have their own suite (mailbox_chats)
@@ -154,6 +156,7 @@ const AGENTS = (waiting) => waiting ? [
             assert.deepEqual([savedBar.chipsOnLine, savedBar.chipsInHead, savedBar.label], [2, 0, 'Search saved messages'], at + 'Saved\'s Open and Done chips are on the toolbar line, not a row under the title (QA finding 3), and the page\'s field says what it searches');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent)`), ['Message', 'Saved', 'Action'], at + 'Message, Saved, Action: the Open filter already says Open, so no State column repeats it on every row (#9628)');
             // a row reads who said what: the sender 14/600, the message after it in the secondary colour; Done is drawn on the row's hover or keyboard focus only (a desktop here has a pointer)
+            await mouseTo(2, 2);
             const look = await ev(`(() => { const who = document.querySelector('#group-table-view .dt-saved-who'), text = document.querySelector('#group-table-view .dt-saved-text'), btn = document.querySelector('#group-table-view tbody .dt-hover-action'); const cs = e => getComputedStyle(e); return { who: [cs(who).fontSize, cs(who).fontWeight, who.textContent], textColor: cs(text).color !== cs(who).color, textWeight: cs(text).fontWeight, rest: cs(btn).opacity }; })()`);
             assert.deepEqual([look.who, look.textColor, look.textWeight, look.rest], [['14px', '600', 'Agent One'], true, '400', '0'], at + 'sender 14/600, the message secondary, Done hidden at rest ' + JSON.stringify(look));
             await ev(`document.querySelector('#group-table-view tbody .dt-hover-action').focus(); true`);
@@ -163,7 +166,12 @@ const AGENTS = (waiting) => waiting ? [
             await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
             await waitFor(`matchMedia('(pointer: coarse)').matches && getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'Done is shown on touch without hover or focus', 3000);
             await Emulation.setTouchEmulationEnabled({ enabled: false });
-            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '0'`, at + 'and hidden again at rest on a pointer', 3000);
+            await mouseTo(2, 2);
+            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '0'`, at + 'and hidden again at rest on a pointer (the mouse in a neutral corner)', 3000);
+            const rowAt = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr.dt-row').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+            await mouseTo(rowAt.x, rowAt.y);
+            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'and shown again when the mouse is on the row', 3000);
+            await mouseTo(2, 2);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim() + (c.getAttribute('aria-pressed') === 'true' ? '*' : ''))`), ['Open 2*', 'Done 1'], at + 'Open and Done chips with counts');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-quiet')].map(b => b.textContent)`), ['Done', 'Done'], at + 'one quiet Done button per row');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the saved table is on the scale');
