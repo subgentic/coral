@@ -317,11 +317,11 @@ export function createArtifactsList({ inbox = false } = {}) {
                     // The Inbox's list is crowded (a computer, a team, a task, a goal): the team's words carry its computer ("alpha · Box Two"), so the Server column is only there when one team is chosen and the Team column is not;
                     // every other column has a fixed width and the file's name takes what is left (it was cut to 60 px at 1280, #8839)
                     ...(inbox && model.filters.team ? serverColumns().map(c => ({ ...c, width: '7rem' })) : []),
-                    ...(inbox && !model.filters.team ? [{ key: 'team', label: 'Team', width: '9rem', line: 2, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }] : []), // the Inbox's list spans teams; one team chosen, the column says nothing new
+                    ...(inbox && !model.filters.team ? [{ key: 'team', label: 'Team', width: '8rem', nowrap: false, line: 2, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }] : []), // the Inbox's list spans teams; one team chosen, the column says nothing new
                 { key: 'type', label: 'Type', ...(inbox ? { width: '6.5rem' } : {}), line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
                     { key: 'size', label: 'Size', ...(inbox ? { width: '4.5rem' } : {}), line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
                     // the head says the task or goal a group is: its own column would say it on every row (#8617)
-                    ...(by === 'task' ? [] : [{ key: 'task', label: 'Task', ...(inbox ? { width: '8rem' } : {}), line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskCell }]),
+                    ...(by === 'task' ? [] : [{ key: 'task', label: 'Task', ...(inbox ? { width: '9rem', nowrap: false } : {}), line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskCell }]),
                     ...(by === 'goal' || model.scope || !shown.some(i => i.goal_id) ? [] : [{ key: 'goal', label: 'Goal', ...(inbox ? { width: '7rem' } : {}), line: 2, tone: 'tertiary', cell: item => (item.goal_id && item.goal_title ? String(item.goal_title) : '') }]),
                     { key: 'created', label: 'Created', ...(inbox ? { width: '8rem' } : {}), line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
                     // An agent's list opens an artifact in the preview panel; its sheet (the facts, Keep, Delete, Copy link, who can read it) is one quiet link away (#8539)
