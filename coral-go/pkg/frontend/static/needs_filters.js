@@ -20,6 +20,7 @@ const model = defineFilters({
     kind: { type: 'choice', values: KINDS }, // the pills of the toolbar: a shortcut of this field, so it has no chip of its own
     team: { type: 'custom', empty: '', clean: v => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 200) : ''), filtered: v => !!v, chip: v => `Team: ${v}`, clear: f => ({ ...f, team: '' }) },
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
+    goal: { type: 'text', max: 200, chip: v => `Goal: ${v}` }, // the goal a row's task serves, or "No goal" (#8917)
     longer: { type: 'choice', values: LONGER, chip: v => `Waiting longer than ${LONGER_LABEL[v]}` },
     sort: { type: 'order', values: SORTS, default: 'oldest' },
 });
@@ -41,6 +42,7 @@ export function matches(s, f, ctx, now = Date.now()) {
     if (c.kind && kindOf(s) !== c.kind) return false;
     if (c.team && ctx.teamOf(s) !== c.team) return false;
     if (c.agent && ctx.nameOf(s) !== c.agent) return false;
+    if (c.goal && ctx.goalOf && ctx.goalOf(s) !== c.goal) return false;
     if (c.longer) {
         const since = Date.parse(s.waiting_since || '');
         if (!Number.isFinite(since) || now - since < Number(c.longer) * 60000) return false; // no time to go by is not "longer than"

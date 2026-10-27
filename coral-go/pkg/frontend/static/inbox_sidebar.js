@@ -78,11 +78,13 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 const waitingSessions = () => (state.liveSessions || []).filter(needsInputAttention);
 const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
 const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : resolveSessionIdentity(s);
-const reviewRows = () => reviewItems().map(a => ({ review: a, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
+const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
 const allNeeds = () => [...waitingSessions(), ...reviewRows()];
-const needsText = s => [s.review?.name || '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s)].join(' ').toLowerCase();
+const needsText = s => [s.review?.name || '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;
-const needsCtx = { text: needsText, teamOf, nameOf: needsName };
+const NO_GOAL = 'No goal';
+const goalLabel = s => (s.goal && s.goal.id && s.goal.title ? String(s.goal.title) : NO_GOAL); // the goal a row's task serves (a review's artifact roll-up, #8579; an agent's task, #7302), or the words for none
+const needsCtx = { text: needsText, teamOf, nameOf: needsName, goalOf: goalLabel };
 const filteredNeeds = () => NF.ordered(allNeeds().filter(s => NF.matches(s, needsFilters, needsCtx) && serverMatches(s, needsFilters)), needsFilters);
 const needsOverflow = () => reviewGroups(filteredNeeds().filter(s => s.review).map(s => s.review)).filter(g => g.more.length);
 const needsRows = () => {
@@ -98,6 +100,7 @@ function inboxNeedsToolbar() {
             fields: [
                 { type: 'select', key: 'team', id: 'inbox-needs-team', label: 'Team', values: [], labels: {}, any: 'Any team' },
                 { type: 'select', key: 'agent', id: 'inbox-needs-agent', label: 'Agent', values: [], labels: {}, any: 'Any agent' },
+                { type: 'select', key: 'goal', id: 'inbox-needs-goal', label: 'Goal', values: [], labels: {}, any: 'Any goal' },
                 { type: 'select', key: 'longer', id: 'inbox-needs-longer', label: 'Waiting longer than', values: NF.LONGER, labels: NF.LONGER_LABEL, any: 'Any time' },
             ],
             model: { EMPTY: NF.EMPTY, clean: NF.clean, chips: NF.chips, isFiltered: NF.isFiltered, without: NF.without },
@@ -109,16 +112,17 @@ function inboxNeedsToolbar() {
     }
     const all = allNeeds();
     const teams = [...new Set(all.map(teamOf).filter(Boolean))].sort(), names = [...new Set(all.map(needsName))].sort();
+    const goalNames = [...new Set(all.filter(s => s.review || s.goal).map(goalLabel))].sort((a, b) => (a === NO_GOAL) - (b === NO_GOAL) || a.localeCompare(b)); // review rows and rows with a goal: "No goal" last
     const rows = all.filter(s => NF.matches(s, { ...needsFilters, kind: '' }, needsCtx));
     const counts = NF.KINDS.filter(k => k !== 'review' || reviewItems().length || needsFilters.kind === 'review').map(k => rows.filter(s => NF.kindOf(s) === k).length);
     const node = needsBar.draw({
         filters: needsFilters,
-        options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} } },
+        options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
             items: [{ key: 'all', label: 'All', count: rows.length }, ...NF.KINDS.filter(k => k !== 'review' || reviewItems().length || needsFilters.kind === 'review').map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: counts[i] }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
     });
-    return { node, signature: JSON.stringify([needsFilters, teams, names, counts, rows.length]) };
+    return { node, signature: JSON.stringify([needsFilters, teams, names, goalNames, counts, rows.length]) };
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────
@@ -438,7 +442,7 @@ registerGroupSource('hub-inbox', {
             const goal = rows.some(goalOf);
             const total = filteredNeeds().length;
             return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.' },
-                signature: JSON.stringify([needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, dirOf(s)])]), // the words move on with the clock: they are part of what was drawn
+                signature: JSON.stringify([needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s)])]), // the words move on with the clock: they are part of what was drawn
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : resolveSessionIdentity(s),
                     open: s => { if (s.review) { openReview(s.review); return; } window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
                     columns: [
@@ -451,7 +455,14 @@ registerGroupSource('hub-inbox', {
                         ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
                         ...serverColumns(),
                         { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
-                        ...(goal ? [{ key: 'goal', label: 'Goal', line: 0, cell: s => { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; } }] : []),
+                        ...(goal || rows.some(s => s.review) ? [{ key: 'goal', label: 'Goal', sort: true, sortValue: s => (goalOf(s) ? s.goal.title : '\uffff'), line: rows.some(s => s.review) ? 2 : 0, cell: s => {
+                            // a review's goal and task come from its artifact's roll-up (#8579); they open in the Inbox, in place; "No goal" when it serves none
+                            if (!s.review) { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; }
+                            const cell = DT.el('span', 'inbox-review-goal');
+                            if (goalOf(s)) { const l = DT.link(s.goal.title, () => go({ ...folderRoute, id: s.review.team, item: String(s.goal.id) })); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); l.dataset.goalLink = String(s.goal.id); cell.append(l); } else cell.append(DT.el('span', 'inbox-review-nogoal', NO_GOAL));
+                            if (s.task) { const t = DT.link(s.task.title || `Task ${s.task.id}`, () => openItemRoute('tasks', s.review.team, String(s.task.id), `${s.review.team}#${s.task.id}`)); t.classList.add('inbox-review-task'); t.setAttribute('aria-label', `Task: ${s.task.title || s.task.id}`); t.dataset.taskLink = String(s.task.id); cell.append(t); }
+                            return cell;
+                        } }] : []),
                         ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', width: '14rem', line: 1, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
                         { key: 'waiting', label: 'Waiting', tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(s => s.review) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
                     ] });

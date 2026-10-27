@@ -1,5 +1,5 @@
 // The Inbox's Needs you folder has the shared list toolbar (#8604, goal #62; UI/UX #8589 section 9): the search box, the kind pills (All, Permission, Question, Needs input) and the Filters icon in one row (the icon to the
-// right of the search), and in the Filters panel Team, Agent, Waiting longer than and Sort; chips, "N on" on the icon, the filters kept in the browser, the folder list (the sidebar) not touched, the longest-waiting
+// right of the search), and in the Filters panel Team, Agent, Goal, Waiting longer than and Sort; chips, "N on" on the icon, the filters kept in the browser, the folder list (the sidebar) not touched, the longest-waiting
 // agent first by default. At 1280 and at 390, where the pills are one select and the search keeps at least 10rem. Four agents are made to wait through the live list. Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -56,7 +56,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
 
             await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`); await settle(200);
             const labels = await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-field-label')].filter(e => e.getClientRects().length).map(e => e.textContent.trim()).join('|')`);
-            check(`${label}: the Filters panel has Team, Agent, Waiting longer than and Sort`, labels.replace(/^Show\|/, '') === 'Team|Agent|Waiting longer than|Sort', labels);
+            check(`${label}: the Filters panel has Team, Agent, Goal (#8917), Waiting longer than and Sort`, labels.replace(/^Show\|/, '') === 'Team|Agent|Goal|Waiting longer than|Sort', labels);
             await setField('inbox-needs-team', 'team-b'); await waitNames(2, 'team-b');
             check(`${label}: a Team filter shows only that team's agents, as a chip, and the icon says one is on`, (await chipText()) === 'Team: team-b' && /1 on/.test(await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').getAttribute('aria-label')`)), await chipText());
             await setField('inbox-needs-longer', '60'); await waitNames(1, 'waiting more than an hour');
