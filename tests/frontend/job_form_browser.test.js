@@ -78,11 +78,12 @@ const STUB = `(() => {
             // 3b. the pickers write the cron expression; the zone defaults to the person's own and is not named
             const cronOf = () => ev(`document.getElementById('job-modal-cron').value`);
             await ev(`document.querySelector('.sched-preset[data-mode="minutes"]').click(); true`);
-            await type('#job-modal-every', '15');
+            await ev(`(() => { const s = document.getElementById('job-modal-every'); s.value = '15'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             assert.equal(await cronOf(), '*/15 * * * *', at + 'every 15 minutes');
             await waitFor(`/^Runs every 15 minutes\\. Next:/.test(document.getElementById('cron-preview').textContent)`, 'the sentence for every 15 minutes', 8000);
             await ev(`document.querySelector('.sched-preset[data-mode="hours"]').click(); true`);
-            await type('#job-modal-every', '6');
+            await ev(`(() => { const s = document.getElementById('job-modal-every'); s.value = '6'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#job-modal-every option')].map(o => o.value).join(',')`), '1,2,3,4,6,8,12', at + 'hours offer only the steps that divide the day');
             assert.equal(await cronOf(), '0 */6 * * *', at + 'every 6 hours');
             await ev(`document.querySelector('.sched-preset[data-mode="daily"]').click(); true`);
             await ev(`(() => { const i = document.getElementById('job-modal-at'); i.value = '07:30'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
