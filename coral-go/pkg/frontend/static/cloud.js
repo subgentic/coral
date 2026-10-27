@@ -180,13 +180,13 @@ export function installCloudFetch() {
 const signOut = signOutThisBrowser; // drafts, pending messages, recent folders, stars and panel requests go before the session does (#3681, #4164)
 
 function buildAccountMenu(email) {
-    const menu = h('div', { className: 'cloud-account-menu', id: 'cloud-account-menu', hidden: true, role: 'menu' },
+    const menu = h('div', { className: 'menu cloud-account-menu', id: 'cloud-account-menu', hidden: true, role: 'menu' },
         h('div', { className: 'cloud-account-email', text: email, title: email }),
-        h('button', { type: 'button', className: 'overflow-menu-item', role: 'menuitem', text: 'Servers', onclick: () => { setOpen(false); importOnce('./servers.js', 'the server list').then(m => m.showServersModal(), () => {}); } }),
+        h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Servers', onclick: () => { setOpen(false); importOnce('./servers.js', 'the server list').then(m => m.showServersModal(), () => {}); } }),
         // The hub's own pages, on this origin (the dashboard is served by the hub): plain links, same tab. Account is coral-go#1, Saved for later the hub's roll-up of every machine's saved messages (#4596).
-        h('a', { className: 'overflow-menu-item', role: 'menuitem', href: '/account', text: 'Account' }),
-        h('a', { className: 'overflow-menu-item', role: 'menuitem', href: '/saved', text: 'Saved for later' }),
-        h('button', { type: 'button', className: 'overflow-menu-item', role: 'menuitem', text: 'Sign out', onclick: signOut }),
+        h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href: '/account', text: 'Account' }),
+        h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href: '/saved', text: 'Saved for later' }),
+        h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Sign out', onclick: signOut }),
     );
     const setOpen = open => { menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
     const btn = h('button', {

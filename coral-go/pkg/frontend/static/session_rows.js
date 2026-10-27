@@ -131,114 +131,114 @@ function _mobileRowParts(s, stateInfo) {
 /** The items of an agent row's action menu (drawn when it opens): the archived, sleeping or awake set. */
 function _rowMenuContent(s, sid) {
     const _archiveItem = `
-            <button class="overflow-menu-item" data-on-click="agent-archive" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="archive">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-archive" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="archive">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M6.5 9h3"/></svg>
                 Archive
             </button>
 `;
     const _sleepingMenu = `
-            <a class="overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" title="Open Agent Tab" aria-label="Open Agent Tab" data-on-click="kebab-close">
+            <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" title="Open Agent Tab" aria-label="Open Agent Tab" data-on-click="kebab-close">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
                 Open Agent Tab
             </a>
-            <button class="overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Wake
             </button>
-${_archiveItem}            <button class="overflow-menu-item" data-on-click="agent-restart" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-click="agent-restart" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-rename" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-rename" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
                 Rename
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-icon" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-icon" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M5.5 9.5c0 0 1 1.5 2.5 1.5s2.5-1.5 2.5-1.5"/><circle cx="6" cy="6.5" r="0.5" fill="currentColor" stroke="none"/><circle cx="10" cy="6.5" r="0.5" fill="currentColor" stroke="none"/></svg>
                 Set Icon
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-info" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-info" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>
                 Session Info
             </button>
             <hr class="overflow-menu-divider">
-            <button class="overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="up">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="up">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 7l4-4 4 4"/></svg>
                 Move Up
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="down">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="down">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 9l4 4 4-4"/></svg>
                 Move Down
             </button>
             <hr class="overflow-menu-divider">
-            <button class="overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
                 Remove Agent
             </button>`;
     const _awakeMenu = `
-            <a class="overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" title="Open Agent Tab" aria-label="Open Agent Tab" data-on-click="kebab-close">
+            <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" title="Open Agent Tab" aria-label="Open Agent Tab" data-on-click="kebab-close">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
                 Open Agent Tab
             </a>
-            <button class="overflow-menu-item" data-local-only data-on-click="agent-attach" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-local-only data-on-click="agent-attach" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,4 8,8 4,12"/><line x1="9" y1="12" x2="13" y2="12"/></svg>
                 Attach
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-restart" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-restart" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart
             </button>
             ${autoAcceptMenuItem(s)}
-            <button class="overflow-menu-item" data-on-click="agent-rename" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-rename" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
                 Rename
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-icon" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-icon" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M5.5 9.5c0 0 1 1.5 2.5 1.5s2.5-1.5 2.5-1.5"/><circle cx="6" cy="6.5" r="0.5" fill="currentColor" stroke="none"/><circle cx="10" cy="6.5" r="0.5" fill="currentColor" stroke="none"/></svg>
                 Set Icon
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-info" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-info" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>
                 Session Info
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="sleep">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="sleep">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Sleep
             </button>
 ${_archiveItem}            <hr class="overflow-menu-divider">
-            <button class="overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="up">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="up">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 7l4-4 4 4"/></svg>
                 Move Up
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="down">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="down">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 9l4 4 4-4"/></svg>
                 Move Down
             </button>
             <hr class="overflow-menu-divider">
-            <button class="overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
                 Kill Session
             </button>`;
     // Archived: no Restart, Rename or reordering (#3030).
     const _archivedMenu = `
-            <a class="overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" title="Open Agent Tab" aria-label="Open Agent Tab" data-on-click="kebab-close">
+            <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" title="Open Agent Tab" aria-label="Open Agent Tab" data-on-click="kebab-close">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
                 Open Agent Tab
             </a>
-            <button class="overflow-menu-item" data-on-click="agent-archive" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="unarchive">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-archive" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="unarchive">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M8 12V8M6 10l2-2 2 2"/></svg>
                 Unarchive
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Wake
             </button>
-            <button class="overflow-menu-item" data-on-click="agent-info" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-info" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>
                 Session Info
             </button>
             <hr class="overflow-menu-divider">
-            <button class="overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
                 Remove Agent
             </button>`;
@@ -325,7 +325,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const rowMenuId = kebabId('agent', rowMenuKey(s.session_id, sessionServer(s), s.name));
     const kebabMenu = `<div class="sidebar-kebab-wrapper">
         <button class="sidebar-kebab-btn" data-on-click="kebab-toggle" title="More actions" aria-label="More actions for ${escapeAttr(identity)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(rowMenuId)}">&#x22EE;</button>
-        <div class="sidebar-kebab-menu" id="${escapeAttr(rowMenuId)}" style="display:none" data-lazy-menu="1" role="menu" aria-label="Actions for ${escapeAttr(identity)}"></div>
+        <div class="menu sidebar-kebab-menu" id="${escapeAttr(rowMenuId)}" style="display:none" data-lazy-menu="1" role="menu" aria-label="Actions for ${escapeAttr(identity)}"></div>
     </div>`;
     const compactClass = isCompact ? ' session-compact' : '';
     const collapsedClass = collapsed ? ' group-collapsed' : '';

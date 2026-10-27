@@ -47,7 +47,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelector('.cloud-account-btn').getAttribute('aria-expanded')`), 'true');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#cloud-account-menu > *')].map(e => e.textContent)`), ['tester@example.com', 'Servers', 'Account', 'Saved for later', 'Sign out']);
         const links = await ev(`[...document.querySelectorAll('#cloud-account-menu a')].map(a => ({ text: a.textContent, href: a.getAttribute('href'), role: a.getAttribute('role'), cls: a.className, target: a.getAttribute('target'), resolved: new URL(a.href).origin === location.origin }))`);
-        assert.deepEqual(links, [{ text: 'Account', href: '/account', role: 'menuitem', cls: 'overflow-menu-item', target: null, resolved: true }, { text: 'Saved for later', href: '/saved', role: 'menuitem', cls: 'overflow-menu-item', target: null, resolved: true }]);
+        assert.deepEqual(links, [{ text: 'Account', href: '/account', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: true }, { text: 'Saved for later', href: '/saved', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: true }]);
         if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/hub-account-menu.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); true`);
         assert.equal(await ev(`document.querySelector('.cloud-account-btn').getAttribute('aria-expanded')`), 'false');
