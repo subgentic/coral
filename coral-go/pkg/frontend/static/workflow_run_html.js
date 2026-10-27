@@ -1,7 +1,7 @@
 /* Workflows: the markup of a run's page: its header line, progress bar and step timeline (moved out of workflows.js, #8360; no behaviour change). Pure builders: a run in, escaped HTML out. */
 
 import { escapeHtml as esc, escapeAttr as escAttr } from './utils.js';
-import { formatDuration } from './format.js';
+import { compactDuration } from './format.js';
 import { reasonWords } from './job_words.js';
 
 export function formatTime(ts) {
@@ -48,7 +48,7 @@ export function runElapsedWords(run) {
     if (!run.started_at) return '';
     const end = run.finished_at ? new Date(run.finished_at) : new Date();
     const sec = Math.max(0, Math.round((end - new Date(run.started_at)) / 1000));
-    return `${run.finished_at ? 'took' : 'running'} ${formatDuration(sec, { unit: 's', dropZeroSeconds: true })}`;
+    return `${run.finished_at ? 'took' : 'running'} ${compactDuration(sec)}`;
 }
 
 /** The run's elapsed time, or '' for a run that has not started. */
@@ -57,7 +57,7 @@ export function runDurationHtml(run) {
     if (run.started_at) {
         const endTime = run.finished_at ? new Date(run.finished_at) : new Date();
         const durSec = Math.round((endTime - new Date(run.started_at)) / 1000);
-        durationHtml = `<span><span class="material-icons" aria-hidden="true">hourglass_empty</span> ${formatDuration(durSec, { unit: 's', dropZeroSeconds: true })}</span>`;
+        durationHtml = `<span><span class="material-icons" aria-hidden="true">hourglass_empty</span> ${compactDuration(durSec)}</span>`;
     }
     return durationHtml;
 }
@@ -85,10 +85,10 @@ export function runStepHtml(run, s, i, count) {
         let timingHtml = '';
         if (s.started_at && s.finished_at) {
             const dur = Math.round((new Date(s.finished_at) - new Date(s.started_at)) / 1000);
-            timingHtml = `<span class="wf-run-step-timing">${formatDuration(dur, { unit: 's', dropZeroSeconds: true })}</span>`;
+            timingHtml = `<span class="wf-run-step-timing">${compactDuration(dur)}</span>`;
         } else if (s.started_at) {
             const elapsed = Math.round((new Date() - new Date(s.started_at)) / 1000);
-            timingHtml = `<span class="wf-run-step-timing wf-timing-active">${formatDuration(elapsed, { unit: 's', dropZeroSeconds: true })}...</span>`;
+            timingHtml = `<span class="wf-run-step-timing wf-timing-active">${compactDuration(elapsed)}...</span>`;
         }
 
         const isFailed = s.status === 'failed' || s.status === 'killed';

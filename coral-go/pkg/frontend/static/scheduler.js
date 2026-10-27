@@ -7,7 +7,7 @@ import { announceNotice } from './notifications.js';
 import { registerActions, withId, uuidOf } from './actions.js';
 import { pollEvery } from './overload.js';
 import { showJobModal, editScheduledJob } from './job_form.js';
-import { formatDuration } from './format.js';
+import { compactDuration } from './format.js';
 import { runFailure } from './run_failure.js';
 import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords } from './job_words.js';
 import { foldWayBack } from './sidebar_groups.js';
@@ -219,7 +219,7 @@ function resultCell(r) {
     if (reason) { chip.title = reason; cell.append(DT.el('span', 'sr-only dt-run-reason', ` ${reason}`)); } // one line a row (Goal #79): the reason is the chip's tooltip and said to assistive technology, not a second line
     return cell;
 }
-const tookOf = (r) => (r.started_at && r.finished_at ? formatDuration(new Date(r.finished_at) - new Date(r.started_at)) : r.started_at ? 'running...' : '-');
+const tookOf = (r) => (r.started_at && r.finished_at ? compactDuration((new Date(r.finished_at) - new Date(r.started_at)) / 1000) : r.started_at ? 'running...' : '-');
 
 // Both job kinds share the table; workflow runs open their run and agent runs link to their conversation.
 function renderRunsTable(page) {
