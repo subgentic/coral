@@ -1,6 +1,6 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { openTask } from './task_navigation.js';
-import { boardFetch, keyLabel } from './server_base.js';
+import { boardFetch, keyLabel, isCloud } from './server_base.js';
 import { OPERATOR_ID } from './utils.js';
 import { browserLocal } from './safe_storage.js';
 import { whenText } from './when_text.js';
@@ -10,7 +10,7 @@ import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
 import { onGoalsSeq } from './goals_feed.js';
 import { pollEvery } from './overload.js';
-const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
+const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js'); // the one shared pane (#8914): a goal's task or artifact opens in it, beside the list
 const DT = await importOnce('./data_table.js');
 const TV = await importOnce('./tasks_view.js');
 const PAGE = 50;
@@ -18,7 +18,7 @@ const PAGE = 50;
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
 export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals' }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
     const root = host;
-    const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', screen: 'goal', creating: false };
+    const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', tab: 'tasks', creating: false };
     let current = goal;
     let disposed = false;
     const goalById = gid => current?.id === gid ? current : null;
@@ -157,32 +157,76 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         main.append(progress);
         if (total) main.append(rollupBar(g.rollup));
         main.append(el('p', 'goals-note goals-updating', rowsAgree(g) ? '' : 'Updating…')); // the column says it too, and is aria-busy
-        const tasks = model.tasks.get(g.id);
-        if (tasks && tasks.rows) { // on a phone the list is the next screen: its way in
-            const go = btn('btn goal-tasks-open', '', () => { model.screen = 'column'; drawPage(); focusHeading('.goal-side-back'); });
-            go.append(el('span', 'goal-tasks-label', 'Tasks'), el('span', 'goal-tasks-counts', `${openLeft} open, ${g.rollup.done} done`), el('span', 'goal-tasks-chevron')); // a phone's way into the list: the button look, the counts beside the label, a chevron at the edge (#8681)
-            go.setAttribute('aria-label', `Tasks, ${openLeft} open, ${g.rollup.done} done`); go.querySelector('.goal-tasks-chevron').setAttribute('aria-hidden', 'true');
-            main.append(go);
-        }
+        main.append(drawTabs(g)); // the Tasks | Artifacts strip and the list under the goal's details (#8914)
         // The pinned bar: Add task and Close goal (Reopen for a closed one), always at the bottom of the page.
         const bar = el('div', 'goals-pinbar');
         bar.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
         if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); bar.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
         else if (W.isClosedGoal(g)) bar.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
-        main.append(artifactsHost(g)); // below the progress and the task button, above the pinned bar
         main.append(bar);
         return h;
     }
 
     const focusHeading = (sel) => requestAnimationFrame(() => root && root.querySelector(sel)?.focus({ preventScroll: true }));
 
-    /** The column's counts: the open and done tasks, and the follow-ups still open when there are any (#7816). */
-    function sideCounts(g) {
-        const r = g.rollup, openN = r.active + r.blocked + r.queued, fu = model.followUps.get(g.id) || 0;
-        return `${openN} open, ${r.done} done${fu ? `, ${W.followUpsOpenText(fu)}` : ''}`;
+    /** A goal's row as the board's task record the columns read. */
+    function taskOf(t) {
+        const raw = t.raw || {};
+        return { ...raw, id: t.id, title: t.title, status: raw.status || t.state, worked_by: t.workedBy || raw.worked_by, assigned_to: raw.assigned_to ?? t.assignee };
     }
 
-    /** The server counts a goal's open follow-ups where one goal is read (never in the list): read it again when the goal's tasks change, and say it in the column's head. */
+    // ── the goal's lists and its preview (#8914, Goal #73: the Operator's goal screen) ─────
+    // Left: the goal's details, then one Tasks | Artifacts strip over one-line rows; right: the clicked task or artifact in the shared detail pane (one at a time; nothing opens by itself, and the list has the
+    // whole width until one does). On a narrow screen the pane covers the list with a Back. The pane's element lives across drawings, so what is open stays open while the page is drawn again.
+    const previewEl = el('aside', 'detail-pane goal-detail-pane'); previewEl.hidden = true;
+    const preview = { key: '', rowKey: '' };
+    const artifacts = { id: 0, host: null, api: null, total: null };
+    const splitEl = () => root.querySelector('.goal-split');
+
+    function markPreviewRow() {
+        for (const tr of root.querySelectorAll('.goal-list tr[data-key]')) { if (preview.rowKey && tr.dataset.key === preview.rowKey) tr.setAttribute('aria-current', 'true'); else tr.removeAttribute('aria-current'); }
+    }
+    function closePreview(restoreFocus = false) { if (!previewEl.hidden) closeDetailPane({ restoreFocus }); }
+    /** What closing the pane does: the list has the whole width again, the row is no longer current, and the keyboard is back on the row that opened it (#8830). */
+    const paneClosed = opener => () => {
+        const rowKey = preview.rowKey; preview.key = ''; preview.rowKey = '';
+        splitEl()?.classList.remove('goal-split-open'); markPreviewRow();
+        (opener && opener.isConnected ? opener : root.querySelector(`.goal-list tr[data-key="${CSS.escape(rowKey)}"] .dt-primary`))?.focus?.({ preventScroll: true });
+    };
+    function opened(opener, key) {
+        const tr = opener && opener.closest && opener.closest('tr');
+        preview.key = key; preview.rowKey = tr ? tr.dataset.key || '' : '';
+        splitEl()?.classList.add('goal-split-open'); markPreviewRow();
+    }
+    function openPreviewTask(task, opener) {
+        const g = goalById(model.openId);
+        const shown = openDetailPane({
+            key: `task:${task.id}`, opener, host: previewEl, onClose: paneClosed(opener),
+            title: `#${task.id} ${task.title}`, backLabel: 'Tasks', focusClose: true,
+            body: (body, { isStale }) => importOnce('./task_preview.js').then(m => m.mountTaskPreview(body, { project: model.project, taskId: task.id }, { current: () => !isStale(), title: () => {}, close: () => closePreview(true) })),
+            actions: [{ label: 'Open task page', primary: true, run: () => (onTask ? onTask(task, g) : openTask(model.project, task.id, null, { from: g && g.title })) }],
+        });
+        if (shown) opened(opener, `task:${task.id}`);
+    }
+    function openPreviewArtifact(item, opener) {
+        importOnce('./goal_artifacts.js').then(m => {
+            const shown = m.openArtifactInPane(item, { team: model.project, host: previewEl, opener, backLabel: 'Artifacts', onClose: paneClosed(opener) });
+            if (shown) opened(opener, `artifact:${item.id || item.uri || item.name}`);
+        }).catch(() => {});
+    }
+
+    /** The Artifacts tab's count: read once for the goal on show, again when its tasks change. */
+    async function countArtifacts(gid, force = false) {
+        if (!force && artifacts.id === gid && artifacts.total != null) return;
+        const m = await importOnce('./goal_artifacts.js').catch(() => null);
+        if (!m || disposed) return;
+        const n = await m.countGoalArtifacts(model.project, gid);
+        if (disposed || model.openId !== gid) return;
+        artifacts.total = n;
+        const label = root.querySelector('#goal-tab-artifacts .goal-tab-count'); if (label) label.textContent = ` ${n}`;
+    }
+
+    /** The server counts a goal's open follow-ups where one goal is read (never in the list): read it again when the goal's tasks change, and say it above the tasks (#7816). */
     function readFollowUps(g) {
         const key = JSON.stringify([g.id, g.rollup, g.updatedAt]);
         if (model.followKey.get(g.id) === key) return;
@@ -193,76 +237,71 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const n = Number(one && one.follow_ups_open) || 0;
             if (n === (model.followUps.get(g.id) || 0)) return;
             model.followUps.set(g.id, n);
-            const counts = model.openId === g.id && root && root.querySelector('.goal-side-counts'); if (counts) counts.textContent = sideCounts(goalById(g.id) || g);
+            if (model.openId === g.id) drawDetail();
         }).catch(() => { model.followKey.delete(g.id); }); // a failed read is tried again at the next drawing; the count is not made up
     }
 
-    /** The task column: header with the counts, search, Open then Done, each row a button that opens the task in the main pane. */
-    function drawGoalSide(side, g) {
-        side.replaceChildren();
-        const r = g.rollup, openN = r.active + r.blocked + r.queued;
-        const back = backButton(`Goal: ${g.title}`, () => { model.screen = 'goal'; drawPage(); focusHeading('.goal-tasks-open'); }); back.classList.add('goal-side-back'); // a phone's way back from the list to the goal
-        const head = el('div', 'goal-side-head'); head.append(el('strong', null, 'Tasks'), el('span', 'goal-side-counts', sideCounts(g)));
+    function tasksList(list, g) {
         readFollowUps(g);
-        const search = el('input', 'goal-side-search'); search.type = 'search'; search.placeholder = 'Search tasks'; search.autocomplete = 'off'; search.maxLength = 100;
-        search.setAttribute('aria-label', `Search the tasks of ${g.title}`); search.value = model.taskSearch;
-        const list = el('div', 'goal-side-list');
-        if (!rowsAgree(g)) list.setAttribute('aria-busy', 'true');
-        side.append(back, head, search, list);
+        const fu = model.followUps.get(g.id) || 0;
+        if (fu) list.append(el('p', 'goals-note goal-followups', W.followUpsOpenText(fu)));
         const tasks = model.tasks.get(g.id);
-        const fill = () => {
-            list.replaceChildren();
-            if (!tasks) { list.append(el('p', 'goals-note', 'Loading tasks…')); return; }
-            if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); list.append(f); return; }
-            if (!tasks.rows.length) { list.append(el('p', 'goals-note', 'No tasks yet')); return; }
-            const q = model.taskSearch.trim().toLowerCase();
-            const shown = tasks.rows.slice(0, tasks.shown).filter(t => !q || `#${t.id} ${t.title} ${whoOf(t)}`.toLowerCase().includes(q));
-            if (!shown.length) { list.append(el('p', 'goals-note', `No task matches "${model.taskSearch.trim()}"`)); }
-            const groups = [['Open', shown.filter(t => !isDone(t))], ['Done', shown.filter(isDone).sort((a, b) => b.id - a.id)]]; // the newest done task first
-            for (const [name, rows] of groups) {
-                if (!rows.length) continue;
-                const head = el('h3', 'goal-side-group', `${name} ${rows.length}`);
-                list.append(head, sideTable(g, name, rows).el);
-            }
-            const total = taskTotal(g, tasks), left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(total - tasks.shown, 1) : 0);
-            if (left) list.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
-            if (tasks.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, tasks.moreFailed)); list.append(f); }
-        };
-        fill();
-        search.addEventListener('input', () => { model.taskSearch = search.value; fill(); });
-    }
-
-    /** A goal's row as the board's task record the columns read. */
-    function taskOf(t) {
-        const raw = t.raw || {};
-        return { ...raw, id: t.id, title: t.title, status: raw.status || t.state, worked_by: t.workedBy || raw.worked_by, assigned_to: raw.assigned_to ?? t.assignee };
-    }
-
-    /** A group of the column (Open, Done): the one table, folded to its two-line row in the column's narrow box. */
-    function sideTable(g, name, rows) {
-        return TV.tasksTable('goal', rows.map(taskOf), { label: `${name} tasks of ${g.title}`, ctx: { goalTitleOf: (gid) => (goalById(gid) || {}).title || `Goal ${gid}` },
-            open: task => onTask ? onTask(task, g) : openTask(model.project, task.id), sortBar: false, bare: true, state: sideState(g.id, name) });
+        if (!rowsAgree(g)) list.setAttribute('aria-busy', 'true');
+        if (!tasks) { list.append(el('p', 'goals-note', 'Loading tasks\u2026')); return; }
+        if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); list.append(f); return; }
+        if (!tasks.rows.length) { list.append(el('p', 'goals-note', 'No tasks yet')); return; }
+        const shown = tasks.rows.slice(0, tasks.shown);
+        const groups = [['Open', shown.filter(t => !isDone(t))], ['Done', shown.filter(isDone).sort((a, b) => b.id - a.id)]]; // the newest done task first
+        for (const [name, rows] of groups) {
+            if (!rows.length) continue;
+            list.append(el('h3', 'goal-side-group', `${name} ${rows.length}`), TV.tasksTable('goal', rows.map(taskOf), { label: `${name} tasks of ${g.title}`, ctx: { goalTitleOf: (gid) => (goalById(gid) || {}).title || `Goal ${gid}` },
+                open: (task, tr) => openPreviewTask(task, tr.querySelector('.dt-primary')), fold: 'none', sortBar: false, bare: true, state: sideState(g.id, name) }).el);
+        }
+        const total = taskTotal(g, tasks), left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(total - tasks.shown, 1) : 0);
+        if (left) list.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
+        if (tasks.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, tasks.moreFailed)); list.append(f); }
     }
     const sideStates = new Map();
     const sideState = (gid, name) => { const k = `${gid}:${name}`; if (!sideStates.has(k)) sideStates.set(k, DT.tableState()); return sideStates.get(k); };
 
-    /** The separator's value for a screen reader: the column's width and its limits (the dock's, dock_resize.js). */
-    function gripValue(grip, split, side) {
-        grip.setAttribute('aria-valuemin', String(DOCK_MIN_WIDTH)); grip.setAttribute('aria-valuemax', String(dockMaxWidth(split)));
-        grip.setAttribute('aria-valuenow', String(Math.round(side.getBoundingClientRect().width)));
+    /** The Artifacts list: one mount for the goal on show, its node moved into each drawing, so what is loaded stays while the page is drawn again. */
+    function artifactsList(list, g) {
+        if (artifacts.id !== g.id) {
+            artifacts.api?.destroy(); artifacts.api = null; artifacts.total = null;
+            const host = artifacts.host = el('div', 'goal-artifacts-host'); artifacts.id = g.id;
+            importOnce('./goal_artifacts.js').then(m => { if (!disposed && artifacts.host === host) artifacts.api = m.mountGoalArtifactsList(host, { team: model.project, goalId: g.id, onOpen: openPreviewArtifact, onCount: n => { artifacts.total = n; const c = root.querySelector('#goal-tab-artifacts .goal-tab-count'); if (c) c.textContent = ` ${n}`; } }); }).catch(() => {});
+        }
+        list.append(artifacts.host);
+    }
+
+    function drawTabs(g) {
+        const wrap = el('div', 'goal-lists');
+        const strip = el('div', 'goal-tabs'); strip.setAttribute('role', 'tablist'); strip.setAttribute('aria-label', `The tasks and artifacts of ${g.title}`);
+        const tabs = [['tasks', 'Tasks', totalOf(g.rollup)], ...(isCloud() ? [] : [['artifacts', 'Artifacts', artifacts.total]])];
+        if (!tabs.some(t => t[0] === model.tab)) model.tab = 'tasks';
+        for (const [key, label, n] of tabs) {
+            const b = btn('goal-tab', null, () => { if (model.tab === key) return; model.tab = key; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${key}`)?.focus({ preventScroll: true }); });
+            b.id = `goal-tab-${key}`; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(model.tab === key)); b.setAttribute('aria-controls', 'goal-list'); b.tabIndex = model.tab === key ? 0 : -1;
+            b.append(el('span', 'goal-tab-label', label), el('span', 'goal-tab-count', n == null ? '' : ` ${n}`));
+            b.addEventListener('keydown', e => { if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return; e.preventDefault(); const i = tabs.findIndex(t => t[0] === key), next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length][0]; model.tab = next; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${next}`)?.focus({ preventScroll: true }); });
+            strip.append(b);
+        }
+        const list = el('div', 'goal-list'); list.id = 'goal-list'; list.setAttribute('role', 'tabpanel'); list.setAttribute('aria-labelledby', `goal-tab-${model.tab}`);
+        if (model.tab === 'artifacts') artifactsList(list, g); else tasksList(list, g);
+        wrap.append(strip, list);
+        countArtifacts(g.id);
+        return wrap;
     }
 
     function drawGoalPageRaw(col) {
         const g = goalById(model.openId);
         const keep = document.activeElement && document.activeElement.id === 'goals-detail-title';
         col.replaceChildren();
-        const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.classList.toggle('goal-split-column', model.screen === 'column');
-        const main = el('div', 'goal-main'), side = el('aside', 'goal-side'); side.setAttribute('aria-label', `Tasks of ${g.title}`);
-        const grip = el('div', 'goal-side-grip'); grip.setAttribute('role', 'separator'); grip.setAttribute('aria-orientation', 'vertical'); grip.setAttribute('aria-label', 'Resize the task list'); grip.tabIndex = 0; grip.title = 'Drag to resize, double click to reset';
-        split.append(main, side, grip); col.append(split);
-        attachDockResize(grip, { panel: side, row: split, key: 'coral-goal-side-width', apply: (w) => { split.style.setProperty('--goal-side-w', w ? `${w}px` : ''); gripValue(grip, split, side); } }).restore();
-        drawGoalSide(side, g);
+        const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.classList.toggle('goal-split-open', !previewEl.hidden);
+        const main = el('div', 'goal-main');
+        split.append(main, previewEl); col.append(split);
         const h = drawGoalMain(main, g);
+        markPreviewRow();
         if (keep) h.focus();
     }
 
@@ -345,17 +384,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     }
 
 
-    // The goal's Artifacts (#8616): one mount for the goal on show, its node moved into each drawing of the page, so what is open and loaded stays while the page is drawn again
-    const artifacts = { id: 0, host: null, api: null };
-    function artifactsHost(g) {
-        if (artifacts.id !== g.id) {
-            artifacts.api?.destroy(); artifacts.api = null;
-            const host = artifacts.host = el('div', 'goal-artifacts-host'); artifacts.id = g.id;
-            importOnce('./goal_artifacts.js').then(m => { if (!disposed && artifacts.host === host) artifacts.api = m.mountGoalArtifacts(host, { team: model.project, goalId: g.id }); }).catch(() => {}); // no section when it cannot load
-        }
-        return artifacts.host;
-    }
-    const update = g => { const again = current && current.id === g.id && JSON.stringify(current.rollup) !== JSON.stringify(g.rollup); current = g; drawPage(); if (again) artifacts.api?.refresh(); }; // the tasks moved: their files may have
+    const update = g => { const again = current && current.id === g.id && JSON.stringify(current.rollup) !== JSON.stringify(g.rollup); current = g; drawPage(); if (again) { artifacts.api?.refresh(); countArtifacts(g.id, true); } }; // the tasks moved: their files may have
     let reading = false, again = false, signature = '', first = true;
     async function reload() {
         if (disposed) return;
@@ -389,6 +418,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         window.addEventListener('focus', visibleRefresh);
     }
     return { update, refreshTasks: () => loadTasks(id), dispose: () => {
-        disposed = true; artifacts.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
+        disposed = true; if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
     }, focus: focusDetail };
 }

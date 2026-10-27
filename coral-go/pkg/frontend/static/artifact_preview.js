@@ -157,7 +157,7 @@ function _renderSandboxed(body, { url, content, name, isStale }) {
 /** Resolve where an artifact's bytes come from; null when the source is unusable. */
 export function resolveArtifactSource(uri, options = {}) {
     const match = CORAL_ARTIFACT_URI_RE.exec(uri);
-    const board = state.selectedTeam ? splitKey(state.selectedTeam).name : (state.currentSession?.board_project || '');
+    const board = options.board || (state.selectedTeam ? splitKey(state.selectedTeam).name : (state.currentSession?.board_project || '')); // options.board: a screen that names its own team (the Inbox's goal, #8914)
     const inlineURL = inlineArtifactPath(options.contentURL, board); // exactly the shape this route has, for this board (a registered server's value must name no other route)
     let externalURL = null;
     try {

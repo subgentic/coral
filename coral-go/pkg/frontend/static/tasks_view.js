@@ -74,7 +74,7 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
 export const SCOPES = {
     team: ['state', 'task', 'who', 'goal', 'files', 'updated'], // no Priority and no task number before the title on a task table (the Operator's rule, #8784): the number is the row's hover title and the button's name
     mine: ['state', 'task', 'files', 'team', 'updated'],
-    goal: ['state', 'task', 'who', 'files'], // no task number before the title and no Priority: the person reads the title and the state (#8784)
+    goal: ['state', 'task', 'who'], // a goal's list is the dock's one-line row: the status chip, the title, who (#8914; no number, Priority or Files, #8784)
     'goal-page': ['task', 'state'],
     'follow-ups': ['state', 'task', 'who'],
     agent: ['state', 'task', 'who'], // the dock's one-line row keeps the responsible agent's avatar
