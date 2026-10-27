@@ -41,7 +41,7 @@
 1	board_chat.js	renderBoardMessageBody(m)
 1	board_chat.js	selectedClass
 1	board_chat.js	spacing
-1	board_export.js	agentCheckboxes || '<p style="font-size:0.8125rem;color:var(--text-muted)">No subscribers</p>'
+1	board_export.js	agentCheckboxes || '<p style="font-size:var(--fs-md);color:var(--text-muted)">No subscribers</p>'
 1	board_export.js	count
 1	board_export.js	role
 1	board_export_render.js	cls
