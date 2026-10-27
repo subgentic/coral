@@ -152,11 +152,6 @@ function folderTable(key) {
                     return cell;
                 } },
                 { key: 'used-by', label: 'Used by', width: '7rem', line: 2, tone: 'tertiary', sort: 'number', sortValue: i => i.usedBy, cell: usedByWords },
-                { key: 'run', label: 'Run', width: '4rem', line: 2, cell: i => { // a workflow can be run from its row, as before (its page has Run too)
-                    const b = DT.el('button', 'btn btn-small dt-action', 'Run'); b.type = 'button'; b.setAttribute('aria-label', `Run ${i.name}`);
-                    b.addEventListener('click', () => W.triggerWorkflow(i.id, b));
-                    return b;
-                } },
             ],
         }).el };
 }
