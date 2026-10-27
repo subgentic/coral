@@ -7,7 +7,7 @@
 
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
-import { isCloud } from './server_base.js';
+import { isCloud, nativeInbox } from './server_base.js';
 import { filterSettingsPayload, settingsErrorMessage } from './cloud_settings.js';
 import { signOutThisBrowser } from './local_store.js';
 import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
@@ -202,6 +202,7 @@ function buildAccountMenu(email) {
 export async function initCloud() {
     if (!isCloud()) return false;
     document.body.classList.add('cloud-mode');
+    if (nativeInbox()) document.body.classList.add('native-inbox'); // the Chats and Board tabs are data-native-inbox-hides (cloud.css, nav_tabs.js)
     state.cloud = true;
     state.hub = true;
     installCloudFetch();

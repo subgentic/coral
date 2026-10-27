@@ -25,7 +25,7 @@ import { selectBoardProject, postBoardMessage, deleteMessageBoardProject, toggle
 import { showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolderTag } from './folder_tags.js';
 import { pinFolder, unpinFolder, showOpenFolderModal, hideOpenFolderModal, submitOpenFolder } from './pinned_folders.js';
 import { checkForUpdates, dismissUpdateToast } from './update_check.js';
-import { teamFetch, keyLabel } from './server_base.js';
+import { teamFetch, keyLabel, nativeInbox } from './server_base.js';
 import { showServersModal } from './servers.js';
 import { toggleAllGroups } from './group_collapse.js';
 import { toggleAllGroupFolds } from './sidebar_groups.js';
@@ -211,7 +211,7 @@ registerActions({
     'analytics-view': el => { const key = el.dataset.view; importOnce('./analytics_views.js').then(m => m.selectView(key, { focus: true })).catch(() => {}); },
     'analytics-phone-back': () => { importOnce('./analytics_views.js').then(m => m.phoneBack()).catch(() => {}); },
     'automations-search-filter': el => { const v = el.value; importOnce('./automations.js').then(m => m.filterAutomations(v)).catch(() => {}); }, // the Automations sidebar's search box is in the page from the start; automations.js loads with the tab
-    'inbox-search-filter': el => { const v = el.value; importOnce('./inbox_sidebar.js').then(m => m.filterInbox(v)).catch(() => {}); }, // the Inbox sidebar's search box is in the page from the start; inbox_sidebar.js loads with the tab
+    'inbox-search-filter': el => { if (nativeInbox()) return; /* the Hub-served Inbox searches on Enter (inbox_sidebar.js) */ const v = el.value; importOnce('./inbox_sidebar.js').then(m => m.filterInbox(v)).catch(() => {}); }, // the Inbox sidebar's search box is in the page from the start; inbox_sidebar.js loads with the tab
     'wf-build-agent': () => launchWorkflowAgent(),
     'wf-build-agent-from-form': () => { hideWorkflowCreateModal(true); launchWorkflowAgent(); }, // the New workflow form's hint
     'wf-create': () => showWorkflowCreateModal(),
