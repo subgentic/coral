@@ -153,30 +153,32 @@ export async function selectWorkflow(id) {
 function runResult(r) {
     const failed = r.status === 'failed' || r.status === 'killed';
     const name = r.status === 'killed' ? 'Stopped' : failed && r.failed_step ? `Failed: step ${Number(r.failed_step.number)} (${r.failed_step.name})` : resultWords(r);
-    const cell = DT.el('span'); cell.append(DT.chip(name, failed ? 'team-state-bad' : r.status === 'completed' ? 'goal-state-task-done' : r.status === 'running' ? 'goal-state-task-active' : ''));
+    const chip = DT.chip(name, failed ? 'team-state-bad' : r.status === 'completed' ? 'goal-state-task-done' : r.status === 'running' ? 'goal-state-task-active' : '');
+    const cell = DT.el('span'); cell.append(chip);
     const failure = runFailure(r); if (failure) cell.append(' ', DT.tag(`(${failure.short})`));
+    if (failed && r.failure_reason) { chip.title = r.failure_reason; cell.append(DT.el('span', 'sr-only dt-run-reason', ` ${r.failure_reason}`)); } // one line a row (Goal #79): the reason is the chip's tooltip and said to assistive technology, not a second line
     return cell;
 }
 
 function workflowStepsTable(steps) {
-    const table = DT.dataTable({ label: 'Workflow steps', rows: steps.map((s, i) => ({ ...s, position: i + 1 })), rowKey: s => s.position, bare: true, sortBar: false, empty: { line: 'No steps yet.' },
-        columns: [
-            { key: 'step', label: 'Step', primary: true, width: 'grow', line: 1, cell: s => { const cell = DT.el('span'); cell.append(DT.el('span', 'sr-only', `Step ${s.position}: `), document.createTextNode(s.name || `Step ${s.position}`)); return cell; } },
-            { key: 'type', label: 'Type', line: 2, cell: s => DT.tag(s.type || 'shell') },
-            { key: 'command', label: 'Command', line: 2, nowrap: false, cell: s => { const what = (s.type || 'shell') === 'shell' ? s.command : s.prompt; return what ? DT.el('code', 'wf-step-what', String(what).slice(0, 300)) : '—'; } },
+    const table = DT.dataTable({ label: 'Workflow steps', rows: steps.map((s, i) => ({ ...s, position: i + 1 })), rowKey: s => s.position, bare: true, sortBar: false, oneLine: true, empty: { line: 'No steps yet.' },
+        columns: [ // one line a row (Goal #79): the command is cut with an ellipsis (whole in its tooltip and the editor), a narrow list drops Type
+            { key: 'step', label: 'Step', primary: true, width: '12rem', cell: s => { const cell = DT.el('span'); cell.append(DT.el('span', 'sr-only', `Step ${s.position}: `), document.createTextNode(s.name || `Step ${s.position}`)); return cell; } },
+            { key: 'type', label: 'Type', width: '6rem', dropAt: 36, cell: s => DT.tag(s.type || 'shell') },
+            { key: 'command', label: 'Command', width: 'grow', cell: s => { const what = (s.type || 'shell') === 'shell' ? s.command : s.prompt; if (!what) return '—'; const code = DT.el('code', 'wf-step-what', String(what).slice(0, 300)); code.title = String(what).slice(0, 300); return code; } },
         ],
     }); table.el.classList.add('wf-steps-table'); return table.el;
 }
 
 function workflowRunsTable(page) {
     const open = r => withId(r.id, selectWorkflowRun);
-    const table = DT.dataTable({ label: 'Workflow runs', rows: page.rows, rowKey: r => r.id, bare: true, sortBar: false, open, empty: { line: 'No runs yet.' },
+    const table = DT.dataTable({ label: 'Workflow runs', rows: page.rows, rowKey: r => r.id, bare: true, sortBar: false, oneLine: true, open, empty: { line: 'No runs yet.' },
         footer: page.rows.length < page.total ? { text: `Showing the newest ${page.rows.length} of ${page.total} runs`, more: { label: 'Show older runs', busy: page.busy, run: () => readOlderRuns(page) } } : undefined,
         columns: [
-            { key: 'started', label: 'Started', primary: true, width: 'grow', line: 1, cell: r => { const time = DT.timeCell(r.started_at); const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b; } },
-            { key: 'result', label: 'Result', line: 2, nowrap: false, cell: runResult, subtitle: r => (r.status === 'failed' || r.status === 'killed') ? r.failure_reason : '' },
-            { key: 'duration', label: 'Duration', line: 2, tone: 'tertiary', cell: r => r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1s' : formatDuration(Math.round(r.duration_seconds), { unit: 's', dropZeroSeconds: true })) : '—' },
-            { key: 'trigger', label: 'Trigger', line: 2, tone: 'tertiary', when: r => !!r.trigger_type, cell: r => r.trigger_type || '—' },
+            { key: 'started', label: 'Started', primary: true, width: '12rem', cell: r => { const time = DT.timeCell(r.started_at); const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b; } },
+            { key: 'result', label: 'Result', width: 'grow', cell: runResult },
+            { key: 'duration', label: 'Duration', width: '7rem', dropAt: 36, tone: 'tertiary', cell: r => r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1s' : formatDuration(Math.round(r.duration_seconds), { unit: 's', dropZeroSeconds: true })) : '—' },
+            { key: 'trigger', label: 'Trigger', width: '8rem', dropAt: 28, tone: 'tertiary', when: r => !!r.trigger_type, cell: r => r.trigger_type || '—' },
         ],
     }); table.el.classList.add('wf-runs-table'); return table.el;
 }

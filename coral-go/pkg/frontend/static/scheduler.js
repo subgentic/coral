@@ -203,7 +203,7 @@ function resultCell(r) {
     const cell = DT.el('span'), chip = DT.chip(r.status === 'failed' ? 'Failed' : resultWords(r), cls); chip.classList.add('sched-status'); cell.append(chip);
     const failure = runFailure(r);
     const reason = r.status === 'failed' ? reasonWords(r) || exitNote(r) || (failure ? `${failure.text}. ${failure.hint}` : '') : resultLine(r);
-    if (reason) { const line = DT.el('span', 'dt-subtitle dt-clamp-2', reason); line.title = reason; cell.append(line); }
+    if (reason) { chip.title = reason; cell.append(DT.el('span', 'sr-only dt-run-reason', ` ${reason}`)); } // one line a row (Goal #79): the reason is the chip's tooltip and said to assistive technology, not a second line
     return cell;
 }
 const tookOf = (r) => (r.started_at && r.finished_at ? formatDuration(new Date(r.finished_at) - new Date(r.started_at)) : r.started_at ? 'running...' : '-');
@@ -212,20 +212,20 @@ const tookOf = (r) => (r.started_at && r.finished_at ? formatDuration(new Date(r
 function renderRunsTable(page) {
     const { rows: runs, workflowHistory } = page;
     const open = r => withId(r.id, id => window.selectWorkflowRun(id));
-    const table = DT.dataTable({ label: 'Job runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false,
+    const table = DT.dataTable({ label: 'Job runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false, oneLine: true,
         footer: runs.length < page.total ? { text: `Showing the newest ${runs.length} of ${page.total} runs`, more: { label: 'Show older runs', busy: page.busy, run: () => readOlderRuns(page) } } : undefined,
         open: workflowHistory ? open : undefined, empty: { line: 'No runs yet.' },
         columns: [
-            { key: 'started', label: 'Started', primary: true, width: 'grow', line: 1, cell: r => {
+            { key: 'started', label: 'Started', primary: true, width: '12rem', cell: r => {
                 const time = DT.timeCell(workflowHistory ? r.started_at || r.created_at : r.scheduled_at || r.started_at);
                 if (!workflowHistory) return time;
                 const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b;
             } },
-            { key: 'result', label: 'Result', line: 2, nowrap: false, cell: resultCell },
-            { key: 'duration', label: 'Duration', line: 2, tone: 'tertiary', cell: tookOf },
-            ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, line: 2, when: r => !!r.session_id, cell: r => {
+            { key: 'result', label: 'Result', width: 'grow', cell: resultCell },
+            { key: 'duration', label: 'Duration', width: '7rem', dropAt: 36, tone: 'tertiary', cell: tookOf },
+            ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, width: '8rem', when: r => !!r.session_id, cell: r => {
                 if (!r.session_id) return '';
-                const b = DT.link('Open the conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
+                const b = DT.link('Conversation'); b.setAttribute('aria-label', 'Open the conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
             } }] : []),
         ],
     });

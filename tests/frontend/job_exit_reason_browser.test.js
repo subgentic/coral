@@ -47,8 +47,8 @@ const RESTART = 'Coral restarted before this run launched its agent.';
             const starts = [[5, 'never-started', 'never started', 'The agent never started: no session appeared in 30 seconds'], [6, 'no-command', "couldn't start the agent", 'The start command failed: claude: not found'], [7, 'exited-at-once', 'agent exited at once', 'The agent exited before it started: exit code 1']];
             for (const [id, name, words, msg] of starts) {
                 const row = by(name); await table(id);
-                const cell = await ev(`(() => { const c = document.querySelector('.sched-runs-section .sched-status'); return { text: c.textContent, line: (c.closest('td').querySelector('.dt-subtitle') || {}).textContent || '' }; })()`);
-                check(`${tag}: a run that failed to start ("${words}") says it in its row's chip (last run failed (${words})) and in the Runs table (Failed, the server's sentence as the line under it)`, row.chip === `last run failed (${words})` && cell.text === 'Failed' && cell.line === msg, JSON.stringify([row, cell]));
+                const cell = await ev(`(() => { const c = document.querySelector('.sched-runs-section .sched-status'); return { text: c.textContent, line: ((c.closest('td').querySelector('.dt-run-reason') || {}).textContent || '').trim(), title: c.title }; })()`); // the reason is the chip's tooltip and said to assistive technology, not a line under it (Goal #79)
+                check(`${tag}: a run that failed to start ("${words}") says it in its row's chip (last run failed (${words})) and in the Runs table (Failed, the server's sentence as its tooltip and for a screen reader)`, row.chip === `last run failed (${words})` && cell.text === 'Failed' && cell.line === msg && cell.title === msg, JSON.stringify([row, cell]));
             }
         }
     } finally { await client.close(); }

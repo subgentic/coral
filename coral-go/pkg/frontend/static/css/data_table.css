@@ -247,7 +247,6 @@
 .dt-box.dt-folded .dt-detail > td { display: block; padding: 8px var(--table-pad-x); }
 .dt-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; } /* a row the redraw or a deep link put the keyboard on (#7903) */
 /* Long reasons stay readable under their chip; the full sentence is in the element's title. */
-.dt-table td.dt-wrap .dt-subtitle.dt-clamp-2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow: hidden; overflow-wrap: anywhere; max-inline-size: 24rem; }
 /* Name buttons keep their full accessible name and tooltip; folded rows expose two lines. */
 .dt-box:not(.dt-folded) .dt-title-cell > .dt-primary:has(.dt-name-text) { min-width: 0; }
 .dt-name-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 32rem; }
@@ -271,7 +270,6 @@
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { min-width: 0; flex: 1; }
 .dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-2 { min-height: var(--table-fold-meta-h); line-height: var(--table-fold-meta-h); }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-name-text { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dt-box.dt-compact.dt-fold-column.dt-folded .dt-subtitle.dt-clamp-2 { -webkit-line-clamp: 1; }
 
 .dt-title-content { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-content { overflow: visible; }
