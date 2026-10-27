@@ -435,3 +435,6 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .dt-hover-action { opacity: 0; }
     .dt-row:hover .dt-hover-action, .dt-row:focus-within .dt-hover-action, .dt-hover-action:focus-visible { opacity: 1; }
 }
+/* The team after a phone row's title (#9654): tertiary, cut before the title is. */
+.dt-mail-team { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); font-weight: var(--fw-regular); }
+@container dt (max-width: 20rem) { .dt-mail-team { flex: none; } }
