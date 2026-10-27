@@ -554,7 +554,7 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 			have[u.id] = true
 			sid := sessionID
 			item := teamArtifact{
-				ID: u.id, Name: u.rec.Name, MediaType: u.rec.MediaType, CreatedAt: u.rec.CreatedAt,
+				ID: u.id, Name: u.rec.Name, MediaType: u.rec.MediaType, CreatedAt: u.rec.CreatedAt, Size: sizeOfRecord(u.rec.Size),
 				Source: "upload", URI: "coral://artifacts/" + u.id, Digest: u.rec.Digest,
 				ReferenceCount: 1, SessionID: &sid, managed: u.id, uploadTask: u.rec.TaskID,
 			}
@@ -604,16 +604,12 @@ func (h *BoardHandler) ListSessionArtifacts(w http.ResponseWriter, r *http.Reque
 	items := filterReadable(r, h.coralDir, h.uploads.merge(nil, h.coralDir, map[string]string{sessionID: ""})) // #5577
 	// the list's sort (#8945): the words of the team lists, over the whole list, then the page
 	if sortName := strings.TrimSpace(r.URL.Query().Get("sort")); sortName != "" {
-		known := false
-		for _, s := range teamArtifactSorts {
-			known = known || s == sortName
-		}
-		if !known {
+		if !validTeamArtifactSort(sortName) {
 			errBadRequest(w, "unknown sort "+sortName)
 			return
 		}
+		// Sorted on the fields the upload records hold (name, type, size, time): no sidecar is read and no blob is stat-ed for an item that is not on the page; only the page is enriched, below.
 		for i := range items {
-			enrichTeamArtifact(&items[i], h.artifactObjectDir())
 			finishTeamArtifactName(&items[i])
 		}
 		sort.SliceStable(items, func(i, j int) bool { return artifactAfter(sortName, keyOf(items[j]), keyOf(items[i])) })
@@ -670,4 +666,12 @@ func (h *BoardHandler) linkUploadTasks(ctx context.Context, project string, item
 			}
 		}
 	}
+}
+
+// sizeOfRecord is an upload record's size as the list's size (nil when the record has none), so the size sorts need no stat of the blob.
+func sizeOfRecord(n int64) *int64 {
+	if n <= 0 {
+		return nil
+	}
+	return &n
 }
