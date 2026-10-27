@@ -32,7 +32,7 @@ function fakeBrowser(href) {
 fakeBrowser('/');
 let nav = await import('../../coral-go/pkg/frontend/static/nav.js?' + Math.random());
 assert.deepEqual(nav.startRoute({ pathname: '/', search: '', hash: `#chat/${S}` }), { view: 'agents', server: null, id: S, sub: null });
-assert.deepEqual(nav.startRoute({ pathname: '/', search: '', hash: '#team-settings=qa' }), { view: 'team', server: null, id: 'qa', sub: 'settings' });
+assert.deepEqual(nav.startRoute({ pathname: '/', search: '', hash: '#team-settings=qa' }), { view: 'team', server: null, id: 'qa', sub: null });
 assert.deepEqual(nav.startRoute({ pathname: '/', search: '?q=battle&page=2&page_size=50', hash: '' }), { view: 'chats', query: 'page=2&q=battle' });
 assert.deepEqual(nav.startRoute({ pathname: '/', search: '?view=x&q=battle&type=agent&page=2&page_size=50', hash: '#history' }), { view: 'chats', query: 'page=2&type=agent&q=battle' }, 'a legacy Chats hash keeps its filters');
 assert.deepEqual(nav.startRoute({ pathname: '/', search: '?q=battle', hash: '#session/abc' }), { view: 'chats', id: 'abc' }, 'a chat link has no list filters');
@@ -95,8 +95,8 @@ const got = [];
 nav.onRoute('team', r => got.push(r));
 await nav.go({ view: 'team', id: 'qa', sub: '<img onerror=1>', evil: 'x' });
 assert.deepEqual(got.pop(), { view: 'team', server: null, id: 'qa', sub: null }, 'go(): stray fields dropped');
-nav.note({ view: 'team', id: 'qa', sub: 'settings', html: '<b>' });
-assert.deepEqual(nav.currentRoute(), { view: 'team', server: null, id: 'qa', sub: 'settings' }, 'note(): stray fields dropped');
+nav.note({ view: 'team', id: 'qa', sub: 'tasks', html: '<b>' });
+assert.deepEqual(nav.currentRoute(), { view: 'team', server: null, id: 'qa', sub: 'tasks' }, 'note(): stray fields dropped');
 assert.deepEqual(nav.startRoute({ pathname: '/team/qa', search: '', hash: '' }), { view: 'team', server: null, id: 'qa', sub: null });
 // A history entry whose stored route was tampered with, or has an old shape.
 // (A name like "../../api" is a legal board name, kept as one encoded segment; a bidi

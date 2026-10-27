@@ -155,10 +155,10 @@
     .team-page-title { font-size: 1.0625rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* 17/700, one line: at 200% text the header and the tabs stay near a quarter of the screen */
     .team-page-status { grid-column: 1; }
     .team-page-actions { grid-column: 2; grid-row: 1 / span 2; }
-    #team-page-add-agent { display: none; }
+    #team-page-add-agent, #team-page-settings { display: none; }
     .team-page-health { min-height: 44px; grid-column: 1; }
     .team-tab { min-height: 44px; }
-    .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"], .team-tab[data-tab="settings"] { display: none; } /* behind More: the row never scrolls sideways */
+    .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"] { display: none; } /* behind More: the row never scrolls sideways */
     .team-tabs-row > .team-tab-more { display: inline-flex; align-items: center; flex: none; margin: 6px 8px 0 0; padding: 0 8px; }
     .team-tabs-row .team-tab { padding: 0 8px; }
     .team-tabs-row > .team-tabs { gap: 0; padding-left: 8px; }
@@ -372,3 +372,14 @@
 @media (max-width: 760px) { .team-page-missing { padding-left: 16px; padding-right: 16px; } } /* the header's left edge on a phone */
 .team-page-missing-line { margin: 0; color: var(--text-secondary); font-size: 0.9375rem; }
 .team-page-no-team .team-tabs-row, .team-page-no-team .team-tabs, .team-page-no-team .team-page-row, .team-page-no-team .team-page-actions, .team-page-no-team .team-page-health, .team-page-no-team .team-page-status { display: none !important; }
+
+/* Team settings in a popout (#8853): a wide dialog over the page, its body scrolls under a fixed head; on a phone it fills the screen */
+.team-settings-modal .modal-content { width: min(960px, 94vw); max-width: none; height: min(780px, 90vh); max-height: none; }
+.team-settings-dialog-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 12px 24px 0; } /* the form's own panes scroll; its save bar stays at the dialog's foot */
+.team-settings-host { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.team-settings-host > .team-settings-workspace { flex: 1 1 auto; min-height: 0; height: auto; }
+@media (max-width: 760px) {
+    .team-settings-modal .modal-content { width: 100% !important; max-width: 100% !important; height: 100% !important; max-height: none !important; border: 0; border-radius: 0; } /* the whole screen: mobile.css gives every dialog 95vw with !important */
+    .team-settings-modal .modal-content:has(.modal-body) .modal-header { padding: 12px 16px; }
+    .team-settings-dialog-body { padding: 8px 16px 0; }
+}

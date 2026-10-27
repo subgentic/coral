@@ -73,8 +73,9 @@ export function closeDialog(modal) { if (modal) hideDialog(modal); }
  *  its backdrop, and the returned close() all remove it, return focus to the control that opened it and then call onClose (resolve the promise that is
  *  waiting for it, say). It also gives the element role="dialog" and names it by its first heading, and moves focus in. Before this each dialog hid itself
  *  with display:none on Escape (the page-wide rule), which left a waiting promise unresolved, or kept its own copy of the rules.
- *  Options: backdrop (default true) whether a click outside closes it; onClose(). */
-export function registerDialog(modal, { onClose, backdrop = true } = {}) {
+ *  Options: backdrop (default true) whether a click outside closes it; onClose(); beforeClose() (may be async) answers false to keep the dialog open (unsaved edits: Escape, a backdrop click and the
+ *  returned close() asked it, #8853), asked once at a time. */
+export function registerDialog(modal, { onClose, backdrop = true, beforeClose = null } = {}) {
     let closed = false;
     const close = () => {
         if (closed) return;
@@ -84,7 +85,9 @@ export function registerDialog(modal, { onClose, backdrop = true } = {}) {
         restoreDialogFocus(modal);
         if (onClose) onClose();
     };
-    registered.set(modal, { hide: close, backdrop });
+    let asking = false;
+    const ask = async () => { if (closed || asking) return; if (!beforeClose) return close(); asking = true; try { if (await beforeClose() !== false) close(); } finally { asking = false; } };
+    registered.set(modal, { hide: ask, backdrop });
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     const heading = modal.querySelector('h2, h3, h4');
@@ -93,7 +96,7 @@ export function registerDialog(modal, { onClose, backdrop = true } = {}) {
         modal.setAttribute('aria-labelledby', heading.id);
     }
     attachDialogFocus(modal);
-    return close;
+    return beforeClose ? ask : close;
 }
 
 // Close modals on outside click
