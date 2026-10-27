@@ -3473,7 +3473,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .prose { --prose-h1: 1.4286em; --prose-h2: 1.1429em; --prose-h3: 1em; --prose-h4: 0.9286em; line-height: var(--lh-body); overflow-wrap: break-word; } /* 20, 16, 14 and 13 px on a 14 px body, and a user-set chat size scales them (UI/UX #9477) */
 .prose > :first-child { margin-top: 0; }
 .prose > :last-child { margin-bottom: 0; }
-.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6, .prose .md-h { font-weight: var(--fw-strong); line-height: 1.3; color: var(--text-primary); }
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6, .prose .md-h { font-weight: var(--fw-strong); line-height: var(--lh-label); color: var(--text-primary); } /* the label ratio (1.2): UI/UX's 1.3 is not one of the three */
 .prose h1 { margin: 1.2em 0 0.4em; font-size: var(--prose-h1); font-weight: var(--fw-title); }
 .prose h2 { margin: 1.25em 0 0.375em; font-size: var(--prose-h2); }
 .prose h3 { margin: 1.143em 0 0.286em; font-size: var(--prose-h3); }
