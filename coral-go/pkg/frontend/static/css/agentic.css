@@ -231,7 +231,7 @@ body.panel-dragging .agentic-state {
 .tc-label .tc-icon-svg svg { width: 1.125rem; height: 1.125rem; }
 .tc-row:has(.tc-check:not(:checked)) .tc-name,
 .tc-row:has(.tc-check:not(:checked)) .tc-icon { opacity: 0.5; }
-.tc-lock { font-size: 0.9375rem; color: var(--text-secondary); }
+.tc-lock { font-size: var(--fs-lg); color: var(--text-secondary); }
 .tc-sp { flex: 1; }
 .tc-move {
     display: inline-flex; align-items: center; justify-content: center;
@@ -553,7 +553,7 @@ body.panel-dragging .agentic-state {
 .activity-chart-count.is-time {
     width: 52px;
     font-family: var(--font-mono);
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
 }
 
 /* Bar colors */
@@ -854,7 +854,7 @@ body.panel-dragging .agentic-state {
     color: var(--text-primary);
 }
 .subagent-detail-md h1 { font-size: var(--fs-xl); }
-.subagent-detail-md h2 { font-size: 0.9375rem; }
+.subagent-detail-md h2 { font-size: var(--fs-lg); }
 .subagent-detail-md h3 { font-size: var(--fs-lg); }
 .subagent-detail-md h4 { font-size: var(--fs-md); }
 
@@ -994,7 +994,7 @@ body.panel-dragging .agentic-state {
 }
 
 .task-dep-status {
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
     font-weight: var(--fw-strong);
     padding: 1px 6px;
     border-radius: var(--radius-xs);
