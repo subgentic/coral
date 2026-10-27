@@ -2,13 +2,14 @@ package board
 
 import (
 	"context"
-	"strings"
+
+	"github.com/subgentic/coral/internal/thinkinglevel"
 )
 
-// SetClaimThinking records the thinking level the agent that just claimed a task was set to (#8915): trimmed and lower-cased, and nothing at all for "" (never a guess). It is written for a task in
+// SetClaimThinking records the thinking level the agent that just claimed a task was set to (#8915): trimmed, lower-cased and capped to the known levels (anything else is "other"), and nothing at all for "" (never a guess). It is written for a task in
 // progress only, so a late call cannot mark a task someone else has finished. Best effort for the caller: a claim without it is just not recorded, as every claim before it.
 func (s *Store) SetClaimThinking(ctx context.Context, project string, taskID int64, thinking string) error {
-	level := strings.ToLower(strings.TrimSpace(thinking))
+	level := thinkinglevel.Normalize(thinking)
 	if level == "" {
 		return nil
 	}

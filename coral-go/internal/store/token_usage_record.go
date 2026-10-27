@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/subgentic/coral/internal/thinkinglevel"
 )
 
 // RepriceZeroCosts fills historical usage rows whose model is now recognized.
@@ -136,15 +138,16 @@ func (s *TokenUsageStore) recordUsageOn(ctx context.Context, ex usageExecer, u *
 		u.Source = "jsonl"
 	}
 
+	u.Thinking = thinkinglevel.Normalize(u.Thinking) // the label is kept to the known set (#8954)
 	insert := func() (sql.Result, error) {
 		return ex.ExecContext(ctx,
 			`INSERT OR IGNORE INTO token_usage
 		 (session_id, agent_name, agent_type, team_id, board_name, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens, cost_usd, num_turns, session_start_at, last_activity_at, recorded_at, source, model, thinking)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''),
-		   COALESCE(NULLIF(?, ''), CASE WHEN ? THEN (SELECT NULLIF(LOWER(TRIM(thinking)), '') FROM live_sessions WHERE session_id = ?) END))`,
+		   COALESCE(NULLIF(?, ''), CASE WHEN ? THEN `+thinkinglevel.SQLExpr(`(SELECT thinking FROM live_sessions WHERE session_id = ?)`)+` END))`,
 			u.SessionID, u.AgentName, u.AgentType, u.TeamID, u.BoardName,
 			u.InputTokens, u.OutputTokens, u.CacheReadTokens, u.CacheWriteTokens, u.TotalTokens, u.CostUSD, u.NumTurns, u.SessionStartAt, u.LastActivityAt, u.RecordedAt, u.Source, strings.TrimSpace(u.Model),
-			strings.ToLower(strings.TrimSpace(u.Thinking)), liveCall(u.RecordedAt), u.SessionID)
+			u.Thinking, liveCall(u.RecordedAt), u.SessionID)
 	}
 	result, err := insert()
 	if err != nil {
