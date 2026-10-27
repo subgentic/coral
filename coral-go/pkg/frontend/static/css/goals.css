@@ -6,7 +6,8 @@
 .goals-back { display: none; align-self: flex-start; min-height: var(--control-touch-height, 44px); }
 
 .goals-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.goals-chip { min-height: var(--control-touch-height, 44px); padding: 4px 10px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: var(--fs-md); cursor: pointer; }
+.goals-chip { min-height: var(--toolbar-control-h, 32px); padding: 4px 10px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: var(--fs-md); cursor: pointer; }
+@media (max-width: 767px), (pointer: coarse) { .goals-chip { min-height: var(--control-touch-height, 44px); } } /* the pills are the toolbar's 32 px beside a search field on a mouse, 44 on touch (#9454) */
 .goals-chip[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); border-color: var(--accent); }
 
 .goal-card-meta { color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
