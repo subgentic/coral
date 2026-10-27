@@ -2,7 +2,7 @@ import { serverColumns, serverOf, readInboxArtifacts } from './inbox_servers.js'
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
-import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, LOCAL_SERVER } from './server_base.js';
+import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBoardAnswerPending, onBoardLabelsChanged, LOCAL_SERVER } from './server_base.js';
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
@@ -39,6 +39,13 @@ export function createArtifactsList({ inbox = false } = {}) {
     const PAGE = 100;
     const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...F.EMPTY }, kept: new Set(), tagCounts: {}, gen: 0, controller: null, teams: [] };
     let root = null, hooks = {}, bar = null, barKey = '';
+    let pendingBoard = null;
+    onBoardLabelsChanged(() => {
+        if (!pendingBoard || isBoardAnswerPending(model.project, pendingBoard.answered)) return;
+        const options = pendingBoard.options;
+        pendingBoard = null;
+        loadArtifacts(options); // a cold /team/<name>/artifacts answer can be checked now; keep the scope check on the new read
+    });
     const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
     const say = (t) => { const s = root && root.querySelector('.team-artifacts-status-live'); if (s) { s.textContent = ''; s.textContent = t; } };
 
@@ -111,6 +118,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     async function loadArtifacts({ append = false, keep = false } = {}) {
         const { project, key } = model; if (!key || (append && (model.controller || !model.hasMore))) return;
         const scope = model.scope;
+        pendingBoard = null;
         model.controller?.abort();
         const gen = ++model.gen, ctrl = model.controller = new AbortController();
         if (!append) { if (!keep || !model.items.length) { model.items = []; model.hasMore = false; model.truncated = false; model.counts = null; } model.cursor = ''; model.loading = !model.items.length; }
@@ -126,7 +134,11 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (!r.ok) { if (await isOwnerLabelRefusal(r)) throw new Error(OWNER_LABEL_TEXT); throw new Error(`Unable to load ${inbox ? '' : scope ? 'agent ' : 'team '}artifacts (${r.status}).`); }
             const data = await r.json();
             if (gen !== model.gen || key !== model.key) return;
-            if ((!inbox && !(scope && scope.standalone) && !isBoardAnswer(project, data.project)) || !Array.isArray(data.artifacts) || (scope && data.session_id !== scope.session)) throw new Error('Unable to load artifacts: unexpected response scope.');
+            if (!Array.isArray(data.artifacts) || (scope && data.session_id !== scope.session)) throw new Error('Unable to load artifacts: unexpected response scope.');
+            if (!inbox && !(scope && scope.standalone) && !isBoardAnswer(project, data.project)) {
+                if (isBoardAnswerPending(project, data.project)) { pendingBoard = { answered: data.project, options: { append, keep } }; return; }
+                throw new Error('Unable to load artifacts: unexpected response scope.');
+            }
             const rows = data.artifacts.filter(a => a && (a.uri || a.id || a.name));
             model.items = append ? model.items.concat(rows) : rows;
             if (!append) model.tagCounts = data.tag_counts && typeof data.tag_counts === 'object' ? data.tag_counts : {}; // the team's tags with how many files carry each (the whole list, not the page)
@@ -185,7 +197,7 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     function statusLine() {
         if (model.error) return model.error;
-        if (model.loading) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
+        if (model.loading || pendingBoard) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
         if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : 'No artifacts yet.';
         const c = model.counts;
         return c && c.matched > model.items.length ? `Showing ${model.items.length} of ${c.matched}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
@@ -414,6 +426,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     /** Show the team's artifacts in `host`; with `scope` ({ session, server, standalone, name }) one agent's (standalone: it has no team, its list has no search). hooks: onCount(n). */
     let external = false; // the Inbox folder draws this list's bar itself, on the folder toolbar (inbox_toolbar.js): useBar
     function initModel(project, scope, key) {
+        pendingBoard = null;
         artifactState = DT.tableState();
         forgetChoices();
         model.controller?.abort();
