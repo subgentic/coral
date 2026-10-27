@@ -1,6 +1,7 @@
 // #8708: every Inbox folder carries origin, sorting and a Server filter in hub mode.
 const assert=require('node:assert/strict');
 const {connect}=require('./agent_view_harness');
+const {setTheme}=require('./helpers/contrast');
 const BASE=require('./test_base').BASE;
 const fs=require('node:fs'),path=require('node:path');
 const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'];
@@ -36,6 +37,8 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
       const group=u.searchParams.get('type')==='group';
       return json({sessions:[{session_id:group?'board:same-team':'same-chat',type:group?'group':'agent',title:label+(group?' board':' chat'),display_name:label+' agent',agent_type:'claude',summary:label+' conversation',last_timestamp:now,duration_sec:60}],total:1});
      }
+     if(p==='/api/sessions/history/same-chat')return json({messages:[],start:0,total:0,agent_type:'claude'});
+     if(p.startsWith('/api/sessions/history/same-chat/'))return json({});
      if(p==='/api/team-artifacts'){
       const id=(remote?'b':'a').repeat(64);return json({artifacts:[{id,name:label+' report.txt',media_type:'text/plain',size:25,created_at:now,board_id:'same-team',team:label+' team',task_id:0,source:'upload',available:true,uri:'coral://artifacts/'+id,produced_by:label+' agent'}],all:1,total:1,has_more:false,teams:[{board_id:'same-team',team:label+' team',all:1}]});
      }
@@ -45,6 +48,8 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
    for(const folder of folders){try{
     await open(folder);
     await waitFor(`!!document.querySelector('#group-table-view th[data-key="server"]')`,'Server column in '+folder,5000);
+    if(['tasks','goals','needs','artifacts'].includes(folder))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('server')>0&&keys.indexOf('server')===keys.indexOf('team')-1;})()`),'Server immediately precedes Team');
+    if(folder.startsWith('chats'))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('server')===keys.indexOf('agent')+1;})()`),'Server follows Agent/Name');
     const cells=`[...document.querySelectorAll('#group-table-view td[data-key="server"]')]`;
     await waitFor(`${cells}.some(e=>e.textContent==='This computer')&&${cells}.some(e=>e.textContent==='Remote box')`,'both origins in '+folder,8000);
     if(width===390)assert.ok(await ev(`${cells}.every(e=>e.getClientRects().length>0)`),'Server visible on phone');
@@ -53,16 +58,25 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     assert.ok(sortable,'Server sort control in '+folder);
     await waitFor(`(()=>{const values=${cells}.map(e=>e.textContent);return values.length>1&&values.every((v,i)=>!i||values[i-1].localeCompare(v)<=0);})()`,'Server ascending order in '+folder);
     const shotDir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
-    if(shotDir){fs.mkdirSync(shotDir,{recursive:true});for(const theme of ['light','dark']){await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);fs.writeFileSync(path.join(shotDir,`inbox-server-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
+    if(shotDir){fs.mkdirSync(shotDir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(shotDir,`inbox-server-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
     await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);
     const select=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Server')?.querySelector('select')`;
     await waitFor(`!!(${select})&&(${select}).getClientRects().length>0`,'Server filter in '+folder);
+    if(shotDir&&['tasks','goals'].includes(folder)){for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(shotDir,`inbox-server-filter-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
     await ev(`(()=>{const s=${select};s.value='box-2';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
     await waitFor(`${cells}.length>0&&${cells}.every(e=>e.textContent==='Remote box')`,'Server filter narrows '+folder);
     // Clear the choice before testing mode changes or the next folder.
     await ev(`(()=>{const s=${select};s.value='';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
     console.log('PASS server '+folder+' '+width);
    }catch(e){failures.push(folder+' '+width+': '+e.message);console.error(failures.at(-1));}}
+   // Same id on two sources: a remote Inbox preview must not capture a local URL.
+   await open('chats');
+   await waitFor(`!![...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.querySelector('td[data-key="server"]')?.textContent==='Remote box')`,'remote chat row');
+   await ev(`window.__serverReads=[];[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.querySelector('td[data-key="server"]')?.textContent==='Remote box').querySelector('.dt-primary').click();true`);
+   await waitFor(`window.__serverReads.includes('/api/remote/box-2/api/sessions/history/same-chat')&&window.__serverState.currentSession?.server==='box-2'`,'remote preview reads its server');
+   await ev(`window.__serverReads=[];history.pushState({},'', '/chats/same-chat');window.dispatchEvent(new PopStateEvent('popstate'));true`);
+   await waitFor(`window.__serverReads.includes('/api/sessions/history/same-chat')&&window.__serverState.currentSession?.server==='local'`,'local URL resets remote preview source');
+   assert.ok(!(await ev(`window.__serverReads`)).includes('/api/remote/box-2/api/sessions/history/same-chat'),'local URL does not read the remote message page');
    for(const mode of ['standalone','only-local']){
     await ev(`window.__serverState.hub=${mode==='only-local'};window.__serverState.servers=[{id:'local',status:'online'}];true`);
     for(const folder of folders){await open(folder);assert.equal(await ev(`!!document.querySelector('#group-table-view th[data-key="server"]')`),false,mode+' hides Server in '+folder);}

@@ -277,7 +277,6 @@ export function createArtifactsList({ inbox = false } = {}) {
                 selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
                 columns: [
-                    ...(inbox ? serverColumns() : []),
                     { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1,
                         cell: item => {
                             const first = el('span', 'dt-title-stack');
@@ -287,6 +286,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                             const tagged = Tags.rowTags(item.tags); if (tagged) first.append(tagged);
                             return first;
                         } },
+                    ...(inbox ? serverColumns() : []),
                     ...(inbox && !model.filters.team ? [{ key: 'team', label: 'Team', line: 2, tone: 'tertiary', cell: item => item.team || item.board_id || '' }] : []), // the Inbox's list spans teams; one team chosen, the column says nothing new
                 { key: 'type', label: 'Type', line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
                     { key: 'size', label: 'Size', line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
