@@ -41,7 +41,7 @@ const { FOLDER_ROWS, ROW_WORDS } = require('./helpers/folder_rows');
         await open('/chats/@m1/no-such-chat');
         await waitFor(`location.pathname === '/inbox/chats/all'`, 'an unknown chat lands on All chats, not a not-found page', 15000);
         await waitFor(`[...document.querySelectorAll('.toast, [role=alert], [role=status]')].some(e => /That chat was not found/.test(e.textContent))`, 'the page says "That chat was not found"', 15000);
-        assert.ok(await ev(`${FOLDER_ROWS}.some(w => /^All chats/.test(w))`), 'the Inbox folders are on screen');
+        await waitFor(`(${FOLDER_ROWS}).some(w => /^All chats/.test(w))`, 'the Inbox folders are on screen', 10000);
         await shot('native-inbox-old-unknown-chat');
         console.log('PASS native Inbox old links: a chat lands in the Inbox with one history entry and Back leaves, ?starred=1 is Starred, an unknown chat says so on All chats');
     } catch (e) { console.error(e && e.stack || e); process.exitCode = 1; }
