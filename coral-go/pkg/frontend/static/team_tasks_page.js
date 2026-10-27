@@ -432,7 +432,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         importOnce('./team_task_actions.js').then(A => {
             const form = A.completeForm(task, acts);
             bar.before(form.node); form.focus();
-            bar.append(btn('btn', 'Back', () => acts.redraw(task, 'view')), btn('btn btn-success', 'Complete', () => form.submit()));
+            bar.append(btn('btn', 'Back', () => acts.redraw(task, 'view')), btn('btn btn-primary', 'Complete', () => form.submit()));
         });
         page.append(bar);
         focus = null;

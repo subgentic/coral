@@ -2026,7 +2026,7 @@ body.panel-dragging .agentic-state {
 /* Human-readable JSON artifacts, without changing their source/download. */
 .artifact-report { padding: 0 16px 20px; color: var(--text-primary); font-size: var(--fs-md); line-height: 1.6; min-width: 0; }
 .artifact-report-controls { display: flex; gap: 6px; padding: 12px 0; position: sticky; top: 0; background: var(--bg-primary); z-index: 1; }
-.artifact-report-controls [aria-pressed="true"] { border-color: var(--accent); color: var(--text-primary); }
+.artifact-report-controls [aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; } /* the one selected style: the accent fill (#9096) */
 .artifact-report-title { font-size: var(--type-page-size); margin: 10px 0 4px; }
 .artifact-report-outcome { margin: 0 0 18px; color: var(--text-secondary); }
 .artifact-report-section { margin: 16px 0; }
