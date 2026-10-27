@@ -21,9 +21,8 @@ export const TOOLBARS = {
     'theme-save-bar': 'the theme save row',
 };
 export const NOT_A_TOOLBAR = {
-    'agent-ui-expanded-bar': 'the expanded agent page\'s own frame', 'artifact-manifest-toolbar': 'a document viewer header', 'av-bar': 'the artifact viewer\'s header',
-    'availability-toolbar': 'a status header', 'chat-find-bar': 'the in-chat find box', 'docs-toolbar': 'the docs page header', 'dt-bar': 'the table\'s selection step bar',
-    'gt-toolbar': 'the goals page header', 'history-changes-toolbar': 'the history dialog header', 'hooks-bar': 'a settings row of buttons', 'item-bar': 'the item page\'s footer actions',
+    'agent-ui-expanded-bar': 'the expanded agent page\'s own frame', 'availability-toolbar': 'a status header', 'chat-find-bar': 'the in-chat find box', 'docs-toolbar': 'the docs page header', 'dt-bar': 'the table\'s selection step bar',
+    'gt-toolbar': 'the goals page header', 'hooks-bar': 'a settings row of buttons', 'item-bar': 'the item page\'s footer actions',
     'list-bar-bar': 'the list bar\'s own wrapper (its rows are the toolbar)', 'mb-select-bar': 'the message board selection bar', 'model-chip-bar': 'the composer\'s model chips',
     'preview-toolbar': 'the file preview header', 'prompt-inspection-bar': 'a card header', 'sv-bar': 'the settings save bar', 'terminal-key-bar': 'the phone terminal keys',
     'top-bar': 'the app\'s top bar',

@@ -51,7 +51,7 @@ export function diffLines(a, b) {
 
 /** Wire the version bar into the viewer `dialog`. hooks: show(row) opens that version, reload() draws the version on show again, body() is the element the document is drawn in. Returns { open, close }. */
 export function attachVersions(dialog, hooks) {
-    const bar = el('div', 'av-bar'); bar.hidden = true;
+    const bar = el('div', 'pane-head pane-head-bar av-bar'); bar.hidden = true;
     bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Versions');
     const live = el('div', 'sr-only av-live'); live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');
     let flip = false;

@@ -100,7 +100,7 @@ function _renderManifest(body, manifest, filename, ctx) {
         <span class="artifact-manifest-uri">${escapeHtml(entry.uri)}</span>
     </li>`;
     }).join('');
-    body.innerHTML = `<div class="artifact-manifest-toolbar"><strong>${manifest.entries.length} file${manifest.entries.length === 1 ? '' : 's'}</strong><div class="artifact-manifest-actions"><button type="button" class="inline-preview-mode-btn artifact-manifest-raw">View raw JSON</button><button type="button" class="inline-preview-mode-btn artifact-manifest-download-raw">Download JSON</button></div></div><ul class="artifact-manifest-list">${rows}</ul>`;
+    body.innerHTML = `<div class="pane-head artifact-manifest-toolbar"><strong>${manifest.entries.length} file${manifest.entries.length === 1 ? '' : 's'}</strong><div class="artifact-manifest-actions"><button type="button" class="inline-preview-mode-btn artifact-manifest-raw">View raw JSON</button><button type="button" class="inline-preview-mode-btn artifact-manifest-download-raw">Download JSON</button></div></div><ul class="artifact-manifest-list">${rows}</ul>`;
     wireDownloads(body);
     // Entries open as their own tabs so the collection stays available.
     body.querySelectorAll('.artifact-manifest-open').forEach(button => button.addEventListener('click', () => {
