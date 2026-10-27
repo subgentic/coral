@@ -60,9 +60,9 @@ const JOB = { id: 5, name: 'Nightly review', enabled: true, cron_expr: '0 3 * * 
         t = await view(101);
         check('an unknown agent type stays neutral', /The agent's CLI did not answer the sign-in check\./.test(t) && !/Claude|claude/.test(t));
         t = await view(93);
-        check(`a code this build does not know shows the server's text as before (${t})`, /something else broke/.test(t) && !/Sign in with/.test(t));
+        check(`a code this build does not know shows the server's text as before, with the run page's capital (${t})`, /something else broke/i.test(t) && !/Sign in with/.test(t));
         t = await view(94);
-        check('an ordinary failure is unchanged', /step build failed/.test(t) && !/Sign in with/.test(t));
+        check('an ordinary failure is unchanged', /step build failed/i.test(t) && !/Sign in with/.test(t));
 
         console.log('2. The workflow: run list and last run');
         await ev(`${WF}.then(m => m.selectWorkflow(7)).then(() => true)`);
