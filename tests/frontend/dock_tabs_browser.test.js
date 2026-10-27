@@ -45,7 +45,7 @@ const { settle } = require('./helpers/wait');
         await waitFor(`!document.getAnimations().some(a => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('${ROW}'))`, 'the tabs have finished their colour transition', 4000);
         const look = await ev(`(() => { const st = id => { const c = getComputedStyle(document.getElementById('agentic-tab-' + id)); return [c.color, c.borderBottomColor, document.getElementById('agentic-tab-' + id).classList.contains('active')]; }; return { files: st('files'), saved: st('saved'), active: [...document.querySelectorAll('${ROW} .agentic-tab.active')].map(b => b.dataset.tab) }; })()`);
         assert.deepEqual(look.active, ['files'], 'one tab is selected: ' + JSON.stringify(look));
-        assert.ok(look.saved[0] !== look.files[0] && look.saved[1] !== look.files[1] && /^rgba\(\d+, \d+, \d+, (0|0\.0\d*)\)$|^rgba\(0, 0, 0, 0\)$/.test(look.saved[1]), 'a hovered tab is not drawn as the selected one (no accent colour, no underline): ' + JSON.stringify(look));
+        assert.ok(look.saved[1] !== look.files[1] && !/^rgba\(0, 0, 0, 0\)$/.test(look.files[1]) && /^rgba\(\d+, \d+, \d+, (0|0\.0\d*)\)$|^rgba\(0, 0, 0, 0\)$/.test(look.saved[1]), 'a hovered tab is not drawn as the selected one (no accent underline; the tab family draws both in the primary text colour): ' + JSON.stringify(look));
         assert.equal(await ev(`getComputedStyle(document.getElementById('changed-files-title')).textTransform`), 'none', 'the files line is not in capitals');
         ok('Customize tabs, one selected tab, sentence case');
         console.log('More opens the rare tabs');
