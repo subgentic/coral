@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 // A helper that detached and was reparented to PID 1 BEFORE the kill (a daemon the agent started: double-forked, a session of its own, ignoring the hangup and SIGTERM) is found by the tag in its environment, and
@@ -29,7 +31,14 @@ func TestKillEndsADaemonThatDetachedBeforeTheKill(t *testing.T) {
 		t.Fatal(err)
 	}
 	pid := pidFrom(t, pidFile)
-	time.Sleep(500 * time.Millisecond) // the intermediate processes have exited: the helper's parent is PID 1
+	// the intermediate processes have exited: the helper's parent is PID 1 (or the system's subreaper). Waited for, not slept: under load the two forks and exits take longer than a fixed half second.
+	if p, perr := process.NewProcess(int32(pid)); perr == nil {
+		for end := time.Now().Add(10 * time.Second); time.Now().Before(end); time.Sleep(20 * time.Millisecond) {
+			if ppid, err := p.Ppid(); err == nil && ppid <= 1 {
+				break
+			}
+		}
+	}
 	if err := b.KillWithin(name, 600*time.Millisecond); err != nil {
 		t.Fatal(err)
 	}

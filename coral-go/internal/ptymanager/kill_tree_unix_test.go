@@ -32,7 +32,9 @@ func needPerl(t *testing.T) {
 func pidFrom(t *testing.T, path string) int {
 	t.Helper()
 	var pid int
-	for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(20 * time.Millisecond) {
+	// The helper is node, started through perl in a terminal: under -race, or on a loaded runner, its start has taken longer than five seconds (the flake of #9235). The wait is for the event, the file the
+	// helper writes once it runs, and only a helper that never starts costs the full time.
+	for end := time.Now().Add(60 * time.Second); time.Now().Before(end); time.Sleep(20 * time.Millisecond) {
 		if b, err := os.ReadFile(path); err == nil {
 			if n, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && n > 1 {
 				pid = n
