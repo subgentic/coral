@@ -24,7 +24,6 @@
   "layout.css:  | .sidebar-header": 2,
   "layout.css:  | .editions-actions": 2,
   "output.css:  | .preview-pane-markdown": 2,
-  "popout.css:  | .terminal-state-pill": 2,
   "scheduler.css:  | .sched-view-header h2": 2,
   "scheduler.css:  | .sched-preview": 2,
   "scheduler.css:  | .sched-tz-input": 2,
