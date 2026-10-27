@@ -47,6 +47,19 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
    })()`);
    for(const folder of folders){try{
     await open(folder);
+    // A phone's rows are mail rows (#9545): one cell each, no Server column or sort. What holds there: rows of both origins are listed and the Server filter in the panel narrows them (the columns are checked at 1280).
+    if(width===390&&await ev(`!!document.querySelector('#group-table-view tr.dt-mailed')`)){
+     const rows=`document.querySelectorAll('#group-table-view tr.dt-mailed').length`,pick=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Server')?.querySelector('select')`;
+     await waitFor(`${rows}>=2`,'rows of both origins in '+folder+' on a phone',8000);
+     const all=await ev(rows);
+     await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);
+     await waitFor(`!!(${pick})&&(${pick}).getClientRects().length>0`,'Server filter in '+folder+' on a phone');
+     await ev(`(()=>{const s=${pick};s.value='box-2';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+     await waitFor(`${rows}>0&&${rows}<${all}`,'the Server filter narrows '+folder+' on a phone');
+     await ev(`(()=>{const s=${pick};s.value='';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+     assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),folder+': no horizontal overflow on a phone');
+     continue;
+    }
     // Artifacts (#9408): a Computer column of its own (th data-key server) beside the plain Team, one line each; the row's hover and preview name it where a narrow list drops both; the Server filter stays in the panel
     const artifacts=folder==='artifacts',col='server',is=t=>`e.textContent==='${t}'`;
     await waitFor(`!!document.querySelector('#group-table-view th[data-key="server"]')`,'Server column in '+folder,5000);
@@ -97,6 +110,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     }
     console.log('PASS server '+folder+' '+width);
    }catch(e){failures.push(folder+' '+width+': '+e.message);console.error(failures.at(-1));}}
+   if(width===1280){ // reads the Server cell of a chat row: a phone's mail rows have none (#9545)
    // Same id on two sources: a remote Inbox preview must not capture a local URL.
    await open('chats');
    await waitFor(`!![...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.querySelector('td[data-key="server"]')?.textContent==='Remote box')`,'remote chat row');
@@ -105,6 +119,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
    await ev(`window.__serverReads=[];history.pushState({},'', '/chats/same-chat');window.dispatchEvent(new PopStateEvent('popstate'));true`);
    await waitFor(`window.__serverReads.includes('/api/sessions/history/same-chat')&&window.__serverState.currentSession?.server==='local'`,'local URL resets remote preview source');
    assert.ok(!(await ev(`window.__serverReads`)).includes('/api/remote/box-2/api/sessions/history/same-chat'),'local URL does not read the remote message page');
+   }
    for(const mode of ['standalone','only-local']){
     await ev(`window.__serverState.hub=${mode==='only-local'};window.__serverState.servers=[{id:'local',status:'online'}];true`);
     for(const folder of folders){await open(folder);assert.equal(await ev(`!!document.querySelector('#group-table-view th[data-key="server"]')`),false,mode+' hides Server in '+folder);}

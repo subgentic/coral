@@ -47,7 +47,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
             const open = async key => {
-                if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); s.value = ${JSON.stringify(key)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                if (mobile) await ev(`(() => { const b = document.querySelector('.view-list-item[data-key=' + ${JSON.stringify(JSON.stringify(key))} + ']'); b.click(); return true; })()`);
                 else await ev(`document.querySelector('.view-list-item[data-key="${key}"]').click(); true`);
                 await settle(600);
             };

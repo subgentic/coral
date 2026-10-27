@@ -30,8 +30,8 @@ const BASE = require('./test_base').BASE;
             } else {
                 await ev(`window.switchNavTab('history'); true`);
                 await waitFor(`!!document.querySelector('.list-bar-search-row')`, 'the chats toolbar', 10000); await settle(600);
-                const e = await ev(`(() => { const row = document.querySelector('.list-bar-search-row').getBoundingClientRect().left; const sel = [...document.querySelectorAll('select')].find(s => s.getClientRects().length && s.getBoundingClientRect().top < document.querySelector('.list-bar-search-row').getBoundingClientRect().top); return { row: Math.round(row), select: sel ? Math.round(sel.getBoundingClientRect().left) : null }; })()`);
-                assert.ok(e.select !== null && e.row === e.select, at + 'the toolbar starts at the left edge of the folder select above it: ' + JSON.stringify(e));
+                const e = await ev(`(() => { const row = document.querySelector('.list-bar-search-row').getBoundingClientRect().left; const sel = [...document.querySelectorAll('.view-list-trigger, select')].find(s => s.getClientRects().length && s.getBoundingClientRect().top < document.querySelector('.list-bar-search-row').getBoundingClientRect().top); return { row: Math.round(row), select: sel ? Math.round(sel.getBoundingClientRect().left) : null }; })()`);
+                assert.ok(e.select !== null && e.row === e.select, at + 'the toolbar starts at the left edge of the folder button above it (the drawer\'s, #9545): ' + JSON.stringify(e));
                 await shot(`${w}-chats`);
             }
         }
