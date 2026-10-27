@@ -35,7 +35,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('.job-type-btn[data-type="workflow"]').click(); true`);
             await waitFor(`document.getElementById('job-modal-no-workflows').checkVisibility()`, 'the no-workflow line', 8000);
             await shot(`first-run-job-workflow-${w}`);
-            await ev(`document.querySelector('#job-modal .modal-close-btn').click(); true`);
+            await ev(`[...document.querySelectorAll('#job-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
 
             // the second card: New workflow, with an example step and the hint
             await ev(`document.querySelectorAll('#group-table-view .start-card')[1].click(); true`);
@@ -44,7 +44,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.querySelector('.wf-step-content').placeholder`), 'e.g. npm test', at + 'with the example as its placeholder');
             assert.equal(await ev(vis('#wf-build-hint')), true, at + 'the Build with Agent hint');
             await shot(`first-run-workflow-${w}`);
-            await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); true`);
+            await ev(`[...document.querySelectorAll('#wf-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
             assert.equal(await ev(`getComputedStyle(document.getElementById('job-modal')).display`), 'none', at + 'a workflow dialog opened from a card does not bring New job back');
         }
         console.log('PASS first run: two cards in every folder, New job on the Agent prompt, New workflow with an example step and the hint');

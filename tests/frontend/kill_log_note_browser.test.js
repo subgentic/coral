@@ -41,11 +41,11 @@ const NOTE_MANY = "Their terminal logs are kept, in the logs folder of Coral's d
             console.log(`   ✓ ${label}: ${d.message}`);
         };
         console.log('Every Kill confirmation says what happens to the terminal log');
-        await asked('Kill Session (sidebar row)', `T.render.killSessionDirect('repo', 'claude', 's1')`, 'Kill Session');
-        await asked('Kill Session (agent header)', `T.state.currentSession = { type: 'live', name: 'repo', session_id: 's1', agent_type: 'claude' }; (await import((window.__coralStatic || '/static/') + 'controls.js')).killSession()`, 'Kill Session');
-        await asked('Kill All Agents (folder)', `T.render.killGroup('repo')`, 'Kill All Agents', NOTE_MANY, 'Kill all 2 agents in');
-        await asked('Kill Team (one agent)', `T.render.killBoard('team-k')`, 'Kill Team', NOTE, 'Kill the 1 agent on board');
-        await asked('Reset Team', `window.resetTeam('team-k')`, 'Reset Team', NOTE_MANY);
+        await asked('Kill Session (sidebar row)', `T.render.killSessionDirect('repo', 'claude', 's1')`, 'Kill session');
+        await asked('Kill Session (agent header)', `T.state.currentSession = { type: 'live', name: 'repo', session_id: 's1', agent_type: 'claude' }; (await import((window.__coralStatic || '/static/') + 'controls.js')).killSession()`, 'Kill session');
+        await asked('Kill All Agents (folder)', `T.render.killGroup('repo')`, 'Kill all agents', NOTE_MANY, 'Kill all 2 agents in');
+        await asked('Kill Team (one agent)', `T.render.killBoard('team-k')`, 'Kill team', NOTE, 'Kill the 1 agent on board');
+        await asked('Reset Team', `window.resetTeam('team-k')`, 'Reset team', NOTE_MANY);
         console.log('PASS');
     } catch (e) {
         console.error(e && e.stack || e);

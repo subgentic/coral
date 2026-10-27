@@ -37,8 +37,8 @@ const STUB = `(() => {
 
             // 1. first screen: Name, Steps with one step showing; the rest behind More options
             assert.equal(await ev(vis('#wf-input-name')), true, at + 'Name');
-            const pat = await ev(`(() => { const m = document.querySelector('#wf-create-modal .modal-content').getBoundingClientRect(), x = document.querySelector('#wf-create-modal .modal-close-btn').getBoundingClientRect(), f = document.getElementById('wf-modal-save').getBoundingClientRect(); return { xRight: Math.round(m.right - x.right), xTop: Math.round(x.top - m.top), btnRight: Math.round(m.right - f.right) }; })()`);
-            assert.ok(pat.xRight >= 0 && pat.xRight <= 40 && pat.xTop <= 40, at + 'the X is at the top right: ' + JSON.stringify(pat));
+            const pat = await ev(`(() => { const m = document.querySelector('#wf-create-modal .modal-content').getBoundingClientRect(), f = document.getElementById('wf-modal-save').getBoundingClientRect(); return { hasX: !!document.querySelector('#wf-create-modal .modal-close-btn'), btnRight: Math.round(m.right - f.right) }; })()`);
+            assert.equal(pat.hasX, false, at + 'no Close X: Cancel and Escape close it (#9456)');
             assert.ok(pat.btnRight <= 40, at + 'the buttons are at the bottom right, as in New job: ' + JSON.stringify(pat));
             assert.equal(await ev(`document.querySelectorAll('#wf-steps-editor .wf-step-editor-item').length`), 1, at + 'one step is already there');
             assert.deepEqual(await ev(`[document.querySelector('.wf-step-type-select').value, document.querySelector('.wf-step-name-input').value, document.querySelector('.wf-step-content').value]`), ['shell', 'Run tests', ''], at + 'it is a named step to fill in, with no command saved by accident (#9297)');
@@ -132,7 +132,7 @@ const STUB = `(() => {
             assert.equal(await ev(`document.querySelectorAll('#wf-create-modal [aria-invalid]').length`), 0, at + 'no mark is left over');
         }
         // the Workflows page behind the dialog: with no workflow, one empty line and no count pill (the page has no header of its own, #7471)
-        await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); window.openAutomationsFolder('workflows'); true`);
+        await ev(`[...document.querySelectorAll('#wf-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); window.openAutomationsFolder('workflows'); true`);
         await waitFor(`!!document.querySelector('#group-table-view .empty-state-line') && document.querySelector('#group-table-view .empty-state-line').checkVisibility()`, 'the Workflows page', 8000);
         assert.equal(await ev(`document.getElementById('wf-count-badge')`), null, 'the page draws no count badge');
         console.log('PASS workflow form: Name, Steps first, the rest behind More options; errors in words');

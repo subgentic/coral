@@ -243,7 +243,7 @@ export function deleteMessageBoardProject() {
     // says it again for an agent this page's list does not show yet.
     const running = runningAgentsOn(project);
     if (running.length) { showToast(runningAgentsText(running), true); return; }
-    window.showConfirmModal('Delete Board', `Delete board "${keyLabel(project)}" with all its messages and tasks? This cannot be undone.`, async () => {
+    window.showConfirmModal('Delete board', `Delete board "${keyLabel(project)}" with all its messages and tasks? This cannot be undone.`, async () => {
         try {
             const resp = await boardFetch(project, ``, { method: 'DELETE' });
             if (!resp.ok) {

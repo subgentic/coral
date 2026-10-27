@@ -73,10 +73,8 @@ registerActions({
     'm-generate-team-from-wizard': el => { window.generateTeamFromWizard(); },
     'm-handle-team-folder-import': el => { _handleTeamFolderImport(el); },
     'm-hide-confirm-modal': el => { window.hideConfirmModal(); },
-    'm-hide-create-task-modal': el => { window.hideCreateTaskModal(); },
     'm-hide-default-prompts-modal': el => { window.hideDefaultPromptsModal(); },
     'm-hide-info-modal': el => { window.hideInfoModal(); },
-    'm-hide-job-modal': el => { window.hideJobModal(); },
     'm-hide-launch-modal': el => { window.hideLaunchModal(); },
     'm-hide-launch-modal-then-show-job-modal': el => { window.hideLaunchModal(); window.showJobModal(); },
     'm-hide-mobile-connect-modal': el => { window._hideMobileConnectModal(); },
@@ -219,7 +217,6 @@ registerActions({
     'wf-create': () => showWorkflowCreateModal(),
     'job-create-workflow': () => { hideJobModal(); showWorkflowCreateModal(reshowJobModal); }, // New job with no workflow to run
     'wf-modal-backdrop': (el, event) => { if (event.target === el) hideWorkflowCreateModal(); },
-    'wf-modal-close': () => hideWorkflowCreateModal(),
 });
 
 registerActions({
@@ -311,7 +308,7 @@ Object.assign(window, {
 });
 
 function resetTeam(boardName) {
-    showConfirmModal('Reset Team', `Reset all agents in "${keyLabel(boardName)}"? Their context will be cleared and they'll restart with their original prompts. ${KILL_LOG_NOTE_MANY}`, async () => {
+    showConfirmModal('Reset team', `Reset all agents in "${keyLabel(boardName)}"? Their context will be cleared and they'll restart with their original prompts. ${KILL_LOG_NOTE_MANY}`, async () => {
         try {
             const resp = await teamFetch(boardName, n => `/api/sessions/live/team/${encodeURIComponent(n)}/reset`, { method: 'POST' });
             if (resp.ok) {

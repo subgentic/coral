@@ -514,7 +514,7 @@ export async function killSession() {
     }
 
     const cur = state.currentSession;
-    window.showConfirmModal('Kill Session', `Kill session "${cur.name}"? This will terminate the agent. ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
+    window.showConfirmModal('Kill session', `Kill session "${cur.name}"? This will terminate the agent. ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
         try {
             const killed = state.currentSession;
             const result = await killLiveSession(killed, currentServer());

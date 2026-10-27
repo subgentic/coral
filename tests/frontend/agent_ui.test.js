@@ -145,7 +145,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const confirmOpen = `(()=>{const m=document.getElementById('confirm-modal');return !!m && getComputedStyle(m).display !== 'none';})()`;
   await ev(`(()=>{ document.querySelector('.agent-ui-card .agent-ui-delete').click(); return true; })()`);
   await waitFor(confirmOpen, 'the delete confirmation');
-  assert.equal(await ev(`document.getElementById('confirm-modal-title').textContent`), 'Delete Panel');
+  assert.equal(await ev(`document.getElementById('confirm-modal-title').textContent`), 'Delete panel');
   assert.match(await ev(`document.getElementById('confirm-modal-message').textContent`), /^Delete “.+”\? This removes the panel and its saved responses\.$/);
   await ev(`(()=>{ document.querySelector('#confirm-modal .btn:not(#confirm-modal-yes)').click(); return true; })()`);
   await sleep(300); // sleep-ok: shows that Cancel deletes nothing (no condition to wait for)

@@ -21,13 +21,12 @@ export async function openTeamSettings(team) {
     modal.className = 'modal team-settings-modal';
     modal.style.display = 'flex'; // display-ok: a script-built dialog is shown as the shared .modal flex box (modal_chrome.js hides it by display none, as every dialog)
     modal.innerHTML = `<div class="modal-content dlg-flow team-settings-dialog">
-        <div class="modal-header"><h3></h3><button type="button" class="btn btn-quiet btn-icon btn-small modal-close-btn" aria-label="Close team settings" title="Close"><span class="material-icons" aria-hidden="true">close</span></button></div>
+        <div class="modal-header"><h3></h3></div>
         <div class="modal-body team-settings-dialog-body"><div class="team-settings-host" id="team-panel-settings"></div></div>
     </div>`;
     modal.querySelector('h3').textContent = `Team settings: ${keyLabel(key)}`;
     document.body.appendChild(modal);
     const close = registerDialog(modal, { beforeClose: async () => !hasUnsavedTeamSettings() || await confirmTeamWorkspaceChange(), onClose: () => { document.removeEventListener('keydown', keepIn, true); document.removeEventListener('keyup', keepIn, true); if (open && open.modal === modal) open = null; } });
-    modal.querySelector('.modal-close-btn').addEventListener('click', () => close());
     // Tab stays inside: the page-wide trap (modal_chrome.js) wraps at the first and last stop it computes, but the browser can still walk past the dialog (a disclosure's summary at the end, a roving-tabindex tab the pointer
     // chose). After a Tab key, if focus is outside the dialog (and no other dialog, the unsaved question, is the one asked), it goes back to the dialog's first stop, or its last with Shift.
     const stopsOf = () => [...modal.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], summary, [tabindex]')].filter(el => el.tabIndex >= 0 && el.getClientRects().length > 0);

@@ -34,7 +34,7 @@ export async function killGroup(groupName) {
     if (!groupSessions.length) return;
 
     showConfirmModal(
-        "Kill All Agents",
+        "Kill all agents",
         `Kill ${killCount(groupSessions.length).agents} in "${groupName.startsWith('wf:') ? groupName.slice(3) : keyLabel(groupName)}"? This will terminate ${groupSessions.length === 1 ? 'it' : 'them'}. ${killCount(groupSessions.length).note}`,
         async () => {
             for (const s of groupSessions) {
@@ -64,7 +64,7 @@ export async function killBoard(boardName) {
     if (blocked) { showToast(blocked, true); return; }
 
     showConfirmModal(
-        "Kill Team",
+        "Kill team",
         `Kill ${killCount(boardSessions.length).agents} on board "${keyLabel(boardName)}"? This will terminate ${boardSessions.length === 1 ? 'it' : 'them'}. ${_teamWorktreeSentence(boardSessions)}${killCount(boardSessions.length).note}`,
         async () => {
             // The whole team through the team route, so the team is marked stopped as an API kill does (its worktree is then not "in use" in the kept-worktrees list); its one answer carries the worktree.
@@ -256,7 +256,7 @@ export function toggleTeamSleep(boardName, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep Team', `Put all agents on "${keyLabel(boardName)}" to sleep?`, doIt, undefined, { danger: false, label: 'Sleep team' });
+        showConfirmModal('Sleep team', `Put all agents on "${keyLabel(boardName)}" to sleep?`, doIt, undefined, { danger: false, label: 'Sleep team' });
     } else {
         doIt();
     }
