@@ -99,3 +99,27 @@ func TestSidecarCacheIsBounded(t *testing.T) {
 		t.Fatalf("the cache holds %d entries, over %d", n, maxSidecarMetaEntries)
 	}
 }
+
+// A sidecar rewritten to the same size with its mtime put back, inside uploadDirSettle, is seen: a coarse mtime cannot hide it (#9535).
+func TestSidecarCacheSettleWindowSeesSameSizeSameMtimeRewrite(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, strings.Repeat("cd", 32)+".json")
+	fresh := time.Now().Add(-uploadDirSettle / 4)
+	write := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, fresh, fresh); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(`{"name":"aaaa.txt"}`)
+	if m, ok := readArtifactSidecar(p); !ok || m.Name != "aaaa.txt" {
+		t.Fatalf("first read: %+v %v", m, ok)
+	}
+	write(`{"name":"bbbb.txt"}`)
+	if m, ok := readArtifactSidecar(p); !ok || m.Name != "bbbb.txt" {
+		t.Fatalf("a same-size rewrite with the same mtime inside the settle window is seen, got %+v", m)
+	}
+}
