@@ -3507,9 +3507,11 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* While the full message is shown the snippet is not (it is the first lines of the same text); when only a reason is shown (deleted, too long) the snippet stays, it is what is left (#5882). */
 
 /* The top bar's Saved button: a bookmark with the number open. */
-.saved-top-btn { position: relative; }
+.saved-top-btn { position: relative; --badge-glyph: 1rem; }
 .saved-top-btn.on { color: var(--accent); }
-.saved-top-btn .saved-count { position: absolute; top: -2px; right: -3px; min-width: 14px; padding: 0 4px; border-radius: var(--radius-lg); background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 14px; text-align: center; }
+/* A count on an icon button hangs off the glyph, never over it (#9572): its bottom-left corner is the glyph's top-right corner (the glyph is centred in the button, --badge-glyph wide), so it grows up and to the right with its text, at 200% text too. */
+.saved-top-btn .saved-count, .display-badge { position: absolute; left: calc(50% + var(--badge-glyph, var(--icon-size)) / 2); bottom: calc(50% + var(--badge-glyph, var(--icon-size)) / 2); top: auto; right: auto; }
+.saved-top-btn .saved-count { min-width: 14px; padding: 0 4px; border-radius: var(--radius-lg); background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 14px; text-align: center; }
 .saved-top-btn .saved-count[hidden] { display: none; }
 /* The jump: a slim bar above the conversation, and the "Saved" tag on the message. */
 .jumpbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: var(--fs-base); color: var(--text-secondary); flex: none; }
