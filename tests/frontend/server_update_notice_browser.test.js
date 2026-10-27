@@ -77,7 +77,7 @@ const NONE = ['srv-current', 'srv-unknown', 'srv-odd'];
             assert.equal(g.markerText, want.label, `${where}: ${id} header marker text`);
             assert.equal(g.updText, want.shown || want.text, `${where}: ${id} details show the notice ("Update to <version>" when there is one)`);
             assert.ok(g.badge, `${where}: ${id} details carry the release link`);
-            assert.equal(g.badge.cls, `server-update-badge server-update-${want.level}`);
+            assert.equal(g.badge.cls, `chip server-update-badge server-update-${want.level}`);
             assert.equal(g.badge.title, want.text); assert.equal(g.badge.aria, want.text);
             assert.equal(g.badge.href, RELEASES, `${where}: ${id} links to the releases page`);
             assert.equal(g.badge.target, '_blank'); assert.equal(g.badge.rel, 'noopener noreferrer');

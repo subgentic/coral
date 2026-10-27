@@ -227,7 +227,7 @@ const contrast = (a, b) => {
         for (const [id, level] of [['m1', 'required'], ['m2', 'available']]) {
             assert.equal(rowInfo[id].badges.length, 1, `${id}: one update badge`);
             const b = rowInfo[id].badges[0];
-            assert.equal(b.cls, `server-update-badge server-update-${level}`);
+            assert.equal(b.cls, `chip server-update-badge server-update-${level}`);
             assert.equal(b.href, RELEASES, `${id}: constant download link`);
             assert.equal(b.aria, notice[id], `${id}: aria-label is the notice`);
             assert.ok(b.inVersion, `${id}: badge sits in the Coral column`);
