@@ -120,11 +120,10 @@ function _mobileRowParts(s, stateInfo) {
     const unreadBoardBadge = mobileUnread > 0
         ? `<span class="chip chip-caps session-mobile-meta-pill">${mobileUnread} unread</span>`
         : '';
-    const mobileAttentionBanner = stateInfo.key === 'needs_input'
-        ? '<div class="chip chip-attn session-mobile-banner">Waiting for your input</div>'
-        : (stateInfo.key === 'check_terminal'
-            ? '<div class="chip chip-attn session-mobile-banner">Nothing yet — open the terminal</div>'
-            : (stateInfo.key === 'stuck' ? '<div class="chip chip-attn chip-attn-error session-mobile-banner">Session needs attention</div>' : ''));
+    // Needs input has no banner: its state chip already says it in the desktop row's words ("Needs input", with the kind after it); a second chip said "Waiting for your input" (#9464).
+    const mobileAttentionBanner = stateInfo.key === 'check_terminal'
+        ? '<div class="chip chip-attn session-mobile-banner">Nothing yet — open the terminal</div>'
+        : (stateInfo.key === 'stuck' ? '<div class="chip chip-attn chip-attn-error session-mobile-banner">Session needs attention</div>' : '');
     return { mobileStatusChip, unreadBoardBadge, mobileAttentionBanner };
 }
 
