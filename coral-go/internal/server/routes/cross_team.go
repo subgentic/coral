@@ -286,6 +286,21 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 				}
 			}
 		}
+		for _, wc := range []struct {
+			name string
+			c    board.HealthWaitCheck
+		}{{"goals_ready", body.Health.GoalsReady}, {"unowned_tasks", body.Health.UnownedTasks}} {
+			if msg := wc.c.Problem(wc.name); msg != "" {
+				errBadRequest(w, msg)
+				return
+			}
+			if who := strings.TrimSpace(wc.c.Nudge); who != "" {
+				if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), who); err != nil || sub == nil {
+					errBadRequest(w, fmt.Sprintf("health.%s.nudge: %q is not a member of this team", wc.name, board.OneLine(who)))
+					return
+				}
+			}
+		}
 		// The check's recipient is a member of this team, never anyone else (#4176 rule 18).
 		if rcpt := strings.TrimSpace(body.Health.Recipient); rcpt != "" {
 			if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), rcpt); err != nil || sub == nil {
