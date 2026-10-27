@@ -87,8 +87,8 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
 
         console.log('2. The real row with the same id is still managed');
         const real = await sheetOf('Design review.md').catch(() => null);
-        const realRow = await ev(`(() => { const r = [...document.querySelectorAll('${ROWS}')].find(r => r.querySelector('.dt-primary').textContent === 'Design review.md' && !r.querySelector('.team-artifact-badge')); return r ? { size: r.querySelectorAll('td')[1].textContent, tags: r.querySelectorAll('.dt-tag:not(.team-artifact-badge)').length, badge: false } : null; })()`);
-        assert.ok(realRow && /\d/.test(realRow.size) && realRow.size !== '—' && realRow.tags === 0 && realRow.badge === false, 'a real file shows its size and no type chip on the one-line row: ' + JSON.stringify(realRow));
+        const realRow = await ev(`(() => { const r = [...document.querySelectorAll('${ROWS}')].find(r => r.querySelector('.dt-primary').textContent === 'Design review.md' && !r.querySelector('.team-artifact-badge')); const at = [...document.querySelectorAll('${ROWS}')[0].closest('table').querySelectorAll('thead th')].findIndex(h => /^Size/.test(h.textContent.trim())); return r ? { size: r.querySelectorAll('td')[at].textContent, tags: r.querySelectorAll('.team-artifact-badge').length, badge: false } : null; })()`); // Size is a column of the shared table (Name, Type, Tags, Size, Updated): the Type chip is its own cell, an origin note is the badge by the name
+        assert.ok(realRow && /\d/.test(realRow.size) && realRow.size !== '—' && realRow.tags === 0 && realRow.badge === false, 'a real file shows its size and no origin note on the one-line row: ' + JSON.stringify(realRow));
         void real;
 
         console.log('3. A shared row and a received row are labelled and never show a producer');
