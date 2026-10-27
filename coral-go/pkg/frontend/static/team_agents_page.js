@@ -215,7 +215,7 @@ export function renderAgentPage(host, agent, ctx) {
     const status = el('div', 'team-agents-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const h = el('h2', 'goals-detail-title', agent.name); h.tabIndex = -1; h.id = 'team-agent-title';
     const line = el('div', 'goals-detail-line'); line.append(stateChip(statusWord(agent), CLASS[agent.availability]));
-    const dl = el('dl', 'goals-facts');
+    const dl = el('dl', 'facts goals-facts');
     fact(dl, 'Provider', providerOf(agent));
     fact(dl, 'Role', agent.role);
     fact(dl, 'Status', agent.reason);

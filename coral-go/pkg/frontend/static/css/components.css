@@ -4273,10 +4273,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .servers-page > * { flex-shrink: 0; }
 .servers-page-name { margin: 0; font-size: 1.0625rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-page .item-meta { display: flex; align-items: center; gap: var(--space-md); }
-.servers-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px var(--space-xl); margin: var(--space-lg) 0; }
+.servers-facts { gap: 6px var(--space-xl); margin: var(--space-lg) 0; }
 .servers-fact { display: contents; }
-.servers-fact dt { font-size: var(--fs-md); font-weight: 500; color: var(--text-secondary); }
-.servers-fact dd { margin: 0; font-size: var(--fs-md); font-weight: 400; color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-page .item-bar { margin-top: auto; bottom: calc(-1 * var(--space-lg, 16px)); margin-bottom: calc(-1 * var(--space-lg, 16px)); padding-bottom: calc(var(--space-lg) + var(--space-lg, 16px)); } /* the view's padding is taken back so nothing shows under the bar */
 .servers-view.servers-view-page .servers-tab { min-height: 100%; display: flex; flex-direction: column; }
 .servers-view.servers-view-page .servers-tab-body { flex: 1 1 auto; display: flex; flex-direction: column; }
