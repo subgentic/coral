@@ -101,6 +101,15 @@ const { pathToFileURL } = require('url');
     assert.strictEqual(m.goalTeamKey({ ...b, goal: { id: 3, title: 'G', board: 'T' } }), 'T');
     assert.strictEqual(m.goalTeamKey({ name: 'x', server: 'ws1', goal: { id: 3, title: 'G', board: 'T' } }), 'T', 'no board on the session: the goal\'s own');
     assert.strictEqual(m.goalTeamKey({ name: 'x' }), '');
+    // two same-named teams on two servers open two different goal addresses in the Inbox (#8861), and each address says its own server
+    {
+        const routes = await import(pathToFileURL(path.join(dir, 'routes.js')).href);
+        const row = (server) => ({ name: 'agent', ...(server ? { server } : {}), board_project: 'T', goal: { id: 3, title: 'G', board: 'T' } });
+        const addr = (s) => routes.build({ view: 'inbox-goals', sub: 'goals', id: m.goalTeamKey(s), item: 3 });
+        const local = addr(row()), remote = addr(row('ws1'));
+        assert.notStrictEqual(local, remote, 'the same team name on two servers is two addresses');
+        assert.ok(/ws1/.test(remote) && !/ws1/.test(local), 'only the remote one names its server: ' + remote + ' vs ' + local);
+    }
     assert.notStrictEqual(m.sessionFolderKey(a), m.sessionFolderKey(b));
 
     // Popout paths.
