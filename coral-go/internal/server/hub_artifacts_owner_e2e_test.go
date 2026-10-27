@@ -41,6 +41,8 @@ func TestHubArtifactsOwnerAndGranteeThroughTheRealConnector(t *testing.T) {
 	srv := newTestServer(t, cfg, db, stack.backend, stack.terminal)
 	local := httptest.NewServer(srv.Router())
 	t.Cleanup(local.Close)
+	_, subErr := srv.boardStore.Subscribe(context.Background(), "team-q", "Dev", "Developer", "", nil, "all") // the team the reads below ask for: a team no board has is 404 (#8821)
+	require.NoError(t, subErr)
 	ss := store.NewSessionStore(db)
 	require.NoError(t, ss.SetSetting(context.Background(), routes.MaxModeSetting, tunnel.TierLaunch.String()))
 	cur := routes.MaxModeFromSettings(ss)

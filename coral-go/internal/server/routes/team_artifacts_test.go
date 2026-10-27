@@ -148,12 +148,10 @@ func TestTeamArtifactsIsolationOrderDedupeAndMissing(t *testing.T) {
 	// Newest task first.
 	require.Equal(t, second, resp.Artifacts[0].TaskID)
 
-	// Another team sees only its own artifact; an unknown team is empty, not an error.
+	// Another team sees only its own artifact; a team no board has is not found, not an empty list (#8821: TestTeamArtifactsUnknownBoardIsNotFound).
 	beta := getTeamArtifacts(t, srv, "/api/board/beta/artifacts", http.StatusOK)
 	require.Len(t, beta.Artifacts, 1)
 	require.Equal(t, other, beta.Artifacts[0].ID)
-	empty := getTeamArtifacts(t, srv, "/api/board/nobody/artifacts", http.StatusOK)
-	require.Empty(t, empty.Artifacts)
 }
 
 func TestTeamArtifactsPaginationAndBounds(t *testing.T) {
@@ -645,4 +643,27 @@ func TestSessionArtifactsAreTiedToTheCallingAgent(t *testing.T) {
 	stranger := &store.SessionTokenOwner{SessionID: "55555555-eeee-0000-0000-000000000005", SessionName: "claude-55555555-eeee-0000-0000-000000000005"}
 	assert.Equal(t, http.StatusForbidden, list(stranger, sessAlice), "an agent on no board sees only its own")
 	assert.Equal(t, http.StatusOK, list(nil, sessCarol), "the dashboard or the hub (no agent token) lists any session")
+}
+
+// #8821: a name or id no board has is 404 board_not_found ("No team named ..."), not an empty list; a board anything refers to (a task, a subscriber with no row: a legacy board) still lists.
+func TestTeamArtifactsUnknownBoardIsNotFound(t *testing.T) {
+	srv, h, _ := teamArtifactServer(t)
+	completeWithArtifacts(t, h, "alpha", "Build", nil) // a task: the board is known
+	_, err := h.bs.Subscribe(context.Background(), "legacy-sprint", "lead", "Lead", "", nil, "all")
+	require.NoError(t, err) // a subscriber and no boards row: a legacy board
+
+	for _, name := range []string{"alpha", "legacy-sprint"} {
+		resp, err := http.Get(srv.URL + "/api/board/" + name + "/artifacts")
+		require.NoError(t, err)
+		resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode, name)
+	}
+	resp, err := http.Get(srv.URL + "/api/board/no-such-team/artifacts")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	var body map[string]string
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, "board_not_found", body["code"])
+	assert.Equal(t, "No team named no-such-team", body["error"])
 }

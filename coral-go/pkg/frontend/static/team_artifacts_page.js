@@ -115,7 +115,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         model.controller?.abort();
         const gen = ++model.gen, ctrl = model.controller = new AbortController();
         if (!append) { if (!keep || !model.items.length) { model.items = []; model.hasMore = false; model.truncated = false; model.counts = null; } model.cursor = ''; model.loading = !model.items.length; }
-        model.loadingMore = append; model.error = '';
+        model.loadingMore = append; model.error = ''; model.notFound = false;
         draw();
         try {
             const params = new URLSearchParams({ limit: String(PAGE) });
@@ -124,6 +124,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (scope) params.set('session_id', scope.session); // one agent's list: the same query, scoped to the agent (its totals are the agent's)
             const inboxData = inbox ? await readInboxArtifacts(params, model.filters, ctrl.signal) : null;
             const r = await (inbox ? Promise.resolve({ ok: true, json: async () => inboxData }) : scope && scope.standalone ? fetch(serverUrl(`/api/session-artifacts?${params}`, scope.server), { signal: ctrl.signal }) : boardFetch(project, `/artifacts?${params}`, { signal: ctrl.signal }));
+            if (!r.ok && r.status === 404 && !inbox && !scope && ((await r.clone().json().catch(() => null)) || {}).code === 'board_not_found') { model.notFound = true; throw new Error(`No team named ${splitKey(project).name}`); } // a mistyped team name is not an empty team (#8821)
             if (!r.ok) { if (await isOwnerLabelRefusal(r)) throw new Error(OWNER_LABEL_TEXT); throw new Error(`Unable to load ${inbox ? '' : scope ? 'agent ' : 'team '}artifacts (${r.status}).`); }
             const data = await r.json();
             if (gen !== model.gen || key !== model.key) return;
@@ -261,7 +262,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' team-empty-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
-        if (model.error) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => loadArtifacts({ append: model.items.length > 0 && !!model.cursor, keep: true })));
+        if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => loadArtifacts({ append: model.items.length > 0 && !!model.cursor, keep: true })));
         const toolbarRow = bar.node.querySelector('.list-bar-search-row');
         toolbarRow?.querySelector('.dt-select-toggle')?.remove();
         Toolbar.mountSelection(toolbarRow, null);

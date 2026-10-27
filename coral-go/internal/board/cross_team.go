@@ -692,6 +692,21 @@ func (s *Store) boardMentionNames(ctx context.Context, project string) ([]string
 	return names, nil
 }
 
+// BoardKnown reports whether a key names a board anything refers to: a boards row, a subscriber, a message, a task or a goal (a legacy board has no row). The team pages' read routes answer 404 for a key
+// that is not (#8821): a mistyped team name is not an empty team. Writes (a subscribe, a post) still start a board under their own rules.
+func (s *Store) BoardKnown(ctx context.Context, key string) (bool, error) {
+	var one int
+	err := s.reader().GetContext(ctx, &one, `SELECT 1 WHERE EXISTS (SELECT 1 FROM boards WHERE id = ?1)
+		OR EXISTS (SELECT 1 FROM board_subscribers WHERE project = ?1)
+		OR EXISTS (SELECT 1 FROM board_messages WHERE project = ?1)
+		OR EXISTS (SELECT 1 FROM board_tasks WHERE board_id = ?1)
+		OR EXISTS (SELECT 1 FROM board_goals WHERE board_id = ?1)`, key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // BoardExists reports whether a board has any subscriber or message.
 func (s *Store) BoardExists(ctx context.Context, project string) (bool, error) {
 	var one int
