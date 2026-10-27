@@ -105,7 +105,8 @@ function liveAgent(it) {
 function srcLabel(it) { return it.title || it.ref; }
 /** Which saved message a button is for: its source and the start of its text, so four items do not read as the same three buttons four times (#6541). */
 const nameSuffix = new Map(), openSuffix = new Map(); // uid -> " (2 of 3)" for items shown together whose button names would otherwise match (same source and first words; same source for Open), so each reads apart
-function baseName(it) { const t = String(it.snippet || '').replace(/\s+/g, ' ').trim(); const c = [...t]; return t ? `${srcLabel(it)}, ${c.length > 40 ? c.slice(0, 40).join('') + '…' : t}` : srcLabel(it); } // cut by characters, not UTF-16 units, so an emoji is never split
+function cutSnippet(it) { const t = String(it.snippet || '').replace(/\s+/g, ' ').trim(); const c = [...t]; return c.length > 40 ? c.slice(0, 40).join('') + '…' : t; } // cut by characters, not UTF-16 units, so an emoji is never split
+function baseName(it) { const t = cutSnippet(it); return t ? `${srcLabel(it)}, ${t}` : srcLabel(it); }
 const whichOne = it => baseName(it) + (nameSuffix.get(uid(it)) || '');
 /** Work out the suffixes for the items about to be drawn together. */
 function nameApart(items) {
@@ -360,7 +361,7 @@ export function savedView() {
 /** One item's facts for a row or a page: its words, and what it can do. */
 export function savedItemFacts(it) {
     const c = chipFor(it), chk = checks.get(uid(it));
-    return { id: uid(it), server: it.server, title: srcLabel(it), snippet: it.snippet || '', saved: ago(it.saved_at), said: it.said_at ? when(it.said_at) : '', done: !!it.done_at,
+    return { id: uid(it), server: it.server, title: srcLabel(it), snippet: it.snippet || '', snip: cutSnippet(it), saved: ago(it.saved_at), said: it.said_at ? when(it.said_at) : '', done: !!it.done_at,
         state: chk && chk.state === 'gone' ? 'Gone' : it.done_at ? 'Done' : 'Open', gone: !!(chk && chk.state === 'gone'), noopen: !!(chk && chk.state === 'noopen'), why: chk ? chk.why || '' : '',
         serverName: multi ? serverName(it.server) : '', which: whichOne(it), open: openLabel(it), chip: c.text, kind: it.kind };
 }

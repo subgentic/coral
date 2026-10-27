@@ -44,7 +44,7 @@ const board = 'saved-line-' + Date.now().toString(36);
                     }
                     if (width === 390 && name === 'Saved') { // 200% text: the narrow container rule must not let the title wrap (#8981, the 20 rem rule)
                         await ev(`document.documentElement.style.fontSize = '32px'; true`); await new Promise(r => setTimeout(r, 600)); // sleep-ok: the table's fold observer settles
-                        const big = await ev(`[...document.querySelectorAll('.dt-table tbody tr:not(.dt-group)')].filter(r => r.getClientRects().length).map(r => { const t = r.querySelector('button.dt-primary'), c = getComputedStyle(t); return { nowrap: c.whiteSpace, ellipsis: c.textOverflow, h: Math.round(t.getBoundingClientRect().height), lh: parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.3 }; })`);
+                        const big = await ev(`[...document.querySelectorAll('.dt-table tbody tr:not(.dt-group)')].filter(r => r.getClientRects().length).map(r => { const b = r.querySelector('button.dt-primary'), t = r.querySelector('.dt-mail-title') || b, c = getComputedStyle(t); /* a phone's Saved row is a mail row (#9583): its title is the line */ return { nowrap: c.whiteSpace, ellipsis: c.textOverflow, h: Math.round(t.getBoundingClientRect().height), lh: parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.3 }; })`);
                         for (const r of big) { assert.equal(r.nowrap, 'nowrap', at + '200% text: the title stays on one line: ' + JSON.stringify(r)); assert.equal(r.ellipsis, 'ellipsis', at + '200% text: cut with an ellipsis'); assert.ok(r.h < 70, at + '200% text: one line high: ' + JSON.stringify(r)); }
                         await ev(`document.documentElement.style.fontSize = ''; true`);
                     }

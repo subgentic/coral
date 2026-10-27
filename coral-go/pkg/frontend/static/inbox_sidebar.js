@@ -409,7 +409,7 @@ function savedListSpec(where = '') {
         signature: JSON.stringify([multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
         node: () => DT.dataTable({ label: `Saved, ${rows.length}`, compact: true, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
             open: (f, row) => dock ? openDockSavedSheet(f.id, row.querySelector('.dt-primary')) : openSavedPage(f.id),
-            mail: f => ({ lead: { text: f.title || f.which, name: f.title || f.which }, title: f.title || f.which, snippet: f.snippet, time: f.saved }), // a phone's row (#9583): who it is from, the message, when it was saved
+            ...(dock ? {} : { mail: f => ({ lead: { text: f.title || f.which, name: f.title || f.which }, title: f.title || f.which, snippet: f.snip, time: f.saved }) }), // the snippet as the name cuts it, so the words on the row are the words in its name // a phone's Inbox row (#9583): who it is from, the message, when it was saved; the agent dock's Saved tab keeps its table
             columns: [
                 { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { // the sender (14/600), then the message in the secondary colour: a list of who said what reads at a glance; the button's name is still the whole words
                     const b = DT.primaryButton('', f.which); b.dataset.id = f.id; b.title = multi && f.serverName ? `${f.which} · ${f.serverName}` : f.which;

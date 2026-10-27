@@ -11,6 +11,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 const { assertPinnedBar } = require('./helpers/pinned_bar');
+const { TOUCH_AREA } = require('./helpers/touch_area');
 const hex = i => i.toString(16).padStart(20, '0');
 
 (async () => {
@@ -380,7 +381,8 @@ const hex = i => i.toString(16).padStart(20, '0');
         // The message button is a 44 px target on a phone too.
         await select('sv-a');
         await waitFor(`${C}.querySelectorAll('.chat-save-btn').length > 3`, 'the chat on the phone', 6000);
-        const tb = await ev(`(() => { const b = ${C}.querySelector('.chat-bubble.assistant .chat-save-btn'); const r = b.getBoundingClientRect(); const cb = ${C}.querySelector('.chat-bubble.assistant .chat-copy-btn'); const c = cb.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), copyW: Math.round(c.width), copyH: Math.round(c.height), opacity: getComputedStyle(b).opacity, copyOpacity: getComputedStyle(cb).opacity, overlapsCopy: r.left < c.right - 1 && r.right > c.left + 1 && r.top < c.bottom - 1 && r.bottom > c.top + 1 }; })()`);
+        await waitFor(`getComputedStyle(${C}.querySelector('.chat-bubble.assistant .chat-save-btn')).opacity === '1'`, 'the Save button shown on touch (its opacity transition)', 3000);
+        const tb = await ev(`(() => { const b = ${C}.querySelector('.chat-bubble.assistant .chat-save-btn'); const r = b.getBoundingClientRect(); const cb = ${C}.querySelector('.chat-bubble.assistant .chat-copy-btn'); const c = cb.getBoundingClientRect(); const ta = (${TOUCH_AREA})(b), tc = (${TOUCH_AREA})(cb); /* what a finger hits (#9332): the dense button's 44 px ::after, not its 24 px box */ return { w: Math.round(ta.w), h: Math.round(ta.h), copyW: Math.round(tc.w), copyH: Math.round(tc.h), opacity: getComputedStyle(b).opacity, copyOpacity: getComputedStyle(cb).opacity, overlapsCopy: r.left < c.right - 1 && r.right > c.left + 1 && r.top < c.bottom - 1 && r.bottom > c.top + 1 }; })()`);
         assert.ok(tb.w >= 44 && tb.h >= 44, 'the Save button is 44 px on touch: ' + JSON.stringify(tb));
         assert.ok(tb.copyW >= 44 && tb.copyH >= 44, 'Copy is 44 px on touch too: ' + JSON.stringify(tb)); assert.equal(tb.opacity, '1', 'always visible on touch'); assert.equal(tb.copyOpacity, '1', 'Copy too');
         assert.equal(tb.overlapsCopy, false, 'it does not sit on Copy: ' + JSON.stringify(tb));
