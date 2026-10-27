@@ -237,6 +237,7 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 	} else {
 		w.ReviewRounds = append(w.ReviewRounds, round)
 	}
+	w.ReviewInPool = false // reviewers were named: the pool has nothing left to give
 	if err := saveWorkflow(ctx, s.db, id, w); err != nil {
 		return nil, nil, err
 	}
@@ -414,6 +415,7 @@ func checkReviewTaskOpen(ctx context.Context, tx *sqlx.Tx, project string, id, r
 // with the approvers in the order they were named.
 func concludeRound(ctx context.Context, tx *sqlx.Tx, project string, id int64, w *TaskWorkflow, round *ReviewRound, approve bool, v *ReviewVerdict) error {
 	if !approve {
+		w.ReviewInPool = false // the pool's open place (a second reviewer) goes with the round: a resubmission goes back to the same reviewers
 		round.Result = "rejected"
 		if _, err := tx.ExecContext(ctx, "UPDATE board_tasks SET status='pending', assigned_to=?, claimed_at=NULL, edited_at=? WHERE id=? AND board_id=?", ptr.NullIfEmpty(w.OriginalAuthor), nowUTC(), id, project); err != nil {
 			return err
@@ -427,6 +429,10 @@ func concludeRound(ctx context.Context, tx *sqlx.Tx, project string, id int64, w
 			return nil
 		}
 	}
+	if w.ReviewInPool && len(round.Reviewers) < max(1, w.ReviewersWanted) {
+		return nil // a pooled review that asked for two reviewers is approved when both have approved, not when the first has
+	}
+	w.ReviewInPool = false
 	round.Result = "approved"
 	round.ConcludedAt = nowUTC()
 	round.ApprovedDigests = patchDigests(w.CompletionReview)

@@ -46,6 +46,8 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	outcome := fs.String("outcome", "success", "Proposed outcome: success or failed")
 	manifest := fs.String("artifacts", "", "Candidate artifact manifest")
 	candidateRevision := fs.String("candidate-revision", "", "Exact source/build revision represented by candidate evidence")
+	areas := fs.String("areas", "", "The review's areas, comma-separated (submit-review): who may take it from the review pool")
+	reviewers := fs.Int("reviewers", 0, "How many reviewers the review wants, 1 or 2 (submit-review)")
 	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	*message = flagText(*message, "completion message")
 	if strings.TrimSpace(*reason) == "" {
@@ -53,6 +55,22 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		clierr.Exit1()
 	}
 	body := map[string]any{"subscriber_id": resolveSubscriberID(), "reason": *reason, "message": *message, "outcome": *outcome}
+	if action != "submit-review" && (*areas != "" || *reviewers != 0) {
+		fmt.Fprintln(os.Stderr, "--areas and --reviewers belong to submit-review")
+		os.Exit(2) // usage
+	}
+	if *areas != "" {
+		var list []string
+		for _, a := range strings.Split(*areas, ",") {
+			if a = strings.TrimSpace(a); a != "" {
+				list = append(list, a)
+			}
+		}
+		body["areas"] = list
+	}
+	if *reviewers != 0 {
+		body["reviewers"] = *reviewers
+	}
 	if *candidateRevision != "" {
 		body["candidate_revision"] = *candidateRevision
 	}
@@ -81,11 +99,25 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		var t struct {
 			Status     string  `json:"status"`
 			AssignedTo *string `json:"assigned_to"`
+			Workflow   struct {
+				InPool          bool     `json:"review_in_pool"`
+				Areas           []string `json:"review_areas"`
+				ReviewersWanted int      `json:"reviewers_wanted"`
+			} `json:"workflow"`
 		}
 		_ = json.Unmarshal(data, &t)
 		switch {
 		case t.Status == "completed":
 			fmt.Printf("Task #%d completed: the team has no orchestrator to review it.\n", id)
+		case t.Workflow.InPool:
+			where, count := "any reviewer", "one reviewer"
+			if len(t.Workflow.Areas) > 0 {
+				where = "areas: " + strings.Join(t.Workflow.Areas, ", ")
+			}
+			if t.Workflow.ReviewersWanted == 2 {
+				count = "two reviewers"
+			}
+			fmt.Printf("Task #%d is in the review pool (%s) and waits for %s; your slot is free.\n", id, where, count)
 		case t.AssignedTo != nil:
 			fmt.Printf("Task #%d is in review with %s; your slot is free.\n", id, *t.AssignedTo)
 		default:

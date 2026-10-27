@@ -454,6 +454,7 @@ var knownPathParams = map[string]string{
 	"goalID":       "a goal of the board addressed by its number (another board's goal is not found): a target",
 	"requestID":    "a goal request the board received, by the board's own number (another board's request is not found): a target; who answers it comes from the caller derivation and the planner check",
 	"category":     "a template category",
+	"subscriberID": "a member of the board whose review setting the Operator changes (#8957): a target; the route is operator-only, so who is acting is the Operator, never a name from the path",
 	"ref":          "an image of the session's own transcript, by the hash of its bytes (the chat's attachment): a target inside the session addressed by {name}",
 	"*":            "the rest of a path: a file inside a workflow run's step, or a remote server's own path (board remotes, the call metrics' remote pattern)",
 	"series_id":    "an artifact series addressed by its id (32 hex, checked before any use) (#6357): a target; who is acting comes from the caller derivation, never from a path",

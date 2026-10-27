@@ -26,6 +26,9 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		Artifacts         []board.TaskArtifact `json:"artifacts"`
 		ExpectedRevision  *int                 `json:"expected_revision,omitempty"`
 		CandidateRevision string               `json:"candidate_revision,omitempty"`
+		Areas             []string             `json:"areas,omitempty"`     // the review's areas (#8957); absent: from paths when they are listed
+		Reviewers         int                  `json:"reviewers,omitempty"` // 1 (the default) or 2
+		Paths             []string             `json:"paths,omitempty"`     // the files the change touches, when the caller knows them
 	}
 	derr := decodeJSON(r, &body)
 	if derr == nil {
@@ -37,6 +40,19 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 	}
 	if derr != nil || body.SubscriberID == "" {
 		errBadRequest(w, "subscriber_id and valid JSON required")
+		return
+	}
+	areas := body.Areas
+	if len(areas) == 0 && len(body.Paths) > 0 {
+		areas = reviewAreasFromPaths(body.Paths)
+	}
+	areas, aerr := board.NormalizeReviewAreas(areas) // refused before anything is recorded
+	if aerr != nil {
+		errBadRequest(w, strings.TrimPrefix(aerr.Error(), board.ErrReviewArea.Error()+": "))
+		return
+	}
+	if body.Reviewers < 0 || body.Reviewers > board.MaxReviewersWanted {
+		errBadRequest(w, fmt.Sprintf("reviewers is 1 or %d", board.MaxReviewersWanted))
 		return
 	}
 	unverified := h.vetTaskArtifacts(r, project, body.Artifacts)
@@ -91,7 +107,9 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		}
 		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("%s [Task #%d resubmitted for review, round %d] %s submitted %q again (candidate: %s; %s). Review it again: coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". @%s the same reviewers have it; change them with coral-board task review %d --to \"...\"",
 			strings.Join(mentions, " "), id, reopened.Round, author, task.Title, candidate, body.Reason, id, id, reopened.Round, id, reopened.Round, orch, id), nil)
-	} else if !h.autoDelegateReview(ctx, project, id, orch) { // #4175: Coral delegates to the named reviewers
+	} else if h.autoDelegateReview(ctx, project, id, orch) { // #4175: Coral delegates to the named reviewers
+	} else if h.putReviewInPool(ctx, project, id, task.Title, author, areas, body.Reviewers, candidate, body.Reason) { // #8957: or the review waits in the board's pool for an agent that only reviews
+	} else {
 		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("@%s [Task #%d in review] %s submitted %q (candidate: %s; %s). Complete it with 'coral-board task complete %d', or delegate it: coral-board task review %d --to \"Security Reviewer,QA Engineer\"",
 			orch, id, author, task.Title, candidate, body.Reason, id, id), nil)
 	}

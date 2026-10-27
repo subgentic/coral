@@ -65,6 +65,7 @@ func setupBoardTestServer(t *testing.T) (*httptest.Server, *BoardHandler) {
 	r.Post("/api/board/{project}/goal-requests/{requestID}/decline", handler.DeclineGoalRequest)
 	r.Put("/api/board/{project}/tasks/{taskID}/goal", handler.SetTaskGoal)
 	r.Post("/api/board/{project}/tasks/claim", handler.ClaimTask)
+	r.Put("/api/board/{project}/subscribers/{subscriberID}/review-settings", handler.SetReviewSettings)
 	r.Patch("/api/board/{project}/tasks/{taskID}", handler.UpdateTask)
 	r.Post("/api/board/{project}/tasks/{taskID}/complete", handler.CompleteTaskByID)
 	r.Post("/api/board/{project}/tasks/{taskID}/submit-review", handler.SubmitCompletionReview)

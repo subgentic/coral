@@ -77,6 +77,12 @@ type TaskWorkflow struct {
 	CompletionGates       []CompletionGate       `json:"completion_gates,omitempty"`
 	GateResults           []CompletionGateResult `json:"gate_results,omitempty"`
 	CandidateRevision     string                 `json:"candidate_revision,omitempty"`
+	// The review pool (#8957, Goal #80): a review that waits on the board for reviewers instead of with the orchestrator. ReviewInPool is true from submit-review until the wanted number of
+	// reviewers have taken it (or a reviewer was named, or a verdict ended it); ReviewAreas are the areas that decide who may take it; ReviewersWanted is 2 when the author asked for two.
+	ReviewAreas     []string `json:"review_areas,omitempty"`
+	ReviewersWanted int      `json:"reviewers_wanted,omitempty"`
+	ReviewInPool    bool     `json:"review_in_pool,omitempty"`
+	ReviewPooledAt  string   `json:"review_pooled_at,omitempty"`
 	// The review flow (#3725): who did the work (a task in review is assigned to the
 	// orchestrator, then to reviewers), the parent of a review task, and the review rounds.
 	OriginalAuthor string        `json:"original_author,omitempty"`
@@ -416,6 +422,9 @@ func finishWorkflow(t *Task, w TaskWorkflow) {
 		if value, ok := amendment.Changes["workflow_instructions"].(string); ok && strings.TrimSpace(value) != "" {
 			w.EffectiveInstructions += "\n\nTask amendment (revision " + fmt.Sprint(amendment.Revision) + "):\n" + value
 		}
+	}
+	if t.Status != "review_pending" {
+		w.ReviewInPool = false // a pooled review that the orchestrator completed or a verdict ended is not waiting any more
 	}
 	if w.Outcome == "" {
 		if t.Status == "completed" {

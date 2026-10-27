@@ -81,6 +81,11 @@ type TaskListItem struct {
 	ArtifactRows int `db:"artifact_rows" json:"-"`
 	// ReviewersJSON is the reviewers as the query reads them (a JSON array of names); fillListReviewers turns it into Reviewers.
 	ReviewersJSON string `db:"reviewers_json" json:"-"`
+	// The review pool (#8957): the areas a review is tagged with, whether it still waits in the pool for its reviewers (review_pending only), and how many it wants (omitted for one).
+	ReviewAreas     []string `db:"-" json:"review_areas,omitempty"`
+	ReviewInPool    bool     `db:"review_in_pool" json:"review_in_pool,omitempty"`
+	ReviewersWanted int      `db:"reviewers_wanted" json:"reviewers_wanted,omitempty"`
+	ReviewAreasJSON string   `db:"review_areas_json" json:"-"`
 }
 
 // TaskListPage is one page of the task list.
@@ -113,7 +118,10 @@ const taskListColumns = `t.id, t.revision, t.board_id, t.title,
 	     ELSE COALESCE(t.assigned_to, '') END AS worked_by,
 	` + prefixedUpdatedAtSQL + ` AS updated_at,
 	COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(w.data, '$.review_rounds[#-1].reviewers') v), '[]') AS reviewers_json,
-	COALESCE(json_array_length(w.data, '$.artifacts'), 0) + COALESCE(json_array_length(w.data, '$.completion_review.artifacts'), 0) AS artifact_rows
+	COALESCE(json_array_length(w.data, '$.artifacts'), 0) + COALESCE(json_array_length(w.data, '$.completion_review.artifacts'), 0) AS artifact_rows,
+	COALESCE(json_extract(w.data, '$.review_areas'), '[]') AS review_areas_json,
+	CASE WHEN t.status = 'review_pending' AND COALESCE(json_extract(w.data, '$.review_in_pool'), 0) = 1 THEN 1 ELSE 0 END AS review_in_pool,
+	COALESCE(json_extract(w.data, '$.reviewers_wanted'), 0) AS reviewers_wanted
 	FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id`
 
 // ListTaskPage returns a page of the board's task list. Each page costs O(limit) rows:
@@ -273,7 +281,36 @@ func fillListReviewers(items []TaskListItem) {
 		if json.Unmarshal([]byte(items[i].ReviewersJSON), &names) == nil && len(names) > 0 {
 			items[i].Reviewers = names
 		}
+		var areas []string
+		if json.Unmarshal([]byte(items[i].ReviewAreasJSON), &areas) == nil && len(areas) > 0 {
+			items[i].ReviewAreas = areas
+		}
 	}
+}
+
+// ListNeedsReview is the board's tasks whose review is waiting (status review_pending), oldest first, in the shape of a task list page with no further pages (#8957: the team Tasks tab's Needs review
+// filter). At most limit (the page maximum when 0).
+func (s *Store) ListNeedsReview(ctx context.Context, project string, limit int) (*TaskListPage, error) {
+	if limit <= 0 || limit > TaskListMaxLimit {
+		limit = TaskListMaxLimit
+	}
+	page := &TaskListPage{Tasks: []TaskListItem{}}
+	if err := s.reader().SelectContext(ctx, &page.Tasks, `SELECT `+taskListColumns+` WHERE t.board_id = ? AND t.status = 'review_pending' ORDER BY t.id ASC LIMIT ?`, project, limit); err != nil {
+		return nil, err
+	}
+	s.loadListVerification(ctx, page.Tasks)
+	fillListReviewers(page.Tasks)
+	s.fillListArtifactCounts(ctx, page.Tasks)
+	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
+		return nil, err
+	}
+	if err := s.reader().QueryRowxContext(ctx, `SELECT
+		 COALESCE(SUM(CASE WHEN `+openTaskStatusSQL+` THEN 1 ELSE 0 END), 0),
+		 COALESCE(SUM(CASE WHEN `+doneTaskStatusSQL+` THEN 1 ELSE 0 END), 0)
+		 FROM board_tasks WHERE board_id = ?`, project).Scan(&page.TotalOpen, &page.TotalCompleted); err != nil {
+		return nil, err
+	}
+	return page, nil
 }
 
 // fillListArtifactCounts sets ArtifactCount on the items that hold artifact rows: one batched read of their workflows, then each distinct stored object or link counted once, and a

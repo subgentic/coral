@@ -499,9 +499,22 @@ func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, req
 	if err := s.refuseWhileSlotHeld(ctx, project, subscriberID); err != nil {
 		return nil, err
 	}
+	named := len(requestedID) > 0 && requestedID[0] > 0
+	reviewsOnly := s.IsReviewsOnly(ctx, project, subscriberID)
+	if reviewsOnly && named {
+		// A pooled review asked for by its number (#8957): the reviewer's own review task is made and claimed for it.
+		if pooled, err := s.ClaimPoolReview(ctx, project, subscriberID, requestedID[0]); err != nil || pooled != nil {
+			return pooled, err
+		}
+	}
 	candidateIDs, err := s.claimCandidates(ctx, project, subscriberID, requestedID)
 	if err != nil {
 		return nil, err
+	}
+	if reviewsOnly { // an agent that only reviews is offered review tasks, and refused a build task it names (#8957)
+		if candidateIDs, err = s.reviewsOnlyCandidates(ctx, candidateIDs, named); err != nil {
+			return nil, err
+		}
 	}
 	for _, taskID := range candidateIDs {
 		claimed, err := s.claimOne(ctx, project, subscriberID, taskID, now)
@@ -513,6 +526,9 @@ func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, req
 		}
 		s.recordClaimSession(ctx, project, subscriberID, taskID)
 		return s.getTaskByID(ctx, project, taskID)
+	}
+	if reviewsOnly && !named { // nothing of its own: the oldest pooled review that matches its areas
+		return s.ClaimPoolReview(ctx, project, subscriberID, 0)
 	}
 	return nil, nil
 }

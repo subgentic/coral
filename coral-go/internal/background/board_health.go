@@ -177,6 +177,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	items = append(items, idle...)
 	items = append(items, m.offBooksItems(ctx, project, orch, subs, bySession, tasks, now)...) // work done off the books (#7793)
 	items = append(items, reviewItems(reviews, reviewers, parked, idleNoWork)...)
+	items = append(items, m.poolReviewItems(ctx, project, now)...) // a review that has waited in the pool (#8957)
 	items = append(items, m.askItems(ctx, project, now)...)
 	// 4. Queue problems (task numbers only).
 	issues, _, _ := taskQueueIssues(tasks)
@@ -474,6 +475,45 @@ func (m *BoardHealthMonitor) askItems(ctx context.Context, project string, now t
 		items = append(items, teamhealth.Item{Rank: 4, Agent: "Board", Key: fmt.Sprintf("ask|%d|%s", o.MessageID, strings.ToLower(o.Member)), State: "open",
 			Problem: fmt.Sprintf("Asked by %s, waiting on %s, %d min (message #%d)", teamhealth.Name(o.Asker), teamhealth.Name(o.Member), int(waited.Minutes()), o.MessageID),
 			Said:    teamhealth.ShownText(o.Content, nil)})
+	}
+	return items
+}
+
+// PoolReviewWait is how long a review waits in the board's pool before the check says so (#8957, Goal #80).
+const PoolReviewWait = 15 * time.Minute
+
+// poolReviewItems is a line of the check for each review that has waited in the pool for PoolReviewWait or more: how long, and the areas no review-only agent covers (or that the board has no reviewer for at
+// all), so the person knows whether to give an agent those areas or to name a reviewer with task review. Task numbers, areas and durations only: no title.
+func (m *BoardHealthMonitor) poolReviewItems(ctx context.Context, project string, now time.Time) []teamhealth.Item {
+	waits, err := m.store.WaitingPoolReviews(ctx, project)
+	if err != nil {
+		return nil
+	}
+	return poolItems(waits, now)
+}
+
+// poolItems is poolReviewItems for the reviews already read.
+func poolItems(waits []board.PoolWait, now time.Time) []teamhealth.Item {
+	var items []teamhealth.Item
+	for _, w := range waits {
+		if w.PooledAt.IsZero() || now.Sub(w.PooledAt) < PoolReviewWait {
+			continue
+		}
+		mins := int(now.Sub(w.PooledAt) / time.Minute)
+		problem := fmt.Sprintf("the review of #%d has waited %d min in the pool", w.TaskID, mins)
+		suggest := fmt.Sprintf("it waits for a reviewer that covers it to finish what it holds, or name one: coral-board task review %d --to \"...\"", w.TaskID)
+		state := "busy"
+		switch {
+		case len(w.Uncovered) == 1 && w.Uncovered[0] == "any":
+			problem += "; the board has no reviewer that could take it"
+			suggest = fmt.Sprintf("set an agent to Reviews only, or name a reviewer: coral-board task review %d --to \"...\"", w.TaskID)
+			state = "any"
+		case len(w.Uncovered) > 0:
+			problem += "; no reviewer covers " + strings.Join(w.Uncovered, ", ")
+			suggest = fmt.Sprintf("give a Reviews only agent those areas (coral-board reviewer set), or name a reviewer: coral-board task review %d --to \"...\"", w.TaskID)
+			state = "uncovered:" + strings.Join(w.Uncovered, ",")
+		}
+		items = append(items, teamhealth.Item{Rank: 2, Agent: "Board", Problem: problem, Suggest: suggest, Key: fmt.Sprintf("pool|%d", w.TaskID), State: state})
 	}
 	return items
 }

@@ -398,6 +398,7 @@ PUT /api/auth/hub-origins never
 PUT /api/auth/hub-signin never
 PUT /api/board/{project}/artifacts/{id}/tags never
 PUT /api/board/{project}/settings launch
+PUT /api/board/{project}/subscribers/{subscriberID}/review-settings never
 PUT /api/board/{project}/tasks/{taskID}/goal interact
 PUT /api/board/{project}/working-mode interact
 PUT /api/board/{project}/working-mode/presets/{presetID} never
