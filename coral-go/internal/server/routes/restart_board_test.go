@@ -151,3 +151,31 @@ func TestRestartSwitchesTheProviderAndKeepsNameBoardAndPrompt(t *testing.T) {
 		assert.Equal(t, "claude", ty, "the old terminal is found by the provider it runs on, not the one it is going to run on")
 	}
 }
+
+// A switch that leaves a stale model in place is refused before anything is touched, and the reason is the answer the person reads (#8973, #8990): the old agent keeps running.
+func TestRestartSwitchRefusesAStaleModelAndLeavesTheAgentRunning(t *testing.T) {
+	t.Parallel()
+	server, _, term, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	const oldID = "switch-stale"
+	const oldName = "claude-" + oldID
+	term.addSession(oldName, t.TempDir())
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{
+		SessionID: oldID, AgentType: "claude", AgentName: "coral-go", Model: ptr.NonEmpty("claude-opus-4"),
+	}))
+	resp, err := http.Post(server.URL+"/api/sessions/live/"+oldName+"/restart", "application/json",
+		bytes.NewBufferString(`{"session_id":"switch-stale","agent_type":"codex"}`)) // no model sent: the stored Claude one would carry to Codex
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var body struct {
+		Error string `json:"error"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Contains(t, body.Error, "claude-opus-4", "the answer names the stale model, for the person to read")
+	ls, err := ss.GetLiveSession(ctx, oldID)
+	require.NoError(t, err)
+	require.NotNil(t, ls)
+	assert.Equal(t, "claude", ls.AgentType, "the old agent is untouched")
+	assert.Empty(t, term.sentCommands(), "nothing was sent to any terminal")
+}
