@@ -287,13 +287,13 @@ async function showFileRefMenu(el) {
 
     const displayPath = line > 0 ? `${filepath}:${line}` : filepath;
     const menu = document.createElement("div");
-    menu.className = "chat-file-menu";
+    menu.className = "menu chat-file-menu";
     menu.setAttribute("role", "menu");
     menu.innerHTML = `<div class="chat-file-menu-path" title="${escapeHtml(displayPath)}">${escapeHtml(displayPath)}</div>
-        <button type="button" role="menuitem" data-action="preview"><span class="material-icons" aria-hidden="true">visibility</span>Preview in Coral${line > 0 ? ` (line ${line})` : ""}</button>
-        ${artifactRef ? '' : `<button type="button" role="menuitem" data-action="edit"><span class="material-icons" aria-hidden="true">edit</span>Edit in Coral${line > 0 ? ` (line ${line})` : ""}</button>
-        ${editors.map((ed, i) => `<button type="button" role="menuitem" data-action="editor" data-editor="${Number(i)}"><span class="material-icons" aria-hidden="true">open_in_new</span>Open in ${escapeHtml(ed.name)}</button>`).join("")}`}
-        <button type="button" role="menuitem" data-action="copy"><span class="material-icons" aria-hidden="true">content_copy</span>${artifactRef ? 'Copy artifact URI' : 'Copy path'}</button>`;
+        <button type="button" class="menu-item" role="menuitem" data-action="preview"><span class="material-icons" aria-hidden="true">visibility</span>Preview in Coral${line > 0 ? ` (line ${line})` : ""}</button>
+        ${artifactRef ? '' : `<button type="button" class="menu-item" role="menuitem" data-action="edit"><span class="material-icons" aria-hidden="true">edit</span>Edit in Coral${line > 0 ? ` (line ${line})` : ""}</button>
+        ${editors.map((ed, i) => `<button type="button" class="menu-item" role="menuitem" data-action="editor" data-editor="${Number(i)}"><span class="material-icons" aria-hidden="true">open_in_new</span>Open in ${escapeHtml(ed.name)}</button>`).join("")}`}
+        <button type="button" class="menu-item" role="menuitem" data-action="copy"><span class="material-icons" aria-hidden="true">content_copy</span>${artifactRef ? 'Copy artifact URI' : 'Copy path'}</button>`;
     document.body.appendChild(menu);
     openFileMenu = menu;
 

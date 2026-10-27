@@ -225,12 +225,12 @@ function _showViewContextMenu(event, viewId) {
     document.querySelectorAll('.view-context-menu').forEach(el => el.remove());
 
     const menu = document.createElement('div');
-    menu.className = 'view-context-menu';
+    menu.className = 'menu view-context-menu';
     menu.style.left = event.clientX + 'px';
     menu.style.top = event.clientY + 'px';
     menu.innerHTML = `
-        ${isCloud() ? '' : `<button data-on-click="custom-view-edit" data-view-id="${Number(viewId)}">Edit</button>`}
-        <button data-on-click="custom-view-delete" data-view-id="${Number(viewId)}">Delete</button>
+        ${isCloud() ? '' : `<button class="menu-item" role="menuitem" data-on-click="custom-view-edit" data-view-id="${Number(viewId)}">Edit</button>`}
+        <button class="menu-item menu-item-danger" role="menuitem" data-on-click="custom-view-delete" data-view-id="${Number(viewId)}">Delete</button>
     `;
     document.body.appendChild(menu);
 

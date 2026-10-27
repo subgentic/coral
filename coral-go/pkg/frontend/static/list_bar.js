@@ -151,6 +151,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     // extras (#7924): controls the panel's owner keeps (the dock's Hide done: a preference of its own, not a filter of the query) go in the panel after the fields and the sort, and count toward the icon's badge (setExtraOn)
     const extras = make('div', 'list-bar-extras'); extras.hidden = true;
     menu.append(...fields.map(x => x.wrap), ...((inline || collapsible) && sort ? [sort.wrap] : []), ...(inline ? [count] : []), extras, clearAll, ...(done ? [done] : []));
+    if (!inline && !collapsible) menu.classList.add('menu', 'menu-panel'); // the filters as a popup: the one menu's surface, with its fields laid out in rows; the inline and collapsible forms are not a popup and draw none
     if (inline) { menu.hidden = false; menu.classList.add('list-bar-menu-inline'); clearAll.textContent = 'Clear filters'; }
     if (collapsible) { menu.classList.add('list-bar-menu-inline', 'list-bar-panel'); clearAll.textContent = 'Clear filters'; menu.setAttribute('aria-label', panelName); }
     // A panel with tool-group boxes (the activity bars) lays them out two to a line: a class on the menu, not a :has() rule, which made every DOM change in the page, the agent list's included, check for it (#7671).
