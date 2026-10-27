@@ -43,6 +43,8 @@ export const loadTaskDetail = panel('the task', './task_detail.js');
 // what runs at startup (loadSettings, the theme).
 export const loadModals = panel('this dialog', './modals.js');
 // The Resume and Default Prompts dialogs are modules of their own (#3836), so opening one does not load the rest of modals.js.
+// So is Settings (#9111): opening it loaded the launch, team and wizard dialogs with it (46 files, 299 K); it loads its own 20.
+export const loadSettingsDialog = panel('this dialog', './settings_modal.js');
 export const loadResumeDialog = panel('this dialog', './resume_dialog.js');
 export const loadDefaultPromptsDialog = panel('this dialog', './default_prompts_dialog.js');
 
