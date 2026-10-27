@@ -163,7 +163,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	if err != nil {
 		return "", 0, err
 	}
-	all, err := m.store.ListOpenTasks(ctx, project)
+	all, err := m.store.ListOpenTaskStates(ctx, project)
 	if err != nil {
 		return "", 0, err
 	}

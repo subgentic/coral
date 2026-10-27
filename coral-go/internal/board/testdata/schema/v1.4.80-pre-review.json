@@ -205,6 +205,12 @@
       "type": "index"
     },
     {
+      "name": "idx_task_workflows_artifacts",
+      "sql": "CREATE INDEX idx_task_workflows_artifacts ON task_workflows(task_id) WHERE has_artifacts = 1",
+      "tbl_name": "task_workflows",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_artifact_tags_1",
       "sql": null,
       "tbl_name": "artifact_tags",
@@ -536,7 +542,7 @@
     },
     {
       "name": "task_workflows",
-      "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL)",
+      "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL, has_artifacts INTEGER NOT NULL DEFAULT 0)",
       "tbl_name": "task_workflows",
       "type": "table"
     },
@@ -4982,9 +4988,44 @@
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "has_artifacts",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
         }
       ],
-      "indexes": []
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_task_workflows_artifacts",
+          "origin": "c",
+          "partial": 1,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
     }
   }
 }

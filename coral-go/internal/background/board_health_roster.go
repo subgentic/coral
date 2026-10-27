@@ -185,7 +185,7 @@ func (m *BoardHealthMonitor) escalateWaits(ctx context.Context, project string) 
 		return
 	}
 	tasks := map[int64]board.Task{}
-	if open, err := m.store.ListOpenTasks(ctx, project); err == nil {
+	if open, err := m.store.ListOpenTaskStates(ctx, project); err == nil {
 		for _, t := range open {
 			tasks[t.ID] = t
 		}
