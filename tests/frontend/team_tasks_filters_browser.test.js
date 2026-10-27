@@ -14,7 +14,7 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios();
-    const panel = `[role=tabpanel]:not([hidden])`;
+    const panel = `[role=tabpanel][id^=team-panel-]:not([hidden])`; // the team page's open tab, not the goal screen's own Tasks | Artifacts panel inside a hidden one (#8914)
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const rows = () => ev(`[...document.querySelectorAll('${panel} .dt-primary')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);
     const chips = () => ev(`[...document.querySelectorAll('${panel} .team-tb-chip')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);

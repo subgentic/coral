@@ -13,7 +13,7 @@ if (!base || !/^http:\/\/(127\.0\.0\.1|localhost):\d+\/?$/.test(base) || /:8420\
         return r.result.value;
     };
     const { waitFor } = require('./helpers/wait').bind(ev);
-    const bar = text => `[...document.querySelectorAll('#tp-host .goals-pinbar .btn')].find(b => b.textContent === ${JSON.stringify(text)})`;
+    const bar = text => `[...document.querySelectorAll('#tp-host .goals-pinbar .btn, #tp-host .goals-pinbar [role=menuitem]')].find(b => b.textContent === ${JSON.stringify(text)})`;
     // the task's page in `mode` for a board; the form is async: wait for it to be there when it will be
     const show = (id, mode = 'view', project = 'fixture') => ev(`(() => { const t = s.currentBoardTasks.find(x => x.id === ${id}); testPage.renderTaskPage(document.getElementById('tp-host'), t, { project: ${JSON.stringify(project)}, backLabel: 'Tasks', onBack() {}, openGoal() {} }, ${JSON.stringify(mode)}); return true; })()`);
     const edit = async id => { await show(id); await waitFor(`!!(${bar('Edit')})`, 'the Edit button'); await ev(`(${bar('Edit')}).click(); true`); };
