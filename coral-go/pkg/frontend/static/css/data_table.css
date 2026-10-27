@@ -362,6 +362,7 @@
 @container (max-width: 52rem) { .dt-one-line [data-drop-at="52"] { display: none; } }
 @container (max-width: 36rem) { .dt-one-line [data-drop-at="36"] { display: none; } }
 @container (max-width: 28rem) { .dt-one-line [data-drop-at="28"] { display: none; } }
+@container (max-width: 16rem) { .dt-one-line [data-drop-at="16"] { display: none; } } /* a phone at 200% text (355 px is 11 rem): the name keeps the row, the Last run column gives way (run 154c) */
 
 .dt-one-line .dt-title-cell { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; min-width: 0; }
 .dt-one-line .team-artifact-badge { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

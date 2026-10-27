@@ -179,7 +179,7 @@ function attentionTable(key, rows, narrowed) {
                 { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, whatWords(i)) },
                 { key: 'kind', label: 'Kind', width: '7rem', dropAt: 36, sort: true, sortValue: i => KIND_WORD[i.kind], cell: i => DT.tag(KIND_WORD[i.kind]) },
                 { key: 'schedule', label: 'Schedule', width: '12rem', dropAt: 52, sort: true, sortValue: scheduleWords, cell: scheduleWords },
-                { key: 'last-run', label: 'Last run', width: '12rem', tone: 'tertiary', sort: 'date', sortValue: i => i.last, cell: lastCell },
+                { key: 'last-run', label: 'Last run', width: '12rem', dropAt: 16, tone: 'tertiary', sort: 'date', sortValue: i => i.last, cell: lastCell },
                 { key: 'next', label: 'Next', width: '7rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => (i.kind === 'job' && i.enabled ? i.job.next_fire_at : ''), cell: nextCell },
             ],
         }).el };
@@ -196,7 +196,7 @@ function folderTable(key) {
                 columns: [ // one line a row (Goal #79): what the job runs is the name's tooltip and its page's; a narrow list drops Schedule, then Next (dropAt, #8931)
                     { key: 'job', label: 'Job', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, runsWords(i)) },
                     { key: 'schedule', label: 'Schedule', width: '12rem', dropAt: 36, sort: true, sortValue: i => scheduleOf(i.job), cell: i => scheduleOf(i.job) },
-                    { key: 'last-run', label: 'Last run', width: '12rem', tone: 'tertiary', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: lastRunCell },
+                    { key: 'last-run', label: 'Last run', width: '12rem', dropAt: 16, tone: 'tertiary', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: lastRunCell },
                     { key: 'next', label: 'Next', width: '7rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => (i.enabled ? i.job.next_fire_at : ''), cell: i => {
                         const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip('Paused');
                         if (i.enabled && i.job.next_fire_at) { cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`; cell.append(DT.el('span', 'sr-only', `, next run ${atWords(i.job.next_fire_at)} your time`)); } // also as text (#9117)
@@ -211,7 +211,7 @@ function folderTable(key) {
             columns: [ // one line a row (Goal #79): the description is the name's tooltip and the page's; a narrow list drops Steps, then Used by (dropAt, #8931)
                 { key: 'workflow', label: 'Workflow', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, i.does) },
                 { key: 'steps', label: 'Steps', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'number', sortValue: i => i.stepCount, cell: stepsWords },
-                { key: 'last-run', label: 'Last run', width: '14rem', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: i => {
+                { key: 'last-run', label: 'Last run', width: '14rem', dropAt: 16, sort: 'date', sortValue: i => i.run && i.run.started_at, cell: i => {
                     if (!i.run) return 'Never run';
                     const cell = DT.el('span'); cell.append(DT.chip(workflowResult(i) || 'Run', resultClass(i.run)));
                     if (i.run.started_at) { cell.title = `Last run ${whenWords(i.run.started_at)}`; cell.append(DT.el('span', 'sr-only', `, last run ${whenWords(i.run.started_at)}`)); } // also as text (#9117)
