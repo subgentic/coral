@@ -1,4 +1,4 @@
-// A goal's Artifacts tab keeps what the old disclosure suites held (#8952, carried over from goal_artifacts_browser and goal_artifacts_mount_browser): the list is grouped by task with the first 20 and Load more (5 on a phone), shows only
+// A goal's Artifacts tab keeps what the old disclosure suites held (#8952, carried over from goal_artifacts_browser and goal_artifacts_mount_browser): the shared artifact table (#8931) with the first 20 and Load more (5 on a phone), shows only
 // this goal's files, and, on the goal screen, the tab's count and its open list follow the goal's rollup while the list node survives a redraw. Real board and goals on the isolated dev server (removed again).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -23,25 +23,19 @@ const BASE = require('./test_base').BASE;
             const r = await api('POST', `/api/board/${B}/tasks/${id}/complete`, { subscriber_id: 'be', message: 'done', outcome: 'success', artifacts: names.map(n => ({ name: n, content: 'c ' + n })) }); assert.ok(r.status < 300, JSON.stringify(r)); return id;
         };
         const G = await goal('Ship it');
-        const a = await done('Write the report', ['report.md', 'notes.txt'], G);
-        const b = await done('Take the screenshots', Array.from({ length: 21 }, (_, i) => `shot-${String(i).padStart(2, '0')}.txt`), G);
+        await done('Write the report', ['report.md', 'notes.txt'], G);
+        await done('Take the screenshots', Array.from({ length: 21 }, (_, i) => `shot-${String(i).padStart(2, '0')}.txt`), G);
         await done('Unrelated', ['other.md'], null);
         await ev(`import(${S} + 'state.js').then(m => { m.state.selectedTeam = ${JSON.stringify(B)}; return true; })`);
         const mount = (id) => ev(`(async () => { const m = await import(${S} + 'goal_artifacts.js'); let h = document.getElementById('ga-host'); if (h) h.remove(); h = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'ga-host' })); window.__counts = []; window.__ga = m.mountGoalArtifactsList(h, { team: ${JSON.stringify(B)}, goalId: ${id}, onCount: n => window.__counts.push(n) }); return true; })()`);
 
-        console.log('1. The list: grouped by task, the first 20, Load more, only this goal\'s files');
+        console.log('1. The list: the first 20, Load more, only this goal\'s files');
         await mount(G);
         await waitFor(`document.querySelectorAll('#ga-host [data-artifact-id]').length === 20`, 'the first 20', 10000);
-        const heads = await ev(`[...document.querySelectorAll('#ga-host tr.dt-group')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
-        assert.ok(heads.some(h => h === `#${b} Take the screenshots`), 'with more to load a head is the task alone: ' + JSON.stringify(heads));
-        assert.equal(new Set(heads).size, heads.length, 'a task\'s head is drawn once: ' + JSON.stringify(heads));
         assert.equal(await ev(`/Showing 20 of 23/.test(document.getElementById('ga-host').textContent)`), true);
         assert.deepEqual(await ev(`window.__counts.slice(-1)`), [23], 'the count is the whole goal\'s');
         await ev(`document.querySelector('#ga-host .dt-more').click(); true`);
         await waitFor(`document.querySelectorAll('#ga-host [data-artifact-id]').length === 23`, 'all 23', 10000);
-        const all = await ev(`[...document.querySelectorAll('#ga-host tr.dt-group')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
-        assert.equal(all.length, 2, JSON.stringify(all));
-        assert.ok(all.some(h => h.includes(`#${b} Take the screenshots, 21 files`)), JSON.stringify(all)); assert.ok(all.some(h => h.includes(`#${a} Write the report, 2 files`)), JSON.stringify(all));
         assert.equal(await ev(`document.getElementById('ga-host').textContent.includes('other.md')`), false, 'only this goal\'s files');
         console.log('   ✓');
 
@@ -71,6 +65,6 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.querySelectorAll('#team-panel-goals .goal-list [data-artifact-id]').length === 5`, 'the open list refreshed to 5 files', 15000);
         assert.equal(await ev(`document.querySelector('#team-panel-goals #goal-tab-artifacts').getAttribute('aria-selected')`), 'true', 'still on the Artifacts tab');
         console.log('   ✓');
-        console.log('PASS goal artifacts list: grouped by task, 20 then Load more, 5 on a phone, only the goal\'s files, the count and the open list follow the rollup');
+        console.log('PASS goal artifacts list: 20 then Load more, 5 on a phone, only the goal\'s files, the count and the open list follow the rollup');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
