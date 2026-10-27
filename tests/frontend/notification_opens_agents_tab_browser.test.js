@@ -1,11 +1,11 @@
 // Opening an agent from a notification puts the Agents tab up first (#4953). From the Inbox (the operator's report), Chats, Servers,
-// Workflows or Jobs, a needs-input toast's link and a desktop notification's click select the agent, and then: the Agents tab is
+// or Automations (Workflows and Jobs), a needs-input toast's link and a desktop notification's click select the agent, and then: the Agents tab is
 // the one highlighted, the agent list is drawn with that agent selected (desktop), and the agent's chat is shown (phone too).
 // Run against an isolated dev server; set NOTIF_SHOT_DIR to save a screenshot after the Inbox toast.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
-const TABS = ['hub-inbox', 'servers', 'workflows', 'jobs']; // Chats are the Inbox's folders on a local Coral (#7776)
+const TABS = ['hub-inbox', 'servers', 'automations']; // Chats are the Inbox's folders on a local Coral (#7776)
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
