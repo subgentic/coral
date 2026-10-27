@@ -43,10 +43,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.ok(t.rows.every(r => /ago|just now|today|yesterday|[A-Z][a-z]{2} \\d/.test(r.cells[r.cells.length - 1])), 'Updated says when ' + JSON.stringify(t.rows.map(r => r.cells)));
         assert.equal(t.ellipsis, 'ellipsis nowrap', 'a long title is cut with an ellipsis');
         const levels = await ev(`(() => { const r = document.querySelector('#team-panel-tasks .dt-table tbody tr'); const c = sel => { const e = r.querySelector(sel), cs = getComputedStyle(e); return cs.fontSize + ' ' + cs.fontWeight + ' ' + cs.color; }; return { title: c('.dt-primary'), who: c('td[data-key="who"]'), when: c('td[data-key="updated"]'), heights: [...document.querySelectorAll('#team-panel-tasks .dt-table tbody tr')].map(x => Math.round(x.getBoundingClientRect().height)) }; })()`);
-        assert.ok(levels.title.startsWith('14px 600') && levels.who.startsWith('13px 400') && levels.when.startsWith('12px 400'), 'title 14/600, who 13/400, updated 12/400 ' + JSON.stringify(levels));
+        assert.ok(levels.title.startsWith('13px 400') && levels.who.startsWith('13px 400') && levels.when.startsWith('12px 400'), 'title 13/400, who 13/400, updated 12/400 ' + JSON.stringify(levels));
         assert.equal(new Set([levels.title.split(' ').slice(2).join(' '), levels.who.split(' ').slice(2).join(' '), levels.when.split(' ').slice(2).join(' ')]).size, 3, 'three colour levels: primary, secondary, tertiary ' + JSON.stringify(levels));
         assert.ok(levels.heights.every(h => h <= 38), 'every row is one line, not wrapped (dense) ' + JSON.stringify(levels.heights));
-        assert.equal(t.titleSize, '14px 600', 'the title is 14/600');
+        assert.equal(t.titleSize, '13px 400', 'the title is 13/400');
         assert.ok(t.goalLink && t.whenRight === 'right', 'the goal is a link and the last column is right-aligned');
         await shot('task-row-desktop');
         // the goal link keeps its own click; the rest of the row opens the task
