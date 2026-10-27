@@ -1922,7 +1922,8 @@ body.panel-dragging .agentic-state {
 
 /* The agent list's bar inside the Display expander (#4947): its fields and sort are open rows of the panel, not a popover. */
 .agent-list-bar .list-bar-bar { padding: 0; }
-.list-bar-menu-inline { background: none; border: 0; box-shadow: none; padding: 0; flex-direction: column; flex-wrap: nowrap; gap: 6px; }
+.list-bar-menu-inline { display: flex; background: none; border: 0; box-shadow: none; padding: 0; flex-direction: column; flex-wrap: nowrap; gap: 6px; } /* the panel form is a flex column again: the popup's own rule moved to .menu (#9402), and the panel's gap and two-to-a-line Show boxes need the display */
+.list-bar-menu-inline[hidden] { display: none; }
 .list-bar-menu-inline .list-bar-clear-all { align-self: flex-start; }
 .list-bar-menu-inline .list-bar-clear-all[hidden] { display: none; }
 .list-bar-menu-inline > .list-bar-count { flex: none; }
