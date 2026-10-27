@@ -30,10 +30,12 @@
 .mb-row-chev { width: 0; height: 0; border-style: solid; border-width: 0.3125rem 0 0.3125rem 0.4375rem; border-color: transparent transparent transparent var(--text-secondary); justify-self: center; }
 .mb-open > .mb-row-toggle .mb-row-chev { transform: rotate(90deg); }
 .mb-row-avatar { width: 1.25rem; height: 1.25rem; border-radius: 50%; display: grid; place-items: center; background: var(--mb-avatar); color: var(--on-avatar); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 1; }
-.mb-row-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.mb-row-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* the sender 13/500, nothing bolder (#9686, UI/UX #9358) */
 .mb-row-snippet { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--text-secondary); }
 .mb-open > .mb-row-toggle .mb-row-snippet { visibility: hidden; } /* the whole message is under it */
-.mb-row-tags { display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; min-width: 0; max-width: 22rem; overflow: hidden; } /* a message with many marks does not leave its words 100 px (the open message shows every tag) */
+.mb-row-tags { display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; min-width: 0; max-width: 22rem; overflow: hidden; }
+/* The row says one thing besides the sender, the words and the time: an OPEN question (#9686). The mentions, the task, the reply mark, the "+N" and an answered question are with the open message (.mb-row-tags-open). */
+.mb-row-tags > :not(.mb-ask-badge), .mb-row-tags > .mb-ask-badge.is-answered { display: none; }
 .mb-row-toggle .message-time { margin: 0; opacity: 1; font-size: var(--fs-base); color: var(--text-secondary); text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* The tags: quiet marks, never louder text. */
@@ -47,7 +49,7 @@
 .mb-table .mb-message.mb-open { background: color-mix(in srgb, var(--accent) 8%, var(--bg-secondary)); }
 .mb-table .mb-message.mb-open > :not(.mb-row-toggle):not(.mb-message-header) { margin-inline: 3.0625rem 0.875rem; max-width: 80ch; }
 .mb-table .mb-message.mb-open > .mb-message-body { padding-top: 0.25rem; }
-.mb-row-tags-open { display: none; flex-wrap: wrap; gap: 0.375rem; padding-top: 0.5rem; }
+.mb-row-tags-open { display: flex; flex-wrap: wrap; gap: 0.375rem; padding-top: 0.5rem; } /* only an open row has it: every mark of the message, the row itself has the open question's */
 .mb-row-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.625rem 0 0.875rem; }
 .mb-row-actions .btn { margin: 0; } /* the row's buttons are .btn-small: its margin is for a button on its own line (#9313) */
 .mb-row-replies { margin-block: 0.75rem 0; padding-inline-start: 0.75rem; border-inline-start: 2px solid var(--border); }
@@ -66,15 +68,15 @@
 .mb-table[data-pill="mentions"] > :is(.mb-message:not(.mb-mine), .mb-queue-run, .mb-day) { display: none; }
 
 /* ── A narrow box (a phone, the dock; board_table.js watchFold sets .mb-fold): two lines a row, the tags with the open message ── */
-.mb-fold .mb-row-toggle { grid-template-columns: 0.875rem 1.25rem minmax(0, 1fr) auto; grid-template-areas: "chev avatar who time" ". snippet snippet snippet"; align-items: center; row-gap: 0.125rem; min-height: var(--control-touch-height, 44px); padding-block: 0.5rem; }
+.mb-fold .mb-row-toggle { grid-template-columns: 0.875rem 1.25rem minmax(0, 1fr) auto auto; grid-template-areas: "chev avatar snippet tags time"; align-items: center; row-gap: 0; min-height: var(--control-touch-height, 44px); padding-block: 0.25rem; }
 .mb-fold .mb-row-chev { grid-area: chev; }
 .mb-fold .mb-row-avatar { grid-area: avatar; }
-.mb-fold .mb-row-who { grid-area: who; }
+.mb-fold .mb-row-who { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* one line a row: the avatar is the sender, its name is the button's name and the hover */
 .mb-fold .mb-row-toggle .message-time { grid-area: time; }
-.mb-fold .mb-row-snippet { grid-area: snippet; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
-.mb-fold .mb-row-tags { display: none; }
+.mb-fold .mb-row-snippet { grid-area: snippet; }
+.mb-fold .mb-row-tags { grid-area: tags; }
+.mb-fold .mb-row-tags > .mb-ask-badge { width: 0.5rem; height: 0.5rem; min-width: 0; padding: 0; border: 0; border-radius: 50%; background: var(--warning); overflow: hidden; white-space: nowrap; text-indent: 100%; } /* the open question is a dot on a phone */
 .mb-fold .mb-open > .mb-row-toggle .mb-row-snippet { display: none; }
-.mb-table.mb-fold .mb-message.mb-open > .mb-row-tags-open { display: flex; }
 .mb-table.mb-fold .mb-message.mb-open > :not(.mb-row-toggle):not(.mb-message-header) { margin-inline: 0.875rem; max-width: none; }
 .mb-fold .mb-row-actions .btn { min-height: var(--control-touch-height, 44px); }
 .mb-fold .mb-row-reply { min-height: var(--control-touch-height, 44px); }
