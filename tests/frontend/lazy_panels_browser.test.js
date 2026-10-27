@@ -61,17 +61,17 @@ const MODULES = ['workflows.js', 'cost_dashboard.js', 'docs.js', 'theme_config.j
         await fresh();
         await quietSeen(); // startup is done (fresh); no panel request follows
         for (const m of MODULES) assert.equal(count(m), 0, `${m} not requested on a cold load (${JSON.stringify(seen.filter(x => !x.startsWith('API')).slice(0, 80))})`);
-        const stubs = await ev(`['showWorkflowsTab','selectWorkflow','selectWorkflowRun','showCostDashboard','showDocsTab','showThemeConfigurator','showTemplateBrowser','searchChats'].filter(n => typeof window[n] !== 'function')`);
+        const stubs = await ev(`['selectWorkflow','selectWorkflowRun','showCostDashboard','showDocsTab','showThemeConfigurator','showTemplateBrowser','searchChats'].filter(n => typeof window[n] !== 'function')`);
         assert.deepEqual(stubs, [], 'every lazy window function exists (as a stub) for the actions that call it');
         console.log('   ✓ 0 requests for the 6 modules; stubs in place');
 
         console.log('2. Each panel loads once on first use; stubs become the real functions');
-        for (const [tab, mod, view] of [['workflows', 'workflows.js', 'workflows-view'], ['docs', 'docs.js', 'group-table-view'], ['tokens', 'cost_dashboard.js', 'cost-dashboard-view']]) {
-            const stubBefore = await ev(`String(window[${JSON.stringify({ workflows: 'showWorkflowsTab', docs: 'showDocsTab', tokens: 'showCostDashboard' }[tab])}])`);
+        for (const [tab, mod, view] of [['automations', 'automations.js', 'group-table-view'], ['docs', 'docs.js', 'group-table-view'], ['tokens', 'cost_dashboard.js', 'cost-dashboard-view']]) {
+            const stubBefore = await ev(`String(window[${JSON.stringify({ automations: 'selectWorkflow', docs: 'showDocsTab', tokens: 'showCostDashboard' }[tab])}])`);
             await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`);
             await waitFor(`(() => { const v = document.getElementById(${JSON.stringify(view)}); return !!v && getComputedStyle(v).display !== 'none'; })()`, `${view} after switching to ${tab}`, 8000);
             assert.equal(count(mod), 1, `${mod} fetched once`);
-            const after = await ev(`String(window[${JSON.stringify({ workflows: 'showWorkflowsTab', docs: 'showDocsTab', tokens: 'showCostDashboard' }[tab])}])`);
+            const after = await ev(`String(window[${JSON.stringify({ automations: 'selectWorkflow', docs: 'showDocsTab', tokens: 'showCostDashboard' }[tab])}])`);
             assert.notEqual(after, stubBefore, `${tab}: the window function is now the module's own`);
             await ev(`window.switchNavTab('agents'); true`); await waitFor(`document.querySelector('.top-nav-tab.active')?.id === 'nav-tab-agents'`, 'the Agents tab', 3000);
             await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`);
@@ -95,7 +95,7 @@ const MODULES = ['workflows.js', 'cost_dashboard.js', 'docs.js', 'theme_config.j
         console.log('3. Switching away while a panel loads keeps the newer choice');
         await fresh();
         plan['workflows.js'] = 'hold';
-        await ev(`window.switchNavTab('workflows'); true`);
+        await ev(`window.openAutomationsFolder('workflows'); true`);
         for (let i = 0; i < 40 && !held.length; i++) await sleep(25);
         assert.ok(held.length > 0, 'the workflows import was requested and held');
         await ev(`window.switchNavTab('agents'); true`);

@@ -16,9 +16,9 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await installAudit(ev);
             const open = async (id) => {
-                await ev(`window.switchNavTab('workflows'); true`);
-                await waitFor(`!!document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]') && document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]').getClientRects().length > 0`, `${tag}: the workflows`, 10000);
-                await ev(`document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]').click(); true`);
+                await ev(`window.openAutomationsFolder('workflows'); true`);
+                await waitFor(`!!document.querySelector('#group-table-view tbody tr[data-key] .dt-primary') && document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').getClientRects().length > 0`, `${tag}: the workflows`, 10000);
+                await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click(); true`);
                 await waitFor(`!!document.querySelector('#wf-detail-container .wf-runs-table button[aria-label="Open run #${id}"]')`, `${tag}: the runs`, 10000);
                 await ev(`document.querySelector('#wf-detail-container .wf-runs-table button[aria-label="Open run #${id}"]').click(); true`);
                 await waitFor(`!!document.querySelector('#wf-run-detail-container .wf-run-step')`, `${tag}: run ${id}`, 10000);

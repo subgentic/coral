@@ -61,11 +61,11 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`window.__st.currentSession = null; window.__ctl.updateSidebarActive(); true`);
         assert.deepEqual(await curChat(), [], 'no chat is current when none is open');
         // Workflows: a row of the sidebar is a real button too (the cards became rows and a table in #7471)
-        await ev(`window.switchNavTab('workflows'); true`);
-        await waitFor(`document.querySelectorAll('#wf-nav-list .row-btn').length === 2`, 'two workflow rows', 8000);
-        const card = await ev(`(() => { const c = document.querySelector('#wf-nav-list .row-btn'); return { tag: c.tagName, tab: c.tabIndex }; })()`);
+        await ev(`window.openAutomationsFolder('workflows'); true`);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-primary').length === 2`, 'two workflow rows', 8000);
+        const card = await ev(`(() => { const c = document.querySelector('#group-table-view tbody tr[data-key] .dt-primary'); return { tag: c.tagName, tab: c.tabIndex }; })()`);
         assert.deepEqual(card, { tag: 'BUTTON', tab: 0 }, 'a workflow row is a button');
-        await ev(`document.querySelector('#wf-nav-list .row-btn').focus(); true`);
+        await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').focus(); true`);
         await key(' ', 32, ' ');
         await waitFor(`!!document.querySelector('.wf-detail, #workflow-detail, .wf-runs-table, .wf-steps') || /build/.test((document.getElementById('workflow-detail') || document.body).textContent)`, 'the workflow opened by Space', 6000);
         console.log('PASS list rows keyboard');

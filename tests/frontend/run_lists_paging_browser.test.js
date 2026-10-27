@@ -51,7 +51,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.ok((await ev(`window.__asked.filter(u => /offset=40/.test(u)).length`)) === 1 && (await ev(`window.__asked.some(u => /offset=20/.test(u))`)), `${tag}: the older runs were asked for by offset: ` + (await ev(`window.__asked.join(' ')`)));
 
             // a workflow with 25 runs
-            await ev(`window.switchNavTab('workflows'); true`);
+            await ev(`window.openAutomationsFolder('workflows'); true`);
             await ev(`import(${S} + 'workflows.js').then(m => m.selectWorkflow(1)).then(() => true)`);
             const W = '#wf-run-table';
             await waitFor(`document.querySelectorAll('${W} tbody tr:not(.dt-group)').length === 10`, `${tag}: the first 10 workflow runs`, 8000);
