@@ -23,12 +23,14 @@ const COPY = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-co
                 host.innerHTML = '<div class="chat-bubble assistant" style="position:relative;padding:10px 40px 10px 12px;border:1px solid var(--border);border-radius:10px">A reply from an agent with a button pair in its corner.' + ${JSON.stringify(COPY)} + m.SAVE_BUTTON + '</div><div class="chat-bubble human" style="position:relative;padding:10px 40px 10px 12px;border:1px solid var(--border);border-radius:10px">A message from the person.' + m.SAVE_BUTTON + '</div>'; return true; })()`);
             const m = await ev(`(() => { const info = sel => [...document.querySelectorAll(sel)].map(b => { const cs = getComputedStyle(b), r = b.getBoundingClientRect(), a = getComputedStyle(b, '::after'); return { cls: b.className, w: Math.round(r.width), h: Math.round(r.height), pos: cs.position, bg: cs.backgroundColor, hit: parseFloat(a.width) || 0, opacity: cs.opacity }; }); return { copy: info('#chat-probe .chat-copy-btn'), save: info('#chat-probe .chat-save-btn') }; })()`);
             assert.equal(m.copy.length, 1); assert.equal(m.save.length, 2);
+            const hasHover = await ev(`matchMedia('(hover: hover)').matches`);
             for (const b of m.copy.concat(m.save)) {
                 assert.ok(/\bbtn-icon\b/.test(b.cls) && /\bbtn-xs\b/.test(b.cls) && /\bbtn-quiet\b/.test(b.cls), `${at}a dense quiet icon button: ${b.cls}`);
                 assert.equal(b.pos, 'absolute', `${at}placed in the bubble's corner`);
                 assert.ok(b.w >= 24 && b.w <= 28 && b.h >= 24 && b.h <= 28, `${at}a 24 px box: ${b.w}x${b.h}`);
                 if (mobile) assert.ok(b.hit >= 44, `${at}a 44 px hit area on touch: ${b.hit}`);
-                if (!mobile) assert.equal(b.opacity, '0', `${at}revealed on hover: ${b.opacity}`); // on a real touch screen (hover: none) they are always shown: the emulated touch does not switch that media feature
+                if (!hasHover) assert.equal(b.opacity, '1', `${at}no hover to reveal them: always shown (${b.opacity})`);
+                if (!mobile && hasHover) assert.equal(b.opacity, '0', `${at}revealed on hover: ${b.opacity}`); // where the pointer can hover; where it cannot (a real touch screen, and the CI's headless Chrome, which reports no hover) they are always shown, as #9642 made the touch rules say: the emulated touch does not switch that media feature
             }
             if (!mobile) { // the hover reveal
                 const pt = await ev(`(() => { const r = document.querySelector('#chat-probe .chat-bubble.assistant').getBoundingClientRect(); return [r.left + 40, r.top + r.height / 2]; })()`);
