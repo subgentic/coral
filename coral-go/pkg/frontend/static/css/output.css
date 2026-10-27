@@ -183,6 +183,7 @@ body.panel-dragging .preview-pane {
 
 .preview-tab {
     display: flex;
+    flex-shrink: 0; /* the strip scrolls instead of losing the name beside Keep open (#8905) */
     align-items: center;
     gap: 5px;
     padding: 0 10px;
@@ -217,6 +218,7 @@ body.panel-dragging .preview-pane {
 }
 
 .preview-tab-name {
+    min-width: 72px;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 160px;
