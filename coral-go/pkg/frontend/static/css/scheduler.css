@@ -57,6 +57,15 @@
     color: var(--text-on-accent);
 }
 
+.sched-line { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sched-line[hidden], .sched-days[hidden] { display: none; }
+.sched-line-label, .sched-unit { font-size: var(--fs-md); color: var(--text-secondary); }
+.sched-line-label { font-weight: 500; }
+.sched-n { width: 5rem; }
+.sched-time { width: 8rem; }
+.sched-days { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.sched-day { min-width: 3rem; }
+
 .sched-custom-row {
     margin-bottom: 6px;
 }

@@ -8,7 +8,7 @@ import { pollEvery } from './overload.js';
 import { showJobModal, editScheduledJob } from './job_form.js';
 import { formatDuration } from './format.js';
 import { runFailure } from './run_failure.js';
-import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine } from './job_words.js';
+import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote } from './job_words.js';
 import { foldWayBack } from './sidebar_groups.js';
 import { note } from './nav.js';
 import { importOnce } from './import_once.js';
@@ -68,7 +68,7 @@ async function fetchJobRuns(jobId) {
 
 // ── Words a job's row and page share ─────────────────────────────────────
 
-export const scheduleOf = job => cronWords(job.cron_expr) + (job.timezone ? ` (${job.timezone})` : '');
+export const scheduleOf = job => cronWords(job.cron_expr) + zoneNote(job.timezone);
 export const nextOf = job => !job.enabled ? 'Paused' : job.next_fire_at ? awayWords(job.next_fire_at) : 'Not scheduled';
 
 // ── Job detail view ──────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         <p class="item-meta sched-status-line">${escapeHtml(status)}</p>
         ${job.description ? `<p class="sched-desc">${escapeHtml(job.description)}</p>` : ''}
         <dl class="sched-facts">
-            <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${job.timezone ? ` (${escapeHtml(job.timezone)})` : ''}</dd>
+            <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${escapeHtml(zoneNote(job.timezone))}</dd>
             ${job.enabled
                 ? (job.next_fire_at ? `<dt>Next</dt><dd title="${escapeAttr(awayWords(job.next_fire_at))}">${escapeHtml(atWords(job.next_fire_at))} your time</dd>` : '<dt>Next</dt><dd>not scheduled</dd>')
                 : `<dt>Paused</dt><dd>${job.paused_reason ? `${escapeHtml(job.paused_reason)}. Fix the cause, then Enable to resume.` : 'Enable it to run on schedule.'}</dd>`}

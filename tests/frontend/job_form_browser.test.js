@@ -27,7 +27,7 @@ const STUB = `(() => {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
-            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile }); await Emulation.setTimezoneOverride({ timezoneId: 'Europe/Berlin' }); // the person's own zone is what a schedule is read in
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`); await ev(STUB);
             await ev(`window.showJobModal(); true`);
@@ -41,9 +41,9 @@ const STUB = `(() => {
             for (const id of ['#job-modal-description', '#job-modal-timezone', '#job-modal-timeout', '#job-modal-cleanup', '#job-modal-cron']) assert.equal(await ev(vis(id)), false, at + id + ' is not on the first screen');
             const labels = await ev(`[...document.querySelectorAll('#job-form .sv-row')].filter(r => r.checkVisibility()).map(r => r.querySelector('.sv-label').textContent.trim() + '|' + (r.querySelector('.sv-required') ? 'req' : ''))`);
             assert.deepEqual(labels, ['Type|', 'Name|req', 'Workflow|req', 'When|req'], at + 'labels, in order, with Required in words: ' + JSON.stringify(labels));
-            assert.deepEqual(await ev(`[...document.querySelectorAll('.sched-preset')].map(b => b.textContent.trim())`), ['Every hour', 'Every 6 hours', 'Every day at 02:00', 'Mondays at 09:00', 'Custom'], at + 'presets say the time');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('.sched-preset')].map(b => b.textContent.trim())`), ['Every N minutes', 'Every N hours', 'Daily at', 'Weekly on', 'Advanced'], at + 'the schedule is picked: minutes, hours, daily, weekly; the cron box is Advanced');
             const prev = await ev(`document.getElementById('cron-preview').textContent`);
-            assert.match(prev, /^Runs every hour \(UTC\)\. Next: (today|tomorrow) \d\d:\d\d, your time\.$/, at + 'the preview is one sentence: ' + prev);
+            assert.match(prev, /^Runs every hour\. Next: (today|tomorrow) \d\d:\d\d\.$/, at + 'the preview is one sentence, in the person\'s own zone (no zone named): ' + prev);
             assert.equal(await ev(`document.getElementById('cron-preview').getAttribute('role')`), 'status');
             assert.equal(await ev(`document.getElementById('job-modal-more').open`), false, at + 'More options starts closed');
             await ev(`document.querySelector('.sched-preset:nth-child(3)').click(); true`);
@@ -57,7 +57,7 @@ const STUB = `(() => {
             assert.equal(pat.hasX, true, at + 'New job has a Close X'); assert.equal(pat.name, 'Close dialog');
             assert.ok(pat.xRight >= 0 && pat.xRight <= 40 && pat.xTop <= 40, at + 'the X is at the top right: ' + JSON.stringify(pat));
             assert.ok(pat.btnRight <= 40, at + 'the buttons are at the bottom right: ' + JSON.stringify(pat));
-            await waitFor(`/every day at 02:00/.test(document.getElementById('cron-preview').textContent)`, 'daily preview', 8000);
+            await waitFor(`/every day at 09:00/.test(document.getElementById('cron-preview').textContent)`, 'daily preview', 8000);
             await shot(`job-form-${w}`);
 
             // 2. contrast, both themes
@@ -75,15 +75,35 @@ const STUB = `(() => {
                 assert.ok(edge <= 28, at + 'the fields start close to the edge (a 16 px gutter plus the dialog border): left edge ' + edge);
             }
 
-            // 4. Custom draws the cron field, with its words
-            await ev(`document.querySelector('.sched-preset[data-cron=""]').click(); true`);
-            assert.equal(await ev(vis('#job-modal-cron')), true, at + 'Custom shows the cron field');
+            // 3b. the pickers write the cron expression; the zone defaults to the person's own and is not named
+            const cronOf = () => ev(`document.getElementById('job-modal-cron').value`);
+            await ev(`document.querySelector('.sched-preset[data-mode="minutes"]').click(); true`);
+            await type('#job-modal-every', '15');
+            assert.equal(await cronOf(), '*/15 * * * *', at + 'every 15 minutes');
+            await waitFor(`/^Runs every 15 minutes\\. Next:/.test(document.getElementById('cron-preview').textContent)`, 'the sentence for every 15 minutes', 8000);
+            await ev(`document.querySelector('.sched-preset[data-mode="hours"]').click(); true`);
+            await type('#job-modal-every', '6');
+            assert.equal(await cronOf(), '0 */6 * * *', at + 'every 6 hours');
+            await ev(`document.querySelector('.sched-preset[data-mode="daily"]').click(); true`);
+            await ev(`(() => { const i = document.getElementById('job-modal-at'); i.value = '07:30'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            assert.equal(await cronOf(), '30 7 * * *', at + 'daily at 07:30');
+            await ev(`document.querySelector('.sched-preset[data-mode="weekly"]').click(); true`);
+            assert.equal(await cronOf(), '30 7 * * 1', at + 'weekly starts with Monday');
+            await ev(`document.querySelector('.sched-day[data-day="3"]').click(); true`);
+            assert.equal(await cronOf(), '30 7 * * 1,3', at + 'Monday and Wednesday at 07:30');
+            await waitFor(`/^Runs at 07:30, Mondays and Wednesdays\\./.test(document.getElementById('cron-preview').textContent)`, 'the weekly sentence', 8000);
+            assert.equal(await ev(`document.getElementById('job-modal-timezone').value`), 'Europe/Berlin', at + 'the zone is the person\'s own by default');
+            await shot(`job-form-weekly-${w}`);
+
+            // 4. Advanced draws the cron field, with its words
+            await ev(`document.querySelector('.sched-preset[data-mode="cron"]').click(); true`);
+            assert.equal(await ev(vis('#job-modal-cron')), true, at + 'Advanced shows the cron field');
             assert.equal(await ev(`document.getElementById('job-modal-cron').closest('label').firstChild.textContent.trim()`), 'Cron expression');
             await type('#job-modal-cron', 'nonsense');
             await waitFor(`/not a schedule Coral can read/.test(document.getElementById('cron-preview').textContent)`, 'a bad schedule in words', 8000);
             await shot(`job-form-custom-${w}`);
             await type('#job-modal-cron', '0 5 * * 1,3');
-            await waitFor(`/Runs at 05:00, Mondays and Wednesdays \\(UTC\\)\\./.test(document.getElementById('cron-preview').textContent)`, 'a less common shape is said in words (#6956)', 8000);
+            await waitFor(`/Runs at 05:00, Mondays and Wednesdays\\./.test(document.getElementById('cron-preview').textContent)`, 'a less common shape is said in words (#6956)', 8000);
 
             // 5. More options: time limit and zone in words
             await ev(`document.querySelector('#job-modal-more > summary').click(); true`);
