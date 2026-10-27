@@ -117,6 +117,9 @@ function _renderTabs() {
         });
     });
     bar.querySelectorAll('.preview-tab-close').forEach(btn => {
+        btn.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && _tabs.find(t => t.id === btn.dataset.tabId)?.kind === 'task') { e.preventDefault(); e.stopPropagation(); closeTab(btn.dataset.tabId); }
+        });
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             closeTab(btn.dataset.tabId);
