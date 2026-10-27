@@ -1222,14 +1222,7 @@ body.panel-dragging .agentic-state {
     border-color: var(--accent);
 }
 
-.starred-section-label {
-    font-size: var(--fs-sm);
-    color: var(--text-muted);
-    padding: 6px 12px 2px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+.starred-section-label { padding: 6px 12px 2px; }
 
 .file-star-btn {
     background: none;

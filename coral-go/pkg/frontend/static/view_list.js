@@ -28,7 +28,7 @@ function draw(root, { sections, current }) {
     const held = nav.contains(document.activeElement) ? document.activeElement.dataset.key : null;
     nav.replaceChildren(); select.replaceChildren();
     for (const sec of sections) {
-        if (sec.title) nav.append(el('h2', 'view-list-title', sec.title));
+        if (sec.title) nav.append(el('h2', 'group-head view-list-title', sec.title));
         const group = sec.title ? document.createElement('optgroup') : select;
         if (sec.title) group.label = sec.title;
         for (const it of sec.items) {
