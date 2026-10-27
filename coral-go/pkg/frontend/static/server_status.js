@@ -245,7 +245,7 @@ function serverLaunchActionsHtml(e) {
     const blocked = launchBlockReason(id, isHub(), state.servers);
     const actions = [['agent', 'New agent'], ['team', 'New team']];
     if (local) actions.push(['folder', 'Open folder']);
-    const btn = ([kind, label]) => `<button type="button" class="server-launch-btn${kind === 'agent' ? ' server-launch-primary' : ''}" data-server-launch="${escHtml(kind)}" data-server-id="${escHtml(e.id)}"`
+    const btn = ([kind, label]) => `<button type="button" class="btn${kind === 'agent' ? ' btn-primary' : ''} server-launch-btn" data-server-launch="${escHtml(kind)}" data-server-id="${escHtml(e.id)}"`
         + (blocked ? ` disabled aria-disabled="true" title="${escHtml(blocked)}"` : '') + `>${label}</button>`;
     return `<div class="server-launch-actions" role="group" aria-label="${escHtml(`Launch on ${e.label || e.id}`)}">`
         + actions.map(btn).join('')

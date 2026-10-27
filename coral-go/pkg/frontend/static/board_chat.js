@@ -471,10 +471,10 @@ function _updateBoardChatSelectBar() {
     const count = _boardChatSelectedIds.size;
     bar.innerHTML = `
         <span class="mb-select-count">${count} selected</span>
-        <button class="btn mb-select-action-btn" data-on-click="board-chat-select-all">Select All</button>
-        <button class="btn mb-select-action-btn" data-on-click="board-chat-select-none">None</button>
-        <button class="btn btn-primary mb-select-action-btn" data-on-click="board-chat-export" ${count === 0 ? 'disabled' : ''}>Export Markdown</button>
-        <button class="btn mb-select-action-btn" data-on-click="board-chat-select-cancel">Cancel</button>
+        <button class="btn btn-small" data-on-click="board-chat-select-all">Select All</button>
+        <button class="btn btn-small" data-on-click="board-chat-select-none">None</button>
+        <button class="btn btn-small btn-primary" data-on-click="board-chat-export" ${count === 0 ? 'disabled' : ''}>Export Markdown</button>
+        <button class="btn btn-small" data-on-click="board-chat-select-cancel">Cancel</button>
     `;
     bar.style.display = '';
 }

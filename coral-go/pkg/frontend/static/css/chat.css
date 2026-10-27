@@ -513,29 +513,15 @@
 
 /* ── Load More Button ─────────────────────────────────────── */
 
+/* "Load older messages": a .btn (the family's look and its 44 px touch height, #4327) laid across the column; the class stays as the hook the chat code finds it by (#9313). */
 .load-more-btn {
     display: block;
     width: 100%;
-    padding: 8px 0;
     margin-bottom: 12px;
-    background: var(--bg-secondary);
-    color: var(--text-muted);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    font-size: var(--fs-base); /* rem, not 12px: it grows with the text size (#4327) */
-    text-align: center;
-    transition: background 0.15s, color 0.15s;
 }
-.load-more-btn:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-}
-/* A phone or a touch screen: the step bars (a group's and a roll-up's) and "Load older messages" are 44 px targets, not 32 (#4327, from the #4276
-   audit: the most numerous taps in a long chat). A mouse layout keeps the compact height. */
+/* A phone or a touch screen: the step bars (a group's and a roll-up's) are 44 px targets, not 32 (#4327, from the #4276 audit: the most numerous taps in a long chat). A mouse layout keeps the compact height. */
 @media (pointer: coarse), (max-width: 767px) {
     .work-group-summary { min-height: var(--control-touch-height, 44px); }
-    .load-more-btn { min-height: var(--control-touch-height, 44px); }
 }
 
 /* ── Center Chat View (Terminal/Chat toggle) ───────────────── */

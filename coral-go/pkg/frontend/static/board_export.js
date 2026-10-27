@@ -253,10 +253,10 @@ function updateSelectBar() {
     const count = _selectedIds.size;
     bar.innerHTML = `
         <span class="mb-select-count">${count} selected</span>
-        <button class="btn mb-select-action-btn" data-on-click="mb-select-all">Select All</button>
-        <button class="btn mb-select-action-btn" data-on-click="mb-select-none">None</button>
-        <button class="btn btn-primary mb-select-action-btn" data-on-click="mb-export-selected" ${count === 0 ? 'disabled' : ''}>Export Markdown</button>
-        <button class="btn mb-select-action-btn" data-on-click="mb-select-cancel">Cancel</button>
+        <button class="btn btn-small" data-on-click="mb-select-all">Select All</button>
+        <button class="btn btn-small" data-on-click="mb-select-none">None</button>
+        <button class="btn btn-small btn-primary" data-on-click="mb-export-selected" ${count === 0 ? 'disabled' : ''}>Export Markdown</button>
+        <button class="btn btn-small" data-on-click="mb-select-cancel">Cancel</button>
     `;
     bar.style.display = '';
 }
