@@ -105,13 +105,13 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 			}
 			mentions = append(mentions, "@"+rv.Reviewer)
 		}
-		h.postNotice(ctx, project, fmt.Sprintf("%s [Task #%d resubmitted for review, round %d] %s submitted %q again (candidate: %s; %s). Review it again: coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". @%s the same reviewers have it; change them with coral-board task review %d --to \"...\"",
-			strings.Join(mentions, " "), id, reopened.Round, h.noticeText(ctx, project, author), h.noticeText(ctx, project, task.Title), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, body.Reason), id, id, reopened.Round, id, reopened.Round, orch, id))
+		h.postNotice(ctx, project, fmt.Sprintf("%s [Task #%d resubmitted for review, round %d] %s submitted %s again (candidate: %s; %s). Review it again: coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". @%s the same reviewers have it; change them with coral-board task review %d --to \"...\"",
+			strings.Join(mentions, " "), id, reopened.Round, h.noticeText(ctx, project, author), quoteNotice(h.noticeText(ctx, project, task.Title)), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, body.Reason), id, id, reopened.Round, id, reopened.Round, orch, id))
 	} else if h.autoDelegateReview(ctx, project, id, orch) { // #4175: Coral delegates to the named reviewers
 	} else if h.putReviewInPool(ctx, project, id, task.Title, author, areas, body.Reviewers, candidate, body.Reason) { // #8957: or the review waits in the board's pool for an agent that only reviews
 	} else {
-		h.postNotice(ctx, project, fmt.Sprintf("@%s [Task #%d in review] %s submitted %q (candidate: %s; %s). Complete it with 'coral-board task complete %d', or delegate it: coral-board task review %d --to \"Security Reviewer,QA Engineer\"",
-			orch, id, h.noticeText(ctx, project, author), h.noticeText(ctx, project, task.Title), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, body.Reason), id, id))
+		h.postNotice(ctx, project, fmt.Sprintf("@%s [Task #%d in review] %s submitted %s (candidate: %s; %s). Complete it with 'coral-board task complete %d', or delegate it: coral-board task review %d --to \"Security Reviewer,QA Engineer\"",
+			orch, id, h.noticeText(ctx, project, author), quoteNotice(h.noticeText(ctx, project, task.Title)), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, body.Reason), id, id))
 	}
 	h.nudgeNextTask(ctx, project, author)
 	if h.notifyFn != nil {

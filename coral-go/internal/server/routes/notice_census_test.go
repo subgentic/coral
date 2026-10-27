@@ -13,6 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// What this guards is the CALL PATH, not the data flow: it fails a PostSystemMessage call that is not on the list, so a new post cannot skip postNotice by accident. It cannot see which values a
+// post quotes: a raw title handed to postNotice passes here. That part is the behaviour tests in notice_sweep_test.go, one per quoted part, each with a member who is tagged if that part is left raw.
+//
 // #9265: a server post that quotes stored text (a title, a message, a note, a reason, a candidate) must be defused, or it tags the members the text names. noticeText + postNotice do that, so
 // Store.PostSystemMessage (which cleans its text, and so cannot carry the defusing) may be called only from the functions below, each of which posts text Coral wrote itself and names only
 // members (the names are cleaned and have no "@"). A new call anywhere else fails here: quote what is stored with h.noticeText and post it with h.postNotice.
