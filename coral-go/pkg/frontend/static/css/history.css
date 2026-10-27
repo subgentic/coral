@@ -72,7 +72,7 @@
     tab-size: 4;
     font-family: var(--font-mono);
     font-size: var(--fs-base);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     color: var(--text-primary);
     background: var(--bg-primary);
 }
@@ -103,7 +103,7 @@
     overflow-y: auto;
     padding: 16px 20px;
     font-size: var(--fs-lg);
-    line-height: 1.6;
+    line-height: var(--lh-body);
     color: var(--text-primary);
 }
 
@@ -182,7 +182,7 @@
     color: var(--text-primary);
     font-family: var(--font-mono);
     font-size: var(--fs-md);
-    line-height: 1.6;
+    line-height: var(--lh-body);
     resize: none;
     outline: none;
 }
@@ -295,7 +295,7 @@
 .chat-search-hit { display:block; width:100%; text-align:left; border:0; border-radius:5px; padding:7px 8px; color:var(--text-primary); background:transparent; cursor:pointer; }
 .chat-search-hit:hover, .chat-search-hit:focus-visible { background:var(--bg-hover); outline:2px solid var(--accent-secondary); outline-offset:-2px; }
 .chat-search-hit-meta { display:block; color:var(--text-secondary); font-size: var(--fs-base); margin-bottom:3px; }
-.chat-search-hit-excerpt { font-size:var(--fs-base); line-height:1.35; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
+.chat-search-hit-excerpt { font-size:var(--fs-base); line-height:var(--lh-ui); overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
 .chat-search-hit mark { background:color-mix(in srgb, var(--accent-secondary) 45%, transparent); color:var(--text-primary); font-weight:var(--fw-strong); border-radius:2px; padding:0 2px; }
 .chat-search-status { padding:10px; color:var(--text-secondary); font-size: var(--fs-base); }
 .chat-search-target { outline:2px solid var(--accent-secondary); outline-offset:3px; }
