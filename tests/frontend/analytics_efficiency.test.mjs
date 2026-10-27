@@ -55,6 +55,13 @@ try {
     // back to All
     click('cost-spend-section', 'All'); await settle();
     assert.equal(sec('cost-spend').hidden, false); assert.equal(sec('cost-eff-per-commit').hidden, true);
+    // every figure 0 (an average of 0): no NaN or Infinity anywhere, no bar of NaN width
+    globalThis.fetch = window.fetch = async () => Response.json({ metric: 'task_time', group_by: 'team', range: '7d', min_sample: 10, total: { n: 22 }, average: { value: 0 }, groups: [{ key: 'a', label: 'alpha', value: 0, n: 12, sent_back_share: 0, cost_usd_per_unit: 0 }, { key: 'b', label: 'beta', value: 0, n: 10, sent_back_share: 0, cost_usd_per_unit: 0 }] });
+    click('cost-task-time-section', 'Team'); await settle();
+    const z = sec('cost-eff-task-time'), zt = z.textContent;
+    assert.ok(!/NaN|Infinity|undefined/.test(zt), 'no NaN or Infinity in the cards or the table: ' + zt.slice(0, 200));
+    assert.ok([...z.querySelectorAll('.eff-fill, .eff-avg')].every(e => /^\d/.test(e.style.width || e.style.left || '0') ), 'no bar or line of NaN width');
+    assert.equal(z.querySelectorAll('.eff-bar').length, 2);
     // an error says so and Retry reads again
     globalThis.fetch = window.fetch = async () => new Response('{}', { status: 500 });
     click('cost-spend-section', 'Agent'); await settle();
