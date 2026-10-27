@@ -7,30 +7,30 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
     background: var(--bg-secondary, #151a22); border: 1px solid var(--border, var(--fx-navy-line)); border-radius: var(--radius-lg); box-shadow: 0 8px 24px rgba(var(--black-rgb), .4); }
 .cloud-account-menu[hidden] { display: none; }
 .cloud-account-menu a.overflow-menu-item { text-decoration: none; } /* the hub's own pages, as links (#4596) */
-.cloud-account-email { padding: 6px 10px 8px; font-size: 0.75rem; opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.cloud-account-email { padding: 6px 10px 8px; font-size: var(--fs-base); opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     border-bottom: 1px solid var(--border, var(--fx-navy-line)); margin-bottom: 4px; }
 
 /* Standalone pages (sign-in, enroll) */
 .cloud-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
     background: var(--bg-primary, var(--fx-navy-ink)); color: var(--text-primary, #e6edf3); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .cloud-card { width: 100%; max-width: 440px; padding: 28px; border-radius: var(--radius-xl); background: var(--bg-secondary, #151a22); border: 1px solid var(--border, var(--fx-navy-line)); }
-.cloud-card h1 { font-size: 1.25rem; margin: 0 0 6px; }
+.cloud-card h1 { font-size: var(--fs-2xl); margin: 0 0 6px; }
 .cloud-card p { margin: 0 0 14px; line-height: 1.5; opacity: .85; }
-.cloud-card label { display: block; font-size: 0.8125rem; margin: 12px 0 4px; }
+.cloud-card label { display: block; font-size: var(--fs-md); margin: 12px 0 4px; }
 .cloud-card input[type=email], .cloud-card input[type=text] { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: var(--radius-lg);
     border: 1px solid var(--control-border, var(--border, var(--fx-navy-line))); background: var(--bg-primary, var(--fx-navy-ink)); color: inherit; font-size: 0.9375rem; min-height: var(--control-touch-height, 44px); } /* a 44px target on every pointer: the sign-in page is used from a phone (#5637) */
-.cloud-card input.cloud-code { font-family: ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; font-size: 1.125rem; text-align: center; }
+.cloud-card input.cloud-code { font-family: ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; font-size: var(--icon-size); text-align: center; }
 .cloud-btn { display: inline-flex; align-items: center; justify-content: center; min-height: var(--control-touch-height, 44px); width: 100%; box-sizing: border-box; margin-top: 14px; padding: 10px 14px; border-radius: var(--radius-lg); border: 1px solid var(--control-border, var(--border, var(--fx-navy-line)));
-    background: var(--bg-tertiary, #1c2330); color: inherit; font-size: 0.875rem; cursor: pointer; text-align: center; text-decoration: none; }
+    background: var(--bg-tertiary, #1c2330); color: inherit; font-size: var(--fs-lg); cursor: pointer; text-align: center; text-decoration: none; }
 .cloud-btn.primary { background: #1f6feb; border-color: #1f6feb; color: var(--text-on-accent); }
 .cloud-btn.danger { background: #b62324; border-color: #b62324; color: var(--text-on-accent); }
 .cloud-btn[disabled] { opacity: .55; cursor: default; }
-.cloud-divider { text-align: center; margin: 16px 0 0; font-size: 0.8125rem; opacity: .6; }
-.cloud-status { margin-top: 12px; min-height: 1.4em; font-size: 0.8125rem; }
+.cloud-divider { text-align: center; margin: 16px 0 0; font-size: var(--fs-md); opacity: .6; }
+.cloud-status { margin-top: 12px; min-height: 1.4em; font-size: var(--fs-md); }
 .cloud-status.error { color: #ff7b72; }
 .cloud-status.ok { color: var(--fx-green); }
-.cloud-warn { margin: 12px 0; padding: 10px 12px; border-radius: var(--radius-lg); background: rgba(var(--fx-amber-rgb), .12); border: 1px solid rgba(var(--fx-amber-rgb), .5); font-size: 0.8125rem; line-height: 1.5; }
-.cloud-facts { margin: 12px 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.875rem; }
+.cloud-warn { margin: 12px 0; padding: 10px 12px; border-radius: var(--radius-lg); background: rgba(var(--fx-amber-rgb), .12); border: 1px solid rgba(var(--fx-amber-rgb), .5); font-size: var(--fs-md); line-height: 1.5; }
+.cloud-facts { margin: 12px 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: var(--fs-lg); }
 .cloud-facts dt { opacity: .65; } .cloud-facts dd { margin: 0; word-break: break-all; }
 
 /* Servers dialog */
@@ -46,7 +46,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cs-access-effective { font-weight: 600; }
 .cs-meta.cs-access-help { opacity: 1; color: var(--text-secondary); }
 .cs-access-info { display: inline-flex; align-items: center; gap: var(--space-xs); margin-top: var(--space-xs); color: var(--text-secondary); }
-.cs-access-info .material-icons { font-size: 1rem; }
+.cs-access-info .material-icons { font-size: var(--fs-xl); }
 .cs-access-matrix { color: var(--text-secondary); font-size: var(--fs-base); line-height: 1.5; }
 .cs-access-matrix p { margin: var(--space-sm) 0; }
 @media (pointer: coarse) { .cs-relink, .cs-access-info, #cs-enroll-toggle { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
@@ -55,16 +55,16 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cs-title { font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; overflow-wrap: anywhere; }
 /* The row's "(online)" / "(offline)" is for screen readers only; the dot shows it. */
 .cs-title .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.cs-meta { font-size: 0.75rem; opacity: .7; margin-top: 2px; }
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .cs-meta { font-size: 0.8125rem; } } /* 13px on a phone (#5669) */
-.cs-note { font-size: 0.75rem; padding: 6px 10px; border-radius: var(--radius-md); background: rgba(var(--fx-amber-rgb), .12); border: 1px solid rgba(var(--fx-amber-rgb), .45); }
+.cs-meta { font-size: var(--fs-base); opacity: .7; margin-top: 2px; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .cs-meta { font-size: var(--fs-md); } } /* 13px on a phone (#5669) */
+.cs-note { font-size: var(--fs-base); padding: 6px 10px; border-radius: var(--radius-md); background: rgba(var(--fx-amber-rgb), .12); border: 1px solid rgba(var(--fx-amber-rgb), .45); }
 .cs-actions { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; justify-content: flex-end; }
 .cs-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #6e7681; }
 .cs-dot.online { background: var(--fx-green); } .cs-dot.offline { background: var(--fx-amber); }
 .cs-enroll { margin: 0 0 18px; padding: 14px; border-radius: var(--radius-lg); border: 1px dashed var(--border, var(--fx-navy-line)); }
 .cs-enroll.cs-enroll-closed { padding: 0; border: 0; } .cs-enroll-title #cs-enroll-toggle { margin-left: 0; } /* closed it is only the Add a computer button, not a dashed box around one button (#6359) */
 .cs-enroll-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 220px); gap: 16px; align-items: start; }
-.cs-enroll ol { margin: 8px 0 12px 18px; padding: 0; line-height: 1.6; font-size: 0.8125rem; }
+.cs-enroll ol { margin: 8px 0 12px 18px; padding: 0; line-height: 1.6; font-size: var(--fs-md); }
 .cs-enroll ol li a { display: block; margin-top: 2px; color: var(--link-text, var(--accent)); overflow-wrap: anywhere; } /* the install link: on its own line (#4586) */
 .cs-shots { min-width: 0; }
 .cs-shot { display: block; width: 100%; height: auto; border: 1px solid var(--border, var(--fx-navy-line)); border-radius: var(--radius-lg); }
@@ -79,7 +79,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cs-launch { display: flex; align-items: center; gap: 6px; margin-top: 4px; cursor: pointer; }
 .cs-launch input { width: auto; margin: 0; }
 .cs-actions .btn { min-width: 64px; }
-.cloud-sub { font-size: 0.8125rem; margin: 14px 0 4px; opacity: .8; font-weight: 600; }
+.cloud-sub { font-size: var(--fs-md); margin: 14px 0 4px; opacity: .8; font-weight: 600; }
 .cloud-note { font-weight: 400; opacity: .7; }
 .cs-launch select { margin-left: 4px; padding: 3px 6px; border-radius: var(--radius-md); border: 1px solid var(--control-border, var(--border, var(--fx-navy-line))); background: var(--bg-primary, var(--fx-navy-ink)); color: inherit; }
 
@@ -132,7 +132,7 @@ body.cloud-mode .settings-cloud-note { margin: 0 0 12px; }
 .hub-nav-link:hover, .hub-nav-link:focus-visible { text-decoration: underline; }
 .cloud-more { display: block; margin: 8px 0 12px; }
 .cloud-more > summary { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; cursor: pointer; list-style: none; border: 1px solid var(--control-border, var(--border)); border-radius: 50%; color: var(--text-secondary); } /* the dashboard's (i): a circle, the icon inside (#6065) */
-.cloud-more > summary .material-icons { font-size: 1rem; }
+.cloud-more > summary .material-icons { font-size: var(--fs-xl); }
 .cloud-more > summary:hover { color: var(--text-primary); }
 .cloud-more[open] > summary { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); }
 @media (pointer: coarse), (max-width: 767px) { .cloud-more > summary { width: 44px; height: 44px; } } /* the 44 px is the target: on touch and at phone width (a narrow window with a mouse too) */

@@ -1,18 +1,18 @@
 /* The local Goals view (#7113, layout A of UI/UX's #7091): the board's second face. Two columns wide (list 300 to 380 px, the open goal beside it); on a phone two screens with a back row. */
 
 .goals-page { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; min-height: 100%; box-sizing: border-box; }
-.goals-note { margin: 2px 0 0; color: var(--text-secondary); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.goals-note { margin: 2px 0 0; color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .goals-detail-col { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .goals-detail-col { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; background: var(--bg-secondary); }
 .goals-back { display: none; align-self: flex-start; background: none; border: none; color: var(--link-text, var(--accent)); font: 500 var(--fs-md)/1.4 var(--font-sans); padding: 8px 0; min-height: var(--control-touch-height, 44px); cursor: pointer; }
 
 .goals-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.goals-chip { min-height: var(--control-touch-height, 44px); padding: 4px 10px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.goals-chip { min-height: var(--control-touch-height, 44px); padding: 4px 10px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: var(--fs-md); cursor: pointer; }
 .goals-chip[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); border-color: var(--accent); }
 
-.goal-card-meta { color: var(--text-secondary); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.goal-card-meta { color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 
-.goal-chip { --goal-hue: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--goal-hue); border-radius: 999px; font-size: 0.75rem; white-space: nowrap; color: var(--text-primary); }
+.goal-chip { --goal-hue: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--goal-hue); border-radius: 999px; font-size: var(--fs-base); white-space: nowrap; color: var(--text-primary); }
 .goal-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--goal-hue); flex: none; }
 /* the word stays in the page's text colour (the accent as text was 4.44:1 on the light theme's panel); the dot and the border carry the state's colour, and the word says it */
 .goal-state-active, .goal-state-task-active { --goal-hue: var(--accent); }
@@ -25,13 +25,13 @@
 .goal-rollup-active { background: var(--accent); }
 .goal-rollup-blocked { background: var(--warning); }
 
-.goals-sub { margin: 8px 0 0; font-size: 0.8125rem; color: var(--text-secondary); }
+.goals-sub { margin: 8px 0 0; font-size: var(--fs-md); color: var(--text-secondary); }
 .goals-detail-title { margin: 0; font-size: 1.0625rem; overflow-wrap: anywhere; }
 .goals-detail-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 
 
 .goals-failed { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border: 1px dashed var(--border-light); border-radius: var(--radius-lg); color: var(--text-secondary); }
-.goals-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; padding: 0; color: var(--text-primary); font-size: 0.875rem; font-weight: 400; line-height: 1.5; } /* the one empty line (14/400, no box; UI/UX 170 consistency pass 2): Goals, Tasks, Agents, as Artifacts and Knowledge */
+.goals-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; padding: 0; color: var(--text-primary); font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; } /* the one empty line (14/400, no box; UI/UX 170 consistency pass 2): Goals, Tasks, Agents, as Artifacts and Knowledge */
 .goals-empty p { margin: 0; }
 .goals-failed { flex-direction: row; flex-wrap: wrap; align-items: center; border-style: solid; border-color: var(--error); }
 
@@ -39,8 +39,8 @@
 .goals-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .goals-form { display: flex; flex-direction: column; gap: 10px; }
 .goals-form h3 { margin: 0; }
-.goals-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.8125rem; }
-.goals-field input, .goals-field select { min-height: 36px; padding: 6px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: 1rem; }
+.goals-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); }
+.goals-field input, .goals-field select { min-height: 36px; padding: 6px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: var(--fs-xl); }
 .goals-field-error { margin: 0; color: var(--error-text); min-height: 0; }
 .goals-field-error:empty { display: none; }
 .goals-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -60,22 +60,22 @@
 /* Close, Reopen and the all-done prompt (#7272). */
 .goals-close-dialog { max-height: calc(100dvh - 24px); overflow-y: auto; }
 .goals-close-goal { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-.goals-warning { border: 1px solid var(--warning); border-radius: var(--radius-lg); padding: 8px 10px; background: rgba(var(--warning-rgb), 0.1); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.goals-warning { border: 1px solid var(--warning); border-radius: var(--radius-lg); padding: 8px 10px; background: rgba(var(--warning-rgb), 0.1); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .goals-radios { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.goals-radios legend { font-size: 0.8125rem; padding: 0; margin-bottom: 2px; }
-.goals-radio { display: flex; align-items: center; gap: 8px; min-height: var(--control-touch-height, 44px); font-size: 0.875rem; cursor: pointer; }
+.goals-radios legend { font-size: var(--fs-md); padding: 0; margin-bottom: 2px; }
+.goals-radio { display: flex; align-items: center; gap: 8px; min-height: var(--control-touch-height, 44px); font-size: var(--fs-lg); cursor: pointer; }
 .goals-alldone { border: 1px solid var(--success); border-radius: var(--radius-lg); padding: 10px 12px; background: rgba(var(--success-rgb), 0.1); display: flex; flex-direction: column; gap: 6px; }
 .goals-alldone-text { margin: 0; overflow-wrap: anywhere; }
 .goals-alldone-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .goals-close, .goals-reopen, .goals-alldone-actions .btn { min-height: var(--control-touch-height, 44px); }
 
 /* Findings of the Goals usability check (#7218, #7224): chips with no goals quieter; a lighter phone header */
-.goals-chip-zero:not([aria-pressed="true"]) { font-size: 0.75rem; } /* a pill with nothing in it is a little quieter in its text and keeps its edge like every other (#7715: Blocked 0 had none) */
+.goals-chip-zero:not([aria-pressed="true"]) { font-size: var(--fs-base); } /* a pill with nothing in it is a little quieter in its text and keeps its edge like every other (#7715: Blocked 0 had none) */
 @media (max-width: 767px) {
     /* a phone, large text (#7224): the page's own heading and New goal share a row, the sub-line is small, the chips take less, so the first goal is not a screen away */
     .goals-page { gap: 8px; }
     .goals-chips { gap: 4px; }
-    .goals-chip { padding: 2px 8px; font-size: 0.75rem; min-width: var(--control-touch-height, 44px); }
+    .goals-chip { padding: 2px 8px; font-size: var(--fs-base); min-width: var(--control-touch-height, 44px); }
 }
 
 /* Goals uses the width (#7404, UI/UX's #7401): the list 280 to 360 px beside a wide detail, the detail under the list when the Goals area is under 880 px (never a strip), the chips on one line,

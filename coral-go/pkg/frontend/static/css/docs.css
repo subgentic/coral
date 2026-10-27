@@ -22,7 +22,7 @@
 .docs-toolbar .group-back { margin: 0; }
 
 .docs-toolbar .btn { display: inline-flex; align-items: center; gap: 6px; margin: 0; } /* .btn-small carries a 20px margin for the sidebars */
-.docs-toolbar .material-icons { font-size: 1rem; }
+.docs-toolbar .material-icons { font-size: var(--fs-xl); }
 .docs-toolbar-hint { margin: 4px 32px 0; max-width: 736px; font-size: var(--fs-base); color: var(--text-secondary); min-width: 0; } /* a hint is 12/400 */
 
 @media (max-width: 600px) {
@@ -78,7 +78,7 @@
 .docs-content p {
     margin: 8px 0;
     line-height: 1.6;
-    font-size: 0.875rem;
+    font-size: var(--fs-lg);
 }
 
 .docs-content :not(pre) > code { overflow-wrap: anywhere; } /* an unbreakable name (CORAL_STRICT_LOCAL_AUTH=0) made the page scroll sideways at 200% text (#7162) */
@@ -86,7 +86,7 @@
     background: var(--bg-tertiary);
     padding: 2px 5px;
     border-radius: var(--radius-xs);
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
 }
 
 .docs-content pre {
@@ -95,7 +95,7 @@
     border-radius: var(--radius-md);
     padding: 12px 14px;
     overflow-x: auto;
-    font-size: 0.8125rem;
+    font-size: var(--fs-md);
     line-height: 1.5;
     margin: 8px 0;
 }
@@ -107,13 +107,13 @@
 
 
 
-.docs-content strong, .docs-content b { font-size: 0.875rem; font-weight: 600; } /* bold labels 14/600 */
+.docs-content strong, .docs-content b { font-size: var(--fs-lg); font-weight: 600; } /* bold labels 14/600 */
 
 .docs-content ul,
 .docs-content ol {
     padding-left: 1.5em;
     margin: 6px 0;
-    font-size: 0.875rem;
+    font-size: var(--fs-lg);
     line-height: 1.6;
 }
 
@@ -151,7 +151,7 @@
 /* Tables (#7162): each sits in a focusable scroll region, so a keyboard and a phone reach every column; the line above says it scrolls, drawn only while it does. */
 .docs-table-wrap { overflow-x: auto; max-width: 100%; margin: 8px 0; }
 .docs-table-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.docs-table-hint { margin: 8px 0 0; color: var(--text-secondary); font-size: 0.75rem; }
+.docs-table-hint { margin: 8px 0 0; color: var(--text-secondary); font-size: var(--fs-base); }
 .docs-table-hint[hidden] { display: none; }
 
 /* Docs on a phone (#7443): the pane is the page's list, and an open document is the screen after it, with a way back to the list */
