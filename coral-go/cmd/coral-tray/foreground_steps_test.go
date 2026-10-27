@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -129,7 +130,8 @@ func TestSetupTrayLogWritesTheLogAndHandsTheFileToRedirect(t *testing.T) {
 	if home != "" && strings.Contains(got, home) {
 		t.Errorf("tray.log holds the home folder %q: %q", home, got)
 	}
-	if fi, err := os.Stat(filepath.Join(dir, "tray.log")); err == nil && fi.Mode().Perm()&0o077 != 0 {
+	// Windows has no file mode bits to check: Go reports 0666 for any file that is not read-only (the log is created 0600 where there are bits).
+	if fi, err := os.Stat(filepath.Join(dir, "tray.log")); runtime.GOOS != "windows" && err == nil && fi.Mode().Perm()&0o077 != 0 {
 		t.Errorf("tray.log mode = %v, want 0600", fi.Mode().Perm())
 	}
 	_ = fmt.Sprint
