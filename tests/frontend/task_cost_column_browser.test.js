@@ -1,5 +1,5 @@
 // The dock's Tasks table shows Status, Task and Agent only (#7962, the operator: "we probably don't need to show priority, type, cost in this side tab view so we can spend more space on the status, task and agent"), at 680 px with real headers
-// and folded at 420 px, with no sideways scroll; priority, type, cost and the time are on the main Tasks tab and in the opened task. (The file keeps its name: it began as the cost column's test.)
+// and one line per row at 420 px (the dock's rows are not folded, #8792), with no sideways scroll; priority, type, cost and the time are on the main Tasks tab and in the opened task. (The file keeps its name: it began as the cost column's test.)
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const PANELS = require('./helpers/list_bars_panels');
@@ -38,7 +38,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`document.getElementById('board-task-list').getBoundingClientRect().width < 460`, 'the narrow dock');
         await shot('tasks-dock-420-columns');
         m = await measure();
-        assert.ok(m.list < 560, 'a narrow list: ' + m.list); assert.equal(m.folded, true, '420 px folds the rows');
+        assert.ok(m.list < 560, 'a narrow list: ' + m.list); assert.equal(m.folded, false, '420 px: the dock rows are one line at every width, not folded (#8792)');
         assert.deepEqual(m.gone, [], 'the folded row has none of them either: ' + JSON.stringify(m)); assert.ok(m.cells.every(k => ['state', 'task', 'who'].includes(k)), 'only Status, Task and Agent cells: ' + JSON.stringify(m));
         assert.ok(m.scrolls <= 1, 'and it does not scroll sideways');
         console.log('PASS dock Tasks columns');
