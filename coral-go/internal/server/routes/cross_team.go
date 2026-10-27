@@ -445,6 +445,12 @@ func (h *BoardHandler) PostExternalMessage(w http.ResponseWriter, r *http.Reques
 		refused(w)
 		return
 	}
+	if body.ReplyTo > 0 {
+		if refused := h.checkLocalReplyTo(ctx, &body, target); refused != nil {
+			refused(w)
+			return
+		}
+	}
 	inbound, outbound, err := h.bs.PostCrossTeamMessage(ctx, board.CrossTeamPost{
 		Origin: board.MessageOrigin{
 			ServerID: store.LocalServerID, Board: body.FromBoard, Sender: body.SubscriberID, SenderRole: role,
@@ -464,6 +470,9 @@ func (h *BoardHandler) PostExternalMessage(w http.ResponseWriter, r *http.Reques
 		h.notifyFn(body.FromBoard)
 	}
 	h.goBG(func() { h.resolveMessageWaits(target, inbound.SubscriberID, inbound.Content) })
+	if body.ReplyTo > 0 && outbound != nil { // the sender's copy says which message it answers (and a question it answers counts as answered)
+		_ = h.bs.RecordReply(ctx, body.FromBoard, outbound.ID, body.ReplyTo)
+	}
 	resp := map[string]any{"message": inbound, "mirror": outbound, "delivered_to": recipients}
 	if len(attached) > 0 {
 		resp["attached"] = h.recordCrossTeamArtifacts(attached, body.FromBoard, target, body.SubscriberID, outbound.ID, inbound.ID)
@@ -484,6 +493,8 @@ type externalMessage struct {
 	To          string `json:"to"`
 	// Attach are coral://artifacts links sent with the message (#4379): see resolveAttachments.
 	Attach []string `json:"attach"`
+	// ReplyTo is the id, on the SENDER's board, of the message from the target board this one answers (#9054). It must be a message that board sent there.
+	ReplyTo int64 `json:"reply_to"`
 }
 
 // refusal refuses a message with no text, text over the limit, no sender, or sent to its own board.
@@ -861,4 +872,19 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 	}
 	slog.Info("[cloud] Coral Hub's owner changed cross-team settings", "board", project, "switches", len(switches), "edits", len(edits), "hub_user", id.pseudo)
 	return true
+}
+
+// checkLocalReplyTo refuses a reply_to that is not a message the target board sent to the sender's board: a message of that board, inbound, from the target (a typo
+// or a message of another conversation must not be recorded as the answer).
+func (h *BoardHandler) checkLocalReplyTo(ctx context.Context, body *externalMessage, target string) answer {
+	bad := func(msg string) answer { return func(w http.ResponseWriter) { errBadRequest(w, msg) } }
+	orig, err := h.bs.GetMessageByID(ctx, body.FromBoard, body.ReplyTo)
+	if err != nil || orig == nil {
+		return bad(fmt.Sprintf("--reply-to %d is not a message on board %q", body.ReplyTo, body.FromBoard))
+	}
+	var o board.MessageOrigin
+	if len(orig.External) == 0 || json.Unmarshal(orig.External, &o) != nil || o.Direction != "inbound" || !strings.EqualFold(o.Board, target) || o.ServerID != store.LocalServerID {
+		return bad(fmt.Sprintf("message #%d is not one that board %q sent to this board", body.ReplyTo, target))
+	}
+	return nil
 }

@@ -457,6 +457,11 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		return
 	}
 	nudge := nudgeText(sub.Project, unread, health)
+	if !health && latestID > 0 { // the newest unread message is from another board: the nudge says how to answer it (#9054)
+		if m, merr := n.boardStore.GetMessageByID(ctx, sub.Project, latestID); merr == nil && m != nil && m.ReplyWith != "" {
+			nudge += fmt.Sprintf(" Message #%d is from another board. %s", m.ID, m.ReplyWith)
+		}
+	}
 	// A nudge about a message that tags the agent is a mention: typed in mid-turn when the
 	// gate follows the signals; a routine one waits for the turn to end (#3578). Decided
 	// from the unread messages themselves (confirmed tags) for every subscriber, never from

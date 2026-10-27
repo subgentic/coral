@@ -396,6 +396,9 @@ func printMessages(messages []map[string]any) {
 		content, _ := m["content"].(string)
 		fmt.Printf("[%s] %s: %s\n", ts, role, content)
 		printAskLines(m)
+		if line, _ := m["reply_with"].(string); line != "" { // a message from another board: how to answer it, as the server built it (#9054)
+			fmt.Printf("  (%s)\n", clitext.Clean(line))
+		}
 		if n, ok := m["task_id"].(float64); ok && n > 0 { // a person's reply on a task (#7703): say how the answer reaches the person
 			fmt.Printf("  (a reply on task #%.0f: answer it on the task with  coral-board post --task %.0f \"...\")\n", n, n)
 		}
