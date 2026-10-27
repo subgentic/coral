@@ -46,6 +46,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/sessions/live/{name}/memory":              "list an agent's instruction and memory files",
 	"GET /api/sessions/live/{name}/memory/{id}":         "read one of an agent's instruction or memory files",
 	"GET /api/board/{project}/spend":                    "read a team's tokens, commits, tool calls and task times (it names every member and their work)",
+	"GET /api/analytics/efficiency":                     "read the teams' tokens per commit and task times, grouped by agent, model, branch and task (it names every agent and their work)",
 	"POST /api/worktrees/remove":                        "remove a kept worktree",
 	"POST /api/workflows":                               "create a workflow",
 	"PUT /api/workflows/{workflowID}":                   "change a workflow",

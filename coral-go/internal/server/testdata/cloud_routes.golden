@@ -43,6 +43,7 @@ GET /api/agent/ui view
 GET /api/agent/ui/{id}/content view
 GET /api/agent/ui/{id}/events view
 GET /api/agents/models launch
+GET /api/analytics/efficiency never
 GET /api/artifacts view
 GET /api/artifacts/series/{series_id} never
 GET /api/artifacts/series/{series_id}/versions never
