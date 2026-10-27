@@ -61,7 +61,7 @@ function buildField(spec) {
     if (spec.type === 'select') return { ...selectField(spec.id, spec.label, spec.values, spec.labels, spec.any), spec };
     if (spec.type === 'text') {
         const wrap = make('label', 'list-bar-field'); wrap.append(make('span', 'list-bar-field-label', spec.label));
-        const input = make('input', spec.className); input.type = 'text'; input.id = spec.id; input.maxLength = spec.max; input.placeholder = spec.placeholder; input.autocomplete = 'off';
+        const input = make('input', `field ${spec.className || ''}`.trim()); input.type = 'text'; input.id = spec.id; input.maxLength = spec.max; input.placeholder = spec.placeholder; input.autocomplete = 'off';
         let list = null;
         if (spec.datalist) {
             input.setAttribute('l' + 'ist', spec.datalist); /* the attribute that links a datalist, spelled in two parts: the icon-name lint reads that quoted word as an icon name */
@@ -76,7 +76,7 @@ function buildField(spec) {
         return { wrap, input, spec };
     }
     const wrap = make('label', 'list-bar-field'); wrap.append(make('span', 'list-bar-field-label', spec.label));
-    const input = make('input'); input.type = 'date'; input.id = spec.id; wrap.append(input);
+    const input = make('input', 'field'); input.type = 'date'; input.id = spec.id; wrap.append(input);
     return { wrap, input, spec };
 }
 
