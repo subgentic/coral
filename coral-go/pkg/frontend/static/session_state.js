@@ -4,6 +4,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { modelDisplayName } from './model_names.js';
 import { sessionLevel, typeName } from './model_labels.js';
 import { escapeHtml, escapeAttr } from './utils.js';
+import { factsHtml } from './facts.js';
 import { formatTokens, formatCost } from './format.js';
 import { getCachedAgentAvailability } from './team_availability.js';
 import { isGoneAsleep } from './terminal_gone.js';
@@ -216,33 +217,29 @@ export function buildSessionTooltip(s) {
     const branch = (_repoBranch(s.repo_name, s.branch) || "—") + (s.git_state?.is_worktree ? " (worktree)" : "");
     const agent = s.agent_type || "claude";
 
-    let rows = [
-        `<tr><td class="tt-label">State</td><td class="tt-value tt-state-${stateLabel.toLowerCase().replace(/ /g, '-')}">${escapeHtml(stateLabel)}</td></tr>`,
-        `<tr><td class="tt-label">Last action</td><td class="tt-value">${escapeHtml(lastAction)}</td></tr>`,
-        `<tr><td class="tt-label">Goal</td><td class="tt-value">${escapeHtml(goal)}</td></tr>`,
-        `<tr><td class="tt-label">Status</td><td class="tt-value">${escapeHtml(status)}</td></tr>`,
-        `<tr><td class="tt-label">Branch</td><td class="tt-value">${escapeHtml(branch)}</td></tr>`,
-        `<tr><td class="tt-label">Agent</td><td class="tt-value">${escapeHtml(agent)}</td></tr>`,
+    const rows = [
+        { label: 'State', text: stateLabel, cls: `tt-state-${stateLabel.toLowerCase().replace(/ /g, '-')}` },
+        { label: 'Last action', text: lastAction },
+        { label: 'Goal', text: goal },
+        { label: 'Status', text: status },
+        { label: 'Branch', text: branch },
+        { label: 'Agent', text: agent },
     ];
-    if (hasWorkingDisplayHint(s)) rows.push('<tr><td class="tt-label">Permission</td><td class="tt-value">Codex’s terminal shows activity. Permission is not confirmed resolved; queued messages remain held.</td></tr>');
+    if (hasWorkingDisplayHint(s)) rows.push({ label: 'Permission', text: 'Codex’s terminal shows activity. Permission is not confirmed resolved; queued messages remain held.' });
     // The model the agent is using now, from the CLI's own signals; no row while it is unknown (#4589).
     const modelName = modelDisplayName(s.model, s.model_display);
-    if (modelName) rows.push(`<tr><td class="tt-label">Model</td><td class="tt-value" title="${escapeAttr(typeof s.model === 'string' ? s.model.trim() : '')}">${escapeHtml(modelName)}</td></tr>`);
+    if (modelName) rows.push({ label: 'Model', text: modelName, title: typeof s.model === 'string' ? s.model.trim() : '' });
     // The thinking (effort) level, as the chat bar's chip says it; "requested" while only the level it was started with is known; no row when none is on record.
     const level = sessionLevel(s);
-    if (level) rows.push(`<tr><td class="tt-label">Thinking</td><td class="tt-value">${escapeHtml(level.name)}${level.requested ? ' (as started)' : ''}</td></tr>`);
+    if (level) rows.push({ label: 'Thinking', text: `${level.name}${level.requested ? ' (as started)' : ''}` });
     // Context window usage moved out of the row (AGENT_LIST_COMPACT): explicit
     // null (unknown model) must read "unknown", never 0% or full.
     const ctxText = (s.context_pct === null || s.context_pct === undefined)
         ? 'unknown'
         : (s.context_window ? `${s.context_pct}% of ${formatTokens(s.context_window)}` : `${s.context_pct}%`);
-    rows.push(`<tr><td class="tt-label">Context</td><td class="tt-value">${escapeHtml(ctxText)}</td></tr>`);
-    if (s.working_directory) {
-        rows.push(`<tr><td class="tt-label">Directory</td><td class="tt-value" title="${escapeAttr(s.working_directory)}">${escapeHtml(_shortPath(s.working_directory, 3))}</td></tr>`);
-    }
-    if (s.changed_file_count > 0) {
-        rows.push(`<tr><td class="tt-label">Files changed</td><td class="tt-value">${s.changed_file_count}</td></tr>`);
-    }
+    rows.push({ label: 'Context', text: ctxText });
+    if (s.working_directory) rows.push({ label: 'Directory', text: _shortPath(s.working_directory, 3), title: s.working_directory });
+    if (s.changed_file_count > 0) rows.push({ label: 'Files changed', text: String(s.changed_file_count) });
     if (s.token_cost_usd > 0 || s.token_input > 0) {
         const tokIn = formatTokens(s.token_input || 0);
         const tokOut = formatTokens(s.token_output || 0);
@@ -250,15 +247,15 @@ export function buildSessionTooltip(s) {
         let tokenText = `${tokIn} in / ${tokOut} out`;
         if (tokCache > 0) tokenText += ` / ${formatTokens(tokCache)} cache`;
         if (s.token_cost_usd > 0) tokenText += ` · ${formatCost(s.token_cost_usd)}`;
-        rows.push(`<tr><td class="tt-label">Tokens</td><td class="tt-value">${tokenText}</td></tr>`);
+        rows.push({ label: 'Tokens', html: tokenText });
     }
     if (s.board_project) {
         const ttUnread = sessionUnreadCount(s);
         const unreadBadge = ttUnread > 0 ? ` <span class="tt-unread">(${ttUnread} unread)</span>` : '';
-        rows.push(`<tr><td class="tt-label">Board</td><td class="tt-value">${escapeHtml(keyLabel(sessionTeamKey(s)))}${unreadBadge}</td></tr>`);
-        rows.push(`<tr><td class="tt-label">Role</td><td class="tt-value">${escapeHtml(s.board_job_title)}</td></tr>`);
+        rows.push({ label: 'Board', html: `${escapeHtml(keyLabel(sessionTeamKey(s)))}${unreadBadge}` });
+        rows.push({ label: 'Role', text: s.board_job_title });
     }
-    return `<table class="session-tooltip-table">${rows.join("")}</table>`;
+    return factsHtml(rows, { cls: 'session-tooltip-facts' });
 }
 
 export function getDotClass(s) {
