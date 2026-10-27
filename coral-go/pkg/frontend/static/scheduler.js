@@ -191,9 +191,9 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         <div class="item-bar sched-actions">
             <div class="sched-more">
                 <button class="btn btn-small sched-more-btn" type="button" data-on-click="job-more" aria-expanded="false" aria-controls="${escapeAttr(moreId)}" aria-label="More for ${escapeAttr(job.name)}">More</button>
-                <div class="sched-more-menu" id="${escapeAttr(moreId)}" hidden>
-                    ${job.enabled ? `<button class="btn btn-small" type="button" data-on-click="job-toggle" data-job-id="${Number(job.id)}" aria-label="Pause ${escapeAttr(job.name)}">Pause</button>` : ''}
-                    <button class="btn btn-small btn-warning sched-delete" type="button" data-on-click="job-delete" data-job-id="${Number(job.id)}" aria-label="Delete ${escapeAttr(job.name)}">Delete</button>
+                <div class="menu sched-more-menu" id="${escapeAttr(moreId)}" hidden>
+                    ${job.enabled ? `<button class="menu-item" type="button" data-on-click="job-toggle" data-job-id="${Number(job.id)}" aria-label="Pause ${escapeAttr(job.name)}">Pause</button>` : ''}
+                    <button class="menu-item menu-item-danger sched-delete" type="button" data-on-click="job-delete" data-job-id="${Number(job.id)}" aria-label="Delete ${escapeAttr(job.name)}">Delete</button>
                 </div>
             </div>
             <button class="btn btn-small" data-on-click="job-edit" data-job-id="${Number(job.id)}">Edit</button>

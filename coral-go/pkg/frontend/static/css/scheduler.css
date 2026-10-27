@@ -236,12 +236,10 @@
 .sched-settings { margin: 6px 0 12px; }
 .sched-settings > summary { cursor: pointer; color: var(--text-secondary); min-height: 28px; font-size: var(--fs-md); font-weight: 500; }
 .sched-more { position: relative; }
-.sched-more-menu { display: flex; flex-direction: column; gap: 6px; position: absolute; right: 0; bottom: calc(100% + 4px); z-index: 5; min-width: 120px; padding: 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
-.sched-more-menu[hidden] { display: none; }
-.sched-more-menu .btn { width: 100%; margin: 0; }
+.sched-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .item-bar .btn { margin: 0; } /* the bar's gap is the bar's own */
 @media (pointer: coarse), (max-width: 767px) {
-    .sched-actions .btn, .sched-more-menu .btn { min-height: var(--control-touch-height, 44px); }
+    .sched-actions .btn { min-height: var(--control-touch-height, 44px); }
     .sched-settings > summary { min-height: var(--control-touch-height, 44px); }
 }
 

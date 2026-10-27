@@ -8,8 +8,7 @@
     ".chat-file-menu": 1
   },
   "css/cloud.css": {
-    ".cloud-account-menu": 1,
-    ".cs-more-menu": 1
+    ".cloud-account-menu": 1
   },
   "css/command-pane.css": {
     ".send-btn-menu": 1,
@@ -23,13 +22,7 @@
     ".nav-more-menu": 1,
     ".top-bar-settings-menu": 1
   },
-  "css/scheduler.css": {
-    ".sched-more-menu": 1
-  },
   "css/session.css": {
     ".sidebar-kebab-menu": 1
-  },
-  "css/workflows.css": {
-    ".wf-more-menu": 1
   }
 }
