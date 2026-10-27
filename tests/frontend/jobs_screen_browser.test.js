@@ -55,13 +55,13 @@ const S = `(window.__coralStatic || '/static/')`;
             }
             console.log(`${at}: one table, every job, in words`);
             assert.equal(await ev(`document.querySelectorAll('.sidebar-subtab').length`), 0, `${at}: no Active / Scheduled tabs`);
-            assert.equal(await ev(vis('#live-jobs-group')), false, `${at}: no "Running now" while nothing runs`);
-            await ev(`import(${S} + 'live_jobs.js').then(m => m.renderLiveJobs([{ id: 99, job_name: 'summarize-the-day', status: 'running', started_at: new Date().toISOString(), session_id: 'abc', agent_type: 'claude', trigger_type: 'cron' }])).then(() => true)`);
-            assert.equal(await ev(vis('#live-jobs-group')), true, `${at}: "Running now" while one runs`);
-            assert.match(await text('#live-jobs-group'), /Running now/);
+            const running = () => ev(`(document.querySelector('.view-list-item[data-key="running"]') || document.querySelector('.view-list-select option[value="running"]') || {}).textContent.replace(/\\s+/g, ' ').trim()`);
+            assert.match(await running(), /^Running now\s*\(?0\)?$/, `${at}: Running now is 0 while nothing runs`);
+            await ev(`import(${S} + 'live_jobs.js').then(m => m.renderLiveJobs([{ id: 99, job_id: 2, job_name: 'summarize-the-day', status: 'running', started_at: new Date().toISOString(), session_id: 'abc', agent_type: 'claude', trigger_type: 'cron' }])).then(() => true)`);
+            await waitFor(`/1\\)?$/.test((document.querySelector('.view-list-item[data-key="running"]') || document.querySelector('.view-list-select option[value="running"]') || {}).textContent || '')`, `${at}: Running now counts the job that runs`, 4000);
             assert.equal(await text('#live-jobs-status'), '1 job running now', `${at}: said once, politely`);
             await ev(`import(${S} + 'live_jobs.js').then(m => m.renderLiveJobs([])).then(() => true)`);
-            assert.equal(await ev(vis('#live-jobs-group')), false);
+            assert.match(await running(), /^Running now\s*\(?0\)?$/, `${at}: and 0 again when it ends`);
             assert.equal(await text('#live-jobs-status'), '', `${at}: and cleared when it ends`);
             await shot(`jobs-list-${w}`);
 
