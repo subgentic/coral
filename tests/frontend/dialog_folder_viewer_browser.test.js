@@ -36,6 +36,16 @@ const MD = '# Report title\n\nSome **bold** text.\n\n## A second heading\n\n- on
             const a = await row('launch-dir', 'btn-browse');
             assert.ok(a && a.sameRow && a.right && a.text === 'Browse', at + 'New agent: Browse is at the folder input\'s right: ' + JSON.stringify(a));
             await shot(`launch-agent-${w}`);
+            // a redraw of the field's values does not put Browse back under it (the form is drawn once; reset and a reopened dialog keep the row, #9489's LOW)
+            await ev(`import((window.__coralStatic || '/static/') + 'agent_form.js').then(m => m.agentForm().reset()).then(() => true)`);
+            const a2 = await row('launch-dir', 'btn-browse');
+            assert.ok(a2 && a2.sameRow && a2.right, at + 'New agent: after the form is reset, Browse is still at the input\'s right: ' + JSON.stringify(a2));
+            await ev(`window.hideLaunchModal(); window.showLaunchModal(); true`);
+            await waitFor(`!!document.getElementById('launch-modal') && getComputedStyle(document.getElementById('launch-modal')).display !== 'none'`, at + 'the chooser again', 8000);
+            await ev(`(() => { const c = [...document.querySelectorAll('#launch-modal button')].find(b => /new agent/i.test(b.textContent)); c.click(); return true; })()`);
+            await waitFor(`!!document.getElementById('launch-dir') && document.getElementById('launch-dir').getClientRects().length > 0`, at + 'New agent again', 8000);
+            const a3 = await row('launch-dir', 'btn-browse');
+            assert.ok(a3 && a3.sameRow && a3.right, at + 'New agent: after closing and reopening the dialog, the same: ' + JSON.stringify(a3));
             await ev(`document.querySelector('#launch-modal .launch-back-btn, #launch-agent-back, [data-on-click="m-select-launch-type"][data-arg="back"]').click(); true`);
             await ev(`(() => { const c = [...document.querySelectorAll('#launch-modal button')].find(b => /new team/i.test(b.textContent)); if (c) c.click(); return true; })()`);
             await waitFor(`!!document.getElementById('launch-team-dir') && document.getElementById('launch-team-dir').getClientRects().length > 0`, at + 'New team step 1', 8000);
