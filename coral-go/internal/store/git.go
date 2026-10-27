@@ -2,7 +2,11 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"strings"
+
 	"github.com/subgentic/coral/internal/clitext"
 
 	"github.com/jmoiron/sqlx"
@@ -38,6 +42,22 @@ type GitSnapshot struct {
 	Ahead      int    `db:"ahead" json:"ahead,omitempty"`
 	Behind     int    `db:"behind" json:"behind,omitempty"`
 	DirtyCount int    `db:"dirty_count" json:"dirty_count,omitempty"`
+	// AuthorName and AuthorHash are who made the commit (a name, and IdentityHash of their email); IdentName and IdentHash are the git identity configured in the checkout the snapshot was taken in
+	// (#8996). None is served: they only let the efficiency read tell whose commit it is.
+	AuthorName string `db:"author_name" json:"-"`
+	AuthorHash string `db:"author_hash" json:"-"`
+	IdentName  string `db:"ident_name" json:"-"`
+	IdentHash  string `db:"ident_hash" json:"-"`
+}
+
+// IdentityHash is a short hash of a git email address (lower-cased, trimmed): enough to tell whether two commits share an author, and never the address itself. "" for no address.
+func IdentityHash(email string) string {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(email))
+	return hex.EncodeToString(sum[:8])
 }
 
 // FileAgent records which agent last edited a file and when.
@@ -83,34 +103,37 @@ func (s *GitStore) UpsertGitSnapshot(ctx context.Context, snap *GitSnapshot) err
 	// characters that reorder or hide text (U+202E) are taken out before they are stored, the one path every snapshot goes through (#6832).
 	snap.CommitSubject = clitext.Clean(snap.CommitSubject)
 	snap.Branch = clitext.CleanName(snap.Branch)
+	snap.AuthorName = clitext.CleanName(snap.AuthorName)
+	snap.IdentName = clitext.CleanName(snap.IdentName)
 	return s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
 		const cols = `agent_name, agent_type, working_directory, branch, commit_hash,
 		  commit_subject, commit_timestamp, session_id, remote_url, recorded_at, pr_number,
-		  is_worktree, base_branch, ahead, behind, dirty_count`
+		  is_worktree, base_branch, ahead, behind, dirty_count, author_name, author_hash, ident_name, ident_hash`
 		args := []interface{}{snap.AgentName, snap.AgentType, snap.WorkingDirectory, snap.Branch,
 			snap.CommitHash, snap.CommitSubject, snap.CommitTimestamp,
 			snap.SessionID, snap.RemoteURL, now, snap.PRNumber,
-			snap.Worktree, snap.BaseBranch, snap.Ahead, snap.Behind, snap.DirtyCount}
+			snap.Worktree, snap.BaseBranch, snap.Ahead, snap.Behind, snap.DirtyCount,
+			snap.AuthorName, snap.AuthorHash, snap.IdentName, snap.IdentHash}
 		var err error
 		if snap.SessionID == nil {
 			_, err = tx.ExecContext(ctx,
 				`INSERT INTO git_snapshots (`+cols+`)
-				 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+				 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 				 WHERE NOT EXISTS (SELECT 1 FROM git_snapshots WHERE session_id IS NULL AND agent_name = ? AND commit_hash = ?)`,
 				append(args, snap.AgentName, snap.CommitHash)...)
 		} else {
 			// Insert or ignore (dedup on session_id + commit_hash)
 			_, err = tx.ExecContext(ctx,
 				`INSERT OR IGNORE INTO git_snapshots (`+cols+`)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, args...)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, args...)
 		}
 		if err != nil {
 			return err
 		}
 
 		// Always update branch/working_directory on the latest row for this session
-		updateSQL := "UPDATE git_snapshots SET branch = ?, working_directory = ?, recorded_at = ?, is_worktree = ?, base_branch = ?, ahead = ?, behind = ?, dirty_count = ?"
-		uargs := []interface{}{snap.Branch, snap.WorkingDirectory, now, snap.Worktree, snap.BaseBranch, snap.Ahead, snap.Behind, snap.DirtyCount}
+		updateSQL := "UPDATE git_snapshots SET branch = ?, working_directory = ?, recorded_at = ?, is_worktree = ?, base_branch = ?, ahead = ?, behind = ?, dirty_count = ?, author_name = COALESCE(NULLIF(author_name, ''), ?), author_hash = COALESCE(NULLIF(author_hash, ''), ?), ident_name = ?, ident_hash = ?"
+		uargs := []interface{}{snap.Branch, snap.WorkingDirectory, now, snap.Worktree, snap.BaseBranch, snap.Ahead, snap.Behind, snap.DirtyCount, snap.AuthorName, snap.AuthorHash, snap.IdentName, snap.IdentHash}
 		if snap.RemoteURL != nil {
 			updateSQL += ", remote_url = ?"
 			uargs = append(uargs, *snap.RemoteURL)

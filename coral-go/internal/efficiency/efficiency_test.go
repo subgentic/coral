@@ -233,7 +233,7 @@ func TestBothMeasuresLeaveOutUnmeasuredAndUnknownProviders(t *testing.T) {
 		r, err := Compute(m, Task, in)
 		require.NoError(t, err)
 		assert.Len(t, r.Groups, 1, m)
-		assert.Equal(t, []string{"gemini"}, r.Unmeasured, m)
+		assert.Equal(t, []string{"gemini", Unknown}, r.Unmeasured, m, "a task of no known session is named too (#8999)")
 	}
 }
 

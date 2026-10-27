@@ -298,7 +298,7 @@ func TestEfficiencyBothMeasuresLeaveOutTasksTheyCannotRead(t *testing.T) {
 		code, body := e.get(t, "metric="+metric+"&group_by=task&range=24h")
 		require.Equal(t, http.StatusOK, code)
 		assert.Len(t, groupsOf(t, body), 1, metric+": only the claude task")
-		assert.Equal(t, []any{"gemini"}, body["unmeasured"], metric)
+		assert.Equal(t, []any{"gemini", "unknown"}, body["unmeasured"], metric+": the task of no recorded session is named too")
 	}
 	_, body := e.get(t, "metric=task_time&group_by=provider&range=24h")
 	assert.EqualValues(t, 1, body["total"].(map[string]any)["n"])
@@ -357,4 +357,39 @@ func TestEfficiencyAFailedReadSaysNothingOfTheStore(t *testing.T) {
 	code, body := e.get(t, "metric=task_time&group_by=team&range=24h")
 	assert.Equal(t, http.StatusInternalServerError, code)
 	assert.Equal(t, "the efficiency read failed", body["error"])
+}
+
+// #8996 (H4c): a session that pulled a teammate's commit before the author's session polled it is not credited: the commit goes to the session whose identity its author matches.
+func TestEfficiencyAPulledCommitIsNotCreditedToTheSessionThatPulledIt(t *testing.T) {
+	e := newEffEnv(t)
+	ctx := context.Background()
+	db, err := storetest.Open(t, e.storePath)
+	require.NoError(t, err)
+	gs := store.NewGitStore(db)
+	at := e.now.Add(-30 * time.Minute).Format(time.RFC3339)
+	snap := func(sid, typ, name string) {
+		s := sid
+		require.NoError(t, gs.UpsertGitSnapshot(ctx, &store.GitSnapshot{AgentName: name, AgentType: typ, WorkingDirectory: "/w", Branch: "main", CommitHash: "pulled1", CommitSubject: "Beta's work", CommitTimestamp: &at, SessionID: &s,
+			AuthorName: "Beta Dev", AuthorHash: store.IdentityHash("beta@example.invalid"), IdentName: "Operator", IdentHash: store.IdentityHash("op@example.invalid")}))
+	}
+	snap(effSessA, "claude", "Alpha Dev") // it pulled the commit and polled it first
+	snap(effSessB, "codex", "Beta Dev")   // the author's session
+	_, body := e.get(t, "metric=tokens_per_commit&group_by=agent&range=24h")
+	g := groupsOf(t, body)
+	assert.EqualValues(t, 2, g["Alpha Dev"]["n"], "c1 and c2, not the pulled commit")
+	assert.EqualValues(t, 3, g["Beta Dev"]["n"], "c3, c4 and the commit it made")
+}
+
+// #8999: a sent-back task's commits are those of every round of its work, as its tokens and time are.
+func TestEfficiencyASentBackTasksCommitsCoverAllItsRounds(t *testing.T) {
+	e := newEffEnv(t)
+	id := e.finishedTask(t, "sent back once", effSessA, 50*time.Minute, 20*time.Minute) // the last round holds no commit
+	raw, err := sql.Open("sqlite", e.boardPath+"?_pragma=busy_timeout(5000)")
+	require.NoError(t, err)
+	defer raw.Close()
+	first := fmt.Sprintf(`[["%s","%s"]]`, e.now.Add(-100*time.Minute).Format("2006-01-02T15:04:05Z"), e.now.Add(-80*time.Minute).Format("2006-01-02T15:04:05Z")) // c2 (90 min ago) is in the first round
+	_, err = raw.Exec(`UPDATE board_tasks SET work_windows = ?, work_before_seconds = 1200 WHERE id = ?`, first, id)
+	require.NoError(t, err)
+	_, body := e.get(t, "metric=tokens_per_commit&group_by=task&range=24h")
+	assert.EqualValues(t, 1, groupsOf(t, body)[fmt.Sprint(id)]["n"], "the first round's commit")
 }

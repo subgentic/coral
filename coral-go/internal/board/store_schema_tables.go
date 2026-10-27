@@ -78,6 +78,8 @@ func (s *Store) createBoardTaskTables(ctx context.Context) error {
 		-- must stay identical to doneTaskStatusSQL for SQLite to use this partial index.
 		CREATE INDEX IF NOT EXISTS idx_board_tasks_done ON board_tasks(board_id, completed_at, id)
 			WHERE status IN ('completed', 'skipped');
+		-- The Analytics view's efficiency read lists the tasks completed in a window across every board (#8999): the board id is not in its WHERE.
+		CREATE INDEX IF NOT EXISTS idx_board_tasks_completed_at ON board_tasks(completed_at) WHERE status = 'completed';
 		CREATE TABLE IF NOT EXISTS task_amendments (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			task_id INTEGER NOT NULL REFERENCES board_tasks(id),

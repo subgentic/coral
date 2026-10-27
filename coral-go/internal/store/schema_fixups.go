@@ -150,6 +150,12 @@ var columnMigrations = []struct {
 	{"git_snapshots", "ahead", "INTEGER DEFAULT 0"},
 	{"git_snapshots", "behind", "INTEGER DEFAULT 0"},
 	{"git_snapshots", "dirty_count", "INTEGER DEFAULT 0"},
+	// who made the commit, and the git identity of the checkout the snapshot was taken in (#8996): a name, and a short hash of the email (never the email), so the efficiency read credits a commit
+	// only to a session whose identity it matches
+	{"git_snapshots", "author_name", "TEXT DEFAULT ''"},
+	{"git_snapshots", "author_hash", "TEXT DEFAULT ''"},
+	{"git_snapshots", "ident_name", "TEXT DEFAULT ''"},
+	{"git_snapshots", "ident_hash", "TEXT DEFAULT ''"},
 	{"git_changed_files", "diff_mode", "TEXT DEFAULT ''"},
 	// How long the activity took, and the id it is known by at its source
 	// (tool_use_id for tool calls, API request id for thinking turns).

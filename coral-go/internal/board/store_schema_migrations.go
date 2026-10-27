@@ -42,6 +42,8 @@ func (s *Store) migrateBoardColumns(ctx context.Context) {
 		"ALTER TABLE board_tasks ADD COLUMN claim_thinking TEXT",
 		// the seconds of work done in the rounds before the last one: a send-back keeps what the author had already spent (#8968); NULL: none
 		"ALTER TABLE board_tasks ADD COLUMN work_before_seconds REAL",
+		// the claim and hand-in of each of those rounds, as JSON [[claimed, submitted], ...]: the commits of every round are the task's (#8999)
+		"ALTER TABLE board_tasks ADD COLUMN work_windows TEXT",
 		"ALTER TABLE board_subscribers ADD COLUMN session_joined_at TEXT",
 	}
 	for _, ddl := range alterColumns {

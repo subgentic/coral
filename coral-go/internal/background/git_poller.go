@@ -316,6 +316,10 @@ func snapshotFor(agent AgentInfo, workdir string, g *gitInfo, prNumber int) *sto
 		Ahead:            g.Ahead,
 		Behind:           g.Behind,
 		DirtyCount:       g.DirtyCount,
+		AuthorName:       g.AuthorName,
+		AuthorHash:       g.AuthorHash,
+		IdentName:        g.IdentName,
+		IdentHash:        g.IdentHash,
 	}
 }
 
@@ -373,6 +377,10 @@ func (p *GitPoller) discoverAgents(ctx context.Context) ([]AgentInfo, error) {
 // gitInfo holds parsed git query results.
 type gitInfo struct {
 	Branch          string
+	AuthorName      string // who made the tip commit, and a hash of their email (never the email); the git identity configured in the checkout (#8996)
+	AuthorHash      string
+	IdentName       string
+	IdentHash       string
 	CommitHash      string
 	CommitSubject   string
 	CommitTimestamp string
@@ -405,14 +413,18 @@ func queryGit(ctx context.Context, workdir string) (*gitInfo, error) {
 
 	// Get latest commit
 	t1 := time.Now()
-	out, err = gitutil.Command(ctx, workdir, "log", "-1", "--format=%H|%s|%aI").Output()
+	out, err = gitutil.Command(ctx, workdir, "log", "-1", "--format=%H%x1f%s%x1f%aI%x1f%an%x1f%ae").Output()
 	logger.Debug("git log", "duration_ms", time.Since(t1).Milliseconds())
 	if err != nil {
 		return nil, err
 	}
-	parts := strings.SplitN(strings.TrimSpace(string(out)), "|", 3)
+	parts := strings.Split(strings.TrimSpace(string(out)), "\x1f")
 	if len(parts) < 3 {
 		return nil, fmt.Errorf("unexpected git log format")
+	}
+	var authorName, authorEmail string
+	if len(parts) >= 5 {
+		authorName, authorEmail = parts[3], parts[4]
 	}
 
 	// Get remote URL (best-effort)
@@ -428,7 +440,20 @@ func queryGit(ctx context.Context, workdir string) (*gitInfo, error) {
 		}
 	}
 
+	// the identity a commit made here without its own would carry (best-effort: a checkout with none configured has none)
+	var identName, identEmail string
+	if o, err := gitutil.Command(ctx, workdir, "config", "user.name").Output(); err == nil {
+		identName = strings.TrimSpace(string(o))
+	}
+	if o, err := gitutil.Command(ctx, workdir, "config", "user.email").Output(); err == nil {
+		identEmail = strings.TrimSpace(string(o))
+	}
+
 	info := &gitInfo{
+		AuthorName:      authorName,
+		AuthorHash:      store.IdentityHash(authorEmail),
+		IdentName:       identName,
+		IdentHash:       store.IdentityHash(identEmail),
 		Branch:          branch,
 		CommitHash:      parts[0],
 		CommitSubject:   parts[1],

@@ -47,6 +47,9 @@ type EfficiencyCommit struct {
 	Hash string
 	At   time.Time // the commit's own (author) time: a rebased, amended or cherry-picked copy keeps it
 	Seen []CommitSighting
+	// AuthorName and AuthorHash are who made it (a name, and IdentityHash of their email); empty for a commit snapshotted before they were recorded.
+	AuthorName string
+	AuthorHash string
 }
 
 // CommitSighting is one session's snapshot of a commit.
@@ -55,6 +58,26 @@ type CommitSighting struct {
 	AgentName string
 	AgentType string
 	Branch    string
+	// IdentName and IdentHash are the git identity configured in the checkout the session snapshotted it in; empty when none was recorded.
+	IdentName string
+	IdentHash string
+}
+
+// MadeBy says whether the commit is one the sighting's session could have made, by who made it: its author is the agent (by the agent's name, as agents commit under their role) or the identity
+// configured in the checkout (by name or by email hash). A commit whose author was never recorded can be anyone's: it is credited as before.
+func (c EfficiencyCommit) MadeBy(sg CommitSighting, agentName string) bool {
+	if c.AuthorName == "" && c.AuthorHash == "" {
+		return true
+	}
+	if c.AuthorHash != "" && c.AuthorHash == sg.IdentHash {
+		return true
+	}
+	for _, name := range []string{sg.AgentName, agentName, sg.IdentName} {
+		if name = strings.TrimSpace(name); name != "" && strings.EqualFold(name, strings.TrimSpace(c.AuthorName)) {
+			return true
+		}
+	}
+	return false
 }
 
 // EfficiencyCommits lists the commits whose own time is in [since, until). A commit is one however many hashes it has had: a rebase, an amend that keeps the message or a cherry-pick gives a new hash with the
@@ -71,8 +94,13 @@ func (s *SessionStore) EfficiencyCommits(ctx context.Context, since, until time.
 		AgentType string  `db:"agent_type"`
 		Branch    string  `db:"branch"`
 		At        *string `db:"commit_timestamp"`
+		Author    string  `db:"author_name"`
+		AuthorH   string  `db:"author_hash"`
+		IdentName string  `db:"ident_name"`
+		IdentHash string  `db:"ident_hash"`
 	}
-	if err := s.db.Reader().SelectContext(ctx, &rows, `SELECT id, commit_hash, COALESCE(commit_subject, '') AS commit_subject, session_id, agent_name, agent_type, branch, commit_timestamp FROM git_snapshots
+	if err := s.db.Reader().SelectContext(ctx, &rows, `SELECT id, commit_hash, COALESCE(commit_subject, '') AS commit_subject, session_id, agent_name, agent_type, branch, commit_timestamp,
+		COALESCE(author_name, '') AS author_name, COALESCE(author_hash, '') AS author_hash, COALESCE(ident_name, '') AS ident_name, COALESCE(ident_hash, '') AS ident_hash FROM git_snapshots
 		WHERE session_id IS NOT NULL AND session_id != '' AND commit_timestamp IS NOT NULL AND recorded_at >= ? ORDER BY id`, since.UTC().Format(ISOFormat)); err != nil {
 		return nil, err
 	}
@@ -90,18 +118,23 @@ func (s *SessionStore) EfficiencyCommits(ctx context.Context, since, until time.
 		if at.Before(since) || !at.Before(until) {
 			continue
 		}
-		sighting := CommitSighting{SessionID: r.SessionID, AgentName: r.AgentName, AgentType: r.AgentType, Branch: r.Branch}
+		sighting := CommitSighting{SessionID: r.SessionID, AgentName: r.AgentName, AgentType: r.AgentType, Branch: r.Branch, IdentName: r.IdentName, IdentHash: r.IdentHash}
+		// the copies of a commit share its subject, author time and author; two commits that share the first two but not the author are two (#8999)
+		copyKey := "s|" + at.Format(time.RFC3339) + "|" + r.AuthorH + "|" + r.Subject
 		i, ok := byKey["h|"+r.Hash]
 		if !ok && strings.TrimSpace(r.Subject) != "" {
-			i, ok = byKey["s|"+at.Format(time.RFC3339)+"|"+r.Subject]
+			i, ok = byKey[copyKey]
 		}
 		if !ok {
 			out = append(out, EfficiencyCommit{Hash: r.Hash, At: at})
 			i = len(out) - 1
 		}
+		if out[i].AuthorName == "" && out[i].AuthorHash == "" {
+			out[i].AuthorName, out[i].AuthorHash = r.Author, r.AuthorH
+		}
 		byKey["h|"+r.Hash] = i
 		if strings.TrimSpace(r.Subject) != "" {
-			byKey["s|"+at.Format(time.RFC3339)+"|"+r.Subject] = i
+			byKey[copyKey] = i
 		}
 		dup := false
 		for _, e := range out[i].Seen {
