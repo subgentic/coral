@@ -165,6 +165,16 @@ export function lastWords(run) {
     return { completed: 'last run passed', failed: 'last run failed', killed: 'last run stopped', running: 'running now', pending: 'waiting to start' }[run.status] || `last run ${run.status}`;
 }
 
+/** A last result as one chip word, the same words as the Runs table and the Workflows list: "Passed", "Failed", "Stopped", "Running", "Waiting to start", "Result not seen". What more there is to say (why a run failed to start) is the chip's tooltip, not its text. A job that never ran has no chip: null (#9456). */
+export function lastChip(run) {
+    if (!run) return null;
+    if (unseen(run)) return { word: 'Result not seen', detail: 'The agent ended while Coral was stopped, so the result was not seen' };
+    if (startFail(run)) return { word: 'Failed', detail: `The last run failed: ${startFail(run)}` };
+    if (restarted(run) && !run.error_msg) return { word: 'Failed', detail: 'The last run failed: Coral restarted' };
+    const word = { completed: 'Passed', failed: 'Failed', killed: 'Stopped', running: 'Running', pending: 'Waiting to start' }[run.status];
+    return { word: word || run.status.charAt(0).toUpperCase() + run.status.slice(1), detail: '' };
+}
+
 /** A time limit in seconds as "1 hour", "10 minutes", "90 seconds". */
 export function limitWords(s) {
     const n = Number(s);
