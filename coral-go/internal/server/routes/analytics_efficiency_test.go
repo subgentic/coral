@@ -45,7 +45,9 @@ func newEffEnv(t *testing.T) *effEnv {
 	bs, err := boardtest.Open(boardPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { bs.Close() })
-	now := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
+	// The real clock, not a fixed date: a usage row recorded within 15 minutes of the real now is a live call, and takes its session's thinking level (liveCall), so a fixed date made this test fail for
+	// a quarter of an hour of every day (09:00 to 09:15 UTC with the rows three hours before it). The rows here are all at least an hour old.
+	now := time.Now().UTC().Truncate(time.Second)
 	h := NewEfficiencyHandler(db, bs)
 	h.now = func() time.Time { return now }
 	ss := store.NewSessionStore(db)
