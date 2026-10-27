@@ -349,12 +349,13 @@
 /* The same literal board name as its list row, including digit+x (#8682). */
 .goals-detail-title, .team-page-title { font-feature-settings: "calt" 0; }
 
-/* Keep review actions together; phone team metadata wraps beneath the filename. */
+/* Keep review actions together; phone team metadata shares the second line with the review state. */
 /* Open below is the artifact's keyboard and touch target; its title does not need a duplicate button line. */
 .inbox-review-name { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; }
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
 .inbox-review-error:empty { display: none; }
+.inbox-review-metadata { display: flex; flex-wrap: wrap; gap: 0 8px; }
 .inbox-review-team { display: none; }
 .inbox-review-more { margin: 12px 0; }
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
