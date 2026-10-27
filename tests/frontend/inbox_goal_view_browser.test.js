@@ -85,6 +85,7 @@ const BASE = require('./test_base').BASE;
             }
             await ev(`document.querySelector('#inbox-page .goal-side .dt-primary').click(); true`);
             await waitFor(`location.pathname===${JSON.stringify(`/inbox/tasks/${board}/${taskId}`)} && !!document.querySelector('#inbox-page .team-task-page')`, 'a task of the goal opens in the Inbox (#8861), not on the team page');
+            assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`),'\u2190 Keep this goal in the I\u2026','the task opened from a goal says that goal (cut at 24 characters)');
             await shot(`inbox-goal-task-${width}`);
             await ev(`document.querySelector('#inbox-page .goals-back').click(); true`); // Back returns to the goal it was opened from, not the folder
             await waitFor(`location.pathname===${JSON.stringify(url)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent==='Keep this goal in the Inbox'`, 'Back returns to the goal (#8861)', 10000);

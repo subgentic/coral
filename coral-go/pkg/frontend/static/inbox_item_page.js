@@ -5,12 +5,12 @@ import { keyLabel } from './server_base.js';
 import { go } from './nav.js';
 const el = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text) e.textContent = text; return e; };
 
-export function mountInboxItem(host, { kind, team, id, back, onChanged }) {
+export function mountInboxItem(host, { kind, team, id, back, onChanged, backLabel = '' }) {
     let disposed = false, leaveBoard = null;
     const task = kind === 'tasks';
     const teamURL = build(keyRoute('team', team, task ? 'tasks' : 'messages', task ? id : null));
     const backButton = () => {
-        const b = el('button', 'goals-back', task ? '← Tasks' : '← Board history'); b.type = 'button'; b.addEventListener('click', back); return b;
+        const b = el('button', 'goals-back', `← ${backLabel || (task ? 'Tasks' : 'Board history')}`); b.type = 'button'; b.addEventListener('click', back); return b;
     };
     const links = () => {
         const row = el('div', 'goal-back-row'), link = el('a', 'goal-team-link inbox-team-link', 'Open on team page');
@@ -25,9 +25,9 @@ export function mountInboxItem(host, { kind, team, id, back, onChanged }) {
                 const full = await m.readTask(team, id);
                 if (disposed) return;
                 if (!full) throw new Error('This task could not be read.');
-                m.renderTaskPage(host, full, { project: team, backLabel: 'Tasks', onBack: back, onChanged, teamLink: teamURL,
-                    openGoal: goal => go({ view: 'inbox-goals', sub: 'goals', id: team, item: Number(goal) }), // the goal opens in the Inbox, Back returns to the task (#8861)
-                    openTask: t => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: t.id }),
+                m.renderTaskPage(host, full, { project: team, backLabel: backLabel || 'Tasks', onBack: back, onChanged, teamLink: teamURL,
+                    openGoal: goal => go({ view: 'inbox-goals', sub: 'goals', id: team, item: Number(goal) }, { from: `#${full.id} ${full.title}` }), // the goal opens in the Inbox, Back returns to the task (#8861)
+                    openTask: t => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: t.id }, { from: `#${full.id} ${full.title}` }),
                 });
             } else {
                 const m = await importOnce('./message_board.js');

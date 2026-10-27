@@ -11,7 +11,7 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const B = 'inbox-goal-' + Date.now().toString(36);
     const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => null) }))`);
-    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = require('./helpers/scene_shots')(Page); // the gate's uploaded output in CI, CORAL_SCREENSHOT_DIR locally
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -38,6 +38,13 @@ const BASE = require('./test_base').BASE;
         console.log('2. the link opens the goal in the Inbox, at its own address (#8861; the team page only through the quiet team link)');
         await ev(`document.querySelector('#group-table-view .dt-link').click(); true`);
         await waitFor(`!!document.querySelector('#inbox-page #goals-detail-title') && document.querySelector('#inbox-page #goals-detail-title').textContent === 'Ship the new installer' && location.pathname.startsWith('/inbox/goals/')`, 'the goal to open in the Inbox', 12000);
+        assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`), '\u2190 Needs you', 'the goal opened from Needs you says Needs you');
+        await shot('inbox-needs-goal-landing');
+        await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
+        await waitFor(`location.pathname === '/inbox/needs' && document.querySelectorAll('#group-table-view .dt-link').length === 1`, 'Back returns to Needs you', 10000);
+        await shot('inbox-needs-goal-back');
+        await ev(`document.querySelector('#group-table-view .dt-link').click(); true`);
+        await waitFor(`!!document.querySelector('#inbox-page #goals-detail-title') && location.pathname.startsWith('/inbox/goals/')`, 'the goal again', 12000);
         assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none'`), true, 'the team page is not on screen');
 
         console.log('3. an opened task in the Inbox shows the same link when its row carries a goal, and nothing when it has none');
