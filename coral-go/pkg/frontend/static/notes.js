@@ -126,7 +126,7 @@ function renderNotes(data) {
     if (data.is_user_edited && data.notes_md) {
         label = "";
     } else if (data.auto_summary) {
-        label = '<div style="font-size:0.6875rem;color:var(--text-muted);margin-bottom:8px;font-style:italic;">Auto-generated summary</div>';
+        label = '<div style="font-size:var(--fs-sm);color:var(--text-muted);margin-bottom:8px;font-style:italic;">Auto-generated summary</div>';
     }
 
     try {

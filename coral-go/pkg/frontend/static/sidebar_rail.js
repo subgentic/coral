@@ -20,7 +20,7 @@ function _getInitials(name) {
 const _RAIL_ICONS = {
     team: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>',
     folder: '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H8L6.5 3H3a1 1 0 0 0-1 1z"/></svg>',
-    workflow: '<span class="material-icons" style="font-size:0.8125rem" aria-hidden="true">account_tree</span>',
+    workflow: '<span class="material-icons" style="font-size:var(--fs-md)" aria-hidden="true">account_tree</span>',
 };
 
 // Role keyword -> Material icon for the rail tiles (first match wins).

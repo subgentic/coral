@@ -182,10 +182,10 @@ export async function shareAgentTeam(boardName) {
         <div class="modal-content" style="width:600px">
             <div class="modal-header">
                 <h3>Export Team: ${escapeHtml(keyLabel(boardName))}</h3>
-                <p style="color:var(--text-secondary);font-size:0.8125rem;margin:6px 0 0">${tmpl.agents.length} agents</p>
+                <p style="color:var(--text-secondary);font-size:var(--fs-md);margin:6px 0 0">${tmpl.agents.length} agents</p>
             </div>
             <div class="modal-body">
-                <textarea readonly style="width:100%;height:260px;font-family:monospace;font-size:0.75rem;resize:vertical;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:12px">${escapeHtml(jsonStr)}</textarea>
+                <textarea readonly style="width:100%;height:260px;font-family:monospace;font-size:var(--fs-base);resize:vertical;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:12px">${escapeHtml(jsonStr)}</textarea>
             </div>
             <div class="modal-actions modal-footer">
                 <button class="btn" data-action="close">Close</button>

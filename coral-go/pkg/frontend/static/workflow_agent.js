@@ -12,7 +12,7 @@ import { selectLiveSession } from './sessions.js';
 
 export async function launchWorkflowAgent() {
     const btn = document.activeElement?.closest?.('[data-on-click="wf-build-agent"]') || document.getElementById('wf-build-agent-btn'); // the empty page's button or the table head's
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons" style="font-size:1rem" aria-hidden="true">hourglass_top</span> Launching\u2026'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons" style="font-size:var(--fs-xl)" aria-hidden="true">hourglass_top</span> Launching\u2026'; }
 
     try {
         // Fetch the skill prompt
@@ -58,7 +58,7 @@ export async function launchWorkflowAgent() {
     } catch (e) {
         showToast('Failed to launch workflow agent', true);
     } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons" style="font-size:1rem" aria-hidden="true">smart_toy</span> Build with Agent'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons" style="font-size:var(--fs-xl)" aria-hidden="true">smart_toy</span> Build with Agent'; }
     }
 }
 

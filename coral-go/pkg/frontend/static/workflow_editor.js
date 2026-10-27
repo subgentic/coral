@@ -59,7 +59,7 @@ function stepsField() {
             slot.setAttribute('role', 'group'); slot.setAttribute('aria-labelledby', 'wf-steps-label');
             const list = el('div', 'wf-step-rows');
             const add = el('button', 'btn btn-sm wf-add-step-btn'); add.type = 'button';
-            const plus = el('span', 'material-icons', 'add'); plus.setAttribute('aria-hidden', 'true'); plus.style.fontSize = '0.875rem';
+            const plus = el('span', 'material-icons', 'add'); plus.setAttribute('aria-hidden', 'true'); plus.style.fontSize = 'var(--fs-lg)';
             add.append(plus, ' Add step');
             slot.append(list, add);
             const items = () => [...list.querySelectorAll('.wf-step-editor-item')];
