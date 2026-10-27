@@ -432,7 +432,7 @@ export function dataTable(cfg) {
             box.classList.toggle('dt-tiny', w < 20 * root()); // a phone at large text: the columns that say tiny: true go, so the name keeps its room (20 rem is a 390 px screen at 200% text)
         };
         new ResizeObserver(syncFold).observe(box);
-        document.fonts?.ready.then(syncFold);
+        if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(syncFold); // fonts already in: the observer's first call settles it before the paint; calling it now read the width of a box not yet laid out, a forced layout (#9450)
     }
     return { el: box, bar, selectButton, selection: () => new Set(st.selected), clear, state: st };
 }
