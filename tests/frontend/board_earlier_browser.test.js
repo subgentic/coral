@@ -36,6 +36,13 @@ function page(q) {
     const counts = () => ev(`window.__coral.boardCounts()`);
     try {
         await Promise.all([Page.enable(), Runtime.enable()]);
+        // The message pages are synthetic, but the team must exist: the team page checks
+        // /artifacts for board_not_found before showing its panels (#8848).
+        const homeLoaded = Page.loadEventFired();
+        await Page.navigate({ url: BASE + '/' });
+        await homeLoaded;
+        await coralReady();
+        assert.equal(await ev(`fetch('/api/board/${B}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'scroll-fixture', job_title: 'Scroll fixture' }) }).then(r => r.status)`), 200, 'the isolated board exists before opening its message panel');
         let hold = false, pending = null; // hold: an earlier page's answer waits until released, to see the line while it is out
         safePaused(client, ({ requestId, request }) => {
             const q = new URL(request.url).searchParams;
