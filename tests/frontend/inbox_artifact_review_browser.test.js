@@ -50,6 +50,10 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'13','all pending artifacts count');
                 assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
                 assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'12 of 13','heading explains the cap');
+                const names = await ev(`(() => {const r=${row('Review file 01.txt')},name=r.querySelector('.inbox-review-name');return {title:name.title,text:name.textContent,open:r.querySelector('.inbox-review-actions button').getAttribute('aria-label')};})()`);
+                assert.equal(names.title,'Review file 01.txt','ellipsis keeps the full filename in its tooltip');
+                assert.equal(names.text,names.title,'assistive text keeps the same full filename');
+                assert.equal(names.open,'Open '+names.title,'Open action retains the full filename');
                 const layout = await ev(`(() => {const r=${row('Review file 01.txt')}, buttons=[...r.querySelectorAll('.inbox-review-actions button')], rects=buttons.map(b=>b.getBoundingClientRect());const team=r.querySelector('.inbox-review-team');return {actionsBesideName:rects[0].left>r.querySelector('.inbox-review-name').getBoundingClientRect().right-1&&Math.abs(rects[0].top+rects[0].height/2-(r.querySelector('.inbox-review-name').getBoundingClientRect().top+r.querySelector('.inbox-review-name').getBoundingClientRect().height/2))<2,team:team.textContent,teamHeight:team.getBoundingClientRect().height,teamFits:team.scrollWidth<=team.clientWidth+1,height:r.getBoundingClientRect().height,sameLine:Math.abs(rects[0].top-rects[1].top)<2,standard:buttons.every(b=>!b.classList.contains('dt-quiet')&&!b.disabled)};})()`);
                 assert.ok(layout.sameLine,'both actions stay on one line');
                 if(width===390){assert.equal(layout.team,team,'phone keeps the full team name');assert.ok(layout.teamHeight>0&&layout.teamFits,'team metadata is visible and wraps within the row');}
