@@ -73,9 +73,8 @@
 .session-list li.empty-welcome p { margin: 0 0 14px; font-size: var(--fs-lg); line-height: 1.45; }
 .session-list li.empty-welcome .empty-launch-list { display: grid; grid-template-columns: 1fr; gap: 10px; }
 /* the phone Home's own cards: the desktop welcome's card rules under their own names, so one class names one thing (UI/UX #5990) */
-.empty-launch:hover { border-color: var(--border-light); background: var(--bg-tertiary); } /* --bg-hover takes the muted line under 4.5:1 (#4218) */
+.empty-launch:hover { border-color: var(--border-light); background: var(--bg-tertiary); transform: translateY(-1px); } /* --bg-hover takes the muted line under 4.5:1 (#4218) */
 .empty-launch { position: relative; display: flex; border: 1px solid var(--border); font-family: inherit; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .15s ease; flex-direction: column; align-items: flex-start; gap: 14px; min-width: 0; padding: 20px; border-radius: 14px; background: var(--bg-secondary); color: var(--text-secondary); text-align: left; }
-.empty-launch:hover { transform: translateY(-1px); }
 .empty-launch .empty-launch-icon { display: flex; align-items: center; justify-content: center; width: 2.625rem; height: 2.625rem; border-radius: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 1.3125rem; line-height: 1; }
 .empty-launch-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .empty-launch-copy strong { color: var(--text-primary); font-size: 0.9375rem; }
@@ -145,8 +144,8 @@
     line-height: 16px;
     text-align: center;
     color: var(--text-secondary);
+    content: "\263E";
 }
-.session-dot.sleeping::before { content: "\263E"; }
 .session-dot.stuck {
     background: var(--danger);
     animation: pulse-stuck 3s ease-in-out infinite;
@@ -1402,14 +1401,14 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .preset-editor label { display: block; font: 500 var(--fs-md)/1.4 var(--font-sans); }
 .preset-editor select, .preset-editor textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .preset-editor p { font-size: var(--fs-md); color: var(--text-secondary); margin: 0; }
-.team-settings-section { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; margin: 0; display: grid; gap: 12px; }
+.team-settings-section { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; margin: 0; display: grid; gap: 12px; min-width: 0; }
 .team-settings-section legend { font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); padding: 0 4px; }
 .working-mode-hint { font-size: var(--fs-base) !important; color: var(--text-secondary); margin: 0; line-height: 1.4; }
 .working-mode-hint .working-mode-settings-link { background: none; border: none; box-shadow: none; padding: 0; margin: 0; min-height: 0; min-width: 0; height: auto; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; display: inline; }
 .working-mode-hint .working-mode-settings-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .working-mode-docs-link { color: var(--link-text); text-decoration: none; cursor: pointer; } /* the light theme's accent is 4.4:1 on this panel (#5345) */
 .working-mode-docs-link:hover { text-decoration: underline; }
-.team-settings-section { min-width: 0; } /* a fieldset is as wide as its widest content by default: on a phone the form scrolled sideways */
+ /* a fieldset is as wide as its widest content by default: on a phone the form scrolled sideways */
 .workflow-preset-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .preset-editor input[name="preset_name"] { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .prompt-inspection-content { display: grid; gap: 10px; }
@@ -1694,8 +1693,14 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 /* Group headers (Group by server): the outermost level of the list, flush left, with a
    computer icon and no status dot; an offline server is dimmed (#3507). */
 .session-list .server-group-header {
-    display: flex; align-items: center; gap: var(--space-xs);
-    margin: var(--space-md) 0 2px; padding: 0 12px 0 0; list-style: none; /* the right gutter team and folder headers have, so the kebabs share a column */
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin: var(--space-md) 0 2px;
+    padding: 0 12px 0 0;
+    list-style: none;
+    /* the right gutter team and folder headers have, so the kebabs share a column */
+    position: relative;
 }
 .server-group-toggle {
     display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0;
@@ -1739,20 +1744,17 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 /* The phone's list header: the title, the display menu and + New share one height (#4062). */
 /* flex-wrap: a narrow phone wraps the header's controls instead of pushing them off the screen (#4086). */
 .mobile-list-header { --ctl-h: 36px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 16px; }
-.mobile-list-header .mobile-list-title { margin-right: auto; }
+.mobile-list-header .mobile-list-title { margin-right: auto; white-space: nowrap; flex: none; }
 .mobile-list-header .btn { height: var(--ctl-h); box-sizing: border-box; padding-top: 0; padding-bottom: 0; margin: 0; } /* margin: 0: .btn-small's 20px side margins counted toward the row and wrapped + New */
-.mobile-list-header .mobile-list-title { white-space: nowrap; flex: none; }
 /* The display menu hangs from the whole header row, not from its own small button, so it is never wider than the screen or cut off at the edge (#4062). */
 .sidebar-header, .mobile-list-header { position: relative; }
-.session-list .server-group-header { position: relative; }
 .server-group-header .server-group-more { position: static; }
 .server-group-more:not([open]) > .server-switcher-panel { display: none; } /* a closed menu has no boxes */
 .server-group-more > .server-switcher-panel { left: auto; right: 0; top: calc(100% - 2px); min-width: min(16em, 100%); max-width: 100%; box-sizing: border-box; }
 /* Keep the search box usable: it gives up width down to 5em (the whole "Search" placeholder still shows) and only a very narrow sidebar wraps the header (#3085, #4062); at 200% text the buttons stay on the search box's row (UI/UX's #7562 point). */
 .sidebar-header { flex-wrap: wrap; }
-.sidebar-header .sidebar-search { flex: 1 1 5em; min-width: 5em; }
+.sidebar-header .sidebar-search { flex: 1 1 5em; min-width: 5em; container-type: inline-size; }
 /* In a box that narrow (at 200% text the header's buttons leave it 5em) the magnifier goes and the placeholder takes its room: the whole word "Search" is shown, and the box's name is the same. */
-.sidebar-header .sidebar-search { container-type: inline-size; }
 @container (max-width: 10rem) { .sidebar-search-icon { display: none; } .sidebar-search-input.field-search { padding-left: 0.625rem; padding-right: 0.25rem; } }
 /* Status text for screen readers only (the dot carries it visually). */
 .row-server-prefix .sr-only {
