@@ -1,6 +1,6 @@
 /* The Inbox's read marker (#9687, phase 1): which chats, boards and tasks the person has opened since they last changed, kept in this browser only (a Hub field that agrees across devices is phase 2).
  *
- *   isUnread(kind, key, stamp) -> bool      markRead(kind, key, stamp)      unreadCount(kind, rows, keyOf, stampOf) -> number
+ *   isUnread(kind, key, stamp) -> bool      markRead(kind, key, stamp)      unreadCount(kind, rows, keyOf, stampOf) -> number      readSince() -> ms
  *
  * Read means opened: opening an item stores the stamp it had (a chat's or board's last message time, a task's updated_at); it is unread again when its stamp is newer than the stored one. An item never opened
  * is unread only if its stamp is newer than `since`, the moment this browser first used the marker: the first visit does not make every old row bold. A stamp that is not a date is read (never bold on a guess).
@@ -44,6 +44,7 @@ export function createReadMarker(store = browserLocal, now = () => Date.now()) {
             if (s.items[id] !== undefined && s.items[id] >= ms) return;
             s.items[id] = ms; save();
         },
+        since() { return load().since; }, // the moment this browser began using the marker (ms)
         unreadCount(kind, rows, keyOf, stampOf) { return rows.filter(r => this.isUnread(kind, keyOf(r), stampOf(r))).length; },
     };
 }
@@ -52,3 +53,4 @@ export const readMarker = createReadMarker();
 export const isUnread = (...a) => readMarker.isUnread(...a);
 export const markRead = (...a) => readMarker.markRead(...a);
 export const unreadCount = (...a) => readMarker.unreadCount(...a);
+export const readSince = () => readMarker.since();

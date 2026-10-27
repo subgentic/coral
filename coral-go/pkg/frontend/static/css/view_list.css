@@ -37,6 +37,7 @@
 .view-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .view-list-dot { width: 9px; height: 9px; border-radius: var(--radius-xs); flex: none; background: var(--view-list-dot); }
 .view-list-count { flex: none; font-size: var(--fs-base); font-weight: var(--fw-regular); color: var(--text-secondary); }
+.view-list-item:not(.view-list-current) .view-list-count.view-list-new { color: var(--text-muted); } /* a folder's unread number (#9687): 12/400 tertiary, not bold */
 .view-list-select { display: none; width: 100%; }
 @media (max-width: 767px) {
     .view-list-nav { display: none; }
