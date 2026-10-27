@@ -69,7 +69,7 @@ try {
     assert.match(tlText, /1 task has no commit and is not listed\./);
     const trs = [...tl.querySelectorAll('tbody tr')].map(r => r.textContent.replace(/\s+/g, ' '));
     assert.equal(trs.length, 2, 'only tasks with a commit'); assert.match(trs[0], /#8 Quick/, 'fewest tokens per commit first'); assert.match(trs[1], /#7 Slow/);
-    assert.match(trs[0], /no cost/, 'no recorded cost says so, not $0.00'); assert.match(trs[1], /<\$0\.01/, 'under a cent');
+    assert.match(trs[0], /\$0\.00/, 'a cost of zero reads $0.00, like every cost on the Analytics pages (#9540)'); assert.match(trs[1], /<\$0\.01/, 'under a cent');
     // back to All
     click('cost-spend-section', 'All'); await settle();
     assert.equal(sec('cost-spend').hidden, false); assert.equal(sec('cost-eff-per-commit').hidden, true);
@@ -80,7 +80,7 @@ try {
     assert.ok(!/NaN|Infinity|undefined/.test(zt), 'no NaN or Infinity in the cards or the table: ' + zt.slice(0, 200));
     assert.ok([...z.querySelectorAll('.eff-fill, .eff-avg')].every(e => /^\d/.test(e.style.width || e.style.left || '0') ), 'no bar or line of NaN width');
     assert.equal(z.querySelectorAll('.eff-bar').length, 2);
-    assert.ok(!/\$0\.00/.test(zt) && /no cost/.test(zt), 'a cost of 0 reads "no cost", never $0.00: ' + zt.slice(0, 300));
+    assert.ok(/\$0\.00/.test(zt) && !/no cost/.test(zt), 'a cost of 0 reads $0.00, never "no cost" (#9540): ' + zt.slice(0, 300));
     // an error says so and Retry reads again
     globalThis.fetch = window.fetch = async () => new Response('{}', { status: 500 });
     click('cost-spend-section', 'Agent'); await settle();
