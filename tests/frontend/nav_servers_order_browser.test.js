@@ -1,4 +1,4 @@
-// The Servers tab sits right of Analytics (the operator's order, #8704): on a hub with a registered computer the top row is Agents, Inbox, Workflows, Jobs, Analytics, Servers, Docs; the keyboard
+// The Servers tab sits right of Analytics (the operator's order, #8704): on a hub with a registered computer the top row is Agents, Inbox, Automations, Analytics, Servers, Docs; the keyboard
 // walks the tabs in that order, and a phone's view list (the dropdown) has the same order. One place defines it: the tab buttons' order in the page (nav_tabs.js draws the rest from them).
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server, with a fake hub (state.hub, one remote). 1280 and 390 px.
 const assert = require('node:assert/strict');
@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
-const WANT = ['Agents', 'Inbox', 'Workflows', 'Jobs', 'Analytics', 'Servers', 'Docs'];
+const WANT = ['Agents', 'Inbox', 'Automations', 'Analytics', 'Servers', 'Docs'];
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
@@ -26,7 +26,7 @@ const WANT = ['Agents', 'Inbox', 'Workflows', 'Jobs', 'Analytics', 'Servers', 'D
             await waitFor(`!document.getElementById('nav-tab-servers').hidden`, 'the Servers tab', 8000); await settle(400);
             // the tab buttons in the page's own order (the row; a phone hides the row for its dropdown but keeps the buttons)
             const dom = await ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]')].filter(el => !el.hidden && !el.hasAttribute('data-cloud-only')).map(el => el.textContent.trim().replace(/\\d+$/, '').trim())`);
-            check(`${label}: the tabs are Agents, Inbox, Workflows, Jobs, Analytics, Servers, Docs`, JSON.stringify(dom) === JSON.stringify(WANT), JSON.stringify(dom));
+            check(`${label}: the tabs are Agents, Inbox, Automations, Analytics, Servers, Docs`, JSON.stringify(dom) === JSON.stringify(WANT), JSON.stringify(dom));
             if (!mobile) {
                 const shown = await ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]')].filter(el => el.getClientRects().length).map(el => el.textContent.trim().replace(/\\d+$/, '').trim())`);
                 check('1280: the row draws them in that order', JSON.stringify(shown.filter(t => WANT.includes(t))) === JSON.stringify(WANT), JSON.stringify(shown));
