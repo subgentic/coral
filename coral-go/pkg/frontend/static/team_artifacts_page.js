@@ -293,7 +293,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         if (!model.error && !model.loading && inbox && model.down && model.down.length) { // a quiet line per computer that did not answer, with Retry: the reachable computers' files are listed above it
             const names = model.down.map(d => d.label || serverLabel(d.server));
             const line = el('p', 'goals-note team-artifacts-down', `${names.join(', ')} did not answer, so ${names.length === 1 ? 'its' : 'their'} artifacts are not shown.`); line.setAttribute('role', 'status');
-            body.append(line, btn('btn btn-small team-artifacts-down-retry', 'Retry', () => loadArtifacts({ keep: true })));
+            const row = el('div', 'team-artifacts-down-row'); row.append(line, btn('btn btn-small team-artifacts-down-retry', 'Retry', () => loadArtifacts({ keep: true }))); body.append(row); // one quiet row: the words and a small Retry beside them
         }
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
             // A label timeout needs another board-list read, not only the same artifact answer. Do not await a possibly offline list: the fresh artifact read has its own bounded label wait.
@@ -471,6 +471,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         root = host.firstChild;
         watch();
         draw();
+        if (sameKey && model.controller) return Promise.resolve(); // this list's read is on its way (a redraw of the folder, its count arriving): it is not started over, so a computer that is slow to answer costs one wait, not one per redraw (#8904)
         if (scope && sameKey && model.loaded) return Promise.resolve(); // an agent's tab drawn again (another tab and back) keeps its list until Refresh or another agent
         return loadArtifacts();
     }
