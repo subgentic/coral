@@ -351,7 +351,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (model.creating) return;
         model.creating = true;
         const open = W.openTasksOf(g.rollup), total = W.allTasksOf(g.rollup);
-        const dlg = document.createElement('dialog'); dlg.className = 'goals-dialog goals-close-dialog'; dlg.setAttribute('aria-labelledby', 'goals-close-title');
+        const dlg = document.createElement('dialog'); dlg.className = 'dlg-confirm goals-dialog goals-close-dialog'; dlg.setAttribute('aria-labelledby', 'goals-close-title');
         const form = el('form', 'goals-form'); form.noValidate = true;
         const title = el('h3', null, W.closeTitle); title.id = 'goals-close-title';
         const parts = [title, el('p', 'goals-close-goal', g.title)];

@@ -18,7 +18,6 @@
 @media (forced-colors: active) { .update-pill { border-color: ButtonText; } .update-dot { background: ButtonText; } }
 
 /* the confirmation */
-.update-confirm { max-width: 520px; }
 .update-confirm .modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-md, 8px); padding: var(--space-md, 8px) var(--space-xl, 20px) var(--space-lg, 16px); }
 .update-confirm p { margin: 0 0 var(--space-md, 8px); }
 .update-confirm .update-go { white-space: normal; max-width: 100%; text-align: center; } /* "Update and relaunch, restart 3 agents" wraps at large text instead of being cut by the dialog (#7360) */

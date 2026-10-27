@@ -40,7 +40,7 @@ for (const f of fs.readdirSync(path.join(FE, 'static', 'css')).filter(f => f.end
         if (/(?:^|;)\s*width\s*:\s*(?:100vw|100%|auto)\s*(?:!important)?\s*(?:;|$)/.test(';' + decl)) continue; // a phone's whole screen, or no width
         for (const raw of m[1].split(',')) {
             const sel = raw.trim().replace(/\s+/g, ' ');
-            if (/!important/.test(decl) && /95vw/.test(decl)) continue; // a phone's own rule (mobile.css)
+            if (/!important/.test(decl) && /95vw|--dlg-max/.test(decl)) continue; // a phone's own rule (mobile.css)
             const last = sel.split(/[ >]+/).pop(); // the element itself, not a descendant of it
             const own = [...last.matchAll(/\.([\w-]+)/g)].map(x => x[1]);
             const dialogish = own.some(c => dialogClasses.has(c) || /-dialog$/.test(c)) && !own.some(c => /^dlg-/.test(c));
