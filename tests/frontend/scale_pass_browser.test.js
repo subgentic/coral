@@ -63,10 +63,11 @@ const { connect } = require('./agent_view_harness');
             const host = document.createElement('div'); host.id = 'scale-probe'; host.style.cssText = 'position:fixed;left:0;top:0;width:360px;background:var(--bg-primary);z-index:9999';
             host.append(document.getElementById('board-task-list')); document.body.append(host); tasks.renderBoardTaskList();
         })()`);
-        await waitFor(`document.querySelector('#scale-probe .dt-box.dt-folded')`, 'folded task table');
-        const row = await ev(`(() => { const host = document.getElementById('scale-probe'), b = host.querySelector('.dt-primary'); const r = { title: b.textContent, label: b.getAttribute('aria-label'), overflow: host.scrollWidth - host.clientWidth, height: b.getBoundingClientRect().height }; host.remove(); return r; })()`);
+        await waitFor(`document.querySelector('#scale-probe .dt-box:not(.dt-folded) .dt-primary')`, 'one-line task table');
+        const row = await ev(`(() => { const host = document.getElementById('scale-probe'), b = host.querySelector('.dt-primary'); const r = { title: b.textContent, label: b.getAttribute('aria-label'), overflow: host.scrollWidth - host.clientWidth, height: b.getBoundingClientRect().height, ellipsis: getComputedStyle(b).textOverflow, clipped: b.scrollWidth > b.clientWidth }; host.remove(); return r; })()`);
         assert.ok(row.title.length > 200 && row.label.includes(row.title), 'the complete title names the keyboard button');
         assert.ok(row.overflow <= 1 && row.height >= 44, 'the shared row fits the dock and keeps a touch target');
+        assert.equal(row.ellipsis, 'ellipsis'); assert.equal(row.clipped, true, 'long title is visually truncated, not wrapped');
         console.log('PASS');
     } catch (e) {
         console.error(e && e.stack || e);

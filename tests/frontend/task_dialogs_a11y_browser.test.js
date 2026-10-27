@@ -1,6 +1,6 @@
 // The Create task dialog and the task page for the keyboard, a screen reader and both themes (#5814, #7644): a refusal in the Create dialog is spoken once (the footer's status line; the field's own error is its description, not an alert, #8431) and marks the
 // title; "+ Add dependency" and a dependency tag's × are buttons (they were links with no href: not reachable by Tab, and the × had no name); the task's page is named by its task and
-// has the focus on its title, its back link gives the focus back to the row; and the real light theme holds 4.5:1 in the Create dialog and on the task page in its three states (the page, Edit, Complete).
+// opens in the shared preview with focus on its close control, and Escape gives focus back to the row; and the real light theme holds 4.5:1 in the Create dialog and on the task page in its three states (the page, Edit, Complete).
 // Focus goes to the title on open and back to what opened the dialog on Escape. Real board over the API. Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -70,13 +70,13 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelector('#create-task-flow').open`), false, 'fresh tasks reset to folded');
         await key('Escape', 'Escape', 27);
 
-        console.log('2. the task page is named by its task and gives the focus back');
+        console.log('2. the task preview is named by its task and gives the focus back');
         await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').focus(); document.querySelector('#agentic-panel-tasks .board-task-open').click(); true`);
-        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`, 'the task page (and no dialog)', 12000);
-        const nm = await ev(`({ region: document.getElementById('team-panel-item').getAttribute('aria-label'), title: document.getElementById('team-task-title').textContent, focus: document.activeElement.id })`);
-        assert.ok(/^Task \d+$/.test(nm.region) && /^#\d+ (Ship the queue|Write the docs)$/.test(nm.title) && nm.focus === 'team-task-title', 'the page is named by its number and its task, the title has the focus: ' + JSON.stringify(nm));
-        await ev(`document.querySelector('#team-panel-item .goals-back').focus(); document.querySelector('#team-panel-item .goals-back').click(); true`);
-        await waitFor(`!document.querySelector('#team-panel-item #team-task-title') && document.activeElement && (document.activeElement.classList.contains('team-row-btn') || document.activeElement.classList.contains('dt-primary')) && !!document.activeElement.dataset.taskId`, 'the focus back on the task\'s row', 8000);
+        await waitFor(`!!document.querySelector('#preview-pane #team-task-title') && document.activeElement === document.querySelector('#preview-pane .preview-tab.active .preview-tab-close') && getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`, 'the task preview (and no dialog)', 12000);
+        const nm = await ev(`({ region: document.querySelector('#preview-pane .team-task-page').parentElement.getAttribute('aria-label'), title: document.querySelector('#preview-pane #team-task-title').textContent, focus: document.activeElement.classList.contains('preview-tab-close') })`);
+        assert.ok(/^Task \d+$/.test(nm.region) && /^#\d+ (Ship the queue|Write the docs)$/.test(nm.title) && nm.focus, 'the preview content is named by its task and the close control has focus: ' + JSON.stringify(nm));
+        await key('Escape', 'Escape', 27);
+        await waitFor(`!document.querySelector('#preview-pane #team-task-title') && document.activeElement?.classList.contains('dt-primary') && !!document.activeElement.dataset.taskId`, 'the focus back on the task\'s row', 8000);
 
         console.log('3. both themes hold 4.5:1 in the dialog and on the page');
         await installAudit(ev);

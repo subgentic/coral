@@ -90,13 +90,15 @@ const BASE = require('./test_base').BASE;
                 assert.equal(row.nestedInButton, false);
                 assert.ok(row.stops.some(x => /^BUTTON:Open task #\d+: /.test(x)), 'the row has the native Open button: ' + JSON.stringify(row.stops));
                 assert.ok(row.stops.length <= 2, 'one control, and at most the status detail: ' + JSON.stringify(row.stops));
-                await ev(`window.__opened = 0; window.openTeamPage = (board, opts) => { window.__opened++; window.__openedId = opts.item; return Promise.resolve(true); }; true`); // a board task opens the team page's task page (#7644): recorded here
+                const title = await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').textContent`);
                 await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').focus(); true`);
                 await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-                await waitFor(`window.__opened >= 1`, 'Enter on the button opens the task', 4000);
-                assert.equal(await ev(`window.__opened`), 1, 'Enter opens the task once');
+                await waitFor(`document.querySelector('#preview-pane #team-task-title')?.textContent.includes(${JSON.stringify(title)})`, 'Enter on the button opens the task preview', 8000);
+                assert.equal(await ev(`document.querySelectorAll('#preview-pane .preview-tab').length`), 1, 'Enter opens one task tab');
+                await ev(`document.querySelector('#preview-pane .preview-tab.active .preview-tab-close').click(); true`);
                 await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').closest('.board-task-item').querySelector('.board-task-desc').click(); true`);
-                assert.equal(await ev(`window.__opened`), 2, 'a click on the row still opens it');
+                await waitFor(`document.querySelector('#preview-pane #team-task-title')?.textContent.includes(${JSON.stringify(title)})`, 'a click on the row opens its task preview');
+                await ev(`document.querySelector('#preview-pane .preview-tab.active .preview-tab-close').click(); true`);
             }
             await shot(`board-${theme}`);
         }
