@@ -30,8 +30,8 @@ const ITEMS = ['plan.md', 'notes.md'].map((name, i) => ({ name, media_type: 'tex
                     return R(u, o); };
             })()` });
             await Page.navigate({ url: BASE + '/team/' + encodeURIComponent(coldLabel) + '/artifacts' }); await Page.loadEventFired(); await install();
-            await waitFor(`window.__artifactReads > 0 && !!document.querySelector('#team-panel-artifacts .team-artifacts-status-live')`, `${label}: the cold artifact answer`, 10000);
-            await waitFor(`!!document.querySelector('#team-panel-artifacts .team-artifacts-error') || /Loading/.test(document.querySelector('#team-panel-artifacts .team-artifacts-status-live')?.textContent || '')`, `${label}: the first answer is handled`, 5000);
+            await waitFor(`window.__artifactReads > 0 && !!document.querySelector('#team-panel-artifacts .team-count-line')`, `${label}: the cold artifact answer`, 10000);
+            await waitFor(`!!document.querySelector('#team-panel-artifacts .team-artifacts-error') || /Loading/.test(document.querySelector('#team-panel-artifacts .team-count-line')?.textContent || '')`, `${label}: the first answer is handled`, 5000);
             check(`${label}: no scope error and no unverified rows while the label is unknown`, (await rows()) === 0 && (await err()) === '', `${await rows()} rows; ${await err()}`);
             await ev(`window.__labelRead = import((window.__coralStatic || '/static/') + 'board_fetch.js').then(m => m.fetchProjects()); window.__releaseLabels(); true`);
             await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr').length === 2 || !!document.querySelector('#team-panel-artifacts .team-artifacts-error')`, `${label}: artifacts after the labels arrive`, 10000);
