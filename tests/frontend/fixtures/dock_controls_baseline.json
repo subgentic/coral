@@ -620,14 +620,14 @@
      },
      {
       "role": "tabpanel",
-      "name": "Working modeNoneShared checkoutWorktreesMerge queueinfo Working mode instruction",
+      "name": "Working modeNoneShared checkoutWorktreesMerge queueTask queueinfo Working mode i",
       "id": "team-settings-workflow",
       "actions": "",
       "disabled": false
      },
      {
       "role": "combobox",
-      "name": "NoneShared checkoutWorktreesMerge queue",
+      "name": "NoneShared checkoutWorktreesMerge queueTask queue",
       "id": "",
       "actions": "",
       "disabled": false

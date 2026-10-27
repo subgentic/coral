@@ -2,7 +2,7 @@ import { importOnce } from './import_once.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 const { infoButton, infoBox } = await importOnce('./info_toggle.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 
-const PRESET_NAMES = { none: 'None', shared_checkout: 'Shared checkout', worktrees: 'Worktrees', merge_queue: 'Merge queue' };
+const PRESET_NAMES = { none: 'None', shared_checkout: 'Shared checkout', worktrees: 'Worktrees', merge_queue: 'Merge queue', task_queue: 'Task queue' };
 
 export function hasUnsavedTeamSettings() {
     const page = document.getElementById('team-settings-workspace'); // the team page's Settings tab (settings_view): any part holding a change, asked of the view itself
