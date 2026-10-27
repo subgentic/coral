@@ -64,6 +64,7 @@ const TEAM = `qa-tsm-${Date.now() % 100000}`;
             await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
             await waitFor(`!!document.getElementById('confirm-modal') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${label}: the unsaved question`, 6000);
             check(`${label}: Escape with an unsaved change asks "Unsaved Team Settings" and the dialog stays`, /Unsaved Team Settings/.test(await ev(`document.getElementById('confirm-modal').textContent`)) && !!(await modal()));
+            check(`${label}: the question's buttons are Keep editing and Leave`, await ev(`(() => { const t = [...document.querySelectorAll('#confirm-modal .modal-actions .btn')].map(b => b.textContent.trim()); return t.join('|') === 'Keep editing|Leave'; })()`));
             await shot(`team-settings-modal-${label}-unsaved-question-dark`, 'dark'); await shot(`team-settings-modal-${label}-unsaved-question-light`, 'light');
             await ev(`document.getElementById('confirm-modal-no') ? document.getElementById('confirm-modal-no').click() : [...document.querySelectorAll('#confirm-modal button')].find(b => /cancel|keep/i.test(b.textContent)).click(); true`); await settle(300);
             check(`${label}: Keep editing leaves the dialog open`, !!(await modal()));
