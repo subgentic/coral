@@ -54,7 +54,7 @@ const STUB = `(() => {
    const dir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(dir,`dock-artifact-one-line-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
    await ev(`document.querySelector('#agentic-panel-artifacts .artifact-details').click();true`);
    await waitFor(`!document.getElementById('agentic-detail-pane').hidden`,'Details opens existing sheet');
-   assert.ok(await ev(`document.getElementById('agentic-detail-pane').textContent.includes('Type')`),'type remains in Details');
+   assert.ok(await ev(`document.getElementById('agentic-detail-pane').textContent.includes('MIME')`),'type remains in Details');
   }catch(e){failures.push(width+': '+e.message);console.error(failures.at(-1));}}
   assert.deepEqual(failures,[]);
  }finally{await client.close();}

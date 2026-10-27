@@ -116,17 +116,16 @@ const STUB = `(() => {
             await shot(`preview-${view.name}-${view.theme}`);
             await ev(`import((window.__coralStatic || '/static/') + 'preview_pane.js').then(m => m.closeAllTabs()); true`);
 
-            // ═══ the table follows the PANEL's width: narrow, Type, Size and Task fold under the name; Created stays
-            const cols = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => e.getClientRects().length > 0; const w = p.getBoundingClientRect().width; return { w, th: [...p.querySelectorAll('thead th')].filter(vis).map(h => h.textContent), phone: !!p.querySelector('.dt-box.dt-folded'), facts: [...p.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(vis) }; })()`);
-            const folded = cols.phone;
-            check(`${tag}: ${folded ? 'a narrow panel folds the shared rows with their description' : 'a wide panel shows every column'} (${JSON.stringify(cols)})`, folded ? cols.facts && cols.th.length === 0 : cols.th.length === 6 && cols.facts); // Name, Type, Size, Task, Created and the Details link (#8539)
+            // #8793: the dock keeps four columns on one line at every width.
+            const cols = await ev(`([...document.querySelector('${panel} tbody tr').cells].map(c=>c.dataset.key))`);
+            check(`${tag}: name, size, created and Details columns`, JSON.stringify(cols) === JSON.stringify(['name','size','created','details']), JSON.stringify(cols));
             if (!view.phone) {
                 for (const width of [420, 620, 680, 980]) {
                     await ev(`document.getElementById('agentic-state').style.width = '${width}px'; true`);
                     await waitFor(`(() => { const box = document.querySelector('${panel} .dt-box'); return box && Math.abs(document.getElementById('agentic-state').getBoundingClientRect().width - ${width}) < 1 ; })()`, 'the artifact dock reaches its resized width');
                     await settle(300);
-                    const layout = await ev(`(() => { const box = document.querySelector('${panel} .dt-box'), missing = box.querySelector('tbody tr [data-key=task]'); const folded = box.classList.contains('dt-folded'); box.classList.remove('dt-folded'); const needsFold = box.querySelector('.dt-table').getBoundingClientRect().width > box.clientWidth + 1; box.classList.toggle('dt-folded', folded); return { folded, needsFold, width: box.clientWidth, missingVisible: missing.getBoundingClientRect().width > 0, facts: [...box.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(c => c.classList.contains('dt-tone-tertiary')) }; })()`);
-                    check(`${tag}: content fits at ${width}px, with quiet facts and no empty folded task (${JSON.stringify(layout)})`, layout.folded === layout.needsFold && layout.facts && (!layout.folded || !layout.missingVisible));
+                    const layout = await ev(`(() => { const box = document.querySelector('${panel} .dt-box'), missing = box.querySelector('tbody tr [data-key=task]'); const folded = box.classList.contains('dt-folded'); box.classList.remove('dt-folded'); const needsFold = box.querySelector('.dt-table').getBoundingClientRect().width > box.clientWidth + 1; box.classList.toggle('dt-folded', folded); return { folded, needsFold, width: box.clientWidth, missingVisible: !!missing?.getClientRects().length, facts: [...box.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(c => c.classList.contains('dt-tone-tertiary')) }; })()`);
+                    check(`${tag}: content fits at ${width}px, with quiet facts and no empty folded task (${JSON.stringify(layout)})`, !layout.folded && !layout.needsFold && layout.facts && !layout.missingVisible);
                     const edges = await ev(`(() => { const panel = document.querySelector('${panel}').getBoundingClientRect(), table = document.querySelector('${panel} .dt-table').getBoundingClientRect(); return { left: table.left - panel.left, right: panel.right - table.right }; })()`);
                     check(`${tag}: ${width}px table fills the dock (${JSON.stringify(edges)})`, Math.abs(edges.left) < 1 && Math.abs(edges.right) < 1);
                     if (width !== 620) await shot(`dock-artifacts-${width}-${view.theme}`);

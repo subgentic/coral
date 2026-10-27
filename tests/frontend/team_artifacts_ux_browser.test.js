@@ -121,7 +121,7 @@ const HEX = c => c.repeat(64);
             await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'the rows on the phone', 8000);
             await sleep(400); // sleep-ok: layout settles
             const m = await ev(`(() => { const small = [];
-                for (const b of document.querySelectorAll('${ROWS} .dt-primary, ${ROWS} .artifact-details, #agentic-panel-artifacts-view .list-bar-more-btn')) { let r = b.getBoundingClientRect(); if (b.classList.contains('artifact-details')) { const pe = getComputedStyle(b, '::after'); r = { width: parseFloat(pe.width), height: parseFloat(pe.height) }; } /* the Details link's 44 px target is its pseudo-element (#8539) */ if (r.height < 43.5 || (!b.classList.contains('dt-primary') && r.width < 43.5)) small.push((b.getAttribute('aria-label') || b.textContent).slice(0, 20) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); }
+                for (const b of document.querySelectorAll('${ROWS} .dt-primary, ${ROWS} .artifact-details, #agentic-panel-artifacts-view .list-bar-more-btn')) { let r = b.getBoundingClientRect(); if (r.height < 43.5 || (!b.classList.contains('dt-primary') && r.width < 43.5)) small.push((b.getAttribute('aria-label') || b.textContent).slice(0, 20) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); }
                 return { small, docOver: document.documentElement.scrollWidth - innerWidth }; })()`);
             assert.deepEqual(m.small, [], `${size || '100%'}: every control is a 44 px target`);
             assert.ok(m.docOver <= 0, `${size || '100%'}: no sideways scroll`);
