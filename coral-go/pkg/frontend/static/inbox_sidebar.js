@@ -12,7 +12,7 @@ import { state } from './state.js';
 import { reviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed } from './inbox_reviews.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
-import { sessionServer, keyLabel, identityKey, splitKey } from './server_base.js';
+import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -457,7 +457,7 @@ registerGroupSource('hub-inbox', {
                         { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
                         ...(goal || rows.some(s => s.review) ? [{ key: 'goal', label: 'Goal', sort: true, sortValue: s => (goalOf(s) ? s.goal.title : '\uffff'), line: rows.some(s => s.review) ? 2 : 0, cell: s => {
                             // a review's goal and task come from its artifact's roll-up (#8579); they open in the Inbox, in place; "No goal" when it serves none
-                            if (!s.review) { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => { const team = s.goal.board || s.board_project || '', id = Number(s.goal.id); if (team && id) go({ view: 'inbox-goals', sub: 'goals', id: team, item: id }); }); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; }
+                            if (!s.review) { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => { const team = goalTeamKey(s), id = Number(s.goal.id); if (team && id) go({ view: 'inbox-goals', sub: 'goals', id: team, item: id }); }); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; }
                             const cell = DT.el('span', 'inbox-review-goal');
                             if (goalOf(s)) { const l = DT.link(s.goal.title, () => go({ ...folderRoute, id: s.review.team, item: String(s.goal.id) })); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); l.dataset.goalLink = String(s.goal.id); cell.append(l); } else cell.append(DT.el('span', 'inbox-review-nogoal', NO_GOAL));
                             if (s.task) { const t = DT.link(s.task.title || `Task ${s.task.id}`, () => openItemRoute('tasks', s.review.team, String(s.task.id), `${s.review.team}#${s.task.id}`)); t.classList.add('inbox-review-task'); t.setAttribute('aria-label', `Task: ${s.task.title || s.task.id}`); t.dataset.taskLink = String(s.task.id); cell.append(t); }
