@@ -7,22 +7,14 @@
   "css/chat.css": {
     ".chat-file-menu": 1
   },
-  "css/cloud.css": {
-    ".cloud-account-menu": 1
-  },
   "css/command-pane.css": {
     ".send-btn-menu": 1,
     ".model-chip-menu": 1
   },
   "css/components.css": {
-    ".overflow-menu": 1,
     ".team-menu": 1
   },
   "css/layout.css": {
-    ".nav-more-menu": 1,
-    ".top-bar-settings-menu": 1
-  },
-  "css/session.css": {
-    ".sidebar-kebab-menu": 1
+    ".nav-more-menu": 1
   }
 }

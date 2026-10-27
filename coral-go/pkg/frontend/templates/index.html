@@ -112,22 +112,22 @@
                     </svg>
                 </button>
                 <template data-lazy="top-bar-settings-menu">
-                <div class="top-bar-settings-menu" id="top-bar-settings-menu" style="display:none">
-                    <button class="overflow-menu-item overflow-menu-danger" id="stop-all-auto-accept" hidden data-on-click="m-close-top-bar-settings-then-stop-all-auto-accept">
+                <div class="menu top-bar-settings-menu" id="top-bar-settings-menu" style="display:none">
+                    <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" id="stop-all-auto-accept" hidden data-on-click="m-close-top-bar-settings-then-stop-all-auto-accept">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>
                         Stop all auto-accept
                     </button>
                     <div id="tier-badge" class="overflow-menu-tier" style="display:none"></div>
                     <hr class="overflow-menu-divider">
-                    <button class="overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-theme-configurator">
+                    <button class="menu-item overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-theme-configurator">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5v13M1.5 8h13"/><path d="M3 3l10 10M13 3L3 13"/></svg>
                         Themes
                     </button>
-                    <button class="overflow-menu-item" data-hub-only style="display:none" data-on-click="m-close-top-bar-settings-then-show-servers-modal">
+                    <button class="menu-item overflow-menu-item" data-hub-only style="display:none" data-on-click="m-close-top-bar-settings-then-show-servers-modal">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><circle cx="4.5" cy="4.75" r=".6" fill="currentColor"/><circle cx="4.5" cy="11.25" r=".6" fill="currentColor"/></svg>
                         Servers
                     </button>
-                    <button class="overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-settings-modal">
+                    <button class="menu-item overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-settings-modal">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M6.7 1.4h2.6l.4 1.8.5.2 1.6-.9 1.8 1.8-.9 1.6.2.5 1.8.4v2.6l-1.8.4-.2.5.9 1.6-1.8 1.8-1.6-.9-.5.2-.4 1.8H6.7l-.4-1.8-.5-.2-1.6.9-1.8-1.8.9-1.6-.2-.5-1.8-.4V6.7l1.8-.4.2-.5-.9-1.6 1.8-1.8 1.6.9.5-.2z"/>
                             <circle cx="8" cy="8" r="2.5"/>
@@ -135,15 +135,15 @@
                         Settings
                     </button>
                     <hr class="overflow-menu-divider">
-                    <a class="overflow-menu-item" href="https://subgentic.github.io/coral/" target="_blank" rel="noopener">
+                    <a class="menu-item overflow-menu-item" href="https://subgentic.github.io/coral/" target="_blank" rel="noopener">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 1.5h4.5a2 2 0 0 1 2 2v11a1.5 1.5 0 0 0-1.5-1.5H2z"/><path d="M14 1.5H9.5a2 2 0 0 0-2 2v11a1.5 1.5 0 0 1 1.5-1.5H14z"/></svg>
                         Documentation
                     </a>
-                    <a class="overflow-menu-item" href="https://github.com/subgentic/coral" target="_blank" rel="noopener">
+                    <a class="menu-item overflow-menu-item" href="https://github.com/subgentic/coral" target="_blank" rel="noopener">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
                         GitHub
                     </a>
-                    <button class="overflow-menu-item" data-local-only data-on-click="m-close-top-bar-settings-then-check-for-updates">
+                    <button class="menu-item overflow-menu-item" data-local-only data-on-click="m-close-top-bar-settings-then-check-for-updates">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 4v4l2.5 2.5"/><path d="M5 1.5A6.5 6.5 0 0 1 14.5 8"/><path d="M14.5 4v4h-4"/></svg>
                         Check for Updates
                     </button>

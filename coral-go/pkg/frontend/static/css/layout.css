@@ -504,14 +504,8 @@ body.panel-dragging .sidebar {
     position: absolute;
     top: calc(100% + 6px);
     right: 0;
-    min-width: 180px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 4px 0;
-    box-shadow: 0 8px 24px rgba(var(--black-rgb), 0.3);
     z-index: 1000;
-}
+} /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 
 .sidebar-section h2 {
     font-size: var(--fs-base);
