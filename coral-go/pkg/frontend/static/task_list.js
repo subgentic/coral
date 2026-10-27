@@ -30,7 +30,12 @@ export async function openDockTaskPreview(id, opener) {
     const selection = { project, key };
     previewTask = selection;
     const mark = () => { for (const row of document.querySelectorAll('#board-task-list tbody tr')) { if (previewTask?.project === project && row.dataset.key === previewTask?.key) row.setAttribute('aria-current', 'true'); else row.removeAttribute('aria-current'); } };
-    pane.openTaskPreview(project, id, opener?.closest('tr')?.querySelector('.dt-primary')?.textContent || `Task ${id}`, () => { if (previewTask === selection) { previewTask = null; mark(); } });
+    const row = () => { const tr = opener && opener.isConnected ? opener.closest('tr') : [...document.querySelectorAll('#board-task-list tbody tr')].find(r => r.dataset.key === key); return tr?.querySelector('.dt-primary') || null; }; // the row's one button: what had the focus (the click's target may be the row itself, which is not focusable)
+    pane.openTaskPreview(project, id, opener?.closest('tr')?.querySelector('.dt-primary')?.textContent || `Task ${id}`, () => {
+        if (previewTask === selection) { previewTask = null; mark(); }
+        const a = document.activeElement; // closing the preview gives the focus back to the row that opened it, at every width (#8830); a close that came from a click elsewhere leaves the focus where it is
+        if (!a || a === document.body || a.closest('#preview-pane')) queueMicrotask(() => row()?.focus({ preventScroll: true })); // after the pane has been redrawn and hidden: the focus is moved last
+    });
     mark();
 }
 
