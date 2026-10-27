@@ -9,6 +9,7 @@ import { showToast } from './utils.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 const DT = await importOnce('./data_table.js');
+const { artifactTable, serverArtifactSort } = await importOnce('./artifact_table.js');
 const { itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead } = await importOnce('./artifact_item.js');
 import { renderArtifact } from './artifact_preview.js';
 const { openDetailPane } = await importOnce('./detail_pane.js');
@@ -51,7 +52,7 @@ function openSheet(item, link, opener, team) {
 export function mountGoalArtifacts(host, { team, goalId }) {
     host.replaceChildren();
     if (isCloud()) return { refresh() {}, destroy() { host.replaceChildren(); } };
-    const state = { items: [], cursor: '', total: 0, busy: false, seq: 0, tableState: DT.tableState(), loadedOnce: false };
+    const state = { items: [], cursor: '', total: 0, busy: false, seq: 0, tableState: DT.tableState(), sort: serverArtifactSort(), loadedOnce: false };
     const box = el('details', 'goal-artifacts');
     const summary = el('summary', 'goal-artifacts-summary', 'Artifacts');
     const body = el('div', 'goal-artifacts-body');
@@ -65,21 +66,18 @@ export function mountGoalArtifacts(host, { team, goalId }) {
         body.replaceChildren();
         if (!state.loadedOnce) { body.append(el('p', 'goals-note', 'Loading…')); return; }
         const rows = orderByGroup(state.items, 'task'); // a task's files together; the newest task first, as the server sorts
-        const table = DT.dataTable({
+        const table = artifactTable({
             label: `Artifacts of this goal, ${rows.length}`, bare: true, compact: true, foldAt: 'fit', rows, rowKey: itemKey, rowName: readableName, state: state.tableState,
             groupBy: (it) => groupHead(it, 'task', rows, !state.cursor),
             // an agent's dock opens the preview panel, a team page the detail pane (the document under its facts): one click either way; Details is the sheet's own link beside the dock's preview
             open: (item, tr) => { const link = linkOfItem(item, { server: undefined, project: team }); if (link && dock()) openPreview(item, link).catch(() => {}); else openSheet(item, link, tr.querySelector('.dt-primary'), team); },
-            columns: [
-                { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, cell: item => { const b = DT.primaryButton(readableName(item)); b.dataset.artifactId = itemKey(item); return b; } },
-                { key: 'type', label: 'Type', line: 2, tone: 'tertiary', cell: item => (isUnverified(item) ? '—' : DT.tag(typeText(item))) },
-                { key: 'size', label: 'Size', line: 2, tone: 'tertiary', align: 'end', cell: item => (isUnverified(item) ? '—' : sizeText(item.size) || '—') },
-                { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
-                ...(dock() ? [{ key: 'details', label: 'Details', line: 2, tone: 'tertiary', align: 'end', cell: item => {
-                    const b = DT.link('Details', () => openSheet(item, linkOfItem(item, { server: undefined, project: team }), b, team));
-                    b.classList.add('artifact-details'); b.setAttribute('aria-label', `Details for ${readableName(item)}`); return b;
-                } }] : []),
-            ],
+            paged: !!state.cursor,
+            onPageSort: order => { state.sort = order; load(false); },
+            details: dock() ? item => {
+                const b = DT.link('', () => openSheet(item, linkOfItem(item, { server: undefined, project: team }), b, team));
+                const icon = el('span', 'material-icons', 'info'); icon.setAttribute('aria-hidden', 'true'); b.append(icon);
+                b.classList.add('artifact-details'); b.setAttribute('aria-label', `Details for ${readableName(item)}`); return b;
+            } : null,
             footer: state.cursor ? { text: `Showing ${state.items.length} of ${state.total}`, more: { label: 'Load more', busy: state.busy, run: () => load(true) } } : null, // by the button, not as the footer scrolls into view: a goal's section is a glance, 20 at a time
         });
         body.append(table.el);
@@ -100,7 +98,7 @@ export function mountGoalArtifacts(host, { team, goalId }) {
         if (state.busy) return;
         state.busy = true;
         try {
-            const data = await read(team, goalId, `limit=${pageSize()}${more && state.cursor ? `&cursor=${encodeURIComponent(state.cursor)}` : ''}`);
+            const data = await read(team, goalId, `sort=${encodeURIComponent(state.sort)}&limit=${pageSize()}${more && state.cursor ? `&cursor=${encodeURIComponent(state.cursor)}` : ''}`);
             const have = new Set(more ? state.items.map(itemKey) : []);
             state.items = (more ? state.items : []).concat((Array.isArray(data.artifacts) ? data.artifacts : []).filter(a => a && !have.has(itemKey(a))));
             state.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : '';

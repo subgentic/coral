@@ -42,18 +42,18 @@ const STUB = `(() => { const real = window.fetch; window.__reqs = []; window.__a
             { id: HEX, name: evil, media_type: 'text/markdown', size: 1300, created_at: new Date(Date.now() - 3600e3).toISOString(), task_id: id, produced_by: 'Backend Dev', uri: 'coral://artifacts/' + HEX, source: 'upload', available: true },
             { id: 'task-1', name: 'result.txt', media_type: 'text/plain', size: 12, created_at: new Date().toISOString(), task_id: id, source: 'completion', inline: true, content_url: '/api/board/x/tasks/1/artifact-content?source=completion&index=0' }] });
         await waitFor(`!!document.querySelector('#preview-pane .team-task-artifacts')`, 'the section', 8000);
-        const d = await ev(`(() => { const s = document.querySelector('#preview-pane .team-task-artifacts'); return { head: s.querySelector('h3').textContent, lines: [...s.querySelectorAll('li')].map(li => ({ name: li.querySelector('.team-task-artifact-name').textContent, tag: li.querySelector('.team-task-artifact-name').tagName, meta: li.querySelector('.team-task-artifact-meta').textContent })), imgs: s.querySelectorAll('img').length, pwned: !!window.__pwned, asked: window.__reqs.filter(r => /\\/artifacts\\?/.test(r)) }; })()`);
+        const d = await ev(`(() => { const s = document.querySelector('#preview-pane .team-task-artifacts'); return { head: s.querySelector('h3').textContent, lines: [...s.querySelectorAll('tbody .dt-row')].map(li => ({ name: li.querySelector('.dt-primary').textContent, tag: li.querySelector('.dt-primary').tagName, meta: li.querySelector('[data-key=type]').textContent + ' · ' + li.querySelector('[data-key=size]').textContent })), imgs: s.querySelectorAll('img').length, pwned: !!window.__pwned, asked: window.__reqs.filter(r => /\\/artifacts\\?/.test(r)) }; })()`);
         assert.equal(d.head, 'Artifacts'); assert.equal(d.lines.length, 2, JSON.stringify(d));
-        assert.equal(d.lines[0].name, evil, 'the name is text'); assert.equal(d.imgs, 0, 'and is never markup'); assert.equal(d.pwned, false);
-        assert.match(d.lines[0].meta, /^text\/markdown · 1\.3 KB · .+ · by Backend Dev$/, d.lines[0].meta);
+        const first = d.lines.find(row => row.name === evil); assert.ok(first, 'the name is text'); assert.equal(d.imgs, 0, 'and is never markup'); assert.equal(d.pwned, false);
+        assert.equal(first.meta, 'Markdown · 1.3 KB');
         assert.equal(d.lines[0].tag, 'BUTTON'); assert.match(d.asked.join(), new RegExp(`task=${id}`), 'it asks for this task\'s artifacts only');
-        await ev(`document.querySelector('#preview-pane .team-task-artifact-name').click(); true`);
+        await ev(`[...document.querySelectorAll('#preview-pane .team-task-artifacts .dt-primary')].find(b => b.textContent === ${JSON.stringify(evil)}).click(); true`);
         await waitFor(`window.__reqs.some(r => r.includes('/api/artifacts/${HEX}'))`, 'the stored artifact is opened (the viewer reads it)', 8000);
 
         console.log('a phone: the name is a 44 px target');
         await open({ total: 1, artifacts: [{ id: HEX, name: 'report.md', media_type: 'text/markdown', size: 10, created_at: new Date().toISOString(), task_id: id, uri: 'coral://artifacts/' + HEX }] }, true);
-        await waitFor(`!!document.querySelector('#preview-pane .team-task-artifact-name')`, 'the section on a phone', 8000);
-        assert.ok(await ev(`document.querySelector('#preview-pane .team-task-artifact-name').getBoundingClientRect().height >= 44`), 'a 44 px target');
+        await waitFor(`!!document.querySelector('#preview-pane .dt-primary')`, 'the section on a phone', 8000);
+        assert.ok(await ev(`document.querySelector('#preview-pane .dt-primary').getBoundingClientRect().height >= 44`), 'a 44 px target');
         assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'nothing runs sideways');
 
         console.log('nothing to show, or a list that cannot be read: no section, no error');
