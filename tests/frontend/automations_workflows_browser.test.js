@@ -1,6 +1,6 @@
 // Automations, the Workflows folder (Goal #74, UI/UX #8862; it carried the Workflows tab's checks from #7471): the sidebar's folder list has Workflows with its count; the folder's page is one table on the shared
-// toolbar (the search named "Search workflows", the All / Active / Paused pills with counts, Filters: Result, Step type, Sort, Build with Agent and New workflow at the right) with the columns Workflow, Steps, Last run,
-// Used by and a Run button per row (named for its workflow); a workflow's page has its link back, a 17/700 name, one facts line, Steps and Runs as tables, and a bar pinned at the foot (More, Edit with Agent,
+// toolbar (the search named "Search workflows", the All / Active / Paused pills with counts, Filters: Result, Step type, Sort, Build with Agent and New workflow at the right) with the columns Workflow, Steps, Last run and
+// Used by (no state-changing button in a row: Run is on the workflow's page); a workflow's page has its link back, a 17/700 name, one facts line, Steps and Runs as tables, and a bar pinned at the foot (More, Edit with Agent,
 // Edit, Run as the primary); a run's page has its link back to the workflow and a bar (Re-run); with no workflow the folder is one empty line with its hint; /workflows opens the folder; both themes and 200%
 // text; a phone's table is the page and a workflow the screen after it. Drives Chrome over CDP through agent_view_harness.js, stubbed API.
 const assert = require('node:assert/strict');
@@ -64,9 +64,9 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             const folderWords = mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`;
             assert.deepEqual(await ev(folderWords), mobile ? ['Jobs (0)', 'Workflows (3)'] : ['Jobs0', 'Workflows3'], at + 'the folder list has Workflows with its count');
             assert.deepEqual(await names(), ['lint-and-fix', 'nightly-build', 'old-deploy'], at + 'by name (a workflow has no next run)');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent)`), ['Workflow', 'Steps', 'Last run', 'Used by', 'Run'], at + 'the columns');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent)`), ['Workflow', 'Steps', 'Last run', 'Used by'], at + 'the columns');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => r.querySelector('.dt-primary').textContent + '|' + r.textContent.replace(/\\s+/g, ' '))`).then(a => a.map(x => [x.split('|')[0], /(\d) steps?/.exec(x)[1], /Failed: step 2 \(Test\)|Passed|Never run/.exec(x)[0], /(\d+ jobs?|No jobs)/.exec(x)[0]])), [['lint-and-fix', '1', 'Passed', 'No jobs'], ['nightly-build', '2', 'Failed: step 2 (Test)', 'No jobs'], ['old-deploy', '1', 'Never run', 'No jobs']], at + 'steps, last run and who uses it, per row');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-action')].map(b => b.getAttribute('aria-label'))`), ['Run lint-and-fix', 'Run nightly-build', 'Run old-deploy'], at + 'a Run button per row, named for its workflow');
+            assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody .dt-action').length`), 0, at + 'no state-changing button in a row: Run is on the workflow\'s page (UI/UX #8863)');
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search workflows', at + 'the search is named for the folder');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-action .btn')].map(b => b.textContent.replace('smart_toy', '').trim())`), ['Build with Agent', 'New workflow'], at + 'Build with Agent and New workflow are the create actions');
             if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['All 3', 'Active 2', 'Paused 1'], at + 'the pills have the table\'s counts');
@@ -96,9 +96,11 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             await ev(`(() => { const s = document.getElementById('automations-search'); s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'cleared', 5000);
 
-            // Run in the table: the button says Starting\u2026 and is off until the run exists, then a line says Started <name> and the run's page is open
-            await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].find(r => /nightly-build/.test(r.textContent)).querySelector('.dt-action').click(); true`);
-            assert.deepEqual(await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view tbody tr[data-key]')].find(r => /nightly-build/.test(r.textContent)).querySelector('.dt-action'); return [b.textContent.trim(), b.disabled]; })()`), ['Starting\u2026', true], at + 'Run reads Starting\u2026 and is disabled while the run is being made');
+            // Run on the workflow's page: the button says Starting\u2026 and is off until the run exists, then a line says Started <name> and the run's page is open
+            await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].find(b => b.textContent.trim() === 'nightly-build').click(); true`);
+            await waitFor(`!!document.querySelector('#wf-detail .item-bar [data-on-click="wf-trigger"]')`, at + "the workflow's page", 8000);
+            await ev(`document.querySelector('#wf-detail .item-bar [data-on-click="wf-trigger"]').click(); true`);
+            assert.deepEqual(await ev(`(() => { const b = document.querySelector('#wf-detail .item-bar [data-on-click="wf-trigger"]'); return [b.textContent.trim(), b.disabled]; })()`), ['Starting\u2026', true], at + 'Run reads Starting\u2026 and is disabled while the run is being made');
             await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title')`, at + "the run's page", 8000);
             assert.equal(await ev(`document.getElementById('wf-status').textContent`), 'Started nightly-build', at + 'a status line says what started');
             assert.equal(await ev(`(document.querySelector('#wf-run-detail .wf-started-line') || {}).textContent`), 'Started nightly-build', at + "and the run's page shows it");
