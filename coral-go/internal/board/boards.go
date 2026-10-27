@@ -58,14 +58,7 @@ func (s *Store) ensureBoardsSchema(ctx context.Context) error {
 	}
 	// Every board that exists today becomes a row whose id and label are its name. Idempotent:
 	// rows already there are kept (a rename survives a restart).
-	_, err := s.db.ExecContext(ctx, `
-		INSERT OR IGNORE INTO boards (id, label, created_at)
-		SELECT key, key, MIN(at) FROM (
-			SELECT project AS key, subscribed_at AS at FROM board_subscribers
-			UNION ALL SELECT project, created_at FROM board_messages
-			UNION ALL SELECT board_id, created_at FROM board_tasks
-		) WHERE key <> '' GROUP BY key`)
-	if err != nil {
+	if _, err := s.db.ExecContext(ctx, adoptBoardsSQL); err != nil {
 		return err
 	}
 	// A re-key that fails never keeps the boards from opening (Security's #3541 review): the
@@ -75,6 +68,24 @@ func (s *Store) ensureBoardsSchema(ctx context.Context) error {
 	}
 	return nil
 }
+
+// adoptBoardsSQL gives every board name that has rows but no boards row one (a board made before board ids). It ran at every open as a scan of every message and every task (162 ms and 84 ms on 500,000 and
+// 50,000, #9611): the messages arm reads board_message_counts (a row per project that has messages, kept by triggers and made right by ensureMessageCounts just before this runs) and the tasks arm
+// walks the distinct board ids with index seeks (a recursive skip scan of idx_board_tasks_assigned, which leads with board_id), and each takes its MIN(created_at) only for a name with no boards
+// row, which is none on every open after the first. The subscribers arm was already an index scan of a small table.
+const adoptBoardsSQL = `
+	WITH RECURSIVE task_boards(b) AS (
+		SELECT MIN(board_id) FROM board_tasks
+		UNION ALL SELECT (SELECT MIN(board_id) FROM board_tasks WHERE board_id > task_boards.b) FROM task_boards WHERE b IS NOT NULL
+	)
+	INSERT OR IGNORE INTO boards (id, label, created_at)
+	SELECT key, key, MIN(at) FROM (
+		SELECT project AS key, subscribed_at AS at FROM board_subscribers
+		UNION ALL SELECT c.project, (SELECT MIN(created_at) FROM board_messages m WHERE m.project = c.project)
+			FROM board_message_counts c WHERE NOT EXISTS (SELECT 1 FROM boards b WHERE b.id = c.project)
+		UNION ALL SELECT t.b, (SELECT MIN(created_at) FROM board_tasks WHERE board_id = t.b)
+			FROM task_boards t WHERE t.b IS NOT NULL AND NOT EXISTS (SELECT 1 FROM boards b WHERE b.id = t.b)
+	) WHERE key <> '' GROUP BY key`
 
 // boardIDShape is the shape of a generated board id.
 var boardIDShape = regexp.MustCompile(`^b-[a-z2-7]{10}$`)

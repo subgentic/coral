@@ -37,6 +37,12 @@
       "type": "index"
     },
     {
+      "name": "idx_board_messages_no_subscriber",
+      "sql": "CREATE INDEX idx_board_messages_no_subscriber ON board_messages(id) WHERE subscriber_id IS NULL",
+      "tbl_name": "board_messages",
+      "type": "index"
+    },
+    {
       "name": "idx_board_messages_project",
       "sql": "CREATE INDEX idx_board_messages_project ON board_messages(project, id)",
       "tbl_name": "board_messages",
@@ -2026,6 +2032,31 @@
         {
           "columns": [
             {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_board_messages_no_subscriber",
+          "origin": "c",
+          "partial": 1,
+          "seq": 2,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
               "cid": 1,
               "coll": "BINARY",
               "desc": 0,
@@ -2053,7 +2084,7 @@
           "name": "idx_board_messages_project",
           "origin": "c",
           "partial": 0,
-          "seq": 2,
+          "seq": 3,
           "unique": 0
         },
         {
