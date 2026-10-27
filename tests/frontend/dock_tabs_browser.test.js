@@ -93,6 +93,14 @@ const { settle } = require('./helpers/wait');
         const target = await ev(`Math.round(document.querySelector('#agentic-more-menu [role=menuitem]').getBoundingClientRect().height)`);
         assert.ok(target >= 44, 'a 44 px target on the phone: ' + target);
         await shot('dock-tabs-more-390'); ok('below 1280 and on the phone');
+        // a tab's new count widens the tabs and leaves the strip's size alone (it does not wrap while its words show, #9420): the tabs are watched, so the words come off and nothing is wrapped or clipped (#9435)
+        await load(1280, false);
+        await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show again at 1280', 4000);
+        await ev(`for (const id of ['files-bar-count', 'task-bar-count', 'note-bar-count']) document.getElementById(id).textContent = '88888888'; true`);
+        await waitFor(`!document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words give way when the counts widen the tabs', 4000);
+        r = await row();
+        assert.ok(r.tops.length === 1 && !r.clipped, 'wide counts: icons alone, one line, nothing clipped: ' + JSON.stringify(r));
+        ok('a count that widens the tabs takes the words off: one line, nothing clipped');
         console.log('PASS dock tabs');
     } catch (e) { console.error(e && e.stack || e); process.exitCode = 1; }
     try { await client.close(); } catch (_) {}
