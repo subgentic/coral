@@ -389,7 +389,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
                 <span class="mb-message-time">${_formatTime(m.created_at)}</span>
             </div>
             ${parts.tagsOpen}
-            <div class="prose mb-message-body" id="${escapeAttr(parts.bodyId)}">${renderBoardMessageBody(m)}</div>
+            <div class="prose prose-compact mb-message-body" id="${escapeAttr(parts.bodyId)}">${renderBoardMessageBody(m)}</div>
             ${messageAttachmentsHtml(m)}
             ${replyWithHtml(m)}
             ${parts.actions}

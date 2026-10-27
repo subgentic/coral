@@ -25,7 +25,7 @@ for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
         const owner = [...parts.slice(0, -1)].reverse().map(p => /\.([a-z][\w-]*)/.exec(p)).find(Boolean);
         if (!owner) continue;
         const cls = owner[1];
-        if (cls === 'prose' || cls === 'prose-doc') continue; // .prose-doc is the document's two hairlines, part of the family
+        if (cls === 'prose' || cls === 'prose-doc' || cls === 'prose-compact') continue; // .prose-doc is the document's two hairlines, part of the family
         // a heading of a chrome part (a dialog title, a page header, a card) is not rendered markdown: only the containers of rendered text are on the list
         if (!/(markdown|md$|prose|rendered|message-text|message-body|docs-content|plan|detail-md|content)/.test(cls)) continue;
         if (/^(modal|dialog|header|team-|cost-|cloud-|agent-ui|availability|hooks|servers|mb-actions|mb-view|template)/.test(cls) || cls === 'modal-content') continue;

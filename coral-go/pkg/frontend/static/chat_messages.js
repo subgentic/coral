@@ -61,14 +61,14 @@ function renderOneMessage(msg, container, agentType) {
         // Images pasted in the dashboard lead the turn as "<path> coral://artifacts/<hex>" pairs (#5284): shown as artifact thumbnails, not as the text of a path and a link.
         const lead = splitSharedImages(unwrapPastedContent(msg.content));
         const bubble = makeBubble("chat-bubble human",
-            `<div class="role-label">You</div><div class="message-text prose">${renderMarkdown(lead.rest, undefined, 'chat')}</div>${attachmentChips(msg.attachments)}${sharedImageChips(lead.images)}${msg.key ? SAVE_BUTTON : ""}${messageTimeHtml(msg.timestamp)}`);
+            `<div class="role-label">You</div><div class="message-text prose prose-compact">${renderMarkdown(lead.rest, undefined, 'chat')}</div>${attachmentChips(msg.attachments)}${sharedImageChips(lead.images)}${msg.key ? SAVE_BUTTON : ""}${messageTimeHtml(msg.timestamp)}`);
         if (msg.key) { bubble.dataset.msgKey = msg.key; bubble.dataset.said = msg.timestamp || ""; } // Save for Later finds the message again by this (#4510)
         wireThumbs(bubble);
         appendContent(container, bubble);
     } else if (msg.type === "assistant") {
         if (msg.text) {
             const bubble = makeBubble(`chat-bubble assistant${msg.phase === "commentary" ? " commentary" : ""}`,
-                `<div class="message-text prose">${renderMarkdown(msg.text, undefined, 'chat')}</div>${msg.key ? SAVE_BUTTON : ""}${COPY_BUTTON}${messageTimeHtml(msg.timestamp)}`);
+                `<div class="message-text prose prose-compact">${renderMarkdown(msg.text, undefined, 'chat')}</div>${msg.key ? SAVE_BUTTON : ""}${COPY_BUTTON}${messageTimeHtml(msg.timestamp)}`);
             bubbleSource.set(bubble, msg.text);
             if (msg.key) { bubble.dataset.msgKey = msg.key; bubble.dataset.said = msg.timestamp || ""; } // Save for Later finds the message again by this (#4510)
             // Prose in a message that also makes tool calls is a one-line preamble ("Checking the CSS first."): it goes

@@ -314,7 +314,6 @@
 .mb-reply-with code { font-family: var(--font-mono, monospace); color: var(--text); }
 
 .mb-message-body {
-    --prose-h1: 1.1428571429em; --prose-h2: 1em; --prose-h3: 0.9285714286em; --prose-h4: 0.9285714286em; /* a board message is dense: its headings step 16, 14, 13 and 13 px, not 20, 16, 14 and 13 (UI/UX #9502) */
     font-size: var(--fs-lg);
     color: var(--mb-text);
     line-height: var(--lh-body);
@@ -462,7 +461,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 /* Links in a post: the theme's link colour, not the browser's #0000ee,
    which is unreadable on the dark theme (#3548); underlined on hover; the focus ring is the
    page-wide one (base.css). */
-.mb-message-body a,
 .board-artifact-link {
     color: var(--link-text);
     text-decoration: none;
@@ -470,7 +468,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 /* @mentions of a board member (#5964): weight and a tint, never colour alone; the viewer's own name (the Operator) is stronger, with an underline bar as well. Text only: no role change. */
 .mb-mention { font-weight: var(--fw-strong); color: var(--text-primary); background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: var(--radius-sm); padding: 0 3px; }
 .mb-mention-self { background: color-mix(in srgb, var(--accent) 36%, transparent); box-shadow: inset 0 -2px 0 var(--accent); }
-.mb-message-body a:hover,
 .board-artifact-link:hover {
     text-decoration: underline;
 }
@@ -482,29 +479,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 
 
-.mb-message-body code {
-    background: var(--mb-code-bg);
-    padding: 1px 5px;
-    border-radius: var(--radius-sm);
-    font-size: var(--fs-base);
-    font-family: var(--font-mono);
-}
-
-.mb-message-body pre {
-    background: var(--mb-code-bg);
-    padding: 8px 10px;
-    border-radius: var(--radius-md);
-    overflow-x: auto;
-    overflow-wrap: normal;
-    max-width: 100%;
-    margin: 6px 0;
-}
-
-.mb-message-body pre code {
-    background: none;
-    padding: 0;
-    font-size: var(--fs-base);
-}
+.mb-message-body pre { overflow-wrap: normal; max-width: 100%; } /* the shared look is .prose's (a, code, pre); a wide block of code scrolls inside the message and does not widen it */
 
 .mb-message-body strong {
     font-weight: var(--fw-strong);
@@ -3464,6 +3439,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .prose h2, .prose .md-h2 { margin: 1.25em 0 0.375em; font-size: var(--prose-h2); }
 .prose h3, .prose .md-h3 { margin: 1.143em 0 0.286em; font-size: var(--prose-h3); }
 .prose h4, .prose h5, .prose h6, .prose .md-h4, .prose .md-h5, .prose .md-h6 { margin: 0.923em 0 0.31em; font-size: var(--prose-h4); } /* the Hub renderer draws a heading as div.md-h.md-hN */
+.prose-compact { --prose-h1: 1.1428571429em; --prose-h2: 1em; --prose-h3: 0.9285714286em; --prose-h4: 0.9285714286em; } /* chat and board messages are dense: their headings step 16, 14, 13 and 13 px of a 14 px text, not 20, 16, 14 and 13 (UI/UX #9502) */
 .prose-doc h1, .prose-doc h2, .prose-doc .md-h1, .prose-doc .md-h2 { padding-bottom: 0.3em; border-bottom: 1px solid var(--border); } /* a document's two titles carry a hairline; chat and the narrow panes do not */
 .prose p, .prose ul, .prose ol, .prose blockquote, .prose pre { margin: 0 0 0.857em; }
 .prose ul, .prose ol { padding-left: 1.43em; }
