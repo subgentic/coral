@@ -190,7 +190,7 @@ function buildAccountMenu(email) {
     );
     const setOpen = open => { menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
     const btn = h('button', {
-        type: 'button', className: 'top-bar-btn cloud-account-btn', title: email, 'aria-label': 'Account menu', 'aria-haspopup': 'menu', 'aria-expanded': 'false',
+        type: 'button', className: 'btn btn-quiet btn-icon btn-small top-bar-btn cloud-account-btn', title: email, 'aria-label': 'Account menu', 'aria-haspopup': 'menu', 'aria-expanded': 'false',
         onclick: e => { e.stopPropagation(); setOpen(menu.hidden); },
     }, h('span', { className: 'material-icons top-bar-icon', 'aria-hidden': 'true', text: 'account_circle' }));
     document.addEventListener('click', () => setOpen(false));
