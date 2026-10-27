@@ -99,7 +99,7 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep Agent', `Put "${name}" to sleep?`, doIt, undefined, { danger: false });
+        showConfirmModal('Sleep Agent', `Put "${name}" to sleep?`, doIt, undefined, { danger: false, label: 'Sleep agent' });
         return Promise.resolve(false);
     }
     return doIt();
@@ -142,7 +142,7 @@ export function toggleAgentArchive(name, agentType, sessionId, action) {
         const stops = s && !s.sleeping ? ' It will be stopped.' : '';
         return new Promise(resolve => showConfirmModal('Archive Agent',
             `Archive "${name}"?${stops} Archived agents are not woken with their team or by Wake All.`,
-            async () => resolve(await doIt()), () => resolve(false), { danger: false }));
+            async () => resolve(await doIt()), () => resolve(false), { danger: false, label: 'Archive' }));
     }
     return doIt();
 }
