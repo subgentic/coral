@@ -152,7 +152,7 @@ body.panel-dragging .agentic-state {
 }
 
 .agentic-tab .material-icons {
-    font-size: var(--icon-size);
+    font-size: var(--icon);
 }
 
 /* The panel's name (#6029): a tab the keyboard reaches says it in a small label under it (the hover title and the accessible name, aria-label, are the same words). */
@@ -188,7 +188,7 @@ body.panel-dragging .agentic-state {
 .agentic-state-tabs[data-words] .agentic-tab-word { display: inline; }
 .agentic-tab.active .agentic-tab-word { color: var(--text-primary); } /* the accent on the light panel is 4.44:1 at 12 px, under AA: the icon and the underline carry the accent, the word is the page's text colour */
 .agentic-state-tabs[data-words] .agentic-tab { flex: 1 0 auto; /* a tab is never narrower than its word: the row wraps, the check sees it and drops the words */ padding-inline: 3px; gap: 3px; font-size: var(--fs-base); }
-.agentic-state-tabs[data-words] .agentic-tab .material-icons { font-size: var(--fs-xl); }
+.agentic-state-tabs[data-words] .agentic-tab .material-icons { font-size: var(--icon-sm); }
 .agentic-state-tabs[data-words] .agentic-tab-customize { min-width: 32px; flex: 0 0 auto; }
 .agentic-state-tabs .agentic-tab { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease; } /* not `all`: dock_tabs.js reads the tabs' sizes right after the words go on, and a size that transitions is read as it was */
 .agentic-tab[hidden] { display: none; }
@@ -201,7 +201,7 @@ body.panel-dragging .agentic-state {
 .agentic-more-item:hover, .agentic-more-item:focus-visible { background: var(--bg-hover); }
 .agentic-more-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .agentic-more-item.active { color: var(--accent); font-weight: 600; }
-.agentic-more-item .material-icons { font-size: var(--icon-size); }
+.agentic-more-item .material-icons { font-size: var(--icon); }
 .agentic-more-count { margin-left: auto; color: var(--text-secondary); font-size: var(--fs-base); }
 .agentic-more-count:empty { display: none; }
 @media (pointer: coarse), (max-width: 767px) { .agentic-more-item { min-height: var(--control-touch-height, 44px); } }
@@ -224,11 +224,11 @@ body.panel-dragging .agentic-state {
 .tc-row { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: var(--radius-md); }
 .tc-row:hover { background: var(--bg-hover); }
 .tc-row.dragging { opacity: 0.5; }
-.tc-grip { font-size: var(--icon-size); color: var(--text-secondary); cursor: grab; }
+.tc-grip { font-size: var(--icon); color: var(--text-secondary); cursor: grab; }
 .tc-label { display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 32px; min-width: 0; }
-.tc-label .tc-icon { font-size: var(--icon-size); color: var(--text-secondary); }
+.tc-label .tc-icon { font-size: var(--icon); color: var(--text-secondary); }
 .tc-label .tc-icon-svg { display: inline-flex; width: 1.125rem; height: 1.125rem; align-items: center; justify-content: center; }
-.tc-label .tc-icon-svg svg { width: 1.125rem; height: 1.125rem; }
+.tc-label .tc-icon-svg svg { width: var(--icon); height: var(--icon); }
 .tc-row:has(.tc-check:not(:checked)) .tc-name,
 .tc-row:has(.tc-check:not(:checked)) .tc-icon { opacity: 0.5; }
 .tc-lock { font-size: 0.9375rem; color: var(--text-secondary); }
@@ -418,7 +418,7 @@ body.panel-dragging .agentic-state {
     align-items: center;
     justify-content: center;
     font-family: 'Material Icons';
-    font-size: var(--icon-inline-size);
+    font-size: var(--icon-sm);
     font-weight: 400;
     font-style: normal;
     line-height: 1;
@@ -803,7 +803,7 @@ body.panel-dragging .agentic-state {
 }
 
 .board-task-type-subagent .material-icons {
-    font-size: var(--icon-inline-size);
+    font-size: var(--icon-sm);
 }
 
 .task-detail-claimed-for {
@@ -1331,7 +1331,7 @@ body.panel-dragging .agentic-state {
 }
 
 .inline-preview-mode-btn .material-icons {
-    font-size: var(--fs-xl);
+    font-size: var(--icon-sm);
 }
 
 .inline-preview-mode-btn:hover {
@@ -1555,7 +1555,7 @@ body.panel-dragging .agentic-state {
 }
 
 .file-action-btn .material-icons {
-    font-size: var(--icon-size);
+    font-size: var(--icon);
 }
 
 .file-type-icon { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex-shrink: 0; }
@@ -1673,7 +1673,7 @@ body.panel-dragging .agentic-state {
 }
 
 .agentic-tab-add .material-icons {
-    font-size: var(--fs-xl);
+    font-size: var(--icon-sm);
 }
 
 
@@ -1808,7 +1808,7 @@ body.panel-dragging .agentic-state {
 
 .agent-ui-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
 .agent-ui-actions button { width:32px; height:32px; padding:4px; display:inline-flex; align-items:center; justify-content:center; }
-.agent-ui-actions button .material-icons { font-size:var(--icon-size); }
+.agent-ui-actions button .material-icons { font-size:var(--icon); }
 .agent-ui-actions .agent-ui-dismiss { font-size:var(--fs-2xl); line-height:1; min-width:32px; min-height:32px; padding:4px 8px; }
 .agent-ui-actions .agent-ui-delete { color:var(--error); }
 .agent-ui-actions .agent-ui-delete:hover { color:var(--error); opacity:0.8; background:rgba(var(--error-rgb),.2); }
@@ -1881,7 +1881,7 @@ body.panel-dragging .agentic-state {
 .list-bar-search-wrap { position: relative; flex: 1 1 12em; min-width: 0; }
 .list-bar-search { width: 100%; box-sizing: border-box; padding: 6px 28px 6px 8px; font-size: var(--fs-md); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); }
 .list-bar-search::-webkit-search-cancel-button { display: none; }
-.list-bar-clear-q { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border: 0; background: none; color: var(--text-secondary); font-size: var(--icon-size); line-height: 1; cursor: pointer; border-radius: var(--radius-sm); }
+.list-bar-clear-q { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border: 0; background: none; color: var(--text-secondary); font-size: var(--icon); line-height: 1; cursor: pointer; border-radius: var(--radius-sm); }
 .list-bar-count { font-size: var(--fs-base); color: var(--text-secondary); white-space: nowrap; }
 .list-bar-live { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .list-bar-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -2081,7 +2081,7 @@ body.panel-dragging .agentic-state {
 
 /* The collapsible list bar (#5293): the agents tab's pattern: the search, the count, one icon for Filters and Sort (a dot on it while anything is on) and, for the artifact lists, one for expand or collapse all */
 .list-bar-toggle, .list-bar-expand-all { position: relative; flex: none; }
-.list-bar-toggle .material-icons { font-size: var(--icon-size); }
+.list-bar-toggle .material-icons { font-size: var(--icon); }
 .list-bar-collapsible .list-bar-search-wrap { flex: 1 1 8em; min-width: 0; }
 .list-bar-panel { padding: 6px 0; }
 .list-bar-panel .list-bar-field > .list-bar-by { flex: 1 1 9rem; width: auto; min-width: 0; max-width: none; } /* the text field (Agent, Uploaded by) spans the panel like the selects beside it (UI/UX #5293): its datalist is the field's last child, so the inline rule above never reached the input */

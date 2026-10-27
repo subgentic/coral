@@ -19,7 +19,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cloud-card label { display: block; font-size: var(--fs-md); margin: 12px 0 4px; }
 .cloud-card input[type=email], .cloud-card input[type=text] { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: var(--radius-lg);
     border: 1px solid var(--control-border, var(--border, var(--fx-navy-line))); background: var(--bg-primary, var(--fx-navy-ink)); color: inherit; font-size: 0.9375rem; min-height: var(--control-touch-height, 44px); } /* a 44px target on every pointer: the sign-in page is used from a phone (#5637) */
-.cloud-card input.cloud-code { font-family: ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; font-size: var(--icon-size); text-align: center; }
+.cloud-card input.cloud-code { font-family: ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; font-size: var(--icon); text-align: center; }
 .cloud-btn { display: inline-flex; align-items: center; justify-content: center; min-height: var(--control-touch-height, 44px); width: 100%; box-sizing: border-box; margin-top: 14px; padding: 10px 14px; border-radius: var(--radius-lg); border: 1px solid var(--control-border, var(--border, var(--fx-navy-line)));
     background: var(--bg-tertiary, #1c2330); color: inherit; font-size: var(--fs-lg); cursor: pointer; text-align: center; text-decoration: none; }
 .cloud-btn.primary { background: #1f6feb; border-color: #1f6feb; color: var(--text-on-accent); }
@@ -46,7 +46,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cs-access-effective { font-weight: 600; }
 .cs-meta.cs-access-help { opacity: 1; color: var(--text-secondary); }
 .cs-access-info { display: inline-flex; align-items: center; gap: var(--space-xs); margin-top: var(--space-xs); color: var(--text-secondary); }
-.cs-access-info .material-icons { font-size: var(--fs-xl); }
+.cs-access-info .material-icons { font-size: var(--icon-sm); }
 .cs-access-matrix { color: var(--text-secondary); font-size: var(--fs-base); line-height: 1.5; }
 .cs-access-matrix p { margin: var(--space-sm) 0; }
 @media (pointer: coarse) { .cs-relink, .cs-access-info, #cs-enroll-toggle { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
@@ -132,7 +132,7 @@ body.cloud-mode .settings-cloud-note { margin: 0 0 12px; }
 .hub-nav-link:hover, .hub-nav-link:focus-visible { text-decoration: underline; }
 .cloud-more { display: block; margin: 8px 0 12px; }
 .cloud-more > summary { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; cursor: pointer; list-style: none; border: 1px solid var(--control-border, var(--border)); border-radius: 50%; color: var(--text-secondary); } /* the dashboard's (i): a circle, the icon inside (#6065) */
-.cloud-more > summary .material-icons { font-size: var(--fs-xl); }
+.cloud-more > summary .material-icons { font-size: var(--icon-sm); }
 .cloud-more > summary:hover { color: var(--text-primary); }
 .cloud-more[open] > summary { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); }
 @media (pointer: coarse), (max-width: 767px) { .cloud-more > summary { width: 44px; height: 44px; } } /* the 44 px is the target: on touch and at phone width (a narrow window with a mouse too) */

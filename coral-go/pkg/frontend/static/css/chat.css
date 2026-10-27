@@ -321,7 +321,7 @@
     color: var(--text-secondary);
 }
 
-.tool-call-icon { flex-shrink: 0; font-size: var(--icon-inline-size); }
+.tool-call-icon { flex-shrink: 0; font-size: var(--icon-sm); }
 
 .tool-call-name {
     flex-shrink: 0;
@@ -635,7 +635,7 @@
 .chat-jump-latest-btn:hover, .chat-jump-latest-btn:focus-visible { color: var(--text-on-accent); }
 .chat-jump-latest-btn[hidden] { display: none; }
 .chat-jump-latest-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
-.chat-jump-latest-btn svg { position: relative; width: 18px; height: 18px; }
+.chat-jump-latest-btn svg { position: relative; width: var(--icon); height: var(--icon); }
 /* A small dot when messages came in while you read higher up. */
 .chat-jump-latest-dot {
     position: absolute;
@@ -680,7 +680,7 @@
     padding: 3px 7px;
 }
 .live-view-toggle-btn .material-icons {
-    font-size: var(--fs-xl);
+    font-size: var(--icon-sm);
 }
 
 /* ── Chat prose: reading typography (live Chat view + history Chat tab) ── */
@@ -913,7 +913,7 @@
     cursor: pointer;
 }
 .chat-file-menu button .material-icons {
-    font-size: var(--icon-inline-size);
+    font-size: var(--icon-sm);
     color: var(--text-muted);
 }
 .chat-file-menu button:hover,
@@ -1030,7 +1030,7 @@
 }
 .chat-system .material-icons {
     flex: none;
-    font-size: var(--icon-inline-size);
+    font-size: var(--icon-sm);
     color: var(--accent);
 }
 .chat-system-label {
@@ -1414,7 +1414,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     transition: opacity 0.12s;
 }
 .chat-bubble.assistant .chat-copy-btn .material-icons {
-    font-size: var(--icon-inline-size);
+    font-size: var(--icon-sm);
 }
 .chat-bubble.assistant:hover .chat-copy-btn,
 .chat-bubble.assistant .chat-copy-btn:focus-visible,
@@ -1472,7 +1472,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     transition: opacity 0.12s;
 }
 .code-block .code-copy-btn .material-icons {
-    font-size: var(--icon-inline-size);
+    font-size: var(--icon-sm);
 }
 .code-block:hover .code-copy-btn,
 .code-block .code-copy-btn:focus-visible,
@@ -1591,7 +1591,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     opacity: 0;
 }
 .chat-bubble.human .chat-save-btn { right: 6px; }
-.chat-bubble .chat-save-btn svg { width: var(--icon-inline-size); height: var(--icon-inline-size); }
+.chat-bubble .chat-save-btn svg { width: var(--icon-sm); height: var(--icon-sm); }
 .chat-bubble:hover .chat-save-btn,
 .chat-bubble .chat-save-btn:focus-visible,
 .chat-bubble .chat-save-btn[aria-pressed="true"] { opacity: 1; }
@@ -1676,7 +1676,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 .chat-attachment-unshare:hover { color: var(--text-primary); background: var(--bg-hover); }
 .chat-attachment-unshare:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* A trash icon, there on hover or focus; the focus-visible outline above shows it to the keyboard. On a touch screen or a phone it is not on the thumbnail: it is in the opened image's toolbar (#6137). These rules read the pointer type and the width, never (hover): a headless browser on a CI runner reports no hover at all and would have hidden the button on a desktop. */
-.chat-attachment-unshare .material-icons { font-size: 1.1rem; vertical-align: middle; }
+.chat-attachment-unshare .material-icons { font-size: var(--icon); vertical-align: middle; }
 @media (min-width: 768px) and (not (pointer: coarse)) {
     .chat-attachment-unshare { opacity: 0; }
     .chat-attachment-image:hover > .chat-attachment-unshare, .chat-attachment-image:focus-within > .chat-attachment-unshare, .chat-attachment-unshare:focus-visible { opacity: 1; }
