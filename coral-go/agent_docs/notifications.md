@@ -2,7 +2,7 @@
 
 Push notifications to the Coral UI from workflows, scripts, or any HTTP client. Notifications appear in real-time via WebSocket.
 
-An agent sends one with `coral-agent notify --title "…" [--message "…"] [--level info|success|warning|error] [--alert]`, which carries its session token. A script sends the API key, as in the examples below (`coral api-key` prints it; the key is for a script you run yourself, never an agent): a request with no credential is refused.
+`coral-agent notify --title "…" [--message "…"] [--level info|success|warning|error] [--alert]` sends one from an agent (with its session token), from a workflow step or from your own terminal (signed as the Operator). The API key is not accepted on this route: a request with no agent token and no Operator signature is refused (401 `session_token_required`).
 
 ## Create Notification
 
@@ -59,11 +59,10 @@ An agent, through its own tool (it carries the agent's session token):
 coral-agent notify --title "Deploy Complete" --message "v1.2.0 is live" --level success
 ```
 
-A script, through the API (with the API key):
+The request `coral-agent notify` sends, for its shape (a bare `curl` with the API key is refused 401 `session_token_required`: only an agent's token or the Operator is accepted here):
 
 ```bash
-# a script you run yourself, never an agent
-curl -H "Authorization: Bearer $(coral api-key)" -X POST http://localhost:${CORAL_PORT}/api/notifications \
+curl -X POST http://localhost:${CORAL_PORT}/api/notifications \
   -H 'Content-Type: application/json' \
   -d '{"title": "Deploy Complete", "message": "v1.2.0 is live", "level": "success"}'
 ```
@@ -73,8 +72,7 @@ curl -H "Authorization: Bearer $(coral api-key)" -X POST http://localhost:${CORA
 Centered modal overlay that requires the user to click OK. Supports an optional link button. Best for important messages that require acknowledgment.
 
 ```bash
-# a script you run yourself, never an agent
-curl -H "Authorization: Bearer $(coral api-key)" -X POST http://localhost:${CORAL_PORT}/api/notifications \
+curl -X POST http://localhost:${CORAL_PORT}/api/notifications \
   -H 'Content-Type: application/json' \
   -d '{
     "title": "Welcome to Coral Workflows",
@@ -112,11 +110,9 @@ Notifications are especially useful in workflow shell steps for reporting result
 {
   "name": "notify-result",
   "type": "shell",
-  "command": "curl -s -X POST $CORAL_URL/api/notifications -H \"Authorization: Bearer $(cat \"$CORAL_DATA_DIR/api_key\")\" -H 'Content-Type: application/json' -d '{\"title\": \"Tests Complete\", \"message\": \"All passed\", \"level\": \"success\"}'"
+  "command": "coral-agent notify --title 'Tests Complete' --message 'All passed' --level success"
 }
 ```
-
-A workflow step has no agent session token, so `coral-agent notify` is refused there (401); the step sends the API key from the data folder (`CORAL_DATA_DIR` is set in every step), as above.
 
 Use `StepFailed` hooks to send error notifications:
 
@@ -126,21 +122,21 @@ Use `StepFailed` hooks to send error notifications:
     "StepFailed": [{
       "hooks": [{
         "type": "command",
-        "command": "curl -s -X POST $CORAL_URL/api/notifications -H \"Authorization: Bearer $(cat \"$CORAL_DATA_DIR/api_key\")\" -H 'Content-Type: application/json' -d '{\"title\": \"Step Failed\", \"message\": \"Check workflow run logs\", \"level\": \"error\"}'"
+        "command": "coral-agent notify --title 'Step Failed' --message 'Check workflow run logs' --level error"
       }]
     }]
   }
 }
 ```
 
-## From an agent session or its hooks: `coral-agent notify`
+## From a hook, a workflow step or an agent: `coral-agent notify`
 
 ```bash
 coral-agent notify --title "Deploy Complete" --message "v1.2.0 is live" --level success
 coral-agent notify --title "Review needed" --message "PR #42 is ready" --alert
 ```
 
-It sends the same request as the `curl` examples, with the agent's session token, so it keeps working with [strict local auth](auth.md#strict-local-auth-the-default), where a plain `curl` is refused (401 `dashboard_auth_required`). It needs that token: it is in an agent's session and in the hooks that session runs, not in a workflow step or your own terminal. There, send the API key with `curl`: `-H "Authorization: Bearer $(coral api-key)"` in your terminal, `-H "Authorization: Bearer $(cat \"$CORAL_DATA_DIR/api_key\")"` in a workflow step (a script you run yourself, never an agent).
+It sends the same request as the `curl` examples, with the caller's identity (an agent's session token, or the command-line signature in your own terminal or a workflow step), so it keeps working with [strict local auth](auth.md#strict-local-auth-the-default), where a plain `curl` is refused (401 `dashboard_auth_required`).
 
 ## Environment
 
