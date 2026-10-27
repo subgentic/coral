@@ -30,7 +30,7 @@
   },
   "task_list.js": {
     "tasks": {
-      "rowClass": 5,
+      "rowClass": 4,
       "listRoute": 4
     }
   },
