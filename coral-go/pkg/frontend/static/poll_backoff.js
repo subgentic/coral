@@ -8,3 +8,23 @@ export function ticksAfter(idle) {
     if (!(idle > QUICK_POLLS)) return 1;
     return Math.min(2 ** (idle - QUICK_POLLS), MAX_WAIT_FACTOR);
 }
+
+/** What puts a backed-off poll back to every second: the person acts (a key, a click, focus), the tab becomes visible again (a long hide left it at 10 s, #9124), the agent page comes back. */
+export const WAKE_EVENTS = ['keydown', 'pointerdown', 'focus', 'visibilitychange', 'coral:agent-view-shown'];
+
+/** The ticker of a backing-off poll: call tick() on every base tick; it runs step() (which resolves true when the poll found something new) only when its wait is over, and any of WAKE_EVENTS on `target` puts it back to
+ *  every tick. stop() removes the listeners. */
+export function backoffTicker(target, step) {
+    let idle = 0, wait = 0;
+    const wake = () => { idle = 0; wait = 0; };
+    for (const e of WAKE_EVENTS) target.addEventListener(e, wake, true);
+    return {
+        async tick() {
+            if (--wait > 0) return;
+            const changed = await step();
+            idle = changed ? 0 : idle + 1;
+            wait = ticksAfter(idle);
+        },
+        stop() { for (const e of WAKE_EVENTS) target.removeEventListener(e, wake, true); },
+    };
+}
