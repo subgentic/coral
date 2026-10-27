@@ -859,6 +859,11 @@ func (s *Store) CancelTask(ctx context.Context, project string, taskID int64, su
 	if n == 0 {
 		return nil, fmt.Errorf("task #%d cannot be cancelled (already completed or not found)", taskID)
 	}
+	if w, err := loadWorkflow(ctx, tx, taskID); err == nil {
+		if err := closeReviewTasks(ctx, tx, project, taskID, w, subscriberID, "cancelled"); err != nil {
+			return nil, err
+		}
+	}
 	if err := resolveCompletedTask(ctx, tx, taskID); err != nil {
 		return nil, err
 	}
