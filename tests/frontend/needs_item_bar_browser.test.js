@@ -48,7 +48,13 @@ const BASE = require('./test_base').BASE;
             assert.equal(apart.length, 1, at + 'the standing permission is its own button ' + JSON.stringify(p.answers));
             assert.ok(p.answers.every(a => a.h >= 44), at + 'every answer is a 44 px target ' + JSON.stringify(p.answers));
             assert.ok(bar.every(a => a.bottom <= p.scrollerBottom + 1 && a.top >= p.scrollerBottom - 140 && p.naturalBelow), at + 'the bar is at the foot of the chat though its answers are below the fold ' + JSON.stringify(p));
-            assert.ok(apart[0].bottom <= Math.min(...bar.map(a => a.top)) && apart[0].bg === 'rgba(0, 0, 0, 0)', at + 'the standing permission is above the bar, with no fill ' + JSON.stringify(p.answers));
+            assert.equal(apart[0].bg, 'rgba(0, 0, 0, 0)', at + 'the standing permission has no fill ' + JSON.stringify(p.answers));
+            // UI/UX (#9630): the standing button is in the card's flow, not stuck: it scrolls with the card and is one scroll from the bar. With the whole card in view it is above the bar, 16 px or more clear of Yes, and the bar does not cover it.
+            await ev(`(() => { const box = document.querySelector('.zz-chat'); box.scrollTop = box.scrollHeight; return true; })()`);
+            const q = await ev(`(() => { const box = document.querySelector('.zz-chat'), br = box.getBoundingClientRect(), st = box.querySelector('.cni-standing .cni-answer'), sr = st.getBoundingClientRect(), bars = [...box.querySelectorAll('.cni-options .cni-answer')].map(b => b.getBoundingClientRect()), at = document.elementFromPoint(sr.left + sr.width / 2, sr.top + sr.height / 2); return { standingBottom: sr.bottom, standingTop: sr.top, barTop: Math.min(...bars.map(r => r.top)), covered: !at || !st.contains(at), inView: sr.top >= br.top && sr.bottom <= br.bottom, pos: getComputedStyle(st.closest('.cni-standing')).position }; })()`);
+            assert.ok(q.inView && !q.covered, at + 'with the card in view the bar does not cover the standing button ' + JSON.stringify(q));
+            assert.ok(q.standingBottom + 16 <= q.barTop, at + 'the standing button is above the bar, 16 px or more clear of Yes ' + JSON.stringify(q));
+            assert.notEqual(q.pos, 'sticky', at + 'and it is not stuck ' + JSON.stringify(q));
             assert.ok(p.answers.every(a => a.key === 'none'), at + 'no keyboard digit on a phone ' + JSON.stringify(p.answers));
             await shot('needs-item-bar-390');
             // where the person may not act: no answers at all, and a word that says why
