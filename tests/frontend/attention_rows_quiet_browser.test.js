@@ -45,7 +45,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                 const dot = id => { const e = li(id).querySelector('.session-dot'); return { name: cs(e).animationName, ring: cs(e, '::after').animationName }; };
                 return { tertiary: probe(getComputedStyle(document.documentElement).getPropertyValue('--bg-tertiary').trim()), borderVar: probe(getComputedStyle(document.documentElement).getPropertyValue('--border').trim()),
                     rows: Object.fromEntries(['r1', 'r2', 'r3', 'r4', 'r5', 'r6'].map(id => [id, row(id)])), pills: Object.fromEntries(['r2', 'r3', 'r4', 'r5'].map(id => [id, pill(id)])),
-                    chips: Object.fromEntries(['r2', 'r5'].map(id => [id, chip(id)])), banners: Object.fromEntries(['r2'].map(id => [id, banner(id)])), dots: { r2: dot('r2'), r5: dot('r5') } };
+                    chips: Object.fromEntries(['r2', 'r5'].map(id => [id, chip(id)])), banners: Object.fromEntries(['r2', 'r5'].map(id => [id, banner(id)])), dots: { r2: dot('r2'), r5: dot('r5') } };
             })()`);
             const transparent = 'rgba(0, 0, 0, 0)';
             for (const id of ['r2', 'r3', 'r4', 'r5']) {
@@ -66,8 +66,9 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             } else {
                 assert.equal(s.chips.r2.bg, s.tertiary, `${v.name}: the Needs input chip is on the neutral surface (${s.chips.r2.bg})`);
                 assert.equal(s.chips.r5.bg, s.tertiary, `${v.name}: the error chip too`);
-                assert.equal(s.banners.r2.bg, s.tertiary, `${v.name}: the banner is on the neutral surface (${s.banners.r2.bg})`);
-                assert.equal(s.banners.r2.border, s.borderVar, `${v.name}: with the neutral hairline (${s.banners.r2.border})`);
+                assert.equal(s.banners.r2, null, `${v.name}: a Needs input card is one chip, no banner saying it again (#9464)`);
+                assert.equal(s.banners.r5.bg, s.tertiary, `${v.name}: the Stuck card's banner is on the neutral surface (${s.banners.r5.bg})`);
+                assert.equal(s.banners.r5.border, s.borderVar, `${v.name}: with the neutral hairline (${s.banners.r5.border})`);
             }
             // The row's dot flashes by itself, with no ring around it (#5140): it animates with no preference, and stops with reduced motion.
             assert.equal(s.dots.r2.name, 'pulse-waiting', `${v.name}: the waiting dot flashes (${s.dots.r2.name})`);
