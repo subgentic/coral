@@ -44,6 +44,14 @@ const BASE = require('./test_base').BASE;
             await ev(`import((window.__coralStatic || '/static/') + 'scheduler.js').then(m => m.selectScheduledJob(7)); true`);
             await settle(300);
             assert.equal(await ev(`!!document.querySelector('#scheduler-detail .sched-saved')`), false, `${label}: said once`);
+            // 3. a deleted job: the page it returns to says so, in words, with no toast over its first control
+            await ev(`window.__deleted = false; const real2 = window.fetch; window.fetch = (u, o) => { const s = String(u && u.url || u); if (/\\/api\\/scheduled\\/jobs\\/7$/.test(s) && o && o.method === 'DELETE') { window.__deleted = true; return Promise.resolve(new Response('{}', { headers: { 'content-type': 'application/json' } })); } if (window.__deleted && /\\/api\\/scheduled\\/jobs(\\?|$)/.test(s)) return Promise.resolve(new Response(JSON.stringify({ jobs: [] }), { headers: { 'content-type': 'application/json' } })); return real2(u, o); }; window.showConfirmModal = (t, m, cb) => cb(); true`);
+            await ev(`document.querySelectorAll('#toast-host .toast').forEach(t => t.remove()); document.querySelector('[data-on-click="job-delete"]').click(); true`);
+            await waitFor(`!!document.querySelector('#group-table-view .group-table-status')`, `${label}: the Jobs page says the job was deleted`, 8000);
+            assert.equal(await ev(`document.querySelector('#group-table-view .group-table-status').textContent.trim()`), 'Deleted greet-hourly.', `${label}: the words`);
+            assert.equal(await ev(`document.querySelector('#group-table-view .group-table-status').getAttribute('role')`), 'status');
+            assert.equal(await ev(`!!document.querySelector('#toast-host .toast')`), false, `${label}: no toast over the page's first control`);
+            await shot(`job-deleted-${label}`);
             console.log(`   ok   ${label}`);
         }
         console.log('toast_pinned_bar_browser: ok');

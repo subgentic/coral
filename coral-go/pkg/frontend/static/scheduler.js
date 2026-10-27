@@ -276,11 +276,13 @@ async function toggleScheduledJob(jobId) {
 function deleteScheduledJob(jobId) {
     window.showConfirmModal('Delete Job', 'Delete this scheduled job and all its run history?', async () => {
         try {
+            const gone = (scheduledJobs.find(j => j.id === jobId) || {}).name || 'the job';
             await fetch(`/api/scheduled/jobs/${jobId}`, { method: 'DELETE' });
-            showToast('Job deleted');
             selectedJobId = null;
             await fetchJobs();
-            (await importOnce('./automations.js')).backToFolder('jobs');
+            const A = await importOnce('./automations.js');
+            A.noteJobDeleted(gone); // no toast: the page it returns to says it, in words, under its title (#9298)
+            A.backToFolder('jobs');
         } catch (e) {
             showToast('Failed to delete job', true);
         }
