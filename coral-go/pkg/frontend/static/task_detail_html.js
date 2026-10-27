@@ -1,4 +1,6 @@
+import { importOnce } from './import_once.js';
 import { formatCost } from './format.js';
+const { reviewPoolInfo } = await importOnce('./review_pool.js');
 /* The task detail dialog's markup (moved out of tasks.js, #4996; no behaviour change). */
 import { escapeHtml, escapeAttr } from './utils.js';
 import { _priorityLabel, formatTaskDate, _formatTokenCount } from './task_format.js';
@@ -88,12 +90,13 @@ function _taskWorkflowHtml(task) {
         for (const input of workflow.inputs || []) html += `<details class="task-detail-section"><summary>Input from ${escapeHtml(input.board_id)} #${Number(input.task_id)} (${escapeHtml(input.outcome)})</summary>${(input.artifacts || []).map(artifactHtml).join('')}</details>`;
         if (workflow.completion_review) {
             const review = workflow.completion_review;
+            const pool = reviewPoolInfo(task);
             // In words a person reads (#7182): who, when (the app's times), what they propose, what it waits for; not "completion candidate", "slot" or an ISO time.
             const note = [review.reason && review.reason !== 'review pending' ? escapeHtml(review.reason) : '', escapeHtml(review.message || '')].filter(Boolean).join('<br>');
             html += `<div class="task-detail-section"><div class="task-detail-label">Submitted for review · not accepted yet</div>
                 <div class="task-detail-body">Submitted by ${escapeHtml(review.submitted_by)}, ${escapeHtml(whenWords(review.submitted_at))}<br>Proposed result: ${escapeHtml(review.proposed_outcome)}${note ? `<br>${note}` : ''}</div>
                 ${(review.artifacts || []).map(artifactHtml).join('')}
-                ${review.released_by ? `<div class="task-detail-body">Waiting for the Orchestrator to pick reviewers.<br>Released by ${escapeHtml(review.released_by)}, ${escapeHtml(whenWords(review.released_at))}${review.release_reason ? `: ${escapeHtml(review.release_reason)}` : ''}</div>` : '<div class="task-detail-body">The agent still holds this task. An orchestrator can release it with coral-board task release-review.</div>'}</div>`;
+                ${pool ? `<div class="task-detail-body">${escapeHtml(pool.text)}<br>Review areas: ${escapeHtml(pool.areas.join(', ') || 'All areas')}</div>` : review.released_by ? `<div class="task-detail-body">Waiting for the Orchestrator to pick reviewers.<br>Released by ${escapeHtml(review.released_by)}, ${escapeHtml(whenWords(review.released_at))}${review.release_reason ? `: ${escapeHtml(review.release_reason)}` : ''}</div>` : '<div class="task-detail-body">The agent still holds this task. An orchestrator can release it with coral-board task release-review.</div>'}</div>`;
         }
         if (workflow.artifacts?.length) html += `<div class="task-detail-section"><div class="task-detail-label">Completion artifacts</div>${workflow.artifacts.map(artifactHtml).join('')}</div>`;
     }

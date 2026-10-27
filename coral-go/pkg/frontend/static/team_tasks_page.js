@@ -14,6 +14,7 @@ const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the
 import { goalTitle, refreshGoalTitles, readGoal, readGoalChoices, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
+const { needsReview } = await importOnce('./review_pool.js');
 import { showToast } from './utils.js';
 import { foldWayBack } from './way_back.js';
 const TF = await importOnce('./task_filters.js');
@@ -21,7 +22,7 @@ const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's re
 const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 
 const PAGE = 50;
-const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['done', 'Done']];
+const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['needs_review', 'Needs review'], ['done', 'Done']];
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css)
 let phoneWatched = false, newTask = null; // one New task button, moved between the search row and the chips' row
 const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTotal: 0, truncated: false, busy: false, error: '' });
@@ -190,8 +191,8 @@ async function loadChoices() {
 const rowsNow = () => (TF.isQuery(model.filters) ? model.q.rows : model.rows);
 
 const counts = () => {
-    const c = { open: 0, all: 0, queued: 0, active: 0, blocked: 0, review: 0, done: 0 };
-    for (const t of rowsNow()) { c.all++; c[bucket(t)]++; }
+    const c = { open: 0, all: 0, queued: 0, active: 0, blocked: 0, review: 0, needs_review: 0, done: 0 };
+    for (const t of rowsNow()) { c.all++; c[bucket(t)]++; if (needsReview(t)) c.needs_review++; }
     if (!TF.isQuery(model.filters)) {
         if (model.totalOpen != null && model.totalDone != null) c.all = model.totalOpen + model.totalDone;
         if (model.totalDone != null) c.done = model.totalDone;
@@ -224,7 +225,7 @@ function draw() {
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (!all.length) { if (!failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : 'No tasks yet')); body.append(e); } }
     else {
-        const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter)));
+        const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'needs_review' ? needsReview(t) : model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter)));
         if (!shown.length) {
             const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
