@@ -89,7 +89,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     const main = el('div', 'detail-body');
     if (facts.length) {
         const dl = el('dl', 'detail-facts');
-        for (const [k, v] of facts) { if (v == null || v === '') continue; dl.append(el('dt', null, k), el('dd', null, v)); }
+        for (const [k, v] of facts) { if (v == null || v === '') continue; const dd = el('dd', null, v instanceof Node ? '' : v); if (v instanceof Node) dd.append(v); dl.append(el('dt', null, k), dd); } // a value is text, or a node (the Task fact is the link the Task column is)
         if (dl.children.length) more.add(dl);
     }
     const doc = el('div', 'detail-doc');
