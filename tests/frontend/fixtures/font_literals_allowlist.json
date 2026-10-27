@@ -13,26 +13,24 @@
       "font-size: 1.05em": 1,
       "font-size: 1.1em": 1,
       "font-size: 1.8rem": 1,
-      "font-size: 1em": 1
+      "font-size: 1em": 1,
+      "font-weight: 600": 4,
+      "font-weight: 700": 2,
+      "line-height: 1.6": 1
     },
     "coral-go/pkg/frontend/static/css/agentic.css": {
-      "font-family: 'Material Icons'": 1,
-      "font-size: 0.9375rem": 2
+      "font-family: 'Material Icons'": 1
     },
     "coral-go/pkg/frontend/static/css/chat.css": {
-      "font-size: 0.8438rem": 1,
       "font-size: 0.84em": 1,
-      "font-size: 0.8rem": 1,
       "font-size: 1.12em": 1,
-      "font-size: 1.1rem": 1,
       "font-size: 1.3em": 1,
       "font-size: 1.5em": 1,
       "font-size: 1em": 1
     },
     "coral-go/pkg/frontend/static/css/cloud.css": {
       "font-family: 'Plus Jakarta Sans', system-ui, sans-serif": 1,
-      "font-family: ui-monospace, monospace": 2,
-      "font-size: 0.9375rem": 1
+      "font-family: ui-monospace, monospace": 2
     },
     "coral-go/pkg/frontend/static/css/command-pane.css": {
       "font-size: calc(1em * var(--ph-scale, 1))": 1
@@ -41,72 +39,60 @@
       "font-family: monospace": 1,
       "font-family: ui-monospace, SFMono-Regular, Menlo, monospace": 1,
       "font-size: 0.78125rem": 1,
-      "font-size: 0.7812rem": 1,
-      "font-size: 0.9375rem": 3,
       "font-size: 0.9em": 1,
-      "font-size: 1.0625rem": 2,
       "font-size: 1.15em": 1,
       "font-size: 1.6em": 1,
       "font-size: 2.5rem": 1,
       "font-size: 2rem": 1,
-      "font-size: 3rem": 1
+      "font-size: 3rem": 1,
+      "font-weight: 700": 1
     },
     "coral-go/pkg/frontend/static/css/cost_dashboard.css": {
-      "font-size: 0.9375rem": 1,
-      "font-size: 1.0625rem": 2,
-      "font-size: 1.5rem": 1
+      "font-weight: 700": 3
     },
     "coral-go/pkg/frontend/static/css/docs.css": {
-      "font-size: 1.0625rem": 1
+      "font-weight: 700": 1
     },
     "coral-go/pkg/frontend/static/css/fonts.css": {
       "font-family: 'Material Icons'": 2,
       "font-family: 'Plus Jakarta Sans'": 2,
-      "font-size: 1.5rem": 1
+      "font-size: 1.5rem": 1,
+      "font-weight: 400": 1,
+      "font-weight: 400 700": 2,
+      "font-weight: normal": 1
     },
     "coral-go/pkg/frontend/static/css/goals.css": {
-      "font-size: 1.0625rem": 1
+      "font-weight: 700": 1
     },
     "coral-go/pkg/frontend/static/css/history.css": {
-      "font-size: 0.9375rem": 1,
-      "font-size: 1.0625rem": 2
+      "font-weight: 700": 1
     },
     "coral-go/pkg/frontend/static/css/layout.css": {
       "font-size: .95em": 1,
-      "font-size: 0.5625rem": 1,
-      "font-size: 0.9375rem": 4,
-      "font-size: 1.0625rem": 2,
       "font-size: 1.1875rem": 1,
       "font-size: 1.3125rem": 1,
       "font-size: 1.5rem": 1,
-      "font-size: clamp(1.625rem, 3.4vw, 2.375rem)": 1
-    },
-    "coral-go/pkg/frontend/static/css/mobile.css": {
-      "font-size: 0.9375rem": 1
+      "font-weight: 700": 1
     },
     "coral-go/pkg/frontend/static/css/output.css": {
-      "font-size: 0.85rem": 1,
       "font-size: 0.88em": 1,
       "font-size: 1.2em": 1,
       "font-size: 1.45em": 1,
       "font-size: 1.9em": 1
     },
     "coral-go/pkg/frontend/static/css/scheduler.css": {
-      "font-size: 1.0625rem": 1
+      "font-weight: 700": 2
     },
     "coral-go/pkg/frontend/static/css/session.css": {
-      "font-size: 0.9375rem": 2,
       "font-size: 1.05em": 1,
       "font-size: 1.1875rem": 1,
-      "font-size: 1.3125rem": 1,
-      "font-size: 1.5rem": 1
+      "font-size: 1.3125rem": 1
     },
     "coral-go/pkg/frontend/static/css/team_page.css": {
-      "font-size: 0.9375rem": 2,
-      "font-size: 1.0625rem": 2
+      "font-weight: 700": 4
     },
     "coral-go/pkg/frontend/static/css/workflows.css": {
-      "font-size: 1.0625rem": 1
+      "font-weight: 700": 1
     },
     "coral-go/pkg/frontend/static/platform/native.js": {
       "font-family: -apple-system,BlinkMacSystemFont,sans-serif": 1,
