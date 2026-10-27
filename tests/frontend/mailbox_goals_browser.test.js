@@ -29,13 +29,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
         console.log('1. Desktop: the Goals folder');
         await open(1280, 800, false);
         const d = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { title: document.getElementById('group-table-title').textContent, heads: [...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()),
-            rows: rows.map(r => ({ goal: r.querySelector('.dt-primary').textContent, team: r.querySelector('td[data-key="team"]').textContent.trim(), chip: r.querySelector('.goal-chip').textContent, progress: r.querySelector('td[data-key="progress"]').textContent.replace(/\\s+/g, ' ').trim() })),
+            rows: rows.map(r => ({ goal: r.querySelector('.dt-primary').textContent, team: r.querySelector('td[data-key="team"]').textContent.trim(), progress: r.querySelector('td[data-key="progress"]').textContent.replace(/\\s+/g, ' ').trim() })),
             sidebar: [...document.querySelectorAll('.view-list-item')].map(${ROW_WORDS}).filter(t => /^(Needs you|Tasks|Goals|Saved)/.test(t)), goalsSoon: !!document.querySelector('.view-list-item[data-key="goals"].view-list-soon, .view-list-item[data-key="goals"][aria-disabled="true"]') }; })()`);
-        assert.equal(d.title, 'Goals'); assert.deepEqual(d.heads, ['State', 'Goal', 'Team', 'Progress', 'Updated'], 'the team page\'s goal row plus a Team column');
+        assert.equal(d.title, 'Goals'); assert.deepEqual(d.heads, ['Goal', 'Team', 'Progress', 'Updated'], 'the team page\'s goal row plus a Team column');
         const mine = d.rows.filter(r => [A, B].includes(r.team));
         assert.deepEqual(mine.map(r => r.goal).sort(), ['Explore goals', 'Plan the notes', 'Ship the mailbox'], 'the open goals of both teams ' + JSON.stringify(d.rows));
         assert.match(mine.find(r => r.goal === 'Ship the mailbox').progress, /0 of 3 done/, 'progress words'); assert.match(mine.find(r => r.goal === 'Plan the notes').progress, /No tasks yet/);
-        assert.ok(mine.every(r => ['Active', 'Proposed', 'Blocked'].includes(r.chip)), 'the goal state words ' + JSON.stringify(mine.map(r => r.chip)));
+        assert.equal(await ev(`document.querySelectorAll('#group-table-view .dt-subtitle').length`), 0, 'outcomes stay in the preview');
         assert.ok(d.sidebar.some(t => /^Goals\s*\d+$/.test(t)) && !d.goalsSoon, 'Goals is a folder in the sidebar with its count, not "soon" ' + JSON.stringify(d.sidebar));
         // the search narrows the folder
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => { m.filterInbox('notes'); return true; })`);
@@ -47,11 +47,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`!!document.getElementById('goals-detail-title') && document.getElementById('goals-detail-title').textContent === 'Plan the notes'`, 'the goal opened on its team page', 12000);
         console.log('   ✓');
 
-        console.log('2. Phone: the two-line row');
+        console.log('2. Phone: the single-line row');
         await open(390, 844, true);
-        await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-folded')`, 'folds on a phone', 5000);
+        await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-one-line')`, 'one line on a phone', 5000);
         const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { h: rows.map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, head: getComputedStyle(document.querySelector('#group-table-view thead')).display }; })()`);
-        assert.equal(p.head, 'none'); assert.ok(p.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(p.h)); assert.ok(p.over <= 1, 'no sideways scroll');
+        assert.equal(p.head, 'table-header-group'); assert.ok(p.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(p.h)); assert.ok(p.over <= 1, 'no sideways scroll');
         console.log('   ✓');
         console.log('PASS Inbox Goals folder: every team\'s open goals as the goal row with a Team column');
     } finally { await removeBoards(ev, [A, B]).catch(() => {}); await client.close(); }

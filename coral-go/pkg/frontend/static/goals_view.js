@@ -154,11 +154,11 @@ function drawTableRaw(col) {
     if (sort) shown.sort((a, b) => { const x = sortValue(a), y = sortValue(b); return (sort.dir === 'desc' ? -1 : 1) * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true })); });
     const rows = shown.concat(model.noGoalOpen > 0 && (model.filter === 'all' || model.filter === DEFAULT_FILTER) ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : []);
     const table = DT.dataTable({
-        label: `Goals, ${shown.length}`, rows, rowKey: g => g.id, state: goalsTableState, rowName: g => g.title,
+        label: `Goals, ${shown.length}`, oneLine: true, sortBar: false, rows, rowKey: g => g.id, state: goalsTableState, rowName: g => g.title,
         selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null) },
         onSort: () => drawList(), // keep the no-goal navigation row last in either direction
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
-        columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']),
+        columns: GC.goalColumns({}, ['goal', 'progress', 'updated']),
     });
     col.append(table.el); Toolbar.mountSelection(toolbar, goalsTableState.selected.size ? table.bar : null);
     if (PHONE.matches) toolbar.querySelector('.goals-new')?.before(table.selectButton);

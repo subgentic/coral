@@ -182,8 +182,6 @@
 .dt-progress-meter::-webkit-progress-value { background: var(--table-progress-fill); }
 .dt-progress-meter::-moz-progress-bar { background: var(--table-progress-fill); }
 
-.dt-table .dt-action { margin: 0; white-space: nowrap; }
-.dt-box.dt-folded .dt-action { min-height: var(--table-touch); }
 
 .dt-note { max-width: 100%; box-sizing: border-box; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
 .dt-warning { border-color: var(--table-warning); color: var(--table-primary-color); }
@@ -367,3 +365,6 @@
 .dt-one-line .team-artifact-badge { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .artifact-name-icon { display: inline-flex; flex: 0 0 16px; }
+.dt-one-line .dt-progress { flex-direction: row; align-items: center; }
+.dt-one-line .dt-progress-meter { display: none; } /* counts stay on the row; the goal preview carries the full rollup */
+.dt-one-line .dt-person { display: flex; min-width: 0; }
