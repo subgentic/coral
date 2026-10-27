@@ -51,7 +51,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await open(390, 844, true);
         await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-one-line')`, 'a one-line table on a phone', 5000);
         const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { h: rows.map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, head: getComputedStyle(document.querySelector('#group-table-view thead')).display }; })()`);
-        assert.notEqual(p.head, 'none', 'the column heads stay (they sort a one-line table)'); assert.ok(p.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(p.h)); assert.ok(p.over <= 1, 'no sideways scroll');
+        assert.equal(p.head, 'none', 'a phone\'s rows are mail rows (#9545): no column heads, and no Sort row (a mail list has none)'); assert.ok(p.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(p.h)); assert.ok(p.over <= 1, 'no sideways scroll');
         console.log('   ✓');
         console.log('PASS Inbox Goals folder: every team\'s open goals as the goal row with a Team column');
     } finally { await removeBoards(ev, [A, B]).catch(() => {}); await client.close(); }

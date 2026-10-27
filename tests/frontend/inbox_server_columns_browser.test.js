@@ -48,6 +48,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
    for(const folder of folders){try{
     await open(folder);
     // A phone's rows are mail rows (#9545): one cell each, no Server column or sort. What holds there: rows of both origins are listed and the Server filter in the panel narrows them (the columns are checked at 1280).
+    if(width===390)await waitFor(`!!document.querySelector('#group-table-view tr.dt-mailed')||!!document.querySelector('#group-table-view th[data-key="server"]')`,'the '+folder+' rows, as mail rows or as a table',8000); // Artifacts rows come after the folder opens
     if(width===390&&await ev(`!!document.querySelector('#group-table-view tr.dt-mailed')`)){
      const rows=`document.querySelectorAll('#group-table-view tr.dt-mailed').length`,pick=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Server')?.querySelector('select')`;
      await waitFor(`${rows}>=2`,'rows of both origins in '+folder+' on a phone',8000);

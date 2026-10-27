@@ -25,7 +25,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
         await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`); await settle(200);
         fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
     };
-    const column = title => ev(`(() => { const th = [...document.querySelectorAll('#group-table-view th')].findIndex(h => h.textContent.replace(/[\\u2191\\u2193\\u2195]/g, '').trim() === ${JSON.stringify(title)}); if (th < 0) return null;
+    const column = title => ev(`(() => { const th = [...document.querySelectorAll('#group-table-view th')].findIndex(h => h.textContent.replace(/[\\u2191\\u2193\\u2195]/g, '').trim() === ${JSON.stringify(title)}); if (th < 0 || document.querySelector('#group-table-view tr.dt-mailed')) return null; // a phone's mail rows have no columns (#9545)
         return [...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.querySelector('.dt-primary, td')).map(r => (r.children[th] || {}).textContent.replace(/\\s+/g, ' ').trim()); })()`);
     const teamChoices = () => ev(`[...document.querySelectorAll('.inbox-folder-toolbar select[id$="-team"] option')].map(o => [o.value, o.textContent.trim()])`);
     try {
@@ -57,7 +57,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             await open('goals');
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length >= 2`, `${label}: two goals`, 10000);
             const gteams = await column('Team');
-            check(`${label}: Goals' Team column tells the two alpha teams apart`, gteams && gteams.length === 2 && gteams[0] !== gteams[1] && gteams.some(t => /alpha.*This computer/.test(t)) && gteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(gteams));
+            if (!mobile) check(`${label}: Goals' Team column tells the two alpha teams apart`, gteams && gteams.length === 2 && gteams[0] !== gteams[1] && gteams.some(t => /alpha.*This computer/.test(t)) && gteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(gteams));
             await shot(`team-labels-goals-${label}`, mobile ? 'dark' : 'light');
             await panel();
             await ev(`(() => { const s = document.getElementById('inbox-goals-team'); s.size = s.options.length; return true; })()`); // the choices as a list, for the shot (a native popup is not in one)
@@ -66,13 +66,13 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             const gchoices = await teamChoices();
             check(`${label}: Goals' Team filter offers both, by their computer`, gchoices.filter(([v]) => v).length === 2 && new Set(gchoices.map(c => c[1])).size === gchoices.length && gchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)), JSON.stringify(gchoices));
             await ev(`(() => { const s = document.getElementById('inbox-goals-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(400);
-            check(`${label}: choosing the remote one shows its goal, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => b.textContent.trim())`)) === '["Remote goal"]' && /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`)));
+            check(`${label}: choosing the remote one shows its goal, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => (b.querySelector('.dt-mail-title') || b).textContent.trim())`)) === '["Remote goal"]' && (mobile || /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`))));
 
             // Tasks: the Team column, and the Team filter this folder did not have
             await open('tasks');
             await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length >= 2`, `${label}: two tasks`, 10000);
             const tteams = await column('Team');
-            check(`${label}: Tasks' Team column tells the two alpha teams apart`, tteams && tteams.length === 2 && tteams[0] !== tteams[1] && tteams.some(t => /alpha.*This computer/.test(t)) && tteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(tteams));
+            if (!mobile) check(`${label}: Tasks' Team column tells the two alpha teams apart`, tteams && tteams.length === 2 && tteams[0] !== tteams[1] && tteams.some(t => /alpha.*This computer/.test(t)) && tteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(tteams));
             await shot(`team-labels-tasks-${label}`, mobile ? 'dark' : 'light');
             await panel();
             await ev(`(() => { const s = document.getElementById('inbox-tk-team'); s.size = s.options.length; return true; })()`);
@@ -81,7 +81,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             const tchoices = await ev(`[...document.querySelectorAll('#inbox-tk-team option')].map(o => [o.value, o.textContent.trim()])`);
             check(`${label}: Tasks has a Team filter with both teams, by their computer`, tchoices.filter(([v]) => v).length === 2 && tchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)) && tchoices.some(([v, t]) => v === 'alpha' && /This computer/.test(t)), JSON.stringify(tchoices));
             await ev(`(() => { const s = document.getElementById('inbox-tk-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500);
-            check(`${label}: choosing the remote one shows its task, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(b => b.textContent.replace(/^#\\d+\\s*/, '').trim())`)) === '["Remote task"]' && /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`)), JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(b => b.textContent.trim())`)));
+            check(`${label}: choosing the remote one shows its task, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(b => ((b.querySelector('.dt-mail-title') || b).textContent).replace(/^#\\d+\\s*/, '').trim())`)) === '["Remote task"]' && (mobile || /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`))), JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(b => b.textContent.trim())`)));
 
             // Needs you: two agents waiting, one on each computer's alpha
             await ev(`(async () => { const S = window.__coralStatic || '/static/'; const ago = m => new Date(Date.now() - m * 60000).toISOString();
@@ -117,7 +117,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             await ev(`(document.querySelector('.detail-close') || document.body).click(); true`); await waitFor(`!document.querySelector('.detail-facts')`, `${label}: the preview closes`, 5000); await settle(300);
             const clipped = await ev(`(() => { const t = document.querySelector('#group-table-view table'); const heads = [...t.querySelectorAll('th')].map(h => h.textContent.trim()); const out = []; for (const name of ['Team', 'Computer']) { const i = heads.findIndex(h => h.startsWith(name)); if (i < 0) { out.push('no ' + name + ' column in ' + heads.join('/')); continue; } for (const r of t.querySelectorAll('tbody tr')) { const td = r.children[i]; if (td && td.getClientRects().length && [td, ...td.querySelectorAll('*')].some(e => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible')) out.push(name + ': ' + td.textContent.trim()); } } return out; })()`);
             const longTeam = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => Math.round(r.getBoundingClientRect().height))`);
-            check(`${label}: Artifacts rows are one line each: the Team and Computer cells do not wrap (the whole of both is the row's hover, #9408)`, longTeam.length >= 2 && longTeam.every(h => h <= 48), JSON.stringify(longTeam));
+            check(`${label}: Artifacts rows are one line each: the Team and Computer cells do not wrap (the whole of both is the row's hover, #9408)`, longTeam.length >= 2 && longTeam.every(h => h <= (mobile ? 56 : 48)), JSON.stringify(longTeam));
             check(`${label}: Artifacts' Team and Computer cells are not cut at this width (alpha, This computer, Box Two stay whole); the Goal cell is the one line, cut with an ellipsis (#9274)`, clipped.length === 0, JSON.stringify(clipped));
             if (!mobile) {
                 const cols = await ev(`(() => { const t = document.querySelector('#group-table-view table'), th = [...t.querySelectorAll('th')].find(h => /^Name/.test(h.textContent.trim())); return { name: Math.round(th.getBoundingClientRect().width), table: Math.round(t.getBoundingClientRect().width), heads: [...t.querySelectorAll('th')].map(h => h.textContent.replace(/[\\u2191\\u2193\\u2195]/g, '').trim()).filter(Boolean), cut: [...document.querySelectorAll('#group-table-view .dt-primary')].filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent.trim()) }; })()`);
@@ -128,7 +128,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             check(`${label}: the Server filter stays in the Artifacts Filters panel while the Server column is hidden (UI/UX's condition on #8839)`, alabels.includes('Server'), JSON.stringify(alabels));
             const achoices = await teamChoices();
             check(`${label}: Artifacts' Team filter lists the two teams by their computer, each with its count`, achoices.filter(([v]) => v).length === 2 && achoices.some(([v, t]) => v === '@box-2/alpha' && /alpha · Box Two \(1\)/.test(t)) && achoices.some(([v, t]) => v === 'alpha' && /alpha · This computer \(1\)/.test(t)), JSON.stringify(achoices));
-            check(`${label}: Needs you's Team column tells the two alpha teams apart`, nteams && nteams.length === 2 && nteams[0] !== nteams[1] && nteams.some(t => /alpha.*This computer/.test(t)) && nteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(nteams));
+            if (!mobile) check(`${label}: Needs you's Team column tells the two alpha teams apart`, nteams && nteams.length === 2 && nteams[0] !== nteams[1] && nteams.some(t => /alpha.*This computer/.test(t)) && nteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(nteams));
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }

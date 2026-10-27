@@ -107,7 +107,7 @@ const compareBy = (col) => {
 };
 
 /** The phone's mail row (#9545, UI/UX's spec): a 44 px leading target holding a 32 px avatar, the title and the first words of what it says on one line, the time at the right, and under the line (Needs you only) the ask.
- *  A caller opts in with `mail(row) -> { lead: { text, name?, square?, icon? }, title, snippet?, ask?, time?, unread?, mark?, data? }` (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
+ *  A caller opts in with `mail(row) -> { lead: { text, name?, square?, icon? }, title, snippet?, ask?, time?, unread?, mark?, data?, tip? }` (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
  *  `unread` makes the title bold and the time primary: a list says it only where a read state exists today. `mark: 'attention'` is the amber dot under the time. Text is set with textContent only. */
 const MAIL_QUERY = '(max-width: 767px)';
 const mailCell = (m, label, open, pick) => { // open: the row opens (a button), pick: a function that selects it, or null
@@ -120,12 +120,13 @@ const mailCell = (m, label, open, pick) => { // open: the row opens (a button), 
     const tick = el('span', 'dt-mail-avatar dt-mail-tick material-icons', 'check'); tick.setAttribute('aria-hidden', 'true'); // the avatar of a selected row
     lead.append(shape, tick);
     const body = el(open ? 'button' : 'span', `dt-mail-open${m.unread ? ' dt-mail-unread' : ''}${open ? ' dt-primary' : ''}`);
+    if (m.tip) body.title = m.tip; // the whole words behind the line's cut or dropped parts (a row's team and computer): its hover
     if (m.data) Object.assign(body.dataset, m.data); // the data-* the row's primary button carried as a column (a task's data-task-id): what finds the row again and what a deep link or a focus return reads
     if (open) { body.type = 'button'; body.setAttribute('aria-label', label); } // its click is the row's (a .dt-primary button is not interactive to the row's handler: it opens, or toggles while selecting)
     const text = el('span', 'dt-mail-text'), line = el('span', 'dt-mail-line');
     line.append(el('span', 'dt-mail-title', m.title || ''), el('span', 'dt-mail-snippet', m.snippet || ''));
     text.append(line);
-    if (m.ask) { text.classList.add('dt-mail-two'); text.append(el('span', 'dt-mail-ask', m.ask)); }
+    if (m.ask) { text.classList.add('dt-mail-two'); const ask = el('span', 'dt-mail-ask', m.ask); ask.title = m.ask; text.append(ask); } // the whole ask is the line's title, so a cut one can be read (#9495)
     const side = el('span', 'dt-mail-side'); side.append(el('span', 'dt-mail-time', m.time || ''));
     if (m.mark) { const dot = el('span', `dt-mail-dot dt-mail-${m.mark}`); dot.setAttribute('aria-hidden', 'true'); side.append(dot); }
     body.append(text, side);

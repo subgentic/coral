@@ -18,7 +18,7 @@ const GOALS = [
     const { settle } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
-    const titles = () => ev(`[...document.querySelectorAll('button.dt-primary')].filter(b => b.getClientRects().length).map(b => b.textContent.trim()).sort()`);
+    const titles = () => ev(`[...document.querySelectorAll('button.dt-primary')].filter(b => b.getClientRects().length).map(b => (b.querySelector('.dt-mail-title') || b).textContent.trim()).sort()`); // a phone's row is a mail row (#9583): its button holds the title, the outcome and the time; the title is the name
     const folders = () => ev(`${FOLDER_ROWS}.join('|')`);
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), p = r.querySelector('.team-tb-pills'), s = r.querySelector('.team-tb-select');
