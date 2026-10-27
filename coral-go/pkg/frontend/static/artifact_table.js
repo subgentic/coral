@@ -19,9 +19,17 @@ export function serverArtifactSort(s = artifactSort()) {
     if (s.key === 'size') return desc ? 'size' : 'size_asc';
     return s.dir === 'asc' ? 'oldest' : 'newest';
 }
+/** The other way: a server word (the Filters panel's Sort) as the table's sort, so its header marks the same order. */
+export function tableSortOf(word) {
+    const m = /^(name|type|tags)(_desc)?$/.exec(word);
+    if (m) return { key: m[1], dir: m[2] ? 'desc' : 'asc' };
+    if (word === 'size' || word === 'size_asc') return { key: 'size', dir: word === 'size' ? 'desc' : 'asc' };
+    return { key: 'updated', dir: word === 'oldest' ? 'asc' : 'desc' };
+}
 export function artifactTable(cfg) {
     const state = cfg.state || DT.tableState();
-    state.sort ||= artifactSort();
+    if (cfg.groupBy && !state.sortTouched) state.sort = null; // a grouped list keeps its groups (a head per task or goal, its files together) until a header is pressed: DataTable draws heads only while it is unsorted
+    else state.sort ||= artifactSort();
     const columns = [
         { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: readableName, cell: item => {
             const b = DT.primaryButton(readableName(item)); b.dataset.artifactId = (cfg.rowKey || itemKey)(item);
@@ -35,11 +43,12 @@ export function artifactTable(cfg) {
             if (badge) wrap.append(badge);
             return wrap;
         } },
-        { key: 'type', label: 'Type', width: '6.5rem', dropAt: 36, sort: true, sortValue: typeText, cell: i => isUnverified(i) ? '—' : DT.tag(typeText(i)) },
-        { key: 'tags', label: 'Tags', width: '16rem', dropAt: 52, sort: true, sortValue: i => (i.tags || []).join(', '), cell: i => Tags.rowTags(i.tags) || '—' },
-        { key: 'size', label: 'Size', width: '5rem', dropAt: 28, sort: 'number', firstDir: 'desc', sortValue: i => Number(i.size) || 0, align: 'end', cell: i => isUnverified(i) ? '—' : sizeText(i.size) || '—' },
-        { key: 'updated', label: 'Updated', width: '7.5rem', sort: 'date', firstDir: 'desc', sortValue: i => i.updated_at || i.created_at, cell: i => DT.timeCell(i.updated_at || i.created_at) },
-        ...(cfg.details ? [{ key: 'details', label: 'Details', hideLabel: true, width: '3rem', cell: cfg.details }] : []),
+        ...(cfg.afterName || []), // the Inbox's list spans teams and computers: its Team (or Server) column, which drops with the optional ones
+        { key: 'type', label: 'Type', width: '6.5rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: typeText, cell: i => isUnverified(i) ? '—' : DT.tag(typeText(i)) },
+        { key: 'tags', label: 'Tags', width: '16rem', dropAt: cfg.tagsDropAt || 52, sort: true, sortValue: i => (i.tags || []).join(', '), cell: i => Tags.rowTags(i.tags) || '—' },
+        { key: 'size', label: 'Size', width: '5rem', dropAt: 28, tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: i => Number(i.size) || 0, align: 'end', cell: i => isUnverified(i) ? '—' : sizeText(i.size) || '—' },
+        { key: 'updated', label: 'Updated', width: '7.5rem', tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: i => i.updated_at || i.created_at, cell: i => DT.timeCell(i.updated_at || i.created_at) },
+        ...(cfg.details ? [{ key: 'details', label: 'Details', hideLabel: true, width: '3.75rem', cell: cfg.details }] : []),
     ];
     const table = DT.dataTable({ ...cfg, columns, state, oneLine: true, resize: false, sortBar: false,
         rowKey: cfg.rowKey || itemKey, rowName: i => Tags.nameWithTags(readableName(i), i.tags),
@@ -50,6 +59,6 @@ export function artifactTable(cfg) {
     });
     table.el.classList.add('artifact-table');
     // DataTable changes the state before the event bubbles here, preserving its keyboard focus handling.
-    table.el.addEventListener('click', e => { if (e.target.closest('.dt-sort')) browserLocal.set(SORT_KEY, JSON.stringify(state.sort)); });
+    table.el.addEventListener('click', e => { if (e.target.closest('.dt-sort')) { state.sortTouched = true; browserLocal.set(SORT_KEY, JSON.stringify(state.sort)); } });
     return table;
 }

@@ -206,10 +206,10 @@ const REMOTE = `(() => {
         await ev(`window.selectLiveSession('', '', '', 'local'); true`); // home: the server names are of the merged list (#4792)
         await ev(`document.getElementById('agentic-state').style.width = '300px'; true`);
         await refresh();
-        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length >= 2 && document.querySelector('#saved-table tbody tr').cells.length > 4`, 'a Computer column');
-        const narrow = await ev(`(() => { const t = document.getElementById('saved-table'), r = t.getBoundingClientRect(); const cells = [...t.querySelectorAll('tbody tr')].map(tr => { const c = tr.cells[1], cr = c.getBoundingClientRect(); return { text: c.textContent.trim(), inside: cr.left >= r.left - 1 && cr.right <= r.right + 1, clipped: c.scrollWidth > c.clientWidth + 1 }; });
-            return { over: t.scrollWidth > t.clientWidth + 1, cells }; })()`);
-        assert.ok(!narrow.over && narrow.cells.length >= 2 && narrow.cells.every(c => c.text && c.inside && !c.clipped), 'in a 300 px panel the rows stack and each computer\'s name is whole and inside: ' + JSON.stringify(narrow));
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length >= 2`, 'the Saved rows');
+        // #8981: a Saved row is one line when narrow (the message, when it was saved, its action); the Computer column goes, and the computer's name stays on the row's hover (its title)
+        const narrow = await ev(`(() => { const t = document.getElementById('saved-table'); const rows = [...t.querySelectorAll('tbody tr')].map(tr => ({ title: (tr.querySelector('.dt-primary') || {}).title || '', h: Math.round(tr.getBoundingClientRect().height), computerColumn: tr.cells.length > 4 && !!tr.querySelector('td[data-key=machine]') && tr.querySelector('td[data-key=machine]').getClientRects().length > 0 })); return { over: t.scrollWidth > t.clientWidth + 1, rows }; })()`);
+        assert.ok(!narrow.over && narrow.rows.length >= 2 && narrow.rows.every(r => /Box B|This computer/.test(r.title) && r.h <= 60 && !r.computerColumn), 'in a 300 px panel a row is one line, with no Computer column and the computer\'s name on its hover: ' + JSON.stringify(narrow));
         await shot('saved-servers-narrow');
         await ev(`document.getElementById('agentic-state').style.width = ''; true`);
 

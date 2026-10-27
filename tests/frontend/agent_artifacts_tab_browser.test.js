@@ -90,7 +90,7 @@ const STUB = `(() => {
             let r = await last();
             check(`${tag}: the agent's list is asked for with its session, the newest first, and the board's route (${JSON.stringify(r.query)})`, r.kind === 'board' && r.query.session_id === 'aa-1' && r.query.sort === 'newest' && r.project === TEAM);
             const head = await ev(`(() => { const p = document.querySelector('${panel}'); const q = s => p.querySelector(s); const vis = e => !!e && e.getClientRects().length > 0; return { search: vis(q('.list-bar-search')), filters: vis(q('.list-bar-toggle')), more: vis(q('.list-bar-more-btn')), refresh: !!q('.team-artifacts-refresh'), rows: p.querySelectorAll('tbody tr').length, heads: [...p.querySelectorAll('thead th')].map(h => h.textContent), count: (q('.list-bar-count') || {}).textContent, countVisible: vis(q('.list-bar-count')) }; })()`);
-            check(`${tag}: the tab is a table with the search, the filter icon and the More icon, no Refresh (${JSON.stringify(head)})`, head.search && head.filters && head.more && !head.refresh && head.rows === 7 && !head.countVisible && head.heads[0] === 'Name' && /^7 artifact/.test(head.count || ''));
+            check(`${tag}: the tab is a table with the search, the filter icon and the More icon, no Refresh (${JSON.stringify(head)})`, head.search && head.filters && head.more && !head.refresh && head.rows === 7 && !head.countVisible && /^Name/.test(head.heads[0]) && /^7 artifact/.test(head.count || ''));
             await ev(`document.querySelector('${panel} .list-bar-search').focus(); true`); await type('zebra'); await settle(900, 450);
             r = await last();
             check(`${tag}: a search is the server's, scoped to the agent (${JSON.stringify(r.query)}), and the count says N of M`, r.query.q === 'zebra' && r.query.session_id === 'aa-1' && (await ev(`document.querySelector('${panel} .list-bar-count').textContent`)).includes('1 of 7'));
@@ -116,9 +116,9 @@ const STUB = `(() => {
             await shot(`preview-${view.name}-${view.theme}`);
             await ev(`import((window.__coralStatic || '/static/') + 'preview_pane.js').then(m => m.closeAllTabs()); true`);
 
-            // #8793: the dock keeps four columns on one line at every width.
+            // #8793, #8931: the dock keeps the shared columns on one line at every width.
             const cols = await ev(`([...document.querySelector('${panel} tbody tr').cells].map(c=>c.dataset.key))`);
-            check(`${tag}: name, size, created and Details columns`, JSON.stringify(cols) === JSON.stringify(['name','size','created','details']), JSON.stringify(cols));
+            check(`${tag}: name, type, tags, size, updated and Details columns`, JSON.stringify(cols) === JSON.stringify(['name','type','tags','size','updated','details']), JSON.stringify(cols));
             if (!view.phone) {
                 for (const width of [420, 620, 680, 980]) {
                     await ev(`document.getElementById('agentic-state').style.width = '${width}px'; true`);
