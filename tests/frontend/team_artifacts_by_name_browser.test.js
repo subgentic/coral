@@ -39,7 +39,7 @@ const ITEMS = ['plan.md', 'notes.md'].map((name, i) => ({ name, media_type: 'tex
                 // No list reply: this used to leave the cold link Loading forever (#8825).
                 await ev(`window.__labelRead = import((window.__coralStatic || '/static/') + 'board_fetch.js').then(m => m.fetchProjects()); true`);
                 await waitFor(`!!document.querySelector('#team-panel-artifacts .team-artifacts-error')`, `${label}: missing labels time out`, 15000);
-                check(`${label}: after about ten seconds, a missing label shows the scope error and Retry without exposing rows`, (await rows()) === 0 && /unexpected response scope/.test(await err()) && Date.now() - began >= 8500 && await ev(`!!document.querySelector('#team-panel-artifacts .team-artifacts-retry')`), `${Date.now() - began} ms; ${await err()}`);
+                check(`${label}: after about ten seconds, a missing label shows a readable error and Retry without exposing rows`, (await rows()) === 0 && (await err()) === "Couldn't check which team this is. Try again." && Date.now() - began >= 8500 && await ev(`!!document.querySelector('#team-panel-artifacts .team-artifacts-retry')`), `${Date.now() - began} ms; ${await err()}`);
                 const reads = await ev(`window.__projectReads`);
                 await ev(`window.__releaseLabels(); document.querySelector('#team-panel-artifacts .team-artifacts-retry').click(); true`);
                 await waitFor(`window.__projectReads > ${reads}`, `${label}: Retry rereads the board lists`, 5000);
