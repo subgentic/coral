@@ -41,6 +41,7 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await ev(`document.querySelectorAll('${host} .goal-side, ${host} .goal-tasks-open').length`), 0, at + 'the right Tasks column and the phone button are gone');
                 await waitFor(`document.querySelectorAll('${host} .goal-list tbody tr').length === 2`, 'two task rows', 15000);
                 assert.equal(await ev(`document.querySelector('${host} .goal-detail-pane').hidden`), true, at + 'nothing is open at first');
+                assert.equal(await ev(`document.querySelector('${host} .goal-detail-pane').getAttribute('aria-label')`), 'Details', at + 'the pane is a named aside, as the team page\'s Details pane is (#9117)');
                 const rows = await ev(`[...document.querySelectorAll('${host} .goal-list tbody tr')].map(r => Math.round(r.getBoundingClientRect().height))`);
                 assert.ok(rows.every(n => n <= 64), at + 'one-line rows: ' + JSON.stringify(rows));
                 assert.equal(await ev(`document.querySelector('${host} .goal-list tr:has([data-task-id="${t1}"]) td[data-key="who"] [role=img]')?.title`), 'Done by be', at + 'a done task says who did it');

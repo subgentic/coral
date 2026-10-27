@@ -157,7 +157,7 @@ const whatWords = i => (i.kind === 'job' ? runsWords(i) : i.kind === 'workflow' 
 function nextCell(i) {
     if (i.kind !== 'job') return 'Not scheduled';
     const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip('Paused');
-    if (i.enabled && i.job.next_fire_at) cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`;
+    if (i.enabled && i.job.next_fire_at) { cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`; cell.append(DT.el('span', 'sr-only', `, next run ${atWords(i.job.next_fire_at)} your time`)); } // also as text: a tooltip is not read, and a touch screen has none (#9117)
     return cell;
 }
 function lastCell(i) {
@@ -197,7 +197,7 @@ function folderTable(key) {
                     { key: 'last-run', label: 'Last run', width: '9rem', line: 2, tone: 'tertiary', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: lastRunCell },
                     { key: 'next', label: 'Next', width: '7rem', line: 1, tone: 'tertiary', sort: 'date', sortValue: i => (i.enabled ? i.job.next_fire_at : ''), cell: i => {
                         const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip('Paused');
-                        if (i.enabled && i.job.next_fire_at) cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`;
+                        if (i.enabled && i.job.next_fire_at) { cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`; cell.append(DT.el('span', 'sr-only', `, next run ${atWords(i.job.next_fire_at)} your time`)); } // also as text (#9117)
                         return cell;
                     } },
                 ],
@@ -212,7 +212,7 @@ function folderTable(key) {
                 { key: 'last-run', label: 'Last run', width: '14rem', line: 2, sort: 'date', sortValue: i => i.run && i.run.started_at, cell: i => {
                     if (!i.run) return 'Never run';
                     const cell = DT.el('span'); cell.append(DT.chip(workflowResult(i) || 'Run', resultClass(i.run)));
-                    if (i.run.started_at) cell.title = `Last run ${whenWords(i.run.started_at)}`;
+                    if (i.run.started_at) { cell.title = `Last run ${whenWords(i.run.started_at)}`; cell.append(DT.el('span', 'sr-only', `, last run ${whenWords(i.run.started_at)}`)); } // also as text (#9117)
                     return cell;
                 } },
                 { key: 'used-by', label: 'Used by', width: '7rem', line: 2, tone: 'tertiary', sort: 'number', sortValue: i => i.usedBy, cell: usedByWords },

@@ -8,8 +8,8 @@ const { mountSettingsView } = await importOnce('./settings_view.js');
 
 export function mountAgentReviewSettings(host, team, subscriber) {
     const section = document.createElement('section');
-    section.setAttribute('aria-label', 'Review settings');
-    const title = document.createElement('h3'); title.textContent = 'Review settings';
+    const title = document.createElement('h3'); title.textContent = 'Review settings'; title.id = `review-settings-title-${subscriber}`.replace(/[^A-Za-z0-9_-]/g, '-');
+    section.setAttribute('aria-labelledby', title.id); // named by its heading, not by the same words twice (#9117)
     const form = document.createElement('div'); section.append(title, form); host.append(section);
     const local = answeredLocally(team);
     let loaded = false;
