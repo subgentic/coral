@@ -159,7 +159,7 @@ let _boardTasksLoadSeq = 0;
 // "Load more" pages older done tasks with the cursor; a poll refreshes the first page
 // and keeps the older pages already loaded.
  const BOARD_TASK_PAGE = 50;
-const REREAD_PAGES = 5; // a refresh reads at most this many loaded pages again (#9121): the rest of what the person loaded stays as it was
+const REREAD_PAGES = 5; // a refresh reads at most this many loaded pages again (#9121); the pages beyond are dropped and Load more fetches them again
 const _fetchTaskPage = (board, cursor) => _boardTasksFetch(board, `/tasks?limit=${BOARD_TASK_PAGE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`); // one page of the default list: the open tasks, then the done ones (#9121)
 
 // A fetch that never answers (a hung server, a dead hub link) must not stop the poll for
@@ -256,11 +256,6 @@ async function _loadBoardTasksDefault(boardName) {
                 older = older.concat(more.tasks || []);
                 nextCursor = more.next_cursor || '';
             }
-            if (depth > reread) { // the pages beyond the cap keep what the person had, and "Load more" continues after them
-                const seen = new Set([...(data.tasks || []), ...older].map(t => t.id));
-                older = older.concat([..._boardList.first, ..._boardList.older].filter(t => !seen.has(t.id)));
-                nextCursor = _boardList.nextCursor;
-            }
         } catch { older = sameBoard ? _boardList.older : []; nextCursor = sameBoard ? _boardList.nextCursor : nextCursor; } // a failed re-read keeps what the person had
         if (seq !== _boardTasksLoadSeq) return;
     }
@@ -268,7 +263,7 @@ async function _loadBoardTasksDefault(boardName) {
         board: boardName,
         first: data.tasks || [],
         older,
-        pages: depth,
+        pages: Math.min(depth, REREAD_PAGES), // the pages beyond the cap are dropped: Load more fetches them again, and no stale row comes back (#9153)
         // Once older pages are loaded, "Load more" continues after the last of them.
         nextCursor,
         // A server from before pagination sends every task and no totals.
