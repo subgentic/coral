@@ -78,9 +78,9 @@ func TestBoardTaskCountsAreTheTotalsAlone(t *testing.T) {
 	assert.Contains(t, counts, `"tasks":[]`, "no rows")
 	assert.Less(t, len(counts), 200, "the totals alone: %d bytes", len(counts))
 
-	_, old, _ := read("?limit=1", "")
-	assert.Greater(t, len(old), 10_000, "the read it replaces held every open task (%d bytes)", len(old))
-	t.Logf("team count read: %d bytes counts=1, %d bytes limit=1", len(counts), len(old))
+	_, old, _ := read("?status=open&limit=200", "") // every open task: what the default read held before it was paged (#9121)
+	assert.Greater(t, len(old), 10_000, "the open set the count read replaces (%d bytes)", len(old))
+	t.Logf("team count read: %d bytes counts=1, %d bytes for the open set", len(counts), len(old))
 	assert.Less(t, len(counts)*50, len(old), "at least 50 times smaller (%d against %d bytes)", len(counts), len(old))
 
 	code, body, _ := read("?counts=1", etag)
