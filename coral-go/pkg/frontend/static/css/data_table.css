@@ -337,6 +337,9 @@
     .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { flex: 1 1 100%; min-width: 8rem; max-width: 100%; margin-block: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* the title keeps one line, cut with an ellipsis, at the narrowest and at 200% text (#8981; its words are on the hover and in the preview) */
 }
 
+/* A task table that does not fold (a goal's column on a phone) at large text: the Who column (6 rem, its circle and name) beside the State chip and a title is wider than the box and the box cuts it (#9198). Below 16 rem of box (a phone at 200% text, 355 px of 32 px rems) it gives way, like the dates; the task's page says who has it. At the normal size the box is 22 rem and Who stays. */
+@container dt (max-width: 16rem) { .dt-box.dt-fold-none .dt-table [data-key="who"] { display: none; } }
+
 /* The dock's task list stays one line, including on phones (#8792). */
 #board-task-list .dt-box { --table-row-h: var(--table-touch); }
 #board-task-list .dt-primary { display: block; width: 100%; min-width: var(--table-touch); min-height: var(--table-touch); }
