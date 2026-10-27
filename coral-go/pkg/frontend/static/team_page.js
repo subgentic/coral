@@ -6,7 +6,7 @@ import { openTask } from './task_navigation.js';
 import { state } from './state.js';
 import { keyLabel, splitKey, boardFetch, teamFetch, isCloud } from './server_base.js';
 import { showView } from './utils.js';
-import { note } from './nav.js';
+import { note, go } from './nav.js';
 import { keyRoute, TEAM_TABS } from './routes.js';
 import { importOnce } from './import_once.js';
 import { refreshTeamAvailability } from './team_availability.js';
@@ -22,6 +22,25 @@ const PHONE_MORE = ['knowledge', 'messages', 'settings']; // (the last three of 
 const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', settings: 'Settings' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, navSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
+
+// A team no board has (a mistyped /team/<name>, #8848): the page says so and offers the way back, with none of a team's tabs, New goal or Add agent. Asked once per team of the page's life, with the same rule as
+// the Artifacts route's 404 (#8821: BoardKnown), so a new empty team that exists keeps its page; a probe that fails (offline, a computer that does not answer) leaves the page as it was.
+const missing = new Map(); // team key -> true (no such team) / false
+async function teamIsMissing(team) {
+    if (missing.has(team)) return missing.get(team);
+    try {
+        const r = await boardFetch(team, '/artifacts?limit=1');
+        const gone = r.status === 404 && (((await r.clone().json().catch(() => null)) || {}).code === 'board_not_found');
+        if (r.ok || gone) missing.set(team, gone);
+        return gone;
+    } catch { return false; }
+}
+function drawMissing(on) {
+    $('team-page-view')?.classList.toggle('team-page-no-team', on);
+    const box = $('team-page-missing'); if (!box) return;
+    box.hidden = !on;
+    if (on) { $('team-page-missing-line').textContent = `No team named ${splitKey(S.team).name}`; }
+}
 
 const currentTeamPage = () => (S.team && $('team-page-view') && $('team-page-view').style.display !== 'none' ? { team: S.team, tab: S.tab } : null);
 
@@ -51,6 +70,7 @@ function buildOnce() {
         goTab(list[to].dataset.tab, { focus: true, user: true }); // selection follows focus
     });
     $('team-page-health').addEventListener('click', () => { goTab('agents', { user: true }); });
+    $('team-page-missing-back')?.addEventListener('click', () => { go({ view: 'agents' }); });
     $('team-page-add-agent').addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
     buildMore();
     // A click or a tap that opens a page or the pane puts the focus on its heading by script: no ring for a pointer, the ring for a key (the dialogs' rule, quiet_focus.js).
@@ -391,6 +411,8 @@ export async function openTeamPage(team, opts = {}) {
         drawCounts(); drawStatus(null);
     }
     drawHeader();
+    drawMissing(missing.get(team) === true);
+    if (changed && !missing.has(team)) teamIsMissing(team).then(gone => { if (gone && S.team === team) { drawMissing(true); drawStatus(null); } });
     if (S.item) closeItem(false);
     if (!opts.silent) note(keyRoute('team', team, tab, opts.item || null), { replace: !!opts.replace });
     startCounts();
