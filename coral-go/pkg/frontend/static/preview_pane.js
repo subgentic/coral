@@ -423,7 +423,7 @@ async function _render(tab) {
             isStale: () => !current(),
             // An artifact is a file an agent wrote: its Markdown uses the strict renderer (raw HTML shown as text, #3540).
             renderContent: (el, content, path) => {
-                if (getLangFromPath(path) === 'markdown') (el.innerHTML = `<div class="preview-pane-markdown">${renderMarkdownStrict(content)}</div>`, highlightCodeIn(el), keepFragmentsInside(el));
+                if (getLangFromPath(path) === 'markdown') (el.innerHTML = `<div class="prose preview-pane-markdown">${renderMarkdownStrict(content)}</div>`, highlightCodeIn(el), keepFragmentsInside(el));
                 else _renderContentView(el, content, path, 0, false);
                 if (comments && current()) comments.docRendered(content, true); // text the comments apply to (#5311)
             },

@@ -34,7 +34,7 @@ let _overlay = 0;        // its entry in overlay_history.js while it is open on 
 /** Render an artifact's text: Markdown through the strict renderer, anything else as plain text. */
  function renderArtifactText(el, content, path) {
     if (/\.(?:md|markdown|mdown)$/i.test(path || '')) {
-        el.innerHTML = `<div class="preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`;
+        el.innerHTML = `<div class="prose preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`;
         highlightCodeIn(el);
     } else {
         el.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;

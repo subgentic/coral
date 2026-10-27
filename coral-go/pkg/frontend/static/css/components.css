@@ -3483,15 +3483,27 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .ibx-open-link:hover { text-decoration-thickness: 2px; }
 .ibx-open-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .ibx .md, .ibx-saved-body .md { overflow-wrap: anywhere; line-height: var(--lh-body); font-size: var(--fs-md, 0.875rem); color: var(--text-primary); }
-.md > :first-child { margin-top: 0; }
-.md p, .md ul, .md ol, .md blockquote, .md pre { margin: 0 0 8px; }
-.md ul, .md ol { padding-left: 22px; }
-.md blockquote { padding-left: 10px; border-left: 3px solid var(--border); color: var(--text-secondary); }
-.md pre { padding: 8px 10px; overflow-x: auto; background: var(--bg-tertiary); border-radius: var(--radius-md); }
-.md code { font-family: var(--font-mono, monospace); font-size: 0.9em; }
-.md .md-h { font-weight: var(--fw-strong); margin: 10px 0 4px; }
-.md hr { border: 0; border-top: 1px solid var(--border); margin: 10px 0; }
-.md a { color: var(--link-text); overflow-wrap: anywhere; }
+/* The one rendered-markdown look (#9477): chat, the preview pane and a .md (Coral Hub's renderer) wear .prose; their own classes say where the text sits and how it is themed, never how a heading, list, quote or code looks.
+ * The sizes are em, so the prose follows the size of the text around it; the heading scale is the three tokens. prose_census.test.mjs fails a heading rule for rendered markdown outside this block. */
+.prose { --prose-h1: 1.5em; --prose-h2: 1.3em; --prose-h3: 1.15em; line-height: var(--lh-body); overflow-wrap: break-word; }
+.prose > :first-child { margin-top: 0; }
+.prose > :last-child { margin-bottom: 0; }
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6, .prose .md-h { margin: 1.5em 0 0.5em; font-weight: var(--fw-strong); line-height: var(--lh-label); color: var(--text-primary); }
+.prose h1 { font-size: var(--prose-h1); }
+.prose h2 { font-size: var(--prose-h2); }
+.prose h3 { font-size: var(--prose-h3); }
+.prose h4, .prose h5, .prose h6, .prose .md-h { font-size: 1em; }
+.prose p, .prose ul, .prose ol, .prose blockquote, .prose pre { margin: 0 0 0.9em; }
+.prose ul, .prose ol { padding-left: 1.75em; }
+.prose li { margin: 0.25em 0; }
+.prose li > ul, .prose li > ol { margin: 0.25em 0 0; }
+.prose blockquote { padding: 0.1em 0 0.1em 0.9em; border-left: 3px solid var(--border-light); color: var(--text-secondary); }
+.prose a { color: var(--link-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.prose code { padding: 0.1em 0.35em; border-radius: var(--radius-sm); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: 0.88em; }
+.prose pre { padding: 0.8em 1em; overflow-x: auto; border-radius: var(--radius-md); background: var(--bg-tertiary); }
+.prose pre code { padding: 0; background: none; font-size: inherit; }
+.prose hr { margin: 1.6em 0; border: 0; border-top: 1px solid var(--border); }
+.prose img { max-width: 100%; }
 .md-plain { white-space: pre-wrap; }
 .md-partial { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
 @media (pointer: coarse) {
