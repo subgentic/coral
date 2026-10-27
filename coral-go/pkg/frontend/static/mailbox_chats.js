@@ -61,7 +61,7 @@ export const chatTags = () => (counts && counts.tags) || [];
 export async function loadChatCounts(redraw) {
     try {
         const replies = await Promise.all(inboxSources().map(async server => { const r = await serverFetch(server, '/api/sessions/history/counts'); if (!r.ok) throw new Error('Chat counts unavailable'); return r.json(); }));
-        counts = { ...replies[0], by_agent_type: {} };
+        counts = { ...replies[0], by_agent_type: Object.create(null) };
         for (const key of ['all','group','notes','starred','active','archived']) counts[key] = replies.reduce((sum, d) => sum + (Number(d[key]) || 0), 0);
         for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
     } catch { /* the folders keep their last counts */ }
