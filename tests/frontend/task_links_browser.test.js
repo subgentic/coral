@@ -53,8 +53,12 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.querySelector('#team-panel-item .ibx-thread')?.textContent.includes('Keep this reply draft')`, 'sent reply joins conversation');
         console.log('PASS reply draft, submit and conversation');
         await team('messages');
-        await ev(`import(${S} + 'tasks.js').then(async () => { const {state}=await import(${S}+'state.js'); state.selectedTeam=${JSON.stringify(B)}; const b=document.createElement('button'); b.dataset.onClick='task-open'; b.dataset.kind='board'; b.dataset.taskId='${id}'; document.body.append(b); b.click(); b.remove(); return true; })`);
-        await landed('dock task action');
+        await ev(`import(${S} + 'tasks.js').then(async () => { const {state}=await import(${S}+'state.js'); state.selectedTeam=${JSON.stringify(B)}; state.currentSession = { type: 'live', name: 'dock-agent', session_id: 'dock-agent-id', board_project: ${JSON.stringify(B)}, server: 'local' }; const b=document.createElement('button'); b.dataset.onClick='task-open'; b.dataset.kind='board'; b.dataset.taskId='${id}'; document.body.append(b); b.click(); b.remove(); return true; })`);
+        // since #8788 an agent dock's task opens in the shared preview pane (the Operator's design), not on the team page
+        await waitFor(`document.querySelector('#preview-pane .team-task-page')?.textContent.includes(${JSON.stringify(title)})`, 'dock task action opens the task in the preview', 15000);
+        assert.equal(await ev(`document.getElementById('task-detail-modal').getClientRects().length`), 0, 'dock task action: no modal');
+        console.log('PASS dock task action');
+        await ev(`import(${S}+'state.js').then(m => { m.state.currentSession = null; return true; })`); // the dock's context is left
         await team('messages');
         await ev(`import(${S} + 'notifications.js').then(m => { m.showAlertNotification('Task assigned', 'Open your task', 'info', {url:${JSON.stringify(want)},label:'Open task'}); document.querySelector('.alert-notification-link').click(); return true; })`);
         await landed('notification task link');
