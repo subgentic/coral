@@ -118,6 +118,9 @@ func remoteURLWarning(raw string) string {
 	}
 	switch u.Scheme {
 	case "https":
+		if u.Hostname() == "" { // https with no host cannot be dialled: nothing says where the key goes
+			return remoteHTTPWarning
+		}
 		return ""
 	case "http":
 	default:
