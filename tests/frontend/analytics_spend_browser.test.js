@@ -173,6 +173,19 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await ev(`document.querySelector('#cost-spend select').size = 0; true`);
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         });
+        await run('every team with a board is in the Team picker, with no agent running (#8811): this computer\'s and each online computer\'s, by their computer, and the spend is read for the one chosen', async () => {
+            await ev(`(async () => { const S = window.__coralStatic || '/static/'; const st = (await import(S + 'state.js')).state; st.hub = true; st.servers = [{ id: 'box-3', label: 'Box Three', status: 'online' }];
+                window._coralSetLiveSessions([]); window.__spendPaths = [];
+                const R = window.fetch; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin), p = url.pathname.replace(/^\\/api\\/remote\\/box-3/, '');
+                    if (p === '/api/board/projects') return Promise.resolve(new Response(JSON.stringify(url.pathname.startsWith('/api/remote/box-3/') ? [{ board_id: 'b-deep000001', board_label: 'Deep team' }] : [{ board_id: 'quiet-team', board_label: 'quiet-team' }]), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                    return R(u, o); };
+                const m = await import(S + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await waitFor(`document.querySelectorAll('#cost-spend select option').length >= 2`, 'the picker with the boards\' teams', 8000);
+            const opts = await ev(`[...document.querySelectorAll('#cost-spend select option')].map(o => [o.value, o.textContent])`);
+            assert.ok(opts.some(([v, t]) => v === 'quiet-team' && /quiet-team · This computer/.test(t)) && opts.some(([v, t]) => v === '@box-3/b-deep000001' && /Deep team · Box Three/.test(t)), JSON.stringify(opts));
+            await ev(`(() => { const s = document.querySelector('#cost-spend select'); s.value = '@box-3/b-deep000001'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await waitFor(`window.__spendPaths.some(p => p === '/api/remote/box-3/api/board/b-deep000001/spend')`, 'the spend read for the remote team with no agent', 8000);
+        });
     } finally { await client.close(); }
     const bad = results.filter(r => r[1]); console.log(`${results.length - bad.length}/${results.length} scenarios pass`); if (bad.length) { console.error('FAIL: ' + bad.map(r => r[0]).join('; ')); process.exit(1); }
 })().catch(e => { console.error(e); process.exit(1); });
