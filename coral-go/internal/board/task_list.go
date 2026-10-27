@@ -164,13 +164,27 @@ func (s *Store) ListTaskPage(ctx context.Context, project string, q TaskListQuer
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
 		return nil, err
 	}
-	if err := s.reader().QueryRowxContext(ctx, `SELECT
-		 COALESCE(SUM(CASE WHEN `+openTaskStatusSQL+` THEN 1 ELSE 0 END), 0),
-		 COALESCE(SUM(CASE WHEN `+doneTaskStatusSQL+` THEN 1 ELSE 0 END), 0)
-		 FROM board_tasks WHERE board_id = ?`, project).Scan(&page.TotalOpen, &page.TotalCompleted); err != nil {
+	if err := s.taskCounts(ctx, project, page); err != nil {
 		return nil, err
 	}
 	return page, nil
+}
+
+// TaskCounts is a page with no tasks and the board's two totals (GET /api/board/{project}/tasks?counts=1, #9100): the team page's tab
+// counts read only these, and the page they used to ask for held every open task of the board.
+func (s *Store) TaskCounts(ctx context.Context, project string) (*TaskListPage, error) {
+	page := &TaskListPage{Tasks: []TaskListItem{}}
+	if err := s.taskCounts(ctx, project, page); err != nil {
+		return nil, err
+	}
+	return page, nil
+}
+
+func (s *Store) taskCounts(ctx context.Context, project string, page *TaskListPage) error {
+	return s.reader().QueryRowxContext(ctx, `SELECT
+		 COALESCE(SUM(CASE WHEN `+openTaskStatusSQL+` THEN 1 ELSE 0 END), 0),
+		 COALESCE(SUM(CASE WHEN `+doneTaskStatusSQL+` THEN 1 ELSE 0 END), 0)
+		 FROM board_tasks WHERE board_id = ?`, project).Scan(&page.TotalOpen, &page.TotalCompleted)
 }
 
 // doneTaskPage pages the done tasks by (completed_at DESC, id DESC). A task finished while

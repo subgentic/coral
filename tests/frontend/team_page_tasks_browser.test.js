@@ -18,7 +18,7 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
             if (url.pathname === '/api/board/tasks') { window.__q.push(url.search); const q = (url.searchParams.get('q') || '').toLowerCase(); const hit = ALL.filter(t => !q || t.title.toLowerCase().includes(q)); if (url.searchParams.getAll('status').includes('completed')) return j({ tasks: [], next_cursor: '', total: 0, truncated: false }); // the done phase has none
             const cur = url.searchParams.get('cursor'); const page = cur ? hit.slice(1) : hit.slice(0, 1); return j({ tasks: page, next_cursor: !cur && hit.length > 1 ? 'next' : '', total: hit.length, truncated: false }); }
-            if (/^\\/api\\/board\\/[^/]+\\/tasks$/.test(url.pathname)) return j({ tasks: [...(window.__more ? [...ALL, T(4, 'A task made while the tab was open', 'pending')] : ALL), T(9, 'Finished long ago', 'completed')], next_cursor: '', total_open: window.__more ? 4 : 3, total_completed: 1 });
+            if (/^\\/api\\/board\\/[^/]+\\/tasks$/.test(url.pathname)) { (window.__taskReads = window.__taskReads || []).push(url.search); if (url.searchParams.get('counts') === '1') return j({ tasks: [], total_open: 3, total_completed: 1 }); } if (/^\\/api\\/board\\/[^/]+\\/tasks$/.test(url.pathname)) return j({ tasks: [...(window.__more ? [...ALL, T(4, 'A task made while the tab was open', 'pending')] : ALL), T(9, 'Finished long ago', 'completed')], next_cursor: '', total_open: window.__more ? 4 : 3, total_completed: 1 });
             if (/^\\/api\\/board\\/[^/]+\\/tasks\\/3$/.test(url.pathname)) return j(ALL[2]);
             return R(u, o); }; return true; })()`);
     const rows = () => ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => window.__na.text(r))`);
@@ -36,6 +36,11 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
             assert.equal(await ev(`localStorage.getItem('coral-hide-completed')`), 'false', 'the choice is kept under the old key');
             await ev(`document.querySelector('#team-panel-tasks .goals-chip[data-filter="open"]').click(); true`); await settle(300);
             assert.equal(await ev(`localStorage.getItem('coral-hide-completed')`), 'true');
+        });
+        await S.run('the tab counts read the two totals alone (counts=1), never a page of tasks to count them (#9100)', async () => {
+            const reads = await ev(`window.__taskReads || []`);
+            assert.ok(reads.includes('?counts=1'), 'the team page asks ?counts=1: ' + JSON.stringify(reads));
+            assert.ok(!reads.includes('?limit=1'), 'and no longer ?limit=1, which returned every open task: ' + JSON.stringify(reads));
         });
         await S.run('the search bar is there and a search asks the task query (q), paged with a total and Load more', async () => {
             assert.ok(await ev(`!!document.querySelector('#team-panel-tasks input[aria-label="Search tasks"]')`), 'a search box named Search tasks');

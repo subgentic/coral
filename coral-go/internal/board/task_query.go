@@ -41,12 +41,14 @@ var taskQueryColumns = map[string]string{
 	"parked_reason": "parked_reason", "parked_until": "parked_until", "remind_at": "remind_at",
 	"created_at": "created_at", "claimed_at": "claimed_at", "completed_at": "completed_at", "updated_at": updatedAtSQL,
 	"body": "body", "completion_message": "completion_message", "goal_id": "goal_id",
+	// what a task cost (the Analytics By task table, #9100): NULL until an agent has worked on it
+	"cost_usd": "cost_usd", "input_tokens": "input_tokens", "output_tokens": "output_tokens", "cache_read_tokens": "cache_read_tokens", "cache_write_tokens": "cache_write_tokens",
 }
 
 // TaskQueryFieldNames lists every field a caller may name (besides the word summary), sorted for the docs and the 400 message.
 func TaskQueryFieldNames() []string {
-	return []string{"artifact_count", "assigned_to", "board_id", "board_label", "body", "claimed_at", "completed_at", "completed_by", "completion_message",
-		"created_at", "created_by", "goal_id", "goal_title", "id", "parked_reason", "parked_until", "priority", "remind_at", "revision", "status", "title", "updated_at", "verification"}
+	return []string{"artifact_count", "assigned_to", "board_id", "board_label", "body", "cache_read_tokens", "cache_write_tokens", "claimed_at", "completed_at", "completed_by", "completion_message",
+		"cost_usd", "created_at", "created_by", "goal_id", "goal_title", "id", "input_tokens", "output_tokens", "parked_reason", "parked_until", "priority", "remind_at", "revision", "status", "title", "updated_at", "verification"}
 }
 
 var (
@@ -87,6 +89,7 @@ type TaskQuery struct {
 	GoalIDs      []int64
 	NoGoal       bool
 	Parked       *bool
+	HasCost      *bool // has_cost (#9100): true keeps the tasks with a recorded cost (cost_usd above 0), false those with none; nil: all
 	CreatedSince string
 	UpdatedSince string
 	SortUpdated  bool
@@ -111,6 +114,7 @@ type queryTaskCursor struct {
 type TaskQueryParams struct {
 	Fields, Status, AssignedTo, Board, Priority, CreatedBy, Verification []string
 	Parked, CreatedSince, UpdatedSince, Sort, Order, Limit, Cursor       []string
+	HasCost                                                              []string
 	Q                                                                    []string
 	ID                                                                   []string
 	GoalID                                                               []string
@@ -216,6 +220,9 @@ func ParseTaskQuery(p TaskQueryParams) (*TaskQuery, error) {
 		return nil, err
 	}
 	if q.Parked, err = parseParked(p.Parked); err != nil {
+		return nil, err
+	}
+	if q.HasCost, err = parseTrueFalse("has_cost", p.HasCost); err != nil {
 		return nil, err
 	}
 	if q.CreatedSince, err = parseSince("created_since", p.CreatedSince); err != nil {
@@ -341,8 +348,11 @@ func parseQueryFields(vals []string) ([]string, error) {
 }
 
 // parseParked reads parked: nil when not given, else true or false.
-func parseParked(vals []string) (*bool, error) {
-	v, ok, err := single("parked", vals)
+func parseParked(vals []string) (*bool, error) { return parseTrueFalse("parked", vals) }
+
+// parseTrueFalse reads a true-or-false parameter: nil when not given.
+func parseTrueFalse(name string, vals []string) (*bool, error) {
+	v, ok, err := single(name, vals)
 	if err != nil || !ok {
 		return nil, err
 	}
@@ -354,7 +364,7 @@ func parseParked(vals []string) (*bool, error) {
 		b := false
 		return &b, nil
 	}
-	return nil, taskQueryErr("parked must be true or false")
+	return nil, taskQueryErr("%s must be true or false", name)
 }
 
 // parseSortOrder reads sort (created_at, the default, or updated_at) and order (desc, the default, or asc).
@@ -605,6 +615,13 @@ func taskQueryWhere(q *TaskQuery, sortExpr string) (join string, where []string,
 			where = append(where, parkedSQL)
 		} else {
 			where = append(where, "NOT "+parkedSQL)
+		}
+	}
+	if q.HasCost != nil {
+		if *q.HasCost {
+			where = append(where, "COALESCE(cost_usd, 0) > 0")
+		} else {
+			where = append(where, "COALESCE(cost_usd, 0) <= 0")
 		}
 	}
 	if q.CreatedSince != "" {

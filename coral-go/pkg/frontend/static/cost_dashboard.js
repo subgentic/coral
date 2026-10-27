@@ -312,7 +312,7 @@ export async function _refreshCostDashboard() {
     try {
         const [summaryResp, taskResp, tsResp, teamResp, branchResp] = await Promise.all([
             fetch(`/api/token-usage/summary${sinceParam}`).catch(() => null),
-            fetch('/api/board/tasks').catch(() => null),
+            fetch('/api/board/tasks' + COST_TASK_QUERY).catch(() => null), // only what the By task table draws: the tasks with a cost, a few columns (#9100: the whole rows of 100 tasks were 147 K, every 15 s)
             fetch(`/api/token-usage/timeseries${tsParams}`).catch(() => null),
             fetch(`/api/token-usage/by-team${sinceParam}`).catch(() => null),
             fetch(`/api/token-usage/by-branch${sinceParam}`).catch(() => null),
@@ -601,6 +601,9 @@ function _renderAgentTable(rows) {
         { key: 'details', label: 'Details', tone: 'secondary', cell: r => { const b = dtLink('Charts', () => agentDetail.openAgent(r, document.getElementById('cost-time-range')?.value || 'day')); b.setAttribute('aria-label', `Charts for ${r.display_name || r.agent_name || 'agent'}`); return b; } }, // one agent over the range (#7930)
     ], filtered, NO_DATA, _seriesOpts('agent'));
 }
+
+const COST_TASK_FIELDS = 'id,board_id,title,status,priority,assigned_to,claimed_at,completed_at,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens';
+const COST_TASK_QUERY = `?has_cost=true&limit=100&fields=${COST_TASK_FIELDS}`; // the tasks with a cost and the columns the table draws, not the whole rows of 100 tasks every 15 s (147 K, #9100)
 
 // Cached tasks for click-to-detail
 let _costTaskCache = [];
