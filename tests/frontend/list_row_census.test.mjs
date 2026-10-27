@@ -29,6 +29,7 @@ for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
         if (!cm) continue;
         const cls = cm[1];
         if (cls === 'list-row' || /^list-row-/.test(cls)) continue;
+        if (cls === 'menu-item' || /^menu-item-/.test(cls)) continue; // a menu's own row: the menu family's (menu_census), not a sidebar list's
         const props = m[2].split(/;(?![^()]*\))/).map(d => d.split(':')[0].trim()).filter(Boolean);
         const state = /:(hover|focus-visible)/.test(subject);
         const hasLook = props.some(p => /^(min-height|border-radius)$/.test(p)) && !state
