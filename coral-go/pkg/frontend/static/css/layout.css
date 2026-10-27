@@ -956,6 +956,13 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .back-link { align-items: center; gap: 4px; align-self: flex-start; min-height: 32px; padding: 4px 0; border: 1px solid transparent; border-radius: var(--radius-md); background: none; color: var(--link-text, var(--accent)); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; } /* the look */
 .back-link[hidden] { display: none; }
 /* The one Back link (#9097, Goal #84 item 5): 13/500 in the accent colour, "\2190 Name" where the name is where it goes. Its placement (display, margin) has zero specificity (:where), so a page's own rule that places it or hides it always wins; the look is only ever declared here. */
+/* The one pane (#9209, Goal #88, spec item 5): a surface with a header band (the title, the Back link, the actions), a scrolling body and a pinned footer. A page's own class (detail-pane, goal-detail-pane ...) says only where it sits and how wide it is;
+ * --pane-pad-x is its one side padding. .pane-aside is a pane docked at the side of a page (its edge line). */
+.pane { display: flex; flex-direction: column; min-height: 0; background: var(--bg-secondary); --pane-pad-x: 18px; }
+.pane-aside { border-left: 1px solid var(--border); }
+.pane-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px var(--pane-pad-x) 10px; border-bottom: 1px solid var(--border); }
+.pane-body { flex: 1; min-height: 0; overflow: auto; padding: 14px var(--pane-pad-x) 20px; display: flex; flex-direction: column; gap: 12px; }
+.pane-foot { flex: none; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; padding: 12px var(--pane-pad-x); border-top: 1px solid var(--border); } /* the one rule of every pinned bar (#7684): right-aligned, secondary buttons, the primary last, a danger button at the left */
 /* A phone's way back and the page's title are one row, the title dropping under the link only when less than 10 rem would be left beside it (#7734; the way #7721 did Analytics); elsewhere the row is not a box */
 .phone-title-row { display: contents; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {

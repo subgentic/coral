@@ -61,7 +61,7 @@ export function artifactsSpec() {
         const n = DT.el('span', 'session-group-count inbox-artifacts-count', count == null ? '' : String(count));
         head.append(h, n);
         const body = DT.el('div', 'inbox-artifacts-list team-panel'); // the team page's list rules (its bar, its table) apply by .team-panel
-        const pane = DT.el('aside', 'detail-pane inbox-detail-pane'); pane.setAttribute('aria-label', 'Details'); pane.hidden = true;
+        const pane = DT.el('aside', 'pane pane-aside detail-pane inbox-detail-pane'); pane.setAttribute('aria-label', 'Details'); pane.hidden = true;
         main.append(head, body); row.append(main, pane);
         pageHost = row;
         // the pane is the folder's right sidebar: as tall as the view and reaching up to its top edge (sticky, so the page scrolls under it), and the search row ends where it begins. Its height, its offset and its

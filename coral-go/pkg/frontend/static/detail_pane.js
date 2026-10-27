@@ -64,7 +64,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     current = { key, opener: opener || (replacing ? current.opener : document.activeElement), onClose, abort, gen: mine, aside, hosted: !!host };
     aside.replaceChildren();
     const more = makeDetails(); // the facts and the rest: one closed button in the header row, the document straight under the header
-    const head = el('div', 'detail-head');
+    const head = el('div', 'pane-head detail-head');
     const text = el('div', 'detail-head-text');
     if (backLabel && (!host || host.classList.contains('inbox-detail-pane') || host.classList.contains('goal-detail-pane'))) { // the phone's way back (the Inbox's pane has its own host, and a way back like the team page's): a text link named for where it goes, on the title's line (#7734); a pane that is not a sheet has the close button
         const back = el('button', 'back-link goals-back detail-back'); back.type = 'button';
@@ -87,7 +87,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     close.append(el('span', 'material-icons', 'close')); close.firstChild.setAttribute('aria-hidden', 'true');
     close.addEventListener('click', () => closeDetailPane({ restoreFocus: true }));
     head.append(text, close);
-    const main = el('div', 'detail-body');
+    const main = el('div', 'pane-body detail-body');
     if (facts.length) {
         const dl = el('dl', 'detail-facts');
         for (const [k, v] of facts) { if (v == null || v === '') continue; const dd = el('dd', null, v instanceof Node ? '' : v); if (v instanceof Node) dd.append(v); dl.append(el('dt', null, k), dd); } // a value is text, or a node (the Task fact is the link the Task column is)
@@ -95,7 +95,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     }
     const doc = el('div', 'detail-doc');
     main.append(doc);
-    const foot = el('div', 'detail-foot');
+    const foot = el('div', 'pane-foot detail-foot');
     const rank = a => (a.danger ? 0 : a.primary ? 2 : 1); // the bar's one order: a danger button first (at the left edge), the primary last (#7684)
     for (const a of [...actions].sort((x, y) => rank(x) - rank(y))) {
         let b;
