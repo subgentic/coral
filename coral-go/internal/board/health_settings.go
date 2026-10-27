@@ -39,6 +39,43 @@ type HealthSettings struct {
 	// Landing puts a line in the health check (off by default, #8942, goal #80) when the branch work lands on (Branch, "main" by default) has not moved for WaitMin although tasks were approved or completed
 	// since it last did (#8942, goal #80): done work that is not landed. It reads the local branch only, never CI or GitHub.
 	Landing HealthLanding `json:"landing"`
+	// GoalsReady and UnownedTasks are two more lines of the check (on by default, the operator's call; each has its switch, #8975, goal #80): a goal whose every task has been done for WaitMin (it is ready to close), and open tasks with no goal
+	// or no assignee that are older than WaitMin, named by number. Each is a switch with its wait and an optional member who is also told.
+	GoalsReady   HealthWaitCheck `json:"goals_ready"`
+	UnownedTasks HealthWaitCheck `json:"unowned_tasks"`
+}
+
+// HealthWaitCheck is a check that waits: On, the wait in minutes, and the member also told when its line is new ("" tells nobody beyond the check's recipient).
+type HealthWaitCheck struct {
+	On      bool   `json:"on"`
+	WaitMin int    `json:"wait_min"`
+	Nudge   string `json:"nudge"`
+}
+
+// WaitCheckMin and WaitCheckMax bound the wait of a HealthWaitCheck, in minutes; the defaults are the goals-ready wait and the unowned-tasks wait.
+const (
+	WaitCheckMin        = 5
+	WaitCheckMax        = 10080
+	GoalsReadyWaitMin   = 30
+	UnownedTasksWaitMin = 15
+)
+
+// Problem is what is wrong with the setting as a user saves it, in words for them, or "": name is the setting's key ("goals_ready"). A wait the body does not carry (0) is the default and is not a problem.
+func (c HealthWaitCheck) Problem(name string) string {
+	if c.WaitMin != 0 && (c.WaitMin < WaitCheckMin || c.WaitMin > WaitCheckMax) {
+		return fmt.Sprintf("%s.wait_min: %d is outside %d to %d minutes", name, c.WaitMin, WaitCheckMin, WaitCheckMax)
+	}
+	return ""
+}
+
+// clamp keeps the wait in range (the default when the body does not carry one) and trims the nudge.
+func (c HealthWaitCheck) clamp(def int) HealthWaitCheck {
+	if c.WaitMin == 0 {
+		c.WaitMin = def
+	}
+	c.WaitMin = min(max(c.WaitMin, WaitCheckMin), WaitCheckMax)
+	c.Nudge = strings.TrimSpace(c.Nudge)
+	return c
 }
 
 // HealthLanding: the branch to watch and how long it may stand still, with tasks finished, before Coral says so (again after each further WaitMin until it moves).
@@ -127,11 +164,13 @@ func DefaultHealthSettings() HealthSettings {
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
 		Landing:        HealthLanding{On: false, Branch: "main", WaitMin: 120},
+		GoalsReady:     HealthWaitCheck{On: true, WaitMin: GoalsReadyWaitMin},
+		UnownedTasks:   HealthWaitCheck{On: true, WaitMin: UnownedTasksWaitMin},
 	}
 }
 
 // Clamp keeps every value in its range (#4176 rule 7): times at least 5 and at most 1440
-// minutes (the landing wait 15 to 10080), nudge counts 1 to 5, at most 8 default reviewers.
+// minutes (the landing wait 15 to 10080, the goals-ready and unowned-tasks waits 5 to 10080), nudge counts 1 to 5, at most 8 default reviewers.
 func (h HealthSettings) Clamp() HealthSettings {
 	h.IntervalMin = min(max(h.IntervalMin, 5), 1440)
 	h.ClaimNudge.AfterMin = min(max(h.ClaimNudge.AfterMin, 5), 1440)
@@ -152,6 +191,8 @@ func (h HealthSettings) Clamp() HealthSettings {
 	}
 	h.Landing.WaitMin = min(max(h.Landing.WaitMin, LandingWaitMin), LandingWaitMax)
 	h.Landing.Nudge = strings.TrimSpace(h.Landing.Nudge)
+	h.GoalsReady = h.GoalsReady.clamp(GoalsReadyWaitMin)
+	h.UnownedTasks = h.UnownedTasks.clamp(UnownedTasksWaitMin)
 	h.Recipient = strings.TrimSpace(h.Recipient)
 	var revs []string
 	for _, r := range h.DefaultReviewers {

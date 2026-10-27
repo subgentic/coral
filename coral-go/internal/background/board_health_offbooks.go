@@ -92,7 +92,7 @@ func commitMention(content string) (what string, ok bool) {
 
 // offBooksKinds is what the board's settings leave on.
 func offBooksKinds(hs board.HealthSettings) map[string]bool {
-	return map[string]bool{board.OffBooksBusy: hs.BusyNoTask.On, board.OffBooksPost: hs.PostNoTask.On, board.OffBooksUpload: hs.UploadNoTask.On, board.OffBooksGoalSize: hs.GoalSize.On, board.OffBooksLanding: hs.Landing.On}
+	return map[string]bool{board.OffBooksBusy: hs.BusyNoTask.On, board.OffBooksPost: hs.PostNoTask.On, board.OffBooksUpload: hs.UploadNoTask.On, board.OffBooksGoalSize: hs.GoalSize.On, board.OffBooksLanding: hs.Landing.On, board.OffBooksGoalReady: hs.GoalsReady.On, board.OffBooksUnowned: hs.UnownedTasks.On}
 }
 
 // offBooksItems notes what happened off the books since the last check and returns the lines for the check: the occurrences not said yet, of the signals that are on. The ids it
@@ -117,6 +117,12 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 			m.nudgeLanding(ctx, project, orch, hs, detail, bySession, subs)
 		}
 	}
+	if hs.GoalsReady.On {
+		m.noteGoalsReady(ctx, project, orch, hs, bySession, subs, now)
+	}
+	if hs.UnownedTasks.On {
+		m.noteUnownedTasks(ctx, project, orch, hs, bySession, subs, now)
+	}
 	pending, err := m.store.PendingOffBooks(ctx, project, now, offBooksKinds(hs))
 	if err != nil {
 		return nil
@@ -127,7 +133,7 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 	items := make([]teamhealth.Item, 0, len(pending))
 	var ids []offBooksShown
 	for _, p := range pending {
-		if p.Kind == board.OffBooksGoalSize || p.Kind == board.OffBooksLanding { // a line about the board's own goal or branch: no agent, and what to do is in it
+		if boardOwnLine(p.Kind) { // a line about the board's own goal, branch or tasks: no agent, and what to do is in it
 			items = append(items, teamhealth.Item{Rank: 3, Agent: "Board", Problem: p.Detail})
 			ids = append(ids, offBooksShown{id: p.ID, needle: "Board: " + p.Detail})
 			continue
@@ -246,9 +252,22 @@ func (m *BoardHealthMonitor) noteGoalSizes(ctx context.Context, project string, 
 	}
 }
 
+// boardOwnLine says an off-the-books kind is a line about the board itself (a goal, the branch, tasks by number) and not about an agent.
+func boardOwnLine(kind string) bool {
+	switch kind {
+	case board.OffBooksGoalSize, board.OffBooksLanding, board.OffBooksGoalReady, board.OffBooksUnowned:
+		return true
+	}
+	return false
+}
+
 // nudgeLanding tells the member the team named for the landing alert (not the one the check goes to: they have the line), once, as the check does: through the gate, in one line.
 func (m *BoardHealthMonitor) nudgeLanding(ctx context.Context, project, orch string, hs board.HealthSettings, detail string, bySession map[string]AgentInfo, subs []board.Subscriber) {
-	who := hs.Landing.Nudge
+	m.nudgeMember(ctx, project, orch, hs, hs.Landing.Nudge, "landing-alert:", detail, bySession, subs)
+}
+
+// nudgeMember tells who (a member the team named for a check; not the one the check goes to: they have the line) the line, once, through the gate, in one line. key names the check for the gate.
+func (m *BoardHealthMonitor) nudgeMember(ctx context.Context, project, orch string, hs board.HealthSettings, who, key, detail string, bySession map[string]AgentInfo, subs []board.Subscriber) {
 	rcpt := orch
 	if hs.Recipient != "" {
 		rcpt = hs.Recipient
@@ -259,8 +278,8 @@ func (m *BoardHealthMonitor) nudgeLanding(ctx context.Context, project, orch str
 	for _, s := range subs {
 		if board.SameIdentity(s.SubscriberID, who) {
 			if a, live := bySession[s.SessionName]; live {
-				if err := m.deliver(ctx, a, "landing-alert:"+project, "[Coral health] "+detail); err != nil {
-					m.logger.Warn("landing alert delivery failed", "project", project, "error", err)
+				if err := m.deliver(ctx, a, key+project, "[Coral health] "+detail); err != nil {
+					m.logger.Warn("health check delivery failed", "check", key, "project", project, "error", err)
 				}
 			}
 			return
