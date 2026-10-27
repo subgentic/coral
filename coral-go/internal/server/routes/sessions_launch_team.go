@@ -108,6 +108,10 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 				errBadRequest(w, fmt.Sprintf("agent %q: the review settings are not offered through Coral Hub", a.Name))
 				return
 			}
+			if agentCaller(r) { // an agent may start agents on its own team: one it made reviews-only could take and approve its own pooled review
+				errForbidden(w, fmt.Sprintf("agent %q: only the Operator sets review settings", a.Name))
+				return
+			}
 			if _, aerr := board.NormalizeReviewAreas(a.ReviewAreas); aerr != nil {
 				errBadRequest(w, fmt.Sprintf("agent %q: %s", a.Name, strings.TrimPrefix(aerr.Error(), board.ErrReviewArea.Error()+": ")))
 				return
