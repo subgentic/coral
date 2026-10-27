@@ -117,6 +117,7 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 
 func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.BoardHandler) {
 	r.Get("/api/board/projects", boardHandler.ListProjects)
+	r.Get("/api/system/message-search-index", boardHandler.MessageSearchIndexStatus) // Settings: the board message search index, on by default (#9685)
 	r.Post("/api/board/{project}/subscribe", boardHandler.Subscribe)
 	r.Delete("/api/board/{project}/subscribe", boardHandler.Unsubscribe)
 	r.Post("/api/board/{project}/messages", boardHandler.PostMessage)

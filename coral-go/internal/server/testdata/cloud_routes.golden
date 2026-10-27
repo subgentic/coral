@@ -179,6 +179,7 @@ GET /api/system/hooks-status launch
 GET /api/system/hub-mode never
 GET /api/system/hub-operator view
 GET /api/system/identity-report never
+GET /api/system/message-search-index never
 GET /api/system/network-info never
 GET /api/system/privacy never
 GET /api/system/proof never

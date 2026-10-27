@@ -14,10 +14,10 @@ import (
 )
 
 // The message search index (#9451): an FTS5 trigram index over board_messages.content that narrows a text search to the messages that
-// can match, so a search no longer reads every message. It is OFF unless CORAL_BOARD_SEARCH_INDEX is on, because the index takes disk
-// (detail=none: about 0.6 times the text of the messages, measured in message_fts_test.go's benchmark) and building it takes seconds on a
-// big board. Turning the setting on builds it in the background (the search keeps answering as before until it is ready); turning it off
-// drops it.
+// can match, so a search no longer reads every message. It is ON unless CORAL_BOARD_SEARCH_INDEX is off (the Operator's decision, #9685),
+// because it costs disk (detail=none: about 0.6 times the text of the messages, measured in message_fts_test.go's benchmark) and building it
+// takes seconds on a big board; Settings shows its state and size. The setting on builds it in the background at the first open (the search
+// keeps answering as before until it is ready); off drops it. A build of SQLite without FTS5 (the Windows build) cannot have it: it stays off.
 //
 // The index only narrows: the query still asks LIKE of every candidate, so the answer is the one the scan gives while every message that
 // LIKE matches is a candidate (a trigram index folds at least the case LIKE folds). Two things LIKE and Go's match disagree on, a NUL
@@ -47,13 +47,39 @@ const (
 	messageIndexReady
 )
 
-// messageSearchIndexWanted reports the setting.
+// messageSearchIndexWanted reports the setting: on unless the variable says off (0, false, off or no, in any case).
 func messageSearchIndexWanted() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(messageSearchIndexEnv))) {
-	case "1", "true", "on", "yes":
-		return true
+	case "0", "false", "off", "no":
+		return false
 	}
-	return false
+	return true
+}
+
+// messageSearchIndexAvailable is true when this SQLite has FTS5.
+func (s *Store) messageSearchIndexAvailable(ctx context.Context) bool {
+	var n int
+	return s.db.GetContext(ctx, &n, `SELECT sqlite_compileoption_used('ENABLE_FTS5')`) == nil && n == 1
+}
+
+// MessageSearchIndexStatus is what Settings shows: the setting, whether this build can have the index, its state and the disk it takes.
+type MessageSearchIndexStatus struct {
+	Setting   string `json:"setting"`    // "on" or "off": CORAL_BOARD_SEARCH_INDEX
+	Available bool   `json:"available"`  // false: this build of SQLite has no FTS5
+	State     string `json:"state"`      // "off", "building" or "ready"
+	SizeBytes int64  `json:"size_bytes"` // the index's tables and their indexes, 0 when there is none
+}
+
+// MessageSearchIndexStatus reports the index's setting, state and size.
+func (s *Store) MessageSearchIndexStatus(ctx context.Context) MessageSearchIndexStatus {
+	st := MessageSearchIndexStatus{Setting: "off", Available: s.messageSearchIndexAvailable(ctx), State: s.MessageSearchIndexState()}
+	if messageSearchIndexWanted() {
+		st.Setting = "on"
+	}
+	if s.messageIndexExists(ctx) {
+		_ = s.db.GetContext(ctx, &st.SizeBytes, `SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name LIKE 'board_messages_fts%' OR name LIKE 'board_message_fts_meta%'`)
+	}
+	return st
 }
 
 // MessageSearchIndexState is "off", "building" or "ready".
@@ -72,6 +98,9 @@ func (s *Store) MessageSearchIndexState() string {
 func (s *Store) applyMessageSearchIndexSetting() {
 	ctx := context.Background()
 	if messageSearchIndexWanted() {
+		if !s.messageSearchIndexAvailable(ctx) {
+			return // no FTS5 in this build: the search is answered without an index, quietly
+		}
 		if s.messageIndexComplete(ctx) {
 			s.msgIndex.Store(messageIndexReady)
 			return

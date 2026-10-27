@@ -226,7 +226,7 @@ func TestMessageSearchIndexSettingAtOpen(t *testing.T) {
 		require.Eventually(t, func() bool { return s.MessageSearchIndexState() == want }, 10*time.Second, 5*time.Millisecond, "state %s", want)
 	}
 	s := open()
-	require.Equal(t, "off", s.MessageSearchIndexState(), "off by default")
+	require.Equal(t, "off", s.MessageSearchIndexState(), "off while the setting is off (the test binary sets it)")
 	ctx := context.Background()
 	_, err := sub(s, ctx, "proj", "dev", "Dev")
 	require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestMessageSearchIndexSettingAtOpen(t *testing.T) {
 	s = open()
 	require.Equal(t, "ready", s.MessageSearchIndexState(), "a complete index is found at the next open, not built again")
 	require.NoError(t, s.Close())
-	t.Setenv(messageSearchIndexEnv, "")
+	t.Setenv(messageSearchIndexEnv, "off")
 	s = open()
 	require.Eventually(t, func() bool { return !s.messageIndexExists(ctx) }, 10*time.Second, 5*time.Millisecond, "the setting off drops it")
 	require.Equal(t, "off", s.MessageSearchIndexState())
