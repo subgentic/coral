@@ -10,6 +10,8 @@ import { serverFetch, isCloud, nativeInbox } from './server_base.js';
  * Text of a chat (its title, the agent's name, a tag) is written by an agent or a person: it is only ever textContent. */
 import { importOnce } from './import_once.js';
 const DT = await importOnce('./data_table.js');
+const IR = await importOnce('./inbox_read.js'); // which chats and boards the person has opened since they changed (#9687)
+const readKey = s => `${s.server}:${s.session_id}`, readKind = s => (isGroup(s) ? 'board' : 'chat');
 const { historyFetch } = await importOnce('./history_source.js');
 const { historyLabel } = await importOnce('./history_label.js');
 
@@ -143,14 +145,15 @@ export function chatsSpec(key, ctx) {
     if (!L.page && !L.busy && !L.done) readMore(key, folder, q, extra, ctx.redraw);
     const rows = L.rows;
     return { title: folder.title, noun: ['chat', 'chats'], rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : 'No chats here.') },
-        signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec])]),
+        signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec, IR.isUnread(readKind(s), readKey(s), stampOf(s))])]),
         node: () => { const table = DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => `${s.server}:${s.session_id}`, state: chatState,
             onModeChange: () => ctx.redraw?.(), // the window crossed 767 px: this spec's selectable (phone only) is decided at draw, so the owner draws the table again
             selectable: isCloud() || !window.matchMedia?.('(max-width: 767px)').matches ? null : { contextKey: key, canSelect: s => !isGroup(s) && (!s.server || s.server === 'local'), onChange: keys => ctx.selection?.(keys.size ? table.bar : null),
                 actions: [{ label: 'Star', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'starred', true, s.server); chatState.selected.clear(); ctx.after(); } }, { label: 'Archive', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'archived', true, s.server); chatState.selected.clear(); ctx.after(); } }] }, // select by the avatar on a phone, then Star or Archive (the flags route: this computer's chats only) rowName: s => name(s) || historyLabel(s),
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
-            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)); return { lead: { text: who, name: who, square: group }, title: who, snippet: group ? '' : historyLabel(s), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
+            unread: s => IR.isUnread(readKind(s), readKey(s), stampOf(s)),
+            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)); return { unread: IR.isUnread(readKind(s), readKey(s), stampOf(s)), lead: { text: who, name: who, square: group }, title: who, snippet: group ? '' : historyLabel(s), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, extra, ctx.redraw) } },
             oneLine: true, resize: false, sortBar: false, // one line per chat, never folded (#8961, the shared one-row table of #8931): Server, then Agent drop as the box narrows; the role and the first message are in the chat that opens
             columns: [
