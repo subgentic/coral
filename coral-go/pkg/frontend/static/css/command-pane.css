@@ -317,15 +317,13 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
         gap: 1px; /* the seam of a split Send */
         margin-left: 4px;
     }
-    /* Send is round in the card (a lone Send: the board's), and the left half of nothing; with its options caret beside it, the two are one split control (#9648, as the phone's #9570): the caret is the rounded left half, Send the rounded right half, both 32 px high */
-    :is(#command-pane, #board-chat-input-pane) .btn-send { width: 32px; min-width: 32px; height: 32px; padding: 0; border-radius: 50%; box-shadow: none; }
-    :is(#command-pane, #board-chat-input-pane) .btn-send:hover { transform: none; }
-    :is(#command-pane, #board-chat-input-pane) .toolbar-send-split:has(.btn-send-dropdown) .btn-send { border-radius: 0 16px 16px 0; }
+    /* With its options caret beside it, Send and the caret are one split control (#9648, as the phone's #9570): the caret is the rounded left half, Send the rounded right half, both 32 px high. A lone Send (the board's) is the rounded square of the family (UI/UX's call, #9643). */
+    :is(#command-pane, #board-chat-input-pane) .toolbar-send-split:has(.btn-send-dropdown) .btn-send { width: 32px; min-width: 32px; height: 32px; padding: 0; border-radius: 0 16px 16px 0; box-shadow: none; }
     :is(#command-pane, #board-chat-input-pane) .toolbar-send-split .btn-send-dropdown { width: 28px; min-width: 28px; height: 32px; padding: 0; border-radius: 16px 0 0 16px; box-shadow: none; }
     /* a wide touch screen (a tablet at 820 px and more, a coarse pointer) has 44 px targets: the caret and Send are 44 px, the halves' ends round at 22 px (#9648, Security Reviewer's SHOULD) */
     @media (pointer: coarse) {
         :is(#command-pane, #board-chat-input-pane) .btn-send, :is(#command-pane, #board-chat-input-pane) .toolbar-send-split .btn-send-dropdown { min-width: var(--control-touch-height); min-height: var(--control-touch-height); height: var(--control-touch-height); }
-        :is(#command-pane, #board-chat-input-pane) .btn-send { width: var(--control-touch-height); }
+        :is(#command-pane, #board-chat-input-pane) .btn-send, :is(#command-pane, #board-chat-input-pane) .toolbar-send-split:has(.btn-send-dropdown) .btn-send { width: var(--control-touch-height); min-width: var(--control-touch-height); }
         :is(#command-pane, #board-chat-input-pane) .toolbar-send-split:has(.btn-send-dropdown) .btn-send { border-radius: 0 22px 22px 0; }
         :is(#command-pane, #board-chat-input-pane) .toolbar-send-split .btn-send-dropdown { border-radius: 22px 0 0 22px; }
     }
@@ -350,7 +348,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
         transition: border-color 0.15s;
     }
     #board-chat-input-pane:focus-within { border-color: var(--accent); }
-    #board-chat-input-pane .btn-send { width: var(--control-touch-height); min-width: var(--control-touch-height); height: var(--control-touch-height); padding: 0; border-radius: 50%; box-shadow: none; } /* the board's lone Send: a round 44 px target */
+    #board-chat-input-pane .btn-send { width: var(--control-touch-height); min-width: var(--control-touch-height); height: var(--control-touch-height); padding: 0; box-shadow: none; } /* the board's lone Send: a 44 px target (its shape is the family's rounded square, #9643) */
     #board-chat-input-pane .command-pane-body { order: 0; flex-direction: column; gap: 6px; padding: 10px 12px 0; }
     #board-chat-input-pane textarea {
         flex: none; min-height: 2.75rem; max-height: 40vh; padding: 0;
