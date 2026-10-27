@@ -27,7 +27,7 @@ function _renderTeamCard(boardName, boardSessions) {
             <button class="sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(boardName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">&#x22EE;</button>
             <div class="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(boardName)}">
                 <button class="overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
-                <button class="overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:0.875rem;vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
+                <button class="overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
                 <button class="overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                     Add Agent
@@ -121,7 +121,7 @@ function _renderWorkflowCard(wfName, wfSessions) {
 
         html += `<li class="session-board-card session-board-card-toplevel session-wf-card" style="border-left-color: var(--color-tool-agent)">
             <div class="session-group-header board-card-header" data-group-name="wf:${escapeAttr(wfName)}" data-on-click="group-collapse" data-group="wf:${escapeAttr(wfName)}"${_collapseAttrs(wfCollapsed)}>${CHEVRON_DECO}
-                <div class="group-header-text"><div class="group-name-line"><span class="material-icons" style="font-size:0.875rem;vertical-align:-2px;margin-right:3px;color:var(--color-tool-agent)" aria-hidden="true">account_tree</span>${escapeHtml(wfName)}</div>${wfSubline}</div><span class="session-name-spacer"></span>${wfKebab}
+                <div class="group-header-text"><div class="group-name-line"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px;margin-right:3px;color:var(--color-tool-agent)" aria-hidden="true">account_tree</span>${escapeHtml(wfName)}</div>${wfSubline}</div><span class="session-name-spacer"></span>${wfKebab}
             </div>
             <ul class="board-card-agents${wfCollapsed ? ' board-card-collapsed' : ''}">`;
 
@@ -268,7 +268,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                     <button class="sidebar-kebab-btn group-kebab-btn" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(boardName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">&#x22EE;</button>
                     <div class="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(boardName)}">
                 <button class="overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
-                <button class="overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:0.875rem;vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
+                <button class="overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
                         <button class="overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                             Add Agent
