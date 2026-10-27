@@ -35,10 +35,10 @@ const BROKEN = (sel) => `(() => { const c = document.createElement('canvas').get
             await S.run(`${label}: every tab is reachable in the strip: the selected tab is in view on load and after each press, a fade says there is more, and the page does not scroll sideways`, async () => {
                 const inView = (name) => ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}) || document.getElementById('team-tab-more'); const b = t.getBoundingClientRect(), s = t.id === 'team-tab-more' ? { left: 0, right: innerWidth } : window.__tp.tablist().getBoundingClientRect(); /* a phone's tab behind More: More is the one in view, beside the strip */ return b.left >= s.left - 1 && b.right <= s.right + 1 && b.left >= -1 && b.right <= innerWidth + 1; })()`);
                 const r = await ev(`(() => { const t = window.__tp.tablist(); return { over: t.scrollWidth - t.clientWidth, more: t.dataset.more || '', n: window.__tp.allTabs().length, shown: window.__tp.tabs().length, page: document.documentElement.scrollWidth - innerWidth, h: Math.round(t.getBoundingClientRect().height) }; })()`);
-                assert.equal(r.n, 7, 'seven tabs'); assert.equal(r.shown, mobile ? 4 : 7, mobile ? 'four tabs in the row, the rest behind More' : 'every tab in the row'); assert.ok(r.page <= 1, `the page does not scroll sideways (${r.page})`);
+                assert.equal(r.n, 6, 'six tabs (Settings is a popout, #8853)'); assert.equal(r.shown, mobile ? 4 : 6, mobile ? 'four tabs in the row, the rest behind More' : 'every tab in the row'); assert.ok(r.page <= 1, `the page does not scroll sideways (${r.page})`);
                 if (r.over > 1) assert.ok(r.more, 'the strip scrolls, and a fade at its edge says there is more');
                 assert.equal(await inView('Goals'), true, 'the selected tab (Goals) is in view on load');
-                for (const name of ['Artifacts', 'Knowledge', 'Settings', 'Tasks']) {
+                for (const name of ['Artifacts', 'Knowledge', 'Board', 'Tasks']) {
                     await goTab(ev, settle, name); await settle(300);
                     assert.equal(await inView(name), true, `${name} is in view after it is pressed`);
                     assert.equal(await ev(`window.__tp.allTabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}).getAttribute('aria-selected')`), 'true');
@@ -50,9 +50,9 @@ const BROKEN = (sel) => `(() => { const c = document.createElement('canvas').get
                 await waitFor(`(() => { const t = window.__tp.allTabs().find(x => window.__tp.tabLabel(x) === 'Knowledge'); return !!t && /Knowledge\\s*3/.test(window.__na.name(t)); })()`, 'Knowledge 3 on the tab', 8000);
             });
             await S.run(`${label}: Settings: no word is broken, the rows stack (the control under its label) and Working mode is reachable`, async () => {
-                await goTab(ev, settle, 'Settings'); await settle(900);
+                await goTab(ev, settle, 'Settings'); await settle(900); // the popout dialog (#8853)
                 const broken = await ev(BROKEN('.sv-label, .sv-help, .settings-pane-title, .settings-pane-sub, .sv-lead')); assert.deepEqual(broken, [], 'no word of the labels and hints is broken: ' + JSON.stringify(broken));
-                const r = await ev(`(() => { const sel = window.__tp.find('select', /^Working mode$/i); const row = sel.closest('.sv-row'); const text = row.querySelector('.sv-text').getBoundingClientRect(), ctl = row.querySelector('.sv-control').getBoundingClientRect(); const sc = document.querySelector('.team-settings-page .settings-panes').getBoundingClientRect(); sel.scrollIntoView({ block: 'nearest' }); const b = sel.getBoundingClientRect(); return { stacked: ctl.top >= text.bottom - 1, within: b.left >= sc.left - 1 && b.right <= sc.right + 1 }; })()`);
+                const r = await ev(`(() => { const sel = window.__tp.find('select', /^Working mode$/i); const row = sel.closest('.sv-row'); const text = row.querySelector('.sv-text').getBoundingClientRect(), ctl = row.querySelector('.sv-control').getBoundingClientRect(); const sc = document.querySelector('.team-settings-modal .settings-panes').getBoundingClientRect(); sel.scrollIntoView({ block: 'nearest' }); const b = sel.getBoundingClientRect(); return { stacked: ctl.top >= text.bottom - 1, within: b.left >= sc.left - 1 && b.right <= sc.right + 1 }; })()`);
                 assert.equal(r.within, true, 'the Working mode select is inside the page'); if (font > 16 || mobile) assert.equal(r.stacked, true, 'the control is under the label and hint');
             });
             await S.run(`${label}: Knowledge: no word of the table or its count line is broken`, async () => {

@@ -12,7 +12,7 @@
  *     group: 'id',                      the group open first (a deep link); onGroup(id) is called when it changes; remember: 'key' keeps the last group per surface
  *     load: async () => ({ key: value }),
  *     save: async (changes, ctx) => ({ saved?: [words], note?: 'text' }),    changes = only the changed fields; ctx = { before, values }
- *     saveBar: { save: 'Save settings', cancel: 'Cancel', onCancel?, cancelAlways? } | false,   cancelAlways: Cancel stays enabled with nothing changed (a dialog's Cancel closes it)
+ *     saveBar: { save: 'Save settings', cancel: 'Cancel', onCancel?, cancelAlways? } | false,   cancelAlways: Cancel stays enabled with nothing changed (onCancel(wasDirty) is told whether there was a change to drop)
  *     readOnly: false | 'reason' | (key) => false | 'reason',
  *     words: { none, dirty, saved, failed, busy },  onApply(key, value) for apply: 'now' fields
  *   }
@@ -470,8 +470,9 @@ export function mountSettingsView(host, spec) {
             afterChange();
         },
         cancel() {
+            const wasDirty = view.isDirty();
             view.reset();
-            const closer = barSpec || formSpec; closer && closer.onCancel && closer.onCancel();
+            const closer = barSpec || formSpec; closer && closer.onCancel && closer.onCancel(wasDirty);
         },
         focus(key) { const r = fields.get(key); if (!r) return; const d = r.row.closest('details.sv-fold'); if (d) d.open = true; r.ctl.focus(); }, // a field of the caller's choosing (a server refusal names it)
         fold(open) { for (const d of folds) d.open = !!open; }, // the form's optional part: open or closed

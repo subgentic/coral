@@ -77,8 +77,8 @@ function settingsViewOptions(st) {
         onGroup: id => { _lastSection = id; },
         words: { failed: 'Could not save: ' },
         failure: m => m.replace(/^Could not save( the health check)?\.?\s*/i, '') || m,
-        saveBar: { save: 'Save settings', cancel: 'Cancel', cancelAlways: !!st.options.closeDialog, onCancel: async () => { // every part back as it was read: the page is drawn again from the server (in the popout dialog Cancel is always there: it drops the edits and closes it)
-            if (st.options.closeDialog) { st.options.closeDialog(); return; }
+        saveBar: { save: 'Save settings', cancel: 'Cancel', cancelAlways: !!st.options.closeDialog, onCancel: async wasDirty => { // every part back as it was read: the page is drawn again from the server (in the popout dialog Cancel is always there: with a change it drops it, with none it closes the dialog)
+            if (st.options.closeDialog && !wasDirty) { st.options.closeDialog(); return; }
             await showTeamSettingsPage(st.team, st.options);
             const h = st.host.querySelector('.settings-pane:not([hidden]) .settings-pane-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } // the button that had the focus is gone: it goes to the open group's heading
         } },
