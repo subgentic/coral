@@ -119,7 +119,7 @@ curl -X POST http://localhost:8420/api/scheduled/jobs \
 
 The `cron_expr` follows standard cron syntax — `0 9 * * 1-5` means "at 9:00 AM, Monday through Friday." Set `timezone` to `"Local"` to use the server's timezone, or specify one like `"America/New_York"`.
 
-You can manage jobs from the **Jobs** tab in the UI, or via the API:
+You can manage jobs from the **Jobs** folder of the **Automations** tab in the UI, or via the API:
 
 ```bash
 # a script you run yourself, never an agent
@@ -138,7 +138,7 @@ curl http://localhost:8420/api/scheduled/jobs/1/runs \
   -H "Authorization: Bearer $(coral api-key)"
 ```
 
-> **Tip:** Coral ships with an example daily-motivation workflow and an example morning-motivation job. The job is switched off, so nothing runs (and no CLI credit is spent) until you turn it on from the Jobs tab; you can also trigger the workflow by hand to see it in action.
+> **Tip:** Coral ships with an example daily-motivation workflow and an example morning-motivation job. The job is switched off, so nothing runs (and no CLI credit is spent) until you turn it on from the Jobs folder of Automations; you can also trigger the workflow by hand to see it in action.
 
 ---
 
@@ -208,4 +208,4 @@ Workflows like this can be [scheduled](scheduled-jobs.md) to run automatically o
 - [Workflows](workflows.md) — Full API reference with all fields, error codes, and run management
 - [Hooks](hooks.md) — Add lifecycle hooks for notifications and custom behavior
 - [Scheduled Jobs](scheduled-jobs.md) — Run workflows automatically on a cron schedule
-- Try the **Build with Agent** button in the Workflows tab — an AI assistant that helps you create workflows through conversation
+- Try the **Build with Agent** button in the Workflows folder of Automations — an AI assistant that helps you create workflows through conversation
