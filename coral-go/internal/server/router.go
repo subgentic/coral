@@ -22,7 +22,6 @@ import (
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/serverproof"
 	"github.com/subgentic/coral/internal/store"
-	"github.com/subgentic/coral/pkg/frontend"
 )
 
 // The router is built in this order; registration and wiring order are as they were in one
@@ -662,21 +661,7 @@ func (s *Server) registerStatic(r *chi.Mux) {
 		log.Printf("static build version unavailable, serving plain /static paths: %v", err)
 	}
 	// The bundled family (#4228): app.js's module graph and the shell's stylesheets as one file each, next to the unchanged files.
-	var bundleFS fs.FS
-	if s.staticVersion != "" && !frontend.BundleDisabled() {
-		index, _ := fs.ReadFile(frontend.Templates, "templates/index.html")
-		if b, err := frontend.BuildBundle(staticSub, index); err != nil {
-			log.Printf("bundled dashboard unavailable, serving the original files: %v", err)
-		} else {
-			bundleFS = b.FS(staticSub)
-			// The build id names the bytes served, not only the sources: the bundler, its options and
-			// the stylesheet order change them with the tree untouched (#4320). It is ONE id for both
-			// families, the pop-out's /static/b/ and the bundled /static/bb/, and the X-Coral-Build
-			// header the update banner compares with, so they stay the same name for one build.
-			s.staticVersion = bundleVersion(s.staticVersion, b)
-			s.bundleBase = "/static/bb/" + s.staticVersion + "/"
-		}
-	}
+	bundleFS := s.buildBundleFamily(staticSub)
 	// The build id of the frontend this binary serves (it hashes every embedded static file and the bundle's bytes): two
 	// servers that print the same id serve the same JavaScript, whatever tree they were built from (#4528).
 	if s.staticVersion != "" {
