@@ -21,7 +21,7 @@ export function appShellHtml() {
 let installed = null;
 
 /** Install DOM globals once; returns the JSDOM instance. */
-export function installDom({ mode = 'cloud' } = {}) {
+export function installDom({ mode = 'cloud', boot: extraBoot = {} } = {}) {
     if (installed) return installed;
     const html = appShellHtml()
         .replace(/<script\b[^>]*src=[^>]*><\/script>/g, '') // external scripts are imported by the test
@@ -37,7 +37,7 @@ export function installDom({ mode = 'cloud' } = {}) {
     w.HTMLElement.prototype.scrollTo = function () {};
     if (!w.navigator.clipboard) Object.defineProperty(w.navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true });
     const boot = w.document.getElementById('coral-boot');
-    if (boot) boot.textContent = JSON.stringify({ mode });
+    if (boot) boot.textContent = JSON.stringify({ mode, ...extraBoot });
     for (const k of Object.getOwnPropertyNames(w)) {
         if (k in globalThis && !['window', 'document', 'navigator', 'location', 'localStorage', 'sessionStorage'].includes(k)) continue;
         try { globalThis[k] = w[k]; } catch { try { Object.defineProperty(globalThis, k, { value: w[k], configurable: true, writable: true }); } catch { /* skip */ } }

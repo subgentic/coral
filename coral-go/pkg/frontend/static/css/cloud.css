@@ -135,3 +135,5 @@ body.cloud-mode .settings-cloud-note { margin: 0 0 12px; }
 .cloud-more[open] { display: block; margin: 8px 0 0; }
 .cloud-more > p { margin: 8px 0 0; }
 
+/* The Hub-served dashboard draws its own Inbox (Goal #100): the Chats and Board tabs of the top row are not shown (nav_tabs.js leaves them out of the hamburger and the More menu too). */
+body.native-inbox [data-native-inbox-hides] { display: none !important; }

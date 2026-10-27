@@ -1,9 +1,10 @@
 /* The Inbox's source identity and shared Server controls. No requests run at module load. */
 import { state } from './state.js';
-import { splitKey, serverFetch, identityKey } from './server_base.js';
-export const serverChoices = () => ['local', ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local').map(s => s.id) : [])];
+import { splitKey, serverFetch, identityKey, isCloud } from './server_base.js';
+/** On a Hub-served dashboard there is no "local" computer: the Hub has no chats or boards of its own, so the sources are the linked computers (online ones for a read; Goal #100). */
+export const serverChoices = () => [...(isCloud() ? [] : ['local']), ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local').map(s => s.id) : [])];
 export const multipleServers = () => !!state.hub && serverChoices().length > 1;
-export const inboxSources = () => ['local', ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
+export const inboxSources = () => [...(isCloud() ? [] : ['local']), ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
 export function serverLabel(id) { return !id || id === 'local' ? 'This computer' : (state.servers || []).find(s => s.id === id)?.label || (state.servers || []).find(s => s.id === id)?.name || id; }
 export const serverOf = row => row.server || splitKey(row.project || row.board_id || row.team || '').server || 'local';
 export const serverMatches = (row, filters) => !multipleServers() || !filters.server || serverOf(row) === filters.server;
