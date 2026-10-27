@@ -1402,10 +1402,11 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 
 /* Save for later (#4510): a bookmark one slot to the left of Copy on each reply, and on your own messages; filled and in the accent colour when saved. Shown on
    hover or keyboard focus, always while saved; on touch both are always shown at 44 px (touch.css). */
+.chat-bubble { --chat-ib: max(24px, calc(var(--fs-lg) + 10px)); } /* the dense icon button's width (Copy, Save: .btn-icon.btn-xs): it grows with the text size, so what sits beside it is placed from it, not from 24 px (#9695: Save overlapped Copy by 12 px at 200% text) */
 .chat-bubble button.chat-save-btn {
     position: absolute;
     top: 6px;
-    right: 34px;
+    right: calc(var(--chat-ib) + 10px);
     margin: 0;
     opacity: 0;
 }
@@ -1416,7 +1417,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 .chat-bubble .chat-save-btn[aria-pressed="true"] { color: var(--accent); }
 .chat-bubble .chat-save-btn[aria-pressed="true"] svg path, .mb-save-btn[aria-pressed="true"] svg path { fill: currentColor; }
 .chat-bubble .chat-save-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.chat-prose.chat-messages .chat-bubble .chat-save-btn { top: 100%; margin-top: -2px; right: 22px; } /* the dense 24 px button (#9494) ends inside the 22 px the bubble reserves below it: -2, not 1, so it never covers the next message (#9643) */
+.chat-prose.chat-messages .chat-bubble .chat-save-btn { top: 100%; margin-top: -2px; right: calc(var(--chat-ib) - 2px); } /* the dense 24 px button (#9494) ends inside the 22 px the bubble reserves below it: -2, not 1, so it never covers the next message (#9643) */
 .chat-prose.chat-messages .chat-bubble.human .chat-save-btn { right: -4px; }
 .chat-bubble .chat-save-btn[hidden] { display: none; }
 @media (hover: none) {
@@ -1512,13 +1513,13 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 /* The sent time shares the existing Save/Copy row (#6063). Keep its reserved
    height and message spacing unchanged when the text is revealed. */
 .chat-bubble > .message-time {
-    position: absolute; top: 6px; right: 62px;
+    position: absolute; top: 6px; right: calc(2 * var(--chat-ib) + 14px);
     display: inline-flex; align-items: center; min-height: 22px;
     white-space: nowrap; color: var(--text-secondary); font-size: var(--fs-sm); opacity: 0;
 }
-.chat-bubble.human > .message-time { right: 34px; }
-.chat-prose.chat-messages .chat-bubble > .message-time { top: 100%; margin-top: 1px; right: 54px; }
-.chat-prose.chat-messages .chat-bubble.human > .message-time { right: 22px; }
+.chat-bubble.human > .message-time { right: calc(var(--chat-ib) + 10px); }
+.chat-prose.chat-messages .chat-bubble > .message-time { top: 100%; margin-top: 1px; right: calc(2 * var(--chat-ib) + 6px); }
+.chat-prose.chat-messages .chat-bubble.human > .message-time { right: calc(var(--chat-ib) - 2px); }
 .chat-bubble:hover > .message-time,
 .chat-bubble:focus-within > .message-time { opacity: 1; }
 @media (hover: none) {
