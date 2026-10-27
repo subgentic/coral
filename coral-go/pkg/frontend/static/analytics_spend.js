@@ -109,9 +109,9 @@ function card(value, label, sub) {
 
 /** Two small toggles that act as one choice each (pressed buttons, 44 px on a phone): [{ key, label, disabled?, title? }]. */
 function toggles(label, options, current, onPick) {
-    const g = el('div', 'spend-toggle'); g.setAttribute('role', 'group'); g.setAttribute('aria-label', label);
+    const g = el('div', 'spend-toggle btn-seg'); g.setAttribute('role', 'group'); g.setAttribute('aria-label', label);
     for (const o of options) {
-        const b = el('button', 'spend-toggle-btn', o.label); b.type = 'button'; b.dataset.key = o.key;
+        const b = el('button', 'btn spend-toggle-btn', o.label); b.type = 'button'; b.dataset.key = o.key;
         b.setAttribute('aria-pressed', String(current === o.key));
         if (o.disabled) { b.disabled = true; if (o.title) b.title = o.title; }
         b.addEventListener('click', () => onPick(o.key));

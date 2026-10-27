@@ -189,7 +189,7 @@ export function attachVersions(dialog, hooks) {
         const h = heading(row, before);
         const top = el('div', 'av-modebar');
         const status = el('p', 'av-count', count); // plain text: the one announcement is the polite line (a second live region would say it twice)
-        const seg = el('div', 'av-seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Compare view');
+        const seg = el('div', 'av-seg btn-seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Compare view');
         const bChanges = btn('av-view-changes', 'Changes'), bSplit = btn('av-view-split', 'Side by side');
         for (const [b, v] of [[bChanges, 'changes'], [bSplit, 'split']]) { b.setAttribute('aria-pressed', String(st.view === v)); b.addEventListener('click', () => { st.view = v; drawCompare(body, row, before, lines, false); body.querySelector(v === 'changes' ? '.av-view-changes' : '.av-view-split')?.focus(); }); }
         seg.append(bChanges, bSplit); top.append(status, seg);

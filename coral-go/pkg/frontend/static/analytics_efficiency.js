@@ -38,10 +38,10 @@ function build(key) {
     state[key] = { group: saved, data: null, loading: false, error: '', seq: 0 };
     const bar = el('div', 'eff-switch');
     bar.append(el('div', 'eff-switch-label', 'Group by'));
-    const seg = el('div', 'eff-seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Group by');
+    const seg = el('div', 'eff-seg btn-seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Group by');
     const pick = el('select', 'cost-time-select eff-pick'); pick.setAttribute('aria-label', 'Group by'); // a phone: one select
     for (const [value, label] of groupsOf(cfg)) {
-        const b = el('button', 'eff-seg-btn', label); b.type = 'button'; b.dataset.group = value; b.addEventListener('click', () => choose(key, value)); seg.append(b);
+        const b = el('button', 'btn eff-seg-btn', label); b.type = 'button'; b.dataset.group = value; b.addEventListener('click', () => choose(key, value)); seg.append(b);
         pick.append(new Option(label, value));
     }
     pick.addEventListener('change', () => choose(key, pick.value));
