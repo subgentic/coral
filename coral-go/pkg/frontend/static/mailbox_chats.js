@@ -1,5 +1,5 @@
 import { inboxSources, serverColumns, multipleServers } from './inbox_servers.js';
-import { serverFetch, isCloud } from './server_base.js';
+import { serverFetch, serverRead, isCloud } from './server_base.js';
 /* The mailbox's chat folders (#7776, UI/UX's mock #7773): All chats, Board history, With notes, Starred, Active now and Archived; by CLI (Claude, Codex, Antigravity, Pi); and the chat tags. One chat is one line of
  * the one table (data_table.js): the agent, the chat's title with a snippet after it, when it last spoke and how long it ran; the days are its dividers, the list grows as it is read (the footer scrolls into view),
  * and the folders' counts come from one grouped read (GET /api/sessions/history/counts). A chat is starred or archived with its own two quiet buttons (PATCH /api/sessions/history/{id}/flags: only the person).
@@ -60,7 +60,8 @@ export const chatTags = () => (counts && counts.tags) || [];
 
 export async function loadChatCounts(redraw) {
     try {
-        const replies = await Promise.all(inboxSources().map(async server => { const r = await serverFetch(server, '/api/sessions/history/counts'); if (!r.ok) throw new Error('Chat counts unavailable'); return r.json(); }));
+        const answers = await Promise.all(inboxSources().map(async server => { try { const r = await serverRead(server, '/api/sessions/history/counts'); if (!r.ok) throw new Error('Chat counts unavailable'); return await r.json(); } catch (e) { if (server === 'local') throw e; return null; } })); // a registered computer that does not answer in time is left out of the counts (#8904); this computer failing is the error
+        const replies = answers.filter(Boolean);
         counts = { ...replies[0], by_agent_type: Object.create(null) };
         for (const key of ['all','group','notes','starred','active','archived']) counts[key] = replies.reduce((sum, d) => sum + (Number(d[key]) || 0), 0);
         for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
