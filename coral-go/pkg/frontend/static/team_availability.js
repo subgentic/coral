@@ -2,7 +2,7 @@ import { importOnce } from './import_once.js';
 import { bindNativeDialog } from './modal_chrome.js';
 import { escapeHtml } from './utils.js';
 import { state } from './state.js';
-import { boardFetch, inTeam, keyLabel, sessionTeamKey } from './server_base.js';
+import { boardFetch, dropBody, fetchValidated, inTeam, keyLabel, sessionTeamKey } from './server_base.js';
 import { platform } from './platform/detect.js';
 
 const availabilityCache = new Map();
@@ -41,14 +41,22 @@ export function getCachedAgentAvailability(session) {
     return null;
 }
 
-function fetchTeamAvailability(team) {
+function fetchTeamAvailability(team, validated = false) {
     const started = Date.now();
     const seq = ++availabilitySeq;
     const request = (async () => {
         try {
-            const response = await boardFetch(team, `/status`, { cache: 'no-store' });
-            if (!response.ok) throw new Error(`Availability could not be loaded (${response.status}).`);
-            const data = await response.json();
+            let data;
+            if (validated) {
+                // A background poll finds the status unchanged most of the time: it sends the last one's validator and, on a 304, keeps the data it has (#9337).
+                const r = await fetchValidated('board-status ' + team, headers => boardFetch(team, `/status`, { cache: 'no-store', headers }));
+                if (!r.ok) { dropBody(r.resp); throw new Error(`Availability could not be loaded (${r.resp.status}).`); }
+                data = r.notModified && availabilityCache.has(team) ? availabilityCache.get(team) : JSON.parse(r.text);
+            } else {
+                const response = await boardFetch(team, `/status`, { cache: 'no-store' });
+                if (!response.ok) throw new Error(`Availability could not be loaded (${response.status}).`);
+                data = await response.json();
+            }
             if (seq > (availabilityWrittenSeq.get(team) || 0)) {
                 availabilityWrittenSeq.set(team, seq);
                 availabilityCache.set(team, data);
@@ -79,7 +87,7 @@ export async function refreshTeamAvailability(team, force = false) {
         if (availabilityInFlight.has(team) || Date.now() < (availabilityNextAt.get(team) || 0)) return null;
     }
     try {
-        return await fetchTeamAvailability(team);
+        return await fetchTeamAvailability(team, !force);
     } catch (err) {
         if (force) throw err;
         return availabilityCache.get(team) || null;

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/subgentic/coral/internal/httputil"
 )
 
 // replyCache computes each key at most once at a time: callers that arrive while it is computed
@@ -41,7 +43,7 @@ func (c *replyCache) serve(w http.ResponseWriter, r *http.Request, key string, c
 	c.mu.Lock()
 	if e, ok := c.entries[key]; ok && c.ttl > 0 && c.now().Sub(e.at) < c.ttl {
 		c.mu.Unlock()
-		writeCachedReply(w, e)
+		writeCachedReply(w, r, e)
 		return
 	}
 	if f, ok := c.flights[key]; ok {
@@ -49,7 +51,7 @@ func (c *replyCache) serve(w http.ResponseWriter, r *http.Request, key string, c
 		select {
 		case <-f.done:
 			if f.reply.status == http.StatusOK {
-				writeCachedReply(w, f.reply)
+				writeCachedReply(w, r, f.reply)
 				return
 			}
 			compute(w) // the shared computation failed (its caller left, say): this one's own
@@ -71,10 +73,21 @@ func (c *replyCache) serve(w http.ResponseWriter, r *http.Request, key string, c
 	}
 	c.mu.Unlock()
 	close(f.done)
-	writeCachedReply(w, f.reply)
+	writeCachedReply(w, r, f.reply)
 }
 
-func writeCachedReply(w http.ResponseWriter, e cachedReplyEntry) {
+// writeCachedReply replays a reply. A reply that carries a validator (an ETag the computation set) is answered 304, with no body, to a request that
+// names it in If-None-Match; the shared computation itself always makes the full reply, so each request is judged by its own header (#9337).
+func writeCachedReply(w http.ResponseWriter, r *http.Request, e cachedReplyEntry) {
+	if tag := e.header.Get("ETag"); tag != "" && (e.status == 0 || e.status == http.StatusOK) && r != nil && httputil.ETagMatches(r.Header.Get("If-None-Match"), tag) {
+		for _, k := range []string{"ETag", httputil.ValidatorHeader, "Cache-Control"} {
+			if v := e.header.Get(k); v != "" {
+				w.Header().Set(k, v)
+			}
+		}
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
 	for k, v := range e.header {
 		w.Header()[k] = append([]string(nil), v...)
 	}

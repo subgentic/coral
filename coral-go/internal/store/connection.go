@@ -217,6 +217,9 @@ func (d *DB) ensureSchema(ctx context.Context) error {
 	if err := d.ensureTokenUsageHourAgg(ctx); err != nil {
 		return err
 	}
+	if err := d.ensureTokenUsageDayAgg(ctx); err != nil {
+		return err
+	}
 	if err := d.ensureTokenUsageThinkingModel(ctx); err != nil {
 		return err
 	}
