@@ -1,6 +1,7 @@
 // A task referenced in an Inbox Board history message opens in the Inbox (#8861, Goal #73 step 2): the `#N` link of a message in /inbox/boards/<team> opens /inbox/tasks/<team>/<id> in the shared task screen, never the
 // team page; Back returns to the board. At 1280 and 390. Real board, task and message on the isolated dev server (removed again).
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
@@ -9,6 +10,7 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const B = 'bt-' + Date.now().toString(36), TASK = 'Referenced from the board';
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -28,8 +30,10 @@ const BASE = require('./test_base').BASE;
             await ev(`(() => { const row = [...document.querySelectorAll('#inbox-page .mb-message')].find(r => r.textContent.includes('See task #${T}')); row.querySelector('.mb-row-toggle').click(); row.querySelector('.mb-task-link').click(); return true; })()`);
             await waitFor(`location.pathname === ${JSON.stringify(taskUrl)} && document.querySelector('#inbox-page .team-task-page')?.textContent.includes(${JSON.stringify(TASK)})`, 'the task in the Inbox at ' + taskUrl, 15000);
             assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none'`), true, at + 'the team page is not on screen');
+            await shot(`inbox-board-task-landing-${w}`);
             await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
             await waitFor(`location.pathname === ${JSON.stringify(boardUrl)} && !!document.querySelector('#inbox-page .mb-message')`, 'Back returns to the board', 15000);
+            await shot(`inbox-board-task-back-${w}`);
             console.log('   ✓');
         }
         console.log('PASS inbox board task in place: a task referenced in Board history opens in the Inbox, Back returns to the board, at 1280 and 390');
