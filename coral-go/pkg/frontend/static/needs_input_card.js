@@ -122,6 +122,12 @@ function checkOptionButtonHtml(o, desc, fullLabel) {
         + `</span></button>`;
 }
 
+// The phone's bottom bar (mobile.css, the same query): there the standing permission (the CLI's "Yes, and don't ask again", "allow all ... this session") is not one of the bar's buttons but a quiet 44 px text
+// button in the card above it, so a permanent allow costs a deliberate reach (UI/UX's call on #9562, #9583). Same words as the CLI's option; a desktop card is unchanged.
+const BAR_QUERY = '(max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px)';
+const phoneBar = () => typeof matchMedia === 'function' && matchMedia(BAR_QUERY).matches;
+const standingOption = o => /(don['\u2019]?t|do not) ask again|always allow|(during|for) this session/i.test(String(o.label || ''));
+
 function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
     const opts = (info.screen && info.screen.options) || [];
     if (!opts.length) return { body: "", foot: "" };
@@ -138,8 +144,10 @@ function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
         const withDesc = selects.some(o => descriptions[fullLabels[o.label] || o.label] || descriptions[o.label]);
         const multi = !!(info.screen && info.screen.multi);
         const button = multi ? checkOptionButtonHtml : optionButtonHtml;
+        const apart = !multi && !withDesc && phoneBar() && selects.length > 1 ? selects.filter(standingOption) : []; // out of the bar, above it
+        if (apart.length) body += `<div class="cni-standing">${apart.map(o => optionButtonHtml(o, "", fullLabels[o.label])).join("")}</div>`;
         body += `<div class="cni-options ${withDesc ? "cni-options-cards" : "cni-options-chips"}"${multi ? ` role="group" aria-label="Pick everything that applies"` : ""}>`
-            + selects.map(o => button(o, descriptions[fullLabels[o.label] || o.label] || descriptions[o.label], fullLabels[o.label])).join("") + `</div>`;
+            + selects.filter(o => !apart.includes(o)).map(o => button(o, descriptions[fullLabels[o.label] || o.label] || descriptions[o.label], fullLabels[o.label])).join("") + `</div>`;
         const submit = info.screen && info.screen.submit;
         if (multi && submit) foot += `<button type="button" class="cni-answer btn btn-sm btn-primary cni-submit" data-n="0" data-label="${escapeHtml(submit.label)}" data-action="submit">${escapeHtml(submit.label)}</button>`;
     }
@@ -384,7 +392,7 @@ export function syncNeedsInputCard(container, session) {
         unwatchCardInView();
         return;
     }
-    const key = JSON.stringify(info);
+    const key = JSON.stringify(info) + (phoneBar() ? '|bar' : ''); // the form of the answers follows the window's width
     const shape = JSON.stringify(info, (k, v) => (k === "checked" ? undefined : v)); // the card but for its boxes' marks
     promptLive();
     if (!el) {
