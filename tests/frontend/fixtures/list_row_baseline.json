@@ -2,7 +2,6 @@
   "about": "*-row and *-item classes outside the .list-row family that still set their own height, radius, hover surface or focus ring, each with why. list_row_census.test.mjs fails on a new one and on one listed here that no longer sets a look: the list only goes down.",
   "classes": {
     "agent-ui-home-row": "a row of a pane or a form, not a sidebar list (slice 4's second pass)",
-    "agentic-more-item": "a menu or dropdown item (slice 1's menus)",
     "archived-summary-row": "a line inside or under an agent row (slice 4, second pass)",
     "board-choice-row": "a row of a pane or a form, not a sidebar list (slice 4's second pass)",
     "board-mention-item": "a menu or dropdown item (slice 1's menus)",
@@ -20,7 +19,6 @@
     "main-row": "a row of a pane or a form, not a sidebar list (slice 4's second pass)",
     "mb-actions-item": "a menu or dropdown item (slice 1's menus)",
     "model-chip-item": "a menu or dropdown item (slice 1's menus)",
-    "nav-more-item": "a menu or dropdown item (slice 1's menus)",
     "overflow-menu-item": "a menu or dropdown item (slice 1's menus)",
     "persona-files-row": "a row of a pane or a form, not a sidebar list (slice 4's second pass)",
     "send-menu-item": "a menu or dropdown item (slice 1's menus)",
@@ -32,7 +30,6 @@
     "tag-dropdown-item": "a menu or dropdown item (slice 1's menus)",
     "task-item": "a list inside a pane or the rail (slice 4's second pass)",
     "tc-row": "a row of a pane or a form, not a sidebar list (slice 4's second pass)",
-    "team-menu-item": "a menu or dropdown item (slice 1's menus)",
     "team-page-row": "a row of a pane or a form, not a sidebar list (slice 4's second pass)",
     "viz-legend-item": "a chart legend entry, not a list row",
     "wf-step-editor-item": "a list inside a pane or the rail (slice 4's second pass)",
