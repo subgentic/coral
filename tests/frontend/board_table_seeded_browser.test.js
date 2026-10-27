@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
-const { execFileSync } = require('./helpers/child_process');
+const { sqliteExec } = require('./helpers/sqlite'); // the sqlite3 tool when there is one, else Node's own SQLite: a Windows machine has no sqlite3 (#8797)
 const { removeBoards } = require('./helpers/board_cleanup');
 
 const B = 'seeded-8047-' + (Date.now() % 100000);
@@ -86,7 +86,7 @@ const spec = (i) => {
         assert.ok(dataDir, 'the runner gives the isolated data directory (CORAL_TEST_DATA_DIR)');
         const stamp = i => new Date(END - (TOTAL - i) * STEP).toISOString();
         const sql = ['PRAGMA busy_timeout=20000;', 'BEGIN;', ...postedIds.map((id, k) => `UPDATE board_messages SET created_at='${stamp(k + 1)}' WHERE id=${id};`), 'COMMIT;'].join('\n');
-        execFileSync('sqlite3', [require('node:path').join(dataDir, 'messageboard.db')], { input: sql });
+        sqliteExec(require('node:path').join(dataDir, 'messageboard.db'), sql);
         const kept = postedIds.filter((id, k) => !deleted.has(k + 1));
         const TOTAL_LEFT = kept.length;
         const needleIds = [...NEEDLE_AT].map(i => postedIds[i - 1]).sort((a, b) => b - a);
