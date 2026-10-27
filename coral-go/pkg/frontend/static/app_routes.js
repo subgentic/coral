@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { deserializeFromUrl } from './search_filters.js';
 import { selectHistorySession } from './sessions.js';
 import { startNav, go, note, onRoute, currentRoute } from './nav.js';
-import { liveRoute, keyRoute, routeKey, AGENT_SUBTABS, parse as parseRoute, cloudRedirect } from './routes.js';
+import { liveRoute, keyRoute, routeKey, AGENT_SUBTABS, parse as parseRoute, cloudRedirect, folderForSub } from './routes.js';
 import { showTerminalView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { showView, showToast } from './utils.js';
@@ -81,7 +81,7 @@ function registerRouteHandlers() {
         if (currentRoute()?.view !== r.view || currentRoute()?.id !== r.id || currentRoute()?.item !== r.item) return;
         if (r.id && sub === 'goals') await m.openInboxGoal(r.id, r.item);
         else if (r.id) await m.openInboxItem(sub, r.id, r.item);
-        else await m.openInboxGroup(sub === 'boards' ? 'chats-group' : sub);
+        else await m.openInboxGroup(folderForSub(sub));
     });
 
     onRoute('team', async r => {

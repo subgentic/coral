@@ -13,7 +13,7 @@ import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGro
 import { failedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
-import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
+import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
 import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView } from './utils.js';
@@ -70,10 +70,10 @@ const queries = { needs: '', tasks: '', goals: '', artifacts: '', saved: '' }; /
 let goalMount = null, goalOpener = null, goalScroll = 0, itemMount = null;
 const itemOpeners = new Map();
 const folderRoute = { view: 'inbox-goals', sub: 'goals' };
-const routeForFolder = key => key === 'goals' ? folderRoute : key === 'tasks' ? { view: 'inbox-tasks', sub: 'tasks' } : key === 'chats-group' ? { view: 'inbox-boards', sub: 'boards' } : null;
-const pageGroup = () => page?.kind === 'goal' ? 'goals' : page?.kind === 'tasks' ? 'tasks' : page?.kind === 'boards' ? 'chats-group' : page ? 'saved' : group;
+const routeForFolder = key => key === 'goals' ? folderRoute : key === 'tasks' ? { view: 'inbox-tasks', sub: 'tasks' } : key === BOARDS_FOLDER ? { view: 'inbox-' + BOARDS_SUB, sub: BOARDS_SUB } : null;
+const pageGroup = () => page?.kind === 'goal' ? 'goals' : page?.kind === 'tasks' ? 'tasks' : page?.kind === BOARDS_SUB ? BOARDS_FOLDER : page ? 'saved' : group;
 function openItemRoute(kind, team, id, rowKey) {
-    const key = kind === 'tasks' ? 'tasks' : 'chats-group', route = routeForFolder(key);
+    const key = kind === 'tasks' ? 'tasks' : BOARDS_FOLDER, route = routeForFolder(key);
     quietFocus($('inbox-view'));
     itemOpeners.set(key, { key: rowKey, scroll: $('group-table-view')?.scrollTop || 0 });
     note(route);
@@ -331,7 +331,7 @@ const savedCounts = () => saved.savedView().totals;
 const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2',
-    chats: 'chat_bubble_outline', 'chats-group': 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
+    chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
 const folderSections = () => (nativeInbox() ? [{ title: 'Needs attention', items: GROUPS.map(g => ({ key: g.key, label: g.label })) }, ...CH.chatSections()] : [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
     { key: 'goals', label: 'Goals', count: countOf('goals') },
@@ -808,7 +808,7 @@ const cameFromInbox = () => /^\/inbox(\/|$)/.test(String(history.state?.prev || 
 /** Task and Board details share their team renderers, with an Inbox-owned address and way back. */
 export async function openInboxItem(kind, team, id) {
     closePage(false);
-    const key = kind === 'tasks' ? 'tasks' : 'chats-group', route = routeForFolder(key);
+    const key = kind === 'tasks' ? 'tasks' : BOARDS_FOLDER, route = routeForFolder(key);
     await showInbox({ folder: key, quiet: true });
     if (currentRoute()?.view !== route.view || currentRoute()?.id !== team || (kind === 'tasks' && currentRoute()?.item !== id)) return;
     page = { kind, project: team, id };
