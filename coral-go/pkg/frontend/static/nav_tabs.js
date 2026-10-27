@@ -215,7 +215,7 @@ if (typeof document !== 'undefined') {
             if (e.target.closest('#nav-more-menu .nav-more-item')) {
                 const button = _menuFor; closeMenu();
                 const a = document.activeElement; // a choice gives the focus back to the button, unless what it opened (a dialog) has taken it (#9116)
-                if (button && (!a || a === document.body)) button.focus();
+                if (button && (!a || a === document.body || !a.getClientRects().length)) button.focus(); // (a view's own switch may have focused a control the phone does not draw: the dropdown or a tab)
             } else if (!e.target.closest('#nav-more-menu, [data-on-click="m-nav-more"], [data-on-click="m-top-menu"]')) closeMenu();
         });
         document.addEventListener('keydown', e => {
