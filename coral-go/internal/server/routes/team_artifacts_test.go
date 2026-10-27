@@ -702,3 +702,19 @@ func TestSessionArtifactSortSharesTheWordsAndRecordSizes(t *testing.T) {
 	require.Nil(t, sizeOfRecord(-1))
 	require.Equal(t, int64(42), *sizeOfRecord(42))
 }
+
+// Only the page is enriched (#9031, Security Reviewer's LOW): five uploads, a page of one, sorted: the sidecar read and the stat happen once, for the item on the page, not for every upload before paging.
+func TestSessionArtifactsEnrichOnlyThePage(t *testing.T) {
+	srv, _, coralDir := teamArtifactServer(t)
+	for i, name := range []string{"e.md", "d.md", "c.md", "b.md", "a.md"} {
+		writeUpload(t, coralDir, "solo-5", "content "+name, name, "2026-10-09T1"+string(rune('0'+i))+":00:00Z")
+	}
+	var enriched []string
+	orig := enrichSessionArtifact
+	enrichSessionArtifact = func(it *teamArtifact, dir string) { enriched = append(enriched, it.Name); orig(it, dir) }
+	t.Cleanup(func() { enrichSessionArtifact = orig })
+	resp := getTeamArtifacts(t, srv, "/api/session-artifacts?session_id=solo-5&sort=name&limit=1&offset=2", http.StatusOK)
+	require.Len(t, resp.Artifacts, 1)
+	require.Equal(t, "c.md", resp.Artifacts[0].Name, "the third by name")
+	require.Equal(t, []string{"c.md"}, enriched, "one enrichment, for the item on the page")
+}
