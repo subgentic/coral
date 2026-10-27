@@ -25,7 +25,8 @@ const BASE = require('./test_base').BASE;
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
             if (method === 'GET' && /\\/api\\/scheduled\\/jobs$/.test(url)) return json({ jobs });
-            if (/\\/api\\/scheduled\\/jobs\\/(\\d+)\\/runs/.test(url)) return json({ runs: [], total: 0 });
+            const runs = /\\/api\\/scheduled\\/jobs\\/(\\d+)\\/runs/.exec(url); // job 2 has a passed and a failed run, each with its conversation (a one-line run list at 390 needs rows to measure)
+            if (runs) return json(runs[1] === '2' ? { runs: [{ id: 102, job_id: 2, status: 'failed', exit_reason: 'agent_error', error_msg: 'the agent exited with 1', scheduled_at: ago(29), started_at: ago(29), finished_at: ago(28.9), session_id: 'aaaaaaaa-0000-4000-8000-000000000002' }, { id: 101, job_id: 2, status: 'completed', scheduled_at: ago(5), started_at: ago(5), finished_at: ago(4.8), session_id: 'aaaaaaaa-0000-4000-8000-000000000001' }], total: 2 } : { runs: [], total: 0 });
             if (method === 'GET' && /\\/api\\/workflows$/.test(url)) return json({ workflows: [{ id: 7, name: 'nightly-build', steps: [{ name: 'Install' }, { name: 'Test' }] }] });
             if (method === 'GET' && /\\/api\\/workflows\\/7\\/runs/.test(url)) return json({ runs: [], total: 0 });
             return real(u, o);
@@ -85,6 +86,12 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!!document.querySelector('#scheduler-detail .sched-header')`, `${at}the job's page`, 8000);
             assert.equal(await pathname(), '/automations/jobs/2', `${at}the address is the job's`);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-header h2').textContent`), 'summarize-the-day');
+            await waitFor(`document.querySelectorAll('#scheduler-detail .sched-runs-table tbody tr').length === 2`, `${at}the job's two runs`, 8000);
+            await oneLinePerRow(ev, '#scheduler-detail .sched-runs-table tbody tr', `${at}the job's runs`, assert, { min: 2 }); // Goal #79: a run is one line at both widths
+            const runs = await ev(`[...document.querySelectorAll('#scheduler-detail .sched-runs-table tbody tr')].map(r => { const chip = r.querySelector('.sched-status'), td = chip.closest('td'), cb = chip.getBoundingClientRect(), tb = td.getBoundingClientRect(), link = r.querySelector('[data-on-click="job-run-session"]'), td2 = link ? link.closest('td') : r, lb = link && link.getBoundingClientRect();
+                return { chip: chip.textContent.trim(), whole: chip.scrollWidth <= chip.clientWidth + 1 && cb.left >= tb.left - 1 && cb.right <= tb.right + 1, link: !!link && link.getAttribute('aria-label'), linkOn: !!lb && lb.width > 0 && lb.left >= 0 && lb.right <= innerWidth && lb.height > 0 && lb.right <= td2.getBoundingClientRect().right + 1, reason: (r.querySelector('.dt-run-reason') || {}).textContent }; })`);
+            assert.deepEqual(runs.map(r => [r.chip, r.whole, r.link, r.linkOn]), [['Failed', true, 'Open the conversation', true], ['Passed', true, 'Open the conversation', true]], `${at}the Result is readable whole beside Started and the conversation link: ${JSON.stringify(runs)}`);
+            assert.match(runs[0].reason, /agent exited with 1/, `${at}the failed run's reason is said to assistive technology`);
             await themed('job-page', w);
             assert.equal(await ev(`!!document.querySelector('#scheduler-detail [data-on-click="automations-back"]')`), true, `${at}the page has its way back to the folder`);
             await ev(`[...document.querySelectorAll('#scheduler-detail [data-on-click="automations-back"]')].find(b => b.getClientRects().length).click(); true`);
