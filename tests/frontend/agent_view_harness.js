@@ -44,6 +44,7 @@ async function connect() {
     // Installed before any app script runs, so the page's own first live-list load already sees
     // the mocked agents (a mock installed after load races it and loses).
     const PRELOAD = `(() => {
+        window.__coralNoFetchShare = true; // the share of repeated reads (fetch_share.js, #9181) is off in a suite: a changed stub is read, whatever the page's age
         const filler = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua';
         const make = (prefix, i) => i % 2 === 0
             ? { type: 'user', content: prefix + i + ' ' + filler }
