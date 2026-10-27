@@ -19,6 +19,11 @@ export const OPEN_STATUSES = ['pending', 'in_progress', 'review_pending', 'block
 export const DONE_STATUSES = ['completed', 'skipped'];
 const STATUS_WORDS = { open: OPEN_STATUSES, working: ['in_progress'], review: ['review_pending'], blocked: ['blocked'], draft: ['draft'], done: DONE_STATUSES };
 
+/** The Inbox Tasks' Team filter (#8774): a team's key (a name, or @server/name for another computer), kept as typed text; the chip says the team as the list does (the page sets the words). Not a server parameter: the Inbox filters across computers on the page. */
+let teamNames = new Map();
+export function setTeamNames(map) { teamNames = map instanceof Map ? map : new Map(); }
+const teamValue = v => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 200) : '');
+
 const goalValue = v => { const t = typeof v === 'number' ? String(v) : v; return t === NO_GOAL || (typeof t === 'string' && /^[1-9]\d{0,11}$/.test(t)) ? t : ''; };
 
 /** The goals' titles by number, for the goal chip's words (the page sets them when it has read the board's goals; a number it does not know reads "Goal 12"). */
@@ -32,6 +37,7 @@ const model = defineFilters({
     status: { type: 'choice', values: STATUSES, chip: v => `Status: ${STATUS_LABEL[v]}` },
     priority: { type: 'choice', values: PRIORITIES, chip: v => `Priority: ${PRIORITY_LABEL[v]}` },
     assignee: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
+    team: { type: 'custom', empty: '', clean: teamValue, filtered: v => !!v, chip: v => `Team: ${teamNames.get(v) || v}` },
     goal: { type: 'custom', empty: '', clean: goalValue, filtered: v => !!v, chip: v => goalChipLabel(v) },
     from: { type: 'day', chip: v => `Updated since ${v}` },
     sort: { type: 'order', values: SORTS, default: 'open' },

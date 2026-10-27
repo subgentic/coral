@@ -49,6 +49,17 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             check(`${label}: Goals' Team filter offers both, by their computer`, gchoices.filter(([v]) => v).length === 2 && new Set(gchoices.map(c => c[1])).size === gchoices.length && gchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)), JSON.stringify(gchoices));
             await ev(`(() => { const s = document.getElementById('inbox-goals-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(400);
             check(`${label}: choosing the remote one shows its goal, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => b.textContent.trim())`)) === '["Remote goal"]' && /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`)));
+
+            // Tasks: the Team column, and the Team filter this folder did not have
+            await open('tasks');
+            await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length >= 2`, `${label}: two tasks`, 10000);
+            const tteams = await column('Team');
+            check(`${label}: Tasks' Team column tells the two alpha teams apart`, tteams && tteams.length === 2 && tteams[0] !== tteams[1] && tteams.some(t => /alpha.*This computer/.test(t)) && tteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(tteams));
+            await panel();
+            const tchoices = await ev(`[...document.querySelectorAll('#inbox-tk-team option')].map(o => [o.value, o.textContent.trim()])`);
+            check(`${label}: Tasks has a Team filter with both teams, by their computer`, tchoices.filter(([v]) => v).length === 2 && tchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)) && tchoices.some(([v, t]) => v === 'alpha' && /This computer/.test(t)), JSON.stringify(tchoices));
+            await ev(`(() => { const s = document.getElementById('inbox-tk-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500);
+            check(`${label}: choosing the remote one shows its task, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(b => b.textContent.replace(/^#\\d+\\s*/, '').trim())`)) === '["Remote task"]' && /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`)), JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(b => b.textContent.trim())`)));
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
