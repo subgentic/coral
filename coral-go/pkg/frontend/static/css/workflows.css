@@ -440,7 +440,7 @@
 }
 
 .wf-step-num { font-size: var(--fs-base); font-weight: var(--fw-strong); color: var(--text-secondary); white-space: nowrap; min-width: 3.2em; }
-.wf-more { margin-top: 4px; }
+.wf-more { margin-top: 4px; position: relative; }
 .wf-more > summary { color: var(--text-primary); font-weight: var(--fw-strong); }
 .wf-limit-fields { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 8px; }
 
@@ -469,7 +469,6 @@
 .wf-step-files-more > summary { cursor: pointer; color: var(--text-muted); font-size: var(--fs-base); width: fit-content; }
 .wf-step-files-more[open] > summary { margin-bottom: 4px; }
 .wf-step-files-more .wf-step-files { margin-top: 0; }
-.wf-more { position: relative; }
 .wf-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .wf-more-btn, .wf-step-files-more > summary { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); display: flex; align-items: center; }
