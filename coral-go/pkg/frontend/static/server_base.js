@@ -104,11 +104,34 @@ function assertInProxy(full, base) {
     refuse('too many layers of escaping');
 }
 
-/** fetch() against `server`. Same contract as fetch (returns the Response); a URL that would leave the proxy is refused, as a rejected promise. */
+/** At most this many requests are on their way to one registered computer at a time; the rest wait their turn (#8904). A browser keeps about six connections to the hub: one hung computer
+ *  with a dozen requests open would hold all of them, and every other computer's reads (and the hub's own) would queue behind it. This computer is not limited. */
+const REMOTE_SLOTS = 2;
+const slots = new Map(); // server id -> { busy, queue: [wake] }
+function takeSlot(server, signal, waitMs) { // waitMs: a read gives up waiting for its turn after this long ({ timedOut }), so a hung computer's queue cannot hold a list for ever
+    const id = normServer(server);
+    if (id === LOCAL_SERVER) return Promise.resolve(() => {});
+    let s = slots.get(id); if (!s) { s = { busy: 0, queue: [] }; slots.set(id, s); }
+    const release = () => { const next = s.queue.shift(); if (next) next(); else s.busy--; };
+    if (s.busy < REMOTE_SLOTS) { s.busy++; return Promise.resolve(release); }
+    return new Promise((resolve, reject) => {
+        let timer = null;
+        const leave = () => { if (timer) clearTimeout(timer); if (signal) signal.removeEventListener('abort', gone); const i = s.queue.indexOf(wake); if (i >= 0) s.queue.splice(i, 1); };
+        const wake = () => { if (timer) clearTimeout(timer); if (signal) signal.removeEventListener('abort', gone); resolve(release); };
+        const gone = () => { leave(); reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); };
+        if (signal) { if (signal.aborted) return gone(); signal.addEventListener('abort', gone, { once: true }); }
+        if (waitMs) timer = setTimeout(() => { leave(); reject(Object.assign(new Error('did not answer'), { timedOut: true })); }, waitMs);
+        s.queue.push(wake);
+    });
+}
+
+/** fetch() against `server`. Same contract as fetch (returns the Response); a URL that would leave the proxy is refused, as a rejected promise. A registered computer's requests go through its
+ *  slots (REMOTE_SLOTS): a slot is held until the answer's headers arrive (or the request is aborted or fails). */
 export function serverFetch(server, url, options) {
     let target;
-    try { target = serverUrl(url, server); } catch (e) { return Promise.reject(e); }
-    return fetch(target, options);
+    try { target = serverUrl(url, server); } catch (e) { return Promise.reject(e); } // a refused URL rejects
+    if (normServer(server) === LOCAL_SERVER) return fetch(target, options); // this computer: no waiting, the request is sent at once
+    return takeSlot(server, options && options.signal).then(release => fetch(target, options).finally(release));
 }
 
 /** How long a registered computer has to answer a list the Inbox merges (#8904). This computer is not timed: it is the one the page came from. */
@@ -119,18 +142,20 @@ const SERVER_READ_MS = 8000;
  *  returned is whole. The caller's own signal still cancels it. */
 export async function serverRead(server, url, options = {}, ms = SERVER_READ_MS) {
     if (normServer(server) === LOCAL_SERVER) return serverFetch(server, url, options);
-    const ctrl = new AbortController(); let timedOut = false;
+    const target = serverUrl(url, server);
     const outer = options.signal;
+    const release = await takeSlot(server, outer, ms); // the answer's clock starts when the request is sent, not while it waits for its turn; a turn is waited for at most as long again
+    const ctrl = new AbortController(); let timedOut = false;
     if (outer) { if (outer.aborted) ctrl.abort(); else outer.addEventListener('abort', () => ctrl.abort(), { once: true }); }
     const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
     try {
-        const r = await serverFetch(server, url, { ...options, signal: ctrl.signal });
+        const r = await fetch(target, { ...options, signal: ctrl.signal });
         const text = await r.text();
         return new Response(text, { status: r.status, statusText: r.statusText, headers: r.headers });
     } catch (e) {
         if (timedOut) throw Object.assign(new Error('did not answer'), { timedOut: true });
         throw e;
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); release(); }
 }
 
 /** An id that goes into a request path: a positive safe integer, as a number, or an error. Ids come from lists a registered server sent, and that is another machine: an id

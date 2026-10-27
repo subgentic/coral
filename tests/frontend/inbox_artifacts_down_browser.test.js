@@ -22,17 +22,17 @@ const art = (id, name) => ({ id: id.repeat(64), name, media_type: 'text/markdown
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'settings')`);
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-inbox-') || k.startsWith('coral-saved-filters')) localStorage.removeItem(k); } catch {} true`);
-            await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.hub = true; st.servers = [{ id: 'box-2', label: 'Box Two', status: 'online' }];
+            await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.hub = true; st.servers = [{ id: 'box-2', label: 'Box Two', status: 'online' }, { id: 'box-3', label: 'Box Three', status: 'online' }];
                 window.__boxTwoUp = false; const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-                window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.href), remote = url.pathname.startsWith('/api/remote/box-2/'), p = url.pathname.replace(/^\\/api\\/remote\\/box-2/, '');
+                window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.href), remote = url.pathname.startsWith('/api/remote/'), box2 = url.pathname.startsWith('/api/remote/box-2/'), p = url.pathname.replace(/^\\/api\\/remote\\/box-[23]/, '');
                     if (p === '/api/goals') {
-                        if (remote && !window.__boxTwoUp) return new Promise((_, reject) => { if (o.signal) o.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))); });
-                        return json({ goals: [{ id: 1, board_id: 'alpha', title: remote ? 'Remote goal' : 'Local goal', state: 'active', rollup: { total: 1, done: 0 } }] });
+                        if (box2 && !window.__boxTwoUp) return new Promise((_, reject) => { if (o.signal) o.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))); });
+                        return json({ goals: [{ id: 1, board_id: 'alpha', title: box2 ? 'Remote goal' : remote ? 'Three goal' : 'Local goal', state: 'active', rollup: { total: 1, done: 0 } }] });
                     }
                     if (p === '/api/team-artifacts') {
-                        if (remote) window.__remoteReads = (window.__remoteReads || 0) + 1;
-                        if (remote && !window.__boxTwoUp) return new Promise((_, reject) => { if (o.signal) o.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))); }); // hung: accepts, never answers
-                        return json({ artifacts: [remote ? ${JSON.stringify(art('b', 'remote-report.md'))} : ${JSON.stringify(art('a', 'local-report.md'))}], limit: 100, offset: 0, has_more: false, truncated: false, total: 1, all: 1, teams: [{ board_id: 'alpha', team: 'alpha', all: 1 }] });
+                        if (box2) window.__remoteReads = (window.__remoteReads || 0) + 1;
+                        if (box2 && !window.__boxTwoUp) return new Promise((_, reject) => { if (o.signal) o.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))); }); // hung: accepts, never answers
+                        return json({ artifacts: [box2 ? ${JSON.stringify(art('b', 'remote-report.md'))} : remote ? ${JSON.stringify(art('c', 'three-report.md'))} : ${JSON.stringify(art('a', 'local-report.md'))}], limit: 100, offset: 0, has_more: false, truncated: false, total: 1, all: 1, teams: [{ board_id: 'alpha', team: 'alpha', all: 1 }] });
                     }
                     if (p === '/api/system/artifact-store/kept') return json({ kept: [] });
                     if (remote) return json({}); return R(u, o); }; return true; })()`);
@@ -40,24 +40,24 @@ const art = (id, name) => ({ id: id.repeat(64), name, media_type: 'text/markdown
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, `${label}: the folders`, 10000);
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); s.value = 'artifacts'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="artifacts"]').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 1`, `${label}: this computer's file, after Box Two's time limit (one wait of 8 s, not one per redraw)`, 12000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: the reachable computers' files, after Box Two's time limit (one wait of 8 s, not one per redraw)`, 12000);
             await settle(300);
             const down = await ev(`({ rows: [...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')), line: ((document.querySelector('.team-artifacts-down') || {}).textContent || '').trim(), retry: !!document.querySelector('.team-artifacts-down-retry'), loading: /Loading artifacts/.test(document.getElementById('group-table-view').textContent) })`);
-            check(`${label}: with Box Two hung, this computer's file is listed and the page is not stuck on Loading`, down.rows.length === 1 && /local-report/.test(down.rows[0]) && !down.loading, JSON.stringify(down));
-            check(`${label}: Box Two was asked twice at most (the sidebar's count and the page), not again at every redraw`, (await ev(`window.__remoteReads`)) <= 2, String(await ev(`window.__remoteReads`)));
-            check(`${label}: a quiet line says Box Two did not answer, with a Retry`, /^Box Two did not answer, so its artifacts are not shown\.$/.test(down.line) && down.retry && await ev(`document.querySelector('.team-artifacts-down-retry').getBoundingClientRect().width < 160`), JSON.stringify(down));
+            check(`${label}: with Box Two hung, this computer's and the healthy Box Three's files are listed and the page is not stuck on Loading`, down.rows.length === 2 && down.rows.some(r => /local-report/.test(r)) && down.rows.some(r => /three-report/.test(r)) && !down.loading, JSON.stringify(down));
+            check(`${label}: Box Two was asked twice at most (and its hung requests did not make Box Three look hung) (the sidebar's count and the page), not again at every redraw`, (await ev(`window.__remoteReads`)) <= 2, String(await ev(`window.__remoteReads`)));
+            check(`${label}: a quiet line names Box Two only (not the healthy Box Three), with a Retry`, /^Box Two did not answer, so its artifacts are not shown\.$/.test(down.line) && down.retry && await ev(`document.querySelector('.team-artifacts-down-retry').getBoundingClientRect().width < 160`), JSON.stringify(down));
             await shot(`inbox-artifacts-down-${label}`);
             await ev(`window.__boxTwoUp = true; document.querySelector('.team-artifacts-down-retry').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: both files after Retry`, 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 3`, `${label}: all three files after Retry`, 10000);
             const after = await ev(`({ rows: document.querySelectorAll('#group-table-view tbody tr').length, line: !!document.querySelector('.team-artifacts-down') })`);
-            check(`${label}: Retry asks again: Box Two answers, both files are listed and the line is gone`, after.rows === 2 && !after.line, JSON.stringify(after));
+            check(`${label}: Retry asks again: Box Two answers, both files are listed and the line is gone`, after.rows === 3 && !after.line, JSON.stringify(after));
             // Goals (the same limit and the same quiet line): this computer's goal is listed, Box Two is named
             await ev(`window.__boxTwoUp = false; true`);
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
             await waitFor(`!!document.querySelector('.group-table-note') && /Box Two did not answer/.test(document.querySelector('.group-table-note').textContent)`, `${label}: Goals names Box Two after its time limit`, 20000);
             const gl = await ev(`({ rows: [...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')), note: document.querySelector('.group-table-note').textContent.trim() })`);
-            check(`${label}: Goals lists this computer's goal and says "Box Two did not answer, so its goals are not shown."`, gl.rows.length === 1 && /Local goal/.test(gl.rows[0]) && gl.note === 'Box Two did not answer, so its goals are not shown.', JSON.stringify(gl));
+            check(`${label}: Goals lists this computer's goal and says "Box Two did not answer, so its goals are not shown."`, gl.rows.length === 2 && gl.rows.some(r => /Local goal/.test(r)) && gl.rows.some(r => /Three goal/.test(r)) && gl.note === 'Box Two did not answer, so its goals are not shown.', JSON.stringify(gl));
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
