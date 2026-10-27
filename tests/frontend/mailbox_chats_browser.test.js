@@ -110,6 +110,7 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         await ev(`document.querySelector('#group-table-view tr.dt-mailed button.dt-mail-lead').click(); true`);
         await waitFor(`!!document.querySelector('.team-tb-selection .dt-bar-count')`, 'the selection bar', 4000);
         assert.deepEqual(await ev(`[document.querySelector('.team-tb-selection .dt-bar-count').textContent, [...document.querySelectorAll('.team-tb-selection .dt-bar-action')].map(b => b.textContent)]`), ['1 selected', ['Star', 'Archive']], 'one selected, Star and Archive');
+        assert.ok(await ev(`[...document.querySelectorAll('.team-tb-selection .dt-bar-action')].every(b => b.getBoundingClientRect().height >= 44)`), 'Star and Archive are 44 px targets under touch');
         await ev(`[...document.querySelectorAll('.team-tb-selection .dt-bar-action')].find(b => b.textContent === 'Star').click(); true`);
         await waitFor(`window.__flags.length === ${flagsBefore} + 1`, 'the star is written', 4000);
         assert.deepEqual(await ev(`window.__flags[window.__flags.length - 1][1]`), { starred: true }, 'the PATCH is the star');

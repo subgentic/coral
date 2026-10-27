@@ -69,6 +69,7 @@ const AGENTS = [
             let q = await sel();
             assert.deepEqual([q.on, q.pressed, q.tick, q.bar], [[true, false, false], ['true', 'false', 'false'], [true, false, false], '1 selected'], at + 'one selected: tint, pressed, a check, the bar ' + JSON.stringify(q));
             assert.ok(q.lead >= 44 && q.page === 'none', at + 'a 44 px select button, and the list is still on screen ' + JSON.stringify(q));
+            assert.ok(await ev(`[...document.querySelectorAll('.team-tb-selection .dt-bar .btn, .team-tb-selection .dt-bar-action, .team-tb-selection .dt-bar-clear')].every(b => b.getBoundingClientRect().height >= 44)`), at + 'the selection bar\'s Mark done and Clear are 44 px targets');
             await shot(`inbox-mail-selected-${w}`);
             await ev(`document.querySelectorAll('${T} tr.dt-mailed button.dt-mail-open')[1].click(); true`);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed.dt-selected').length === 2`, at + 'a tap on a row while selecting toggles it', 4000);
