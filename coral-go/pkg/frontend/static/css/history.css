@@ -13,7 +13,7 @@
 
 .history-title-row h2 {
     font-size: 1.0625rem; /* an item's page title: 17/700 (#7443) */
-    font-weight: 700;
+    font-weight: var(--fw-strong);
 }
 
 .history-title-row .btn-small {
@@ -45,7 +45,7 @@
 .history-tab-btn {
     padding: 8px 16px;
     font-size: var(--fs-md);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--text-secondary);
     background: none;
     border: none;
@@ -325,7 +325,7 @@
 .chat-search-hit:hover, .chat-search-hit:focus-visible { background:var(--bg-hover); outline:2px solid var(--accent-secondary); outline-offset:-2px; }
 .chat-search-hit-meta { display:block; color:var(--text-secondary); font-size: var(--fs-base); margin-bottom:3px; }
 .chat-search-hit-excerpt { font-size:var(--fs-base); line-height:1.35; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
-.chat-search-hit mark { background:color-mix(in srgb, var(--accent-secondary) 45%, transparent); color:var(--text-primary); font-weight:700; border-radius:2px; padding:0 2px; }
+.chat-search-hit mark { background:color-mix(in srgb, var(--accent-secondary) 45%, transparent); color:var(--text-primary); font-weight:var(--fw-strong); border-radius:2px; padding:0 2px; }
 .chat-search-status { padding:10px; color:var(--text-secondary); font-size: var(--fs-base); }
 .chat-search-target { outline:2px solid var(--accent-secondary); outline-offset:3px; }
 

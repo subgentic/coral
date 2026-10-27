@@ -41,7 +41,7 @@
 
 .theme-group-title {
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
