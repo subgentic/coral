@@ -80,8 +80,13 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 	if reopened != nil {
 		// Resubmitted after a rejection (#3787): its reviewers review the new revision, with no
 		// orchestrator step; the orchestrator is told, and can still change the reviewers.
+		// a reviewer at work on their own task is named without an @: no mention, no nudge; the review is offered when their task ends (#8875)
 		var mentions []string
 		for _, rv := range reopened.Reviewers {
+			if h.reviewerBusy(ctx, project, rv.Reviewer, rv.ReviewTaskID) {
+				mentions = append(mentions, rv.Reviewer+" (busy: offered when their task ends)")
+				continue
+			}
 			mentions = append(mentions, "@"+rv.Reviewer)
 		}
 		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("%s [Task #%d resubmitted for review, round %d] %s submitted %q again (candidate: %s; %s). Review it again: coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". @%s the same reviewers have it; change them with coral-board task review %d --to \"...\"",

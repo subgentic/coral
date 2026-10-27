@@ -802,7 +802,7 @@ It counts against an agent's write budget like a post.
 
 A review task is not reassigned (`task reassign` on it is refused, with this advice): its reviewer is a place in the reviewed task's round, so a reviewer is changed with `coral-board task review <id> --to "Name,Name"` on the task under review.
 
-When a task in review is completed by hand or cancelled, its open review tasks are skipped with a note ("#N was completed by X: this review is no longer needed"), so no review is left pending for work that no longer exists; a review already answered is left as it is.
+A reviewer who is at work on their own task is not interrupted by a review: Coral's line for them has no `@` and nothing is typed into their terminal ("notification deferred while they have an active task"). The review waits in their queue and is offered when their task ends. When a task in review is completed by hand or cancelled, its open review tasks are skipped with a note ("#N was completed by X: this review is no longer needed"), so no review is left pending for work that no longer exists; a review already answered is left as it is.
 
 Only the task's reviewers approve or reject; only the orchestrator delegates, changes the
 reviewers (task review again, while a round is open) or completes a task in review. The orchestrator's health check names a reviewer whose reviews pile up while another is idle. `task release-review` remains for a

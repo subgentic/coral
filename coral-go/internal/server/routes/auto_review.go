@@ -67,12 +67,25 @@ func (h *BoardHandler) autoDelegateReview(ctx context.Context, project string, i
 		"[Task #%d delegated for review by Coral] to %s, %s. @%s change them with coral-board task review %d --to \"...\"",
 		id, strings.Join(list, ", "), source, teamhealth.Name(orch), id), nil)
 	for _, rt := range reviews {
+		if h.reviewerBusy(ctx, project, *rt.AssignedTo, rt.ID) {
+			// a reviewer at work on their own task is not interrupted: no mention, no nudge. The review waits in their queue and is offered when their task ends (nudgeNextTask, #8875)
+			h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf(
+				"[Task #%d assigned to %s: the review of #%d, notification deferred while they have an active task]", rt.ID, teamhealth.Name(*rt.AssignedTo), id), nil)
+			continue
+		}
 		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf(
 			"@%s [Task #%d assigned to you: the review of #%d] run 'coral-board task claim %d', then 'coral-board task detail %d'",
 			teamhealth.Name(*rt.AssignedTo), rt.ID, id, rt.ID, id), nil)
 		h.sendTaskNudge(ctx, project, *rt.AssignedTo, taskClaimNudge(rt.ID))
 	}
 	return true
+}
+
+// reviewerBusy: whether a reviewer has a task of their own in progress (their one active task), other than the review task itself. A review given to a busy reviewer waits quietly (#8875).
+// When that cannot be told, the reviewer is left alone: the review is offered when their slot is free anyway.
+func (h *BoardHandler) reviewerBusy(ctx context.Context, project, reviewer string, reviewTaskID int64) bool {
+	busy, err := h.bs.HasActiveTaskForAssignee(ctx, project, reviewer, reviewTaskID)
+	return err != nil || busy
 }
 
 // healthBudgetReached tells the orchestrator, once an hour, that Coral stopped acting on its own
