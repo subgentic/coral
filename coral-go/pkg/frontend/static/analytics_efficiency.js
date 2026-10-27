@@ -170,14 +170,15 @@ function draw(key) {
     else panel.append(el('p', 'eff-note', `Sent back is the share of tasks a reviewer returned for changes: fast is not efficient if the work comes back.${left ? ' ' + left : ''}`));
     view.append(panel);
 
-    const vs = g => { if (!(avg > 0)) return '—'; const p = Math.round((g.value / avg - 1) * 100); return `${p > 0 ? '+' : ''}${p}%`; }; // an average of 0 has nothing to be above or under
+    const pct = share => Math.round(Number((share * 100).toFixed(6))); // a share as a percent, halves up: 0.285 is 29%, not 28% by the float 28.499999999999996 (#9516)
+    const vs = g => { if (!(avg > 0)) return '—'; const p = pct(g.value / avg - 1); return `${p > 0 ? '+' : ''}${p}%`; }; // an average of 0 has nothing to be above or under
     const columns = [
         { key: 'label', label: groupLabel(s.group), tone: 'primary', cell: g => { const c = document.createElement('span'); c.append(document.createTextNode(g.label)); if (g === best) c.append(el('span', 'chip chip-tag eff-tag eff-tag-best', cfg.metric === 'task_time' ? 'fastest' : 'most efficient')); if (g.n > 0 && isFewG(g)) c.append(el('span', 'chip chip-tag eff-tag', 'few')); if (!g.n) c.append(el('span', 'chip chip-tag eff-tag', 'no data')); return c; } },
         { key: 'value', label: cfg.metric === 'task_time' ? 'Median time' : 'Tokens per commit', numeric: true, cell: g => (num(g.value) == null ? '—' : cfg.value(g.value)) },
         { key: 'vs', label: `vs ${avgWord}`, numeric: true, cell: g => (num(g.value) == null ? '—' : vs(g)) },
         { key: 'n', label: cfg.metric === 'task_time' ? 'Tasks' : 'Commits', numeric: true, cell: g => String(num(g.n) == null ? 0 : g.n) },
         cfg.metric === 'task_time'
-            ? { key: 'sent_back_share', label: 'Sent back', numeric: true, cell: g => (num(g.sent_back_share) == null ? '—' : `${Math.round(g.sent_back_share * 100)}%`) }
+            ? { key: 'sent_back_share', label: 'Sent back', numeric: true, cell: g => (num(g.sent_back_share) == null ? '—' : `${pct(g.sent_back_share)}%`) }
             : { key: 'tokens', label: 'Tokens', numeric: true, cell: g => (num(g.tokens) == null ? '—' : fmtTokens(g.tokens)) },
         { key: 'cost', label: cfg.metric === 'task_time' ? 'Cost per task' : 'Cost per commit', numeric: true, cell: g => (num(g.cost_usd_per_unit) == null ? '—' : g.cost_usd_per_unit > 0 ? money(g.cost_usd_per_unit) : 'no cost') },
     ];
