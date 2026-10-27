@@ -19,7 +19,8 @@ const LINE = "Coral's docs for agents: run `coral-agent docs` to list the topics
             await Page.navigate({ url: BASE + path });
             await loaded;
             await ev(`window.__coralReady.then(() => true)`);
-            await waitFor(`!!document.getElementById('docs-copy-agent-line') && getComputedStyle(document.getElementById('docs-view')).display !== 'none'`, 'the Docs page', 15000);
+            // laid out, not only in the page: on a phone the page (#docs-page) is shown a moment after the Docs view, and the button measures 0 by 0 until it is (#8776)
+            await waitFor(`!!document.getElementById('docs-copy-agent-line') && getComputedStyle(document.getElementById('docs-view')).display !== 'none' && document.getElementById('docs-copy-agent-line').getBoundingClientRect().height > 0`, 'the Docs page', 15000);
         };
         const stubClipboard = (ok) => ev(`window.__copied = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { window.__copied.push(t); return ${ok ? 'Promise.resolve()' : "Promise.reject(new Error('refused'))"}; } } }); true`);
         const toasts = () => ev(`[...document.querySelectorAll('.toast .toast-message')].map(t => t.textContent.trim())`);
