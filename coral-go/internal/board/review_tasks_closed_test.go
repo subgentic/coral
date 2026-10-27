@@ -172,3 +172,33 @@ func TestAReviewForABusyReviewerIsOfferedWhenTheirTaskEnds(t *testing.T) {
 	require.NotNil(t, next, "the review is offered next")
 	assert.Equal(t, rt.review["Security"].ID, next.ID)
 }
+
+// A workflow that names another board's task as a review task (planted here: Coral never writes one) closes nothing of that board: the update is scoped to the finished task's own board.
+func TestClosingReviewTasksStaysOnTheTasksOwnBoard(t *testing.T) {
+	rt := newReviewTeam(t, "Security")
+	_, err := rt.s.Subscribe(rt.ctx, "elsewhere", "Security", "Security", "sec-session-2", nil, "mentions")
+	require.NoError(t, err)
+	foreign, err := rt.s.CreateTask(rt.ctx, "elsewhere", "Another board's work", "", "high", "Security", "Security")
+	require.NoError(t, err)
+	require.Equal(t, "pending", rt.get2("elsewhere", foreign.ID).Status)
+
+	w, err := loadWorkflow(rt.ctx, rt.s.db, rt.parent.ID)
+	require.NoError(t, err)
+	require.NotEmpty(t, w.ReviewRounds)
+	w.ReviewRounds[0].Reviewers = append(w.ReviewRounds[0].Reviewers, ReviewerState{Reviewer: "Security", ReviewTaskID: foreign.ID, State: "pending"})
+	require.NoError(t, saveWorkflow(rt.ctx, rt.s.db, rt.parent.ID, w))
+
+	_, err = rt.s.CancelTask(rt.ctx, "team", rt.parent.ID, "Lead", nil)
+	require.NoError(t, err)
+	rt.assertClosed("Security", "cancelled", "Lead") // its own review task is closed...
+	other := rt.get2("elsewhere", foreign.ID)
+	assert.Equal(t, "pending", other.Status, "...the other board's task, named in the workflow, is not")
+	assert.Nil(t, other.CompletionMessage)
+}
+
+func (rt *reviewTeam) get2(project string, id int64) *Task {
+	rt.t.Helper()
+	task, err := rt.s.GetTask(rt.ctx, project, id)
+	require.NoError(rt.t, err)
+	return task
+}
