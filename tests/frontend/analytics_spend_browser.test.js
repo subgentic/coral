@@ -164,6 +164,14 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             assert.equal(opts.length, 2, JSON.stringify(opts));
             assert.notEqual(opts[0][1], opts[1][1], 'the two labels differ: ' + JSON.stringify(opts));
             assert.ok(opts.some(([v, t]) => v === 'alpha' && /This computer/.test(t)) && opts.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)), JSON.stringify(opts));
+            // the shots: the picker as a list (a native select's popup is not in a screenshot), at 1280 and at 390
+            await ev(`(() => { const s = document.querySelector('#cost-spend select'); s.size = s.options.length + 1; s.scrollIntoView({ block: 'center' }); return true; })()`);
+            await shot('team-picker-1280');
+            await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+            await ev(`(() => { const s = document.querySelector('#cost-spend select'); s.scrollIntoView({ block: 'center' }); return true; })()`);
+            await shot('team-picker-390');
+            await ev(`document.querySelector('#cost-spend select').size = 0; true`);
+            await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         });
     } finally { await client.close(); }
     const bad = results.filter(r => r[1]); console.log(`${results.length - bad.length}/${results.length} scenarios pass`); if (bad.length) { console.error('FAIL: ' + bad.map(r => r[0]).join('; ')); process.exit(1); }

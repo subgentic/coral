@@ -6,8 +6,8 @@ const BASE = require('./test_base').BASE;
 const fs = require('node:fs');
 const path = require('node:path');
 
-const GOALS = { local: [{ id: 1, board_id: 'alpha', title: 'Local goal', outcome: 'o', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-26T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }],
-    'box-2': [{ id: 1, board_id: 'alpha', title: 'Remote goal', outcome: 'o', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-25T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }] };
+const GOALS = { local: [{ id: 1, board_id: 'alpha', title: 'Local goal', outcome: 'Ship the local importer', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-26T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }],
+    'box-2': [{ id: 1, board_id: 'alpha', title: 'Remote goal', outcome: 'Ship the remote importer', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-25T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }] };
 const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priority: 'high', status: 'queued', assigned_to: 'Operator', updated_at: '2026-10-26T10:00:00Z' }],
     'box-2': [{ id: 7, board_id: 'alpha', title: 'Remote task', priority: 'medium', status: 'queued', assigned_to: 'Operator', updated_at: '2026-10-25T10:00:00Z' }] };
 
@@ -53,6 +53,9 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             check(`${label}: Goals' Team column tells the two alpha teams apart`, gteams && gteams.length === 2 && gteams[0] !== gteams[1] && gteams.some(t => /alpha.*This computer/.test(t)) && gteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(gteams));
             await shot(`team-labels-goals-${label}`, mobile ? 'dark' : 'light');
             await panel();
+            await ev(`(() => { const s = document.getElementById('inbox-goals-team'); s.size = s.options.length; return true; })()`); // the choices as a list, for the shot (a native popup is not in one)
+            await shot(`team-labels-goals-team-filter-${label}`, mobile ? 'dark' : 'light');
+            await ev(`document.getElementById('inbox-goals-team').size = 0; true`);
             const gchoices = await teamChoices();
             check(`${label}: Goals' Team filter offers both, by their computer`, gchoices.filter(([v]) => v).length === 2 && new Set(gchoices.map(c => c[1])).size === gchoices.length && gchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)), JSON.stringify(gchoices));
             await ev(`(() => { const s = document.getElementById('inbox-goals-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(400);
@@ -65,7 +68,9 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             check(`${label}: Tasks' Team column tells the two alpha teams apart`, tteams && tteams.length === 2 && tteams[0] !== tteams[1] && tteams.some(t => /alpha.*This computer/.test(t)) && tteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(tteams));
             await shot(`team-labels-tasks-${label}`, mobile ? 'dark' : 'light');
             await panel();
+            await ev(`(() => { const s = document.getElementById('inbox-tk-team'); s.size = s.options.length; return true; })()`);
             await shot(`team-labels-tasks-filters-${label}`, mobile ? 'dark' : 'light');
+            await ev(`document.getElementById('inbox-tk-team').size = 0; true`);
             const tchoices = await ev(`[...document.querySelectorAll('#inbox-tk-team option')].map(o => [o.value, o.textContent.trim()])`);
             check(`${label}: Tasks has a Team filter with both teams, by their computer`, tchoices.filter(([v]) => v).length === 2 && tchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)) && tchoices.some(([v, t]) => v === 'alpha' && /This computer/.test(t)), JSON.stringify(tchoices));
             await ev(`(() => { const s = document.getElementById('inbox-tk-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500);
