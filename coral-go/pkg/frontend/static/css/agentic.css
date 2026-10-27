@@ -1698,7 +1698,7 @@ body.panel-dragging .agentic-state {
     flex-direction: column;
     gap: var(--space-lg);
 }
-.note-card { flex: none; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
+.note-card { flex: none; border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-secondary); }
 .note-card-time { padding: var(--space-md) var(--space-lg) 0; font-size: var(--fs-base); font-weight: 500; color: var(--text-secondary); }
 .note-md-rendered { padding: var(--space-md) var(--space-lg) var(--space-lg); cursor: pointer; border-radius: var(--radius-lg); overflow-wrap: anywhere; }
 .note-md-rendered:hover { background: var(--bg-hover); }

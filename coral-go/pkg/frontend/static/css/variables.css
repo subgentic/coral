@@ -127,6 +127,13 @@
     --space-xl:  16px;
     --space-2xl: 24px;
 
+    /* Design Tokens — Card (Goal #84, spec item 9): every card look takes these; one radius and one border, three paddings by kind (dense: a row-like card, regular, roomy: a card that stands alone on a page) */
+    --card-pad: 12px 14px;
+    --card-pad-dense: 6px 10px;
+    --card-pad-roomy: 28px;
+    --card-radius: var(--radius-lg);
+    --card-border: 1px solid var(--border);
+
     /* Design Tokens — Border Radius Scale */
     --radius-sm:  4px;
     --radius-md:  6px;

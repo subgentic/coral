@@ -13,7 +13,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 /* Standalone pages (sign-in, enroll) */
 .cloud-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
     background: var(--bg-primary, var(--fx-navy-ink)); color: var(--text-primary, #e6edf3); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
-.cloud-card { width: 100%; max-width: 440px; padding: 28px; border-radius: var(--radius-xl); background: var(--bg-secondary, #151a22); border: 1px solid var(--border, var(--fx-navy-line)); }
+.cloud-card { width: 100%; max-width: 440px; padding: var(--card-pad-roomy); border-radius: var(--card-radius); background: var(--bg-secondary, #151a22); border: var(--card-border); }
 .cloud-card h1 { font-size: var(--fs-2xl); margin: 0 0 6px; }
 .cloud-card p { margin: 0 0 14px; line-height: 1.5; opacity: .85; }
 .cloud-card label { display: block; font-size: var(--fs-md); margin: 12px 0 4px; }
