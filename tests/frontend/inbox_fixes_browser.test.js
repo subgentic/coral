@@ -34,9 +34,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // Tasks: priority first, a High chip, the count of high ones on the tab
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')); true`);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three tasks', 10000);
-        const tasks = await ev(`({ titles: [...document.querySelectorAll('#group-table-view .dt-primary')].map(t => t.textContent), prio: [...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(tr => tr.querySelector('td[data-key="priority"]').textContent.trim()), count: document.querySelector('#group-table-view .session-group-count').textContent })`);
+        const tasks = await ev(`({ titles: [...document.querySelectorAll('#group-table-view .dt-primary')].map(t => t.textContent), prio: document.querySelectorAll('#group-table-view td[data-key="priority"], #group-table-view th[data-key="priority"]').length, count: document.querySelector('#group-table-view .session-group-count').textContent })`);
         assert.deepEqual(tasks.titles, ['Decide: ship 166 with the Windows trace pending?', 'Approve the design', 'Pick the name for the Goals tab'], 'the tasks are ordered by priority: ' + JSON.stringify(tasks));
-        assert.deepEqual(tasks.prio, ['High', 'Medium', 'Low'], 'the priority column says each one: ' + JSON.stringify(tasks));
+        assert.equal(tasks.prio, 0, 'the order is by priority but there is no Priority column (#8784): ' + JSON.stringify(tasks));
         assert.equal(tasks.count, '3', 'the table says 3 tasks: ' + JSON.stringify(tasks));
         // a task opens: the reply box says the task stays open, and Open the task is a button
         await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);

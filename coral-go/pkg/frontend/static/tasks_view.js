@@ -72,8 +72,8 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
 
 /** The columns of each scope, in order; a narrow box (the goal's column, a task's follow-ups) folds them to the two-line row, so the order is also the order of the lines. */
 export const SCOPES = {
-    team: ['state', 'task', 'who', 'goal', 'priority', 'files', 'updated'],
-    mine: ['state', 'task', 'priority', 'files', 'team', 'updated'],
+    team: ['state', 'task', 'who', 'goal', 'files', 'updated'], // no Priority and no task number before the title on a task table (the Operator's rule, #8784): the number is the row's hover title and the button's name
+    mine: ['state', 'task', 'files', 'team', 'updated'],
     goal: ['state', 'task', 'who', 'files'], // no task number before the title and no Priority: the person reads the title and the state (#8784)
     'goal-page': ['task', 'state'],
     'follow-ups': ['state', 'task', 'who'],
@@ -86,7 +86,7 @@ export const SCOPES = {
 export function tasksTable(scope, rows, { ctx = {}, tweak, ...table } = {}) {
     const keys = SCOPES[scope];
     if (!keys) throw new Error(`tasksTable: no scope "${scope}"`);
-    let columns = taskColumns(ctx, keys).filter(c => c.key !== 'files' || rows.some(t => c.when(t))); // a Files column nothing fills is not drawn: its head would sit over nothing (the cells are hidden per row, not the column): every scope, the Inbox's (#8682) among them
+    let columns = taskColumns({ hideTaskId: true, ...ctx }, keys).filter(c => c.key !== 'files' || rows.some(t => c.when(t))); // a Files column nothing fills is not drawn: its head would sit over nothing (the cells are hidden per row, not the column): every scope, the Inbox's (#8682) among them
     if (tweak) columns = tweak(columns) || columns;
     return DT.dataTable({ compact: true, label: `Tasks, ${rows.length}`, rowKey: taskKey, rowName: (t) => `#${t.id} ${t.title}`, ...table, columns, rows });
 }
