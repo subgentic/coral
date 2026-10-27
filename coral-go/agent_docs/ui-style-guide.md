@@ -22,7 +22,7 @@ Build new dashboard UI from the shared families below. Each family is one class 
 - **Group head** (the heading of a group of rows or a section): `.group-head`, or `.group-head-lg` for a page's section title. Guard: `group_head_census`.
 - **Pane** (header band, scrolling body, pinned footer): `.pane`, `.pane-head`, `.pane-body`, `.pane-foot`, `.pane-aside`. Guard: `pane_census`.
 - **Toolbar** (a row of controls over a list): `.toolbar`, spacing from the `--toolbar-*` tokens. Guard: `toolbar_census`.
-- **Tabs** (a text tab strip): `.tabs` holding `.tab` buttons (`aria-selected="true"` or `.active` is the underlined one) and `.tab-count`; `.tabs-icons` for a narrow panel's icon tabs. Guard: `tab_family_census` (its baseline is empty).
+- **Tabs** (a text tab strip): `.tabs` holding `.tab` buttons (`aria-selected="true"` or `.active` is the underlined one) and `.tab-count`; `.tabs-icons` (#9328) for a narrow panel's icon tabs. Guard: `tab_family_census` (its baseline is empty).
 - **Card**: the tokens `--card-border`, `--card-radius` and `--card-pad`, `--card-pad-dense`, `--card-pad-roomy`. No card inside a card. Guard: `card_census`.
 - **Table**: the shared data table (`data_table.js`, `dt-*` classes in `data_table.css`); no other stylesheet styles a table. Guard: `data_table_census`.
 - **Dialog**: one of `.dlg-confirm` (28 rem), `.dlg-form` (40 rem) or `.dlg-flow` (60 rem, 640 high) beside `.modal-content`; its width and radius come from the `--dlg-*` tokens (`--dlg-title` is the title's type). Guard: `dialog_census`.
