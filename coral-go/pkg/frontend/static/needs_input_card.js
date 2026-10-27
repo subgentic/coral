@@ -39,6 +39,11 @@ function readsPromptsFromScreen(session) {
 }
 
 function needsInputInfo(session) {
+    const info = needsInputInfoOf(session);
+    if (info && session.hubReadOnly) info.readOnly = (session.hubReadOnly.chip || "View only"); // part of the card's key: a change of access draws it again
+    return info;
+}
+function needsInputInfoOf(session) {
     const row = (state.liveSessions || []).find(s => s.session_id === session.session_id) || session;
     const key = deriveSessionState(row);
     if (key === "sleeping") return null;
@@ -224,8 +229,8 @@ function needsInputHtml(info, session) {
 
     if (info.kind === "login") return loginCardHtml(info, name, kicker);
 
-    const controls = answerControlsHtml(info, descriptions, fullLabels);
-    const hint = !onScreen && info.kind !== "startup" ? `<span class="cni-hint">Answer in the terminal</span>` : "";
+    const controls = info.readOnly ? { body: "", foot: "" } : answerControlsHtml(info, descriptions, fullLabels); // where the person may not act (a View machine, a read-only Hub) no answer is drawn: it would only fail
+    const hint = info.readOnly ? `<span class="cni-hint">${escapeHtml(info.readOnly)}</span>` : !onScreen && info.kind !== "startup" ? `<span class="cni-hint">Answer in the terminal</span>` : "";
     // A dialog with a heading (Codex's "Hooks need review", #306): the heading is the card's heading, its text a line under it,
     // instead of the two run together as one line.
     let questionHtml = question ? `<div class="cni-question">${escapeHtml(question)}</div>` : "";
@@ -421,3 +426,6 @@ export function syncNeedsInputCard(container, session) {
     }
     watchCardInView(el);
 }
+
+// A change of what the person may do on this computer (the Hub says so) draws the card again: answers come or go.
+document.addEventListener('coral:hub-access-changed', () => refreshNeedsInputCard());
