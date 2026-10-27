@@ -32,13 +32,18 @@ const BASE = require('./test_base').BASE;
    await ev('window.__failSave=false');await save();await waitFor('window.__review.reviews_only===true','saved settings');
    assert.deepEqual(await ev('window.__review.review_areas'),['ui','go']);
    const dir=process.env.CORAL_SCREENSHOT_DIR;
-   if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(dir,`review-settings-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
-   const detail=await ev(`(async()=>{const m=await import((window.__coralStatic||'/static/')+'task_detail_html.js');const host=document.getElementById('review-ui');const wf={review_areas:['ui','<script>'],review_in_pool:true,reviewers_wanted:2,completion_review:{submitted_by:'author',released_by:'Coral'},review_rounds:[{reviewers:[{reviewer:'Ada <img>'}]}]};host.innerHTML=m.taskExtraHtml({status:'review_pending',workflow:wf});const pool=host.textContent;wf.review_in_pool=false;host.innerHTML=m.taskExtraHtml({status:'review_pending',workflow:wf});return {pool,assigned:host.textContent,unsafe:!!host.querySelector('script,img')};})()`);
+   const shot=async name=>{if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(dir,`${name}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}};
+   await shot('review-settings');
+   const detail=await ev(`(async()=>{const m=await import((window.__coralStatic||'/static/')+'task_detail_html.js');const host=document.getElementById('review-ui');const wf={review_areas:['ui','<script>'],review_in_pool:true,reviewers_wanted:2,completion_review:{submitted_by:'author',released_by:'Coral'},review_rounds:[{reviewers:[{reviewer:'Ada <img>'}]}]};host.innerHTML=m.taskExtraHtml({status:'review_pending',workflow:wf});const pool=host.textContent;window.__reviewWorkflow=wf;wf.review_in_pool=false;host.innerHTML=m.taskExtraHtml({status:'review_pending',workflow:wf});return {pool,assigned:host.textContent,unsafe:!!host.querySelector('script,img')};})()`);
    assert.match(detail.pool,/In the pool/);assert.match(detail.pool,/ui/);assert.match(detail.pool,/Ada <img>/);assert.match(detail.assigned,/Ada <img>/);assert.doesNotMatch(detail.assigned,/Waiting for the Orchestrator/);assert.equal(detail.unsafe,false);
+   await shot('review-assigned');
+   await ev(`(async()=>{const m=await import((window.__coralStatic||'/static/')+'task_detail_html.js');window.__reviewWorkflow.review_in_pool=true;document.getElementById('review-ui').innerHTML=m.taskExtraHtml({status:'review_pending',workflow:window.__reviewWorkflow});return true;})()`);
+   await shot('review-pool');
    await ev(`(async()=>{const m=await import((window.__coralStatic||'/static/')+'team_tasks_page.js');const host=document.getElementById('review-ui');host.replaceChildren();delete host.dataset.built;await m.showTasks(host,'review-ui');const select=host.querySelector('select[aria-label="Show tasks that are"]');select.value='needs_review';select.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
    await waitFor(`document.querySelectorAll('#review-ui tbody .dt-row').length===2`,'Needs review contains pool and assigned reviews only');
    const names=await ev(`[...document.querySelectorAll('#review-ui tbody .dt-primary')].map(x=>x.textContent)`);assert.ok(names.includes('Pool review')&&names.includes('Assigned review'));assert.ok(!names.includes('Still held'));
    assert.equal(await ev(`document.getElementById('review-ui').scrollWidth>innerWidth+1`),false,'phone fits');
+   await shot('needs-review');
   }
  }finally{await client.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
