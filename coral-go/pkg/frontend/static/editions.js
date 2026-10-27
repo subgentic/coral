@@ -50,7 +50,7 @@ export async function initEditions() {
     try {
         // The connector may still be loading its stored enrollment (#3285): ask again briefly.
         for (let i = 0; i < LOADING_TRIES; i++) {
-            const r = await fetch('/api/cloud/status');
+            const r = await fetch('/api/cloud/status', { cache: 'no-store' }); // a poll waiting for a change asks fresh: a shared read (fetch_share.js) would answer within a second with the one before
             st = r.ok ? await r.json() : null;
             if (!st || !st.loading) break;
             await new Promise(res => setTimeout(res, loadingWaitMs()));

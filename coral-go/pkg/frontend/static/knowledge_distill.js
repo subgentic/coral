@@ -44,7 +44,8 @@ export function distillJob(team) {
 }
 
 async function _fetchStatus(team) {
-    const r = await teamFetch(team, path);
+    // A poll and a refresh ask fresh: the run's progress and its end are what they wait for, and a shared read (fetch_share.js, one second) would answer with the state before.
+    const r = await teamFetch(team, path, { cache: 'no-store' });
     if (!r.ok) throw new Error(`distill status ${r.status}`);
     return r.json();
 }
