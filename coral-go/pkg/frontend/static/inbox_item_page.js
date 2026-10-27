@@ -26,7 +26,7 @@ export function mountInboxItem(host, { kind, team, id, back, onChanged }) {
                 if (disposed) return;
                 if (!full) throw new Error('This task could not be read.');
                 m.renderTaskPage(host, full, { project: team, backLabel: 'Tasks', onBack: back, onChanged, teamLink: teamURL,
-                    openGoal: goal => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(team, goal)),
+                    openGoal: goal => go({ view: 'inbox-goals', sub: 'goals', id: team, item: Number(goal) }), // the goal opens in the Inbox, Back returns to the task (#8861)
                     openTask: t => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: t.id }),
                 });
             } else {
