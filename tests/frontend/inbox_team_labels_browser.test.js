@@ -8,8 +8,8 @@ const path = require('node:path');
 
 const GOALS = { local: [{ id: 1, board_id: 'alpha', title: 'Local goal', outcome: 'Ship the local importer', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-26T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }],
     'box-2': [{ id: 1, board_id: 'alpha', title: 'Remote goal', outcome: 'Ship the remote importer', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-25T10:00:00Z', rollup: { done: 0, active: 1, blocked: 0, queued: 0 } }] };
-const ARTS = { local: [{ id: '1'.repeat(64), name: 'local-report.md', media_type: 'text/markdown', size: 1000, created_at: '2026-10-26T10:00:00Z', task_id: 7, task_title: 'Local task', source: 'task', uri: 'coral://artifacts/' + '1'.repeat(64), available: true, inline: false, reference_count: 1, board_id: 'alpha', team: 'alpha' }],
-    'box-2': [{ id: '2'.repeat(64), name: 'remote-report.md', media_type: 'text/markdown', size: 2000, created_at: '2026-10-25T10:00:00Z', task_id: 7, task_title: 'Remote task', source: 'task', uri: 'coral://artifacts/' + '2'.repeat(64), available: true, inline: false, reference_count: 1, board_id: 'alpha', team: 'alpha' }] };
+const ARTS = { local: [{ id: '1'.repeat(64), name: 'local-report.md', media_type: 'text/markdown', size: 1000, created_at: '2026-10-26T10:00:00Z', task_id: 7, task_title: 'Local finished task with files', source: 'task', uri: 'coral://artifacts/' + '1'.repeat(64), available: true, inline: false, reference_count: 1, board_id: 'alpha', team: 'alpha', goal_id: 3, goal_title: 'Local goal for the importer' }],
+    'box-2': [{ id: '2'.repeat(64), name: 'remote-report.md', media_type: 'text/markdown', size: 2000, created_at: '2026-10-25T10:00:00Z', task_id: 7, task_title: 'Remote finished task with files', source: 'task', uri: 'coral://artifacts/' + '2'.repeat(64), available: true, inline: false, reference_count: 1, board_id: 'alpha', team: 'alpha', goal_id: 3, goal_title: 'Remote goal for the importer' }] };
 const SAVED = { local: [{ id: 1, kind: 'board', ref: 'alpha', key: '1001', title: 'alpha board', snippet: 'Local note', saved_at: '2026-10-26T10:00:00Z', team: 'alpha' }],
     'box-2': [{ id: 1, kind: 'board', ref: 'alpha', key: '1001', title: 'alpha board', snippet: 'Remote note', saved_at: '2026-10-25T10:00:00Z', team: 'alpha' }] };
 const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priority: 'high', status: 'queued', assigned_to: 'Operator', updated_at: '2026-10-26T10:00:00Z' }],
@@ -94,7 +94,10 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             // Saved: a bookmark of each computer's alpha
             await open('saved');
             await waitFor(`document.querySelectorAll('#group-table-view .dt-primary, #group-table-view .dt-person').length >= 2 || /Local note/.test(document.getElementById('group-table-view').textContent) && /Remote note/.test(document.getElementById('group-table-view').textContent)`, `${label}: two saved messages`, 10000); await settle(400);
-            await panel();
+            await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').getAttribute('aria-expanded') === 'true' || document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`); await settle(250);
+            await ev(`(() => { const s = document.getElementById('inbox-saved-team'); if (s) s.size = s.options.length; return true; })()`);
+            await shot(`team-labels-saved-team-filter-${label}`, mobile ? 'dark' : 'light');
+            await ev(`(() => { const s = document.getElementById('inbox-saved-team'); if (s) s.size = 0; return true; })()`);
             const schoices = await teamChoices();
             check(`${label}: Saved's Team filter lists the two alpha teams by their computer`, schoices.filter(([v]) => v).length === 2 && schoices.some(([v, t]) => v === '@box-2/alpha' && /alpha · Box Two/.test(t)) && schoices.some(([v, t]) => v === 'alpha' && /alpha · This computer/.test(t)), JSON.stringify(schoices));
             await ev(`(() => { const s = document.getElementById('inbox-saved-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500);
@@ -103,8 +106,13 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             // Artifacts: the files of each computer's alpha
             await open('artifacts');
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: two files`, 10000); await settle(500);
+            await shot(`team-labels-artifacts-${label}`, mobile ? 'dark' : 'light');
             const arows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
             check(`${label}: Artifacts' Team words tell the two alpha teams apart (This computer's file and Box Two's)`, arows.some(t => /local-report/.test(t) && /alpha · This computer/.test(t)) && arows.some(t => /remote-report/.test(t) && /alpha · Box Two/.test(t)), JSON.stringify(arows));
+            if (!mobile) {
+                const cols = await ev(`(() => { const t = document.querySelector('#group-table-view table'), th = [...t.querySelectorAll('th')].find(h => /^Name/.test(h.textContent.trim())); return { name: Math.round(th.getBoundingClientRect().width), table: Math.round(t.getBoundingClientRect().width), heads: [...t.querySelectorAll('th')].map(h => h.textContent.replace(/[\\u2191\\u2193\\u2195]/g, '').trim()).filter(Boolean), cut: [...document.querySelectorAll('#group-table-view .dt-primary')].filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent.trim()) }; })()`);
+                check(`${label}: Artifacts' Name column has the room (at least 180 px, no file name cut) beside the team, task and goal, and no Server column (the team's words carry the computer)`, cols.name >= 180 && cols.cut.length === 0 && !cols.heads.includes('Server') && cols.heads.includes('Team'), JSON.stringify(cols));
+            }
             await panel();
             const achoices = await teamChoices();
             check(`${label}: Artifacts' Team filter lists the two teams by their computer, each with its count`, achoices.filter(([v]) => v).length === 2 && achoices.some(([v, t]) => v === '@box-2/alpha' && /alpha · Box Two \(1\)/.test(t)) && achoices.some(([v, t]) => v === 'alpha' && /alpha · This computer \(1\)/.test(t)), JSON.stringify(achoices));

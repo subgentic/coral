@@ -287,7 +287,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             const by = !model.scope && !inbox ? model.filters.group : ''; // the team's list read by task or goal: a head per group, its files together (an agent's list is not grouped)
             const shown = by ? orderByGroup(model.items, by) : model.items;
             const table = DT.dataTable({
-                label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, fold: model.scope ? 'none' : 'column', foldAt: 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
+                label: `Artifacts, ${model.items.length}`, ...(inbox ? { layout: 'fixed' } : {}), bare: !!model.scope, compact: !!model.scope, fold: model.scope ? 'none' : 'column', foldAt: 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
                 selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
                 columns: [
@@ -300,14 +300,16 @@ export function createArtifactsList({ inbox = false } = {}) {
                             const tagged = model.scope ? null : Tags.rowTags(item.tags); if (tagged) first.append(tagged);
                             return first;
                         } },
-                    ...(inbox ? serverColumns() : []),
-                    ...(inbox && !model.filters.team ? [{ key: 'team', label: 'Team', line: 2, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }] : []), // the Inbox's list spans teams; one team chosen, the column says nothing new
-                { key: 'type', label: 'Type', line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
-                    { key: 'size', label: 'Size', line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
+                    // The Inbox's list is crowded (a computer, a team, a task, a goal): the team's words carry its computer ("alpha · Box Two"), so the Server column is only there when one team is chosen and the Team column is not;
+                    // every other column has a fixed width and the file's name takes what is left (it was cut to 60 px at 1280, #8839)
+                    ...(inbox && model.filters.team ? serverColumns().map(c => ({ ...c, width: '7rem' })) : []),
+                    ...(inbox && !model.filters.team ? [{ key: 'team', label: 'Team', width: '9rem', line: 2, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }] : []), // the Inbox's list spans teams; one team chosen, the column says nothing new
+                { key: 'type', label: 'Type', ...(inbox ? { width: '6.5rem' } : {}), line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
+                    { key: 'size', label: 'Size', ...(inbox ? { width: '4.5rem' } : {}), line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
                     // the head says the task or goal a group is: its own column would say it on every row (#8617)
-                    ...(by === 'task' ? [] : [{ key: 'task', label: 'Task', line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskCell }]),
-                    ...(by === 'goal' || model.scope || !shown.some(i => i.goal_id) ? [] : [{ key: 'goal', label: 'Goal', line: 2, tone: 'tertiary', cell: item => (item.goal_id && item.goal_title ? String(item.goal_title) : '') }]),
-                    { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
+                    ...(by === 'task' ? [] : [{ key: 'task', label: 'Task', ...(inbox ? { width: '8rem' } : {}), line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskCell }]),
+                    ...(by === 'goal' || model.scope || !shown.some(i => i.goal_id) ? [] : [{ key: 'goal', label: 'Goal', ...(inbox ? { width: '7rem' } : {}), line: 2, tone: 'tertiary', cell: item => (item.goal_id && item.goal_title ? String(item.goal_title) : '') }]),
+                    { key: 'created', label: 'Created', ...(inbox ? { width: '8rem' } : {}), line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
                     // An agent's list opens an artifact in the preview panel; its sheet (the facts, Keep, Delete, Copy link, who can read it) is one quiet link away (#8539)
                     ...(model.scope ? [{ key: 'details', label: 'Details', hideLabel: true, line: 2, tone: 'tertiary', align: 'end', cell: item => detailsLink(item) }] : []), // only an agent's list has the column: a `when` kept its head and its links on the team's and the Inbox's list at a wide width
                 ].filter(c => !model.scope || !['type', 'task'].includes(c.key)).map(c => model.scope && c.key !== 'name' ? { ...c, width: 'content' } : c),
