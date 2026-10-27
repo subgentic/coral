@@ -110,7 +110,7 @@
 /* ── Job type toggle ───────────────────────────────────────── */
 
 .job-type-toggle { width: 100%; margin-bottom: 8px; } /* the box and its buttons are the family's segmented control (.btn-seg > .btn, components.css); this is only its width (#9505) */
-.job-type-toggle > .job-type-btn { flex: 1; gap: 6px; }
+.job-type-toggle > .job-type-btn { flex: 1 1 0; min-width: 0; gap: 6px; white-space: normal; } /* at 200% text the words wrap inside their half; the pair never runs past the screen (#9576) */
 
 .sched-header {
     display: flex;

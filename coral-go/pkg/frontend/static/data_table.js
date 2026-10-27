@@ -20,6 +20,9 @@ import { browserLocal } from './safe_storage.js';
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
+/** A select box with its 44 px target (#9576): the box is 16 px, so a label around it is what a finger hits (a touch screen's census counts a checkbox as its label); the label's own click is the box's and goes no further (the row's handler would open the row). */
+const checkHit = input => { const l = el('label', 'dt-check-hit'); l.append(input); l.addEventListener('click', e => e.stopPropagation()); return l; };
+
 export const tableState = () => ({ widths: null, sort: null, selected: new Set(), rowCache: new Map(), anchor: null, ctx: undefined, select: false, confirming: -1 });
 
 // ── cell types ────────────────────────────────────────────────────────────
@@ -248,7 +251,7 @@ export function dataTable(cfg) {
     function drawHead() {
         thead.replaceChildren();
         const tr = el('tr'); tr.setAttribute('role', 'row');
-        if (sel) { const th = el('th', 'dt-check'); th.setAttribute('role', 'columnheader'); const all = el('input'); all.type = 'checkbox'; all.className = 'check dt-check-all'; all.setAttribute('aria-label', 'Select all rows on this page'); all.addEventListener('change', () => { for (const r of rows.filter(eligible)) (all.checked ? st.selected.add(keyOf(r)) : st.selected.delete(keyOf(r))); st.anchor = null; syncSelection(); }); th.append(all); tr.append(th); }
+        if (sel) { const th = el('th', 'dt-check'); th.setAttribute('role', 'columnheader'); const all = el('input'); all.type = 'checkbox'; all.className = 'check dt-check-all'; all.setAttribute('aria-label', 'Select all rows on this page'); all.addEventListener('change', () => { for (const r of rows.filter(eligible)) (all.checked ? st.selected.add(keyOf(r)) : st.selected.delete(keyOf(r))); st.anchor = null; syncSelection(); }); th.append(checkHit(all)); tr.append(th); }
         for (const c of columns) {
             const th = el('th', `dt-th${c.numeric || c.align === 'end' ? ' dt-end' : ''}`); th.scope = 'col'; th.setAttribute('role', 'columnheader'); th.dataset.key = c.key;
             if (cfg.oneLine && c.dropAt) th.setAttribute('data-drop-at', String(c.dropAt));
@@ -355,7 +358,7 @@ export function dataTable(cfg) {
                     else (on ? st.selected.add(k) : st.selected.delete(k));
                     st.anchor = i; syncSelection();
                 });
-                td.append(cb); tr.append(td);
+                td.append(cb.hidden ? cb : checkHit(cb)); tr.append(td);
             }
             if (mailOn()) {
                 const m = cfg.mail(r);
