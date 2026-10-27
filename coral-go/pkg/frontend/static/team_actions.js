@@ -45,7 +45,7 @@ export async function killGroup(groupName) {
                 }
             }
             dropKilledRows(groupSessions);
-        }
+        }, undefined, { danger: true }
     );
 }
 
@@ -79,7 +79,7 @@ export async function killBoard(boardName) {
             }
             showWorktreeNotice(worktree); // an error is an alert, the rest a status; a kept one stays on screen with its path (#6818)
             dropKilledRows(boardSessions);
-        }
+        }, undefined, { danger: true }
     );
 }
 
@@ -256,7 +256,7 @@ export function toggleTeamSleep(boardName, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep Team', `Put all agents on "${keyLabel(boardName)}" to sleep?`, doIt);
+        showConfirmModal('Sleep Team', `Put all agents on "${keyLabel(boardName)}" to sleep?`, doIt, undefined, { danger: false });
     } else {
         doIt();
     }

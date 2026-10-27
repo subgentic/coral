@@ -3,7 +3,7 @@
 // Called when the open confirm modal is dismissed without confirming.
 let _confirmCancel = null;
 
-/** opts.label: the confirming button's word when "Yes" would not name the action ("Delete"); every other call keeps Yes. opts.danger: false makes the button the primary instead of the danger style it has by default. */
+/** opts.label: the confirming button's word when "Yes" would not name the action ("Delete"); every other call keeps Yes. opts.danger: true makes the button the danger style; every caller names it (confirm_census), a question that loses nothing keeps the primary. */
 export function showConfirmModal(title, message, onConfirm, onCancel, opts = {}) {
     _dismissConfirm(); // a modal replaced before an answer counts as cancelled
     document.getElementById("confirm-modal-title").textContent = title;
@@ -11,7 +11,7 @@ export function showConfirmModal(title, message, onConfirm, onCancel, opts = {})
     const yesBtn = document.getElementById("confirm-modal-yes");
     const newBtn = yesBtn.cloneNode(true);
     newBtn.textContent = opts.label || 'Yes';
-    newBtn.className = opts.danger === false ? 'btn btn-primary' : 'btn btn-danger'; // the style is set on every call: a question that deletes is always the danger button
+    newBtn.className = opts.danger === true ? 'btn btn-danger' : 'btn btn-primary'; // set on every call: the template's class is not kept
     const noBtn = document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)'); if (noBtn) noBtn.textContent = opts.cancelLabel || 'Cancel'; // the stay button's words, put back to Cancel for every other question
     yesBtn.parentNode.replaceChild(newBtn, yesBtn);
     newBtn.addEventListener("click", () => {

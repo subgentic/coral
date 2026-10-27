@@ -57,7 +57,7 @@ export async function toggleBoardPause() {
     const m = bs._allMessages.find(x => x.id === messageId);
     const text = m ? String(m.content || '').replace(/\s+/g, ' ').trim() : '';
     const what = m ? `the message from ${m.job_title || 'Unknown'}${text ? ` ("${text.length > 60 ? text.slice(0, 60) + '\u2026' : text}")` : ''}` : `message #${messageId}`;
-    window.showConfirmModal('Delete Message', `Delete ${what}? This cannot be undone.`, () => deleteBoardMessage(messageId));
+    window.showConfirmModal('Delete Message', `Delete ${what}? This cannot be undone.`, () => deleteBoardMessage(messageId), undefined, { danger: true });
 }
 
 async function deleteBoardMessage(messageId) {

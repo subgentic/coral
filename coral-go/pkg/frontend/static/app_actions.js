@@ -322,7 +322,7 @@ function resetTeam(boardName) {
         } catch {
             showToast('Reset failed', true);
         }
-    });
+    }, undefined, { danger: true });
 }
 
 window.toggleSendMenu = function(btn, event) {

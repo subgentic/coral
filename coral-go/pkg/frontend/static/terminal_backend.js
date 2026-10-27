@@ -118,12 +118,12 @@ async function saveAndRestart(want) {
     return true;
 }
 
-function confirmWith(title, message, yesLabel) {
+function confirmWith(title, message, yesLabel, opts = {}) {
     return new Promise(resolve => {
         const yes = $('confirm-modal-yes');
         const before = yes ? yes.textContent : '';
         const restore = () => { const b = $('confirm-modal-yes'); if (b) b.textContent = before; };
-        showConfirmModal(title, message, () => { restore(); resolve(true); }, () => { restore(); resolve(false); });
+        showConfirmModal(title, message, () => { restore(); resolve(true); }, () => { restore(); resolve(false); }, { danger: opts.danger === true });
         const b = $('confirm-modal-yes');
         if (b) b.textContent = yesLabel;
     });
@@ -176,7 +176,7 @@ export async function applyTerminalBackendChange() {
                 + 'Wake them from the dashboard afterwards: they resume their conversation, but a tool that is running now is not continued. '
                 : 'No agents are running. Coral restarts on pty now. ')
             + 'After this, agents end whenever Coral restarts or upgrades.',
-            n ? `Sleep ${n} agent${n === 1 ? '' : 's'} and restart on pty` : 'Restart on pty');
+            n ? `Sleep ${n} agent${n === 1 ? '' : 's'} and restart on pty` : 'Restart on pty', { danger: n > 0 });
         if (!ok) return false;
         if (n) {
             const r = await post('/api/sessions/live/sleep-all');
@@ -187,7 +187,7 @@ export async function applyTerminalBackendChange() {
     if (want === 'tmux' && st.running === 'pty') {
         const ok = await confirmWith('Switch to tmux?',
             "Agents will keep running across Coral restarts after this. Any agent will be able to reach other agents' terminals. "
-            + 'Coral restarts on tmux now; your sleeping agents wake as usual.', 'Restart on tmux');
+            + 'Coral restarts on tmux now; your sleeping agents wake as usual.', 'Restart on tmux', { danger: false });
         if (!ok) return false;
         return saveAndRestart('tmux');
     }
@@ -224,7 +224,7 @@ function showLeftoverTmux(st) {
 
 export async function endLeftoverTmux() {
     const ok = await confirmWith('End the agents left in the old tmux server?',
-        "They stop at once (a tool that is running is not finished). Then wake them here: they resume their conversation on pty.", 'End them');
+        "They stop at once (a tool that is running is not finished). Then wake them here: they resume their conversation on pty.", 'End them', { danger: true });
     if (!ok) return;
     const r = await post('/api/system/terminal-backend/end-leftover');
     if (!r.ok) { showToast(r.body.error || 'Could not end them', true); return; }
@@ -433,7 +433,7 @@ async function resumeOneOnCurrentHooks(sessionId, name) {
     let r = await refreshHooksOf(sessionId, false);
     if (r.status === 409 && r.data.code === 'busy') {
         const ok = await confirmWith(`Resume ${name} now?`,
-            'It is in a turn or waiting on a prompt. Resuming stops that turn; its conversation is kept.', 'Resume now');
+            'It is in a turn or waiting on a prompt. Resuming stops that turn; its conversation is kept.', 'Resume now', { danger: true });
         if (!ok) return;
         r = await refreshHooksOf(sessionId, true);
     }

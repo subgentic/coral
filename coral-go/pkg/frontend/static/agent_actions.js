@@ -44,7 +44,7 @@ export function killSessionDirect(name, agentType, sessionId) {
         }
     } catch (e) {
         showToast("Failed to kill session", true);
-    } });
+    } }, undefined, { danger: true });
 }
 
 export async function showInfoDirect(name, agentType, sessionId) {
@@ -99,7 +99,7 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep Agent', `Put "${name}" to sleep?`, doIt);
+        showConfirmModal('Sleep Agent', `Put "${name}" to sleep?`, doIt, undefined, { danger: false });
         return Promise.resolve(false);
     }
     return doIt();
@@ -142,7 +142,7 @@ export function toggleAgentArchive(name, agentType, sessionId, action) {
         const stops = s && !s.sleeping ? ' It will be stopped.' : '';
         return new Promise(resolve => showConfirmModal('Archive Agent',
             `Archive "${name}"?${stops} Archived agents are not woken with their team or by Wake All.`,
-            async () => resolve(await doIt()), () => resolve(false)));
+            async () => resolve(await doIt()), () => resolve(false), { danger: false }));
     }
     return doIt();
 }

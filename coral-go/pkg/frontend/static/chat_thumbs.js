@@ -108,7 +108,7 @@ function askRemoveSharedCopy(x, after) {
             showToast(removedCopyText(result)); // says whether the image stays shared with another agent
             if (after) after();
         } else showToast('Could not remove the shared copy.', true);
-    });
+    }, undefined, { danger: true });
 }
 
 registerActions({

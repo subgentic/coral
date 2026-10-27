@@ -113,7 +113,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                         const after = [...(root?.querySelectorAll('tbody tr') || [])]; ((after[at] || after[at - 1])?.querySelector('.dt-primary') || root?.querySelector('.list-bar-search') || root?.querySelector('.list-bar-more-btn'))?.focus(); // and the search box when none is left
                     } else { const d = await r.json().catch(() => ({})); showToast(`Couldn't delete ${name}: ${d.error || `HTTP ${r.status}`}`, true); }
                 } catch { showToast(`Couldn't delete ${name}: Coral didn't answer.`, true); }
-            }, null, { label: 'Delete' });
+            }, null, { label: 'Delete', danger: true });
         requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus()); // no default: the focus starts on Cancel
     }
 

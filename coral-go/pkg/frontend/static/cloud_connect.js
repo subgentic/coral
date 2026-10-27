@@ -63,7 +63,7 @@ class CloudPanel {
         this.enrolled = undefined; // unknown until the first status: the Operator row is read then
         // The dashboard's confirm dialog (render.js is already loaded in the dashboard; imported
         // here only when needed, so this module stays light). Tests replace it.
-        this.confirm = async (title, message, onYes) => (await importOnce('./render.js')).showConfirmModal(title, message, onYes);
+        this.confirm = async (title, message, onYes, opts = {}) => (await importOnce('./render.js')).showConfirmModal(title, message, onYes, undefined, { danger: opts.danger === true });
     }
 
     part(role) { return this.root.querySelector(`[data-cloud="${role}"]`); }
@@ -467,7 +467,7 @@ class CloudPanel {
             }
             if (r.status === 403) { this.elsewhere(out); return; }
             this.say((out && out.error) || 'The secret key could not be replaced');
-        });
+        }, { danger: true });
     }
 
     bind() {

@@ -236,7 +236,7 @@ function deleteSelectedTheme() {
         showToast(`Deleted: ${name}`);
     } catch (e) {
         showToast('Failed to delete theme', true);
-    } });
+    } }, undefined, { danger: true });
 };
 
 (window.__coral ||= {}).exportCurrentTheme = function() {

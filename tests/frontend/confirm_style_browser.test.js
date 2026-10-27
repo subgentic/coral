@@ -1,0 +1,42 @@
+// The confirm dialog's button style (#9318): a question that loses something passes { danger: true } and its confirming button is the danger style; one that loses nothing passes
+// { danger: false }, or a call that names nothing, gets the primary. The real dialog, asked with callers' own words. The style is set on every call, so a danger dialog followed by a plain one is not still red.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+
+const CASES = [
+    ['danger-delete-workflow', 'Delete Workflow', 'Delete workflow "nightly-build"? This will also delete all run history.', { label: 'Delete', danger: true }, 'btn-danger'],
+    ['danger-kill-run', 'Kill Run', 'Stop run #12? Its steps stop where they are and the run cannot be resumed.', { danger: true }, 'btn-danger'],
+    ['primary-sleep-agent', 'Sleep Agent', 'Put "Backend Dev" to sleep?', { danger: false }, 'btn-primary'],
+    ['primary-paste', 'Paste 3 lines?', 'This terminal isn’t in paste mode, so each line is sent as if typed and runs on its own.', { danger: false }, 'btn-primary'],
+    ['primary-unnamed', 'Anything', 'A call that names no choice.', undefined, 'btn-primary'],
+];
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [w, h, mobile] of [[1280, 700, false], [390, 844, true]]) {
+            const at = `at ${w}px: `;
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            const colours = {};
+            for (const [key, title, message, opts, cls] of CASES) {
+                await ev(`window.showConfirmModal(${JSON.stringify(title)}, ${JSON.stringify(message)}, () => {}, undefined, ${JSON.stringify(opts)}); true`);
+                await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${at}${key}: the dialog`, 8000);
+                const got = await ev(`(() => { const b = document.getElementById('confirm-modal-yes'); const s = getComputedStyle(b); return { cls: b.className, bg: s.backgroundColor, color: s.color, text: b.textContent }; })()`);
+                assert.ok(got.cls.split(/\s+/).includes(cls) && !got.cls.split(/\s+/).includes(cls === 'btn-danger' ? 'btn-primary' : 'btn-danger'), `${at}${key}: the confirming button is ${cls}: ${got.cls}`);
+                colours[key] = got.bg + '|' + got.color;
+                await waitFor(`getComputedStyle(document.querySelector('#confirm-modal .modal-content, #confirm-modal > div') || document.body).opacity === '1'`, `${at}${key}: the dialog has settled`, 8000);
+                if (key !== 'primary-unnamed') await shot(`confirm-${key}-${w}`);
+                await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
+            }
+            assert.notEqual(colours['danger-kill-run'], colours['primary-sleep-agent'], at + 'the two styles look different');
+            assert.equal(colours['primary-unnamed'], colours['primary-sleep-agent'], at + 'no choice named looks like the primary');
+        }
+        console.log('PASS confirm style: danger true is the danger button, false or unnamed is the primary, set on every call');
+    } finally { await client.close(); }
+})().catch(e => { console.error(e); process.exit(1); });

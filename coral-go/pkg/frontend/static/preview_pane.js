@@ -308,7 +308,7 @@ function closeTab(tabId) {
     const tab = _tabs.find(t => t.id === tabId);
     if (!tab) return;
     if (_isDirty(tab)) {
-        window.showConfirmModal('Discard Changes', `Discard unsaved changes to ${_fileName(tab.filepath)}?`, () => _closeTabNow(tabId));
+        window.showConfirmModal('Discard Changes', `Discard unsaved changes to ${_fileName(tab.filepath)}?`, () => _closeTabNow(tabId), undefined, { danger: true });
         return;
     }
     _closeTabNow(tabId);

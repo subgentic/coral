@@ -110,7 +110,7 @@ function confirmDeleteEndedLogs() {
                 else showToast(`Couldn't delete the terminal logs: ${e.message}`, true);
             }
             loadTerminalLogs();
-        });
+        }, undefined, { danger: true });
     requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
 }
 
@@ -237,7 +237,7 @@ async function previewAndRun(body, verb) {
             result.textContent = `Couldn't finish: ${e.message}`;
         }
         asker?.focus(); // Yes closed the confirmation: the focus goes back to the button that asked, not to the page (#4469, UX's #4456 SHOULD 10)
-    }, undefined, { label: verb }); // the button says what it does: Prune or Shrink, not Yes
+    }, undefined, { label: verb, danger: true }); // the button says what it does: Prune or Shrink, not Yes
     // No default: focus starts on Cancel.
     requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
 }
@@ -277,7 +277,7 @@ export function wireStorageActions() {
                     return;
                 }
                 loadStorageDetail();
-            });
+            }, undefined, { danger: true });
         requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
     });
 }
@@ -349,7 +349,7 @@ function confirmDeleteUnlisted() {
             const left = (d.skipped || []).length;
             showToast(`Deleted ${Number(d.deleted || 0).toLocaleString()} received file${d.deleted === 1 ? '' : 's'}, ${_gib(d.bytes)} freed.${left ? ` ${left} left alone: something lists or links ${left === 1 ? 'it' : 'them'}.` : ''}`, false, 8000);
             loadArtifactStoreSize();
-        });
+        }, undefined, { danger: true });
     requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
 }
 

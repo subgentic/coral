@@ -537,7 +537,7 @@ export async function killSession() {
             showToast("Failed to kill session", true);
             console.error("killSession exception:", e);
         }
-    });
+    }, undefined, { danger: true });
 }
 
 // ── Goal editing ───────────────────────────────────────────────────────────
