@@ -55,6 +55,7 @@ try {
     assert.match(read('static/list_bar.js'), /const typed = next => \{ if \(!spec\.commitOnEnter\) later\(next\); \}/);
     assert.match(read('static/app_actions.js'), /'inbox-search-filter': el => \{ if \(nativeInbox\(\)\) return;/);
     assert.match(sidebar, /async function openChat\(c\) \{\n    if \(nativeInbox\(\) && !c\.server\) return;/, 'on a Hub a chat row with no computer opens nothing (no fall back to local)');
+    for (const f of ['inbox_sidebar.js', 'app_routes.js']) assert.ok(!read('static/' + f).includes("'chats-group'"), `${f} does not spell the Boards folder: routes.js owns the pair (BOARDS_FOLDER, BOARDS_SUB)`);
     // the tab, the hamburger and the More menu
     const tabs = ['nav-tab-history', 'nav-tab-board'].map(id => document.getElementById(id));
     for (const t of tabs) assert.ok(t && t.hasAttribute('data-native-inbox-hides'), `${t && t.id} is the switch's`);
