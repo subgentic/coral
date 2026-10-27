@@ -32,16 +32,16 @@ const GOAL = 'Explore goals with two teams';
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {}); await settle(400);
             const onGoals = ev(`window.__tp.tabs().length > 0`);
-            await S.run(`${label}: Goals is a table with the columns Goal, State, Tasks, Updated, a row per goal, and a New goal button`, async () => {
+            await S.run(`${label}: Goals is a table with the columns Goal, Progress, Updated, a row per goal, and a New goal button`, async () => {
                 assert.ok(await onGoals, 'the team page is open');
                 const hd = await headers(); assert.ok(hd, 'Goals has a table');
-                assert.deepEqual(hd.map(x => x.replace(/[↕↑↓]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 4), ['Goal', 'State', 'Tasks', 'Updated'], 'the columns');
+                assert.deepEqual(hd.map(x => x.replace(/[↕↑↓]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 3), ['Goal', 'Progress', 'Updated'], 'the columns');
                 const rows = (await rowsOf()).filter(r => !/ no goal\b/.test(r)); assert.equal(rows.length, 2, `a row per goal (got ${rows.length}); the tasks with no goal are the last row (#7717)`);
                 assert.ok(rows.some(r => r.includes(GOAL)) && rows.some(r => r.includes('Plan the release notes')), 'the two goals are the rows');
                 assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-table')`), true, 'Goals uses the shared table');
                 const progress = await ev(`(() => { const p = window.__tp.page().querySelector('progress'); return p && { max: p.max, value: p.value, label: p.getAttribute('aria-label') }; })()`);
                 assert.ok(progress && progress.max > 0 && progress.label === `${progress.value} of ${progress.max} done`, 'progress exposes the task counts');
-                if (mobile) assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-box.dt-folded .dt-sortbar-select')`), true, 'phone has shared folded sorting');
+                if (mobile) assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-one-line .dt-sort')`), true, 'phone keeps sortable column headers');
                 else {
                     await ev(`window.__tp.page().querySelector('.dt-sort[data-key="goal"]').click()`);
                     assert.equal(await ev(`window.__tp.page().querySelector('th[data-key="goal"]').getAttribute('aria-sort')`), 'ascending');

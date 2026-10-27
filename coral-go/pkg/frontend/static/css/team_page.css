@@ -353,13 +353,10 @@
 .inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; }
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
 .inbox-review-error:empty { display: none; }
-.inbox-review-metadata { display: flex; flex-wrap: wrap; gap: 0 8px; }
-.inbox-review-team { display: none; }
 .inbox-review-more { margin: 12px 0; }
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {
     .inbox-review-actions button { min-height: 44px; }
-    .inbox-review-team { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); line-height: 1.3; color: var(--table-tertiary-color); }
 }
 /* A team no board has (#8848): its name and the way back, none of a team's tabs, panels or actions */
 .team-page-missing { padding: 16px 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }

@@ -90,13 +90,6 @@ async function sendReminder(agent, { message, seconds }) {
 
 const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, onSend: (v) => sendReminder(agent, v) });
 
-function remindButton(agent) {
-    const b = btn('btn btn-small dt-action team-remind', 'Remind');
-    b.setAttribute('aria-label', `Remind ${agent.name}`); // one button per row, each named for whose
-    b.addEventListener('click', (e) => { e.stopPropagation(); askRemind(agent, b); });
-    return b;
-}
-
 // The Orchestrator first, then the agents that need a person (the header's "N need attention" opens this tab): a waiting agent, then a queued one, then an offline one; the rest in the sidebar's order.
 const NEEDS = ['waiting', 'needs_input']; // an ended agent needs no one: it sorts with the rest (#8271)
 const rank = (a) => { const i = NEEDS.indexOf(a.availability); return i < 0 ? NEEDS.length : i; };
@@ -142,15 +135,12 @@ function draw() {
     body.append(el('p', 'goals-note team-agents-count', `${data.agents.length} agent${data.agents.length === 1 ? '' : 's'}${ended ? `, ${ended} ended` : ''}`));
     const rows = visibleAgents();
     body.append(DT.dataTable({
-        label: `Agents, ${rows.length}`, rows, rowKey: ag => ag.subscriber_id || ag.session_id || ag.name, state: agentsTableState,
+        label: `Agents, ${rows.length}`, oneLine: true, sortBar: false, rows, rowKey: ag => ag.subscriber_id || ag.session_id || ag.name, state: agentsTableState,
         open: (ag, tr) => hooks.openAgent?.(ag, tr.querySelector('.dt-primary')),
         columns: [
-            { key: 'agent', label: 'Agent', primary: true, width: 'grow', line: 1, field: 'name', sort: true,
+            { key: 'agent', label: 'Agent', primary: true, width: '10rem', line: 1, field: 'name', sort: true,
                 cell: ag => { const b = DT.primaryButton('', ag.name); b.append(DT.avatar(ag.name)); return b; } },
-            { key: 'status', label: 'Status', line: 2, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
-            { key: 'doing', label: 'Doing', line: 2, sort: true, sortValue: doingOf, cell: doingOf },
-            { key: 'provider', label: 'Provider', line: 2, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
-            { key: 'remind', label: 'Remind', line: 1, cell: ag => canRemind(ag) && ag.agent_type !== 'terminal' ? remindButton(ag) : '' },
+            { key: 'doing', label: 'Doing', width: 'grow', title: doingOf, line: 1, sort: true, sortValue: doingOf, cell: doingOf },
         ],
     }).el);
     if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.goals-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
