@@ -74,7 +74,6 @@
     .chat-copy-btn,
     .chat-save-btn,
     .mb-save-btn,
-    .modal-close-btn,
     .job-type-btn,
     .board-chat-toolbar .btn-nav,
     #board-chat-pause-btn,
@@ -153,7 +152,6 @@
        search, the Display options rows (the label is the checkbox's hit area)
        and the agent rows. The phone agent list keeps its own row sizing
        (#mobile-session-list, mobile.css). */
-    .sidebar-collapse-btn,
     #sidebar-summary-btn {
         min-width: var(--control-touch-height);
         min-height: var(--control-touch-height);

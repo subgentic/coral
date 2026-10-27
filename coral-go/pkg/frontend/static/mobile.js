@@ -88,10 +88,10 @@ function _listHeader(agentList) {
     header.className = 'mobile-list-header';
     header.innerHTML = `
             <h2 class="mobile-list-title">Live Sessions</h2>
-            <button class="sidebar-collapse-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="mobile-display-panel" title="Display options" aria-label="Display options">
+            <button class="btn btn-quiet btn-icon sidebar-collapse-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="mobile-display-panel" title="Display options" aria-label="Display options">
                 <span class="material-icons" style="font-size:var(--icon-size)" aria-hidden="true">notes</span><span class="display-dot" data-display-badge hidden></span>
             </button>
-            <button class="sidebar-collapse-btn group-toggle-btn" type="button" data-group-toggle data-next="collapse" data-on-click="groups-toggle-all" title="Collapse all groups" aria-label="Collapse all groups" hidden>
+            <button class="btn btn-quiet btn-icon sidebar-collapse-btn group-toggle-btn" type="button" data-group-toggle data-next="collapse" data-on-click="groups-toggle-all" title="Collapse all groups" aria-label="Collapse all groups" hidden>
                 <svg class="group-toggle-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg>
                 <svg class="group-toggle-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>
             </button>

@@ -21,7 +21,7 @@ export async function openTeamSettings(team) {
     modal.className = 'modal team-settings-modal';
     modal.style.display = 'flex'; // display-ok: a script-built dialog is shown as the shared .modal flex box (modal_chrome.js hides it by display none, as every dialog)
     modal.innerHTML = `<div class="modal-content dlg-flow team-settings-dialog">
-        <div class="modal-header"><h3></h3><button type="button" class="modal-close-btn" aria-label="Close team settings" title="Close"><span class="material-icons" aria-hidden="true">close</span></button></div>
+        <div class="modal-header"><h3></h3><button type="button" class="btn btn-quiet btn-icon btn-small modal-close-btn" aria-label="Close team settings" title="Close"><span class="material-icons" aria-hidden="true">close</span></button></div>
         <div class="modal-body team-settings-dialog-body"><div class="team-settings-host" id="team-panel-settings"></div></div>
     </div>`;
     modal.querySelector('h3').textContent = `Team settings: ${keyLabel(key)}`;

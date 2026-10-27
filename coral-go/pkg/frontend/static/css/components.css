@@ -78,6 +78,15 @@
 
 /* The family's other variants (Goal #84, #9096): quiet is a button with no box (an icon or a word in a toolbar), and a chosen button of any choice wears the one selected style, the accent fill (a text tab strip keeps
    its underline and does not use .btn). The square icon-only variant comes with the first icon buttons that move onto it. */
+.btn-quiet { border-color: transparent; background: transparent; color: var(--text-secondary); }
+.btn-quiet:hover { background: var(--bg-hover); color: var(--text-primary); }
+.btn-quiet.btn-danger:hover { background: rgba(var(--fx-red-rgb), 0.15); color: var(--error-text); }
+/* The icon-only button (Goal #94, #9332): a square .btn with one icon and no label (its name is its aria-label), 36 px, 32 with .btn-small, 44 on touch; with .btn-quiet it has no box. The icon is --icon-size
+   unless the place sets its own. .btn-small's margin is for a button on its own line: an icon button never has one. */
+.btn-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--control-height); padding: 0; }
+.btn-icon.btn-small { width: var(--control-compact-height); margin: 0; }
+.btn-icon .material-icons { font-size: var(--icon-size); }
+@media (max-width: 767px), (pointer: coarse) { .btn-icon, .btn-icon.btn-small { width: var(--control-touch-height); } }
 .btn[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
 
 /* One text tab strip (Goal #88, spec item 10, #9210): .tabs holds .tab buttons (role tab, aria-selected): 13/500, a 2 px transparent underline that is the accent on the chosen tab (text-primary, 600), a count in .tab-count, 40 px high
@@ -101,7 +110,13 @@
 .btn-seg > .btn { margin: 0; border: 0; border-radius: 0; min-height: var(--control-compact-height); padding: 0 var(--space-lg); background: var(--bg-secondary); color: var(--text-secondary); white-space: nowrap; }
 .btn-seg > .btn + .btn { border-inline-start: 1px solid var(--control-border); }
 .btn-seg > .btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.btn-seg > .btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); }
+.btn-seg > /* The icon-only button (Goal #94, #9332): a square .btn with one icon and no label (its name is its aria-label), 36 px, 32 with .btn-small, 44 on touch; with .btn-quiet it has no box. The icon is --icon-size
+   unless the place sets its own. .btn-small's margin is for a button on its own line: an icon button never has one. */
+.btn-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--control-height); padding: 0; }
+.btn-icon.btn-small { width: var(--control-compact-height); margin: 0; }
+.btn-icon .material-icons { font-size: var(--icon-size); }
+@media (max-width: 767px), (pointer: coarse) { .btn-icon, .btn-icon.btn-small { width: var(--control-touch-height); } }
+.btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); }
 .btn-seg > .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 767px), (pointer: coarse) { .btn-seg > .btn { min-height: var(--control-touch-height); } }
 
@@ -700,22 +715,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     gap: var(--space-lg);
 }
 .modal-header:has(> .modal-close-btn) h3 { min-width: 0; overflow-wrap: anywhere; }
-.modal-close-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: var(--control-compact-height);
-    height: var(--control-compact-height);
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-}
-.modal-close-btn .material-icons { font-size: var(--icon-size); }
-.modal-close-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+/* The dialog's close: a quiet dense .btn-icon (#9332); the class stays as the hook the dialogs find it by. */
+.modal-close-btn { flex-shrink: 0; }
 
 .modal-body {
     padding: 12px 24px;
@@ -1563,23 +1564,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     padding-bottom: 4px;
 }
 
-.emoji-picker-btn {
-    width: 34px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--fs-2xl);
-    background: none;
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: background 0.1s;
-}
-
-.emoji-picker-btn:hover {
-    background: rgba(var(--white-rgb), 0.1);
-}
+/* A quiet .btn-icon (#9332); the emoji is larger than an icon. */
+.emoji-picker-btn { font-size: var(--fs-2xl); }
 
 /* ── Tags ──────────────────────────────────────────────────── */
 
@@ -4081,7 +4067,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agent-summary { color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .team-agent-summary b { color: var(--text-primary); font-weight: 600; }
 .team-agent-chev { color: var(--text-secondary); font-size: var(--fs-2xl); }
-.team-agent-menu-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); color: var(--text-primary); cursor: pointer; }
 .team-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 6; min-width: min(12rem, calc(100vw - 3rem)); max-width: calc(100vw - 3rem); } /* where it sits and how wide: what it looks like is the one menu's (.menu, layout.css) */
 .team-menu.team-menu-up { top: auto; bottom: calc(100% + 4px); }
 .team-menu-item { white-space: normal; overflow-wrap: anywhere; } /* at 200% text an item wraps inside the menu, the menu never wider than the screen: the dialog's scroll box clipped its left edge (#8678) */

@@ -112,7 +112,7 @@ function toolbarHtml(bar, first) {
     const items = bar.menu ? bar.menu.items.filter(i => TOOLBAR_ACTION_ATTR[i.name]) : [];
     if (items.length) {
         const label = `More ${bar.menu.noun} actions`;
-        html += `<span class="list-bar-more gt-menu"><button type="button" class="sidebar-collapse-btn list-bar-more-btn" id="gt-more" data-on-click="gt-menu-toggle" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}" aria-haspopup="menu" aria-expanded="false" aria-controls="gt-more-menu">${MORE_SVG}</button>`
+        html += `<span class="list-bar-more gt-menu"><button type="button" class="btn btn-quiet btn-icon sidebar-collapse-btn list-bar-more-btn" id="gt-more" data-on-click="gt-menu-toggle" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}" aria-haspopup="menu" aria-expanded="false" aria-controls="gt-more-menu">${MORE_SVG}</button>`
             + `<div class="menu team-more-menu list-bar-more-menu" id="gt-more-menu" role="menu" aria-label="${escapeAttr(label)}" hidden>${items.map(i => `<button type="button" class="menu-item" role="menuitem" ${TOOLBAR_ACTION_ATTR[i.name]}>${escapeHtml(i.label)}</button>`).join('')}</div></span>`;
     }
     if (bar.action && TOOLBAR_ACTION_ATTR[bar.action.name]) html += `<button type="button" class="btn btn-primary team-tb-action" ${TOOLBAR_ACTION_ATTR[bar.action.name]}>${escapeHtml(bar.action.label)}</button>`;

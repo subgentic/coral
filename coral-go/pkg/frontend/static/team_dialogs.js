@@ -476,7 +476,7 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
             <svg class="team-agent-chev" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
         </button>
         <div class="team-agent-more">
-            <button type="button" class="team-agent-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(menuId)}" data-on-click="team-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg></button>
+            <button type="button" class="btn btn-icon team-agent-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(menuId)}" data-on-click="team-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg></button>
             <div class="menu team-menu" id="${escapeAttr(menuId)}" role="menu" hidden>
                 <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="team-agent-edit">Edit member</button>
                 <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="team-agent-move" data-dir="up">Move up</button>
