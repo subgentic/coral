@@ -114,7 +114,7 @@ func TestRestartSwitchesTheProviderAndKeepsNameBoardAndPrompt(t *testing.T) {
 	term.addSession(oldName, t.TempDir())
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{
 		SessionID: oldID, AgentType: "claude", AgentName: "coral-go", DisplayName: ptr.NonEmpty("Reviewer"), Prompt: ptr.NonEmpty("You review the work."),
-		BoardName: ptr.NonEmpty("coral-go-team"),
+		BoardName: ptr.NonEmpty("coral-go-team"), Flags: store.MarshalFlags([]string{"--verbose-claude-only"}),
 	}))
 	_, err := handler.bs.Subscribe(ctx, "coral-go-team", "Reviewer", "Reviewer", oldName, nil, "all", true)
 	require.NoError(t, err)
@@ -133,6 +133,7 @@ func TestRestartSwitchesTheProviderAndKeepsNameBoardAndPrompt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, ls)
 	assert.Equal(t, "codex", ls.AgentType)
+	assert.NotContains(t, ptr.Value(ls.Flags), "--verbose-claude-only", "the old provider's flags do not carry to the new one")
 	assert.Equal(t, "coral-go-team", ptr.Value(ls.BoardName), "the board is kept")
 	assert.Equal(t, "You review the work.", ptr.Value(ls.Prompt), "the prompt is kept")
 	assert.Equal(t, "Reviewer", ptr.Value(ls.DisplayName), "the name is kept")

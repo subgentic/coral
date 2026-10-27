@@ -261,6 +261,9 @@ func (p *restartPlan) restartSettings() {
 	var storedFlags []string
 	if ls := p.stored; ls != nil {
 		storedFlags = store.UnmarshalFlags(ls.Flags)
+		if ls.AgentType != "" && ls.AgentType != p.agentType {
+			storedFlags = nil // a switch to another provider: the flags belong to the CLI it ran on, they do not carry (#8973)
+		}
 		p.prompt = ptr.Value(ls.Prompt)
 		p.board = ptr.Value(ls.BoardName)
 		p.boardServer = ptr.Value(ls.BoardServer)
