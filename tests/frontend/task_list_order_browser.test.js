@@ -109,7 +109,7 @@ const open = [
         console.log('  ok');
         if (process.env.QA_WIDTHS) process.exitCode = 1; // measuring: print
         await ev(`document.getElementById('qa-dock').style.width = '360px'; true`);
-        await waitFor(`document.querySelector('#board-task-list .dt-box.dt-folded')`, 'folded');
+        await waitFor(`document.querySelector('#board-task-list .dt-box.dt-fold-none')`, 'one-line dock');
         // one sort, inside Filters only (#7924): a folded dock has no "Sort by" row of its own
         assert.equal(await ev(`[...document.querySelectorAll('#board-task-list .dt-sortbar')].every(e => e.hidden || !e.getClientRects().length)`), true, 'no Sort by row in the dock: the Filters panel has the sort');
         assert.equal(await ev(`!!document.querySelector('#board-task-bar #tk-sort')`), true, 'the Filters panel holds it');
