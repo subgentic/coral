@@ -11,6 +11,7 @@ import { rememberFocus } from './dom_morph.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { sessionServer } from './server_base.js';
+import { needsInputAttention } from './display_activity_hint.js';
 import { showToast } from './utils.js';
 import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
 import {
@@ -91,7 +92,7 @@ function serverCell(s) {
     if (isLocal(s)) return DT.el('span', 'dt-name-text', s.label || 'This computer');
     const b = DT.primaryButton(s.label || s.id, `Open ${s.label || s.id}`);
     const wrap = DT.el('span', 'servers-name'); wrap.append(DT.el('span', 'dt-name-text servers-name-text', s.label || s.id)); b.replaceChildren(wrap);
-    if (s.warning) { const t = DT.tag('warning'); t.classList.add('servers-warn'); t.title = String(s.warning); const g = DT.el('span', 'material-icons servers-warn-icon', 'warning'); g.setAttribute('aria-hidden', 'true'); t.prepend(g); wrap.append(t); b.setAttribute('aria-label', `Open ${s.label || s.id}, warning: ${s.warning}`); } // the unencrypted-key warning stays on the row at every width (the Orchestrator's call, #9679): it is by the name, not in a column a narrow list drops
+    if (!isLocal(s) && s.warning) { const t = DT.tag('warning'); t.classList.add('servers-warn'); t.title = String(s.warning); const g = DT.el('span', 'material-icons servers-warn-icon', 'warning'); g.setAttribute('aria-hidden', 'true'); t.prepend(g); wrap.append(t); b.setAttribute('aria-label', `Open ${s.label || s.id}, warning: ${s.warning}`); } // the unencrypted-key warning stays on the row at every width (the Orchestrator's call, #9679): it is by the name, not in a column a narrow list drops
     b.title = s.label || s.id;
     b.dataset.action = 'open'; b.dataset.id = s.id; // the tab's click handler opens the server's page
     return b;
@@ -107,7 +108,7 @@ function tagsCell(s) {
 const versionWords = (s, live) => (isLocal(s) ? (state.localVersion ? `Coral ${state.localVersion}` : '') : (serverVersion(live) ? `Coral ${serverVersion(live)}` : ''));
 
 /** Agents of a server waiting for their person (the Inbox's Needs you, counted from the live list per server: no new route). */
-const needsCount = s => (state.liveSessions || []).filter(x => x && x.waiting_for_input && sessionServer(x) === (isLocal(s) ? 'local' : s.id)).length;
+const needsCount = s => (state.liveSessions || []).filter(x => x && needsInputAttention(x) && sessionServer(x) === (isLocal(s) ? 'local' : s.id)).length; // the Inbox's own test (inbox_sidebar.js waitingSessions): a session the screen says is working is not waiting for the person
 const isOnline = (s, live) => (live.status || s.status) === 'online';
 /** Last seen: "now" while the server is online, else when it last answered (the words the server's page uses). */
 const seenWords = (s, live) => (isLocal(s) || isOnline(s, live) ? 'now' : formatLastSeen(s.last_seen));
