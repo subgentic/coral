@@ -26,7 +26,6 @@
   "panel-toggle-btn": 1,
   "permissions-toggle-btn": 5,
   "preview-unshare-btn": 1,
-  "seg-btn": 7,
   "server-open-btn": 5,
   "server-strip-btn": 5,
   "settings-info-btn": 6,
@@ -37,6 +36,5 @@
   "template-item-btn": 6,
   "top-bar-btn": 6,
   "top-menu-btn": 6,
-  "viz-legend-btn": 8,
   "wf-more-btn": 1
 }
