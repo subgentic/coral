@@ -879,14 +879,8 @@
 .chat-file-menu {
     position: fixed;
     z-index: 300;
-    min-width: 180px;
     max-width: 360px;
-    padding: 4px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-}
+} /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .chat-file-menu-path {
     padding: 4px 10px 6px;
     font-family: var(--font-mono, monospace);
@@ -898,28 +892,9 @@
     direction: rtl;
     text-align: left;
 }
-.chat-file-menu button {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 6px 10px;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--text-primary);
-    font-size: var(--fs-base);
-    text-align: left;
-    cursor: pointer;
-}
-.chat-file-menu button .material-icons {
+.chat-file-menu .menu-item .material-icons {
     font-size: var(--icon-inline-size);
     color: var(--text-muted);
-}
-.chat-file-menu button:hover,
-.chat-file-menu button:focus-visible {
-    background: var(--bg-hover);
-    outline: none;
 }
 
 /* Sent but not yet in the transcript: dimmed bubble with a "Queued" label */

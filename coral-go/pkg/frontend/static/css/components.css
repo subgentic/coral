@@ -4175,11 +4175,9 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agent-summary b { color: var(--text-primary); font-weight: 600; }
 .team-agent-chev { color: var(--text-secondary); font-size: var(--fs-2xl); }
 .team-agent-menu-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); color: var(--text-primary); cursor: pointer; }
-.team-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 6; min-width: min(12rem, calc(100vw - 3rem)); max-width: calc(100vw - 3rem); padding: 4px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
-.team-menu[hidden] { display: none; }
+.team-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 6; min-width: min(12rem, calc(100vw - 3rem)); max-width: calc(100vw - 3rem); } /* where it sits and how wide: what it looks like is the one menu's (.menu, layout.css) */
 .team-menu.team-menu-up { top: auto; bottom: calc(100% + 4px); }
-.team-menu-item { display: block; width: 100%; min-height: 36px; padding: 6px 12px; background: none; border: 0; border-radius: var(--radius-sm); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; white-space: normal; overflow-wrap: anywhere; } /* at 200% text an item wraps inside the menu, the menu never wider than the screen: the dialog's scroll box clipped its left edge (#8678) */
-.team-menu-item:hover, .team-menu-item:focus-visible { background: var(--bg-hover); outline: none; }
+.team-menu-item { white-space: normal; overflow-wrap: anywhere; } /* at 200% text an item wraps inside the menu, the menu never wider than the screen: the dialog's scroll box clipped its left edge (#8678) */
 .team-menu-item[disabled] { color: var(--text-muted); cursor: default; }
 .team-menu-item[hidden] { display: none; }
 .team-orchestrator-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: var(--fs-sm); }
@@ -4193,7 +4191,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
     .team-agent-summary { grid-column: 1 / -1; order: 3; }
     .team-agent-badge { display: block; width: max-content; margin: 4px 0 0; }
     .team-agent-menu-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); }
-    .team-menu-item { min-height: var(--control-touch-height, 44px); }
     .team-menu { position: static; margin-top: 4px; min-width: 0; max-width: none; } /* on a phone the menu opens in the flow under its button, as the Inbox's More menu does: an absolutely placed one was wider than the dialog's scroll box at 200% text and lost its left edge (#8678) */
     .team-orchestrator-line { flex-direction: column; align-items: stretch; }
     .team-template-row .btn, .team-template-pick select, .team-allworkers select { min-height: var(--control-touch-height, 44px); }

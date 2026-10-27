@@ -50,7 +50,7 @@ function syncMore() {
     setAttr(more, 'aria-label', open ? `More: ${wordOf(open)}, open` : 'More tabs');
     setTitle(more, open ? `${wordOf(open)} (More)` : 'More tabs');
     setText(more.querySelector('.material-icons'), open ? iconOf(open) : 'expand_more');
-    setHtml($('agentic-more-menu'), here.map(b => `<button type="button" role="menuitem" class="agentic-more-item ${escapeAttr(b.classList.contains('active') ? 'active' : '')}" data-on-click="dock-more-pick" data-on-keydown="dock-more-key" data-tab="${escapeAttr(b.dataset.tab)}"><span class="material-icons" aria-hidden="true">${escapeHtml(iconOf(b))}</span><span>${escapeHtml(wordOf(b))}</span><span class="agentic-more-count">${escapeHtml(b.querySelector('.agentic-tab-count')?.textContent || '')}</span></button>`).join(''));
+    setHtml($('agentic-more-menu'), here.map(b => `<button type="button" role="menuitem" class="menu-item agentic-more-item ${escapeAttr(b.classList.contains('active') ? 'active' : '')}" data-on-click="dock-more-pick" data-on-keydown="dock-more-key" data-tab="${escapeAttr(b.dataset.tab)}"><span class="material-icons" aria-hidden="true">${escapeHtml(iconOf(b))}</span><span>${escapeHtml(wordOf(b))}</span><span class="agentic-more-count">${escapeHtml(b.querySelector('.agentic-tab-count')?.textContent || '')}</span></button>`).join(''));
     if (here.length === 0) closeMore(false);
     const shape = here.map(b => b.id).join();
     if (shape !== lastShape) { lastShape = shape; fitWords(); } // the set of tabs in the row changed: the words are looked at again

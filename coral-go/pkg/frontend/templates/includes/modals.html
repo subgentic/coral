@@ -257,11 +257,11 @@
                             </div>
                             <div class="team-more-wrap">
                                 <button type="button" class="btn" id="team-template-more" aria-haspopup="menu" aria-expanded="false" aria-controls="team-template-menu" data-on-click="team-menu">More</button>
-                                <div class="team-menu" id="team-template-menu" role="menu" aria-label="Template options" hidden>
-                                    <button type="button" role="menuitem" class="team-menu-item" data-on-click="m-show-team-wizard-modal">Generate with AI</button>
-                                    <button type="button" role="menuitem" class="team-menu-item" data-on-click="m-import-team-templates">Import a template</button>
-                                    <button type="button" role="menuitem" class="team-menu-item" data-on-click="m-import-team-from-folder" title="A folder with SKILL.md (the Orchestrator's prompt) and agents/role-name.md (one agent each)">Import from a folder</button>
-                                    <button type="button" role="menuitem" class="team-menu-item" data-on-click="m-save-team-template">Save this team as a template</button>
+                                <div class="menu team-menu" id="team-template-menu" role="menu" aria-label="Template options" hidden>
+                                    <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-show-team-wizard-modal">Generate with AI</button>
+                                    <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-import-team-templates">Import a template</button>
+                                    <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-import-team-from-folder" title="A folder with SKILL.md (the Orchestrator's prompt) and agents/role-name.md (one agent each)">Import from a folder</button>
+                                    <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-save-team-template">Save this team as a template</button>
                                 </div>
                                 <input type="file" id="team-folder-input" webkitdirectory directory multiple style="display:none" data-on-change="m-handle-team-folder-import">
                             </div>

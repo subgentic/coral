@@ -202,19 +202,19 @@
                                     <!-- A phone (#7623): one Options button holds Model and Thinking, so the composer is one row; its sheet lists them and each opens its own menu below (css hides this button on a larger screen) -->
                                     <span class="model-chip-wrap options-chip-wrap" id="options-chip-wrap">
                                         <button type="button" class="model-chip options-chip" id="options-chip" aria-haspopup="menu" aria-expanded="false" aria-controls="options-chip-menu">Model and thinking</button>
-                                        <div id="options-chip-menu" class="model-chip-menu" role="menu" aria-label="Model and thinking" hidden></div>
+                                        <div id="options-chip-menu" class="menu model-chip-menu" role="menu" aria-label="Model and thinking" hidden></div>
                                     </span>
                                     <span class="model-chip-wrap" id="model-chip-wrap">
                                         <button type="button" class="model-chip" id="model-chip" aria-haspopup="menu" aria-expanded="false" aria-controls="model-chip-menu" aria-label="Model">
                                             <span class="model-chip-key" aria-hidden="true">Model: </span><span id="model-chip-text" class="model-chip-text"></span><span class="material-icons model-chip-caret" aria-hidden="true">expand_more</span>
                                         </button>
-                                        <div id="model-chip-menu" class="model-chip-menu" role="menu" aria-label="Model" hidden></div>
+                                        <div id="model-chip-menu" class="menu model-chip-menu" role="menu" aria-label="Model" hidden></div>
                                     </span>
                                     <span class="model-chip-wrap" id="thinking-chip-wrap" hidden>
                                         <button type="button" class="model-chip" id="thinking-chip" aria-haspopup="menu" aria-expanded="false" aria-controls="thinking-chip-menu" aria-label="Thinking level">
                                             <span class="model-chip-key" aria-hidden="true">Thinking: </span><span id="thinking-chip-text" class="model-chip-text"></span><span class="material-icons model-chip-caret" aria-hidden="true">expand_more</span>
                                         </button>
-                                        <div id="thinking-chip-menu" class="model-chip-menu" role="menu" aria-label="Thinking level" hidden></div>
+                                        <div id="thinking-chip-menu" class="menu model-chip-menu" role="menu" aria-label="Thinking level" hidden></div>
                                     </span>
                                     <button type="button" class="model-chip keys-chip" id="keys-chip" data-on-click="agent-keys-toggle" aria-pressed="false" aria-controls="terminal-key-bar" aria-label="Keys"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg><span class="model-chip-text">Keys</span></button>
                                 </div>

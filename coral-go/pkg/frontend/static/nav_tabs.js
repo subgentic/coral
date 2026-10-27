@@ -29,7 +29,7 @@ function availableTabs() {
 function makeItem(t) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'nav-more-item' + (t.active ? ' active' : '');
+    b.className = 'menu-item nav-more-item' + (t.active ? ' active' : '');
     b.dataset.onClick = 'm-switch-nav-tab';
     b.dataset.arg = t.arg;
     if (t.active) b.setAttribute('aria-current', 'page');
@@ -74,7 +74,7 @@ function makeMore() {
 function entry(icon, label, { action, href, onClick } = {}) {
     const b = document.createElement(href ? 'a' : 'button');
     if (href) b.href = href; else b.type = 'button';
-    b.className = 'nav-more-item';
+    b.className = 'menu-item nav-more-item';
     b.setAttribute('role', 'menuitem');
     if (action) b.dataset.onClick = action;
     if (onClick) b.addEventListener('click', onClick);
