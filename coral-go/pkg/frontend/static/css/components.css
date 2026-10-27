@@ -442,12 +442,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     margin-right: auto;
 }
 
-.mb-select-action-btn {
-    padding: 6px 14px;
-    font-size: var(--fs-md);
-    font-weight: 500;
-    border-radius: var(--radius-md);
-}
+/* The select bar's buttons are .btn-small: its margin is for a button on its own line (#9313). */
+.mb-select-bar .btn { margin: 0; }
 
 #mb-select-btn.active,
 .board-select-btn.active {
@@ -1075,23 +1071,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     }
 }
 
-.copy-btn {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--control-border);
-    color: var(--text-secondary);
-    padding: 2px 8px;
-    border-radius: var(--radius-sm);
-    font-size: var(--fs-md);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.15s;
-}
-
-.copy-btn:hover {
-    background: var(--accent-dim);
-    color: var(--text-on-accent);
-    border-color: var(--accent-dim);
-}
+/* The info dialog's Copy: a small .btn beside the command; .btn-small's own margin is for a button on its own line (#9313). */
+.copy-btn { margin: 0; flex: none; }
 
 /* ── Toast Notification ────────────────────────────────────── */
 

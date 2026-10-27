@@ -433,7 +433,7 @@ function _updateLoadMoreButton(container) {
     if (historyHasMore) {
         if (!btn) {
             btn = document.createElement("button");
-            btn.className = "load-more-btn chat-history-sentinel";
+            btn.className = "btn load-more-btn chat-history-sentinel";
             btn.textContent = "Load older messages";
             btn.onclick = loadMoreHistory;
             container.insertBefore(btn, container.firstChild);
