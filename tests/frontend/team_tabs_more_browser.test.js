@@ -1,4 +1,4 @@
-// The team page's tabs on a phone (Goal #60, audit #8572 point 5): seven tabs scrolled sideways at 390 px. Now Goals, Board, Tasks and Agents are the row and Artifacts, Knowledge and Settings are behind
+// The team page's tabs on a phone (Goal #60, audit #8572 point 5): seven tabs scrolled sideways at 390 px. Now Goals, Agents, Tasks and Artifacts are the row and Artifacts, Knowledge and Settings are behind
 // a More menu (desktop unchanged: all seven, no More). The row never scrolls sideways; More is a 44 px menu button that says which of its tabs is open; the menu is reachable by keyboard (Enter or ArrowDown
 // opens it on its first item, arrows move, Escape closes it back on More, Enter chooses) and by a screen reader (a menu button with aria-haspopup and aria-expanded, a menu of menuitems named for the tabs).
 // Written failing-first against a build with seven tabs at 390. Isolated dev server, 1280 and 390 px.
@@ -39,12 +39,12 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
             await openTeam(ev, waitFor, TEAM); await settle(500);
             let s = await state();
             if (!mobile) {
-                check('1280: all seven tabs are in the row and there is no More', s.tabs.join() === 'goals,messages,tasks,agents,artifacts,knowledge,settings' && !s.shown, JSON.stringify(s.tabs));
+                check('1280: all seven tabs are in the row in the operator\'s order (Goals, Agents, Tasks, Artifacts, Knowledge, Board, Settings) and there is no More', s.tabs.join() === 'goals,agents,tasks,artifacts,knowledge,messages,settings' && !s.shown, JSON.stringify(s.tabs));
                 check('1280: the row does not scroll sideways', s.sideways <= 0, String(s.sideways));
                 await shot('team-tabs-1280');
                 continue;
             }
-            check('390: the row is Goals, Board, Tasks and Agents, then More', s.tabs.join() === 'goals,messages,tasks,agents' && s.shown, JSON.stringify(s.tabs));
+            check('390: the row is the first four tabs, Goals, Agents, Tasks and Artifacts, then More', s.tabs.join() === 'goals,agents,tasks,artifacts' && s.shown, JSON.stringify(s.tabs));
             check('390: the row never scrolls sideways', s.sideways <= 0, String(s.sideways));
             check('390: More is a menu button (aria-haspopup=menu, aria-expanded=false) named "More tabs", 44 px, beside the tab list and not a tab in it', s.haspopup === 'menu' && s.expanded === 'false' && s.name === 'More tabs' && s.h >= 44 && s.w >= 44 && !s.inList, JSON.stringify(s));
             await shot('team-tabs-390');
@@ -52,10 +52,10 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
             await ev(`document.getElementById('team-tab-more').focus(); true`);
             await key('Enter', 13); await settle(250);
             s = await state();
-            check('390: Enter on More opens the menu with Artifacts, Knowledge and Settings (menuitems, 44 px), the first focused, aria-expanded true', s.menuOpen && s.expanded === 'true' && s.items.map(i => i.tab).join() === 'artifacts,knowledge,settings' && s.items.every(i => i.h >= 44 && /^(Artifacts|Knowledge|Settings)/.test(i.name)) && s.focus === 'artifacts' || (s.menuOpen && s.focus && /artifacts/.test(String(s.focus))), JSON.stringify(s));
+            check('390: Enter on More opens the menu with Knowledge, Board and Settings (menuitems, 44 px), the first focused, aria-expanded true', s.menuOpen && s.expanded === 'true' && s.items.map(i => i.tab).join() === 'knowledge,messages,settings' && s.items.every(i => i.h >= 44 && /^(Knowledge|Board|Settings)/.test(i.name)) && s.focus === 'knowledge' || (s.menuOpen && s.focus && /knowledge/.test(String(s.focus))), JSON.stringify(s));
             await shot('team-tabs-390-menu');
             await key('ArrowDown', 40); await settle(100);
-            check('390: ArrowDown moves to the next item', (await state()).focus === 'knowledge', (await state()).focus);
+            check('390: ArrowDown moves to the next item', (await state()).focus === 'messages', (await state()).focus);
             await key('Escape', 27); await settle(200);
             s = await state();
             check('390: Escape closes the menu and the keyboard is back on More', !s.menuOpen && s.expanded === 'false' && s.focus === 'team-tab-more', JSON.stringify(s));
@@ -66,18 +66,18 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
             await shot('team-tabs-390-settings');
             // by tap
             await ev(`document.getElementById('team-tab-more').click(); true`); await settle(200);
-            await ev(`document.querySelector('#team-tabs-more-menu [data-tab="artifacts"]').click(); true`); await settle(600);
+            await ev(`document.querySelector('#team-tabs-more-menu [data-tab="knowledge"]').click(); true`); await settle(600);
             s = await state();
-            check('390: tapping Artifacts opens the Artifacts tab', s.selected === 'artifacts' && s.panel === 'artifacts' && s.current, JSON.stringify(s));
+            check('390: tapping Knowledge opens the Knowledge tab', s.selected === 'knowledge' && s.panel === 'knowledge' && s.current, JSON.stringify(s));
             // a tab of the row takes the page back and More is a plain More again
             await ev(`document.getElementById('team-tab-goals').click(); true`); await settle(500);
             s = await state();
             check('390: a tab of the row opens its page and More is plain again', s.selected === 'goals' && !s.current && s.name === 'More tabs' && s.text === 'More', JSON.stringify(s));
             // the arrow keys of the row stay on the tabs that are in it
-            await ev(`document.getElementById('team-tab-agents').focus(); true`);
+            await ev(`document.getElementById('team-tab-artifacts').focus(); true`);
             await key('ArrowRight', 39); await settle(300);
             s = await state();
-            check('390: ArrowRight from Agents wraps to Goals, not to a tab behind More', s.focus === 'team-tab-goals' && s.selected === 'goals', JSON.stringify(s));
+            check('390: ArrowRight from Artifacts, the last tab of the row, wraps to Goals, not to a tab behind More', s.focus === 'team-tab-goals' && s.selected === 'goals', JSON.stringify(s));
             check('390: the page does not scroll sideways', (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) <= 0);
         }
         const failed = results.filter(r => !r).length;

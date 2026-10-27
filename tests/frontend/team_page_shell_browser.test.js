@@ -46,14 +46,14 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 const full = await ev(`window.__tp.allTabs().map(t => window.__na.name(t))`);
                 assert.ok(/Goals\s*2/.test(full[0]), `Goals carries its count 2 (got ${JSON.stringify(full[0])})`);
                 assert.ok(/Tasks\s*5/.test(full[2]), `Tasks carries its count 5 (got ${JSON.stringify(full[2])})`);
-                assert.ok(/Agents\s*2/.test(full[3]), `Agents carries its count 2 (got ${JSON.stringify(full[3])})`);
+                assert.ok(/Agents\s*2/.test(full[1]), `Agents carries its count 2 (got ${JSON.stringify(full[1])})`);
             });
             await S.run(`${label}: the tablist is one tab stop with Left, Right, Home and End moving between the tabs (roving tabindex, selection follows focus)`, async () => {
                 await ev(`(() => { const t = window.__tp.tabs().find(x => x.getAttribute('aria-selected') === 'true'); t.focus(); return true; })()`);
                 const tabindexes = await ev(`window.__tp.tabs().map(t => t.tabIndex)`);
                 assert.deepEqual(tabindexes.filter(i => i === 0).length, 1, `exactly one tab is a tab stop (got ${JSON.stringify(tabindexes)})`);
-                await key('ArrowRight'); assert.equal(await focusedTab(), 'Board', 'Right moves to Board');
-                const last = mobile ? 'Agents' : 'Settings'; // a phone's row ends at Agents: the rest are behind More
+                await key('ArrowRight'); assert.equal(await focusedTab(), 'Agents', 'Right moves to Agents');
+                const last = mobile ? 'Artifacts' : 'Settings'; // a phone's row ends at Artifacts (the first four tabs): the rest are behind More
                 await key('End'); assert.equal(await focusedTab(), last, `End moves to ${last}`);
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Goals', 'Right wraps to Goals');
                 await key('ArrowLeft'); assert.equal(await focusedTab(), last, `Left wraps to ${last}`);

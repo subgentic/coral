@@ -24,9 +24,9 @@ const BOX = `window.__tp.find('textarea, input[type=text], [role=textbox]', /^Me
             await seed(ev, TEAM);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});
-            await S.run(`${label}: a team opens on Goals, not Messages; Messages is the second tab`, async () => {
+            await S.run(`${label}: a team opens on Goals, not Messages; Board is the sixth tab, after Knowledge (the operator's order, #8791)`, async () => {
                 assert.equal(await ev(`(() => { const t = window.__tp.tabs().find(x => x.getAttribute('aria-selected') === 'true'); return t ? window.__tp.tabLabel(t) : ''; })()`), 'Goals', 'the page opens on Goals');
-                assert.equal(await ev(`window.__tp.tabs().length > 1 ? window.__tp.tabLabel(window.__tp.tabs()[1]) : ''`), 'Board', 'Board is the second tab');
+                assert.equal(await ev(`(() => { const all = window.__tp.allTabs(); return all.length > 5 ? window.__tp.tabLabel(all[5]) : ''; })()`), 'Board', 'Board is the sixth tab (a phone has it behind More)');
             });
             await S.run(`${label}: Messages shows the board's messages and a text box named "Message the team" with a Send button, and the header and tab strip stay put`, async () => {
                 const base = await rect(ev); await goTab(ev, settle, 'Board'); await settle(600);

@@ -1,4 +1,4 @@
-// The team page's tab strip on a phone (#8149; since #8648 Artifacts, Knowledge and Settings are behind More, so the strip holds Goals, Board, Tasks and Agents and More): the strip scrolls sideways when the counts widen it, and the selected tab is scrolled into view when it is chosen; the counts arrive after that and widen the tabs before it, so
+// The team page's tab strip on a phone (#8149; since #8648 Artifacts, Knowledge and Settings are behind More, so the strip holds Goals, Agents, Tasks and Artifacts and More): the strip scrolls sideways when the counts widen it, and the selected tab is scrolled into view when it is chosen; the counts arrive after that and widen the tabs before it, so
 // a selected tab far along the strip ended half out of view ("Ar", cut at the edge). It is brought back into view when a count changes. 390 px, real seeded team, the counts' reads stubbed wide.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -35,10 +35,9 @@ const TEAM = `qa-tabs-${Date.now() % 100000}`;
             const r = await ev(`(() => { const strip = document.getElementById('team-tabs'), sel = [...strip.querySelectorAll('[aria-selected="true"]')].find(t => t.getClientRects().length) || document.getElementById('team-tab-more'); const a = strip.getBoundingClientRect(), b = sel.getBoundingClientRect(); const more = document.getElementById('team-tab-more').getBoundingClientRect(); return { name: sel.textContent.trim(), left: Math.round(b.left - a.left), right: Math.round(innerWidth - b.right), strip: Math.round(a.width), moreIn: more.left >= 0 && more.right <= innerWidth + 1 }; })()`);
             assert.ok(r.left >= -1 && r.right >= -1 && r.moreIn, `${name}: the selected tab (or More, for a tab behind it) is wholly inside the window: ` + JSON.stringify(r));
         }
-        // the Artifacts tab's count (three digits, from its list) is on its item in the More menu
-        await ev(`document.getElementById('team-tab-more').click(); true`); await settle(300);
-        const item = await ev(`document.querySelector('#team-tabs-more-menu [data-tab="artifacts"]').textContent.replace(/\\s+/g, ' ').trim()`);
-        assert.match(item, /Artifacts\s*1\d\d/, 'the stubbed list gave the Artifacts item its count: ' + item);
+        // the Artifacts tab's count (three digits, from its list) is on its tab in the row (Artifacts is the row's fourth tab since #8791)
+        const item = await ev(`document.getElementById('team-tab-artifacts').textContent.replace(/\\s+/g, ' ').trim()`);
+        assert.match(item, /Artifacts\s*1\d\d/, 'the stubbed list gave the Artifacts tab its count: ' + item);
         console.log('PASS the selected team tab stays wholly in view on a phone after the counts arrive');
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });
