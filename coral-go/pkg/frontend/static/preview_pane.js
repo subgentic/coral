@@ -104,6 +104,7 @@ function _renderTabs() {
         </div>`;
     }
     bar.innerHTML = html;
+    layout.revealActiveTab(); // a task title can arrive after the pane was placed (#8941)
 
     bar.querySelectorAll('.preview-tab').forEach(el => {
         el.addEventListener('click', (e) => {
