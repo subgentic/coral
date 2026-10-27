@@ -216,11 +216,6 @@
 1	list_card_parts.js	name
 1	list_card_parts.js	prefix
 1	list_card_parts.js	st.cls
-1	live_jobs.js	clickable
-1	live_jobs.js	dotClass
-1	live_jobs.js	elapsed
-1	live_jobs.js	onClick
-1	live_jobs.js	triggerBadge
 1	markdown.js	HL_MARK
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count
