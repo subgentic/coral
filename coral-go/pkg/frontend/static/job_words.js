@@ -5,6 +5,11 @@ const pad = (n) => String(n).padStart(2, '0');
 const DAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
 
 /** "0 2 * * *" -> "Every day at 02:00"; the five-field cron the scheduler takes. Unknown shapes come back as `Schedule: <expr>` so nothing is lost. */
+/** The person's own time zone (the browser's); a job is scheduled in it unless they pick another (Automations #4). */
+export const localZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } };
+/** " (Europe/Berlin)" for a zone that is not the person's own, "" for theirs: one zone on the page, named only when it differs. */
+export const zoneNote = tz => (tz && tz !== localZone() ? ` (${tz})` : '');
+
 export function cronWords(expr) {
     const e = String(expr || '').trim();
     const f = e.split(/\s+/);
