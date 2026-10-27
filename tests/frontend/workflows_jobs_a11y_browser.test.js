@@ -19,9 +19,9 @@ const { DATA_WORLD } = require('./helpers/census_world');
             // (the sidebar's Active / Scheduled buttons are gone: one list of every job, #6521)
 
             // the workflow editor
-            await ev(`window.switchNavTab('workflows'); true`);
-            await waitFor(`!!document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]')`, `${tag}: workflows`, 10000);
-            await ev(`document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]').click(); true`);
+            await ev(`window.openAutomationsFolder('workflows'); true`);
+            await waitFor(`!!document.querySelector('#group-table-view tbody tr[data-key] .dt-primary')`, `${tag}: workflows`, 10000);
+            await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('[data-on-click="wf-edit"]')`, `${tag}: workflow`, 10000);
             await ev(`document.querySelector('[data-on-click="wf-edit"]').click(); true`);
             await waitFor(`!!document.querySelector('#wf-create-modal .wf-add-step-btn') && !!document.querySelector('#wf-steps-editor .wf-step-editor-item')`, `${tag}: the editor`, 10000);
