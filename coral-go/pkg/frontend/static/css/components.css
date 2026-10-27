@@ -4020,8 +4020,8 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .launch-agent-opt:has(input:checked) { border-color: var(--accent); background: var(--bg-hover); }
 .launch-agent-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .launch-agent-opt input { margin: 0; width: auto; flex: 0 0 auto; }
-#launch-agent-pick .launch-agent-opt { color: var(--text-primary); } /* the dialog's labels are the secondary colour: 4.4:1 on this chip in the light theme */
-#launch-agent-pick .launch-agent-missing { color: var(--text-muted); font-size: 0.6875rem; font-weight: 400; }
+.launch-agent-pick .launch-agent-opt { color: var(--text-primary); } /* the dialog's labels are the secondary colour: 4.4:1 on this chip in the light theme */
+.launch-agent-pick .launch-agent-missing { color: var(--text-muted); font-size: 0.6875rem; font-weight: 400; }
 @media (pointer: coarse), (max-width: 767px) { .launch-agent-opt { min-height: var(--control-touch-height, 44px); } }
 
 /* the reminder dialog (#6329): a native dialog (top layer, so it sits above the Team view dialog it opens from) that is the dashboard's own dialog card (.modal-content), so its fields look like every other form */
@@ -4083,8 +4083,8 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-wizard .acf-persona-page { padding: 0; }
 .launch-wizard .settings-panes { padding: 20px 24px; overflow: auto; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
-.launch-field-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: var(--fs-md); font-weight: 500; } /* the field label style of every form: 13/500 (UI/UX on #8401) */
-.launch-field-head label, .launch-field-head span:first-child { margin: 0; flex: none; } /* the label stays on one line; "optional" wraps under it at 200% text (UI/UX, #7407) */
+.launch-field-head, .acf-pick-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: var(--fs-md); font-weight: 500; } /* the field label style of every form: 13/500 (UI/UX on #8401) */
+.launch-field-head label, .launch-field-head span:first-child, .acf-pick-head span:first-child { margin: 0; flex: none; } /* the label stays on one line; "optional" wraps under it at 200% text (UI/UX, #7407) */
 .sd-modal-content.restart-wizard-content :is(.settings-pane, .acf-persona-page) textarea.acf-prompt { font-family: inherit; font-size: var(--fs-md, .875rem); }
 .sd-modal-content.restart-wizard-content .acf-persona-page textarea.acf-prompt { min-height: 16rem; resize: vertical; } /* the prompt is the person's writing: the product font, not mono */
 .launch-optional { color: var(--text-secondary); font-size: .75rem; font-weight: 400; }
@@ -4180,7 +4180,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .acf-restart-name { margin: 0 0 16px; padding: 0; font-size: .875rem; color: var(--text-primary); overflow-wrap: anywhere; }
 .acf-provider-label { display: block; margin: 0 0 14px; }
 .acf-provider-head { display: block; font-size: .875rem; font-weight: 600; margin-bottom: 4px; }
-.acf-provider-fixed { margin: 0 0 14px; }
 .restart-wizard-content > .modal-actions .btn-warning { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); }
 .restart-wizard-content > .modal-actions .btn-warning:hover { background: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); border-color: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); color: var(--text-on-accent); }
 
