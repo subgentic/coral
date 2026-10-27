@@ -49,10 +49,10 @@ export function pickerOptions(servers) {
     return opts;
 }
 
-/** Human label of a server id ("Local" for the hub). */
+/** Human label of a server id ("This computer" for the hub, the words the Inbox and Analytics use). */
 export function serverLabel(server, servers) {
     const id = normServer(server);
-    if (id === LOCAL_SERVER) return 'Local';
+    if (id === LOCAL_SERVER) return 'This computer';
     const hit = remoteServers(servers).find(s => s.id === id);
     return (hit && hit.label) || id;
 }
