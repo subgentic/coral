@@ -54,9 +54,8 @@ const STUB = `(() => {
     const axUnnamed = async sel => {
         await DOM.enable(); await Accessibility.enable();
         const { root } = await DOM.getDocument({ depth: 0 }); const { nodeId } = await DOM.querySelector({ nodeId: root.nodeId, selector: sel }); if (!nodeId) return ['missing'];
-        const { node } = await DOM.describeNode({ nodeId }); const { nodes } = await Accessibility.getFullAXTree();
-        const byId = new Map(nodes.map(n => [n.nodeId, n])); const start = nodes.find(n => n.backendDOMNodeId === node.backendNodeId); if (!start) return ['not in the tree'];
-        const out = []; const walk = n => { if (!n.ignored && INTERACTIVE.has(n.role && n.role.value) && !((n.name && n.name.value) || '').trim()) out.push(n.role.value); for (const c of n.childIds || []) { const k = byId.get(c); if (k) walk(k); } }; walk(start); return out;
+        const { node } = await DOM.describeNode({ nodeId }); const under = await require('./helpers/ax_tree').axNodes(Accessibility, { from: node.backendNodeId }); if (!under) return ['not in the tree'];
+        return under.filter(n => INTERACTIVE.has(n.role && n.role.value) && !((n.name && n.name.value) || '').trim()).map(n => n.role.value);
     };
     const open = async (view) => {
         await Emulation.setDeviceMetricsOverride({ width: view.w, height: view.h, deviceScaleFactor: 1, mobile: view.phone });
