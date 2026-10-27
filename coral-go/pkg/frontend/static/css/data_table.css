@@ -159,7 +159,7 @@
 .dt-box.dt-folded.dt-selecting .dt-check input { width: 24px; height: 24px; }
 .dt-box.dt-fold-column.dt-folded td.dt-line-0, .dt-box.dt-fold-column.dt-folded td.dt-when-off { display: none; }
 .dt-box.dt-fold-column.dt-folded td.dt-line-1 { order: 1; }
-.dt-box.dt-fold-column.dt-folded td.dt-line-1.dt-grow { flex: 1 1 0; min-width: 0; }
+.dt-box.dt-fold-column.dt-folded td.dt-line-1.dt-grow { flex: 1 1 8rem; min-width: 0; } /* the name has a room of its own, 8 rem (it grows with the text): at large text, where the actions beside it would leave it a few letters, they wrap to the line under it (#9430) */
 .dt-box.dt-fold-column.dt-folded tr::before { content: ""; order: 2; flex-basis: 100%; height: 0; }
 .dt-box.dt-fold-column.dt-folded td.dt-line-2.dt-grow { flex: 1 1 100%; min-width: 0; } /* a growing second line takes its whole line: a chat's title and snippet are not cut at the width of their own text */
 .dt-box.dt-fold-column.dt-folded td.dt-line-2 { order: 3; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
