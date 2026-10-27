@@ -161,6 +161,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// How the creator's name is backed: the server's to say, whatever the request sent (#4175).
+	clearReviewFields(&body.Workflow)
 	body.Workflow.CreatedIdentity = h.claimIdentity(r, project, createdBy)
 	body.Workflow.AmendIdentity = nil
 	opts := &board.CreateTaskOpts{Draft: body.Draft, Workflow: body.Workflow, GoalID: body.GoalID}
@@ -308,3 +309,11 @@ const (
 	maxFullTaskRows     = 500
 	maxAllTasksRows     = 500
 )
+
+// clearReviewFields removes what only Coral writes when a review is made or pooled from a task a client creates (#8957): a build task that
+// says review_of is a review to the Reviews only filter, and one that says review_in_pool is in the pool. Coral's own review tasks are made by
+// the store, not through this route.
+func clearReviewFields(wf *board.TaskWorkflow) {
+	wf.ReviewOf, wf.ReviewRound, wf.ReviewRounds, wf.OriginalAuthor = 0, 0, nil, ""
+	wf.ReviewInPool, wf.ReviewAreas, wf.ReviewersWanted, wf.ReviewPooledAt = false, nil, 0, ""
+}

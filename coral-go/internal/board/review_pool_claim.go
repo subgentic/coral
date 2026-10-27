@@ -242,6 +242,7 @@ func (s *Store) takePoolReview(ctx context.Context, project string, id int64, re
 	}
 	claimed, err := s.claimOne(ctx, project, reviewer, rt.ID, nowUTC())
 	if err != nil {
+		s.releasePoolPlace(ctx, project, id, rt.ID, reviewer) // a busy or racing reviewer must not keep the place
 		return nil, err
 	}
 	if !claimed {
@@ -249,6 +250,47 @@ func (s *Store) takePoolReview(ctx context.Context, project string, id int64, re
 	}
 	s.recordClaimSession(ctx, project, reviewer, rt.ID)
 	return s.getTaskByID(ctx, project, rt.ID)
+}
+
+// releasePoolPlace gives back the place reviewer took from the pool when it could not claim its review task: the review is waiting in the pool
+// again for the next reviewer, and the review task made for it is skipped.
+func (s *Store) releasePoolPlace(ctx context.Context, project string, id, reviewTaskID int64, reviewer string) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return
+	}
+	if w, err := loadWorkflow(ctx, tx, id); err == nil {
+		for i := range w.ReviewRounds {
+			r := &w.ReviewRounds[i]
+			if r.Result != "" {
+				continue
+			}
+			kept := r.Reviewers[:0]
+			for _, rv := range r.Reviewers {
+				if rv.ReviewTaskID != reviewTaskID {
+					kept = append(kept, rv)
+				}
+			}
+			r.Reviewers = kept
+			if len(r.Reviewers) == 0 && r.DelegatedBy == "the review pool" {
+				w.ReviewRounds = append(w.ReviewRounds[:i], w.ReviewRounds[i+1:]...)
+			}
+			break
+		}
+		w.ReviewInPool = true
+		if err := saveWorkflow(ctx, tx, id, w); err != nil {
+			tx.Rollback()
+			return
+		}
+	} else {
+		tx.Rollback()
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		return
+	}
+	s.db.ExecContext(ctx, "UPDATE board_tasks SET status='skipped', completed_by=?, completion_message=?, completed_at=? WHERE id=? AND board_id=? AND status='pending'",
+		"Coral Task Queue", reviewer+" could not take this review; it is back in the pool", nowUTC(), reviewTaskID, project)
 }
 
 // isReviewTaskID reports whether the task is a review task Coral made (a review of another task).

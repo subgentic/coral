@@ -19,6 +19,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
 
@@ -321,6 +322,20 @@ func TestLaunchTeamChecksTheMembersReviewSettings(t *testing.T) {
 	rec = launch(map[string]any{"name": "Reviewer", "prompt": "review", "review_areas": []string{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9"}}, nil)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, "more than eight areas")
 
+	// An agent may start agents on its own team, so one it started reviews-only could take and approve its own pooled review: only the Operator sets the setting.
+	b, _ := json.Marshal(map[string]any{"board_name": "poolteam", "working_dir": t.TempDir(), "agents": []map[string]any{{"name": "Orchestrator", "prompt": "lead"}, {"name": "Helper", "prompt": "review", "reviews_only": true}}})
+	areq := httptest.NewRequest(http.MethodPost, "/x", bytes.NewReader(b))
+	areq = areq.WithContext(context.WithValue(areq.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "sid-author", SessionName: "claude-sid-author"}))
+	arec := httptest.NewRecorder()
+	handler.LaunchTeam(arec, areq)
+	assert.Equal(t, http.StatusForbidden, arec.Code, arec.Body.String())
+	assert.Contains(t, arec.Body.String(), "only the Operator sets review settings")
+	areq = httptest.NewRequest(http.MethodPost, "/x", bytes.NewReader(bytes.ReplaceAll(b, []byte(`"reviews_only":true`), []byte(`"review_areas":["go"]`))))
+	areq = areq.WithContext(context.WithValue(areq.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "sid-author", SessionName: "claude-sid-author"}))
+	arec = httptest.NewRecorder()
+	handler.LaunchTeam(arec, areq)
+	assert.Equal(t, http.StatusForbidden, arec.Code, "the areas alone are refused too: %s", arec.Body.String())
+
 	withRecord(t, "team", teamOrgA, nil)
 	rec = launch(map[string]any{"name": "Reviewer", "prompt": "review", "reviews_only": true}, teamStamp(teamOrgA, "admin", teamUIDA, teamUser))
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -328,4 +343,25 @@ func TestLaunchTeamChecksTheMembersReviewSettings(t *testing.T) {
 	boards, err := bs.ListSubscribers(context.Background(), "poolteam")
 	require.NoError(t, err)
 	assert.Empty(t, boards, "nothing was launched or subscribed")
+}
+
+// A client cannot make a build task look like a review: review_of and the pool fields of a created task are cleared, so the Reviews only filter (which trusts review_of) never lets a
+// reviews-only agent claim it.
+func TestCreateTaskClearsTheReviewFieldsOfTheRequest(t *testing.T) {
+	_, h, _, root := poolTeam(t, "clearteam")
+	code, out := postCode(t, root+"/tasks", map[string]any{
+		"title": "Fake review", "created_by": "lead", "assigned_to": "Security Reviewer",
+		"workflow": map[string]any{"review_of": 424242, "review_round": 3, "original_author": "x", "review_in_pool": true, "review_areas": []string{"go"}, "reviewers_wanted": 2, "review_pooled_at": "2020-01-01T00:00:00Z"},
+	})
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	id := int64(out["id"].(float64))
+	task, err := h.bs.GetTask(context.Background(), "clearteam", id)
+	require.NoError(t, err)
+	assert.Equal(t, board.TaskWorkflow{}.ReviewOf, task.Workflow.ReviewOf)
+	assert.False(t, task.Workflow.ReviewInPool)
+	assert.Empty(t, task.Workflow.ReviewAreas)
+	assert.Zero(t, task.Workflow.ReviewersWanted)
+	assert.Empty(t, task.Workflow.ReviewPooledAt)
+	assert.Empty(t, task.Workflow.OriginalAuthor)
+	assert.Zero(t, task.Workflow.ReviewRound)
 }

@@ -432,3 +432,35 @@ func TestOneReviewerCannotTakeBothPlacesOfAReviewThatWantsTwo(t *testing.T) {
 	assert.Equal(t, id, e.workflow(rb.ID).ReviewOf)
 	assert.Len(t, e.workflow(id).ReviewRounds[0].Reviewers, 2)
 }
+
+// A reviewer that is busy by the time it takes a place (two claims racing) does not keep the place: the review is back in the pool and the review task made for it is skipped.
+func TestAPlaceTakenByABusyReviewerGoesBackToThePool(t *testing.T) {
+	e := newPoolEnv(t, map[string][]string{"Rev": {}})
+	a, _ := e.submit("Dev", "One", nil, 1)
+	b, _ := e.submit("Dev2", "Two", nil, 1)
+	require.NotNil(t, e.claim("Rev"), "Rev holds the review of One")
+	_ = a
+	_, err := e.s.takePoolReview(e.ctx, "team", b, "Rev", nil) // the racing second claim, past ClaimTask's own slot check
+	require.ErrorIs(t, err, errSlotHeld)
+	w := e.workflow(b)
+	assert.True(t, w.ReviewInPool, "the place is back in the pool")
+	assert.Empty(t, w.ReviewRounds, "no round and no reviewer recorded for Rev")
+	var pending int
+	require.NoError(t, e.s.db.GetContext(e.ctx, &pending, "SELECT COUNT(*) FROM board_tasks WHERE board_id='team' AND status='pending' AND title LIKE 'Review #%'"))
+	assert.Zero(t, pending, "no review task waits on Rev")
+	other := newPoolReviewerFor(t, e, "Rev2")
+	got := e.claim(other)
+	require.NotNil(t, got)
+	assert.Equal(t, b, e.workflow(got.ID).ReviewOf, "another reviewer takes it")
+}
+
+func newPoolReviewerFor(t *testing.T, e *poolEnv, name string) string {
+	t.Helper()
+	_, err := e.s.Subscribe(e.ctx, "team", name, "Reviewer", "claude-"+name, nil, "all")
+	require.NoError(t, err)
+	yes := true
+	none := []string{}
+	_, err = e.s.SetReviewSettings(e.ctx, "team", name, &yes, &none)
+	require.NoError(t, err)
+	return name
+}
