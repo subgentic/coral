@@ -45,8 +45,8 @@ const { DATA_WORLD } = require('./helpers/census_world');
 
             // the job editor
             await ev(`window.openAutomationsFolder('jobs'); true`);
-            await waitFor(`!!document.querySelector('#group-table-view button.dt-primary')`, `${tag}: jobs`, 10000);
-            await ev(`document.querySelector('#group-table-view button.dt-primary').click(); true`);
+            await waitFor(`!!document.querySelector('#group-table-view tr[data-key="5"] button.dt-primary')`, `${tag}: jobs`, 10000); // the world serves job 5 only
+            await ev(`document.querySelector('#group-table-view tr[data-key="5"] button.dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-detail [data-on-click="job-edit"]')`, `${tag}: job`, 10000);
             await ev(`document.querySelector('#scheduler-detail [data-on-click="job-edit"]').click(); true`);
             await waitFor(`!!document.getElementById('job-modal') && document.getElementById('job-modal').style.display === 'flex'`, `${tag}: the job editor`, 10000);
