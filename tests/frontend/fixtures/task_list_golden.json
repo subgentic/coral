@@ -2,8 +2,8 @@
   "about": "what the task list shows, scenario by scenario, for task_list_golden_browser.test.js: sha256 of the list, toggle, section, label and count, and the readable text. CORAL_UPDATE_GOLDEN=1 rewrites it.",
   "hashes": {
     "nothing, no agent": "ba09759a8bb0f3bec61b765928a23a1d582ca17906626e6b01c2bfa5dfb0084a",
-    "nothing, a live agent": "56e96abdc2d7837c70b3dd31ccca47c9a20f303b03bd5aa44740f0d25acabf8d",
-    "nothing, a team": "56e96abdc2d7837c70b3dd31ccca47c9a20f303b03bd5aa44740f0d25acabf8d",
+    "nothing, a live agent": "52b3de0123931e58b57c158d2cfa5a4e8fa68837763507ea530e0681f0b3099e",
+    "nothing, a team": "52b3de0123931e58b57c158d2cfa5a4e8fa68837763507ea530e0681f0b3099e",
     "a board of every status": "d1605220b67f97c28e64eb1ec1d6c9fb1d3729bd738e29e7e77af538b71cf222",
     "sorted by id": "812d64a7ebdadf7303bf817502bf382651f3dcf8f587d730ddb4cf81853367a2",
     "sorted by id again": "f5d7ed2ae32092be10c54a666f2ff95282ce51aa7ac74d0865f23217603d3c02",
