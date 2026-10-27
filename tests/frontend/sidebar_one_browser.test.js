@@ -160,6 +160,8 @@ const STUB = `(() => {
             assert.equal(await ev(`(() => { const r = document.querySelector('#history-session-view > .item-bar').getBoundingClientRect(); return r.bottom <= innerHeight + 1; })()`), true, at + 'the bar is on screen');
             await shot(`sidebar-one-chat-${w}`);
             // The way back to the table, the sidebar row's page and the group's chevron are the hub's Chats list (history_list.js, #7776): a local Coral's way back is the Inbox folder (mailbox_chats, inbox_one).
+            // the way back is the Inbox folder's table: its source registers when inbox_sidebar.js has loaded (lazy since #8670), so wait for that, or the click lands on nothing
+            await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(() => true)`);
             await ev(`document.getElementById('history-back').click(); true`);
             await waitFor(`document.getElementById('group-table-view').checkVisibility()`, at + 'back is the table', 8000);
             // the same page from a sidebar row has the same way back; the chevron folds without opening a table
