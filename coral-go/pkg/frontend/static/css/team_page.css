@@ -382,3 +382,5 @@
 @media (pointer: coarse), (max-width: 767px) {
     .task-version-history summary { min-height: var(--control-touch-height, 44px); }
 }
+
+@media (max-width: 767px) { .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; } } /* a full line (200% text) wraps its Select button to the next, whole, not cut at the screen's edge (#9658) */
