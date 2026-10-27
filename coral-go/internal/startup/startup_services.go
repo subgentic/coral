@@ -136,11 +136,12 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 
 	startCloudConnector(ctx, db, cfg, srv, sessStore)
 
-	startIndexingServices(ctx, cfg, srv, agentRT, gitStore, sessStore)
+	landingWatch := background.NewLandingWatch(srv.BoardStore()) // the git poller feeds it, the health check reads it (#8942)
+	startIndexingServices(ctx, cfg, srv, agentRT, gitStore, sessStore, landingWatch)
 
 	scheduler, launcher := startScheduler(ctx, cfg, srv, agentRT, sessStore, schedStore, taskStore)
 
-	startBoardServices(ctx, cfg, srv, agentRT, sessStore, taskStore, rbStore, discoverFn)
+	startBoardServices(ctx, cfg, srv, agentRT, sessStore, taskStore, rbStore, discoverFn, landingWatch)
 
 	startAgentServices(ctx, db, srv, agentRT, sessStore, taskStore)
 
@@ -185,7 +186,7 @@ func agentDiscovery(agentRT background.AgentRuntime, sessStore *store.SessionSto
 }
 
 // startIndexingServices starts what keeps the session and git views current: the remote agent poller (hub mode), the git poller and the session indexer.
-func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.Server, agentRT background.AgentRuntime, gitStore *store.GitStore, sessStore *store.SessionStore) {
+func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.Server, agentRT background.AgentRuntime, gitStore *store.GitStore, sessStore *store.SessionStore, landingWatch *background.LandingWatch) {
 	// Multi-server hub: remote agent poller and feed relay. Hub mode only;
 	// a standalone server has nothing to poll.
 	if srv.HasRemoteAgents() {
@@ -196,6 +197,7 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 	// someone on a repository where scanning is slow can stretch it out or
 	// turn it off without restarting.
 	gitPoller := background.NewGitPoller(gitStore, agentRT, time.Duration(cfg.GitPollerIntervalS)*time.Second)
+	gitPoller.SetLandingWatch(landingWatch)
 	gitPoller.SetIntervalFn(func() time.Duration {
 		return gitPollInterval(ctx, sessStore, cfg.GitPollerIntervalS)
 	})
@@ -242,7 +244,7 @@ func startScheduler(ctx context.Context, cfg *config.Config, srv *server.Server,
 }
 
 // startBoardServices starts the board's services: the notifier, the health monitor and nudges, the task reminders and the remote board poller.
-func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Server, agentRT background.AgentRuntime, sessStore *store.SessionStore, taskStore *store.TaskStore, rbStore *store.RemoteBoardStore, discoverFn func(context.Context) ([]background.AgentInfo, error)) {
+func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Server, agentRT background.AgentRuntime, sessStore *store.SessionStore, taskStore *store.TaskStore, rbStore *store.RemoteBoardStore, discoverFn func(context.Context) ([]background.AgentInfo, error), landingWatch *background.LandingWatch) {
 	// Board notifier
 	boardNotifier := background.NewBoardNotifier(srv.BoardStore(), agentRT, time.Duration(cfg.BoardNotifierIntervalS)*time.Second)
 	boardNotifier.SetDiscoverFn(discoverFn)
@@ -264,6 +266,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 		// Every 5 minutes; each team's own interval (10 by default) decides when its check goes.
 		healthMonitor := background.NewBoardHealthMonitor(srv.BoardStore(), 5*time.Minute)
 		healthMonitor.SetAgents(taskStore, agentRT, discoverFn)
+		healthMonitor.SetLandingWatch(landingWatch)
 		healthMonitor.SetIdleThresholds(time.Duration(cfg.TaskIdleReminderS)*time.Second, time.Duration(cfg.TaskIdleEscalationS)*time.Second)
 		safeGo(ctx, "board_health_monitor", func() { healthMonitor.Run(ctx) })
 		// Coral acts on the mechanical items itself (#4175): claim and status nudges.
