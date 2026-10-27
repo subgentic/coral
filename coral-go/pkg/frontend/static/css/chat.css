@@ -631,6 +631,7 @@
 }
 .chat-jump-latest-btn:hover, .chat-jump-latest-btn:focus-visible { color: var(--text-on-accent); }
 .chat-jump-latest-btn[hidden] { display: none; }
+body:has(.model-chip-menu:not([hidden])) .chat-jump-latest-btn { visibility: hidden; } /* the model and thinking menus open over the chat have the room: the arrow would sit over its text at large sizes (#9377) */
 .chat-jump-latest-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .chat-jump-latest-btn svg { position: relative; width: 18px; height: 18px; }
 /* A small dot when messages came in while you read higher up. */
