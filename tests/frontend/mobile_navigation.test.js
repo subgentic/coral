@@ -34,7 +34,7 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(await visible(), ['scheduler-view']);
             await evaluate(`window.mobileBack()`);
             assert.deepEqual(await visible(), ['mobile-agent-list']);
-            await evaluate(`window.switchNavTab('workflows'); window.switchMobileTab('agents')`);
+            await evaluate(`window.openAutomationsFolder('workflows'); window.switchMobileTab('agents')`);
             assert.deepEqual(await visible(), ['mobile-agent-list']);
             assert.ok(await evaluate(`(() => { const nav = document.querySelector('.top-nav-tabs'); nav.scrollLeft = nav.scrollWidth; const last = document.getElementById('nav-tab-docs').getBoundingClientRect(); const bounds = nav.getBoundingClientRect(); return document.documentElement.scrollWidth <= innerWidth && last.right <= bounds.right + 1 && bounds.right <= innerWidth; })()`), `tabs reachable at ${width}px`);
             console.log(`PASS ${width}px: exclusive views and reachable navigation`);

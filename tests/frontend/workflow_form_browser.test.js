@@ -31,7 +31,7 @@ const STUB = `(() => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`); await ev(STUB);
-            await ev(`window.switchNavTab('workflows'); window.showWorkflowCreateModal(); true`);
+            await ev(`window.openAutomationsFolder('workflows'); window.showWorkflowCreateModal(); true`);
             await waitFor(`document.getElementById('wf-create-modal').style.display === 'flex'`, 'the dialog', 8000).catch(async e => { throw new Error(e.message + ' ' + await ev(`String(typeof window.showWorkflowCreateModal)`)); });
             await installAudit(ev);
 
@@ -127,8 +127,8 @@ const STUB = `(() => {
             assert.equal(await ev(`document.querySelectorAll('#wf-create-modal [aria-invalid]').length`), 0, at + 'no mark is left over');
         }
         // the Workflows page behind the dialog: with no workflow, one empty line and no count pill (the page has no header of its own, #7471)
-        await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); window.switchNavTab('workflows'); true`);
-        await waitFor(`!!document.querySelector('#wf-list-empty .empty-line') && document.querySelector('#wf-list-empty .empty-line').checkVisibility()`, 'the Workflows page', 8000);
+        await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); window.openAutomationsFolder('workflows'); true`);
+        await waitFor(`!!document.querySelector('#group-table-view .empty-line') && document.querySelector('#group-table-view .empty-line').checkVisibility()`, 'the Workflows page', 8000);
         assert.equal(await ev(`document.getElementById('wf-count-badge')`), null, 'the page draws no count badge');
         console.log('PASS workflow form: Name, Steps first, the rest behind More options; errors in words');
     } finally { await client.close(); }
