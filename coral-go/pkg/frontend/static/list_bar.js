@@ -179,6 +179,8 @@ export function buildListBar(spec, onChange, hooks = {}) {
     }
     const apply = next => { f = clean(trimmed(next)); announce = true; onChange({ ...f }); };
     const later = next => { clearTimeout(timer); timer = setTimeout(() => apply(next), DEBOUNCE_MS); };
+    // the first field that is drawn: a hidden one (the Inbox's Server field with one computer, showField) takes no focus, and the panel would open with the focus on the page (#8812)
+    const focusFirstField = () => (fields.find(x => !x.wrap.hidden) || fields[0])?.input.focus();
     // the panel of a collapsible bar: opened and shut by the icon (the state is the panel's owner's to keep: hooks.onPanel)
     const setOpen = (open, { focus = false, silent = true } = {}) => {
         if (!tog) return;
@@ -186,7 +188,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
         // a sheet sits under the search row (in a flex bar an absolute box would start at the bar's top, over the search row): its top is the row's bottom; no effect where the panel is in the flow
         if (open && spec.sheet) menu.style.top = `${searchRow.offsetTop + searchRow.offsetHeight + 4}px`;
         if (!silent && hooks.onPanel) hooks.onPanel(open);
-        if (open && focus && fields.length) fields[0].input.focus();
+        if (open && focus) focusFirstField();
     };
     const closeMenu = (focus) => { if (tog) { if (!menu.hidden) { setOpen(false, { silent: false }); if (focus) tog.focus(); } return; } if (inline || menu.hidden) return; menu.hidden = true; filterBtn.setAttribute('aria-expanded', 'false'); if (focus) filterBtn.focus(); };
 
@@ -201,7 +203,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     filterBtn.addEventListener('click', () => {
         const open = menu.hidden;
         menu.hidden = !open; filterBtn.setAttribute('aria-expanded', String(open));
-        if (open && fields.length) fields[0].input.focus();
+        if (open) focusFirstField();
     });
     node.addEventListener('keydown', e => { if (e.key === 'Escape' && !inline && !menu.hidden && !(tog && !menu.contains(e.target))) { e.preventDefault(); e.stopPropagation(); closeMenu(true); } });
     const outside = e => { if (!inline && (!tog || (spec.sheet && isPhoneLayout())) && !menu.hidden && !node.contains(e.target)) closeMenu(false); }; // a collapsible panel is in the flow: it stays open until the icon shuts it (a phone's sheet shuts on a tap outside too)
