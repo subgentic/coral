@@ -18,7 +18,10 @@ import { isCloud, isHub, normServer, LOCAL_SERVER } from './server_base.js';
 }
 
 /** Show or hide the top-nav tab. Safe to call often (after each list update). */
+let _serversSig = null;
 export function updateServersTabVisibility() {
+    const sig = JSON.stringify(state.hub ? (state.servers || []).map(s => s && [s.id, s.status]) : []);
+    if (sig !== _serversSig) { _serversSig = sig; document.dispatchEvent(new CustomEvent('coral-servers')); } // the computers or their statuses changed (the first list included): the Inbox's merged lists are read again (#8922)
     const tab = document.getElementById('nav-tab-servers');
     if (!tab) return;
     const show = serversTabAvailable();

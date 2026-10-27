@@ -74,5 +74,12 @@ try {
     mock.timers.tick(8000); mock.timers.tick(8000);
     assert.ok((await Promise.all(extra)).every(r => r === 'timed out'), 'every Box Two request ends as "did not answer", none hangs');
     mock.timers.reset();
+    // a fresh load: the lists were read before the hub's computers were known; when the list arrives (or a status changes) the Inbox is told once, and not for the same list again (#8922)
+    const { updateServersTabVisibility } = await importUi('servers_tab');
+    let told = 0; document.addEventListener('coral-servers', () => told++);
+    state.servers = [{ id: 'box-2', label: 'Box Two', status: 'online' }]; updateServersTabVisibility(); updateServersTabVisibility();
+    assert.equal(told, 1, 'told once for a new list, not again for the same one');
+    state.servers = [{ id: 'box-2', label: 'Box Two', status: 'unreachable' }]; updateServersTabVisibility();
+    assert.equal(told, 2, 'and again when a status changes');
     console.log('inbox_server_timeout: ok');
 } finally { dom.close && dom.close(); }
