@@ -35,7 +35,7 @@ func TestRemoteHTTPRules(t *testing.T) {
 		"http://localhost:8420":      false,
 		"http://LOCALHOST:8420":      false,
 		"http://[::1]:8420":          false,
-		"not a url\x7f":              false,
+		"not a url\x7f":              true, // a URL that does not parse is not known to be safe: it fails closed (#9688)
 	} {
 		w := remoteURLWarning(raw)
 		if warn {

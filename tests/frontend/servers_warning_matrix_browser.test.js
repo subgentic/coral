@@ -17,9 +17,10 @@ const MATRIX = [
     { id: 'empty', label: 'Empty warning', url: 'https://e.example.net', status: 'online', warning: '' },
     { id: 'nulled', label: 'Null warning', url: 'https://n.example.net', status: 'online', warning: null },
     { id: 'xss', label: 'Markup words', url: 'http://10.0.0.10:8420', status: 'online', allow_private: true, warning: 'the key <img src=x onerror="window.__pwn=1"> crosses the network' },
+    { id: 'legacy', label: 'Legacy row', url: 'http://10.0.0.2:8420x', status: 'unreachable', allow_private: true, warning: W }, // a stored URL that does not parse: the server fails closed and sends the warning (#9688)
     { id: 'long', label: 'A very long server name that has to be cut to fit the one line a row gets on a phone and still keep its flag', url: 'http://10.0.0.11:8420', status: 'online', allow_private: true, warning: W },
 ];
-const SHOWS = ['lan', 'unreach', 'unauth', 'offline', 'xss', 'long'];
+const SHOWS = ['lan', 'unreach', 'unauth', 'offline', 'xss', 'legacy', 'long'];
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -75,7 +76,7 @@ const SHOWS = ['lan', 'unreach', 'unauth', 'offline', 'xss', 'long'];
         assert.equal(changed.lan, null, 'a server whose record no longer has a warning shows none');
         assert.deepEqual(Object.keys(changed).filter(k => changed[k]).sort(), SHOWS.filter(s => s !== 'lan').sort(), 'the others keep theirs');
         // the server's own page keeps its warning line (the words, capitalised, with a full stop) and a server without a warning has none: the flag by the name was added, nothing was taken from the page
-        for (const [id, want] of [['lan', 'Warning: The key crosses the network unencrypted; use https or a tunnel.'], ['https', null], ['xss', 'Warning: The key <img src=x onerror="window.__pwn=1"> crosses the network.']]) {
+        for (const [id, want] of [['lan', 'Warning: The key crosses the network unencrypted; use https or a tunnel.'], ['legacy', 'Warning: The key crosses the network unencrypted; use https or a tunnel.'], ['https', null], ['xss', 'Warning: The key <img src=x onerror="window.__pwn=1"> crosses the network.']]) {
             await open(1280, 900, false);
             await ev(`document.querySelector('tr[data-key="${id}"] [data-action=open]').click(); true`);
             await waitFor(`!!document.querySelector('.servers-view-page, #servers-view .servers-page, [data-server-page]') || !!document.querySelector('.servers-row-warn') || /Test|Edit/.test(document.getElementById('servers-view').textContent)`, `the page of ${id}`, 8000);

@@ -1,9 +1,12 @@
 package routes
 
 import (
+	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // #9681 (security check on #9679 slice 1): the warning the Servers page shows beside a server's name is the server record's `warning`, and the record has one exactly when its URL is plain http at an
@@ -38,11 +41,21 @@ func TestRemoteURLWarningEdgeCases(t *testing.T) {
 		"http://user:secret@localhost:8420": false,
 		"http://[::1]":                      false,
 		"http://[0:0:0:0:0:0:0:1]:8420":     false,
-		// not http: the key is not sent in the clear by the scheme (https, and the rest are not servers)
+		// https is the one scheme that keeps the key off the network in the clear
 		"https://10.0.0.2:8420": false,
 		"HTTPS://10.0.0.2:8420": false,
-		"ftp://10.0.0.2":        false,
-		"":                      false,
+		// fail closed (#9688): a stored URL that is not https, or that does not parse (a legacy row), is not known to keep the key off the network: it warns
+		"ftp://10.0.0.2":           true,
+		"":                         true,
+		"ws://10.0.0.2:8420":       true,
+		"10.0.0.2:8420":            true,
+		"http://10.0.0.2:8420x":    true,
+		"http://10.0.0.2:port":     true,
+		"http://[::1":              true,
+		"http://10.0.0.2:8420/%zz": true,
+		"http://exa mple.com":      true,
+		"http://127.0.0.1:8420x":   true, // this computer, but the URL is unreadable: still warns
+		"https://10.0.0.2:8420x":   true, // an unparseable https URL too: nothing says where the key goes
 	} {
 		w := remoteURLWarning(raw)
 		if warn {
@@ -61,4 +74,27 @@ func TestRemoteURLWarningDoesNotExemptUnusualSpellingsOfThisComputer(t *testing.
 	for _, raw := range []string{"http://localhost.:8420", "http://2130706433:8420", "http://127.1:8420", "http://0x7f.0.0.1:8420"} {
 		assert.Equal(t, remoteHTTPWarning, remoteURLWarning(raw), "%q is not read as this computer: it warns", raw)
 	}
+}
+
+// The API carries it: a stored row whose URL does not parse (registered before the URL rules, or edited in the database) has the warning in the list and in the edit and test answers, and a readable
+// https row has none (#9688).
+func TestRemoteServersListWarnsForAStoredRowWithAnUnreadableURL(t *testing.T) {
+	e := newRSEnv(t)
+	ctx := t.Context()
+	rs := e.h.store
+	_, err := rs.Add(ctx, "legacy", "Legacy", "http://10.0.0.2:8420x", routeSecret, true)
+	require.NoError(t, err)
+	_, err = rs.Add(ctx, "tls", "TLS", "https://93.184.216.34:8420", routeSecret, false)
+	require.NoError(t, err)
+	w := e.do("GET", "/api/servers", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	var list []map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &list))
+	warning := map[string]any{}
+	for _, s := range list {
+		warning[s["id"].(string)] = s["warning"]
+	}
+	assert.Equal(t, remoteHTTPWarning, warning["legacy"], "an unreadable stored URL fails closed: the warning")
+	assert.Nil(t, warning["tls"])
+	assert.Nil(t, warning["local"])
 }
