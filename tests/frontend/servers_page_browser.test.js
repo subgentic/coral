@@ -11,7 +11,7 @@ const { setTheme } = require('./helpers/contrast');
 const SERVERS = [
     { id: 'local', label: 'studio-mac', local: true, status: 'online' },
     { id: 'epoch', label: 'epoch', url: 'https://epoch.example.net:8420', status: 'online' },
-    { id: 'lan', label: 'LAN box', url: 'http://192.168.1.50:8420', status: 'unreachable', last_error: 'dial tcp: i/o timeout', allow_private: true, last_seen: '2026-10-13T00:00:00Z' },
+    { id: 'lan', label: 'LAN box', url: 'http://192.168.1.50:8420', status: 'unreachable', last_error: 'dial tcp: i/o timeout', allow_private: true, warning: 'the key crosses the network unencrypted; use https or a tunnel', last_seen: '2026-10-13T00:00:00Z' },
 ];
 
 (async () => {
@@ -36,20 +36,26 @@ const SERVERS = [
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
-            await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.hub = true; s.state.servers = ${JSON.stringify(SERVERS)}; return true; })()`);
+            await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.hub = true; s.state.servers = ${JSON.stringify(SERVERS)}; s.state.liveSessions = [{ session_id: 'w1', name: 'waiter', agent_type: 'claude', server: 'lan', waiting_for_input: true }, { session_id: 'w2', name: 'busy', agent_type: 'claude', server: 'lan', waiting_for_input: false }]; return true; })()`); // one agent of LAN box waits for its person (the Needs you column)
             await ev(`window.switchNavTab('servers'); true`);
             await waitFor(`!!document.querySelector('#server-row-lan')`, 'the servers table');
 
             // 1. a table: Server, Status, Agents; the name opens the page; no Test, Edit or Remove in the rows
             const t = await ev(`(() => { const tb = document.querySelector('table.dt-table'); return { heads: [...tb.querySelectorAll('thead th')].map(h => (h.querySelector('.dt-sort span') || h.querySelector('.dt-head-text')).textContent.trim()), scopes: [...tb.querySelectorAll('thead th')].map(h => h.getAttribute('scope')), rows: tb.querySelectorAll('tbody tr').length,
                 links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => b.textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open').length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
-            assert.deepEqual(t.heads, ['Server', 'Tags', 'Version', 'Status', 'Agents'], at + 'the columns (one line a row, Goal #79)');
+            assert.deepEqual(t.heads, ['Server', 'Tags', 'Status', 'Agents', 'Needs you', 'Last seen', 'Version'], at + 'the columns, UI/UX\'s order (Goal #79, #9679): Tags stays by the name, its warning on the row');
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), true, at + 'the table keeps the Servers title');
-            assert.deepEqual(t.scopes, ['col', 'col', 'col', 'col', 'col']);
+            assert.deepEqual(t.scopes, ['col', 'col', 'col', 'col', 'col', 'col', 'col']);
+            const cols = await ev(`(() => { const cell = (id, k) => { const td = document.querySelector('#server-row-' + id + ' td[data-key="' + k + '"]'); return td ? td.textContent.trim() : null; }; return { needs: ['local', 'epoch', 'lan'].map(id => cell(id, 'needs')), seen: ['local', 'epoch', 'lan'].map(id => cell(id, 'seen')), sortable: [...document.querySelectorAll('table.dt-table thead th')].map(th => !!th.querySelector('.dt-sort')) }; })()`);
+            assert.deepEqual(cols.needs, ['', '', '1'], at + 'Needs you: nothing at zero, the count where an agent waits: ' + JSON.stringify(cols));
+            assert.deepEqual(cols.seen.slice(0, 2), ['now', 'now'], at + 'Last seen is "now" while a server is online: ' + JSON.stringify(cols));
+            assert.ok(cols.seen[2] && cols.seen[2] !== 'now' && cols.seen[2] !== '\u2014', at + 'and the time of contact for one that is not: ' + JSON.stringify(cols));
+            assert.equal(await ev(`(() => { const t = document.querySelector('#server-row-lan .dt-name-text'); const w = t && t.closest('.servers-name').querySelector('.servers-warn'); return !!w && w.textContent.trim() === 'warning' && w.getClientRects().length > 0; })()`), true, at + 'the unencrypted-key warning is on the row, by the name, at every width');
+            assert.deepEqual(cols.sortable, [true, false, true, true, true, true, true], at + 'every header sorts but Tags: ' + JSON.stringify(cols));
             await oneLinePerRow(ev, 'table.dt-table tbody tr[data-key]', `${at}the servers`, assert, { min: 2 }); // Goal #79: a server is one line at both widths; a narrow list drops Tags, Version and Agents
             for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await sceneShot(`servers-list-${theme}-${w}`); } await setTheme(ev, 'dark'); // the scenes UI/UX looks at (written when the gate asks for shots)
             assert.equal(t.rows, 3, at + 'this hub and two servers');
-            assert.deepEqual(t.links, ['epoch', 'LAN box'], at + 'each remote server\'s name opens its page; this hub has none');
+            assert.deepEqual(t.links, ['epoch', 'LAN boxwarning'], at + 'each remote server\'s name opens its page (LAN box\'s button holds its warning tag too, #9679); this hub has none');
             assert.equal(t.rowButtons, 0, at + 'no Test, Edit or Remove buttons in the table');
             assert.ok(t.overflow <= 0, at + 'no sideways scroll');
             await shot(`servers-table-${w}`);
@@ -68,7 +74,7 @@ const SERVERS = [
             assert.equal(p.remove, true, at + 'Remove is the danger button');
             assert.equal(p.small, false, at + 'the normal button size');
             assert.ok(p.barBottomGap <= 1, at + 'the bar is at the foot of the page: ' + p.barBottomGap);
-            assert.equal(p.facts.URL, 'http://192.168.1.50:8420'); assert.match(p.facts['Last contact'] || '', /\S/, at + 'last contact, as it is not online'); assert.equal(p.facts.Agents, '0 agents');
+            assert.equal(p.facts.URL, 'http://192.168.1.50:8420'); assert.match(p.facts['Last contact'] || '', /\S/, at + 'last contact, as it is not online'); assert.equal(p.facts.Agents, '2 agents'); // the two live sessions seeded for LAN box (one of them waits: the Needs you column)
             assert.match(p.error || '', /Is Coral running on that machine/, at + 'what to do about it');
             assert.equal(p.table, false, at + 'the table is not on the page');
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), false, at + 'the page has no "Servers" title: its back link says it');
