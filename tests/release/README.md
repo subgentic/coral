@@ -71,3 +71,18 @@ It **installs and removes software**, so it refuses to run unless the machine is
 ## The stripped dashboard (#6208)
 
 A release embeds the dashboard's JS and CSS already minified (1.4 MB less per binary): each build job runs `go run ./tools/strip-static` in `coral-go` (a fresh owner-only temp folder; the overlay's path is the only thing on stdout), passes it to its `go build` commands as `-overlay`, and deletes the folder by its exact path with `-clean`. It is the build lines that carry the flag, never `GOFLAGS`, so `go test` and `go vet` still read the real tree; the source tree is never written. `trimpath_census_test.py` fails any release or installer build without `-overlay`, `verify_standard_bundle.sh/.ps1` fail a server binary that still holds a source comment (`strip_marker.txt`, kept in the source by a Go test), and `CORAL_STRIP_STATIC=1` makes `tests/frontend/run_cdp_suites.mjs` build the way a release does (the gate's `stripped` job runs Settings, chat and launch suites that way). `CORAL_NO_MINIFY=1` needs a source build (`make dev`).
+
+## update_real_linux.sh: the auto-update chain on Linux with real releases (#9192, Goal #65)
+
+The Linux twin of `update_real.sh`: FROM's tarball is installed in a folder of its own, run with a fresh `HOME` and data folder (`env -i`, a random port, `CORAL_CLOUD_URL=off`, telemetry off, the stand-in agent CLI),
+and FROM's own updater finds, verifies and stages TO on GitHub, then installs it the way a person does, with a tmux agent running through it.
+
+```bash
+tests/release/update_real_linux.sh --from v2.0.0 --to v2.0.0                       # the dry run: the updater says up to date, nothing staged (safe anywhere)
+tests/release/update_real_linux.sh --from v1.4.168 --to v2.0.0 --throwaway-machine  # the whole chain, on a VM or a GitHub-hosted runner only
+```
+
+Items: 1 download (sha256 against `SHA256SUMS.txt`, every program of `commands.txt`), 2 start, 3 find (staged and verified by FROM's updater), 4 ask (an API key and an agent's token are refused),
+then, only with `--throwaway-machine` or on a GitHub-hosted runner: 5 apply (the person's request installs TO and Coral comes back from its run record), 6 install (`coral --version`, `coral-update` and every
+program byte for byte TO's own tarball), 7 tmux (the agent's session and pane process survive), 8 settled. Needs Linux (amd64 or arm64), curl, python3, tar and sha256sum, and go or `PERSON_CALL=` a built
+`internal/updater/testrig/cmd/person-call`. Run once on an arm64 VM: v2.0.0 to itself (items 1 to 3, 4 to 8 skipped as designed) and v1.4.168 to v2.0.0 (all eight PASS).
