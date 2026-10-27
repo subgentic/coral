@@ -104,7 +104,7 @@
 
 .cost-header h2 {
     font-size: var(--type-page-size);
-    font-weight: 700;
+    font-weight: var(--fw-title);
     line-height: var(--lh-label);
     margin: 0;
     color: var(--text-primary);
@@ -155,7 +155,7 @@
 .cost-card-value {
     white-space: nowrap; /* a number never breaks inside itself */
     font-size: var(--fs-2xl);
-    font-weight: 700;
+    font-weight: var(--fw-title);
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
 }
@@ -400,7 +400,7 @@
 @media (max-width: 40rem) { .viz-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .viz-tile { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg, 8px); padding: 10px 12px; }
 .viz-tile-label { font-size: var(--fs-base); color: var(--text-muted); }
-.viz-tile-value { font-size: var(--fs-2xl); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.viz-tile-value { font-size: var(--fs-2xl); font-weight: var(--fw-title); font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .viz-tile-sub { font-size: var(--fs-base); color: var(--text-muted); }
 .viz-card-stack { margin: 0 0 12px; position: relative; }
 .viz-hint { margin: 0 0 8px; font-size: var(--fs-base); color: var(--text-muted); }

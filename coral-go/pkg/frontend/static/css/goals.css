@@ -26,7 +26,7 @@
 .goal-rollup-blocked { background: var(--warning); }
 
 .goals-sub { margin: 8px 0 0; font-size: var(--fs-md); color: var(--text-secondary); }
-.goals-detail-title { margin: 0; font-size: var(--fs-2xl); overflow-wrap: anywhere; font-weight: 700; }
+.goals-detail-title { margin: 0; font-size: var(--fs-2xl); overflow-wrap: anywhere; font-weight: var(--fw-title); }
 .goals-detail-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 
 
