@@ -145,10 +145,9 @@ function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
         const multi = !!(info.screen && info.screen.multi);
         const button = multi ? checkOptionButtonHtml : optionButtonHtml;
         const apart = !multi && !withDesc && info.kind === "permission" && phoneBar() && selects.length > 1 ? standingOptions(selects) : []; // out of the bar, above it: every answer that is not plainly one-time (standing_option.js fails closed)
-        const optionsHtml = `<div class="cni-options ${withDesc ? "cni-options-cards" : "cni-options-chips"}"${multi ? ` role="group" aria-label="Pick everything that applies"` : ""}>`
+        if (apart.length) body += `<div class="cni-standing">${apart.map(o => optionButtonHtml(o, "", fullLabels[o.label])).join("")}</div>`;
+        body += `<div class="cni-options ${withDesc ? "cni-options-cards" : "cni-options-chips"}"${multi ? ` role="group" aria-label="Pick everything that applies"` : ""}>`
             + selects.filter(o => !apart.includes(o)).map(o => button(o, descriptions[fullLabels[o.label] || o.label] || descriptions[o.label], fullLabels[o.label])).join("") + `</div>`;
-        // the standing answer and the bar are ONE sticky block, the standing one on top: stuck apart, the bar would sit at the foot of the chat over the standing button, which stays in the card's flow below the fold
-        body += apart.length ? `<div class="cni-sticky"><div class="cni-standing">${apart.map(o => optionButtonHtml(o, "", fullLabels[o.label])).join("")}</div>${optionsHtml}</div>` : optionsHtml;
         const submit = info.screen && info.screen.submit;
         if (multi && submit) foot += `<button type="button" class="cni-answer btn btn-sm btn-primary cni-submit" data-n="0" data-label="${escapeHtml(submit.label)}" data-action="submit">${escapeHtml(submit.label)}</button>`;
     }
