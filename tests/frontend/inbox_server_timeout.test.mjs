@@ -10,11 +10,13 @@ try {
     state.servers = [{id:'local',status:'online'},{id:'box-2',label:'Box Two',status:'online'},{id:'box-3',label:'Box Three',status:'offline'}]; // box-3: the hub already knows it is not answering
     const art = id => ({ id: id.repeat(64), name: id + '.md', media_type: 'text/markdown', size: 1, created_at: new Date().toISOString(), board_id: 'alpha', team: 'alpha', task_id: 1, uri: 'coral://artifacts/' + id.repeat(64), available: true });
     let stalled = true;
+    let inflight = 0, maxInflight = 0;
     globalThis.fetch = window.fetch = (url, opts = {}) => {
         const path = new URL(url, 'https://hub.example').pathname;
+        if (path.startsWith('/api/remote/box-2/') && stalled) { inflight++; maxInflight = Math.max(maxInflight, inflight); if (opts.signal) opts.signal.addEventListener('abort', () => { inflight--; }); } // box-2 requests on their way
         if (path.startsWith('/api/remote/box-2/') && stalled) return new Promise((_, reject) => { if (opts.signal) opts.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))); });
-        const remote = path.startsWith('/api/remote/box-2/');
-        if (path.endsWith('/api/team-artifacts')) return Promise.resolve(Response.json({ artifacts: [art(remote ? 'b' : 'a')], teams: [], all: 1, total: 1, has_more: false }));
+        const remote = path.startsWith('/api/remote/'), three = path.startsWith('/api/remote/box-3/');
+        if (path.endsWith('/api/team-artifacts')) return Promise.resolve(Response.json({ artifacts: [art(three ? 'c' : remote ? 'b' : 'a')], teams: [], all: 1, total: 1, has_more: false }));
         if (path.endsWith('/api/goals')) return Promise.resolve(Response.json({ goals: [{ id: 1, board_id: 'alpha', title: remote ? 'Remote goal' : 'Local goal', state: 'active', rollup: { total: 1, done: 0 } }] }));
         if (path.endsWith('/api/saved')) return Promise.resolve(Response.json({ items: [], open: 0, done: 0 }));
         return Promise.resolve(Response.json({}));
@@ -45,5 +47,23 @@ try {
     assert.deepEqual(ok.artifacts.map(a => a.name).sort(), ['a.md', 'b.md'], 'both computers\' files');
     assert.deepEqual(ok.down, [{ server: 'box-3', label: 'Box Three' }], 'only the offline one is down');
     await inbox.listInboxGoals(); assert.equal(inbox.inboxDownNote('goals'), 'Box Three did not answer, so its goals are not shown.', 'the line keeps only the offline one when Box Two answers');
+    // A hung computer beside a healthy one (QA Reviewer 2's real check): Box Two has a dozen requests open, Box Three is healthy. At most 2 are on their way to Box Two at once, the rest wait;
+    // Box Three's files are listed and only Box Two is named; a request that waited for its turn is not marked "did not answer" until its own clock (started when it was sent) runs out.
+    const { serverRead } = await importUi('server_base');
+    state.servers = [{id:'local',status:'online'},{id:'box-2',label:'Box Two',status:'online'},{id:'box-3',label:'Box Three',status:'online'}];
+    stalled = true; inflight = 0; maxInflight = 0;
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const extra = Array.from({ length: 6 }, (_, i) => serverRead('box-2', '/api/extra' + i).then(() => 'answered', e => e.timedOut ? 'timed out' : 'failed'));
+    const three = readInboxArtifacts(new URLSearchParams({ limit: '50' }), {});
+    await new Promise(r => setImmediate(r));
+    assert.equal(maxInflight, 2, 'at most 2 requests are on their way to Box Two at once');
+    mock.timers.tick(8000);
+    const t = await three;
+    assert.deepEqual(t.artifacts.map(a => a.name).sort(), ['a.md', 'c.md'], 'this computer\'s and Box Three\'s files are listed');
+    assert.deepEqual(t.down.map(x => x.server), ['box-2'], 'only Box Two is named, not the healthy Box Three');
+    assert.ok(maxInflight <= 2, 'still at most 2 at once after the first two timed out');
+    mock.timers.tick(8000); mock.timers.tick(8000);
+    assert.ok((await Promise.all(extra)).every(r => r === 'timed out'), 'every Box Two request ends as "did not answer", none hangs');
+    mock.timers.reset();
     console.log('inbox_server_timeout: ok');
 } finally { dom.close && dom.close(); }
