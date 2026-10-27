@@ -72,7 +72,7 @@ const BASE = require('./test_base').BASE;
                         assert.equal(await ev(`document.querySelector('#inbox-page .inbox-board-head h2').textContent`), board);
                     }
                     if (!isTask) assert.ok(await ev(`(() => { const title=document.querySelector('#inbox-page .inbox-board-head h2').getBoundingClientRect(), search=document.querySelector('#inbox-page #mb-tools').getBoundingClientRect(); return search.top-title.bottom>=12; })()`),'Board title has at least 12 px before search');
-                    if (width===390) assert.equal(await ev(`document.querySelector('#inbox-page .view-list-item[aria-current="true"]').dataset.key`),key); // a phone's folders are a drawer (#9545): the open folder is the current item
+                    if (width===390) { const cur = await ev(`document.querySelector('#inbox-page .view-list-item[aria-current="true"]').dataset.key`); assert.ok(key === 'chats-group' ? /^board:/.test(cur) : cur === key, `the open folder is the current item (an open board is its own item in the drawer's Boards group, #9583): ${cur}`); } // a phone's folders are a drawer (#9545): the open folder is the current item
                     for (const theme of ['light','dark']) {
                         await ev(`document.documentElement.setAttribute('data-theme',${JSON.stringify(theme)}); true`);
                         await shot(`inbox-${kind}-${width}-${theme}`);

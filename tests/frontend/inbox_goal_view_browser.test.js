@@ -20,7 +20,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(() => { const style = document.createElement('style'); style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.append(style); return true; })()`);
     };
     const clickGoal = async mount => {
-        const point = await ev(`(() => { const row = [...document.querySelectorAll('${mount} .dt-primary')].find(e=>e.textContent==='Keep this goal in the Inbox'); const r = row.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        const point = await ev(`(() => { const row = [...document.querySelectorAll('${mount} .dt-primary')].find(e=>(e.querySelector('.dt-mail-title')||e).textContent==='Keep this goal in the Inbox'); const r = row.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
         await client.Input.dispatchMouseEvent({type:'mousePressed',...point,button:'left',clickCount:1});
         await client.Input.dispatchMouseEvent({type:'mouseReleased',...point,button:'left',clickCount:1});
     };
@@ -41,7 +41,7 @@ const BASE = require('./test_base').BASE;
             await load('/');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('goals')).then(()=>true)`);
-            await waitFor(`[...document.querySelectorAll('#group-table-view .dt-primary')].some(e=>e.textContent==='Keep this goal in the Inbox')`, 'Inbox goal row',15000);
+            await waitFor(`[...document.querySelectorAll('#group-table-view .dt-primary')].some(e=>(e.querySelector('.dt-mail-title')||e).textContent==='Keep this goal in the Inbox')`, 'Inbox goal row',15000);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('Keep this goal'))`);
             await clickGoal('#group-table-view');
             await detail('#inbox-page'); // fails before #8571: the row leaves Inbox for the team page
@@ -92,7 +92,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`location.pathname===${JSON.stringify(url)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent==='Keep this goal in the Inbox'`, 'Back returns to the goal (#8861)', 10000);
             await shot(`inbox-goal-task-back-${width}`);
             await load(`/team/${board}/goals`);
-            await waitFor(`[...document.querySelectorAll('#team-panel-goals .dt-primary')].some(e=>e.textContent==='Keep this goal in the Inbox')`, 'team goal row');
+            await waitFor(`[...document.querySelectorAll('#team-panel-goals .dt-primary')].some(e=>(e.querySelector('.dt-mail-title')||e).textContent==='Keep this goal in the Inbox')`, 'team goal row');
             await clickGoal('#team-panel-goals'); await detail('#team-panel-goals');
             await ev(`document.documentElement.setAttribute('data-theme','dark'); true`);
             assert.equal(await ev(`document.querySelectorAll('#team-panel-goals .goal-team-link').length`),0);

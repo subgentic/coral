@@ -100,12 +100,12 @@ const AGENTS = (waiting) => waiting ? [
                 await ev(`document.querySelector('#inbox-page .goals-back').click(); true`); await settle(500);
                 const a = await active(); assert.ok(a.cls.includes('dt-primary') && a.data.taskId, 'the task row in the table has the focus (' + JSON.stringify(a) + ')');
             });
-            if (mobile) await step('the Saved table stacks: the message has the row, its state and action are under it, nothing is behind a sideways scroll', async () => {
+            if (mobile) await step('the Saved list on a phone is mail rows (#9583): the message and its time on the row, the whole row on screen, nothing behind a sideways scroll, and a tap opens the message (Done is on its page)', async () => {
                 await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .view-list-item[data-key="saved"]').click(); true`); await settle(500);
-                const r = await ev(`(() => { const tb = document.querySelector('#group-table-view .dt-table'); const row = tb.querySelector('tbody tr'); const tds = [...row.children]; const rb = row.getBoundingClientRect(); const first = tds[0].getBoundingClientRect(); const rest = tds.filter(t => t.classList.contains('dt-line-2')).map(t => t.getBoundingClientRect()); const sc = document.querySelector('#group-table-view .dt-box'); const act = row.querySelector('button.dt-quiet'); const ab = act && act.getBoundingClientRect();
-                    return { firstW: Math.round(first.width), rowW: Math.round(rb.width), under: rest.every(b => b.top >= first.bottom - 1), over: sc.scrollWidth - sc.clientWidth, actionIn: !!ab && ab.left >= -1 && ab.right <= innerWidth + 1, role: tb.getAttribute('role'), cells: tds.map(t => t.getAttribute('role')) }; })()`);
-                assert.ok(r.firstW >= r.rowW * 0.45, 'the message takes the first line (its date at the right): ' + JSON.stringify(r)); assert.ok(r.under, 'its state and action are under it: ' + JSON.stringify(r)); assert.ok(r.over <= 1, 'no sideways scroll: ' + JSON.stringify(r));
-                assert.ok(r.actionIn, 'the action is on screen: ' + JSON.stringify(r)); assert.equal(r.role, 'table'); assert.ok(r.cells.every(c => c === 'cell'), 'cells keep their role');
+                const r = await ev(`(() => { const tb = document.querySelector('#group-table-view .dt-table'); const row = tb.querySelector('tbody tr'); const rb = row.getBoundingClientRect(); const sc = document.querySelector('#group-table-view .dt-box'); const btn = row.querySelector('button.dt-mail-open'), time = row.querySelector('.dt-mail-time'); const bb = btn && btn.getBoundingClientRect(), tbx = time && time.getBoundingClientRect();
+                    return { mail: row.classList.contains('dt-mailed'), h: Math.round(rb.height), btnIn: !!bb && bb.left >= -1 && bb.right <= innerWidth + 1, timeIn: !!tbx && tbx.right <= innerWidth - 11, text: btn ? btn.textContent.length : 0, over: sc.scrollWidth - sc.clientWidth, role: tb.getAttribute('role'), cells: [...row.children].map(t => t.getAttribute('role')) }; })()`);
+                assert.ok(r.mail && r.h >= 56, 'a mail row: ' + JSON.stringify(r)); assert.ok(r.btnIn && r.timeIn && r.text > 0, 'the row and its time are on screen: ' + JSON.stringify(r)); assert.ok(r.over <= 1, 'no sideways scroll: ' + JSON.stringify(r));
+                assert.equal(r.role, 'table'); assert.ok(r.cells.every(c => c === 'cell'), 'cells keep their role');
             });
         }
     } finally { await client.close(); }
