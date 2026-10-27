@@ -54,7 +54,13 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
     const _savedNumber = key => { const n = parseInt(browserLocal.get(key), 10); return Number.isFinite(n) && n > 0 ? n : null; };
 
     const _isMobile = () => isPhoneLayout();
-    const _effectiveDock = () => (_isMobile() ? 'bottom' : _dock);
+    const _effectiveDock = () => {
+        if (_isMobile()) return 'bottom';
+        const room = document.querySelector('.live-body')?.getBoundingClientRect().width || window.innerWidth;
+        // Keep the chosen column preference, but a task must leave a readable chat beside it (#8905).
+        if (_dock === 'column' && !_maximised && isTaskPreview() && room - _clampColumnWidth(_paneWidth) - HANDLE_W < 420) return 'bottom';
+        return _dock;
+    };
 
     function initPreviewPane() {
         const handle = document.getElementById('preview-pane-resize-handle');
@@ -119,7 +125,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
                 fitTerminal();
             });
             // The room changes with the window, the side panel opening or shutting, and the sidebar's width: the width shown is held to it again each time.
-            if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (getTabs().length && _effectiveDock() === 'column' && !_maximised) _applyColumnWidth(); }).observe(liveBody);
+            if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (getTabs().length && !_maximised) { if (isTaskPreview()) _placePane(); else if (_effectiveDock() === 'column') _applyColumnWidth(); } }).observe(liveBody);
         }
 
         document.getElementById('preview-max-btn')?.addEventListener('click', () => (_isMobile() ? _setPhoneFull(!_phoneFull) : _setMaximised(!_maximised)));
@@ -167,8 +173,8 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
 
     /** Maximise the column over Chat, or give Chat its place back (#4931). The width the column had is untouched: restoring is taking one class off. */
     function _setMaximised(on) {
-        if (on && !_isMobile() && _dock === 'bottom' && isTaskPreview() && getTabs().length) { _restoreBottom = true; _dock = 'column'; }
-        on = !!on && _effectiveDock() === 'column' && getTabs().length > 0;
+        if (on && !_isMobile() && _effectiveDock() === 'bottom' && isTaskPreview() && getTabs().length) { _restoreBottom = true; _dock = 'column'; }
+        on = !!on && !_isMobile() && _dock === 'column' && getTabs().length > 0;
         const restore = !on && _restoreBottom;
         if (restore) { _restoreBottom = false; _dock = 'bottom'; }
         const body = document.querySelector('.live-body');
@@ -231,7 +237,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         } else {
             if (pane.parentElement !== side) side.appendChild(pane);
             pane.classList.remove('docked-column');
-            const h = _clampPaneHeight(_paneHeight);
+            const h = _clampPaneHeight(_dock === 'column' && isTaskPreview() ? side.getBoundingClientRect().height / 2 : _paneHeight);
             if (h) pane.style.height = h + 'px';
         }
         column.style.display = dock === 'column' && visible ? '' : 'none';
@@ -244,6 +250,8 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         if (_phoneFull && !(_isMobile() && visible)) _setPhoneFull(false); // the last tab closed, or the window grew past a phone
         const maxBtn = document.getElementById('preview-max-btn');
         if (maxBtn) { maxBtn.hidden = _isMobile() ? !visible : !(visible && (dock === 'column' || isTaskPreview())); _paintMaxButton(); }
+
+        if (visible) document.querySelector('#preview-tabs .preview-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
         const btn = document.getElementById('preview-dock-btn');
         if (btn) {
