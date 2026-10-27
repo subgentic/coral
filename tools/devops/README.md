@@ -64,7 +64,16 @@ the first failed check.
 
 4. **Notes and tag**:
    - Write the notes section in a file starting with `## vX.Y.Z — `, and add it on top of the gated head:
-     `python3 tools/devops/insert-notes.py RELEASE_NOTES.md notes.md X.Y.Z`. Commit that file alone.
+     `python3 tools/devops/insert-notes.py RELEASE_NOTES.md notes.md X.Y.Z`. Commit that file alone. `tools/devops/notes-commit.sh X.Y.Z notes.md <gated sha>`
+     does both with the role identity and the `Gated-commit: <gated sha>` trailer that `release_provenance.py` reads.
+   - **Known red suites (the operator's call, #8643, #8667):** when the operator has approved a known red cdp suite for this release, name it as the fourth
+     argument: `tools/devops/notes-commit.sh X.Y.Z notes.md <gated sha> "strict: some_suite.test.mjs"` (1 to 3 suites, comma separated). The commit then also
+     carries one `Accepted-red: <suite>, <suite>` line. The names are checked by `release_provenance.py`'s own parser before the commit is made, so a name
+     it would refuse (more than three, a repeat, a character outside a plain suite name) stops the script. At the tag, provenance lets `cdp-gate` be red for exactly those
+     suites and nothing else: each must really be red in cdp-gate's NEWEST push run on the gated commit (read from that run's `cdp-summary` artifact), every
+     part must have reported, no suite may be flaky and the end checks and the stripped-dashboard job must be green; `go-tests` and `go-race` must still be green.
+     A green rerun of the suite makes the waiver refuse, by design: re-check the run before tagging. The release record names the waived suites, the run and
+     its attempt: open the run and read the summary before approving the `release` environment. Without the fourth argument nothing changes.
    - Land with `tools/devops/land-main.sh <old main> <notes commit> <gated tree>`. It checks that `main` is a
      fast-forward, that the parent's tree is the gated tree, and that the top commit is notes-only. It syncs the shared
      checkout's files with their modes, and stops if anyone else edited one of them.
