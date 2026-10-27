@@ -398,6 +398,7 @@ export async function selectLiveSession(name, agentType, sessionId, server) {
 }
 
 import { historyServer, historyRoute } from './history_source.js';
+import { markRead } from './inbox_read.js';
 import { describeChat } from './history_list.js';
 import { setBackLink } from './sidebar_groups.js';
 
@@ -427,6 +428,7 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
     const fromSource = x => x.session_id === sessionId && (x.server || (isCloud() ? source : 'local')) === source;
     const route = normalize(historyRoute(sessionId));
     if (!route || (isCloud() && !source)) return false;
+    markRead(String(sessionId).startsWith('board:') ? 'board' : 'chat', `${source || 'local'}:${sessionId}`, Date.now()); // opened, by the list, an address (/inbox/chats/...), a saved message or a link: read as of now (#9687); the Inbox's list reads the same key
     const generation = ++switchGeneration;
     stopCaptureRefresh();
     leaveSessionOwnership();
