@@ -74,7 +74,7 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`);
 
             // Restart: one screen, the same rectangle as New agent, on all four tabs, and the Provider warning moves nothing
-            await S.run(`${label}: Restart Session is the same rectangle on its persona step and its three tabs (Model, Permissions, Advanced), and the provider is fixed`, async () => {
+            await S.run(`${label}: Restart Session is the same rectangle on its persona step and its three tabs (Model, Permissions, Advanced), and the Model tab has the provider choice`, async () => {
                 await ev(`window.__m.add('qa-agent', 'A', 3, { sleeping: false }); T.render.renderLiveSessions(T.state.liveSessions); true`);
                 await select('qa-agent');
                 await ev(`(async () => { await window.restartSession(); return true; })()`);
@@ -88,7 +88,9 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
                 const names = await ev(`(() => { const tl = window.__na.dialog().querySelector('[role=tablist]'); const tabs = tl ? [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(t => window.__na.name(t)) : []; return tabs.length ? tabs : [...window.__na.find('select', /section$/i).options].map(o => o.textContent.trim()); })()`);
                 assert.deepEqual(names, ['Model', 'Permissions', 'Advanced'], 'Restart has three sections: the agent is fixed, so no Agent step');
                 for (const t of ['Model', 'Permissions', 'Advanced']) { await section(t); same(base, await rect(), `Restart tab ${t}`); }
-                assert.equal(await ev(`[...window.__na.dialog().querySelectorAll('[role=radiogroup]')].some(e => ${N.provider}.test(window.__na.name(e)))`), false, 'no provider choice: the provider is fixed');
+                await section('Model'); // #8973: Restart's Model tab has New Agent's provider picker (the agent's own provider is chosen), so a restart may switch the provider
+                const pick = await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.provider}.test(window.__na.name(e))); if (!g) return null; const rs = window.__na.radios(g); return { n: rs.length, on: rs.filter(r => r.checked || r.getAttribute('aria-checked') === 'true').length }; })()`);
+                assert.ok(pick && pick.n >= 2 && pick.on === 1, 'the Model tab has the provider choice, the agent\'s own provider chosen: ' + JSON.stringify(pick));
                 await click('button', N.cancel); await waitFor(`!window.__na.dialog()`, 'Cancel closes Restart', 4000);
             });
             await ev(`document.documentElement.style.fontSize = ''; true`);
