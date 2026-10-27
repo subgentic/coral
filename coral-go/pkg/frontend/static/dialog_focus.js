@@ -69,9 +69,15 @@ export function attachDialogFocus(dialog) {
         // this one (Settings' Themes and Default Prompts buttons). Back into a dialog that is still
         // open is right: a confirmation asked from Settings, cancelled or escaped, gives focus back to
         // the button in Settings that asked (it dropped to the page: UX on #4500).
-        const now = document.activeElement;
-        const behind = [...document.querySelectorAll('.modal')].some(m => m !== dialog && isShown(m) && m.getClientRects().length > 0 && !m.contains(back));
-        if (back && !behind && (!now || now === document.body || dialog.contains(now))) back.focus();
+        // A dialog closed by answering a question (Team settings: "Leave" on the unsaved question) closes before the question's own dialog has finished hiding, so it looks like one opened from this one:
+        // it is looked at again a frame later, once, and focus goes back then (#9062: it fell to the page about half the time).
+        const restore = (again) => {
+            const now = document.activeElement;
+            const behind = [...document.querySelectorAll('.modal')].some(m => m !== dialog && isShown(m) && m.getClientRects().length > 0 && !m.contains(back));
+            if (back && !behind && (!now || now === document.body || dialog.contains(now))) back.focus();
+            else if (back && behind && again) requestAnimationFrame(() => restore(false));
+        };
+        restore(true);
     };
     dialog._focusRestore = onClose;
     new MutationObserver(() => {
