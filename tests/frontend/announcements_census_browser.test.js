@@ -73,7 +73,7 @@ const S = `(window.__coralStatic || '/static/')`;
             }, { must: [[/data folder can be read/, 'the security warning'], [/Windows Firewall lets/, 'the firewall warning']] });
             // a notice with no toast on screen: the Notifications column is not drawn then (no empty landmark), and its words must still be said (#6226: they were not, the regions sat inside it)
             await scene(`${tag}: a notice with no toast`, async () => {
-                await ev(`document.querySelectorAll('.toast, .update-toast').forEach(e => e.remove()); import(${S} + 'notifications.js').then(n => n.announceNotice('A computer came back online.')); true`);
+                await ev(`document.querySelectorAll('.toast, .update-toast').forEach(e => e.remove()); import(${S} + 'notifications.js').then(n => { n.announceNotice('A computer came back online.'); return true; })`);
                 await wait(1200); // sleep-ok: an announcement is timed; there is no event to wait for
             }, { must: [[/came back online/, 'a notice with no toast']] });
             await scene(`${tag}: toasts and notices`, async () => {
