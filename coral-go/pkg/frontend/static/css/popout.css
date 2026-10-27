@@ -33,7 +33,7 @@ body.popout-mode .main-content {
 body.popout-mode .terminal-session-label {
     font-family: inherit;
     font-size: var(--fs-md);
-    font-weight: 600;
+    font-weight: var(--fw-strong);
     color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;

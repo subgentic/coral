@@ -11,7 +11,7 @@
 #settings-modal .modal-header h3 { font: var(--dlg-title); }
 #settings-modal .settings-pane-title { font: var(--dlg-pane); }
 #settings-modal .settings-tab { font: 400 0.875rem/1.35 var(--font-sans); }
-#settings-modal .settings-tab[aria-selected="true"] { font-weight: 600; }
+#settings-modal .settings-tab[aria-selected="true"] { font-weight: var(--fw-strong); }
 #settings-modal .settings-tab, #settings-modal .settings-tab[aria-selected="true"] { transition: none; }
 #settings-modal :is(dt, dt label, .toggle-dt label, .tb-label, summary) { font: var(--dlg-label); }
 #settings-modal :is(input, select, textarea) { font: var(--dlg-control); }

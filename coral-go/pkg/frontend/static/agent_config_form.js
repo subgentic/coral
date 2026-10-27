@@ -340,7 +340,7 @@ function acfPermEditorHtml(uid, open) {
                     <div id="${escapeAttr(uid)}-perms-deny" class="perms-chips" role="group" aria-labelledby="${escapeAttr(uid)}-perms-deny-label"></div>
                 </div>
                 <div class="perms-shell-patterns" style="display:none">
-                    <label class="perms-label">Shell patterns <span style="color:var(--text-muted);font-weight:normal">(comma-separated)</span> <span class="perms-patterns-note settings-hint"></span></label>
+                    <label class="perms-label">Shell patterns <span style="color:var(--text-muted);font-weight:var(--fw-regular)">(comma-separated)</span> <span class="perms-patterns-note settings-hint"></span></label>
                     <input type="text" class="perms-shell-input" aria-label="Shell patterns, comma-separated" placeholder="e.g. git *, npm *, npx *">
                 </div>
             </div>`;
@@ -367,7 +367,7 @@ function drawAcfForm(container, uid, opts, f) {
         <div class="permissions-section">
             <button type="button" class="permissions-toggle-btn" data-on-click="perms-toggle" data-target="${escapeAttr(uid + '-perms')}">
                 <svg class="permissions-chevron" width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M6 4l4 4-4 4z"/></svg>
-                Permissions <span class="acf-perms-summary" style="color:var(--text-muted);font-weight:normal;font-size:var(--fs-sm)">(${escapeHtml(permsSummary)})</span>
+                Permissions <span class="acf-perms-summary" style="color:var(--text-muted);font-weight:var(--fw-regular);font-size:var(--fs-sm)">(${escapeHtml(permsSummary)})</span>
             </button>
             ${permEditorHTML(false)}
         </div>
