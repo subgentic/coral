@@ -47,7 +47,7 @@ const BASE = require('./test_base').BASE;
                     if (g) assert.ok(g.badgeRight <= g.nextWord && g.wide, at + `${zoom * 100}% text: the "99+" badge ends before the next tab's word: ` + JSON.stringify(g));
                 }
                 await ev(`document.documentElement.style.fontSize = ''; true`);
-                await waitFor(`!!document.getElementById('nav-tab-hub-inbox')`, 'the tabs', 3000); await new Promise(r => setTimeout(r, 800)); // sleep-ok: the tab row measures itself again when the text size goes back
+                { const until = Date.now() + 3000; while (Date.now() < until && JSON.stringify(await tabs()) !== JSON.stringify(none)) await new Promise(r => setTimeout(r, 100)); } // sleep-ok: the tab row measures itself again when the text size goes back; it is waited for until it is where it was
             }
             await waiting(0);
             assert.deepEqual(await tabs(), none, at + 'and the tabs are where they were when the badge goes');
