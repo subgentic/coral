@@ -166,22 +166,22 @@ func (h *BoardHandler) applyTaskEdit(ctx context.Context, project string, taskID
 // or ready (nudging a ready task's assignee); a pending task given to someone new nudges them to claim it, unless
 // that nudge was just sent or they are busy with another task.
 func (h *BoardHandler) announceTaskEdit(ctx context.Context, project string, reassigned bool, before, task *board.Task, prevStatus string) {
-	h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf("[Task #%d edited] %s", task.ID, taskNoticeText(task.Title)), nil)
+	h.postNotice(ctx, project, fmt.Sprintf("[Task #%d edited] %s", task.ID, h.noticeText(ctx, project, task.Title)))
 	assignee := taskAssignee(task)
 	nudged := false
 	parked := task.Parked(time.Now()) // a parked task is set aside: nobody is nudged to start it (#5183)
 	switch {
 	case prevStatus == "pending" && task.Status == "blocked":
 		if assignee != "" {
-			msg := fmt.Sprintf("[Task #%d blocked] %s — @%s task is now blocked, please pause work", task.ID, taskNoticeText(task.Title), assignee)
-			h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", msg, nil)
+			msg := fmt.Sprintf("[Task #%d blocked] %s — @%s task is now blocked, please pause work", task.ID, h.noticeText(ctx, project, task.Title), assignee)
+			h.postNotice(ctx, project, msg)
 		}
 	case prevStatus == "blocked" && task.Status == "pending":
-		msg := fmt.Sprintf("[Task #%d unblocked] %s", task.ID, taskNoticeText(task.Title))
+		msg := fmt.Sprintf("[Task #%d unblocked] %s", task.ID, h.noticeText(ctx, project, task.Title))
 		if assignee != "" {
 			msg += fmt.Sprintf(" — @%s your task is now ready", assignee)
 		}
-		h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", msg, nil)
+		h.postNotice(ctx, project, msg)
 		if assignee != "" && !parked {
 			h.sendTaskNudge(ctx, project, assignee, taskClaimNudge(task.ID))
 			nudged = true
@@ -250,11 +250,11 @@ func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 		if beforeTextTask != nil && task.Version > beforeTextTask.Version {
 			h.announceTaskTextEdit(context.Background(), project, body.SubscriberID, beforeTextTask, task)
 		}
-		notice := fmt.Sprintf("[Task #%d amended to revision %d] %s", task.ID, task.Revision, taskNoticeText(task.Title))
+		notice := fmt.Sprintf("[Task #%d amended to revision %d] %s", task.ID, task.Revision, h.noticeText(context.Background(), project, task.Title))
 		if task.AssignedTo != nil && *task.AssignedTo != "" {
 			notice += fmt.Sprintf(" — @%s reread task detail before acting", *task.AssignedTo)
 		}
-		h.bs.PostSystemMessage(context.Background(), project, "Coral Task Queue", notice, nil)
+		h.postNotice(context.Background(), project, notice)
 	})
 	writeJSON(w, http.StatusOK, task)
 }
@@ -313,11 +313,11 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 			if t.AssignedTo != nil {
 				assignee = *t.AssignedTo
 			}
-			msg := fmt.Sprintf("[Task #%d blocked] %s", t.ID, taskNoticeText(t.Title))
+			msg := fmt.Sprintf("[Task #%d blocked] %s", t.ID, h.noticeText(ctx, t.BoardID, t.Title))
 			if assignee != "" {
 				msg += fmt.Sprintf(" — @%s task is blocked again, please pause work", assignee)
 			}
-			h.bs.PostSystemMessage(ctx, t.BoardID, "Coral Task Queue", msg, nil)
+			h.postNotice(ctx, t.BoardID, msg)
 		}
 	})
 	writeJSON(w, http.StatusOK, task)
@@ -364,17 +364,17 @@ func (h *BoardHandler) PublishTask(w http.ResponseWriter, r *http.Request) {
 		h.goBG(func() {
 			deps, _ := h.bs.GetTaskDependencies(context.Background(), task.ID)
 			blockerList := formatBlockerList(deps)
-			notification := fmt.Sprintf("[Task #%d published (blocked)] %s — blocked by %s", task.ID, taskNoticeText(task.Title), blockerList)
-			h.bs.PostSystemMessage(context.Background(), project, "Coral Task Queue", notification, nil)
+			notification := fmt.Sprintf("[Task #%d published (blocked)] %s — blocked by %s", task.ID, h.noticeText(context.Background(), project, task.Title), h.noticeText(context.Background(), project, blockerList))
+			h.postNotice(context.Background(), project, notification)
 		})
 	} else {
 		h.goBG(func() {
 			ctx := context.Background()
-			notification := fmt.Sprintf("[Task #%d published] %s", task.ID, taskNoticeText(task.Title))
+			notification := fmt.Sprintf("[Task #%d published] %s", task.ID, h.noticeText(ctx, project, task.Title))
 			if assignee != "" {
 				notification += fmt.Sprintf(" — @%s", assignee)
 			}
-			h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", notification, nil)
+			h.postNotice(ctx, project, notification)
 
 			if assignee != "" {
 				hasActive, _ := h.bs.HasActiveTaskForAssignee(ctx, project, assignee, task.ID)
