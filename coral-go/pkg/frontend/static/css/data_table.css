@@ -340,3 +340,7 @@
     .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell { flex-wrap: wrap; align-items: baseline; row-gap: 0; }
     .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { flex: 1 1 100%; min-width: 8rem; max-width: 100%; margin-block: 0; white-space: normal; overflow: visible; overflow-wrap: normal; word-break: normal; text-overflow: clip; }
 }
+
+/* The dock's task list stays one line, including on phones (#8792). */
+#board-task-list .dt-box { --table-row-h: var(--table-touch); }
+#board-task-list .dt-primary { display: block; width: 100%; min-width: var(--table-touch); min-height: var(--table-touch); }
