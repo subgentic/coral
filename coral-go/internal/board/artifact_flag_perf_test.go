@@ -134,6 +134,38 @@ func TestAnOlderDatabaseGetsTheFlagBackfilledOnOpen(t *testing.T) {
 	assert.Equal(t, 1, n)
 }
 
+// #9138: a task saved by an older Coral (after a rollback and a second upgrade) has no flag; the next open flags it, so it is in the Team Artifacts list again.
+func TestARowWrittenWithoutTheFlagIsFlaggedOnTheNextOpen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "board.db")
+	s, err := NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	ctx := context.Background()
+	_, err = s.Subscribe(ctx, "team", "Dev", "Dev", "dev-session", nil, "mentions")
+	require.NoError(t, err)
+	flaggedID := completeWith(t, s, ctx, "Dev", "saved by this version", true)
+	oldID := completeWith(t, s, ctx, "Dev", "saved by the older version", true)
+	completeWith(t, s, ctx, "Dev", "no artifacts", false)
+	// the older Coral wrote this result and knows no flag: the column's default, 0
+	_, err = s.db.ExecContext(ctx, `UPDATE task_workflows SET has_artifacts = 0 WHERE task_id = ?`, oldID)
+	require.NoError(t, err)
+	before, _, err := s.ListTeamArtifactTasksQuery(ctx, TeamArtifactQuery{Project: "team", Limit: MaxTeamArtifactTaskScan})
+	require.NoError(t, err)
+	require.Len(t, before, 1, "unflagged: missing from the list until the next open")
+	require.NoError(t, s.Close())
+
+	s, err = NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	defer s.Close()
+	after, _, err := s.ListTeamArtifactTasksQuery(ctx, TeamArtifactQuery{Project: "team", Limit: MaxTeamArtifactTaskScan})
+	require.NoError(t, err)
+	var got []int64
+	for _, tk := range after {
+		got = append(got, tk.TaskID)
+	}
+	sort.Slice(got, func(i, j int) bool { return got[i] < got[j] })
+	assert.Equal(t, []int64{flaggedID, oldID}, got, "both artifact-bearing tasks, and not the one without")
+}
+
 // With a board of thousands of tasks and a few with artifacts, the flagged read is much faster than the LIKE over every blob it replaced (the timings are logged).
 func TestTheFlaggedReadBeatsTheScanOverEveryWorkflowBlob(t *testing.T) {
 	if testing.Short() {
@@ -186,11 +218,21 @@ func TestOpenTaskStatesAreTheOpenTasksWithoutTheirText(t *testing.T) {
 		}
 	}
 	completeWith(t, s, ctx, "QA", "done", false) // not open: in neither (QA has nothing in progress)
+	// the statuses the open read includes (blocked, draft) and the one it leaves out (review_pending): both reads must agree on each, so adding a status to one of them fails here
+	for status, title := range map[string]string{"blocked": "blocked one", "draft": "draft one", "review_pending": "waiting for its review"} {
+		task, err := s.CreateTask(ctx, "team", title, "body", "medium", "Lead", "Dev")
+		require.NoError(t, err)
+		_, err = s.db.ExecContext(ctx, `UPDATE board_tasks SET status = ? WHERE id = ?`, status, task.ID)
+		require.NoError(t, err)
+	}
 	wide, err := s.ListOpenTasks(ctx, "team")
 	require.NoError(t, err)
 	narrow, err := s.ListOpenTaskStates(ctx, "team")
 	require.NoError(t, err)
 	require.Len(t, narrow, len(wide))
+	for _, tk := range narrow {
+		assert.NotEqual(t, "review_pending", tk.Status, "a task waiting for its review is not an open task here")
+	}
 	for i := range wide {
 		w, n := wide[i], narrow[i]
 		assert.Equal(t, w.ID, n.ID)
