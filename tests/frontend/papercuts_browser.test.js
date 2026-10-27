@@ -217,7 +217,8 @@ const BASE = require('./test_base').BASE;
         // ── (10)(11) Phone: team-send button. (The nav strip and its edge fade are gone: the phone has a bottom tab bar, nav_tabs_browser, #3785.)
         await open(390, 844, true);
         // (#7063) the team reminder is behind Send options, as on a desktop: a caret with a name, and the item inside it says what it sends
-        const team = await ev(`(() => { const b = document.querySelector('.mobile-send-options-btn'); const i = [...document.querySelectorAll('.mobile-send-menu .send-menu-item')].find(e => /team reminder/.test(e.textContent)); // the menu's first item is Model and thinking (#9021): the reminder is found by its words return b && { label: b.getAttribute('aria-label'), title: b.title, icon: !!b.querySelector('.material-icons'), text: b.textContent.replace('expand_more', '').trim(), item: i && i.textContent.trim(), action: i && i.getAttribute('data-on-click') }; })()`);
+        // the menu's first item is Model and thinking (#9021): the team reminder is found by its words
+        const team = await ev(`(() => { const b = document.querySelector('.mobile-send-options-btn'); const i = [...document.querySelectorAll('.mobile-send-menu .send-menu-item')].find(e => /team reminder/.test(e.textContent)); return b && { label: b.getAttribute('aria-label'), title: b.title, icon: !!b.querySelector('.material-icons'), text: b.textContent.replace('expand_more', '').trim(), item: i && i.textContent.trim(), action: i && i.getAttribute('data-on-click') }; })()`);
         assert.ok(team, 'the Send options button exists');
         assert.equal(team.label, 'Send options');
         assert.ok(team.icon, 'an icon, not "+T"');

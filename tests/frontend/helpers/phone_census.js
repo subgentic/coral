@@ -78,8 +78,10 @@ module.exports = part => (async () => {
             await ev(`import(${S} + 'session_header_updates.js').then(m => m.updateWaitingIndicator({ session_id: ${JSON.stringify(standIn.sid)}, name: ${JSON.stringify(standIn.name)}, agent_type: 'claude', working: false })).then(() => true)`);
             await sc('composer: model menu', async () => {
                 await ev(`import(${S} + 'model_chip.js').then(m => m.updateModelChip({ session_id: ${JSON.stringify(standIn.sid)}, name: ${JSON.stringify(standIn.name)}, agent_type: 'claude', model: 'claude-sonnet-5-5', sleeping: false, archived: false }, 'local')).then(() => true)`);
-                await waitFor(`document.getElementById('options-chip').getClientRects().length > 0`, 'the Options button (the chips are behind it on a phone, #7623)', 10000);
-                await tap('#options-chip');
+                await waitFor(`(document.querySelector('.mobile-send-options-btn') || { getClientRects: () => [] }).getClientRects().length > 0`, 'the send chevron (the chips are behind its Model and thinking item on a phone, #7623, #9021)', 10000);
+                await tap('.mobile-send-options-btn');
+                await waitFor(`!!document.querySelector('.mobile-send-menu [data-on-click="send-menu-options"]') && document.querySelector('.mobile-send-menu [data-on-click="send-menu-options"]').getClientRects().length > 0`, 'the chevron menu', 5000);
+                await tap('.mobile-send-menu [data-on-click="send-menu-options"]');
                 await waitFor(`!document.getElementById('options-chip-menu').hidden`, 'the Options sheet', 5000);
                 await tap('#options-chip-menu [data-options-open="model"]');
             }, { min: 10, expect: `!document.getElementById('model-chip-menu').hidden` });

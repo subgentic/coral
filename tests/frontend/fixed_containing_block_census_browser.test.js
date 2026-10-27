@@ -80,7 +80,7 @@ const SCAN = `(() => { const sel = e => (e.id ? '#' + e.id : e.tagName.toLowerCa
                 await ev(`window.selectLiveSession('solo', 'claude', 'solo-id', 'local'); true`); await sleep(500); // sleep-ok: the agent view draws
                 await ev(`(() => { const a = window.__m.agents['solo-id']; T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ ...window.__m.entry(a), model: 'claude-opus-5-5', thinking_actual: 'high' }] }); return true; })()`);
                 await ev(`import(${S} + 'worktree_notice.js').then(m => { m.showWorktreeNotice({ state: 'kept', path: '/tmp/wt/census', branch: 'coral-team/census', reason: 'it has uncommitted changes' }, 'team'); return true; })`);
-                await waitFor(`!!document.getElementById('model-chip-bar') && !document.getElementById('model-chip-bar').hidden && (document.getElementById('model-chip').getClientRects().length > 0 || document.getElementById('options-chip').getClientRects().length > 0)`, 'the model chip, or on a phone the Options button', 10000);
+                await waitFor(`!!document.getElementById('model-chip-bar') && !document.getElementById('model-chip-bar').hidden && (document.getElementById('model-chip').getClientRects().length > 0 || (document.querySelector('.mobile-send-options-btn') || { getClientRects: () => [] }).getClientRects().length > 0)`, 'the model chip, or on a phone the send chevron that holds it (the Options button is not drawn since #9021)', 10000);
                 for (const hh of [844, 464]) {
                     await Emulation.setDeviceMetricsOverride({ width: w, height: hh, deviceScaleFactor: 1, mobile });
                     await sleep(500); // sleep-ok: layout settles after a resize

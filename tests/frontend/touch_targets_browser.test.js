@@ -249,6 +249,15 @@ const UNDERSIZED = `(() => {
             await waitFor(`!!document.querySelector('.cloud-account-btn')`, 'the hub account button', { soft: true, timeout: 8000 });
             const where = await ev(`({ path: location.pathname, mode: (document.getElementById('coral-boot') || {}).textContent, cloud: document.body.classList.contains('cloud-mode'), btn: !!document.querySelector('.cloud-account-btn') })`);
             assert.ok(where.btn, 'the hub account button is shown: ' + JSON.stringify(where));
+            // Under 640 px the account is entries of the hamburger's menu (#9021): the four rows are measured there; the account dropdown itself is measured at 700 px
+            await ev(`document.getElementById('top-menu-btn').click(); true`);
+            await waitFor(`[...document.querySelectorAll('#nav-more-menu:not([hidden]) .nav-more-item')].some(e => /Sign out/.test(e.textContent))`, 'the hamburger menu with the account entries', { soft: true });
+            const menuTexts = await ev(`[...document.querySelectorAll('#nav-more-menu:not([hidden]) .nav-more-item')].map(e => e.textContent.replace(/\\s+/g, ' ').trim())`);
+            for (const word of ['Servers', 'Account', 'Saved for later', 'Sign out']) assert.ok(menuTexts.some(t => t.includes(word)), `the hamburger menu has ${word}: ` + JSON.stringify(menuTexts));
+            const hamburgerRows = await menuRows('#nav-more-menu:not([hidden]) .nav-more-item');
+            for (const [w, h] of hamburgerRows) assert.ok(w >= 44 && h >= 44, `hamburger menu row ${w}x${h} under 44px`);
+            await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+            await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: true });
             await ev(`document.querySelector('.cloud-account-btn').click()`);
             await waitFor(`[...document.querySelectorAll('#cloud-account-menu .overflow-menu-item')].filter(e => e.getBoundingClientRect().height).length >= 4`, 'the account dropdown', { soft: true });
             const accountRows = await menuRows('#cloud-account-menu .overflow-menu-item');
