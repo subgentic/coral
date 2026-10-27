@@ -9,6 +9,7 @@ import { go, note, backIs, currentRoute } from './nav.js';
 import { registerActions, textOf } from './actions.js';
 import { registerGroupSource, openGroupTable, refreshGroupTable } from './sidebar_groups.js';
 import { setHidden } from './dom_write.js';
+import { announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
 import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf } from './scheduler.js';
 import { lastWords, atWords, whenWords } from './job_words.js';
@@ -188,6 +189,7 @@ let _gone = '', _goneTimer = 0; // 'Deleted greet-hourly.': the Jobs page says a
 /** The Jobs page says a job was deleted, under its title, for twelve seconds. */
 export function noteJobDeleted(name) {
     _gone = `Deleted ${name}.`; clearTimeout(_goneTimer);
+    announceNotice(_gone); // the line arrives already filled, which a screen reader does not reliably say: the notices' own live region says it
     _goneTimer = setTimeout(() => { _gone = ''; renderNav(true); }, 12000);
 }
 function folderTable(key) {

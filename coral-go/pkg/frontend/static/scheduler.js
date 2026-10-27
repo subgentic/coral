@@ -3,6 +3,7 @@
 import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
 import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent } from './utils.js';
+import { announceNotice } from './notifications.js';
 import { registerActions, withId, uuidOf } from './actions.js';
 import { pollEvery } from './overload.js';
 import { showJobModal, editScheduledJob } from './job_form.js';
@@ -148,7 +149,9 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
     ].filter(Boolean);
 
     const saved = _saved && _saved.id === job.id ? _saved : null; _saved = null;
-    const savedLine = saved ? `<p class="item-meta sched-saved" role="status">${saved.kind === 'updated' ? 'Updated.' : 'Created.'}${job.enabled && job.next_fire_at ? ` Next run ${escapeHtml(atWords(job.next_fire_at))} your time.` : ''}</p>` : '';
+    const savedWords = saved ? `${saved.kind === 'updated' ? 'Updated.' : 'Created.'}${job.enabled && job.next_fire_at ? ` Next run ${atWords(job.next_fire_at)} your time.` : ''}` : '';
+    if (saved) announceNotice(savedWords); // the line arrives already filled, which a screen reader does not reliably say: the notices' own live region says it (QA Reviewer 2)
+    const savedLine = saved ? `<p class="item-meta sched-saved" role="status">${escapeHtml(savedWords)}</p>` : '';
 
     const moreId = `sched-more-${Number(job.id)}`;
     const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Paused'), lastWords(job.last_run), job.enabled && job.next_fire_at ? `next ${awayWords(job.next_fire_at)}` : ''].filter(Boolean).join(' \u00b7 ');
