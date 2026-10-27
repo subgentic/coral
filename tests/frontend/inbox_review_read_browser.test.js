@@ -92,6 +92,11 @@ const BASE = require('./test_base').BASE;
                 await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent==='2'`,'the badge counts it again (the viewer-opened item stays read)');
                 assert.deepEqual(await ev(`window.__tagWrites.at(-1)`),['for review'],'the read tag is taken off');
                 assert.ok(await ev(`!(${row('Read me 1.txt')}).querySelector('.inbox-review-item')`),'the tag is gone from the row');
+                // Mark reviewed also reads the tags fresh: a tag added meanwhile is kept, and the read tag goes with the review tag (#9299)
+                await ev(`window.__reviewItems[1].tags=['for review','team-tag'];true`);
+                await click('Read me 2.txt','Mark reviewed');
+                await waitFor(`!(${row('Read me 2.txt')})`,'the reviewed row goes');
+                assert.deepEqual((await ev(`window.__tagWrites.at(-1)`)).sort(),['reviewed','team-tag'],'Mark reviewed keeps the tag added meanwhile');
                 console.log('PASS review read '+width);
             } catch(error){failures.push(width+': '+error.message);console.error(failures.at(-1));}
         }
