@@ -117,11 +117,11 @@ export function showTeamAvailability(team) {
     dialog.id = 'team-availability-dialog';
     dialog.className = 'dlg-flow team-availability-dialog';
     dialog.setAttribute('aria-labelledby', 'availability-title');
-    const actions = '<button type="button" data-dialog-close aria-label="Close team view">×</button>';
-    dialog.innerHTML = `<header><div><h2 id="availability-title">Team view</h2><p>${escapeHtml(keyLabel(team))}</p></div>${actions}</header>
+    dialog.innerHTML = `<header><div><h2 id="availability-title">Team view</h2><p>${escapeHtml(keyLabel(team))}</p></div></header>
         <div class="availability-toolbar"><button type="button" class="btn btn-small">Refresh</button></div>
         <p class="sr-only availability-status" role="status"></p>
-        <div class="availability-content"></div>`; // the live region is the one line above, not the whole view: a Refresh says what changed, it does not read every card again
+        <div class="availability-content"></div>
+        <div class="modal-actions"><button type="button" class="btn" data-dialog-close>Close</button></div>`; // the live region is the one line above, not the whole view: a Refresh says what changed, it does not read every card again
     document.body.append(dialog);
     const refresh = dialog.querySelector('.availability-toolbar button');
     const content = dialog.querySelector('.availability-content');

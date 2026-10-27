@@ -60,7 +60,6 @@ export async function showTemplateBrowser(type, onSelect) {
             <div class="template-browser-header">
                 <h3>${type === 'agents' ? 'Agent Templates' : 'Command Templates'}</h3>
                 <input type="text" class="field template-browser-search" placeholder="Filter templates...">
-                <button class="btn template-browser-close" data-on-click="template-browser-close">&times;</button>
             </div>
             <div style="font-size:var(--fs-sm);color:var(--text-muted);padding:4px 0 8px">
                 Templates from <a href="https://www.aitmpl.com/${type === 'agents' ? 'agents' : 'commands'}" target="_blank" rel="noopener" style="color:var(--accent)">aitmpl.com</a>
@@ -76,6 +75,7 @@ export async function showTemplateBrowser(type, onSelect) {
                     <div class="empty-state empty-state-tight">Select a template to preview</div>
                 </div>
             </div>
+            <div class="modal-actions"><button class="btn" data-on-click="template-browser-close">Close</button></div>
         </div>
     `;
     document.body.appendChild(modal);

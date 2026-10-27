@@ -2373,12 +2373,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .template-browser-search { flex: 1; }
 
 
-.template-browser-close {
-    font-size: var(--icon-size);
-    padding: 2px 8px !important;
-    min-width: 0;
-}
-
 .template-browser-body {
     display: flex;
     gap: 1px;
