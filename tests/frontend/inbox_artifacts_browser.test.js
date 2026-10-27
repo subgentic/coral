@@ -73,6 +73,8 @@ const WORLD = `(() => {
             await ev(`(document.querySelector('#group-table-view .list-bar-filter-btn, #group-table-view [aria-controls$="-menu"]') || {}).click?.(); true`);
             await waitFor(`!!document.getElementById('ia-team')`, `${label}: the Team field`, 5000);
             await shot(`inbox-artifacts-${label}-filters`); // the Filters panel open: the fields, Kept only beside its box
+            const heights = await ev(`Object.fromEntries(['ia-team', 'ia-by', 'ia-from'].map(id => { const e = document.getElementById(id); return [id, e ? Math.round(e.getBoundingClientRect().height) : -1]; }))`);
+            check(`${label}: Uploaded by is a one-line box like Team and From, not a tall empty one`, heights['ia-by'] > 0 && Math.abs(heights['ia-by'] - heights['ia-team']) <= 2 && Math.abs(heights['ia-by'] - heights['ia-from']) <= 2, JSON.stringify(heights)); // a datalist after the input made the panel's column rule miss it, and the panel's 9rem flex basis became its height (#8802)
             await ev(`(() => { const s = document.getElementById('ia-team'); s.value = 'beta'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, `${label}: the rows narrowed to the team`, 8000);
             check(`${label}: the Team filter asks the route for that team`, (await ev(`window.__ta.some(q => /(^|[?&])team=beta(&|$)/.test(q))`)));
