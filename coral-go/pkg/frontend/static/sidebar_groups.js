@@ -16,6 +16,7 @@ import { importOnce } from './import_once.js';
 
 const sources = new Map();
 const TAB_NAME = { 'hub-inbox': 'Inbox', history: 'Chats', workflows: 'Workflows', jobs: 'Jobs', docs: 'Docs' }; // what a phone's way back from a table is named for (#7734)
+const LAZY_SOURCES = { 'hub-inbox': './inbox_sidebar.js' }; // the module that registers a source this file may be asked to open before it has loaded
 const LANDING = '*'; // the key of the page that lists every group (a source with landing: true)
 const KEY = kind => `coral-sidebar-groups-${kind}`;
 
@@ -238,7 +239,12 @@ export function setBackLink(id, kind, group) {
 }
 
 registerActions({
-    'sgroup-open': el => { const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group); if (kind && key && !openGroupTable(kind, key, { focus: true })) sources.get(kind)?.showList?.(); }, // a group that has gone (a filter, a fold of the list) leaves for the tab's own page
+    'sgroup-open': el => {
+        const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group); if (!kind || !key) return;
+        const open = () => { if (!openGroupTable(kind, key, { focus: true })) sources.get(kind)?.showList?.(); };
+        // A chat opened by a link or a reload says "<- folder" before the Inbox module that registers its source has loaded (#8817): the press waits for it, not for a second press.
+        if (!sources.has(kind) && LAZY_SOURCES[kind]) importOnce(LAZY_SOURCES[kind]).then(open, () => {}); else open();
+    }, // a group that has gone (a filter, a fold of the list) leaves for the tab's own page
     'sgroup-chevron': (el, event) => { event.stopPropagation(); const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group); if (kind && key) toggleGroupFold(kind, key); },
     'sgroup-key': (el, event) => {
         if (event.target !== el || (event.key !== 'Enter' && event.key !== ' ')) return;
