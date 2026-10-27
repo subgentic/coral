@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -147,7 +148,14 @@ func (h *SessionsHandler) teamAvailabilityUncached(w http.ResponseWriter, r *htt
 		exists, _ = h.bs.BoardExists(ctx, name)
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, map[string]any{"board": name, "team": name, "exists": exists, "working_mode": mode, "observed_at": time.Now().UTC().Format(time.RFC3339), "agents": agents, "summary": availabilitySummary(agents), "unassigned_tasks": boardTasksAssignedTo(snap.tasks, ""), "health_report": availabilityHealthReport(snap.tasks)})
+	out := map[string]any{"board": name, "team": name, "exists": exists, "working_mode": mode, "agents": agents, "summary": availabilitySummary(agents), "unassigned_tasks": boardTasksAssignedTo(snap.tasks, ""), "health_report": availabilityHealthReport(snap.tasks)}
+	// The validator is of the status without its clock: a poll that finds nothing changed gets a 304 with no body, though observed_at moved on (#9337).
+	if tag := httputil.JSONValidator(out); tag != "" {
+		w.Header().Set("ETag", tag)
+		w.Header().Set(httputil.ValidatorHeader, tag)
+	}
+	out["observed_at"] = time.Now().UTC().Format(time.RFC3339)
+	writeJSON(w, http.StatusOK, out)
 }
 
 // loadBoardStatus reads the board's sessions, subscribers, tasks, terminals, state events, waits and personal tasks,

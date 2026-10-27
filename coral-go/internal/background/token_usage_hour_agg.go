@@ -65,6 +65,24 @@ func (j *TokenUsageHourAgg) RunOnce(ctx context.Context) int {
 		case <-time.After(j.Pause):
 		}
 	}
+	// The rolled-up hourly rows are summed by day the same way (#9337); a day is cheap beside the hours, so the cap is the days of a month.
+	for days := 0; days < 31 && ctx.Err() == nil; {
+		n, err := j.db.RefreshTokenUsageDayAgg(ctx, j.now(), 8)
+		days += n
+		if err != nil {
+			if ctx.Err() == nil {
+				j.logger.Warn("token usage day aggregate: refresh failed", "error", err)
+			}
+			break
+		}
+		if n < 8 {
+			break
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(j.Pause):
+		}
+	}
 	if hours > 2 {
 		j.logger.Info("token usage hour aggregate", "hours", hours, "took_ms", j.now().Sub(started).Milliseconds())
 	}

@@ -56,6 +56,17 @@ func WriteJSONValidated(w http.ResponseWriter, r *http.Request, status int, v an
 	_, _ = w.Write(gz.Bytes())
 }
 
+// JSONValidator is the weak validator WriteJSONValidated would send for v: a hash of its JSON. A caller that writes its own reply (a shared one, replayed
+// to several requests) sets it as ETag and ValidatorHeader, and the reply's writer answers 304 to a request that names it (#9337).
+func JSONValidator(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(b)
+	return `W/"` + hex.EncodeToString(sum[:12]) + `"`
+}
+
 // ETagMatches reports whether an If-None-Match header names etag, by weak comparison
 // (RFC 9110 13.1.2): "*", or any listed tag equal to it once a W/ prefix is ignored.
 func ETagMatches(ifNoneMatch, etag string) bool {
