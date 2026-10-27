@@ -422,7 +422,7 @@
     },
     {
       "name": "board_tasks",
-      "sql": "CREATE TABLE board_tasks (\n\t\t\tid INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\trevision INTEGER NOT NULL DEFAULT 1,\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\ttitle TEXT NOT NULL,\n\t\t\tbody TEXT,\n\t\t\tstatus TEXT NOT NULL DEFAULT 'pending'\n\t\t\t\tCHECK (status IN ('pending', 'in_progress', 'completed', 'skipped', 'blocked', 'draft', 'review_pending')),\n\t\t\tpriority TEXT NOT NULL DEFAULT 'medium'\n\t\t\t\tCHECK (priority IN ('critical', 'high', 'medium', 'low')),\n\t\t\tcreated_by TEXT NOT NULL,\n\t\t\tassigned_to TEXT,\n\t\t\tcompleted_by TEXT,\n\t\t\tcompletion_message TEXT,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tclaimed_at TEXT,\n\t\t\tcompleted_at TEXT,\n\t\t\tlast_activity_at TEXT,\n\t\t\tidle_snoozed_until TEXT\n\t\t, session_id TEXT, cost_usd REAL, input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, parked_reason TEXT, parked_until TEXT, remind_at TEXT, reminded_at TEXT, edited_at TEXT, goal_id INTEGER, remote_board_uid TEXT, remote_goal_uid TEXT, request_id TEXT, request_server TEXT, request_board TEXT)",
+      "sql": "CREATE TABLE board_tasks (\n\t\t\tid INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\trevision INTEGER NOT NULL DEFAULT 1,\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\ttitle TEXT NOT NULL,\n\t\t\tbody TEXT,\n\t\t\tstatus TEXT NOT NULL DEFAULT 'pending'\n\t\t\t\tCHECK (status IN ('pending', 'in_progress', 'completed', 'skipped', 'blocked', 'draft', 'review_pending')),\n\t\t\tpriority TEXT NOT NULL DEFAULT 'medium'\n\t\t\t\tCHECK (priority IN ('critical', 'high', 'medium', 'low')),\n\t\t\tcreated_by TEXT NOT NULL,\n\t\t\tassigned_to TEXT,\n\t\t\tcompleted_by TEXT,\n\t\t\tcompletion_message TEXT,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tclaimed_at TEXT,\n\t\t\tcompleted_at TEXT,\n\t\t\tlast_activity_at TEXT,\n\t\t\tidle_snoozed_until TEXT\n\t\t, session_id TEXT, cost_usd REAL, input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, parked_reason TEXT, parked_until TEXT, remind_at TEXT, reminded_at TEXT, edited_at TEXT, claim_thinking TEXT, goal_id INTEGER, remote_board_uid TEXT, remote_goal_uid TEXT, request_id TEXT, request_server TEXT, request_board TEXT)",
       "tbl_name": "board_tasks",
       "type": "table"
     },
@@ -2987,13 +2987,22 @@
           "cid": 27,
           "dflt_value": null,
           "hidden": 0,
+          "name": "claim_thinking",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 28,
+          "dflt_value": null,
+          "hidden": 0,
           "name": "goal_id",
           "notnull": 0,
           "pk": 0,
           "type": "INTEGER"
         },
         {
-          "cid": 28,
+          "cid": 29,
           "dflt_value": null,
           "hidden": 0,
           "name": "remote_board_uid",
@@ -3002,7 +3011,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 29,
+          "cid": 30,
           "dflt_value": null,
           "hidden": 0,
           "name": "remote_goal_uid",
@@ -3011,7 +3020,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 30,
+          "cid": 31,
           "dflt_value": null,
           "hidden": 0,
           "name": "request_id",
@@ -3020,7 +3029,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 31,
+          "cid": 32,
           "dflt_value": null,
           "hidden": 0,
           "name": "request_server",
@@ -3029,7 +3038,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 32,
+          "cid": 33,
           "dflt_value": null,
           "hidden": 0,
           "name": "request_board",
@@ -3157,7 +3166,7 @@
               "seqno": 0
             },
             {
-              "cid": 27,
+              "cid": 28,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
@@ -3190,7 +3199,7 @@
               "seqno": 0
             },
             {
-              "cid": 31,
+              "cid": 32,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
@@ -3198,7 +3207,7 @@
               "seqno": 1
             },
             {
-              "cid": 32,
+              "cid": 33,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
@@ -3206,7 +3215,7 @@
               "seqno": 2
             },
             {
-              "cid": 30,
+              "cid": 31,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,

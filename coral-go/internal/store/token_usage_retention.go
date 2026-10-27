@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS token_usage_hourly (
 	source             TEXT NOT NULL,
 	model              TEXT,
 	n_rows             INTEGER NOT NULL,
-	ctx_tokens         INTEGER NOT NULL
+	ctx_tokens         INTEGER NOT NULL,
+	thinking           TEXT           -- the thinking level of the rows it holds (#8915); NULL: not recorded. Last, so an older table gains it with ALTER in the same place
 );
 CREATE INDEX IF NOT EXISTS idx_token_usage_hourly_session ON token_usage_hourly(session_id, hour);
 CREATE INDEX IF NOT EXISTS idx_token_usage_hourly_team ON token_usage_hourly(team_id);
@@ -54,16 +55,17 @@ CREATE INDEX IF NOT EXISTS idx_token_usage_hourly_time ON token_usage_hourly(rec
 CREATE INDEX IF NOT EXISTS idx_token_usage_hourly_source ON token_usage_hourly(source, session_id);
 CREATE TABLE IF NOT EXISTS token_usage_pruning (on_since TEXT);
 
-CREATE VIEW IF NOT EXISTS token_usage_all AS
+DROP VIEW IF EXISTS token_usage_all; -- remade on every start: its columns changed (thinking, #8915)
+CREATE VIEW token_usage_all AS
 	SELECT id, session_id, agent_name, agent_type, team_id, board_name, input_tokens, output_tokens,
 	       total_tokens, cost_usd, num_turns, recorded_at, cache_read_tokens, cache_write_tokens,
 	       session_start_at, last_activity_at, source, model, 1 AS n_rows,
-	       input_tokens + cache_read_tokens + cache_write_tokens AS ctx_tokens
+	       input_tokens + cache_read_tokens + cache_write_tokens AS ctx_tokens, thinking
 	FROM token_usage
 	UNION ALL
 	SELECT id, session_id, agent_name, agent_type, team_id, board_name, input_tokens, output_tokens,
 	       total_tokens, cost_usd, num_turns, recorded_at, cache_read_tokens, cache_write_tokens,
-	       session_start_at, last_activity_at, source, model, n_rows, ctx_tokens
+	       session_start_at, last_activity_at, source, model, n_rows, ctx_tokens, thinking
 	FROM token_usage_hourly;
 
 CREATE TRIGGER IF NOT EXISTS token_usage_skip_rolled_up BEFORE INSERT ON token_usage
@@ -82,7 +84,8 @@ SELECT ?1, g.id, g.session_id, g.agent_name, g.agent_type, g.team_id, g.board_na
        g.cache_read_tokens, g.cache_write_tokens, g.session_start_at, g.last_activity_at,
        g.source, g.model, g.n_rows,
        COALESCE((SELECT x.input_tokens + x.cache_read_tokens + x.cache_write_tokens FROM token_usage x
-                 WHERE x.session_id = g.session_id AND x.recorded_at = g.recorded_at LIMIT 1), 0)
+                 WHERE x.session_id = g.session_id AND x.recorded_at = g.recorded_at LIMIT 1), 0),
+       g.thinking
 FROM (SELECT MAX(id) AS id, session_id, agent_name, agent_type, team_id, board_name,
              SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
              SUM(total_tokens) AS total_tokens, SUM(cost_usd) AS cost_usd, SUM(num_turns) AS num_turns,
@@ -90,9 +93,9 @@ FROM (SELECT MAX(id) AS id, session_id, agent_name, agent_type, team_id, board_n
              SUM(cache_write_tokens) AS cache_write_tokens,
              MIN(NULLIF(session_start_at, '')) AS session_start_at,
              MAX(NULLIF(last_activity_at, '')) AS last_activity_at,
-             COALESCE(source, 'jsonl') AS source, model, COUNT(*) AS n_rows
+             COALESCE(source, 'jsonl') AS source, model, COUNT(*) AS n_rows, thinking
       FROM token_usage WHERE recorded_at >= ?2 AND recorded_at < ?3
-      GROUP BY session_id, COALESCE(source, 'jsonl'), model, agent_name, agent_type, team_id, board_name) g`
+      GROUP BY session_id, COALESCE(source, 'jsonl'), model, agent_name, agent_type, team_id, board_name, thinking) g`
 
 // tokenHourBounds is the recorded_at range of the hour with prefix p ("2006-01-02T15", or with
 // a space for the T): the values that start with p, as the hour column and the skip trigger

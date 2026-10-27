@@ -60,6 +60,7 @@ func (h *BoardHandler) ClaimTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.endOwnWaits(r.Context(), project, body.SubscriberID) // it has work in hand: a wait it parked on is over (#7765)
+	h.recordClaimThinking(r.Context(), project, body.SubscriberID, task.ID)
 	// Post board notification asynchronously to avoid DB contention
 	h.goBG(func() {
 		notification := fmt.Sprintf("[Task #%d claimed by %s] %s", task.ID, body.SubscriberID, task.Title)
