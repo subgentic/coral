@@ -31,7 +31,7 @@
     --table-tertiary-size: 0.75rem;
     --table-tertiary-weight: 400;
     --table-tertiary-color: var(--text-muted);
-    --table-check-w: 24px;
+    --table-check-w: 44px; /* the select column holds the box, its 44 px target and its focus ring whole (#9073) */
     --table-control-border: var(--control-border);
     --table-control-radius: var(--radius-md);
     --table-control-bg: var(--bg-primary);
@@ -129,7 +129,7 @@
 .dt-row[aria-current="true"] td { background: var(--table-hover); }
 .dt-row.dt-quiet td { color: var(--table-tertiary-color); }
 .dt-row.dt-selected td { background: var(--table-selected); }
-.dt-table .dt-check { width: var(--table-check-w); padding-right: 0; }
+.dt-table .dt-check { width: var(--table-check-w); padding: 0; text-align: center; overflow: visible; }
 .dt-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
 .dt-bar { flex: 1 1 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
 .dt-bar > * { margin: 0; }
