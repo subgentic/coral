@@ -331,6 +331,13 @@ func (s *Store) ListOpenTaskStates(ctx context.Context, project string) ([]Task,
 	return tasks, nil
 }
 
+// The status test is two parts on purpose: IN (...) gives the (board_id, status) index both its columns, so only the board's review_pending and in_progress tasks are looked at; the
+// same test as one OR (status = 'review_pending' OR (status = 'in_progress' AND ...)) made SQLite walk every task of the board, completed ones included, on every poll of the board
+// status (#9471: 4.6 s of the 12.5 s of CPU the status read used in a 20 s profile, for a result of nothing).
+const tasksUnderReviewSQL = `SELECT t.id, COALESCE(t.assigned_to, '') AS assigned_to FROM board_tasks t
+	 WHERE t.board_id = ? AND t.status IN ('review_pending', 'in_progress') AND (t.status = 'review_pending' OR EXISTS (
+	   SELECT 1 FROM task_workflows w WHERE w.task_id = t.id AND json_extract(w.data, '$.completion_review') IS NOT NULL))`
+
 // TasksUnderReview returns a board's tasks waiting for their completion review, by id,
 // with their assignees: a candidate submitted for review (still in_progress, or
 // review_pending once the worker's slot is released). The team status says
@@ -341,9 +348,7 @@ func (s *Store) TasksUnderReview(ctx context.Context, project string) (map[int64
 		AssignedTo string `db:"assigned_to"`
 	}
 	err := s.reader().SelectContext(ctx, &rows,
-		`SELECT t.id, COALESCE(t.assigned_to, '') AS assigned_to FROM board_tasks t
-		 WHERE t.board_id = ? AND (t.status = 'review_pending' OR (t.status = 'in_progress' AND EXISTS (
-		   SELECT 1 FROM task_workflows w WHERE w.task_id = t.id AND json_extract(w.data, '$.completion_review') IS NOT NULL)))`, project)
+		tasksUnderReviewSQL, project)
 	if err != nil {
 		return nil, err
 	}
