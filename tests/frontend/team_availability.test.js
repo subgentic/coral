@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
   await ev(`window.fetch=originalFetch;document.querySelector('.availability-toolbar button').click()`);
   await ev(`new Promise(resolve=>setTimeout(resolve,300))`);
   assert.ok(await ev(`document.querySelector('.availability-content').textContent.includes('No agents found')`));
-  await ev(`document.querySelector('#team-availability-dialog header button').click()`);
+  await ev(`document.querySelector('#team-availability-dialog [data-dialog-close]').click()`);
   await ev(`new Promise(resolve=>setTimeout(resolve,50))`);
   assert.equal(await ev(`!!document.querySelector('#team-availability-dialog')`),false);
   console.log('PASS team availability API, rendering, mobile width, escaping, refresh/error, close');

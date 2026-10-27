@@ -20,7 +20,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
         const q = e.getBoundingClientRect(); return { left: Math.round(q.left - pr.left), under: Math.round(q.top - strip.bottom), what: e.className }; })()`);
     const chip = sel => ev(`(() => { const e = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) ${sel}')].find(x => (window.__na.vis(x) || x.closest('.team-tb-pills')) && x.getAttribute('aria-pressed') === 'true'); /* the pills are the compact select on a phone (#7717): their own style is still read */ if (!e) return null; const c = getComputedStyle(e); return { bg: c.backgroundColor, border: c.borderTopColor, color: c.color, weight: c.fontWeight }; })()`);
     const empty = () => ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); const l = p.querySelector('.empty-state-line'); if (!l) return null; const c = getComputedStyle(l), h = p.querySelector('.empty-state-hint'); const boxed = [l, l.parentElement].some(e => getComputedStyle(e).borderTopStyle !== 'none');
-        return { text: l.textContent.trim(), size: c.fontSize, weight: c.fontWeight, boxed, hint: h && [h.textContent.trim(), getComputedStyle(h).fontSize, getComputedStyle(h).fontWeight] }; })()`);
+        return { text: [...l.childNodes].filter(n => !(n.classList && n.classList.contains('empty-state-hint'))).map(n => n.textContent).join('').trim(), size: c.fontSize, weight: c.fontWeight, boxed, hint: h && [h.textContent.trim(), getComputedStyle(h).fontSize, getComputedStyle(h).fontWeight] }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of VIEWS) {
