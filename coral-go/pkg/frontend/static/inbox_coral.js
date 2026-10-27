@@ -22,6 +22,13 @@ async function json(resp) {
 
 /** The local Inbox spans the same online registered machines as Saved and Board history.
  * IDs are only unique on their source machine; qualify the team before any row is opened. */
+const downLabels = { goals: [], tasks: [] };
+const serverName = id => { const s = (state.servers || []).find(x => x && x.id === id); return (s && (s.label || s.name)) || id; };
+/** The computers that did not answer the last read of `field` ('goals' or 'tasks'), as a sentence for the folder's quiet line, or '' when all answered. */
+export function inboxDownNote(field) {
+    const names = downLabels[field] || [];
+    return names.length ? `${names.join(', ')} did not answer, so ${names.length === 1 ? 'its' : 'their'} ${field} are not shown.` : '';
+}
 async function inboxRows(path, field) {
     const servers = ['local', ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
     const results = await Promise.allSettled(servers.map(async server => {
@@ -30,6 +37,7 @@ async function inboxRows(path, field) {
         noteBoardLabels(rows, 'board_id', server);
         return rows.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) }));
     }));
+    downLabels[field] = results.flatMap((r, i) => r.status === 'rejected' && servers[i] !== 'local' ? [serverName(servers[i])] : []); // the registered computers that did not answer, for the folder's quiet line (#8904)
     // Each source is ordered independently; merge by update time, not server order.
     const updated = row => { const time = Date.parse(row.updated_at); return Number.isFinite(time) ? time : -Infinity; };
     return results.flatMap(result => result.status === 'fulfilled' ? result.value : [])

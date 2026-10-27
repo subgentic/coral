@@ -25,6 +25,10 @@ const art = (id, name) => ({ id: id.repeat(64), name, media_type: 'text/markdown
             await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.hub = true; st.servers = [{ id: 'box-2', label: 'Box Two', status: 'online' }];
                 window.__boxTwoUp = false; const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.href), remote = url.pathname.startsWith('/api/remote/box-2/'), p = url.pathname.replace(/^\\/api\\/remote\\/box-2/, '');
+                    if (p === '/api/goals') {
+                        if (remote && !window.__boxTwoUp) return new Promise((_, reject) => { if (o.signal) o.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))); });
+                        return json({ goals: [{ id: 1, board_id: 'alpha', title: remote ? 'Remote goal' : 'Local goal', state: 'active', rollup: { total: 1, done: 0 } }] });
+                    }
                     if (p === '/api/team-artifacts') {
                         if (remote && !window.__boxTwoUp) return new Promise((_, reject) => { if (o.signal) o.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))); }); // hung: accepts, never answers
                         return json({ artifacts: [remote ? ${JSON.stringify(art('b', 'remote-report.md'))} : ${JSON.stringify(art('a', 'local-report.md'))}], limit: 100, offset: 0, has_more: false, truncated: false, total: 1, all: 1, teams: [{ board_id: 'alpha', team: 'alpha', all: 1 }] });
@@ -45,6 +49,13 @@ const art = (id, name) => ({ id: id.repeat(64), name, media_type: 'text/markdown
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: both files after Retry`, 10000);
             const after = await ev(`({ rows: document.querySelectorAll('#group-table-view tbody tr').length, line: !!document.querySelector('.team-artifacts-down') })`);
             check(`${label}: Retry asks again: Box Two answers, both files are listed and the line is gone`, after.rows === 2 && !after.line, JSON.stringify(after));
+            // Goals (the same limit and the same quiet line): this computer's goal is listed, Box Two is named
+            await ev(`window.__boxTwoUp = false; true`);
+            if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
+            await waitFor(`!!document.querySelector('.group-table-note') && /Box Two did not answer/.test(document.querySelector('.group-table-note').textContent)`, `${label}: Goals names Box Two after its time limit`, 20000);
+            const gl = await ev(`({ rows: [...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')), note: document.querySelector('.group-table-note').textContent.trim() })`);
+            check(`${label}: Goals lists this computer's goal and says "Box Two did not answer, so its goals are not shown."`, gl.rows.length === 1 && /Local goal/.test(gl.rows[0]) && gl.note === 'Box Two did not answer, so its goals are not shown.', JSON.stringify(gl));
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
