@@ -198,7 +198,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
 
     if (!noSearch) {
         q.addEventListener('input', () => { clearQ.hidden = !q.value; typed({ ...f, q: q.value }); });
-        q.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); apply({ ...f, q: q.value }); } });
+        q.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search, not thirty a second */ clearTimeout(timer); apply({ ...f, q: q.value }); } });
         clearQ.addEventListener('click', () => { clearTimeout(timer); q.value = ''; clearQ.hidden = true; apply({ ...f, q: '' }); q.focus(); });
     }
     if (tog) tog.addEventListener('click', () => setOpen(menu.hidden, { focus: true, silent: false }));
@@ -214,7 +214,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     document.addEventListener('click', outside);
     for (const fld of fields) {
         const key = fld.spec.key;
-        if (fld.spec.type === 'text') { fld.input.addEventListener('input', () => typed({ ...f, [key]: fld.input.value })); if (spec.commitOnEnter) fld.input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply({ ...f, [key]: fld.input.value }); } }); }
+        if (fld.spec.type === 'text') { fld.input.addEventListener('input', () => typed({ ...f, [key]: fld.input.value })); if (spec.commitOnEnter) fld.input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; apply({ ...f, [key]: fld.input.value }); } }); }
         else if (fld.spec.type === 'check') fld.input.addEventListener('change', () => apply({ ...f, [key]: fld.input.checked }));
         else fld.input.addEventListener('change', () => apply({ ...f, [key]: fld.input.value }));
     }

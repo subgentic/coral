@@ -100,7 +100,8 @@ async function readMore(key, folder, q, extra, redraw) {
     L.busy = false; redraw();
 }
 /** Forget what was read (a chat was starred or archived): the folders are read again from their first page. */
-export function resetChatLists() { lists.clear(); } // also: a search sent on Enter reads again, though the same words were read before (the Hub-served Inbox, #9574)
+/** Forget the kept lists: all of them, or only a folder's (a search sent on Enter reads that folder again, though the same words were read before: the Hub-served Inbox, #9574). The key is `sources|folder|words|filters`. */
+export function resetChatLists(folder) { if (!folder) { lists.clear(); return; } for (const k of [...lists.keys()]) if (k.split('|')[1] === folder) lists.delete(k); }
 
 const isGroup = (s) => s.type === 'group' || String(s.session_id || '').startsWith('board:');
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
