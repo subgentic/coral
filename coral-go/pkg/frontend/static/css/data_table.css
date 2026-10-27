@@ -426,3 +426,12 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box.dt-mail-on tr.dt-mailed .dt-mail-time { flex: none; }
 .dt-check-hit { display: flex; align-items: center; justify-content: center; margin: 0; cursor: pointer; } /* the select box's label: its target (44 px on a touch screen or a phone, the cell's own width on a desktop, where the row keeps its 36 px) */
 @media (max-width: 767px), (pointer: coarse) { .dt-check-hit { min-width: var(--table-touch); min-height: var(--table-touch); } }
+
+/* A Saved row (#9628; UI/UX): the sender 14/600, then the message in the secondary colour, on one line; the Done button shows on the row's hover and keyboard focus only (a touch screen and a desktop without a pointer always show it). */
+.dt-box .dt-saved-message.dt-primary { display: flex; align-items: baseline; gap: 8px; width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; }
+.dt-saved-who { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-lg); font-weight: var(--fw-strong); color: var(--table-primary-color); }
+.dt-saved-text { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-lg); font-weight: var(--fw-regular); color: var(--table-secondary-color); }
+@media (hover: hover) and (pointer: fine) {
+    .dt-hover-action { opacity: 0; }
+    .dt-row:hover .dt-hover-action, .dt-row:focus-within .dt-hover-action, .dt-hover-action:focus-visible { opacity: 1; }
+}
