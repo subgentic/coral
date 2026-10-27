@@ -31,7 +31,7 @@
   "task_list.js": {
     "tasks": {
       "rowClass": 4,
-      "listRoute": 4
+      "listRoute": 3
     }
   },
   "team_page.js": {

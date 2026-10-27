@@ -29,7 +29,7 @@ const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTot
 // Hide completed (the old tab's toggle, same stored key): the Open chip, chosen until the person picks All; kept in this browser (#7453).
 const HIDE_KEY = 'coral-hide-completed';
 const startFilter = () => (browserLocal.get(HIDE_KEY) === 'false' ? 'all' : 'open');
-const model = { dt: DT.tableState(), choices: null, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
+const model = { dt: DT.tableState(), choices: null, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, extraPages: 0, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-tasks-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested); return { 'Queued': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
@@ -54,7 +54,7 @@ async function renderTaskText(host, text) {
     } catch { /* the plain text stays */ }
 }
 
-/** Read the first page: every open task and the first of the done ones; "Load more" continues the done ones. */
+/** Read the first page: the first 50 open tasks (every open task when they fit, and then the first of the done ones); "Load more" continues the open tasks, then the done ones (#9121). A refresh reads again as many pages as were loaded. */
 export async function loadTasks() {
     const project = model.project; if (!project) return;
     if (TF.isQuery(model.filters)) return loadQuery(); // a search, a filter or an order the default list does not have: the task query
@@ -63,11 +63,17 @@ export async function loadTasks() {
     try {
         const json = await readJson(`/tasks?limit=${PAGE}`);
         if (project !== model.project) return;
-        const rows = Array.isArray(json && json.tasks) ? json.tasks : [];
-        const have = new Set(rows.map(t => t.id));
-        const older = model.moreLoaded ? model.rows.filter(t => !have.has(t.id) && bucket(t) === 'done') : [];
-        model.rows = rows.concat(older);
-        if (!model.moreLoaded) model.cursor = typeof json.next_cursor === 'string' ? json.next_cursor : '';
+        let rows = Array.isArray(json && json.tasks) ? json.tasks : [];
+        let cursor = typeof json.next_cursor === 'string' ? json.next_cursor : '';
+        for (let i = 0; i < (model.moreLoaded ? model.extraPages : 0) && cursor; i++) { // the pages the person loaded are read again with the first, so an open task that finished does not stay open on screen
+            const next = await readJson(`/tasks?limit=${PAGE}&cursor=${encodeURIComponent(cursor)}`);
+            if (project !== model.project) return;
+            const have = new Set(rows.map(t => t.id));
+            rows = rows.concat((next.tasks || []).filter(t => !have.has(t.id)));
+            cursor = typeof next.next_cursor === 'string' ? next.next_cursor : '';
+        }
+        model.rows = rows;
+        model.cursor = cursor;
         model.totalOpen = Number.isFinite(json.total_open) ? json.total_open : null;
         model.totalDone = Number.isFinite(json.total_completed) ? json.total_completed : null;
         model.failed = '';
@@ -87,11 +93,11 @@ async function loadMore() {
     model.loadingMore = true; model.moreFailed = '';
     const before = model.rows.length;
     try {
-        const json = await readJson(`/tasks?status=completed&limit=${PAGE}&cursor=${encodeURIComponent(model.cursor)}`);
+        const json = await readJson(`/tasks?limit=${PAGE}&cursor=${encodeURIComponent(model.cursor)}`);
         const have = new Set(model.rows.map(t => t.id));
         model.rows = model.rows.concat((json.tasks || []).filter(t => !have.has(t.id)));
         model.cursor = typeof json.next_cursor === 'string' ? json.next_cursor : '';
-        model.moreLoaded = true;
+        model.moreLoaded = true; model.extraPages++;
     } catch { model.moreFailed = 'More tasks could not be read.'; }
     model.loadingMore = false;
     draw();
@@ -237,7 +243,8 @@ function draw() {
             if (PHONE.matches) { if (newTask && newTask.parentElement === row) newTask.before(t.selectButton); else row.append(t.selectButton); } // a phone enters Select mode from the toolbar line, before the action that stays last
             body.append(t.el);
         }
-        if (query ? queryHasMore() : (model.cursor && (model.filter === 'all' || model.filter === 'done'))) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : (query ? 'Load more' : 'Load more done tasks'), loadMore));
+        const openLeft = !query && !!model.cursor && model.totalOpen != null && model.rows.filter(t => bucket(t) !== 'done').length < model.totalOpen; // more open tasks than the pages loaded (#9121)
+        if (query ? queryHasMore() : (model.cursor && (openLeft || model.filter === 'all' || model.filter === 'done'))) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : (query ? 'Load more' : openLeft ? 'Load more open tasks' : 'Load more done tasks'), loadMore));
         if (model.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.moreFailed)); body.append(f); }
     }
     bar.names([...new Set(all.map(t => t.assigned_to).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Agent field
@@ -271,7 +278,7 @@ function watch() {
 }
 
 export function showTasks(host, project, h = {}) {
-    if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), choices: null, project, filters: { ...TF.loadFilters(project, browserLocal), sort: 'open' }, q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
+    if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), choices: null, project, filters: { ...TF.loadFilters(project, browserLocal), sort: 'open' }, q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, extraPages: 0, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
     hooks = h;
     if (!model.choices || Date.now() - (model.choicesAt || 0) > CHOICES_MS) loadChoices();
     if (h.query) model.filters = TF.fromQuery(h.query); // an address with filters in it (a link): they are the view, over what this browser kept

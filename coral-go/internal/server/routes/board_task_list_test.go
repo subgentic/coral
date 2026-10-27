@@ -104,3 +104,37 @@ func TestBoardListTasks_CursorFromAnotherBoardIs400(t *testing.T) {
 	status, _ = getTaskList(t, server.URL+"/api/board/alpha/tasks?status=completed&limit=1&cursor="+cursor)
 	assert.Equal(t, http.StatusOK, status, "on its own board the cursor still pages")
 }
+
+// #9121: the default list pages a big open set through the route: 70 open tasks and 3 done ones come as 50 open, then 20 open with the done ones, by the same next_cursor, and the totals stay exact.
+func TestBoardListTasks_PagesABigOpenSet(t *testing.T) {
+	server, handler := setupBoardTestServer(t)
+	ctx := context.Background()
+	bs := handler.bs
+	for i := 0; i < 70; i++ {
+		_, err := bs.CreateTask(ctx, "team", fmt.Sprintf("open %d", i), "x", "medium", "lead")
+		require.NoError(t, err)
+	}
+	for i := 0; i < 3; i++ {
+		task, err := bs.CreateTask(ctx, "team", fmt.Sprintf("done %d", i), "x", "medium", "lead", "worker")
+		require.NoError(t, err)
+		_, err = bs.ClaimTask(ctx, "team", "worker", task.ID)
+		require.NoError(t, err)
+		_, err = bs.CompleteTask(ctx, "team", task.ID, "worker", nil)
+		require.NoError(t, err)
+	}
+	base := server.URL + "/api/board/team/tasks"
+	status, page := getTaskList(t, base+"?limit=50")
+	require.Equal(t, http.StatusOK, status)
+	assert.Len(t, page["tasks"].([]any), 50, "the first page holds only open tasks")
+	assert.EqualValues(t, 70, page["total_open"])
+	assert.EqualValues(t, 3, page["total_completed"])
+	cursor, _ := page["next_cursor"].(string)
+	require.NotEmpty(t, cursor)
+	status, page = getTaskList(t, base+"?limit=50&cursor="+cursor)
+	require.Equal(t, http.StatusOK, status)
+	assert.Len(t, page["tasks"].([]any), 23, "the last 20 open tasks and the 3 done ones")
+	assert.EqualValues(t, 70, page["total_open"])
+	assert.Empty(t, page["next_cursor"])
+	status, _ = getTaskList(t, base+"?limit=50&cursor=bogus")
+	assert.Equal(t, http.StatusBadRequest, status)
+}
