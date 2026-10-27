@@ -32,14 +32,14 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
             await seed(ev, TEAM); await stub();
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});
-            await S.run(`${label}: Artifacts has a box named "Search team artifacts", the count in words, and a table Name, Type, Size, Task, Created`, async () => {
+            await S.run(`${label}: Artifacts has a box named "Search team artifacts", the count in words, and a table Name, Task, Type, Tags, Size, Updated (the shared artifact table, #8931)`, async () => {
                 await goTab(ev, settle, 'Artifacts'); await waitFor(`!!window.__tp.rows() && window.__tp.rows().length >= 5`, 'the first page of artifacts in the table', 10000).catch(() => {}); // a cold start loads the page's modules first
                 assert.ok(await ev(`!!window.__tp.find('input', /^Search (team )?artifacts$/i)`), 'an input named Search team artifacts (the old tab\'s name stays)');
                 assert.ok(await ev(`/\\b\\d[\\d,]*\\s+artifacts\\b/i.test(window.__na.text(window.__tp.page()))`), 'the count as words ("<n> artifacts")');
                 const hd = await ev(`window.__tp.headers()`); assert.ok(hd, 'the Artifacts tab has a table');
                 if (!mobile) {
                     assert.equal(await ev(`window.__tp.table().querySelector('thead th input[type="checkbox"]')?.getAttribute('aria-label')`), 'Select all rows on this page', 'the first column selects artifacts for bulk actions');
-                    assert.deepEqual(hd.slice(1, 6), ['Name', 'Type', 'Size', 'Task', 'Created'], 'the data columns after selection');
+                    assert.deepEqual(hd.slice(1, 7).map(h => String(h).replace(/[\u2195\u2191\u2193]/g, '').trim().toLowerCase()), ['name', 'task', 'type', 'tags', 'size', 'updated'], 'the data columns after selection: the shared artifact table with the Task link (the goal is a filter)');
                 }
                 assert.ok((await ev(`window.__tp.rows()`)).length >= 5, 'the first page is present (the visible footer may already append the second)');
             });
