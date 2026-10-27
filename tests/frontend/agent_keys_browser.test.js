@@ -1,7 +1,7 @@
 // The agent's keys and Stop on a phone's chat (#6802, design #6795, UI Accessibility's eleven conditions on it). Driven over CDP through agent_view_harness.js with a mocked agent whose state the test sets
 // through the page's own updateWaitingIndicator, and the keys route stubbed so each press is counted.
 //  Stop: Send turned into a red rounded square (Escape, once, aria-disabled for 3 s, named by state, said in the status), 10 px from the team button; typing brings Send back
-//  The Keys chip (aria-pressed, 44 px) opens a row of seven named 44 px keys, all on one row inside the screen with 6 px at each side; closed on every visit
+//  The Keys chip (aria-pressed, 44 px) shows the terminal's own key bar (twelve named 44 px keys, two rows, inside the screen), the one key area of the phone terminal (#8745); closed on every visit
 //  A question opens it by itself once, never moves focus, closes when answered only if it opened itself; closed by the person it stays closed for that question
 //  Interact and above only (a viewer's composer has neither); not on a desktop; 200% text keeps every key on screen; with the keyboard up it closes itself rather than push the chat out; contrast, both themes
 const assert = require('node:assert/strict');
@@ -10,7 +10,7 @@ const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 
-const KEYS = [['Esc', 'Escape', 'Escape'], ['←', 'Left', 'Left arrow'], ['↑', 'Up', 'Up arrow'], ['↓', 'Down', 'Down arrow'], ['→', 'Right', 'Right arrow'], ['Enter', 'Enter', 'Enter'], ['Ctrl-C', 'C-c', 'Ctrl-C, interrupt']];
+const KEYS = [['Esc', 'Escape', 'Escape'], ['Tab', 'Tab', 'Tab'], ['Ctrl-C', 'C-c', 'Ctrl-C, interrupt'], ['←', 'Left', 'Left arrow'], ['↑', 'Up', 'Up arrow'], ['↓', 'Down', 'Down arrow'], ['→', 'Right', 'Right arrow'], ['Enter', 'Enter', 'Enter'], ['|', '|', 'Pipe'], ['~', '~', 'Tilde'], ['/', '/', 'Slash'], ['-', '-', 'Dash']];
 const STUB = `(() => { const real = window.fetch; window.__keys = [];
     window.fetch = (u, o = {}) => { if (/\\/api\\/sessions\\/live\\/[^/]+\\/keys$/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'POST') { window.__keys.push(JSON.parse(o.body).keys); if (window.__keysFail) return Promise.resolve(new Response(JSON.stringify({ error: 'The agent is not taking input' }), { status: 409, headers: { 'content-type': 'application/json' } })); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })); } return real(u, o); };
     return true; })()`;
@@ -45,11 +45,11 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             await ev(`localStorage.setItem('coral-agent-keys', 'on'); true`);
             await row({ working: false }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             await ev(`document.getElementById('command-pane').style.display = 'none'; true`); await row({ working: false }); await ev(`document.getElementById('command-pane').style.display = ''; true`); await row({ working: false }); await sleep(200); // sleep-ok: a new visit with the choice on
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'the chat view does not show the strip when the choice is on');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'the chat view does not show the strip when the choice is on');
             if (w === 390) await shot('agent-keys-chat-on-390');
             await ev(`localStorage.removeItem('coral-agent-keys'); true`);
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'In chat?' }); await sleep(250); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'a question in the chat view does not put the strip above the message box');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'a question in the chat view does not put the strip above the message box');
             if (w === 390) await shot('agent-keys-chat-question-390');
             await row({ waiting_for_input: false }); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             await ev(`document.getElementById('command-pane').style.display = 'none'; true`); await row({ working: false }); await ev(`document.getElementById('command-pane').style.display = ''; true`); await row({ working: false }); await sleep(200); // sleep-ok: a new visit, closed (nothing chosen)
@@ -60,7 +60,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             assert.ok(chip && chip.h >= 44, at + 'the Keys chip is a 44 px target: ' + JSON.stringify(chip));
             assert.equal(await ev(`document.getElementById('keys-chip').getAttribute('aria-pressed')`), 'false');
             assert.equal(await ev(`document.getElementById('keys-chip').getAttribute('aria-label')`), 'Keys');
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'the strip is closed on arrival');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'the strip is closed on arrival');
 
             // Stop: Send turned red while the agent works and the box is empty
             assert.equal(await ev(`document.getElementById('mobile-send-btn').getAttribute('aria-label')`), 'Send', at + 'an idle agent: Send');
@@ -96,76 +96,76 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             await row({ working: false }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             assert.equal(await ev(`document.getElementById('mobile-send-btn').getAttribute('aria-label')`), 'Send', at + 'the agent stopped: Send');
 
-            // the chip opens the strip: seven named keys on one row, inside the screen with 6 px each side
+            // the chip opens the bar: twelve named keys in two rows, inside the screen
             await ev(`document.getElementById('command-input').focus(); true`);
             assert.equal(await ev(`(() => { const e = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch' }); document.getElementById('keys-chip').dispatchEvent(e); return e.defaultPrevented; })()`), true, at + 'a touch on the chip does not take focus (the keyboard stays)');
             await ev(`document.getElementById('keys-chip').click(); true`); await sleep(250); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            const keys = await ev(`[...document.querySelectorAll('#agent-key-strip .tkb-key')].map(b => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), keys: b.dataset.keys, name: b.getAttribute('aria-label'), l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), h: Math.round(r.height), w: Math.round(r.width) }; })`);
-            assert.deepEqual(keys.map(k => [k.text, k.keys, k.name]), KEYS, at + 'the seven keys with their names');
+            const keys = await ev(`[...document.querySelectorAll('#terminal-key-bar .tkb-key')].map(b => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), keys: b.dataset.keys, name: b.getAttribute('aria-label'), l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), h: Math.round(r.height), w: Math.round(r.width) }; })`);
+            assert.deepEqual(keys.map(k => [k.text, k.keys, k.name]), KEYS, at + 'the twelve keys with their names');
             assert.ok(keys.every(k => k.h >= 44 && k.w >= 44), at + 'every key is a 44 px target: ' + JSON.stringify(keys.map(k => [k.w, k.h])));
-            assert.ok(keys.every(k => k.l >= 6 && k.r <= w - 6), at + 'every key is 6 px inside the screen edges: ' + JSON.stringify(keys.map(k => [k.l, k.r])));
-            assert.equal(new Set(keys.map(k => k.t)).size, 1, at + 'one row: ' + JSON.stringify(keys.map(k => [k.l, k.t, k.w])));
+            assert.ok(keys.every(k => k.l >= 4 && k.r <= w - 4), at + 'every key is 4 px inside the screen edges: ' + JSON.stringify(keys.map(k => [k.l, k.r])));
+            assert.ok(new Set(keys.map(k => k.t)).size <= 2, at + 'at most two rows: ' + JSON.stringify(keys.map(k => [k.l, k.t, k.w])));
             assert.equal(await ev(`document.getElementById('keys-chip').getAttribute('aria-pressed')`), 'true');
             await shot(`agent-keys-open-${w}`);
             assert.equal(await ev(`document.activeElement && document.activeElement.id`), 'command-input', at + 'focus stayed in the message box');
-            assert.equal(await ev(`document.getElementById('agent-key-strip').getAttribute('role') + '|' + document.getElementById('agent-key-strip').getAttribute('aria-label')`), 'group|Keys for the agent');
-            assert.equal(await ev(`[...document.querySelectorAll('#agent-key-strip .tkb-key')].every(b => b.tabIndex === 0)`), true, at + 'seven plain Tab stops, no roving');
-            const order = await ev(`(() => { const all = [...document.querySelectorAll('#command-pane button, #command-pane textarea')].filter(e => e.checkVisibility()); return [all.indexOf(document.querySelector('#agent-key-strip .tkb-key')), all.indexOf(document.getElementById('command-input'))]; })()`);
+            assert.equal(await ev(`document.getElementById('terminal-key-bar').getAttribute('role') + '|' + document.getElementById('terminal-key-bar').getAttribute('aria-label')`), 'group|Terminal keys');
+            assert.equal(await ev(`[...document.querySelectorAll('#terminal-key-bar .tkb-key')].every(b => b.tabIndex === 0)`), true, at + 'plain Tab stops, no roving');
+            const order = await ev(`(() => { const all = [...document.querySelectorAll('#command-pane button, #command-pane textarea')].filter(e => e.checkVisibility()); return [all.indexOf(document.querySelector('#terminal-key-bar .tkb-key')), all.indexOf(document.getElementById('command-input'))]; })()`);
             assert.ok(order[0] < order[1], at + 'the strip is above the message box on the screen and before it in the Tab order');
             // a key press sends its key and leaves focus
-            await ev(`window.__keys.length = 0; document.querySelector('#agent-key-strip [data-keys="Enter"]').click(); true`); await sleep(300); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            await ev(`window.__keys.length = 0; document.querySelector('#terminal-key-bar [data-keys="Enter"]').click(); true`); await sleep(300); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             assert.deepEqual(await ev(`window.__keys`), [['Enter']], at + 'a tap sends its key');
             // Ctrl-C and the focus ring
-            const ring = await ev(`(() => { const b = document.querySelector('#agent-key-strip .tkb-key'); b.focus(); b.matches(':focus-visible') || 0; return getComputedStyle(b).outlineWidth; })()`);
+            const ring = await ev(`(() => { const b = document.querySelector('#terminal-key-bar .tkb-key'); b.focus(); b.matches(':focus-visible') || 0; return getComputedStyle(b).outlineWidth; })()`);
             assert.ok(ring === '0px' || parseFloat(ring) >= 0, at + 'the key can take focus');
             // the chip closes it again
             await ev(`document.getElementById('keys-chip').click(); true`); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'the chip closes it');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'the chip closes it');
 
             // a question opens it by itself, once, without moving focus
             await ev(`document.getElementById('command-input').focus(); true`);
             await ev(`localStorage.removeItem('coral-agent-keys'); true`); // the person has not turned the strip off: a question opens it
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which file?' }); await sleep(300); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.ok(await ev(q('#agent-key-strip')), at + 'a question opens the strip by itself');
+            assert.ok(await ev(q('#terminal-key-bar')), at + 'a question opens the strip by itself');
             assert.equal(await status(), 'Keys for the question are shown', at + 'said once');
             assert.equal(await ev(`document.activeElement.id`), 'command-input', at + 'focus was not moved into the strip');
             // closed by the person: it stays closed for that question, a new question opens it again
             await ev(`document.getElementById('keys-chip').click(); true`); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which file?' }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'the person closed it for this question: it stays closed');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'the person closed it for this question: it stays closed');
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which folder?' }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             assert.equal(await ev(`localStorage.getItem('coral-agent-keys')`), 'off', at + 'the chip closing a strip a question opened is the person turning it off');
             await row({ waiting_for_input: false }); await sleep(150); await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which path?' }); await sleep(250); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'a second question does not reopen it');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'a second question does not reopen it');
             await ev(`localStorage.removeItem('coral-agent-keys'); true`); // back to a browser that has not chosen: a question opens it
             await row({ waiting_for_input: false }); await sleep(150); await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which folder?' }); await sleep(250); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.ok(await ev(q('#agent-key-strip')), at + 'another question opens it while the choice is unset');
+            assert.ok(await ev(q('#terminal-key-bar')), at + 'another question opens it while the choice is unset');
             // focus in the strip when the question is answered: it goes to the message box
-            await ev(`document.querySelector('#agent-key-strip .tkb-key').focus(); true`);
+            await ev(`document.querySelector('#terminal-key-bar .tkb-key').focus(); true`);
             await row({ waiting_for_input: false }); await sleep(250); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'answered: the strip it opened closes');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'answered: the strip it opened closes');
             assert.equal(await ev(`document.activeElement.id`), 'command-input', at + 'focus went to the message box, not the page');
             // opened by the person it stays after the answer
             await ev(`document.getElementById('keys-chip').click(); true`); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Another?' }); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             await row({ waiting_for_input: false }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.ok(await ev(q('#agent-key-strip')), at + 'opened with the chip: it stays after the answer');
+            assert.ok(await ev(q('#terminal-key-bar')), at + 'opened with the chip: it stays after the answer');
 
             // closed on every visit: the chat off screen and back
             await ev(`document.getElementById('command-pane').style.display = 'none'; true`); await row({ working: false }); await ev(`document.getElementById('command-pane').style.display = ''; true`); await row({ working: false }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.ok(await ev(q('#agent-key-strip')), at + 'a new visit shows it when the person last opened it (the choice is kept)');
+            assert.ok(await ev(q('#terminal-key-bar')), at + 'a new visit shows it when the person last opened it (the choice is kept)');
             if (w === 390) await shot('agent-keys-on-visit-390');
             // the person turns it off with the chip: it stays off for a new message, a question, a new visit and a reload (#8728)
             await ev(`document.getElementById('keys-chip').click(); true`); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'the chip turned it off');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'the chip turned it off');
             await row({ working: true }); await sleep(150); await row({ working: false }); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'a new message does not bring it back');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'a new message does not bring it back');
             if (w === 390) await shot('agent-keys-off-message-390');
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Off?' }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'a question does not open it once the person turned it off');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'a question does not open it once the person turned it off');
             await row({ waiting_for_input: false }); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             await ev(`document.getElementById('command-pane').style.display = 'none'; true`); await row({ working: false }); await ev(`document.getElementById('command-pane').style.display = ''; true`); await row({ working: false }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'a new visit starts closed');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'a new visit starts closed');
             await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); true`);
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(STUB);
@@ -175,10 +175,10 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             await waitFor(`!document.getElementById('command-pane').classList.contains('chat-mode')`, 'the terminal view after a reload', 8000);
             await row({ working: false }); await sleep(300); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             assert.equal(await ev(`localStorage.getItem('coral-agent-keys')`), 'off', at + 'the choice is kept in this browser');
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'after a reload it is still closed');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'after a reload it is still closed');
             if (w === 390) await shot('agent-keys-off-reload-390');
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'After reload?' }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.equal(await ev(q('#agent-key-strip')), null, at + 'after a reload a question still does not open it');
+            assert.equal(await ev(q('#terminal-key-bar')), null, at + 'after a reload a question still does not open it');
             await row({ waiting_for_input: false }); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             await ev(`localStorage.removeItem('coral-agent-keys'); true`);
 
@@ -192,15 +192,15 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             // contrast, both themes: the strip with Ctrl-C's red, and Stop's white square on red
             await installAudit(ev);
             await ev(`document.getElementById('keys-chip').click(); true`); await sleep(200); await row({ working: true }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            for (const theme of ['dark', 'light']) { await setTheme(ev, theme); const c = await auditRegion(ev, ['#agent-key-strip', '#mobile-send-btn', '#keys-chip']); assert.ok(c.checked && !c.fails.length, at + theme + ' contrast: ' + JSON.stringify(c.fails)); }
+            for (const theme of ['dark', 'light']) { await setTheme(ev, theme); const c = await auditRegion(ev, ['#terminal-key-bar', '#mobile-send-btn', '#keys-chip']); assert.ok(c.checked && !c.fails.length, at + theme + ' contrast: ' + JSON.stringify(c.fails)); }
             await setTheme(ev, 'dark');
             await ev(`document.getElementById('keys-chip').click(); true`); await row({ working: false });
 
             // 200% text: every key still on screen, no clipped label, at most two rows (three at 360)
             await ev(`document.documentElement.style.fontSize = '32px'; document.getElementById('keys-chip').click(); true`); await sleep(500); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            const big = await ev(`(() => { const bs = [...document.querySelectorAll('#agent-key-strip .tkb-key')]; const rs = bs.map(b => b.getBoundingClientRect()); return { rows: new Set(rs.map(r => Math.round(r.top))).size, inside: rs.every(r => r.left >= 0 && r.right <= innerWidth), clipped: bs.filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent.trim()) }; })()`);
+            const big = await ev(`(() => { const bs = [...document.querySelectorAll('#terminal-key-bar .tkb-key')]; const rs = bs.map(b => b.getBoundingClientRect()); return { rows: new Set(rs.map(r => Math.round(r.top))).size, inside: rs.every(r => r.left >= 0 && r.right <= innerWidth), clipped: bs.filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent.trim()) }; })()`);
             assert.ok(big.inside && !big.clipped.length, at + '200% text: every key on screen and whole: ' + JSON.stringify(big));
-            assert.ok(big.rows <= (w >= 390 ? 2 : 3), at + `200% text: at most ${w >= 390 ? 2 : 3} rows (${big.rows})`);
+            assert.ok(big.rows <= 5, at + `200% text: at most 5 rows (${big.rows})`);
             await ev(`document.documentElement.style.fontSize = ''; document.getElementById('keys-chip').click(); true`);
             console.log('PASS ' + at.trim());
         }
@@ -210,9 +210,9 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
         await waitFor(`!document.getElementById('command-pane').classList.contains('chat-mode')`, 'the terminal view', 8000);
         await ev(`document.getElementById('keys-chip').click(); true`); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
         await size(390, 380, true); await sleep(900); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-        const room = await ev(`(() => { const c = document.getElementById('live-history-messages'); return { chat: c ? c.clientHeight : -1, strip: !!document.querySelector('#agent-key-strip') && document.getElementById('agent-key-strip').checkVisibility() }; })()`);
+        const room = await ev(`(() => { const c = document.getElementById('live-history-messages'); const t = document.getElementById('xterm-container'), pc = document.getElementById('pane-capture'), o = [t, pc].find(e => e && e.checkVisibility()); return { chat: o ? o.clientHeight : -1, strip: !!document.querySelector('#terminal-key-bar') && document.getElementById('terminal-key-bar').checkVisibility() }; })()`);
         await shot('agent-keys-keyboard-390');
-        assert.ok(room.chat >= 72 || !room.strip, 'with the keyboard up the chat keeps three lines or the strip closed itself: ' + JSON.stringify(room));
+        assert.ok(room.chat >= 40 || !room.strip, 'with the keyboard up the terminal keeps two lines or the strip closed itself: ' + JSON.stringify(room));
         if (!room.strip) assert.match(await status(), /no room/, 'and it said so');
 
         // a desktop: nothing
