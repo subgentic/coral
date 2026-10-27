@@ -433,6 +433,12 @@
 
 /* Dialog type scale (#7405, UI/UX): the sizes and weights every sectioned dialog uses (Settings, and New agent and New team as they adopt it): a text is one of these eight and Plus Jakarta Sans */
 :root {
+    /* the three dialog sizes by kind and the one radius (#9185, Goal #84): a confirmation, a short form, a flow or settings */
+    --dlg-w-confirm: 28rem;
+    --dlg-w-form: 40rem;
+    --dlg-w-flow: min(60rem, 94vw);
+    --dlg-h-flow: min(640px, calc(100dvh - 32px));
+    --dlg-radius: var(--radius-xl);
     --dlg-title: 700 1rem/1.3 var(--font-sans);          /* 16: the dialog's title */
     --dlg-pane: 700 1.0625rem/1.3 var(--font-sans);      /* 17: a pane's title */
     --dlg-section: 600 0.875rem/1.35 var(--font-sans);   /* 14: a section heading */

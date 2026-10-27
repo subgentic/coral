@@ -70,7 +70,6 @@ function _showLaunchStep(step) {
         // New Agent and Agent Team are sectioned dialogs (#4950, section_dialog.js): the Settings shell's size; the chooser and the terminal form keep the narrow one.
         const sectioned = step === "agent" || step === "team";
         content.classList.toggle("sd-modal-content", sectioned);
-        content.classList.toggle("modal-content-wide", !sectioned);
         content.classList.toggle("launch-choosing", step === "chooser"); // four choices in a row (#3630)
         content.classList.toggle("launch-wizard-content", step === "agent" || step === "team"); // one size for every step and tab of New Agent and New team (#7391, #7407)
         content.classList.toggle("launch-team-content", step === "team" || !!launch.member); // the team dialog is 720 high, New Agent 640 (UI/UX); a member keeps the team's size, it is the team form's own step (#7861)
@@ -153,7 +152,7 @@ export function showTeamLaunchFailures(failed, started, openSettings) {
     modal.className = 'modal';
     modal.style.display = 'flex'; // display-ok: a script-built dialog is shown as the flex container the .modal rule centres; registerDialog removes it on close
     modal.innerHTML = `
-        <div class="modal-content" style="width:500px">
+        <div class="modal-content dlg-form">
             <h3>Team Launch — ${failed.length} agent${failed.length > 1 ? 's' : ''} failed</h3>
             <p style="color:var(--text-secondary);font-size:var(--fs-md);margin:8px 0">${started} launched successfully, ${failed.length} failed:</p>
             <ul style="color:var(--error);font-size:var(--fs-md);line-height:1.6;margin:8px 0 16px;padding-left:20px">${failList}</ul>

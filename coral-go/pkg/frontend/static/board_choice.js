@@ -38,7 +38,7 @@ export function chooseBoard(data, name) {
         overlay.id = 'board-choice-modal';
         overlay.style.display = 'flex';
         const box = document.createElement('div');
-        box.className = 'modal-content';
+        box.className = 'modal-content dlg-confirm';
         box.setAttribute('role', 'dialog');
         box.setAttribute('aria-modal', 'true');
         box.setAttribute('aria-labelledby', 'board-choice-title');

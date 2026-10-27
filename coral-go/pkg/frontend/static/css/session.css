@@ -1517,7 +1517,7 @@
 }
 
 /* Team routing snapshot */
-.team-availability-dialog { position: fixed; inset: 0; margin: auto; width: min(760px, calc(100vw - 32px)); max-height: 85dvh; box-sizing: border-box; overflow: auto; padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-secondary); color: var(--text-primary); }
+.team-availability-dialog { position: fixed; inset: 0; margin: auto; width: min(var(--dlg-w-flow), calc(100vw - 32px)); max-height: 85dvh; box-sizing: border-box; overflow: auto; padding: 24px; border: 1px solid var(--border); border-radius: var(--dlg-radius); background: var(--bg-secondary); color: var(--text-primary); }
 .team-availability-dialog::backdrop { background: rgba(var(--black-rgb), .55); }
 .team-availability-dialog header, .availability-toolbar, .availability-agent-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .team-availability-dialog h2, .team-availability-dialog header p { margin: 0 0 var(--space-sm); }

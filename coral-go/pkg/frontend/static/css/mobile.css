@@ -637,8 +637,9 @@
 
     /* Modal adjustments */
     .modal-content,
-    .modal-content-wide,
-    .modal-content-extra-wide {
+    .dlg-confirm,
+    .dlg-form,
+    .dlg-flow {
         width: 95vw !important;
         max-width: 95vw !important;
         max-height: 90vh;
@@ -1195,7 +1196,8 @@
 @media (min-width: 768px) and (max-width: 1023px) and (min-height: 501px), (min-width: 768px) and (max-width: 1023px) and (pointer: fine), (min-width: 951px) and (max-width: 1023px) {
     /* Modal: better sizing for tablets */
     .modal-content,
-    .modal-content-wide {
+    .dlg-form,
+    .dlg-flow {
         max-width: 85vw;
     }
 

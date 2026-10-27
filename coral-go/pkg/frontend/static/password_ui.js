@@ -103,7 +103,7 @@ export function showSetPasswordModal({ local = false } = {}) {
     const opener = document.activeElement;
     const modal = el('div', 'modal'); modal.id = 'set-password-modal';
     modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-labelledby', 'set-password-title');
-    const content = el('div', 'modal-content modal-md');
+    const content = el('div', 'modal-content dlg-confirm');
     const head = el('div', 'modal-header'); const title = el('h3', '', 'Set a password for Coral'); title.id = 'set-password-title'; head.append(title);
     const body = el('div', 'modal-body');
     // One wording for everyone (a new install and an upgrade alike): what the password is for. The server has no first-run marker, and nobody needs "nothing changed here" (#6010).
