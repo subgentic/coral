@@ -1040,3 +1040,17 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .toolbar-nowrap { flex-wrap: nowrap; }
 .toolbar-pad { padding: var(--toolbar-pad); }
 .toolbar-pad-bare { padding: var(--toolbar-pad-bare); }
+
+/* The one notice (#9244, Goal #88 item 3): an icon and words in a tinted box; the tone is the variant (.notice-info, -warn and -error: one colour each, from the page's tokens; an ok tone is added with its first use). .notice-bar is the full-width band at the edge of a screen, .notice-center centres it.
+ * .notice-line is the load and error line (the words, and a Try again beside them) with no box. A page's own class (sched-fail-banner, tmux-missing-banner ...) says only where it sits, never what a notice looks like; error and warn notices carry
+ * role=alert or status in the markup. notice_census.test.mjs fails a class named *-banner, *-notice or *-toast that declares its own look, with a down-only list of those still to move. */
+.notice { --notice-tone: var(--accent); display: flex; align-items: flex-start; gap: var(--space-md); padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--notice-tone) 45%, var(--border)); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--notice-tone) 12%, var(--bg-secondary)); color: var(--text-primary); font-size: var(--fs-md); font-weight: 400; line-height: 1.5; }
+.notice[hidden] { display: none; }
+.notice-info { --notice-tone: var(--accent); }
+.notice-warn { --notice-tone: var(--warning); }
+.notice-error { --notice-tone: var(--error); }
+.notice .material-icons { flex: none; color: var(--notice-tone); font-size: var(--icon-size); }
+.notice-bar { align-items: center; padding: 10px 16px; border-width: 0 0 1px; border-radius: 0; }
+.notice-center { align-items: center; justify-content: center; text-align: center; }
+.notice-float { box-shadow: 0 2px 8px rgba(var(--black-rgb), 0.25); } /* a notice drawn over other content (the unreachable-server pill) */
+.notice-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 16px; color: var(--text-secondary); font-size: var(--fs-md); }

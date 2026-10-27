@@ -424,13 +424,6 @@ body.panel-dragging .preview-pane {
 
 /* Editor / terminal library loading or failed to load (#3083, vendor_loader.js) */
 .vendor-load-notice {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding: 16px;
-    color: var(--text-secondary);
-    font-size: var(--fs-md);
     font-family: var(--font-sans);
 }
 
