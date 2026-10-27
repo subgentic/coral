@@ -21,7 +21,7 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
     if (lang === 'markdown' && typeof marked !== 'undefined') {
         const html = marked.parse(content);
         // A workspace file can be agent-written: its links follow the file policy (#3542).
-        const safe = sanitizeHtml(html, DOMPURIFY_CONFIG, { links: 'file' });
+        const safe = sanitizeHtml(html, DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
         body.innerHTML = `<div class="prose preview-pane-markdown">${safe}</div>`;
         keepFragmentsInside(body);
         if (line > 0) _scrollToLine(body, content, line);

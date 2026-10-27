@@ -1,5 +1,5 @@
 // The heading outline of rendered Markdown (#9522): a message, a note or a viewed file that says "# Title" is drawn as the prose h1 but does not take over the page's own outline: its aria-level starts at 4 (h1 -> 4,
-// h2 -> 5, h3 to h6 -> 6, the Hub renderer's rule for its md-h), and a Docs page, which owns its h1, keeps its levels. The shared Hub renderer (renderSafe) already gives role=heading aria-level 4 to 6.
+// h2 -> 5, h3 to h6 -> 6, the Hub renderer's rule for its md-h), a viewed file at 3 (under its dialog's h2), and a Docs page, which owns its h1, keeps its levels. The shared Hub renderer (renderSafe) already gives role=heading aria-level 4 to 6.
 //   node markdown_headings.test.mjs
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +21,7 @@ const levels = html => { const box = document.createElement('div'); box.innerHTM
 const want = ['h1:4', 'h2:5', 'h3:6', 'h4:6', 'h6:6'];
 assert.deepEqual(levels(renderMarkdown(MD, undefined, 'chat')), want, 'a chat message');
 assert.deepEqual(levels(renderMarkdown(MD, { breaks: true }, 'board')), want, 'a board message, a note, a plan');
-assert.deepEqual(levels(renderMarkdownStrict(MD)), want, 'a viewed Markdown file');
+assert.deepEqual(levels(renderMarkdownStrict(MD)), ['h1:3', 'h2:4', 'h3:5', 'h4:6', 'h6:6'], 'a viewed Markdown file sits under its dialog\'s h2: its h1 is level 3');
 assert.deepEqual(levels(renderDocsMarkdown(MD)), ['h1:null', 'h2:null', 'h3:null', 'h4:null', 'h6:null'], 'a Docs page owns its h1');
 
 // the Hub renderer's own headings are never above level 4 (vendor/safe-markdown.js)
