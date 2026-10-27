@@ -11,6 +11,7 @@
 }
 
 .chat-bubble {
+    --chat-ib: max(24px, calc(var(--fs-lg) + 10px)); /* the dense icon button's width (Copy, Save: .btn-icon.btn-xs): it grows with the text size, so what sits beside it is placed from it, not from 24 px (#9695: Save overlapped Copy by 12 px at 200% text) */
     margin-bottom: 16px;
     padding: 12px 16px;
     border-radius: var(--radius-xl);
@@ -1402,7 +1403,6 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 
 /* Save for later (#4510): a bookmark one slot to the left of Copy on each reply, and on your own messages; filled and in the accent colour when saved. Shown on
    hover or keyboard focus, always while saved; on touch both are always shown at 44 px (touch.css). */
-.chat-bubble { --chat-ib: max(24px, calc(var(--fs-lg) + 10px)); } /* the dense icon button's width (Copy, Save: .btn-icon.btn-xs): it grows with the text size, so what sits beside it is placed from it, not from 24 px (#9695: Save overlapped Copy by 12 px at 200% text) */
 .chat-bubble button.chat-save-btn {
     position: absolute;
     top: 6px;
