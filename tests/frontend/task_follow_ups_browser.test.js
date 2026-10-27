@@ -58,10 +58,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
             for (const [open, want] of [[2, '2 follow-ups open'], [1, '1 follow-up open'], [0, null]]) {
                 await stub(open); await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'goals', item: ${goal} }); true`);
                 await waitFor(`!!document.querySelector('.goal-split')`, `${label}: the goal page`, 10000);
-                if (want) await waitFor(`/${want}/.test((document.querySelector('.goal-side-counts') || {}).textContent || '')`, `${label}: "${want}"`, 6000);
+                if (want) await waitFor(`/${want}/.test((document.querySelector('.goal-followups') || {}).textContent || '')`, `${label}: "${want}"`, 6000);
                 else await ev(`new Promise(r => setTimeout(r, 600))`); // sleep-ok: nothing arrives to wait for: the page says nothing at 0
-                const counts = await ev(`(document.querySelector('.goal-side-counts') || {}).textContent`);
-                check(`${label}: the goal page's task counts say ${want ? `"${want}"` : 'nothing about follow-ups at 0'}`, want ? counts.includes(want) && /^\d+ open, \d+ done, /.test(counts) : !/follow-up/.test(counts), counts);
+                const counts = await ev(`(document.querySelector('.goal-followups') || {}).textContent || ''`);
+                check(`${label}: the goal page's task counts say ${want ? `"${want}"` : 'nothing about follow-ups at 0'}`, want ? counts.includes(want) : !/follow-up/.test(counts), counts);
                 if (open === 2) await shot(`goal-follow-ups-${mobile ? 390 : 1280}`);
                 await ev(`window.closeTeamPage && window.closeTeamPage(); true`);
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);

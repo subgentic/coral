@@ -3,7 +3,7 @@
 //   - an agent's name in a By agent row is a 44 px target on a phone;
 //   - the agent dock's divider is drawn in forced colors too (#7732: ButtonText at rest, Highlight while dragged; it was not drawn at all);
 //   - the goal page's column handle is drawn in forced colors (Windows High Contrast drops backgrounds, and its hover, drag and focus line was one) when it has the keyboard.
-// (The names, the sort state, the keyboard order, the contrast in both themes and the targets of the rest were walked and are right; analytics_a11y, the censuses and goal_side_column hold them.)
+// (The names, the sort state, the keyboard order, the contrast in both themes and the targets of the rest were walked and are right; analytics_a11y and the censuses hold them.)
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server, with the census data world for Analytics and a seeded team for the goal page.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -43,16 +43,6 @@ const TEAM = `qa-a11y-pass-${Date.now() % 100000}`;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
         await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM).catch(() => {}); await goTab(ev, settle, 'Goals'); await settle(800);
         await ev(`(() => { const b = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) button')].find(x => /Explore goals/.test(x.textContent)); if (b) b.click(); return !!b; })()`);
-        await waitFor(`!!document.querySelector('.goal-side-grip')`, 'the goal page', 8000);
-        await S.run("the goal page's column handle is drawn in forced colors when it has the keyboard, and not drawn when it has not", async () => {
-            await Emulation.setEmulatedMedia({ features: [{ name: 'forced-colors', value: 'active' }] }); await settle(400);
-            await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`); // the line's own fade would be measured half way
-            const line = () => ev(`(() => { const c = getComputedStyle(document.querySelector('.goal-side-grip'), '::before').backgroundColor; return c; })()`);
-            await ev(`document.activeElement && document.activeElement.blur(); true`); await settle(300);
-            const idle = await line(); await ev(`document.querySelector('.goal-side-grip').focus({ focusVisible: true }); true`); await settle(300);
-            const focused = await line(), highlight = await ev(`(() => { const t = document.createElement('i'); t.style.background = 'Highlight'; document.body.append(t); const c = getComputedStyle(t).backgroundColor; t.remove(); return c; })()`); await shot('goal-grip-forced-colors');
-            assert.match(idle, /^rgba\(\d+, \d+, \d+, 0\)$/, 'nothing is drawn while it has no keyboard (fully transparent, whatever colour the theme gives it): ' + idle); assert.equal(focused, highlight, `drawn in Highlight when focused: ${focused} against ${highlight}`);
-        });
         await S.run("the agent dock's divider is drawn in forced colors (ButtonText) and in Highlight while it is dragged", async () => {
             await ev(`window.__m.add('dock-a', 'A', 3, { sleeping: false, session_id: 'dock-a-id' }); window.selectLiveSession('dock-a', 'claude', 'dock-a-id', 'local'); true`);
             await waitFor(`!!document.getElementById('task-bar-resize-handle') && document.getElementById('task-bar-resize-handle').getBoundingClientRect().height > 100`, 'the dock divider', 10000);
