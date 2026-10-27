@@ -76,7 +76,7 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsInputAttention);
-const teamOf = s => s.board_project ? keyLabel(identityKey(sessionServer(s), s.board_project)) : '';
+const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
 const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : resolveSessionIdentity(s);
 const reviewRows = () => reviewItems().map(a => ({ review: a, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
 const allNeeds = () => [...waitingSessions(), ...reviewRows()];
