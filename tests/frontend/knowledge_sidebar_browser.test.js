@@ -52,7 +52,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
             assert.ok(!/^#|\n#|---|\]\(\.\//.test(d.text), `no raw Markdown text: ${JSON.stringify(d.text.match(/^#|\n#|---|\]\(\.\//))} in ${JSON.stringify(d.text)}`); assert.equal(d.pre, false, 'the plain text is replaced by the rendering');
         });
         await S.run('the front matter is a facts block: type, title, tags as chips and no time of its own (one time format, in the header line, with the exact one on hover), not raw text', async () => {
-            const f = await ev(`(() => { const p = window.__tp.pane(), dl = p.querySelector('.knowledge-facts'); if (!dl) return null; const rows = {}; dl.querySelectorAll('dt').forEach(t => { rows[t.textContent] = t.nextElementSibling; }); return { keys: [...dl.querySelectorAll('dt')].map(t => t.textContent), type: rows.Type.textContent, title: rows.Title.textContent, tags: [...rows.Tags.querySelectorAll('.knowledge-tag')].map(t => t.textContent), sub: p.querySelector('.detail-sub').textContent, exact: p.querySelector('.detail-sub').title, all: window.__na.text(p) }; })()`);
+            const f = await ev(`(() => { const p = window.__tp.pane(), dl = p.querySelector('dl.facts'); if (!dl) return null; const rows = {}; dl.querySelectorAll('dt').forEach(t => { rows[t.textContent] = t.nextElementSibling; }); return { keys: [...dl.querySelectorAll('dt')].map(t => t.textContent), type: rows.Type.textContent, title: rows.Title.textContent, tags: [...rows.Tags.querySelectorAll('.knowledge-tag')].map(t => t.textContent), sub: p.querySelector('.detail-sub').textContent, exact: p.querySelector('.detail-sub').title, all: window.__na.text(p) }; })()`);
             assert.ok(f, 'a facts block'); assert.deepEqual(f.keys, ['Type', 'Title', 'About', 'Tags'], 'no Written row: the time is in the header line only');
             assert.equal(f.type, 'Team Knowledge Bundle'); assert.equal(f.title, TEAM); assert.deepEqual(f.tags, ['orchestrator', 'uxux-engineer', 'backend-dev']);
             assert.ok(f.sub && f.exact && !f.sub.startsWith(f.exact) && /^(just now|\d+ min ago|today|yesterday|[A-Z][a-z]{2} \d)/.test(f.sub), `the header line has the time in words (${JSON.stringify(f.sub)}) and the exact time on hover (${JSON.stringify(f.exact)})`);
@@ -72,7 +72,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
             assert.equal(await title(), 'Backend Dev', 'a link inside an agent entry opens the other entry');
             assert.match(await paneText(), /Backend knowledge text\./);
             await openRow('/UX\\/UX Engineer/'); await settle(200);
-            assert.equal(await ev(`window.__tp.pane().querySelector('.knowledge-facts')`), null, 'an entry without a block has no facts'); assert.match(await paneText(), /UX notes/);
+            assert.equal(await ev(`window.__tp.pane().querySelector('dl.facts')`), null, 'an entry without a block has no facts'); assert.match(await paneText(), /UX notes/);
         });
         await S.run('the sidebar has the goal column\'s handle: a separator, dragged wider, kept, with the dock\'s limits, keys and double click', async () => {
             await openRow('/^Index$/'); await waitFor(`!!document.querySelector('.detail-grip')`, 'the handle');
