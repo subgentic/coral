@@ -7,16 +7,10 @@
 /* ── The controls: the pills at the left, the Table | Chat switch at the right ── */
 .mb-table-tools { display: flex; align-items: center; gap: 0.5rem 0.75rem; flex-wrap: wrap; padding: 0.25rem 0 0.5rem; }
 .mb-table-tools .mb-pills { flex: 1 1 auto; min-width: 0; }
-.mb-view-switch { display: inline-flex; margin-inline-start: auto; border: 1px solid var(--control-border); border-radius: var(--radius-md, 6px); overflow: hidden; }
-.mb-view-btn { min-height: 2rem; padding: 0 0.875rem; border: 0; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: var(--fs-md); cursor: pointer; }
-.mb-view-btn + .mb-view-btn { border-inline-start: 1px solid var(--control-border); }
-.mb-view-btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
-@media (max-width: 767px), (pointer: coarse) { .mb-view-btn { min-height: var(--control-touch-height, 44px); } }
+.mb-view-switch { margin-inline-start: auto; }
 
 /* In the agent dock's head line the switch sits between the title and the buttons. */
 .board-chat-header .mb-table-tools { padding: 0; margin-inline-start: auto; flex: none; }
-.board-chat-header .mb-view-btn { min-height: 1.75rem; padding-inline: 0.625rem; font-size: var(--fs-base); }
-@media (max-width: 767px), (pointer: coarse) { .board-chat-header .mb-view-btn { min-height: var(--control-touch-height, 44px); } }
 
 /* ── The table ── */
 .mb-table { padding: 0 0 0.75rem; }

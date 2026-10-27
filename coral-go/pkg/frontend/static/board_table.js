@@ -285,12 +285,12 @@ export function mountTableTools(host, { view, pill = 'all', onView, onPill, pill
         pills.append(b);
     }
     const sw = document.createElement('div');
-    sw.className = 'mb-view-switch';
+    sw.className = 'mb-view-switch btn-seg';
     sw.setAttribute('role', 'group');
     sw.setAttribute('aria-label', 'Board view');
     for (const [key, label] of [['table', 'Table'], ['chat', 'Chat']]) {
         const b = document.createElement('button');
-        b.type = 'button'; b.className = 'mb-view-btn'; b.dataset.view = key; b.textContent = label;
+        b.type = 'button'; b.className = 'btn mb-view-btn'; b.dataset.view = key; b.textContent = label;
         b.setAttribute('aria-pressed', String(key === view));
         b.addEventListener('click', () => { for (const x of sw.children) x.setAttribute('aria-pressed', String(x === b)); onView(key); });
         sw.append(b);

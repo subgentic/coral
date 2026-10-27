@@ -82,6 +82,20 @@
 .btn-quiet.btn-danger:hover { background: rgba(var(--fx-red-rgb), 0.15); color: var(--error-text); }
 .btn[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
 
+/* A segmented control (Goal #84, #9096): one choice among two to five buttons, joined in one box: one height (32, 44 on touch), one radius, one padding; the chosen one is the accent fill above. A text tab strip is not one. */
+.btn-seg { display: inline-flex; width: fit-content; max-width: 100%; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow: hidden; }
+.btn-seg > .btn { margin: 0; border: 0; border-radius: 0; min-height: var(--control-compact-height); padding: 0 var(--space-lg); background: var(--bg-secondary); color: var(--text-secondary); white-space: nowrap; }
+.btn-seg > .btn + .btn { border-inline-start: 1px solid var(--control-border); }
+.btn-seg > .btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.btn-seg > .btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); }
+.btn-seg > .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 767px), (pointer: coarse) { .btn-seg > .btn { min-height: var(--control-touch-height); } }
+
+/* Disabled reads as unavailable (the style guide): the label stays readable, the box fades to the panel, no hover and no pointer; never opacity alone. */
+.btn:disabled, .btn[disabled] { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; opacity: 1; }
+.btn:disabled:hover, .btn[disabled]:hover { background: transparent; border-color: var(--border); color: var(--text-muted); }
+.btn-primary:disabled, .btn-primary[disabled] { background: transparent; border-color: var(--border); color: var(--text-muted); }
+
 .mb-project-count, .mb-project-meta {
     font-size: var(--fs-base);
     color: var(--text-secondary);
@@ -3947,7 +3961,6 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .cloud-command-row .btn { flex: none; margin: 0; }
 @container settingspane (max-width: 40rem) { .net-level-row { grid-template-columns: minmax(0, 1fr); } }
 /* New Agent (#5990): a Launch that is off (the CLI it needs is missing) looks off; the line under the folder is its reason. */
-#launch-modal .btn:disabled { opacity: .5; cursor: not-allowed; }
 .launch-dir-note { margin: 6px 0 0; }
 
 /* Default models (#6042): four short boxes, two by two, not four full-width boxes stacked (the loudest block of Settings > Agents for a rarely changed setting); one column on a phone. */
