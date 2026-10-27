@@ -29,7 +29,7 @@ const { connect } = require('./agent_view_harness');
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js'); await m.showSettingsModal(); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'settings');
             await sleep(500); // sleep-ok: the dialog's rows fill from several answers; there is no single completion event
-            const boxes = await acrossGroups(ev, `[...document.querySelectorAll('#settings-modal .info-grid dd input[type="checkbox"], #settings-modal .sv-switch')].filter(i => i.getClientRects().length).map(i => { const dd = i.closest('dd, .sv-control').getBoundingClientRect(), r = i.getBoundingClientRect(); return { id: i.id, w: Math.round(r.width), offset: Math.round(r.left - dd.left) }; })`);
+            const boxes = await acrossGroups(ev, `[...document.querySelectorAll('#settings-modal .info-grid dd input[type="checkbox"], #settings-modal input.switch')].filter(i => i.getClientRects().length).map(i => { const dd = i.closest('dd, .sv-control').getBoundingClientRect(), r = i.getBoundingClientRect(); return { id: i.id, w: Math.round(r.width), offset: Math.round(r.left - dd.left) }; })`);
             assert.ok(boxes.length >= 3, dev + ': the dialog has checkbox rows to check (' + boxes.length + ')');
             // A checkbox is a box (a 2.5rem switch since #4566), never the full-width field of #3981.
             assert.deepEqual(boxes.filter(b => b.w > 44), [], dev + ': every checkbox is a small switch, not a full-width box: ' + JSON.stringify(boxes.filter(b => b.w > 44)));
