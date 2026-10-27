@@ -1,4 +1,4 @@
-// Every dialog closes by its Close/Cancel control and by Escape, and focus goes back to the control that opened it (#5705; the Team settings Close was bound to the
+// Every dialog closes by a Close/Cancel button in its footer (the close X is gone since #9456: a dialog whose only exit is Escape fails) and by Escape, and focus goes back to the control that opened it (#5705; the Team settings Close was bound to the
 // first header button, Rename board, #5681). One table: how each dialog opens and where it is. A dialog that cannot be opened here is listed in SKIPPED with its reason.
 // CAPTURE=1 prints the table instead of asserting. Drives Chrome over CDP against the isolated dev server (agent_view_harness.js).
 const assert = require('node:assert/strict');
@@ -54,9 +54,12 @@ const REAL = {
         await ev(`window.__coralReady.startup('liveList', 'settings')`);
         await ev(`(() => { window.__M = f => import((window.__coralStatic || '/static/') + f); const t = document.createElement('button'); t.id = 'opener'; /* z-index 5: above the sidebar's pinned New Agent footer (2) that sits in this corner (#6159) */ t.textContent = 'opener'; t.style.cssText = 'position:fixed;left:4px;bottom:4px;z-index:5'; document.body.append(t); })(); true`);
     };
-    // The control a person would press to close it: a visible button named Close, Cancel, Done, Got it (the notice's own dismiss) or ×, or the close button class.
+    // The control a person would press to close it WITHOUT the close X (#9456 took the X out of every dialog; #9473 pins that each can still be dismissed): a visible button in the dialog's footer or actions (not its header, never the
+    // .modal-close-btn) whose words (an icon glyph's name is not words) are Close, Cancel, Done, OK, Got it or Not now; a script-built dialog's button[data-action=close] is the same control.
     const CLOSER = root => `(() => { const m = document.querySelector('${root}'); const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
-        const bs = [...m.querySelectorAll('button')].filter(vis); return bs.find(b => b.classList.contains('modal-close-btn')) || bs.find(b => /^(close|cancel|done|ok|got it|×|✕)$/i.test((b.textContent || b.getAttribute('aria-label') || '').trim())) || null; })()`;
+        const words = b => { const c = b.cloneNode(true); c.querySelectorAll('.material-icons, svg').forEach(i => i.remove()); return (c.textContent || b.getAttribute('aria-label') || '').trim(); };
+        const bs = [...m.querySelectorAll('button')].filter(b => vis(b) && !b.classList.contains('modal-close-btn') && !b.closest('.modal-header, header'));
+        return bs.find(b => /^(close|cancel|done|ok|got it|not now)$/i.test(words(b))) || bs.find(b => b.matches('[data-action=close]')) || null; })()`;
     const rows = []; let failed = 0;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
