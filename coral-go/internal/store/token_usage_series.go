@@ -46,6 +46,14 @@ const MaxUsageTurns = 200
 
 // GetUsageTurns lists turns, for the drill-down from a spike to what made it.
 func (s *TokenUsageStore) GetUsageTurns(ctx context.Context, q UsageTurnsQuery) ([]UsageTurn, error) {
+	query, args := usageTurnsSQL(q)
+	var turns []UsageTurn
+	err := s.db.Reader().SelectContext(ctx, &turns, query, args...)
+	return turns, err
+}
+
+// usageTurnsSQL is the statement and arguments of GetUsageTurns.
+func usageTurnsSQL(q UsageTurnsQuery) (string, []interface{}) {
 	limit := q.Limit
 	if limit <= 0 {
 		limit = 20
@@ -70,12 +78,18 @@ func (s *TokenUsageStore) GetUsageTurns(ctx context.Context, q UsageTurnsQuery) 
 	if q.Order == "cost" {
 		order = `cost_usd DESC, recorded_at DESC, id DESC`
 	}
-	var turns []UsageTurn
-	err := s.db.Reader().SelectContext(ctx, &turns,
-		`SELECT session_id, agent_name, agent_type, COALESCE(board_name, '') AS board_name, COALESCE(model, '') AS model, cost_usd, input_tokens, output_tokens,
-		        cache_read_tokens, cache_write_tokens, n_rows, recorded_at
-		 FROM token_usage_all WHERE `+strings.Join(where, ` AND `)+` ORDER BY `+order+` LIMIT ?`, append(args, limit)...)
-	return turns, err
+	// Each table gives its own newest (or dearest) limit rows, and the two are merged: the first limit rows of a union under one order are among the first limit rows of each side.
+	// Read through the view (token_usage_all) the query built the whole union, 32,000 rows in the baseline seed, applied the source rule to each and sorted them to return 20
+	// (#9482); this way each side walks its time index and stops.
+	conds := strings.Join(where, ` AND `)
+	branch := func(table, nRows string) string {
+		return `SELECT * FROM (SELECT session_id, agent_name, agent_type, COALESCE(board_name, '') AS board_name, COALESCE(model, '') AS model, cost_usd, input_tokens, output_tokens,
+		        cache_read_tokens, cache_write_tokens, ` + nRows + ` AS n_rows, recorded_at, id
+		 FROM ` + table + ` WHERE ` + conds + ` ORDER BY ` + order + ` LIMIT ?)`
+	}
+	query := `SELECT session_id, agent_name, agent_type, board_name, model, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, n_rows, recorded_at FROM (` +
+		branch("token_usage", "1") + ` UNION ALL ` + branch("token_usage_hourly", "n_rows") + `) ORDER BY ` + order + ` LIMIT ?`
+	return query, append(append(append(append([]interface{}{}, args...), limit), args...), limit, limit)
 }
 
 // TimeSeriesBucket represents a single time bucket of aggregated cost.
