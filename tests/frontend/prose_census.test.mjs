@@ -12,7 +12,6 @@ const walk = (dir, ext, out = []) => { for (const e of fs.readdirSync(dir, { wit
 
 // the containers of rendered text that still have heading rules of their own, each for its reason: moving one onto .prose is a change to what it looks like, taken one at a time
 export const BASELINE = {
-    'docs-content': 'the documentation page: its titles are the page\'s own scale (32, 24, 18, 16)',
     'notes-rendered': 'the history notes: three heading sizes from the type scale',
     'subagent-detail-md': 'a sub-agent\'s detail pane: small headings from the type scale',
     'cni-plan': 'the plan inside a needs-input card: small headings',
@@ -27,7 +26,7 @@ for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
     for (const raw of m[1].split(',')) {
         const parts = raw.trim().split(/[\s>+~]+/).filter(Boolean);
         const last = parts[parts.length - 1] || '';
-        if (!/^(h[1-6]|\.md-h)$/.test(last.split(':')[0]) || parts.length < 2) continue;
+        if (!/^(h[1-6]|\.md-h[1-6]?)$/.test(last.split(':')[0]) || parts.length < 2) continue;
         const owner = [...parts.slice(0, -1)].reverse().map(p => /\.([a-z][\w-]*)/.exec(p)).find(Boolean);
         if (!owner) continue;
         const cls = owner[1];
@@ -45,6 +44,6 @@ for (const f of [...walk(path.join(root, 'static'), ['.js']), ...walk(path.join(
     for (const m of text.matchAll(/class="([^"]*\bpreview-pane-markdown\b[^"]*)"/g)) if (!/(^|\s)prose(\s|$)/.test(m[1])) problems.push(`${path.relative(root, f)}: "${m[1]}" draws markdown without .prose`);
     for (const m of text.matchAll(/class="([^"]*\bmessage-text\b[^"]*)">\$\{renderMarkdown\(/g)) if (!/(^|\s)(prose|cni-plan)(\s|$)/.test(m[1])) problems.push(`${path.relative(root, f)}: a chat message's markdown ("${m[1]}") has no .prose`);
 }
-if (!/\.prose h1 \{[^}]*font-size: var\(--prose-h1\)/.test(css)) problems.push('css: the .prose heading scale is missing');
+if (!/\.prose h1(, \.prose \.md-h1)? \{[^}]*font-size: var\(--prose-h1\)/.test(css)) problems.push('css: the .prose heading scale is missing');
 if (problems.length) { console.error('prose_census: FAIL\n  ' + [...new Set(problems)].join('\n  ')); process.exit(1); }
 console.log(`prose_census: ok (.prose; ${Object.keys(BASELINE).length} containers of rendered text still have heading rules of their own)`);
