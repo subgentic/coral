@@ -57,6 +57,9 @@ const AGENTS = [
             }
             assert.deepEqual(r.map(x => x.snippet), ['Queued', 'In progress', 'In review'], at + 'the state is the first words');
             const edge = await ev(`(() => { const b = document.querySelector('${T} .dt-box').getBoundingClientRect(), tr = document.querySelector('${T} tr.dt-mailed').getBoundingClientRect(), sb = document.querySelector('${T} .dt-sortbar'); return { left: Math.round(b.left), right: Math.round(innerWidth - b.right), tr: [Math.round(tr.left), Math.round(tr.right)], sort: !!sb && getComputedStyle(sb).display !== 'none', border: getComputedStyle(document.querySelector('${T} .dt-box')).borderLeftWidth }; })()`);
+            const CLIP = `(() => [...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const t = tr.querySelector('.dt-mail-time').getBoundingClientRect(), r = tr.getBoundingClientRect(), w = tr.querySelector('.dt-mail-time').scrollWidth; return { gap: Math.round(innerWidth - t.right), rowRight: Math.round(r.right), clipped: w > Math.ceil(t.width) }; }))()`;
+            const clip = await ev(CLIP);
+            assert.ok(clip.every(x => x.gap >= 12 && x.rowRight <= w && !x.clipped), at + 'the time keeps the 12 px right padding and is never cut, under the selection tint too ' + JSON.stringify(clip));
             assert.ok(edge.left === 0 && edge.right === 0 && edge.border === '0px' && !edge.sort, at + 'the rows run edge to edge, no card, no Sort row ' + JSON.stringify(edge));
             assert.ok(r.every(x => /^(now|\d+m|\d+:\d\d\s?[AP]M|Yesterday|[A-Z][a-z]{2}( \d+(, \d{4})?)?)$/.test(x.time)), at + 'short times ' + JSON.stringify(r.map(x => x.time)));
             assert.deepEqual(r.map(x => x.title), ['Pick the release date', 'Check <img src=x onerror="window.__pwn=1"> the logo', 'Approve the budget'], at + 'the titles, as text');
@@ -67,6 +70,8 @@ const AGENTS = [
             await ev(`document.querySelectorAll('${T} tr.dt-mailed button.dt-mail-lead')[0].click(); true`);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed.dt-selected').length === 1`, at + 'the avatar selects a task', 4000);
             let q = await sel();
+            const clip2 = await ev(CLIP);
+            assert.ok(clip2.every(x => x.gap >= 12 && !x.clipped), at + 'and still, with a row selected ' + JSON.stringify(clip2));
             assert.deepEqual([q.on, q.pressed, q.tick, q.bar], [[true, false, false], ['true', 'false', 'false'], [true, false, false], '1 selected'], at + 'one selected: tint, pressed, a check, the bar ' + JSON.stringify(q));
             assert.ok(q.lead >= 44 && q.page === 'none', at + 'a 44 px select button, and the list is still on screen ' + JSON.stringify(q));
             assert.ok(await ev(`[...document.querySelectorAll('.team-tb-selection .dt-bar .btn, .team-tb-selection .dt-bar-action, .team-tb-selection .dt-bar-clear')].every(b => b.getBoundingClientRect().height >= 44)`), at + 'the selection bar\'s Mark done and Clear are 44 px targets');

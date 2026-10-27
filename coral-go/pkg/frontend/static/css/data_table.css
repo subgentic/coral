@@ -421,3 +421,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .group-table-view .dt-box.dt-mail-on { margin-inline: calc(-1 * var(--space-2xl)); border-inline: 0; border-radius: 0; }
     .dt-box.dt-mail-on .dt-sortbar { display: none; }
 }
+/* the mail row's button keeps its padding whatever the table's own primary-button rules say (a compact table zeroed it, and the time sat on the screen's edge: #9613) */
+.dt-box.dt-mail-on tr.dt-mailed .dt-mail-open.dt-primary { padding: 0 12px 0 4px; margin: 0; }
+.dt-box.dt-mail-on tr.dt-mailed .dt-mail-open.dt-primary:has(.dt-mail-two) { padding-block: 12px; }
+.dt-box.dt-mail-on tr.dt-mailed .dt-mail-time { flex: none; }
