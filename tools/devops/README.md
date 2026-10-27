@@ -125,6 +125,22 @@ the first failed check.
   re-approval, not a security control. Every Monday read the audit log for Approve release runs and their actors (`gh run list --workflow approve-release.yml`): the team rule is
   that no agent dispatches it.
 
+## The pre-tag dry run (#8642, Goal #65)
+
+The step before every tag. `.github/workflows/release-dryrun.yml` runs release.yml's `resolve` job on a candidate commit without tagging anything: the release
+provenance record (who, which commit, on `main`, and whether go-tests, go-race and cdp-gate passed on exactly that code) and every release self-test of that step
+(the list is kept equal to release.yml's by `tests/release/release_dryrun_test.py`). It runs every check to its end and prints one line, `GO`, or `NO-GO` with the
+failing line of each check (also in the run's step summary). It builds, signs and publishes nothing and its token is read-only (and only the provenance step gets it: the candidate's own test scripts never see it). GO is advisory: the real gate stays release.yml and the operator's approval.
+
+```bash
+gh workflow run release-dryrun.yml --ref main      # the candidate is the commit the run starts on
+gh run list --workflow release-dryrun.yml --limit 1 --json databaseId,status,conclusion
+gh run view <id> --log | grep -E '^(GO|NO-GO|FAIL)'   # poll the run, then read it; gh run watch hangs a session
+```
+
+Post `GO` (with the run id and the commit) or the failing lines on the board before the release approval is asked for. To try a change to the workflow itself, push a
+branch named `dryrun/<anything>`: the same job runs on a push there.
+
 ## Release provenance (#5550)
 
 - **At every tag**: the first step of `release.yml`'s resolve job runs `tests/release/release_provenance.py`. It writes into the run's
