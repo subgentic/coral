@@ -19,7 +19,9 @@ export function makeDetails({ panel = null } = {}) {
     button.setAttribute('aria-controls', p.id);
     const chevron = document.createElement('span'); // turns when open, as More options and Who can read this do
     chevron.className = 'material-icons details-toggle-chevron'; chevron.setAttribute('aria-hidden', 'true'); chevron.textContent = 'expand_more';
-    button.append('Details', chevron);
+    const count = document.createElement('span'); // how many facts the row of the list leaves out on a narrow box (the Team and the Task): a person knows something is behind the button
+    count.className = 'details-toggle-count'; count.hidden = true;
+    button.append('Details', count, chevron);
     let used = false;
     let shown = [];
     const isOpen = () => browserLocal.get(KEY) === '1';
@@ -32,6 +34,7 @@ export function makeDetails({ panel = null } = {}) {
     sync();
     return {
         button, panel: p,
+        setCount(n) { const k = Number(n) || 0; count.hidden = k < 1; count.textContent = k > 0 ? String(k) : ''; if (k > 0) button.setAttribute('aria-label', `Details, ${k} fact${k === 1 ? '' : 's'} the list row does not show`); else button.removeAttribute('aria-label'); },
         add(node) { p.append(node); used = true; sync(); },
         remove(node) { node.remove(); used = p.children.length > 0; sync(); },
         onShown(fn) { shown.push(fn); if (isOpen() && used) fn(); },

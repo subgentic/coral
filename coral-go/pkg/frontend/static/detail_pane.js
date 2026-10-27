@@ -52,7 +52,7 @@ function addResizeHandle(aside) {
     attachDockResize(grip, { panel: aside, row, mainMin, key: 'coral-detail-width', apply: (w) => { aside.style.setProperty('--detail-w', w ? `${w}px` : ''); value(); } }).restore();
 }
 
-export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true, focusClose = false, subTitle = '', details = null, extra = null }) {
+export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true, focusClose = false, subTitle = '', details = null, extra = null, hiddenFacts = 0 }) {
     const aside = host || pane(); // host: a pane of its own, a sheet over a panel (the agent's Artifacts), not the team page's aside
     if (!aside) return false;
     if (current && current.aside !== aside) closeDetailPane(); // one document at a time: the other pane is put away
@@ -78,6 +78,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     const subRow = el('div', 'detail-sub-row'); // the one line under the title: its facts in words, and the Details button at its end (nothing taller than the line)
     if (sub) { const p = el('p', 'detail-sub', sub); if (subTitle) p.title = subTitle; subRow.append(p); } // subTitle: the exact time behind a time in words
     subRow.append(more.button);
+    more.setCount(hiddenFacts); // the facts the list's row has dropped, said on the closed button
     text.append(subRow);
     if (extra) text.append(extra); // a line of the caller's own under the title row (an artifact's tags, #8594)
     if (backLabel && (!host || host.classList.contains('inbox-detail-pane') || host.classList.contains('goal-detail-pane'))) foldWayBack(text, '.detail-back', '.detail-title');

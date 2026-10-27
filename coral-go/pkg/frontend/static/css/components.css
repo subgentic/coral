@@ -3437,6 +3437,8 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: 0.6875rem; line-heig
 .detail-sub-row { display: flex; align-items: center; flex-wrap: wrap; column-gap: 12px; }
 .detail-sub-row .details-toggle { min-height: 24px; margin: -2px 0 -2px -6px; } /* the pane's: no taller than the line it ends */
 .details-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.details-toggle-count { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); font-weight: 600; line-height: 1; }
+.details-toggle-count[hidden] { display: none; }
 .details-toggle-chevron { font-size: 1.25rem; transition: transform .12s; }
 .details-toggle[aria-expanded="true"] .details-toggle-chevron { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) { .details-toggle-chevron { transition: none; } }
