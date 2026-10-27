@@ -1,10 +1,12 @@
-// A Hub page framed in the Hub-served Inbox (Needs you, Tasks, Saved for later: #9542) on a phone (#9660, UI/UX's 22:34 check): the folder button names the page, so there is no heading under it, and the frame runs
-// edge to edge (no gutter, no panel fill). A desktop keeps its heading and its gutter. The stubbed two-computer Hub of helpers/hub_world.js (native boot); the frame's address is the Hub's page, which this test
+// A Hub page framed in the Hub-served Inbox (Needs you, Tasks, Saved for later: #9542) on a phone (#9660, UI/UX's 22:34 check): the folder button names the page, so no heading is drawn under it, and the frame runs
+// edge to edge (no gutter, no panel fill); the heading stays in the page for a screen reader, clipped to 1 px. A desktop draws its heading and keeps its gutter. The stubbed two-computer Hub of helpers/hub_world.js (native boot); the frame's address is the Hub's page, which this test
 // server does not serve: only the frame's place is tested. Shots with CORAL_SCREENSHOT_DIR.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
+
+const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved for later' };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
@@ -19,14 +21,15 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(group)})).then(() => true)`);
         await waitFor(`!!document.querySelector('#group-table-view iframe.inbox-frame')`, `the ${group} frame`, 10000);
     };
-    const probe = () => ev(`(() => { const v = document.getElementById('group-table-view'), f = v.querySelector('iframe.inbox-frame'), r = f.getBoundingClientRect(), cs = getComputedStyle(v); return { src: f.getAttribute('src'), heading: !!document.getElementById('group-table-title'), headingShown: !!document.getElementById('group-table-title'), left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), vw: innerWidth, padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), padT: parseFloat(cs.paddingTop), fillAbove: getComputedStyle(f).backgroundColor }; })()`);
+    const probe = () => ev(`(() => { const v = document.getElementById('group-table-view'), f = v.querySelector('iframe.inbox-frame'), r = f.getBoundingClientRect(), cs = getComputedStyle(v); return { src: f.getAttribute('src'), heading: (document.getElementById('group-table-title') || {}).textContent || null, headBox: (h => h ? [Math.round(h.getBoundingClientRect().width), Math.round(h.getBoundingClientRect().height)] : null)(document.querySelector('#group-table-view > .group-table-head')), left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), vw: innerWidth, padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), padT: parseFloat(cs.paddingTop), fillAbove: getComputedStyle(f).backgroundColor }; })()`);
     try {
         await setupHubWorld({ client, Page, Emulation, width: 390, height: 844, mobile: true, inbox: 'native' });
         for (const [group, src] of [['needs', '/inbox/hub/needs'], ['tasks', '/inbox/hub/tasks'], ['saved', '/inbox/hub/saved']]) {
             await open(390, 844, true, group);
             const p = await probe();
             assert.equal(p.src, src, `${group}: the frame is the Hub page at its constant address`);
-            assert.equal(p.headingShown, false, `${group}, 390: no heading under the folder button (it names the page) ${JSON.stringify(p)}`);
+            assert.equal(p.heading, NAMES[group], `${group}, 390: the page's heading is still in the page, for a screen reader ${JSON.stringify(p)}`);
+            assert.ok(p.headBox && p.headBox[0] <= 1 && p.headBox[1] <= 1, `${group}, 390: but it is not drawn under the folder button (the button names the page) ${JSON.stringify(p)}`);
             assert.ok(p.left === 0 && p.width === p.vw, `${group}, 390: the frame runs edge to edge ${JSON.stringify(p)}`);
             assert.ok(p.padL === 0 && p.padR === 0 && p.padT === 0, `${group}, 390: no gutter round the frame ${JSON.stringify(p)}`);
             if (group === 'needs') await shot('hub-inbox-framed-390-edge');
@@ -34,7 +37,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
         }
         await open(1280, 800, false, 'needs');
         const d = await probe();
-        assert.equal(d.headingShown, true, `1280: a desktop keeps the page heading ${JSON.stringify(d)}`);
+        assert.ok(d.heading === NAMES.needs && d.headBox[1] > 8, `1280: a desktop draws the page heading ${JSON.stringify(d)}`);
         assert.ok(d.padL > 0 && d.left > 0, `1280: and its gutter ${JSON.stringify(d)}`);
         console.log('PASS 1280: heading and gutter as before');
     } finally { await client.close(); }
