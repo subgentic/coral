@@ -12,6 +12,21 @@ const BASELINE = path.join(HERE, 'tab_family_baseline.json');
 const update = process.argv.includes('--update');
 export const FAMILY = new Set(['tabs', 'tab', 'tab-count']);
 const NAMES = /(^|-)tabs?(-|$)/;
+// Classes whose name has "tab" but that are not a text tab strip, so they keep their own look (Goal #94): each with its reason.
+export const NOT_A_TAB_STRIP = {
+    'preview-tabs': 'the preview pane\'s browser-style file tabs: a close button, a pin and an icon on each, closable and reorderable',
+    'preview-tab': 'a browser-style file tab (see preview-tabs)',
+    'preview-tab-close': 'the close button of a file tab',
+    'preview-tab-icon': 'the icon of a file tab',
+    'preview-tab-keep': 'the pin button of a file tab',
+    'settings-tab': 'a row in the Settings dialog\'s vertical list of sections, not a strip',
+    'mobile-tab': 'a button of the phone\'s bottom bar: an icon over a label',
+    'mobile-tab-bar': 'the phone\'s bottom bar',
+    'nav-tab-badge': 'the Inbox count that hangs on the top-nav tab\'s corner: a badge, not a tab',
+    'tab-customize': 'the dock\'s Customize panel: a popover that holds checkboxes',
+    'history-tab-content': 'the panel under the history tabs: it is the content, not a tab',
+    'servers-tab-title': 'the heading inside the Servers page',
+};
 const LOOK = /(^|[;\s])(background|border|padding|font-size|font-weight|color|min-height|height|border-radius)\s*:/g;
 
 /** Every plain class selector (with a pseudo suffix) that names a tab and gives it a look: { class: number of look declarations }. */
@@ -23,7 +38,7 @@ export function scan(css) {
         if (!n) continue;
         for (const sel of m[1].split(',')) {
             const c = /^\s*\.([a-z0-9_-]+)(?::[a-z-]+(?:\([^)]*\))?|\[[^\]]*\])*\s*$/.exec(sel);
-            if (c && NAMES.test(c[1]) && !FAMILY.has(c[1])) out[c[1]] = (out[c[1]] || 0) + n;
+            if (c && NAMES.test(c[1]) && !FAMILY.has(c[1]) && !(c[1] in NOT_A_TAB_STRIP)) out[c[1]] = (out[c[1]] || 0) + n;
         }
     }
     return out;
@@ -45,4 +60,4 @@ for (const [c, n] of Object.entries(sorted)) {
 }
 for (const c of Object.keys(base)) if (!(c in sorted)) bad.push(`.${c} is gone: lower the baseline (node tab_family_census.test.mjs --update)`);
 assert.deepEqual(bad, [], 'tab family census');
-console.log(`tab_family_census: ok (${Object.keys(sorted).length} legacy tab classes in the baseline; goal #88 is done when only non-tab-strip ones are left)`);
+console.log(`tab_family_census: ok (${Object.keys(sorted).length} legacy tab classes in the baseline; every one with its own look is a second tab strip, and the baseline is empty)`);
