@@ -368,3 +368,5 @@
 
 .dt-one-line .dt-title-cell { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; min-width: 0; }
 .dt-one-line .team-artifact-badge { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.artifact-name-icon { display: inline-flex; flex: 0 0 16px; }
