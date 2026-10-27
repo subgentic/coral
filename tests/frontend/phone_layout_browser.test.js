@@ -55,7 +55,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.selectLiveSession('phone-bot-with-a-long-name', 'claude', 'phone-bot-with-a-long-name-id', 'local'); true`); await settle(1800);
             await scan('agent chat');
             await ev(`window.setLiveViewMode('terminal'); true`); await settle(1500); await scan('agent terminal'); await ev(`window.setLiveViewMode('chat'); true`); await settle(500);
-            for (const tab of ['history', 'workflows', 'jobs', 'tokens', 'docs', 'board']) { await ev(`window.switchNavTab('${tab}'); true`).catch(() => {}); await settle(1500); await scan('tab ' + tab); }
+            for (const tab of ['history', 'automations', 'tokens', 'docs', 'board']) { await ev(`window.switchNavTab('${tab}'); true`).catch(() => {}); await settle(1500); await scan('tab ' + tab); }
             await ev(`window.switchNavTab('agents'); true`); await settle(500);
             // the side panel overlay: Tasks and Board
             await ev(`window.selectLiveSession('phone-bot-with-a-long-name', 'claude', 'phone-bot-with-a-long-name-id', 'local'); true`); await settle(1200);

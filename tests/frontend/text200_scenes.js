@@ -76,7 +76,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.documentElement.style.fontSize = ''; true`);
         };
         if (group === 'tabs') {
-            for (const tab of ['agents', 'history', 'workflows', 'jobs', 'tokens', 'docs', 'servers', 'board']) await probe('tab ' + tab, () => ev(`window.switchNavTab('${tab}'); true`));
+            for (const tab of ['agents', 'history', 'automations', 'tokens', 'docs', 'servers', 'board']) await probe('tab ' + tab, () => ev(`window.switchNavTab('${tab}'); true`));
             await ev(`window.switchNavTab('agents'); true`);
             await probe('agent chat', () => ev(`window.selectLiveSession('phone-bot-with-a-long-name', 'claude', 'phone-bot-with-a-long-name-id', 'local'); true`));
         }
