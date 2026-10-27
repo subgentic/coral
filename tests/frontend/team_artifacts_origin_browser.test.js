@@ -71,7 +71,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
 
         console.log('1. An unverified row says so and offers nothing to open');
         const unvNames = ['Design review.md', "Another team's report.pdf"];
-        const unv = await ev(`[...document.querySelectorAll('${ROWS}')].filter(r => r.querySelector('.team-artifact-badge-unverified')).map(r => ({ name: r.querySelector('.dt-primary').textContent, badge: r.querySelector('.team-artifact-badge').textContent, cells: [...r.querySelectorAll('td')].slice(1, 3).map(c => c.textContent), tags: r.querySelectorAll('.dt-tag:not(.team-artifact-badge)').length }))`); // the one-line dock row (#8793): Name, Size, Created; the file type is in the preview, not on the row
+        const unv = await ev(`[...document.querySelectorAll('${ROWS}')].filter(r => r.querySelector('.team-artifact-badge-unverified')).map(r => ({ name: r.querySelector('.dt-primary').textContent, badge: r.querySelector('.team-artifact-badge').textContent, cells: ['size', 'type'].map(key => r.querySelector('[data-key=' + key + ']').textContent), tags: r.querySelectorAll('.dt-tag:not(.team-artifact-badge)').length }))`); // the one-line dock row (#8793): Name, Size, Created; the file type is in the preview, not on the row
         assert.equal(unv.length, 2);
         for (const r of unv) {
             assert.equal(r.badge, 'Link not verified');

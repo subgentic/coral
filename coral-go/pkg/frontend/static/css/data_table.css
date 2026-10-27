@@ -189,7 +189,6 @@
 .dt-table .dt-action { margin: 0; white-space: nowrap; }
 .dt-box.dt-folded .dt-action { min-height: var(--table-touch); }
 
-.dt-title-stack { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .dt-note { max-width: 100%; box-sizing: border-box; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
 .dt-warning { border-color: var(--table-warning); color: var(--table-primary-color); }
 .dt-row:has(.dt-subtitle) td { height: var(--table-row-description-h); }
@@ -275,7 +274,6 @@
 /* A name with its description under it stacks: the description is not a second flex item squeezing the name to ellipsis at a large text size (#8541) */
 .dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-1:has(> .dt-subtitle) { flex-direction: column; align-items: flex-start; height: auto; }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell { align-items: center; width: 100%; }
-.dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-stack { width: 100%; }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-primary { box-sizing: border-box; padding: 0; margin-block: calc((var(--table-fold-line-h) - var(--table-touch)) / 2); line-height: 1.3; font-weight: var(--table-fold-primary-weight); }
 .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { min-width: 0; flex: 1; }
 .dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-2 { min-height: var(--table-fold-meta-h); line-height: var(--table-fold-meta-h); }
@@ -353,3 +351,21 @@
 #agentic-panel-artifacts .artifact-details { display: inline-flex; align-items: center; justify-content: center; width: var(--table-touch); height: var(--table-touch); }
 #agentic-panel-artifacts .artifact-details::after { content: none; } /* the icon itself is 44px; no overlapping hit-area extension */
 .dt-box.dt-folded .inbox-review-task { display: none; } /* a folded (phone) Needs you row has a review's goal on its second line; its task is one tap away on the goal (#8917) */
+
+/* Shared one-line tables: column priorities use the list's width, including a narrow dock. */
+.dt-one-line { container-type: inline-size; }
+.dt-one-line .dt-table { width: 100%; table-layout: fixed; }
+.dt-one-line .dt-td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt-one-line .dt-primary { min-height: 44px; display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-one-line .dt-sortbar { display: none; }
+.artifact-table .artifact-tags-row { flex-wrap: nowrap; margin-top: 0; overflow: hidden; vertical-align: middle; }
+.artifact-table .artifact-tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.artifact-table .artifact-tag-more { flex-shrink: 0; }
+.artifact-table .artifact-details { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; }
+.artifact-table .artifact-details::after { content: none; }
+@container (max-width: 52rem) { .dt-one-line [data-drop-at="52"] { display: none; } }
+@container (max-width: 36rem) { .dt-one-line [data-drop-at="36"] { display: none; } }
+@container (max-width: 28rem) { .dt-one-line [data-drop-at="28"] { display: none; } }
+
+.dt-one-line .dt-title-cell { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; min-width: 0; }
+.dt-one-line .team-artifact-badge { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

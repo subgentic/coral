@@ -171,7 +171,6 @@
     .goals-pinbar .btn { flex: 1 1 auto; }
     .goals-table-page .goals-back, .inbox-board-head .goals-back { min-height: 44px; min-width: 44px; } /* a short label ("Goals") is still a 44 px target both ways */
     .team-task-extra summary { min-height: 44px; display: flex; align-items: center; } /* the dialog's folded sections are 44 px targets on a phone */
-    .team-task-artifact-name { min-height: 44px; display: inline-flex; align-items: center; } /* a task's artifact is a 44 px target on a phone (#7739) */
     .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
     .detail-close { width: 44px; height: 44px; }
     .detail-grip { display: none; }
@@ -224,10 +223,6 @@
 .team-task-form .task-edit-revision { margin: 0 0 12px; }
 .team-task-extra { max-width: 760px; margin-top: 16px; }
 .team-task-artifacts { max-width: 760px; margin-top: 16px; }
-.team-task-artifact-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.team-task-artifact { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-size: 0.875rem; }
-.team-task-artifact-name { overflow-wrap: anywhere; text-align: left; }
-.team-task-artifact-meta { color: var(--text-secondary); font-size: 0.8125rem; }
 .team-task-extra .task-detail-section { margin-top: 12px; }
 .goals-pinbar .btn-danger, .item-bar .btn-danger { margin-right: auto; } /* a danger button is alone at the left edge of every pinned bar, first in the order too (#7684) */
 /* the dialog's sections under a task's facts read like the page's other labels: sentence case, 14/600 (UI/UX, #7644) */

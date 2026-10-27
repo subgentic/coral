@@ -9,6 +9,7 @@
  *   detail = { id(row), open(row) -> bool, render(row) -> Node }: a second full-width row under each row (hidden while open(row) is false); the surface's own toggle in a cell opens it (Coral Hub's Servers: health, what applies).
  *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
  *   cell types: chip(word, cls), avatar(name), avatars(people, label), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
+ *   oneLine: true: keep one row, hide columns with dropAt 52/36/28 (rem) as the container narrows; never fold.
  *   compact: true: a folded column row is two compact lines (60 px; the name on one line): the Tasks lists and the dock's Artifacts ask for it (#8496); other folded tables keep two-line names and descriptions.
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; 'fit' measures the unfolded columns; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
@@ -101,12 +102,14 @@ const compareBy = (col) => {
 };
 
 export function dataTable(cfg) {
+    if (cfg.oneLine) cfg = { ...cfg, fold: 'none', layout: 'fixed', resize: false };
     const st = cfg.state || tableState();
     const columns = cfg.columns, sel = cfg.selectable || null, ctx = cfg.ctx || {};
-    const foldKind = cfg.fold || 'column', foldAt = cfg.foldAt || 40;
+    const foldKind = cfg.oneLine ? 'none' : cfg.fold || 'column', foldAt = cfg.foldAt || 40;
     if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.rowCache?.clear(); st.confirming = -1; st.choices = null; st.anchor = null; st.ctx = String(sel.contextKey); }
     const hasContent = cfg.columns.some(c => c.width === 'content');
     const box = el('div', `dt-box${cfg.compact ? ' dt-compact' : ''}${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
+    if (cfg.oneLine) box.classList.add('dt-one-line');
     const bar = el('div', 'dt-bar'); bar.hidden = true;
     const selectButton = button('btn btn-small dt-select-toggle', 'Select', () => { st.select = !st.select; syncSelectMode(); });
     selectButton.setAttribute('aria-pressed', 'false'); selectButton.hidden = !sel;
@@ -120,7 +123,7 @@ export function dataTable(cfg) {
     const sortBar = el('div', 'dt-sortbar');
     if (cfg.sortBar === false) sortBar.hidden = true; // a narrow column of a few rows (a goal's tasks) needs no Sort by
     const table = el('table', 'dt-table'); table.setAttribute('aria-label', cfg.label); table.setAttribute('role', 'table');
-    if (cfg.layout === 'fixed') table.style.tableLayout = 'fixed'; // grouped lists share column widths even when their contents differ
+    if (cfg.layout === 'fixed' || cfg.oneLine) table.style.tableLayout = 'fixed'; // grouped lists share column widths even when their contents differ
     const thead = el('thead'); thead.setAttribute('role', 'rowgroup'); const tbody = el('tbody'); tbody.setAttribute('role', 'rowgroup');
     const colgroup = el('colgroup');
     table.append(colgroup, thead, tbody);
@@ -143,12 +146,12 @@ export function dataTable(cfg) {
     function saveWidths() {
         if (Object.keys(st.widths).length) browserLocal.set(wkey, JSON.stringify(st.widths)); else browserLocal.remove(wkey); // a convenience: the store is guarded, and the widths last until the page closes without it
     }
-    st.widths ||= readWidths();
+    st.widths ||= cfg.oneLine ? {} : readWidths();
     function applyWidths() {
         colgroup.replaceChildren();
         const any = Object.keys(st.widths).length > 0;
         box.classList.toggle('dt-sized', any); widthBar.hidden = !any;
-        if (cfg.layout !== 'fixed') table.style.tableLayout = any ? 'fixed' : '';
+        if (cfg.layout !== 'fixed' && !cfg.oneLine) table.style.tableLayout = any ? 'fixed' : '';
         if (!any) return;
         if (sel) { const k = el('col'); k.style.width = 'var(--table-check-w)'; colgroup.append(k); }
         for (const c of columns) { const k = el('col'); if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; colgroup.append(k); }
@@ -214,6 +217,7 @@ export function dataTable(cfg) {
         if (sel) { const th = el('th', 'dt-check'); th.setAttribute('role', 'columnheader'); const all = el('input'); all.type = 'checkbox'; all.className = 'dt-check-all'; all.setAttribute('aria-label', 'Select all rows on this page'); all.addEventListener('change', () => { for (const r of rows.filter(eligible)) (all.checked ? st.selected.add(keyOf(r)) : st.selected.delete(keyOf(r))); st.anchor = null; syncSelection(); }); th.append(all); tr.append(th); }
         for (const c of columns) {
             const th = el('th', `dt-th${c.numeric || c.align === 'end' ? ' dt-end' : ''}`); th.scope = 'col'; th.setAttribute('role', 'columnheader'); th.dataset.key = c.key;
+            if (cfg.oneLine && c.dropAt) th.setAttribute('data-drop-at', String(c.dropAt));
             if (c.width && /rem$/.test(c.width)) th.style.width = c.width;
             if (c.width === 'grow') th.classList.add('dt-grow');
             if (c.width === 'content') th.classList.add('dt-content');
@@ -268,6 +272,7 @@ export function dataTable(cfg) {
         if (c.width === 'grow') td.classList.add('dt-grow');
         if (c.width === 'content') td.classList.add('dt-content');
         td.setAttribute('role', 'cell'); td.dataset.label = c.label; td.dataset.key = c.key;
+        if (cfg.oneLine && c.dropAt) td.setAttribute('data-drop-at', String(c.dropAt));
         td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
         if (c.foldFirst) td.classList.add('dt-fold-first');
