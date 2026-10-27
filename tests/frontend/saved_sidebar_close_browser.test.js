@@ -103,6 +103,9 @@ async function run() {
         await clickDockSaved(); check('and again leaves it', await until(`!(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'left'));
         await goAgent();
         await clickDockSaved(); await opened('on an agent the bookmark opens the overlay');
+        // the open tab says its name beside its icon on a phone (#7063): Saved's name is long, so its open tab is the icon and the count, the full words kept as its accessible name (#9647)
+        const tab = await ev(`(() => { const b = document.getElementById('agentic-tab-saved'); return { active: b.classList.contains('active'), after: getComputedStyle(b, '::after').content, label: b.getAttribute('aria-label'), w: Math.round(b.getBoundingClientRect().width) }; })()`);
+        check('the open Saved tab on a phone is its icon and count, not a wide pill of words, and keeps its name', tab.active && !/Saved for later/.test(tab.after) && tab.w < 120 && /^Saved for later/.test(tab.label), JSON.stringify(tab));
         check('the phone has its own close button and not the desktop X', await ev(`getComputedStyle(document.getElementById('agentic-mobile-close-btn')).display !== 'none'`));
         await clickDockSaved(); await closed('the bookmark again closes the overlay');
     } finally {
