@@ -14,7 +14,8 @@ try {
             { key: 'sonnet', label: 'claude-sonnet-5-5', provider: 'claude', value: 268000, n: 61, tokens: 16300000, cost_usd_per_unit: 2.2 },
             { key: 'opus', label: 'claude-opus-5-5', provider: 'claude', value: 412000, n: 38, tokens: 15700000, cost_usd_per_unit: 6.8 },
             { key: 'haiku', label: 'claude-haiku-5-5', provider: 'claude', value: 141000, n: 12, tokens: 1700000, cost_usd_per_unit: 0.6 },
-            { key: 'pi', label: 'pi: qwen3-coder', provider: 'pi', value: 190000, n: 4, tokens: 800000, cost_usd_per_unit: 0.9 }] }
+            { key: 'pi', label: 'pi: qwen3-coder', provider: 'pi', value: 190000, n: 4, tokens: 800000, cost_usd_per_unit: 0.9, low_sample: true },
+            { key: 'none', label: 'idle-model', provider: 'agy', n: 0 }] }
         : { metric, group_by: group, range: '7d', min_sample: 10, total: { n: 260 }, average: { value: 1080 }, groups: [
             { key: 'low', label: 'Low', value: 540, n: 57, sent_back_share: 0.29, cost_usd_per_unit: 1.4 },
             { key: 'high', label: 'High', value: 1440, n: 64, sent_back_share: 0.12, cost_usd_per_unit: 5.3 },
@@ -39,7 +40,8 @@ try {
     assert.match(text, /pi: qwen3-coder4 commits · too few to rank/, 'a group under 10 is said to be too few');
     assert.match(text, /gemini writes no usage rows, so its commits are left out/);
     assert.equal(v.querySelectorAll('.eff-fill.eff-few').length, 1, 'one hatched bar');
-    assert.equal(v.querySelectorAll('.eff-bar').length, 4);
+    assert.equal(v.querySelectorAll('.eff-bar').length, 4, 'a group with no commits has no bar');
+    assert.match(v.querySelector('table').textContent, /idle-model.*no data/s, 'but it is in the table');
     assert.ok(!/most efficient/.test([...v.querySelectorAll('tr')].filter(r => /pi: qwen3/.test(r.textContent)).map(r => r.textContent).join('')), 'the few group is not called most efficient');
     assert.match(v.querySelector('table').textContent, /few/, 'the table tags it');
     assert.equal(sec('cost-spend-section').querySelector('.eff-seg-btn[aria-pressed="true"]').textContent, 'Model');
