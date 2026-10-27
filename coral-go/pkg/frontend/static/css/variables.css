@@ -164,7 +164,7 @@
     --control-height: 36px;
     --control-compact-height: 32px;
     --control-touch-height: 44px;
-    --chip-height: 1.125rem; /* the one height of a .chip (#9095) */
+    --chip-height: 1rem; /* the one height of a .chip (#9095) */
     /* settings_view (#7744): every visual choice of the settings rows, the help, the errors and the save bar; read only by settings_view.css, so a styling change is one token here or one rule there */
     --sv-label-size: var(--fs-md);                   /* 13px */
     --sv-label-weight: 500;
