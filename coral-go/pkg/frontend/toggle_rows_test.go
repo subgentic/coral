@@ -18,13 +18,13 @@ func TestShellSettingsSwitchesAreNamedAndDescribed(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := b.String()
-	input := regexp.MustCompile(`<input type="checkbox" id="(settings-[\w-]+)"([^>]*)>`)
+	input := regexp.MustCompile(`<input type="checkbox" class="switch" id="(settings-[\w-]+)"([^>]*)>`)
 	describedby := regexp.MustCompile(`aria-describedby="([^"]*)"`)
 	n := 0
 	for _, m := range input.FindAllStringSubmatch(html, -1) {
 		id := m[1]
 		n++
-		if !strings.Contains(html, `<label for="`+id+`"`) && !strings.Contains(m[2], "aria-label") && !regexp.MustCompile(`<label[^>]*><input type="checkbox" id="`+id+`"[^>]*>[^<]*[A-Za-z]`).MatchString(html) {
+		if !strings.Contains(html, `<label for="`+id+`"`) && !strings.Contains(m[2], "aria-label") && !regexp.MustCompile(`<label[^>]*><input type="checkbox" class="switch" id="`+id+`"[^>]*>[^<]*[A-Za-z]`).MatchString(html) {
 			t.Errorf("switch #%s has no label", id)
 		}
 		for _, d := range describedby.FindAllStringSubmatch(m[2], -1) {
@@ -58,7 +58,7 @@ func TestToggleRowTemplateMarkup(t *testing.T) {
 	html := regexp.MustCompile(`\s+`).ReplaceAllString(b.String(), " ")
 	for _, want := range []string{
 		`<label for="settings-cloud-hub-cross-team" class="settings-cloud-switch-label">Let Coral Hub change cross-team settings</label> <div id="settings-cloud-hub-cross-team-desc" class="settings-hint">`,
-		`<input type="checkbox" id="settings-cloud-hub-cross-team" data-cloud="hub-cross-team" aria-describedby="settings-cloud-hub-cross-team-desc">`,
+		`<input type="checkbox" class="switch" id="settings-cloud-hub-cross-team" data-cloud="hub-cross-team" aria-describedby="settings-cloud-hub-cross-team-desc">`,
 		`<div id="settings-cloud-auto-accept-row" class="settings-cloud-switch-row" data-cloud="auto-accept-row" hidden>`,
 	} {
 		if !strings.Contains(html, want) {
