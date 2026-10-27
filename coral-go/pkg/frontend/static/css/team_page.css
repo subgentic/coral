@@ -235,40 +235,32 @@
 .team-task-extra summary { font-size: 0.875rem; font-weight: 600; }
 .team-task-extra .task-dep-status { text-transform: capitalize; } /* the pill reads Unmet, not UNMET (UI/UX, #7644) */
 
-/* a goal's page (#7665): its details beside its tasks. The main pane is the goal or the picked task's page; the column is the shared sidebar's look */
-.goal-split { --goal-side-w: 340px; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) var(--goal-side-w); align-items: stretch; flex: 1 1 auto; min-height: 0; } /* the right sidebar of a goal's page: the main pane and the column each scroll, as the agent dock does */
-.goal-main { min-width: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 16px 24px 0; } /* the title has its gap under the back link, the state line under the title */
-.goal-side { border-left: 1px solid var(--border); background: var(--bg-secondary); overflow-y: auto; min-height: 0; }
-.goal-side-grip { position: absolute; top: 0; bottom: 0; right: var(--goal-side-w); width: 8px; margin-right: -4px; z-index: 2; cursor: col-resize; touch-action: none; outline: none; } /* an 8 px target on the column's edge, its line drawn in the middle */
-.goal-side-grip::before, .detail-grip::before { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background 0.15s; } /* the agent dock's handle: the edge turns accent on hover, while dragged and on keyboard focus */
-.goal-side-grip:focus-visible, .detail-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; } /* the keyboard's ring on the handle itself, not only its edge's colour */
-.goal-side-grip:hover::before, .goal-side-grip.dragging::before, .goal-side-grip:focus-visible::before, .detail-grip:hover::before, .detail-grip.dragging::before, .detail-grip:focus-visible::before { background: var(--accent); }
+/* a goal's screen (#8914, the Operator's layout): its details and one Tasks | Artifacts list on the left; the clicked task or artifact opens in the shared detail pane on the right (nothing is there until one is clicked: the list has the whole width) */
+.goal-split { position: relative; display: flex; align-items: stretch; flex: 1 1 auto; min-height: 0; }
+.goal-main { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 16px 24px 0; } /* the title has its gap under the back link, the state line under the title */
+.goal-detail-pane { flex: 0 0 min(46%, 640px); width: auto; max-width: none; min-height: 0; overflow-y: auto; }
+.goal-detail-pane[hidden] { display: none; }
+.goal-detail-pane .detail-back { display: none; }
 .goals-page.goals-open.goals-table-page { max-width: none; padding: 0; gap: 0; min-height: 0; overflow: hidden; } /* an open goal fills the page area to the window's right edge: the padding belongs to the main pane */
 .goals-page.goals-open .goals-body { gap: 0; }
-.goal-side-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 12px 8px; font-size: 0.875rem; }
-.goal-side-counts { color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; }
-.goal-side-search { display: block; width: calc(100% - 24px); box-sizing: border-box; margin: 0 12px 10px; padding: 6px 10px; font: inherit; font-size: 0.8125rem; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border, var(--border)); border-radius: var(--radius-md); }
-.goal-side-search::placeholder { color: var(--text-secondary); opacity: 1; }
-.goal-side-list { border-top: 1px solid var(--border); }
-.goal-side-group { margin: 0; padding: 10px 12px 4px; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
-.goal-side .goals-note, .goal-side .goals-failed, .goal-side .goals-more { margin: 10px 12px; }
-.goals-table-page .goal-side-back, .goal-tasks-open { display: none; }
+.goal-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-top: 8px; }
+.goal-tab { min-height: 44px; padding: 0 12px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--text-secondary); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+.goal-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
+.goal-tab-count { font-weight: 400; color: var(--text-secondary); }
+.goal-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.goal-list { min-height: 0; padding-bottom: 12px; }
+.goal-side-group { margin: 0; padding: 10px 0 4px; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
+.goal-list .goals-note, .goal-list .goals-failed, .goal-list .goals-more { margin: 10px 0; }
 .goal-main > .goals-table-page { padding: 0; } /* the task page in the main pane sits where the goal's details sat */
 .goals-progress { margin: 14px 0 6px; font-weight: 600; font-size: 0.875rem; }
+@media (max-width: 900px) { /* narrow: the pane covers the list, with a Back (the tabs and details stay behind it) */
+    .goal-split-open .goal-detail-pane { position: absolute; inset: 0; z-index: 5; flex: none; border-left: 0; }
+    .goal-detail-pane .detail-back { display: inline-flex; }
+}
 @media (max-width: 760px) {
-    .goal-split { display: flex; flex-direction: column; }
     .goal-main { flex: 1; padding: 0; overflow: visible; }
     .goals-page.goals-open.goals-table-page { padding: 12px 16px 0; gap: 12px; min-height: 100%; overflow: visible; } /* a phone's goal is a page with its own margins, as before */
     .goals-page.goals-open .goals-body { gap: 12px; }
-    .goal-side-grip { display: none; }
-    .goal-split-column .goal-main, .goal-split:not(.goal-split-column) .goal-side { display: none; } /* the list is a screen of its own: the goal or a task is the other */
-    .goal-side { position: static; max-height: none; border: 0; background: none; align-self: stretch; } /* the list screen is the page's whole width */
-    .goals-table-page .goal-side-back { display: inline-flex; margin: 0 0 8px; }
-    .goal-tasks-open { display: flex; align-items: center; gap: 8px; align-self: stretch; width: 100%; box-sizing: border-box; min-height: 44px; margin-top: 12px; padding: 0 12px; text-align: left; border: 1px solid var(--control-border, var(--border)); background: var(--bg-secondary); }
-    .goal-tasks-label { font-weight: 600; }
-    .goal-tasks-counts { margin-left: auto; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); }
-    .goal-tasks-chevron { flex: none; width: 8px; height: 8px; border: solid var(--text-secondary); border-width: 2px 2px 0 0; transform: rotate(45deg); margin-left: 4px; }
-    .goal-side-search { min-height: 44px; }
 }
 .goals-note.team-agents-count { margin: 8px 0 4px; } /* the count line: 8 px under the search row, a little above the table (#8271) */
 

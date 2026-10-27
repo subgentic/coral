@@ -171,6 +171,7 @@ document.addEventListener('keydown', (e) => {
     const t = e.target instanceof Element ? e.target : document.body;
     if (t.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], .modal')) return;
     if (!(t === document.body || t.closest('#agentic-state, #inbox-view, #group-table-view') || t.id === 'saved-btn')) return;
+    if (document.querySelector('.goal-detail-pane:not([hidden])')) return; // a goal's task or file pane beside its list: Escape closes that first (detail_pane.js), with the focus on its row (#8914)
     if (document.querySelector('#agentic-saved-detail-pane:not([hidden])')) return; // a message's sheet over the dock is one level back (detail_pane.js closes it); the next Escape leaves
     e.preventDefault();
     const back = savedViewShowing() ? document.querySelector('#inbox-page:not([hidden]) > .group-back') : null; // on a message's (or a task's) page inside the Inbox Escape is one level back, to its table with the focus on its row; the next Escape leaves
