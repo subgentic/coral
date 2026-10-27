@@ -42,6 +42,7 @@ const TT = { metric: 'task_time', range: '24h', min_sample: 10, total: { n: 260 
                 assert.equal(mobile ? s.seg : s.pick, 'none', mobile ? 'a phone has the select, not the buttons' : 'a desktop has the buttons, not the select'); assert.notEqual(mobile ? s.pick : s.seg, 'none');
             });
             await run(`${label}: grouped by Model: the cards, the bars with the average line, the table, few tagged and hatched`, async () => {
+                await open('per-commit'); await waitFor(`!document.getElementById('cost-spend-section').hidden`, 'Tokens per commit on screen', 8000); // a slow page (CPU x6) finishes opening Analytics on Overview after the click of the step before: the view is asked for again
                 if (mobile) await ev(`(() => { const s = document.querySelector('#cost-spend-section .eff-pick'); s.value = 'model'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 else await ev(`[...document.querySelectorAll('#cost-spend-section .eff-seg-btn')].find(b => b.textContent === 'Model').click(); true`);
                 await waitFor(`document.querySelectorAll('#cost-eff-per-commit .eff-bar').length === 6`, 'the six bars', 8000);
