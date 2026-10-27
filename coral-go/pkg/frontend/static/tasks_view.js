@@ -56,7 +56,7 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
     const all = {
         state: { key: 'state', label: 'State', cell: (t) => DT.chip(taskWord(t), statusClass(taskWord(t))), sort: true, sortValue: (t) => STATE_RANK[taskWord(t)] ?? 9, line: 2 },
         task: { key: 'task', label: 'Task', primary: true, width: 'grow', sort: true, sortValue: (t) => t.title, line: 1,
-            cell: (t) => { const c = DT.el('span', 'dt-title-cell'); const b = DT.primaryButton(t.title, `Open task #${t.id}: ${t.title}`); b.dataset.taskId = String(t.id); c.append(DT.el('span', 'dt-id', `#${t.id}`), b); return c; } },
+            cell: (t) => { const c = DT.el('span', 'dt-title-cell'); const b = DT.primaryButton(t.title, `Open task #${t.id}: ${t.title}`); b.dataset.taskId = String(t.id); if (ctx.hideTaskId) c.title = `Task #${t.id}`; else c.append(DT.el('span', 'dt-id', `#${t.id}`)); c.append(b); return c; } }, // a goal's column does not lead with the number (#8784): it is the row's hover title and the button's name
         who: { key: 'who', label: 'Who', sort: true, sortValue: (t) => doerOf(t) || '', line: 2, width: '6rem', cell: (t) => whoCell(t) },
         goal: { key: 'goal', label: 'Goal', sort: true, sortValue: (t) => (t.goal_id ? ctx.goalTitleOf(t.goal_id) : ''), line: 0,
             cell: (t) => { if (!t.goal_id) return ctx.noGoal || 'No goal'; const l = DT.link(ctx.goalTitleOf(t.goal_id), () => ctx.openGoal?.(t.goal_id)); l.dataset.goalLink = String(t.goal_id); return l; } },
@@ -74,7 +74,7 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
 export const SCOPES = {
     team: ['state', 'task', 'who', 'goal', 'priority', 'files', 'updated'],
     mine: ['state', 'task', 'priority', 'files', 'team', 'updated'],
-    goal: ['state', 'task', 'who', 'priority', 'files'],
+    goal: ['state', 'task', 'who', 'files'], // no task number before the title and no Priority: the person reads the title and the state (#8784)
     'goal-page': ['task', 'state'],
     'follow-ups': ['state', 'task', 'who'],
     agent: ['state', 'task', 'who'], // the dock's one-line row keeps the responsible agent's avatar
