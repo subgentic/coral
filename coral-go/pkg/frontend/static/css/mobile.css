@@ -730,6 +730,7 @@
     }
 
     #mobile-session-list .session-group-header {
+        min-height: calc(var(--control-touch-height, 44px) + 20px); /* the header keeps the height its 44 px kebab gave it (#9352) */
         padding: 10px 12px !important;
         margin: 8px 0 4px;
         border-radius: var(--radius-ml);
@@ -795,13 +796,6 @@
         margin: 5px 6px 0 0;
     }
 
-    #mobile-session-list .sidebar-kebab-btn {
-        min-width: 44px;
-        min-height: 44px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
 
     #mobile-session-list .session-name-row {
         align-items: flex-start;

@@ -98,24 +98,9 @@ body.panel-dragging .preview-pane {
     border-bottom: 0;
 }
 
-.preview-dock-btn {
-    background: none;
-    border: none;
-    border-left: 1px solid var(--border);
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 0 8px;
-    display: flex;
-    align-items: center;
-    font-size: var(--fs-md); /* a button's own default is 13.33 px, which ignores the reader's font size: the Back label stayed small at 200% (#6267) */
-}
-
-.preview-dock-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
-
-/* The maximise toggle (#4931): 44px wide, and 44px high where the pointer is a finger; the bar keeps its height with a mouse */
-.preview-max-btn { min-width: 44px; justify-content: center; }
+/* The tab bar's dock and maximise toggles are dense .btn-icon.btn-xs (aria-pressed is the on state, #9332) and its Back is a quiet small .btn, a label: the font-size is the family's, in rem, so it grows with the reader's text (#6267). */
+.preview-full-back { margin: 0; }
 .preview-max-btn[hidden] { display: none; }
-@media (pointer: coarse) { .preview-max-btn, .preview-dock-btn { min-height: 44px; } }
 .preview-column-resize-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* Maximised: the column takes the whole centre, Chat is hidden behind it, the width it had is still on it (inline) and comes back with the class gone */
 .live-body.preview-maximised .live-left-column { display: none; }

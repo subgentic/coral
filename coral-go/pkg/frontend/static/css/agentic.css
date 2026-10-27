@@ -1412,6 +1412,9 @@ body.panel-dragging .agentic-state {
     transition: opacity 0.15s;
 }
 
+/* On a touch screen each dense button's 44 px hit area (components.css) must not reach its neighbour's: 8 px between the 24 px boxes (#9344, UI/UX). */
+@media (pointer: coarse), (max-width: 767px) { .file-action-btns, .explorer-actions { gap: 8px; } }
+
 .file-item:hover .file-action-btns,
 .file-item:focus-within .file-action-btns {
     opacity: 1;

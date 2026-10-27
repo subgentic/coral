@@ -267,21 +267,6 @@
     line-height: 1rem;
 }
 
-.session-name-row .sidebar-kebab-btn {
-    /* 16px tall so line 1 stays 16px; the ::after pad gives a 24x24 hit target */
-    padding: 0 5px;
-    height: 1rem;
-    line-height: 1rem;
-    font-size: var(--fs-lg);
-    position: relative;
-}
-.session-name-row .sidebar-kebab-btn::after {
-    /* its place and size are the 24 px square the generic rule below centres on the button (#5713); an inset here beat that rule's left and top while its transform
-       still applied, which moved the pad 12 px up and left of the button */
-    content: "";
-    position: absolute;
-}
-
 .session-name-spacer {
     flex: 1;
 }
@@ -368,43 +353,16 @@
     flex-shrink: 0;
 }
 
+/* The kebab is a dense .btn-icon.btn-xs with the family's three-dot More icon, one size in every row type (#9332): 24 px, taking 16 px of the row so the row keeps its height, and a 44 px hit area on touch (components.css). It is hidden until the row is hovered or focused. */
 .sidebar-kebab-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: var(--fs-xl);
-    padding: 2px 4px;
-    border-radius: var(--radius-xs);
-    line-height: 1;
-    font-weight: bold;
-    letter-spacing: 1px;
     opacity: 0;
     transition: opacity 0.1s;
 }
 
 /* Target size (#5713, WCAG 2.5.8): the sidebar's kebab and open buttons and the Launch dialog's Back are 12 to 22 px across, which at 125 or 150% display scaling is a
    small target to hit. An invisible 24 px square around each is part of the button, so the row does not change. */
-.sidebar-kebab-btn, .folder-copy-btn, .launch-back-btn { position: relative; }
-.sidebar-kebab-btn::after, .folder-copy-btn::after, .launch-back-btn::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 24px); height: max(100%, 24px); transform: translate(-50%, -50%); }
-
-/* The button has no fill of its own (#5121, #5127): hovered or keyboard-focused, only the dots take the primary text colour. At rest they are muted; on a hovered or selected
-   row, the row's secondary text colour. The keyboard focus ring is the global button:focus-visible. */
-.sidebar-kebab-btn:hover,
-.sidebar-kebab-btn:focus-visible {
-    background: none;
-}
-.session-list li:hover .sidebar-kebab-btn,
-.session-list li.active .sidebar-kebab-btn,
-.session-group-header:hover .sidebar-kebab-btn {
-    color: var(--text-secondary);
-}
-.sidebar-kebab-btn:hover,
-.sidebar-kebab-btn:focus-visible,
-.session-list li .sidebar-kebab-btn:hover,
-.session-list li .sidebar-kebab-btn:focus-visible,
-.session-group-header:hover .sidebar-kebab-btn:hover,
-.session-group-header .sidebar-kebab-btn:focus-visible { color: var(--text-primary); }
+.folder-copy-btn, .launch-back-btn { position: relative; }
+.folder-copy-btn::after, .launch-back-btn::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 24px); height: max(100%, 24px); transform: translate(-50%, -50%); }
 
 .session-list li:hover .sidebar-kebab-btn,
 .session-list li:focus-within .sidebar-kebab-btn {
@@ -600,8 +558,7 @@
 }
 
 .group-kebab .sidebar-kebab-btn {
-    font-size: var(--fs-md);
-    padding: 1px 3px;
+    display: flex; /* a block-level box in its wrapper: an inline one would add the wrapper's text strut to the header's height */
     opacity: 0;
     align-self: center;
 }
@@ -1753,7 +1710,7 @@
 /* A folder header is the button that collapses its group; a team header opens the team, and its chevron (#5989) is the one control that collapses. */
 .session-group-header[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-md); }
 .server-group-toggle .session-group-count { flex: none; } /* right after the name, as in the team row (the Update marker and the name shrink before it); the row's right edge keeps only the menu */
-.server-group-more > summary.sidebar-kebab-btn { display: block; } /* a <summary> sized and placed as the other headers' kebab buttons */
+/* the machine menu's summary wears the kebab's classes (a dense .btn-icon.btn-xs): it is inline-flex, so it draws no marker (#9332) */
 /* The machine menu's launch row (#5487): Launch agent first, Launch team, Open folder on the hub's own machine, and Open in Servers as a text link so the row stays one line at about 380 px. */
 .server-launch-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); margin: 0 0 var(--space-sm); }
 .server-open-btn { margin-left: auto; padding: 5px 2px; border: 0; background: none; color: var(--link-text, var(--accent)); font: inherit; font-size: var(--fs-lg); text-decoration: underline; cursor: pointer; }
@@ -1775,7 +1732,6 @@
     .server-group-toggle, .server-open-btn, .list-display-option {
         min-height: var(--control-touch-height, 44px);
     }
-    .server-group-more > summary.sidebar-kebab-btn { display: inline-flex; align-items: center; justify-content: center; } /* the kebab's own touch size (touch.css) */
 }
 /* The phone's list header: the title, the display menu and + New share one height (#4062). */
 /* flex-wrap: a narrow phone wraps the header's controls instead of pushing them off the screen (#4086). */

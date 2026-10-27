@@ -6,6 +6,7 @@
  * remote is registered, so a standalone Coral renders exactly as before. */
 
 import { state } from './state.js';
+import { MORE_DOTS_SVG } from './html_escape.js';
 import { LOCAL_SERVER, normServer, isHub, keyLabel, splitKey } from './server_base.js';
 import { launchBlockReason } from './launch_server.js';
 import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
@@ -278,7 +279,7 @@ export function serverGroupHeaderHtml(e, count, collapsed, detailsOpen = false) 
         + ((n => n ? `<span class="server-update-marker server-update-${n.level}">${n.level === 'required' ? 'Update required' : 'Update'}</span>` : '')(normServer(e.id) === LOCAL_SERVER ? null : updateNotice(e)))
         + `</button>`
         + `<details class="server-group-more sidebar-kebab-wrapper group-kebab" data-server-details="${escHtml(e.id)}"${detailsOpen ? ' open' : ''}>`
-        + `<summary class="server-group-more-btn sidebar-kebab-btn group-kebab-btn" aria-label="${escHtml(`Details for ${e.label || e.id}`)}" title="${escHtml(serverHoverText(e.id))}">⋮</summary>`
+        + `<summary class="btn btn-quiet btn-icon btn-xs server-group-more-btn sidebar-kebab-btn group-kebab-btn" aria-label="${escHtml(`Details for ${e.label || e.id}`)}" title="${escHtml(serverHoverText(e.id))}">${MORE_DOTS_SVG}</summary>`
         + `<div class="server-switcher-panel">${serverLaunchActionsHtml(e)}${serverDetailsHtml(e)}</div></details>`
         + `</li>`;
 }

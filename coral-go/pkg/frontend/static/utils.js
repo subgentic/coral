@@ -7,7 +7,7 @@ import { browserLocal } from './safe_storage.js';
 import './dock_page.js';
 import { formatDuration } from './format.js';
 import { showToast } from './notifications.js';
-export { escapeAttr, escapeHtml, tagColor } from './html_escape.js';
+export { MORE_DOTS_SVG, escapeAttr, escapeHtml, tagColor } from './html_escape.js';
 export { notificationLinkTarget, showAlertNotification, showNotificationToast, showToast, showWorkflowNotification } from './notifications.js';
 export { buildWelcome, showView, viewChanges } from './view_switch.js';
 export { DOMPURIFY_CONFIG, artifactRefHex, highlightCodeIn, keepFragmentsInside, renderDocsMarkdown, renderMarkdown, renderMarkdownStrict, sanitizeHtml, sanitizeMarkdown } from './markdown.js';
