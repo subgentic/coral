@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"io/fs"
 	"testing"
 	"time"
@@ -60,3 +61,40 @@ func TestNoBundleNoFreeOSMemory(t *testing.T) {
 		t.Errorf("FreeOSMemory ran %d times with nothing built", len(ran))
 	}
 }
+
+// A prebuilt family (#8760) is served as it is: no build, so no garbage to free and no call to free it; the family is the one the source returned.
+func TestPrebuiltBundleIsNotFollowedByFreeOSMemory(t *testing.T) {
+	staticSub, _ := fs.Sub(frontend.Static, "static")
+	index, _ := fs.ReadFile(frontend.Templates, "templates/index.html")
+	built, err := frontend.BuildBundle(staticSub, index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	realFree, realDelay, realSource := freeOSMemory, releaseDelay, bundleSource
+	t.Cleanup(func() { freeOSMemory, releaseDelay, bundleSource = realFree, realDelay, realSource })
+	releaseDelay = time.Millisecond
+	ran := make(chan struct{}, 4)
+	freeOSMemory = func() { ran <- struct{}{} }
+	bundleSource = func(fs.FS, []byte) (*frontend.Bundle, string, error) { return built, "prebuilt", nil }
+	s := &Server{staticVersion: "build"}
+	if fsys := s.buildBundleFamily(staticSub); fsys == nil || s.bundleBase == "" {
+		t.Fatalf("the prebuilt family was not served: fs %v, base %q", fsys, s.bundleBase)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if len(ran) != 0 {
+		t.Errorf("FreeOSMemory ran after a prebuilt family: %d", len(ran))
+	}
+	// and a build that fails still gets the call (its garbage is the same), and serves the original files
+	bundleSource = func(fs.FS, []byte) (*frontend.Bundle, string, error) { return nil, "built", errBundle }
+	s2 := &Server{staticVersion: "build"}
+	if fsys := s2.buildBundleFamily(staticSub); fsys != nil || s2.bundleBase != "" {
+		t.Errorf("a failed build served a family: %v %q", fsys, s2.bundleBase)
+	}
+	select {
+	case <-ran:
+	case <-time.After(5 * time.Second):
+		t.Error("a failed build was not followed by FreeOSMemory")
+	}
+}
+
+var errBundle = errors.New("the build failed")

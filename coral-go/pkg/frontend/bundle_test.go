@@ -531,3 +531,39 @@ func TestALazyBuildThatPanicsIsSkipped(t *testing.T) {
 		t.Errorf("%s is not served as the original: %v", single, err)
 	}
 }
+
+// One build lists the exports of every module as module-by-module builds do (#8760): the startup modules, the lazy ones, those in a folder.
+func TestExportNamesBatchIsExportNames(t *testing.T) {
+	b, static := realBundle(t)
+	startup := map[string]bool{"app.js": true}
+	for _, m := range b.Modules {
+		startup[m] = true
+	}
+	all := append(append([]string{}, b.Modules...), lazyModules(static, startup)...)
+	if len(all) < 300 {
+		t.Fatalf("only %d modules: the walk is not reading the tree", len(all))
+	}
+	batch, err := exportNamesBatch(static, all)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var withExports int
+	for _, m := range all {
+		one, err := exportNames(static, m)
+		if err != nil {
+			t.Fatalf("%s: %v", m, err)
+		}
+		if strings.Join(batch[m], ",") != strings.Join(one, ",") {
+			t.Errorf("%s: the batch lists %v, one build lists %v", m, batch[m], one)
+		}
+		if len(one) > 0 {
+			withExports++
+		}
+	}
+	if withExports < 200 {
+		t.Errorf("only %d modules export anything: the comparison proves little", withExports)
+	}
+	if _, err := exportNamesBatch(fstest.MapFS{"a.js": {Data: []byte("export const a = 1")}}, []string{"a.js", "missing.js"}); err == nil {
+		t.Error("a module that is not in the tree was listed")
+	}
+}

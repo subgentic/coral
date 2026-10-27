@@ -191,19 +191,10 @@ func reexport(m string, names []string) string {
 
 // buildLazyModules builds every lazy module of the family, with its groups, and returns the files to add to the bundle, the modules covered and the modules
 // whose build failed (served as the original file: a lazy module that does not build must not take the dashboard's bundle down).
-func buildLazyModules(static fs.FS, startup map[string]bool, alias map[string]string, exports map[string][]string) (files map[string][]byte, covered []string, skipped map[string]error, err error) {
-	lazy := lazyModules(static, startup)
+func buildLazyModules(static fs.FS, startup map[string]bool, alias map[string]string, exports map[string][]string, lazy []string, lazyExports map[string][]string) (files map[string][]byte, covered []string, skipped map[string]error, err error) {
 	lazySet := map[string]bool{}
 	for _, m := range lazy {
 		lazySet[m] = true
-	}
-	lazyExports := map[string][]string{}
-	for _, m := range lazy {
-		ex, e := exportNames(static, m)
-		if e != nil {
-			continue // does not parse: served as the original, reported as skipped below
-		}
-		lazyExports[m] = ex
 	}
 	inGroup := map[string]bool{}
 	registered := map[string]bool{}
