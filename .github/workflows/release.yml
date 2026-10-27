@@ -63,6 +63,7 @@ jobs:
           bash tests/release/update_tap_test.sh         # the cask move (#5559); a local bare repository, no network
           bash tests/release/release_cadence_test.sh    # the cadence table (#5559); a stand-in gh, no network
           bash tests/release/release_notes_edits_test.sh   # lines removed from a published body on purpose; no network
+          bash tests/release/notes_commit_test.sh   # the notes commit's Gated-commit and optional Accepted-red trailers, validated as the release reads them (#8667); a throwaway repository
           python3 tests/release/windows_build_census_test.py   # windows-tests' package build is release.yml's Windows build: same tags and programs (#5886)
           python3 tests/release/trimpath_census_test.py   # every release and installer go build has -trimpath: no builder path in a shipped trace (#6052)
           python3 tests/release/verify_buildinfo_test.py   # verify-release reads a -trimpath build by its vcs.revision, not by an ldflags line that is no longer there (#6052)
