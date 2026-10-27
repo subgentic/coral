@@ -943,8 +943,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); margin: 0; padding: var(--space-2xl); color: var(--text-secondary); font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; }
 .empty-state[hidden] { display: none; }
 .empty-state-tight { padding: var(--space-md); }
-.empty-state-line, .goals-note.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-secondary); } /* the line is the secondary colour: an empty message is never as loud as the rows on the other screens */
-.empty-state-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-muted); }
+.empty-state-line, .goals-note.empty-state-line, .welcome p.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-secondary); } /* the line is the secondary colour: an empty message is never as loud as the rows on the other screens */
+.empty-state-hint, .welcome p.empty-state-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-muted); }
 .empty-state-action { margin-top: var(--space-sm); }
 .welcome > .empty-state { margin: 0; align-self: stretch; }
 /* The line under an item page's title: who, when, how long */
