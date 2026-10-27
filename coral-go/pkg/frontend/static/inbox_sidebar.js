@@ -155,6 +155,7 @@ const goalsState = DT.tableState();
 const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
 let taskFilters = { ...TF.EMPTY }, taskState = 'all', taskBar = null;
 const taskMatches = t => serverMatches(t, taskFilters) && (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()))
+    && (!taskFilters.team || t.project === taskFilters.team)
     && (!taskFilters.priority || t.priority === taskFilters.priority)
     && (!taskFilters.from || Date.parse(t.updated_at || t.created_at) >= new Date(taskFilters.from + 'T00:00:00').getTime());
 const taskRows = () => tasks.filter(t => taskMatches(t) && (taskState === 'all' || stateOf(t) === taskState)).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
@@ -171,6 +172,9 @@ function inboxTaskToolbar() {
         taskBar.node.classList.add('inbox-tasks-toolbar', 'inbox-folder-toolbar');
         taskBar.node.querySelector('.list-bar-search-row').classList.add('gt-toolbar');
     }
+    const taskTeams = [...new Set(tasks.map(t => t.project))].sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
+    TF.setTeamNames(new Map(taskTeams.map(k => [k, teamLabel(k)])));
+    taskBar.setOptions('team', taskTeams, Object.fromEntries(taskTeams.map(k => [k, teamLabel(k)])));
     taskBar.set({ ...taskFilters, q: queries.tasks });
     syncServerField(taskBar);
     if (!inboxTasksState.selected.size) Toolbar.mountSelection(taskBar.node.querySelector('.list-bar-search-row'), null);
@@ -185,7 +189,7 @@ function inboxTaskToolbar() {
         const next = held === 'select' ? taskBar.node.querySelector('.team-tb-select') : [...taskBar.node.querySelectorAll('[data-filter]')].find(el => el.dataset.filter === held);
         next?.focus({ preventScroll: true });
     }
-    return { node: taskBar.node, signature: JSON.stringify([taskFilters, queries.tasks, taskState]) };
+    return { node: taskBar.node, signature: JSON.stringify([taskFilters, queries.tasks, taskState, taskTeams]) };
 }
 async function refreshTasks() {
     try {
@@ -463,7 +467,7 @@ registerGroupSource('hub-inbox', {
                 signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count])]),
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
-                    const t = TV.tasksTable('mine', rows, { tweak: columns => columns.flatMap(c => c.key === 'team' ? [...serverColumns(), c] : [c]), ctx: { teamOf: t => t.board || '' }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
+                    const t = TV.tasksTable('mine', rows, { tweak: columns => columns.flatMap(c => c.key === 'team' ? [...serverColumns(), c] : [c]), ctx: { teamOf: t => teamLabel(t.project) }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
                         open: t => openItemRoute('tasks', t.project, t.id, `${t.project}#${t.id}`), state: inboxTasksState,
                         selectable: { contextKey: 'inbox-tasks', actions: TB.inboxTaskActions(() => { inboxTasksState.selected.clear(); refreshTasks(); }), onChange: keys => row && Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the bar takes the toolbar's line while tasks are selected
                     if (row) { Toolbar.mountSelection(row, inboxTasksState.selected.size ? t.bar : null); row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (isPhoneLayout()) row.append(t.selectButton); }

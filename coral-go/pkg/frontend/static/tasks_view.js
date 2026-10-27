@@ -137,7 +137,8 @@ const DOCK_SPEC = {
 
 
 // Inbox tasks belong to the person across teams: no assignee or goal field, and no create action.
-const MINE_SPEC = { ...TEAM_SPEC, idp: 'inbox-tk', chipsElsewhere: false, fields: [serverField('inbox-tk'), SPEC.fields[1], SPEC.fields[3]].map(field => ({ ...field, id: field.id.replace('tk-', 'inbox-tk-') })) };
+// Its Team is a select the Inbox fills with the teams of the rows it holds, by their computer when a hub has more than one (#8774).
+const MINE_SPEC = { ...TEAM_SPEC, idp: 'inbox-tk', chipsElsewhere: false, fields: [serverField('inbox-tk'), { type: 'select', key: 'team', id: 'tk-team', label: 'Team', values: [], labels: {}, any: 'Any team' }, SPEC.fields[1], SPEC.fields[3]].map(field => ({ ...field, id: field.id.replace('tk-', 'inbox-tk-') })) };
 
 const TOOLBAR_SPECS = { mine: MINE_SPEC, team: TEAM_SPEC, agent: DOCK_SPEC, 'agent-team': DOCK_SPEC };
 
