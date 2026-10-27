@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
+const { oneLinePerRow } = require('./helpers/row_lines');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -52,8 +53,10 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(await names(), ['nightly-build-job', 'summarize-the-day', 'weekly-cleanup'], `${at}by next run (20 h, 30 h), the paused job last`);
             // the Last run chip says its state in words (the old sidebar dot's name, which scheduler_status_dot pinned): the words are the chip's text, the dot is decoration
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => [r.querySelector('.dt-primary').textContent, [...r.querySelectorAll('.dt-chip')].map(c => c.textContent.trim()), r.querySelectorAll('.dt-chip .goal-dot[aria-hidden="true"]').length])`), [['nightly-build-job', ['last run failed'], 1], ['summarize-the-day', ['last run passed'], 1], ['weekly-cleanup', ['Paused'], 1]], `${at}each Last run chip is named by its words (failed, passed, Paused), its dot decorative`);
-            const subs = await ev(`[...document.querySelectorAll('#group-table-view .dt-subtitle')].map(e => e.textContent.trim())`);
-            assert.deepEqual(subs.sort(), ['Agent prompt (Claude)', 'Agent prompt (Claude)', 'Workflow nightly-build'], `${at}a row says what the job runs under its name`);
+            await oneLinePerRow(ev, '#group-table-view tbody tr[data-key]', `${at}the jobs`, assert, { min: 3 }); // Goal #79: one line a row at both widths; a narrow list drops Schedule and Next
+            const tips = await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => b.title).sort()`);
+            assert.deepEqual(tips, ['nightly-build-job \u2014 Workflow nightly-build', 'summarize-the-day \u2014 Agent prompt (Claude)', 'weekly-cleanup \u2014 Agent prompt (Claude)'], `${at}what a job runs is its name's tooltip (and its page's), not a second line`);
+            assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].some(r => [...r.querySelectorAll('.dt-subtitle')].length)`), false, `${at}no row has a subtitle line`);
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search jobs', `${at}the search is named for the folder`);
             assert.equal(await ev(`/New job/.test((document.querySelector('#group-table-view .team-tb-action') || {}).textContent || '')`), true, `${at}New job is at the row's right`);
             const act = await ev(`(() => { const b = document.querySelector('#group-table-view .team-tb-action'), r = b.getBoundingClientRect(); return { name: b.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height), text: [...b.querySelectorAll('.automations-act-text')].some(e => e.getClientRects().length > 0) }; })()`);
