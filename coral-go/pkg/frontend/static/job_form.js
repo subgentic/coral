@@ -245,7 +245,7 @@ function jobFields(host) {
         {
             key: 'timezone', type: 'text', id: 'job-modal-timezone', label: 'Time zone', default: LOCAL_ZONE, placeholder: LOCAL_ZONE,
             validate: v => zoneMessage(String(v || '').trim() || LOCAL_ZONE),
-            setup: e => { e.classList.add('field sched-tz-input'); e.addEventListener('input', () => checkSchedule()); },
+            setup: e => { e.classList.add('field', 'sched-tz-input'); e.addEventListener('input', () => checkSchedule()); },
         },
         limitField(),
         { key: 'base_branch', type: 'text', id: 'job-modal-branch', label: 'Base branch', placeholder: "the repo's current branch", default: '', visibleWhen: prompt },
