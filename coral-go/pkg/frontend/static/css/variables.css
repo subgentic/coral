@@ -177,7 +177,6 @@
     --sv-row-pad-y: 10px;
     --sv-row-divider: var(--border-subtle, var(--border));
     --sv-control-width: minmax(12rem, 22rem);        /* the control's column in settings mode */
-    --sv-control-height: var(--control-compact-height);   /* 32px on a desktop */
     --sv-control-height-touch: var(--control-touch-height); /* 44px on a phone */
     --sv-error-color: var(--error-text);
     --sv-required-color: var(--text-secondary);

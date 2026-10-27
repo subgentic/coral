@@ -102,7 +102,7 @@ function toolbarHtml(bar, first) {
     const value = input ? input.value : '';
     const label = (input && input.getAttribute('aria-label')) || bar.search.label; // the sidebar's field says what it searches in the open group (the Inbox: "Search saved messages"): the page's says the same
     const hint = (input && input.placeholder) || label;
-    let html = `<div class="list-bar-search-wrap"><input type="search" class="list-bar-search gt-search" id="gt-search" data-on-input="sgroup-search" data-search="${escapeAttr(bar.search.id)}" placeholder="${escapeAttr(hint)}" aria-label="${escapeAttr(label)}" value="${escapeAttr(value)}" maxlength="200" autocomplete="off" spellcheck="false"></div>`;
+    let html = `<div class="list-bar-search-wrap"><input type="search" class="field field-clear list-bar-search gt-search" id="gt-search" data-on-input="sgroup-search" data-search="${escapeAttr(bar.search.id)}" placeholder="${escapeAttr(hint)}" aria-label="${escapeAttr(label)}" value="${escapeAttr(value)}" maxlength="200" autocomplete="off" spellcheck="false"></div>`;
     html += chipsHtml(first);
     const items = bar.menu ? bar.menu.items.filter(i => TOOLBAR_ACTION_ATTR[i.name]) : [];
     if (items.length) {

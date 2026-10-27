@@ -49,7 +49,7 @@ export function buildMoreMenu(id, items, noun = '') {
 function selectField(id, label, values, labels, anyLabel) {
     const wrap = make('label', 'list-bar-field');
     wrap.append(make('span', 'list-bar-field-label', label));
-    const s = make('select', 'list-bar-select'); s.id = id;
+    const s = make('select', 'field list-bar-select'); s.id = id;
     if (anyLabel) s.append(new Option(anyLabel, ''));
     for (const v of values) s.append(new Option(labels[v], v));
     wrap.append(s);
@@ -98,7 +98,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     const collapsible = !!spec.collapsible && !spec.noSearch && !inline;
     const searchRow = make('div', 'list-bar-search-row');
     const wrap = make('div', 'list-bar-search-wrap');
-    const q = make('input', 'list-bar-search'); q.type = 'search'; q.id = `${p}-search`; q.placeholder = spec.placeholder; q.maxLength = 200; q.autocomplete = 'off'; q.spellcheck = false;
+    const q = make('input', 'field field-clear list-bar-search'); q.type = 'search'; q.id = `${p}-search`; q.placeholder = spec.placeholder; q.maxLength = 200; q.autocomplete = 'off'; q.spellcheck = false;
     q.setAttribute('aria-label', spec.searchLabel);
     const clearQ = make('button', 'list-bar-clear-q', '×'); clearQ.type = 'button'; clearQ.setAttribute('aria-label', 'Clear search'); clearQ.hidden = true;
     wrap.append(q, clearQ);

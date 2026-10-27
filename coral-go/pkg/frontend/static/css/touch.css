@@ -185,7 +185,6 @@
     /* Browse and Team Artifacts rows, the file filter, the list actions and
        the Servers tab's Access select. */
     .explorer-item,
-    .files-search-input,
     .list-bar-search, .list-bar-filter-btn, .list-bar-clear-all, .list-bar-select, .list-bar-by, .list-bar-chip, .list-bar-field input[type="date"],
     .team-artifacts-action,
     .cs-launch select {

@@ -97,7 +97,7 @@ function _listHeader(agentList) {
             </button>
             <button class="btn btn-small btn-primary" data-on-click="launch-show">+ New</button>
             <div class="mobile-search-row" id="mobile-search-row">
-                <input type="search" class="sidebar-search-input mobile-search-input" placeholder="Search agents" autocomplete="off" aria-label="Search agents" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
+                <input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents" autocomplete="off" aria-label="Search agents" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
             </div>
             <span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>
             <div class="list-display-panel" id="mobile-display-panel" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>

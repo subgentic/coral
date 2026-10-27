@@ -1527,17 +1527,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     box-shadow: 0 4px 16px rgba(var(--black-rgb), 0.35);
 }
 .chat-find-bar[hidden] { display: none; }
-.chat-find-input {
-    width: 200px;
-    padding: 3px 6px;
-    background: var(--bg-primary);
-    border: 1px solid var(--control-border);
-    border-radius: 5px;
-    color: var(--text-primary);
-    font: inherit;
-    font-size: var(--fs-md);
-}
-.chat-find-input:focus { outline: none; border-color: var(--accent); }
+.chat-find-input { width: 200px; }
 .chat-find-bar.no-results .chat-find-input { border-color: var(--error); }
 .chat-find-count { min-width: 56px; font-size: var(--fs-base); color: var(--text-muted); white-space: nowrap; }
 .chat-find-bar button {

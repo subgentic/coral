@@ -3249,6 +3249,16 @@ input[aria-invalid="true"] {
 
 /* The line under a rejected field: the reason and the next step (launch_core.js markFieldInvalid). */
 label:has(+ .field-error) { margin-bottom: 0; } /* the line sits after the label and takes the label's space below it */
+/* One field (Goal #88, #9241): a text input, search box, select or textarea. 36 px (.field-dense 32, 44 on a phone or touch), one radius, border, placeholder and focus colour. .field-search leaves room for the search icon on the left,
+   .field-clear for a clear button on the right. A class beside it only places the box (a width, a flex basis); field_census.test.mjs fails on a second look. The composer's box is a named exception (the pane census). */
+.field { box-sizing: border-box; min-height: var(--control-height); padding: 6px 10px; font: inherit; font-size: var(--fs-md); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); }
+.field::placeholder { color: var(--text-secondary); opacity: 1; }
+.field:focus { border-color: var(--accent); }
+.field[aria-invalid="true"] { border-color: var(--error); }
+.field-dense { min-height: var(--control-compact-height); }
+.field-search { padding-left: 1.875rem; }
+.field-clear { padding-right: 28px; }
+@media (max-width: 767px), (pointer: coarse) { .field { min-height: var(--control-touch-height); } }
 .field-error { margin: 4px 0 .9rem; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); line-height: 1.4; overflow-wrap: anywhere; }
 
 /* Auto-accept (#3182): the AUTO chip (agent row and header), the menu switch's state and the warning dialog. */

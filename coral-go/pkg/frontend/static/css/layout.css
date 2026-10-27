@@ -287,21 +287,8 @@ body.panel-dragging .sidebar {
     pointer-events: none;
 }
 
-.sidebar-search-input {
-    width: 100%;
-    height: var(--ctl-h, 36px);
-    box-sizing: border-box;
-    padding: 0 0.625rem 0 1.875rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-lg);
-    color: var(--text-primary);
-    font: inherit;
-    font-size: var(--fs-md);
-}
+.sidebar-search-input { width: 100%; }
 
-.sidebar-search-input:focus { border-color: var(--accent); }
-.sidebar-search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; } /* a ring as well as the border colour (#6094) */
 
 .sidebar-header {
     display: flex;
