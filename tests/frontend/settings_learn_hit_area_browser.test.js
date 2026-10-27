@@ -12,7 +12,7 @@ const { connect } = require('./agent_view_harness');
         const bad = []; let considered = 0, takenByOwn = 0;
         for (const b of learns) {
             const root = b.closest('#settings-modal') || b.closest('#team-panel-settings') || document; // what is behind a dialog is not the hit area's neighbour
-            const others = [...root.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, summary, [role=switch]')].filter(e => e.getClientRects().length);
+            const others = [...root.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, summary, [role=switch]')].filter(e => e.getClientRects().length && (e.tagName === 'SUMMARY' || e.closest('summary') || !e.closest('details:not([open])'))); // a control inside a closed details (Change password) keeps a layout box but cannot be hit: it is not a neighbour
             const r = b.getBoundingClientRect();
             for (const o of others) {
                 if (o === b || b.contains(o) || o.contains(b)) continue;

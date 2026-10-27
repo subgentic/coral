@@ -424,3 +424,5 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box.dt-mail-on tr.dt-mailed .dt-mail-open.dt-primary { padding: 0 12px 0 4px; margin: 0; }
 .dt-box.dt-mail-on tr.dt-mailed .dt-mail-open.dt-primary:has(.dt-mail-two) { padding-block: 12px; }
 .dt-box.dt-mail-on tr.dt-mailed .dt-mail-time { flex: none; }
+.dt-check-hit { display: flex; align-items: center; justify-content: center; margin: 0; cursor: pointer; } /* the select box's label: its target (44 px on a touch screen or a phone, the cell's own width on a desktop, where the row keeps its 36 px) */
+@media (max-width: 767px), (pointer: coarse) { .dt-check-hit { min-width: var(--table-touch); min-height: var(--table-touch); } }

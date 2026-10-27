@@ -50,7 +50,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await waitFor(`document.getElementById('btn-resume-session') && document.getElementById('btn-resume-session').getClientRects().length > 0`, 'Resume on the newest chat', 8000); await sleep(300); // sleep-ok: the header settles
             assert.equal(await ev(`document.getElementById('btn-resume-session').classList.contains('btn-primary')`), true, `${tag}: Resume is the primary button on the newest chat`);
             if (mobile) {
-                const cb = await ev(`(() => { const b = document.querySelector('#history-session-branch .copy-branch-btn'); const r = b.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) }; })()`);
+                const cb = await ev(`(() => { const b = document.querySelector('#history-session-branch .copy-branch-btn'); const r = b.getBoundingClientRect(), after = getComputedStyle(b, '::after'); return { w: Math.round(Math.max(r.width, parseFloat(after.width) || 0)), h: Math.round(Math.max(r.height, parseFloat(after.height) || 0)) }; })()`); // the dense icon button is a 24 px box with a 44 px hit area (its ::after, #9484)
                 assert.ok(cb.w >= 44 && cb.h >= 44, `${tag}: the copy-branch icon is a 44 px target: ` + JSON.stringify(cb));
             }
             await ev(`window.selectHistorySession('aaaaaa2'); true`);

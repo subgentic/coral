@@ -105,9 +105,9 @@ const LONG = 'worktree-agent-a1b2c3d4e5f60718/feature/calm-the-dashboard-remove-
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         // a visual viewport the suite can shrink, as a phone's keyboard does (Chrome on Android shrinks the visual viewport and leaves the layout viewport): mobile.js reads it
-        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const hs = {}; const vv = { width: innerWidth, height: innerHeight, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, scale: 1, addEventListener: (t, f) => (hs[t] = hs[t] || []).push(f), removeEventListener() {} };
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const hs = {}; let shrunk = null; const vv = { get width() { return innerWidth; }, get height() { return shrunk == null ? innerHeight : shrunk; }, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, scale: 1, addEventListener: (t, f) => (hs[t] = hs[t] || []).push(f), removeEventListener() {} };
             Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
-            window.__vv = { set(h) { vv.height = h; (hs.resize || []).forEach(f => f()); } }; })()` });
+            window.__vv = { set(h) { shrunk = h; (hs.resize || []).forEach(f => f()); } }; })()` });
         for (const [w, h] of [[320, 640], [390, 844]]) for (const theme of ['dark', 'light']) {
             const tag = `${w}px ${theme}`;
             console.log(tag);
