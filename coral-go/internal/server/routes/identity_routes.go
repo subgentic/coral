@@ -56,6 +56,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/scheduled/jobs":                          "schedule a job",
 	"PUT /api/scheduled/jobs/{jobID}":                   "change a scheduled job",
 	"DELETE /api/scheduled/jobs/{jobID}":                "delete a scheduled job",
+	"POST /api/scheduled/jobs/{jobID}/run":              "run a scheduled job now",
 	"POST /api/scheduled/jobs/{jobID}/toggle":           "turn a scheduled job on or off",
 	"POST /api/tasks/run":                               "start a task run",
 

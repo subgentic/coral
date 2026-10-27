@@ -10,7 +10,7 @@ import (
 
 // triggerWorkflowForJob triggers a workflow run for a scheduled workflow job,
 // then updates the scheduled run record when the workflow completes.
-func (s *JobScheduler) triggerWorkflowForJob(runID int64, job store.ScheduledJob) {
+func (s *JobScheduler) triggerWorkflowForJob(runID int64, job store.ScheduledJob, trigger string) {
 	ctx := s.parentCtx
 	if ctx == nil {
 		ctx = context.Background()
@@ -55,7 +55,7 @@ func (s *JobScheduler) triggerWorkflowForJob(runID int64, job store.ScheduledJob
 
 	// Trigger the workflow
 	triggerCtx := fmt.Sprintf(`{"scheduled_job_id":%d,"scheduled_run_id":%d}`, job.ID, runID)
-	wfRun, err := s.workflowRunner.TriggerWorkflow(runCtx, wf, "scheduled", &triggerCtx)
+	wfRun, err := s.workflowRunner.TriggerWorkflow(runCtx, wf, workflowTrigger(trigger), &triggerCtx)
 	if err != nil {
 		s.logger.Error("failed to trigger workflow", "job", job.Name, "error", err)
 		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{
@@ -113,4 +113,12 @@ func (s *JobScheduler) triggerWorkflowForJob(runID int64, job store.ScheduledJob
 			// Still pending/running — continue polling
 		}
 	}
+}
+
+// workflowTrigger is the trigger a job's workflow run is recorded with: "manual" for Run now, "scheduled" for the schedule's own.
+func workflowTrigger(runTrigger string) string {
+	if runTrigger == store.TriggerManual {
+		return "manual"
+	}
+	return "scheduled"
 }

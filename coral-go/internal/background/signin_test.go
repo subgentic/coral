@@ -281,7 +281,7 @@ func TestScheduledWorkflowJobCarriesTheWorkflowRunsSignInCode(t *testing.T) {
 	e.s.SetWorkflowRunner(runner, wfStore)
 	wf := signInWorkflow(t, wfStore, []StepDef{{Name: "ask", Type: "agent", Prompt: "hi", Agent: &AgentStepConfig{AgentType: at.Claude}}})
 
-	e.s.triggerWorkflowForJob(e.runID, store.ScheduledJob{Name: "wf", JobType: "workflow", WorkflowID: &wf.ID})
+	e.s.triggerWorkflowForJob(e.runID, store.ScheduledJob{Name: "wf", JobType: "workflow", WorkflowID: &wf.ID}, store.TriggerCron)
 	run := e.run(t)
 	assert.Equal(t, "failed", run.Status)
 	require.NotNil(t, run.ErrorMsg)

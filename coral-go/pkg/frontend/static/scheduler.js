@@ -192,11 +192,15 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             <div class="sched-more">
                 <button class="btn btn-small sched-more-btn" type="button" data-on-click="job-more" aria-expanded="false" aria-controls="${escapeAttr(moreId)}" aria-label="More for ${escapeAttr(job.name)}">More</button>
                 <div class="sched-more-menu" id="${escapeAttr(moreId)}" hidden>
+                    ${job.enabled ? `<button class="btn btn-small" type="button" data-on-click="job-toggle" data-job-id="${Number(job.id)}" aria-label="Pause ${escapeAttr(job.name)}">Pause</button>` : ''}
                     <button class="btn btn-small btn-warning sched-delete" type="button" data-on-click="job-delete" data-job-id="${Number(job.id)}" aria-label="Delete ${escapeAttr(job.name)}">Delete</button>
                 </div>
             </div>
             <button class="btn btn-small" data-on-click="job-edit" data-job-id="${Number(job.id)}">Edit</button>
-            <button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">${job.enabled ? 'Pause' : 'Enable'}</button>
+            ${job.enabled
+                ? `<button class="btn btn-small btn-primary" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>`
+                : `<button class="btn btn-small" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>
+            <button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">Enable</button>`}
         </div>
     `;
     container.querySelector('#sched-run-history').append(renderRunsTable(runsPage));
@@ -276,6 +280,25 @@ async function toggleScheduledJob(jobId) {
     }
 }
 
+/** Run now: the job's workflow or prompt runs once, recorded as the job's run (#9293); the page shows the new run under the job. */
+async function runScheduledJobNow(jobId, btn) {
+    if (btn) btn.disabled = true;
+    try {
+        const resp = await fetch(`/api/scheduled/jobs/${jobId}/run`, { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            showToast(resp.status === 409 ? 'This job is already running' : (err.error || err.message || 'Could not start the run'), true);
+            if (btn) btn.disabled = false;
+            return;
+        }
+        await fetchJobs();
+        if (selectedJobId === jobId) selectScheduledJob(jobId);
+    } catch (e) {
+        showToast('Could not start the run', true);
+        if (btn) btn.disabled = false;
+    }
+}
+
 function deleteScheduledJob(jobId) {
     window.showConfirmModal('Delete Job', 'Delete this scheduled job and all its run history?', async () => {
         try {
@@ -322,6 +345,7 @@ registerActions({
     'job-new': () => showJobModal(),
     'job-edit': el => withId(el.dataset.jobId, editScheduledJob),
     'job-toggle': el => withId(el.dataset.jobId, toggleScheduledJob),
+    'job-run-now': el => withId(el.dataset.jobId, id => runScheduledJobNow(id, el)),
     'job-delete': el => withId(el.dataset.jobId, deleteScheduledJob),
     'job-more': el => toggleJobMore(el),
     'job-workflow': (el, event) => { event.preventDefault(); withId(el.dataset.workflowId, id => window.selectWorkflow(id)); },

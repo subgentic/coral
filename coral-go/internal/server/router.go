@@ -246,6 +246,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	}
 	sysHandler.SetSavedPresence(savedBoardHas, histHandler.SavedAgentPresence)
 	schedHandler := routes.NewScheduleHandler(s.db, s.cfg)
+	s.schedHandler = schedHandler
 	workflowHandler := routes.NewWorkflowHandler(s.db, s.cfg)
 	s.workflowHandler = workflowHandler
 	themeHandler := routes.NewThemesHandler(s.cfg)
@@ -573,6 +574,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Put("/api/scheduled/jobs/{jobID}", schedHandler.UpdateJob)
 	r.Delete("/api/scheduled/jobs/{jobID}", schedHandler.DeleteJob)
 	r.Post("/api/scheduled/jobs/{jobID}/toggle", schedHandler.ToggleJob)
+	r.Post("/api/scheduled/jobs/{jobID}/run", schedHandler.RunJob)
 	r.Get("/api/scheduled/jobs/{jobID}/runs", schedHandler.GetJobRuns)
 	r.Get("/api/scheduled/runs/recent", schedHandler.GetRecentRuns)
 	r.Post("/api/scheduled/validate-cron", schedHandler.ValidateCron)
