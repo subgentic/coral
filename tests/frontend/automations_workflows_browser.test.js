@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { setTheme, auditRegion } = require('./helpers/contrast');
+const { oneLinePerRow } = require('./helpers/row_lines');
 const BASE = require('./test_base').BASE;
 
 const now = Date.now();
@@ -67,6 +68,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.deepEqual(await names(), ['lint-and-fix', 'nightly-build', 'old-deploy'], at + 'by name (a workflow has no next run)');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent)`), ['Workflow', 'Steps', 'Last run', 'Used by'], at + 'the columns');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => r.querySelector('.dt-primary').textContent + '|' + r.textContent.replace(/\\s+/g, ' '))`).then(a => a.map(x => [x.split('|')[0], /(\d) steps?/.exec(x)[1], /Failed: step 2 \(Test\)|Passed|Never run/.exec(x)[0], /(\d+ jobs?|No jobs)/.exec(x)[0]])), [['lint-and-fix', '1', 'Passed', 'No jobs'], ['nightly-build', '2', 'Failed: step 2 (Test)', 'No jobs'], ['old-deploy', '1', 'Never run', 'No jobs']], at + 'steps, last run and who uses it, per row');
+            await oneLinePerRow(ev, '#group-table-view tbody tr[data-key]', `${at}the workflows`, assert, { min: 3 }); // Goal #79: one line a row; the description is the name's tooltip, a narrow list drops Steps and Used by
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody .dt-action').length`), 0, at + 'no state-changing button in a row: Run is on the workflow\'s page (UI/UX #8863)');
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search workflows', at + 'the search is named for the folder');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-action .btn')].map(b => b.textContent.replace('smart_toy', '').trim())`), ['Build with Agent', 'New workflow'], at + 'Build with Agent and New workflow are the create actions');

@@ -48,10 +48,9 @@ const NAME = 'Production build server for the release candidate integration and 
                 await waitFor(`!!document.querySelector('#server-row-build-west .dt-name-text')`, 'long server name', 10000, `({tab:document.querySelector('.nav-tab.active')?.id,body:document.querySelector('#servers-tab-body')?.textContent,servers:window.__qaState?.servers})`);
                 const name=await ev(`(()=>{const n=document.querySelector('#server-row-build-west .dt-name-text'),b=n.closest('button'),s=getComputedStyle(n),td=n.closest('td');return {text:n.textContent,title:td.title,buttonTitle:b.title,accessible:b.getAttribute('aria-label'),space:s.whiteSpace,clamp:s.webkitLineClamp,folded:!!n.closest('.dt-folded'),nameHeight:n.getBoundingClientRect().height,height:b.getBoundingClientRect().height,width:b.getBoundingClientRect().width,clipped:n.scrollWidth>n.clientWidth,over:document.documentElement.scrollWidth-innerWidth};})()`);
                 assert.equal(name.text,NAME); assert.equal(name.title,NAME); assert.equal(name.buttonTitle,NAME); assert.equal(name.accessible,'Open '+NAME); assert.ok(name.over<=1,JSON.stringify(name));
-                if(width===390){assert.equal(name.folded,true);assert.equal(name.space,'normal');assert.equal(name.clamp,'2');assert.ok(name.nameHeight<60,JSON.stringify(name));assert.ok(name.height>=44 && name.width>=44,JSON.stringify(name));}
-                else {assert.equal(name.space,'nowrap');assert.equal(name.clipped,true,'desktop name is ellipsized');}
+                assert.equal(name.folded,false,'a server row is one line at every width (Goal #79): the table does not fold'); assert.equal(name.space,'nowrap'); assert.equal(name.clipped,true,'a long name is ellipsized, its title is whole'); assert.ok(name.height>=44 && name.width>=44,JSON.stringify(name));
                 await shot(`servers-long-name-${width}-${theme}`);
-                console.log(`PASS ${width} ${theme}: short failed chip, two-line reason, complete title, responsive server name`);
+                console.log(`PASS ${width} ${theme}: short failed chip, two-line reason, complete title, one-line server name`);
             }
         }
     } finally {await client.close();}

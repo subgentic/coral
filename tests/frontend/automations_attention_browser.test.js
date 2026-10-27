@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
+const { oneLinePerRow } = require('./helpers/row_lines');
 const BASE = require('./test_base').BASE;
 
 const STUB = `(() => {
@@ -62,6 +63,7 @@ const STUB = `(() => {
             }
             assert.deepEqual((await rows()).sort(), ['nightly-build-job|Job', 'nightly-build|Workflow'].sort(), `${at}Failed lists the job and the workflow whose last run failed, each tagged with its kind`);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent)`), ['Name', 'Kind', 'Schedule', 'Last run', 'Next'], `${at}the five columns`);
+            await oneLinePerRow(ev, '#group-table-view tbody tr[data-key]', `${at}Failed`, assert, { min: 2 }); // Goal #79: one line a row, a narrow list drops Schedule, Kind and Next
             assert.equal(await ev(`document.querySelector('#group-table-view .team-tb-pills')`), null, `${at}no pills: the folder is the filter`);
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search what failed', `${at}the search is named for the folder`);
             await themed('failed', w);
@@ -80,6 +82,7 @@ const STUB = `(() => {
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 4`, `${at}the live runs join Running now`, 6000);
             assert.deepEqual((await rows()).sort(), ['Job run 51|One-off', 'review-pass|Workflow', 'summarize-the-day|Job', 'watch-the-queue|Job'].sort(), `${at}a live run of a job is the job, an API run with no job is a One-off row`);
             assert.equal(await ev(`document.querySelector('#live-jobs-status').textContent`), '2 jobs running now', `${at}and the status line says it once`);
+            await oneLinePerRow(ev, '#group-table-view tbody tr[data-key]', `${at}Running now`, assert, { min: 4 });
             await themed('running', w);
             await live([]);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}the live runs leave when they end`, 6000);

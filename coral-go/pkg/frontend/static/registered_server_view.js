@@ -85,36 +85,38 @@ function statusChip(status) {
 }
 
 const isLocal = s => !!(s.local || s.id === 'local');
-/** A server's name cell: this hub is plain text (it has no page), a remote server is the row's one button (it opens the server's page), then its id, the private-network tag and a warning, as the old row had them. */
+/** A server's name cell: this hub is plain text (it has no page), a remote server is the row's one button (it opens the server's page). One line (Goal #79): its id, the private-network mark and the warning are the Tags column's, its version the Version column's. */
 function serverCell(s) {
-    const box = DT.el('div'), wrap = DT.el('span', 'dt-title-cell'); // the name and its tags on one line, the warning under them, whole and wrapping
-    box.append(wrap);
-    if (isLocal(s)) {
-        wrap.append(DT.el('span', 'dt-name-text', s.label || 'This computer'), DT.tag('local'));
-        return box;
-    }
+    if (isLocal(s)) return DT.el('span', 'dt-name-text', s.label || 'This computer');
     const b = DT.primaryButton(s.label || s.id, `Open ${s.label || s.id}`);
     b.replaceChildren(DT.el('span', 'dt-name-text', s.label || s.id));
     b.title = s.label || s.id;
     b.dataset.action = 'open'; b.dataset.id = s.id; // the tab's click handler opens the server's page
-    wrap.append(b, DT.tag(s.id));
-    if (s.allow_private) { const t = DT.tag('private network'); t.title = 'Private network addresses are allowed for this server'; wrap.append(t); }
-    const warn = warningHtml(s.warning);
-    if (warn) { const w = document.createElement('div'); w.innerHTML = warn; box.append(w.firstElementChild); }
-    return box;
+    return b;
 }
+/** The tags of a server in one cell: this hub's "local" or a remote server's id, the private-network mark and a warning flag (its words are the flag's tooltip and the server's page's). */
+function tagsCell(s) {
+    const cell = DT.el('span', 'dt-title-cell');
+    cell.append(DT.tag(isLocal(s) ? 'local' : s.id));
+    if (!isLocal(s) && s.allow_private) { const t = DT.tag('private network'); t.title = 'Private network addresses are allowed for this server'; cell.append(t); }
+    if (!isLocal(s) && s.warning) { const t = DT.tag('warning'); t.title = String(s.warning); cell.append(t); }
+    return cell;
+}
+/** The version a server runs: this hub's own, or what the registered server reported (its version row on the page says more). */
+const versionWords = (s, live) => (isLocal(s) ? (state.localVersion ? `Coral ${state.localVersion}` : '') : (serverVersion(live) ? `Coral ${serverVersion(live)}` : ''));
 
 /** This hub and the registered servers as one data_table (Server, Status, Agents): the sort is kept across redraws and every row has the id the tab's focus handling looks for. */
 function serversTable(local, remotes) {
     const rows = [local, ...remotes];
     const live = s => (isLocal(s) ? { id: 'local', status: 'online' } : liveOf(s));
     return buildServersTable(DT, {
-        label: 'Registered servers', state: _dt, rows, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
-        columns: [
-            { key: 'server', label: 'Server', primary: true, width: 'grow', nowrap: false, line: 1, sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: serverCell, title: s => s.label || s.id,
-                subtitle: s => (isLocal(s) ? ['This hub', state.localVersion ? `Coral ${state.localVersion}` : ''].filter(Boolean).join(' \u00b7 ') : '') },
-            { key: 'status', label: 'Status', line: 2, sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusChip(live(s).status || s.status) },
-            { key: 'agents', label: 'Agents', line: 2, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => agentsText(serverAgentCount(live(s))) },
+        label: 'Registered servers', state: _dt, rows, oneLine: true, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
+        columns: [ // one line a row (Goal #79): Name, Tags, Version, then Status and Agents; a narrow list drops Tags, then Version, then Agents (dropAt, #8931)
+            { key: 'server', label: 'Server', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: serverCell, title: s => s.label || s.id },
+            { key: 'tags', label: 'Tags', width: '14rem', dropAt: 52, cell: tagsCell },
+            { key: 'version', label: 'Version', width: '8rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: s => versionWords(s, live(s)), cell: s => versionWords(s, live(s)) || '\u2014' },
+            { key: 'status', label: 'Status', width: '8rem', sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusChip(live(s).status || s.status) },
+            { key: 'agents', label: 'Agents', width: '6rem', dropAt: 28, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => agentsText(serverAgentCount(live(s))) },
         ],
         open: s => { if (!isLocal(s)) { _open = s.id; _confirmDelete = null; _focusNext = 'back'; render(); } },
     }, { rowId: s => `server-row-${isLocal(s) ? 'local' : s.id}` });
