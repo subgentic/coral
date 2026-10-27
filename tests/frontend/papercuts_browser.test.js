@@ -120,7 +120,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.__realFetch = window.fetch; window.__keyAnswer = 200; window.fetch = (u, o) => new URL(String(u), location.origin).pathname === '/api/system/api-key'
             ? Promise.resolve(window.__keyAnswer === 200 ? new Response(JSON.stringify({ key: 'papercuts-test-key-0123456789' }), { status: 200, headers: { 'content-type': 'application/json' } }) : new Response('{"error":"dashboard_auth_required"}', { status: window.__keyAnswer, headers: { 'content-type': 'application/json' } }))
             : window.__realFetch(u, o); true`);
-        await ev(`showSettingsModal()`);
+        await ev(`showSettingsModal('security')`);
         await waitFor(`(() => { const i = document.getElementById('settings-api-key'); return i && i.value && i.value !== 'Loading...'; })()`, 'the API key', { timeout: 8000 });
         const key = await ev(`(() => { const i = document.getElementById('settings-api-key'); const row = i.closest('.sv-ctl-line'); const show = document.getElementById('settings-api-key-show'); const copy = document.getElementById('settings-api-key-copy');
             return { type: i.type, readOnly: i.readOnly, w: i.getBoundingClientRect().width, rowW: row.getBoundingClientRect().width, showHidden: show.hidden, copyDisabled: copy.disabled, sameLine: Math.abs(copy.getBoundingClientRect().top - i.getBoundingClientRect().top) < i.getBoundingClientRect().height, copyRight: copy.getBoundingClientRect().left >= i.getBoundingClientRect().right - 1 }; })()`);

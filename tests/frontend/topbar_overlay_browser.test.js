@@ -104,13 +104,16 @@ const HIT = id => `(() => {
         await ev(`new Promise(r => { const t = Date.now(); const w = () => document.getElementById('agentic-state').classList.contains('mobile-panel-overlay') || Date.now() - t > 4000 ? r() : setTimeout(w, 50); w(); })`);
         assert.ok(await ev(`document.getElementById('agentic-state').classList.contains('mobile-panel-overlay')`), 'the side panel is open as the phone overlay at 700 px');
         const coarse700 = await barBottom();
-        await coarse(false);
-        await ev(`new Promise(r => { const t = Date.now(); const w = () => document.querySelector('header.top-bar').getBoundingClientRect().bottom < ${coarse700} || Date.now() - t > 4000 ? r() : setTimeout(w, 50); w(); })`);
+        // The bar's height changes (since the buttons are the family's, a fine pointer no longer makes the bar shorter at 700 px: the views dropdown is 44 px whatever the pointer): a taller bar, made by a minimum height, and the overlay follows it.
+        await ev(`document.querySelector('header.top-bar').style.minHeight = '90px'; true`);
+        await ev(`new Promise(r => { const t = Date.now(); const w = () => document.querySelector('header.top-bar').getBoundingClientRect().bottom > ${coarse700} || Date.now() - t > 4000 ? r() : setTimeout(w, 50); w(); })`);
+        await sleep(400); // sleep-ok: the bar's resize observer publishes --top-bar-height on its next frame
         const fine = await barBottom();
-        assert.ok(fine < coarse700, `the fine-pointer bar is shorter (${fine} < ${coarse700})`);
+        assert.ok(fine > coarse700, `the bar is taller (${fine} > ${coarse700})`);
         assert.ok(Math.abs(await panelTop() - fine) <= 1, `the overlay follows the bar (${await panelTop()} vs ${fine})`);
-        assert.deepEqual(await ev(UNDER_BAR), [], 'phone fine: no fixed element starts under the top bar');
-        console.log(`PASS phone 700 fine: overlay follows the bar to ${fine}px`);
+        assert.deepEqual(await ev(UNDER_BAR), [], 'phone, a taller bar: no fixed element starts under the top bar');
+        await ev(`document.querySelector('header.top-bar').style.minHeight = ''; true`);
+        console.log(`PASS phone 700, a taller bar: overlay follows the bar to ${fine}px`);
 
         // iPad with touch: the tablet sidebar and its backdrop start below the bar.
         await coarse(true);

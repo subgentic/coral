@@ -1270,7 +1270,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 .chat-prose.chat-messages .chat-bubble.assistant .chat-copy-btn {
     top: 100%;
     right: -4px;
-    margin-top: 1px;
+    margin-top: -2px; /* as Save's: inside the bubble's 22 px (#9643) */
 }
 @media (hover: none) {
     .chat-bubble.assistant .chat-copy-btn {
@@ -1416,7 +1416,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 .chat-bubble .chat-save-btn[aria-pressed="true"] { color: var(--accent); }
 .chat-bubble .chat-save-btn[aria-pressed="true"] svg path, .mb-save-btn[aria-pressed="true"] svg path { fill: currentColor; }
 .chat-bubble .chat-save-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.chat-prose.chat-messages .chat-bubble .chat-save-btn { top: 100%; margin-top: 1px; right: 22px; }
+.chat-prose.chat-messages .chat-bubble .chat-save-btn { top: 100%; margin-top: -2px; right: 22px; } /* the dense 24 px button (#9494) ends inside the 22 px the bubble reserves below it: -2, not 1, so it never covers the next message (#9643) */
 .chat-prose.chat-messages .chat-bubble.human .chat-save-btn { right: -4px; }
 .chat-bubble .chat-save-btn[hidden] { display: none; }
 @media (hover: none) {
