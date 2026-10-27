@@ -14,6 +14,7 @@ const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the
 const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 
 const DT = await importOnce('./data_table.js');
+const { mountAgentReviewSettings } = await importOnce('./agent_review_settings.js');
 let agentsTableState = DT.tableState();
 
 const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Ended', unknown: 'No signal yet', unavailable: 'Unavailable' };
@@ -237,6 +238,7 @@ export function renderAgentPage(host, agent, ctx) {
     page.append(bar);
     foldWayBack(page, '.goals-back', '.goals-detail-title');
     host.append(page);
+    if (agent.agent_type !== 'terminal') mountAgentReviewSettings(page, model.team, agent.subscriber_id || agent.name);
     h.focus({ preventScroll: true });
 }
 

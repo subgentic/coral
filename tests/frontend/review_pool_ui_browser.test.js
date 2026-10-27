@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
    await setAreas('bad/area');await save();assert.equal(await ev('window.__writes.length'),0,'invalid area never written');
    await setAreas('UI,go,ui');
    await ev(`(()=>{const b=document.querySelector('#review-ui [name=reviews_only]');b.click();window.__failSave=true;return true;})()`);
-   await save();await waitFor(`document.getElementById('review-ui').textContent.includes('Operator access required')`,'save refusal shown');
+   await save();await waitFor(`document.getElementById('review-ui').textContent.includes('Only the Operator can change review settings.')`,'save refusal shown');
    assert.equal(await ev(`document.querySelector('#review-ui [name=review_areas]').value`),'UI,go,ui','refusal retains edit');
    await ev('window.__failSave=false');await save();await waitFor('window.__review.reviews_only===true','saved settings');
    assert.deepEqual(await ev('window.__review.review_areas'),['ui','go']);
