@@ -20,6 +20,7 @@ Run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read on
 - [Quickstart](quickstart.md) — Install, launch your first agent, and get a committed change
 - [Worked Demos](worked-demos.md) — Three multi-agent scenarios run end to end, with real output
 - [Using the Dashboard](using-the-dashboard.md) — Task-oriented: model and thinking level and the chat-bar chip, Cost by thinking level, the team health monitor, the agent list's Display panel, the sectioned dialogs, image thumbnails
+- [UI style guide](ui-style-guide.md) — The shared UI families (button, chip, form row, menu, notice, list row, facts, tabs, pane, dialog ...), their classes and the census that guards each, so new UI is built from them
 - [Troubleshooting](troubleshooting.md) — Observed failure modes and their causes, profiling, isolated test servers
 
 ### Automation
