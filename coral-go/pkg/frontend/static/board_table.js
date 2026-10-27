@@ -77,7 +77,7 @@ export function chipsOf(m, tags) {
 function chipHtml(c) {
     if (c.k === 'ask') return c.h || '';
     const cls = c.k === 'in-reply' ? 'mb-row-reply-tag' : c.k === 'mention' ? `mb-row-mention${c.self ? ' is-self' : ''}` : 'mb-row-task';
-    return `<span class="mb-row-tag ${cls}">${escapeHtml(c.t)}</span>`;
+    return `<span class="chip chip-tag mb-row-tag ${cls}">${escapeHtml(c.t)}</span>`;
 }
 
 /** The marks as the head draws them (all = false): up to three as they are; more, the Question badge (always) and the first mention (else the first mark), then one "+N" pill whose title and name list the rest.
@@ -89,7 +89,7 @@ export function layoutChips(chips, { all = false } = {}) {
     const shown = chips.filter(c => c === ask || c === first);
     const rest = chips.filter(c => !shown.includes(c)).map(c => c.t);
     const list = rest.join(', ');
-    return shown.map(chipHtml).join('') + `<span class="mb-row-tag mb-row-more-tag" title="${escapeAttr(list)}" aria-label="${escapeAttr(`${rest.length} more: ${list}`)}">+${Number(rest.length)}</span>`;
+    return shown.map(chipHtml).join('') + `<span class="chip chip-tag mb-row-tag mb-row-more-tag" title="${escapeAttr(list)}" aria-label="${escapeAttr(`${rest.length} more: ${list}`)}">+${Number(rest.length)}</span>`;
 }
 
 const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -121,7 +121,7 @@ export function dayDividerHtml(iso, { listItem = true } = {}) {
 /** The parts only an open row has, built when it opens (a collapsed row has none: a long board is a lot of rows): the tags again at the top of the message (the phone's folded row hides them in the head), the replies' place and Reply, Copy link and More. */
 function openParts(id, agent, moreLabel, more, tagHtml) {
     const replyText = `Reply to ${agent}`;
-    const taskTag = /<span class="mb-row-tag mb-row-task">#(\d+)<\/span>/.exec(tagHtml);
+    const taskTag = /<span class="chip chip-tag mb-row-tag mb-row-task">#(\d+)<\/span>/.exec(tagHtml);
     const taskLink = taskTag ? `<button type="button" class="btn mb-row-btn mb-task-link" data-on-click="mb-task-open" data-task-id="${Number(taskTag[1])}">Open task #${Number(taskTag[1])}</button>` : '';
     return {
         tagsOpen: tagHtml ? `<div class="mb-row-tags-open">${tagHtml}</div>` : '',

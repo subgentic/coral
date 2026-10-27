@@ -121,7 +121,7 @@ export function mountInbox(host, adapter, options) {
         const high = task.priority === 'high';
         const bits = [task.created_by ? `From ${task.created_by}` : '', task.board, high ? '' : task.priority, task.status === 'review_pending' ? 'review' : '', ago(task.updated_at || task.created_at, adapter.now)].filter(Boolean); // who, where, how urgent, how old: said once, here
         meta.textContent = bits.join(' · ');
-        if (high) meta.prepend(el('span', 'ibx-chip-high', 'High')); // the urgent ones say so in a word, first in the line (#7122)
+        if (high) meta.prepend(el('span', 'chip ibx-chip-high', 'High')); // the urgent ones say so in a word, first in the line (#7122)
         head.append(title, meta);
         const region = el('div', 'ibx-task-body');
         region.id = bodyId; // not a landmark: aria-controls and aria-expanded on the button already tie them together

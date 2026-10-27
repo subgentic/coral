@@ -32,12 +32,12 @@ export function primaryButton(text, label) {
 }
 /** A state as a dot and a word (the dot is decoration: the word says it). */
 export function chip(word, cls) {
-    const c = el('span', `dt-chip goal-chip ${cls || ''}`.trim());
+    const c = el('span', `chip dt-chip goal-chip ${cls || ''}`.trim());
     const dot = el('span', 'goal-dot'); dot.setAttribute('aria-hidden', 'true');
     c.append(dot, document.createTextNode(word));
     return c;
 }
-export function tag(text) { return el('span', 'dt-tag', text); }
+export function tag(text) { return el('span', 'chip chip-tag dt-tag', text); }
 // white 11/700 on each of these is 4.5:1 or more
 // the eight colours are --avatar-1 .. --avatar-8 (variables.css): white 11/700 on each is 4.5:1 or more
 const hash = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) >>> 0; return h; };

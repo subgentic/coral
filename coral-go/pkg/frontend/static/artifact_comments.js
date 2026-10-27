@@ -204,17 +204,17 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (KIND[c.authorKind]) m.append(el('span', 'ac-kind', KIND[c.authorKind]));
         const dot = el('span', 'ac-dot', '·'); dot.setAttribute('aria-hidden', 'true'); m.append(dot);
         const time = el('span', 'ac-time', ago(c.createdAt)); time.title = c.createdAt; m.append(time);
-        if (c.editedAt) m.append(el('span', 'ac-pill', 'edited'));
+        if (c.editedAt) m.append(el('span', 'chip ac-pill', 'edited'));
         let resolveBtn = null;
         if (top) {
             const a = c.anchor || {};
             if (a.start_line) m.append(el('span', 'ac-lines', a.end_line && a.end_line !== a.start_line ? `lines ${a.start_line}-${a.end_line}` : `line ${a.start_line}`));
-            if (c.resolved) m.append(el('span', 'ac-pill ac-pill-resolved', 'resolved'));
+            if (c.resolved) m.append(el('span', 'chip ac-pill ac-pill-resolved', 'resolved'));
             if (c.fromVersion != null) {
                 const g = groupOf(c);
                 if (g === 'main') m.append(el('span', 'ac-from', `from v${c.fromVersion}`)); // muted text, not a pill
-                else m.append(el('span', 'ac-pill ac-pill-orphan', g === 'look' ? 'text appears twice' : 'text no longer present'));
-            } else if (st.orphan.has(c.id)) m.append(el('span', 'ac-pill ac-pill-orphan', 'text changed'));
+                else m.append(el('span', 'chip ac-pill ac-pill-orphan', g === 'look' ? 'text appears twice' : 'text no longer present'));
+            } else if (st.orphan.has(c.id)) m.append(el('span', 'chip ac-pill ac-pill-orphan', 'text changed'));
             if (!c.deleted && c.can.resolve) {
                 const r = act(c.resolved ? 'Reopen' : 'Resolve', () => run(() => (c.resolved ? api.reopenComment : api.resolveComment)(ownHex(c), st.server, c.id), c.resolved ? 'Comment reopened' : 'Comment resolved'));
                 r.classList.add('ac-resolve'); r.setAttribute('aria-label', `${c.resolved ? 'Reopen' : 'Resolve'} the thread by ${c.authorName || c.authorId || 'unknown'}`);

@@ -38,7 +38,7 @@ export function _updateDepTags(containerId) {
     }
     const tags = Array.from(checked).map(cb => {
         const label = cb.parentElement.textContent.trim();
-        return `<span class="dep-tag">${escapeHtml(label)} <button type="button" class="dep-tag-remove" data-on-click="dep-tag-remove" data-container="${escapeAttr(containerId)}" data-task-id="${Number(cb.value)}" aria-label="Remove dependency ${escapeAttr(label)}">&times;</button></span>`;
+        return `<span class="chip chip-tag dep-tag">${escapeHtml(label)} <button type="button" class="dep-tag-remove" data-on-click="dep-tag-remove" data-container="${escapeAttr(containerId)}" data-task-id="${Number(cb.value)}" aria-label="Remove dependency ${escapeAttr(label)}">&times;</button></span>`;
     }).join('');
     tagsEl.innerHTML = tags;
 }

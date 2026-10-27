@@ -556,10 +556,6 @@ body.panel-dragging .xterm-container {
     right: 12px;
     background: var(--warning);
     color: var(--bg-primary);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    padding: 3px 10px;
-    border-radius: var(--radius-ml);
     pointer-events: none;
     opacity: 0.9;
     z-index: 10;
@@ -571,10 +567,6 @@ body.panel-dragging .xterm-container {
     left: 12px;
     background: var(--danger);
     color: var(--text-on-accent);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    padding: 3px 10px;
-    border-radius: var(--radius-ml);
     pointer-events: none;
     opacity: 0.9;
     z-index: 10;

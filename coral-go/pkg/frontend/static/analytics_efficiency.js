@@ -171,7 +171,7 @@ function draw(key) {
 
     const vs = g => { if (!(avg > 0)) return '—'; const p = Math.round((g.value / avg - 1) * 100); return `${p > 0 ? '+' : ''}${p}%`; }; // an average of 0 has nothing to be above or under
     const columns = [
-        { key: 'label', label: groupLabel(s.group), tone: 'primary', cell: g => { const c = document.createElement('span'); c.append(document.createTextNode(g.label)); if (g === best) c.append(el('span', 'eff-tag eff-tag-best', cfg.metric === 'task_time' ? 'fastest' : 'most efficient')); if (g.n > 0 && isFewG(g)) c.append(el('span', 'eff-tag', 'few')); if (!g.n) c.append(el('span', 'eff-tag', 'no data')); return c; } },
+        { key: 'label', label: groupLabel(s.group), tone: 'primary', cell: g => { const c = document.createElement('span'); c.append(document.createTextNode(g.label)); if (g === best) c.append(el('span', 'chip chip-tag eff-tag eff-tag-best', cfg.metric === 'task_time' ? 'fastest' : 'most efficient')); if (g.n > 0 && isFewG(g)) c.append(el('span', 'chip chip-tag eff-tag', 'few')); if (!g.n) c.append(el('span', 'chip chip-tag eff-tag', 'no data')); return c; } },
         { key: 'value', label: cfg.metric === 'task_time' ? 'Median time' : 'Tokens per commit', numeric: true, cell: g => (num(g.value) == null ? '—' : cfg.value(g.value)) },
         { key: 'vs', label: `vs ${avgWord}`, numeric: true, cell: g => (num(g.value) == null ? '—' : vs(g)) },
         { key: 'n', label: cfg.metric === 'task_time' ? 'Tasks' : 'Commits', numeric: true, cell: g => String(num(g.n) == null ? 0 : g.n) },

@@ -7,7 +7,7 @@ installDom();
 const { askBadge } = await importUi('board_message_text');
 
 const open = askBadge({ ask: { to: ['Dev A', 'Dev B'], open: ['Dev B'], answered: false } });
-assert.match(open, /^<span class="mb-external-badge mb-ask-badge" title="A question: waiting on Dev B">Question<\/span>$/);
+assert.match(open, /^<span class="chip chip-tag mb-external-badge mb-ask-badge" title="A question: waiting on Dev B">Question<\/span>$/);
 
 const done = askBadge({ ask: { to: ['Dev A'], open: [], answered: true } });
 assert.match(done, /mb-ask-badge is-answered/);

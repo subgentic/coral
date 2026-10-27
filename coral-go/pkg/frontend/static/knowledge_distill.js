@@ -108,6 +108,6 @@ export function distillChip(team) {
         refreshDistill(team);
     }
     if (!isDistilling(team)) return '';
-    return '<span class="team-distill-chip" title="Distilling team knowledge…"><span class="team-distill-dot" aria-hidden="true"></span>Distilling…</span>';
+    return '<span class="chip team-distill-chip" title="Distilling team knowledge…"><span class="team-distill-dot" aria-hidden="true"></span>Distilling…</span>';
 }
 

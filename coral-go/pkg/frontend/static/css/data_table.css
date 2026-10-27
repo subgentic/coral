@@ -99,7 +99,7 @@
 .dt-time { font-variant-numeric: tabular-nums; }
 .dt-title-cell { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .dt-id { flex: none; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
-.dt-tag { display: inline-block; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 1px 6px; font-size: var(--table-head-size); font-weight: var(--table-head-weight); color: var(--table-secondary-color); } /* a tag is one line: a server called build-west was build- / west at 390 (#8220) */
+.dt-tag { white-space: nowrap; border: 1px solid var(--table-outer); color: var(--table-secondary-color); } /* a tag is one line: a server called build-west was build- / west at 390 (#8220) */
 .dt-person { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
 .dt-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--table-avatar); height: var(--table-avatar); border-radius: 50%; color: var(--on-avatar); font-size: var(--fs-sm); font-weight: 700; }
 .dt-avatars { gap: 4px; }
@@ -299,7 +299,7 @@
 
 /* Artifact tags (#8594): small outlined chips (11/600, the quiet tone), two on a row then +N; in the sheet each has an x, and "+ Tag" opens the starter set and a box */
 .artifact-tags-row { display: inline-flex; gap: 4px; margin-top: 2px; max-width: 100%; flex-wrap: wrap; }
-.artifact-tag { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 0 6px; font-size: var(--fs-sm); font-weight: 600; line-height: 1.5; color: var(--table-secondary-color); }
+.artifact-tag { white-space: nowrap; border: 1px solid var(--table-outer); color: var(--table-secondary-color); }
 .artifact-tag-more { border-style: dashed; }
 .artifact-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .artifact-tag-list { display: contents; list-style: none; margin: 0; padding: 0; }

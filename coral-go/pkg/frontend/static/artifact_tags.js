@@ -16,7 +16,7 @@ export async function putTags(project, hex, tags) {
     return Array.isArray(d.tags) ? d.tags : tags;
 }
 
-export function tagChip(tag) { return mk('span', 'artifact-tag', tag); }
+export function tagChip(tag) { return mk('span', 'chip artifact-tag', tag); }
 
 /** The tags of a table row: at most two chips, then +N; the whole list in the title. null when there are none. */
 export function rowTags(tags) {
@@ -24,7 +24,7 @@ export function rowTags(tags) {
     const wrap = mk('span', 'artifact-tags-row');
     wrap.title = `Tags: ${tags.join(', ')}`;
     for (const t of tags.slice(0, 2)) wrap.append(tagChip(t));
-    if (tags.length > 2) wrap.append(mk('span', 'artifact-tag artifact-tag-more', `+${tags.length - 2}`));
+    if (tags.length > 2) wrap.append(mk('span', 'chip chip-count artifact-tag artifact-tag-more', `+${tags.length - 2}`));
     return wrap;
 }
 
@@ -80,7 +80,7 @@ export function tagEditor({ project, hex, tags, editable, offer = () => [], onCh
         list.replaceChildren();
         for (const t of current) {
             const li = mk('li', 'artifact-tag-item');
-            li.append(mk('span', 'artifact-tag', t));
+            li.append(mk('span', 'chip artifact-tag', t));
             if (editable) {
                 const x = mk('button', 'artifact-tag-remove'); x.type = 'button'; x.setAttribute('aria-label', `Remove tag ${t}`);
                 const icon = mk('span', 'material-icons', 'close'); icon.setAttribute('aria-hidden', 'true'); x.append(icon);

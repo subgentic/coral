@@ -493,15 +493,8 @@ body.panel-dragging .sidebar {
 }
 
 .section-count-badge {
-    font-size: var(--fs-sm);
-    font-weight: 600;
     color: var(--text-muted);
     background: var(--bg-tertiary);
-    border-radius: var(--radius-lg);
-    padding: 0 6px;
-    line-height: 16px;
-    min-width: 16px;
-    text-align: center;
 }
 
 .sidebar-new-btn-full {
@@ -602,12 +595,6 @@ body.panel-dragging .sidebar {
 }
 
 .hf-tag-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 1px 7px;
-    border-radius: var(--radius-ml);
-    font-size: var(--fs-sm);
     background: var(--accent-dim);
     color: var(--text-on-accent);
 }

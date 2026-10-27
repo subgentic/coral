@@ -62,7 +62,7 @@ function status() {
 
 function chips(m) {
     const wrap = mk('span', 'cm-levels');
-    if (m.efforts && m.efforts.length) for (const e of m.efforts) wrap.append(mk('span', 'cm-chip', e));
+    if (m.efforts && m.efforts.length) for (const e of m.efforts) wrap.append(mk('span', 'chip chip-tag cm-chip', e));
     return wrap;
 }
 
