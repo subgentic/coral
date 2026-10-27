@@ -526,7 +526,7 @@ registerGroupSource('hub-inbox', {
                 } };
         }
         if (CH.CHAT_KEY.test(key)) {
-            return CH.chatsSpec(key, { query: chatFiltersOf(key).q, params: CF.toParams(key, chatFiltersOf(key)), server: chatFiltersOf(key).server, redraw: () => refreshGroupTable('hub-inbox'), open: openChat,
+            return CH.chatsSpec(key, { selection: bar => Toolbar.mountSelection($('group-table-view')?.querySelector('.gt-toolbar'), bar), query: chatFiltersOf(key).q, params: CF.toParams(key, chatFiltersOf(key)), server: chatFiltersOf(key).server, redraw: () => refreshGroupTable('hub-inbox'), open: openChat,
                 after: () => { CH.loadChatCounts(() => renderInboxNav(true)); refreshGroupTable('hub-inbox'); } });
         }
         if (key === 'goals') {

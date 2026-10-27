@@ -126,6 +126,7 @@ export async function setChatFlag(sessionId, flag, value, server = null) {
 }
 async function setFlag(s, flag, value, after) { if (await setChatFlag(s.session_id, flag, value, s.server)) after(); }
 
+const chatState = DT.tableState(); // the chats the person has selected on a phone (an avatar tap): kept across the redraws of a folder
 /** The table spec of a chat folder. ctx: { query, params, open(session), redraw(), after() } (params: the Filters' extra parameters of the history read, chat_filters.js; open: the chat in the viewer; redraw: draw the table again; after: counts and rows read again). */
 export function chatsSpec(key, ctx) {
     const folder = chatFolder(key);
@@ -137,7 +138,9 @@ export function chatsSpec(key, ctx) {
     const rows = L.rows;
     return { title: folder.title, noun: ['chat', 'chats'], rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : 'No chats here.') },
         signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec])]),
-        node: () => DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => `${s.server}:${s.session_id}`, state: DT.tableState(), rowName: s => name(s) || historyLabel(s),
+        node: () => { const table = DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => `${s.server}:${s.session_id}`, state: chatState,
+            selectable: isCloud() || !window.matchMedia?.('(max-width: 767px)').matches ? null : { contextKey: key, canSelect: s => !isGroup(s) && (!s.server || s.server === 'local'), onChange: keys => ctx.selection?.(keys.size ? table.bar : null),
+                actions: [{ label: 'Star', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'starred', true, s.server); chatState.selected.clear(); ctx.after(); } }, { label: 'Archive', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'archived', true, s.server); chatState.selected.clear(); ctx.after(); } }] }, // select by the avatar on a phone, then Star or Archive (the flags route: this computer's chats only) rowName: s => name(s) || historyLabel(s),
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
             mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)); return { lead: { text: who, name: who, square: group }, title: who, snippet: group ? '' : historyLabel(s), time: DT.timeCell(stampOf(s)).textContent }; }, // a phone's row: the agent or board, the chat's title after it, the time
@@ -156,5 +159,5 @@ export function chatsSpec(key, ctx) {
                     // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat
                     const flag = (key, on, icon, label, pressed) => { const b = DT.el('button', `dt-flag${key === 'starred' && on ? ' dt-flag-on' : ''}`); b.type = 'button'; b.title = label; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); if (pressed) b.setAttribute('aria-pressed', String(!!on)); const i = DT.el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', (e) => { e.stopPropagation(); setFlag(s, key, !on, ctx.after); }); return b; };
                     w.append(flag('starred', s.starred, 'star', s.starred ? 'Remove the star' : 'Star', true), flag('archived', s.archived, s.archived ? 'unarchive' : 'archive', s.archived ? 'Unarchive' : 'Archive', false)); return w; } },
-            ] }).el };
+            ] }); ctx.selection?.(chatState.selected.size ? table.bar : null); return table.el; } };
 }
