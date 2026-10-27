@@ -1786,7 +1786,7 @@ body.panel-dragging .agentic-state {
 .inline-preview-artifact-fallback span { color:var(--text-secondary); font-size:var(--fs-base); }
 .inline-preview-artifact-fallback p { margin:0; color:var(--text-secondary); }
 .inline-preview-artifact-fallback a { align-self:flex-start; color:var(--accent); }
-.artifact-manifest-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; max-width:760px; margin:0 auto 14px; padding:10px 12px; color:var(--text-secondary); border-bottom:1px solid var(--border); }
+.artifact-manifest-toolbar { align-items:center; max-width:760px; margin:0 auto 14px; color:var(--text-secondary); } /* a .pane-head (layout.css): where it sits only */
 .artifact-manifest-actions { display:flex; flex-wrap:wrap; gap:6px; }
 .artifact-manifest-list { list-style:none; max-width:760px; margin:0 auto; padding:0; }
 .artifact-manifest-entry { display:grid; grid-template-columns:minmax(0,1fr) minmax(120px,auto); gap:4px 12px; align-items:center; padding:10px 12px; border-bottom:1px solid color-mix(in srgb, var(--border) 70%, transparent); }

@@ -89,18 +89,7 @@
 
 /* ── Persisted Changes View ───────────────────────────────── */
 
-.history-changes-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 20px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
-    font-size: var(--fs-base);
-    flex-shrink: 0;
-}
+.history-changes-toolbar { color: var(--text-secondary); font-size: var(--fs-base); align-items: center; } /* a .pane-head (layout.css): where it sits only */
 
 .history-changes-content {
     flex: 1;

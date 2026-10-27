@@ -921,9 +921,9 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
  * --pane-pad-x is its one side padding. .pane-aside is a pane docked at the side of a page (its edge line). */
 .pane { display: flex; flex-direction: column; min-height: 0; background: var(--bg-secondary); --pane-pad-x: 18px; }
 .pane-aside { border-left: 1px solid var(--border); }
-.pane-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px var(--pane-pad-x) 10px; border-bottom: 1px solid var(--border); }
-.pane-body { flex: 1; min-height: 0; overflow: auto; padding: 14px var(--pane-pad-x) 20px; display: flex; flex-direction: column; gap: 12px; }
-.pane-foot { flex: none; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; padding: 12px var(--pane-pad-x); border-top: 1px solid var(--border); } /* the one rule of every pinned bar (#7684): right-aligned, secondary buttons, the primary last, a danger button at the left */
+.pane-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px var(--pane-pad-x, 18px) 10px; border-bottom: 1px solid var(--border); }
+.pane-body { flex: 1; min-height: 0; overflow: auto; padding: 14px var(--pane-pad-x, 18px) 20px; display: flex; flex-direction: column; gap: 12px; }
+.pane-foot { flex: none; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; padding: 12px var(--pane-pad-x, 18px); border-top: 1px solid var(--border); } /* the one rule of every pinned bar (#7684): right-aligned, secondary buttons, the primary last, a danger button at the left */
 
 /* Variants of the parts, by what the pane holds (#9213): -top a pane docked under the page (its top line); a header as a strip of tabs and buttons, or as a slim bar; a body that is the document's canvas, a stack of frames; a frame round a picture or a player. */
 .pane-top { border-top: 1px solid var(--border); }

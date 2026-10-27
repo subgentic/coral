@@ -24,7 +24,7 @@ const LOOK = /^(display|flex-direction|flex-wrap|gap|padding(-[a-z]+)*|backgroun
 const problems = [];
 
 // pane instances that keep their own size and padding and, in a sheet, their own edges: their markup must wear the family
-const INSTANCES = new Map([['ac-panel', 'pane']]);
+const INSTANCES = new Map([['ac-panel', 'pane'], ['artifact-manifest-toolbar', 'pane-head'], ['av-bar', 'pane-head'], ['history-changes-toolbar', 'pane-head']]);
 export const NOT_A_PANE = {
     'eff-panel': 'the Analytics efficiency section\'s frame; its figures are the eff-cards inside it',
     'ibx-panel': 'an inset inside an Inbox folder page, drawn from the --ibx-inset-* tokens',
