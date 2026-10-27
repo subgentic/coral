@@ -4,6 +4,7 @@ import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 const DT = await importOnce('./data_table.js');
 const Tags = await importOnce('./artifact_tags.js');
+const { fileIconHtml } = await importOnce('./file_explorer.js');
 const { readableName, itemKey, sizeText, typeText, isUnverified } = await importOnce('./artifact_item.js');
 const SORT_KEY = 'coral-artifact-table-sort';
 const keys = ['name', 'type', 'tags', 'size', 'updated'];
@@ -28,8 +29,13 @@ export function artifactTable(cfg) {
             const b = DT.primaryButton(readableName(item)); b.dataset.artifactId = (cfg.rowKey || itemKey)(item);
             if (cfg.nameTitle) b.title = cfg.nameTitle(item);
             const badge = cfg.nameBadge?.(item);
-            if (badge) { const wrap = DT.el('span', 'dt-title-cell'); wrap.append(b, badge); return wrap; }
-            return b;
+            const wrap = DT.el('span', 'dt-title-cell');
+            // Browse owns the filename mapping and decorative SVG markup.
+            const icon = DT.el('span', 'artifact-name-icon');
+            icon.innerHTML = fileIconHtml(readableName(item));
+            wrap.append(icon, b);
+            if (badge) wrap.append(badge);
+            return wrap;
         } },
         { key: 'type', label: 'Type', width: '6.5rem', dropAt: 36, sort: !cfg.paged, sortValue: typeText, cell: i => isUnverified(i) ? '—' : DT.tag(typeText(i)) },
         { key: 'tags', label: 'Tags', width: '16rem', dropAt: 52, sort: !cfg.paged, sortValue: i => (i.tags || []).join(', '), cell: i => Tags.rowTags(i.tags) || '—' },
