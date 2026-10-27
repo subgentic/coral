@@ -164,6 +164,19 @@ diag_failure() {
   gh api rate_limit --jq '"    gh (authenticated): core remaining \(.resources.core.remaining) of \(.resources.core.limit), resets \(.resources.core.reset)"' 2>&1 | head -2 >&2
   echo "update_real: ---- end of the evidence ----" >&2
 }
+# Evidence for an apply that did not come up on this run's port (item 5): the apply restarts Coral through open(1), which gives the new app the login session's environment, not this run's
+# port, so the new Coral may be up on its default port. Print what is there so the next run says which case it is. Only called on a throwaway runner (items 5 to 8 run nowhere else).
+diag_apply() {
+  echo "update_real: ---- evidence for the failed apply ----" >&2
+  echo "update_real: Coral processes after the apply (pid, ppid, command):" >&2
+  ps -axo pid=,ppid=,command= 2>/dev/null | grep -iE '[C]oral' | head -15 | sed 's/^/    /' >&2
+  echo "update_real: what Coral processes listen on:" >&2
+  lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -iE 'coral' | head -10 | sed 's/^/    /' >&2
+  echo "update_real: health on this run's port ($PORT) and on the default port (8420):" >&2
+  echo "    run port: [$(health)]  8420: [$(curl -s -m 5 http://127.0.0.1:8420/api/health | jget version)]" >&2
+  echo "update_real: the installed app's version (Info.plist): $(defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null)" >&2
+  echo "update_real: ---- end of the evidence ----" >&2
+}
 checked_at() { person --path /api/system/update | pbody | jget checked_at; }
 start_check() { person --method POST --path /api/system/update/check | grep -q '^202'; }
 before=$(checked_at)
@@ -230,6 +243,7 @@ if [ -n "$SRV1" ] && ours "$SRV1"; then PIDS+=("$SRV1"); else [ -n "$SRV1" ] && 
 if [ "$v" = "$tov" ] && [ -n "$SRV1" ] && [ "$SRV1" != "$SRV0" ] && ! kill -0 "$SRV0" 2>/dev/null; then
   result "5 apply" PASS "the person's request ($(printf '%s' "$answer" | head -c 80)) installed $tov: /api/health says $tov, server $SRV1 replaced $SRV0 (gone)"
 else
+  diag_apply
   result "5 apply" FAIL "answer=[$(printf '%s' "$answer" | head -c 300)] health=[$v] server $SRV0 then [$SRV1]; tray: $(tail -c 300 "$work/tray.out" | tr '\n' ' ')"; finish
 fi
 
