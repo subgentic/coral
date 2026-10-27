@@ -12,14 +12,14 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 
 /* Standalone pages (sign-in, enroll) */
 .cloud-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
-    background: var(--bg-primary, var(--fx-navy-ink)); color: var(--text-primary, #e6edf3); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    background: var(--bg-primary, var(--fx-navy-ink)); color: var(--text-primary, #e6edf3); font-family: var(--font-sans); }
 .cloud-card { width: 100%; max-width: 440px; padding: var(--card-pad-roomy); border-radius: var(--card-radius); background: var(--bg-secondary, #151a22); border: var(--card-border); }
 .cloud-card h1 { font-size: var(--fs-2xl); margin: 0 0 6px; }
 .cloud-card p { margin: 0 0 14px; line-height: var(--lh-body); opacity: .85; }
 .cloud-card label { display: block; font-size: var(--fs-md); margin: 12px 0 4px; }
 .cloud-card input[type=email], .cloud-card input[type=text] { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: var(--radius-lg);
     border: 1px solid var(--control-border, var(--border, var(--fx-navy-line))); background: var(--bg-primary, var(--fx-navy-ink)); color: inherit; font-size: var(--fs-lg); min-height: var(--control-touch-height, 44px); } /* a 44px target on every pointer: the sign-in page is used from a phone (#5637) */
-.cloud-card input.cloud-code { font-family: ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; font-size: var(--icon-size); text-align: center; }
+.cloud-card input.cloud-code { font-family: var(--font-mono); letter-spacing: .15em; text-transform: uppercase; font-size: var(--icon-size); text-align: center; }
 .cloud-btn { display: inline-flex; align-items: center; justify-content: center; min-height: var(--control-touch-height, 44px); width: 100%; box-sizing: border-box; margin-top: 14px; padding: 10px 14px; border-radius: var(--radius-lg); border: 1px solid var(--control-border, var(--border, var(--fx-navy-line)));
     background: var(--bg-tertiary, #1c2330); color: inherit; font-size: var(--fs-lg); cursor: pointer; text-align: center; text-decoration: none; }
 .cloud-btn.primary { background: #1f6feb; border-color: #1f6feb; color: var(--text-on-accent); }
@@ -71,7 +71,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 /* One picture per theme: the page's theme is the data-theme attribute (dark when there is none). */
 :root:not([data-theme="light"]) .cs-shot-light, :root[data-theme="light"] .cs-shot-dark { display: none; }
 @container servers-tab (max-width: 640px) { .cs-enroll-body { grid-template-columns: minmax(0, 1fr); } .cs-shots { display: none; } } /* a phone adds no computer: the picture is for the desktop's page, and the table comes first there */
-.cs-enroll code { font-family: ui-monospace, monospace; }
+.cs-enroll code { font-family: var(--font-mono); }
 .cs-enroll-form { display: flex; gap: 8px; }
 .cs-enroll-form input { flex: 1; }
 .cs-enroll-form input::placeholder { color: var(--text-primary, inherit); opacity: .8; } /* the example code holds 4.5:1 (the page's default placeholder was 3.4:1) */

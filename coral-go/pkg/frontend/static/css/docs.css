@@ -41,7 +41,7 @@
 
 .docs-content h1 {
     font-size: var(--type-page-size);
-    font-weight: 700;
+    font-weight: var(--fw-title);
     margin: 0 0 12px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border);

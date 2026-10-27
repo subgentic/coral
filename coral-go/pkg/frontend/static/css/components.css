@@ -1264,7 +1264,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .alert-notification-icon {
-    font-size: 2.5rem;
+    font-size: var(--glyph-md);
     margin-bottom: 12px;
 }
 
@@ -2393,7 +2393,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .team-wizard-success-icon {
-    font-size: 3rem;
+    font-size: var(--glyph-lg);
     color: var(--success);
 }
 
@@ -2959,7 +2959,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     padding: 2px 8px;
 }
 
-.prompt-textarea { resize: vertical; font-family: monospace; }
+.prompt-textarea { resize: vertical; font-family: var(--font-mono); }
 
 .prompts-divider {
     border: none;
@@ -3087,7 +3087,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     background: var(--bg-secondary);
     padding: 2px 6px;
     border-radius: var(--radius-xs);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-size: var(--fs-base);
 }
 .tmux-missing-banner-close {
@@ -3618,7 +3618,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .saved-top-btn .saved-count { position: absolute; top: -2px; right: -3px; min-width: 14px; padding: 0 4px; border-radius: var(--radius-lg); background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 14px; text-align: center; }
 .saved-top-btn .saved-count[hidden] { display: none; }
 /* The jump: a slim bar above the conversation, and the "Saved" tag on the message. */
-.jumpbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: 0.78125rem; color: var(--text-secondary); flex: none; }
+.jumpbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: var(--fs-base); color: var(--text-secondary); flex: none; }
 .jumpbar .btn { margin: 0; padding: 2px 10px; min-height: 26px; font-size: var(--fs-base); }
 .jumpbar span { flex: 1; }
 @media (pointer: coarse) { .jumpbar .btn { min-height: 44px; min-width: 44px; } }
@@ -3830,7 +3830,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* Folded section: one summary style. A user sets only the --dz-* variables that differ. */
 .disclosure > summary { cursor: pointer; width: var(--dz-width, fit-content); padding: var(--dz-pad, .25rem .5rem .25rem 0); color: var(--dz-color, inherit); font-size: var(--dz-size, var(--fs-md)); font-weight: var(--fw-strong); }
 .disclosure[open] > summary { margin-bottom: var(--dz-gap, .4rem); }
-.launch-type-glyph { font-size: 2rem; } /* the agent card draws the same robot as the start page */
+.launch-type-glyph { font-size: var(--fs-display); } /* the agent card draws the same robot as the start page */
 
 /* Settings' footer: the note that something is not saved yet, on the left (UI audit #5589, finding 27); and the CLI paths behind one line. */
 .settings-unsaved { margin-right: auto; align-self: center; font-size: var(--fs-base); color: var(--text-secondary); }
@@ -4193,7 +4193,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 /* The Servers tab of a self-hosted hub (#7638): a table (Server, Status, Agents), and a server's page with its facts and Test, Edit and Remove in a bar pinned at its foot */
 .servers-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .servers-page > * { flex-shrink: 0; }
-.servers-page-name { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); color: var(--text-primary); overflow-wrap: anywhere; }
+.servers-page-name { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-page .item-meta { display: flex; align-items: center; gap: var(--space-md); }
 .servers-facts { gap: 6px var(--space-xl); margin: var(--space-lg) 0; }
 .servers-fact { display: contents; }

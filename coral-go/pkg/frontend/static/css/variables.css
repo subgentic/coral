@@ -156,11 +156,15 @@
     --fs-lg:   0.875rem;   /* 14px */
     --fs-xl:   1rem;       /* 16px */
     --fs-2xl:  1.25rem;    /* 20px: a page title, an item page title, a big figure (Goal #84) */
+    --glyph-sm: 1.5rem;    /* 24px: a decorative icon glyph, not a text step */
+    --glyph-md: 2.5rem;    /* 40px */
+    --glyph-lg: 3rem;      /* 48px */
     --fs-display: 2rem;    /* 32px: the welcome title only */
     /* Weights: three. 700 only on the 20 px and 32 px titles (Goal #84) */
     --fw-regular: 400;
     --fw-medium: 500;     /* UI text, buttons, labels */
     --fw-strong: 600;     /* titles, selected, badges, uppercase labels */
+    --fw-title: 700;      /* only the 20 px and 32 px titles (Goal #84) */
     /* Line heights: three (Goal #84) */
     --lh-label: 1.2;      /* badges, tabs, single-line controls, the 20 and 32 px titles */
     --lh-ui: 1.4;         /* the default */

@@ -2,7 +2,7 @@
 #team-page-view { flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
 
 .team-page-head { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 12px 24px 0; min-height: 48px; box-sizing: border-box; }
-.team-page-title { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); overflow-wrap: anywhere; min-width: 0; }
+.team-page-title { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); overflow-wrap: anywhere; min-width: 0; }
 .team-page-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .team-page-machine { font-weight: var(--fw-regular); font-size: var(--fs-lg); color: var(--text-secondary); }
 .team-page-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
@@ -103,7 +103,7 @@
 .detail-pane { position: relative; flex: none; width: var(--detail-w, 460px); max-width: 100%; } /* where it sits and how wide; what it looks like is the one pane's (.pane, layout.css) */
 .detail-pane[hidden] { display: none; }
 .detail-title, .goals-table-page .goals-detail-title { width: fit-content; max-width: 100%; }
-.detail-title { margin: 0; font-size: var(--fs-2xl); font-weight: 700; overflow-wrap: anywhere; }
+.detail-title { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-title); overflow-wrap: anywhere; }
 .detail-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .detail-sub { margin: 2px 0 0; font-size: var(--fs-base); color: var(--text-secondary); }
 .detail-close { flex: none; width: 36px; height: 36px; display: inline-grid; place-items: center; border: 0; background: none; border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; }
@@ -135,7 +135,7 @@
     #team-panel-messages { padding: 12px 16px 0; }
     .team-page-head, .team-tabs { padding-left: 16px; padding-right: 16px; }
     .team-page-head { flex-wrap: nowrap; padding-top: 8px; min-height: 0; gap: 2px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
-    .team-page-title { font-size: var(--fs-2xl); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; } /* 17/700, one line: at 200% text the header and the tabs stay near a quarter of the screen */
+    .team-page-title { font-size: var(--fs-2xl); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-title); } /* 17/700, one line: at 200% text the header and the tabs stay near a quarter of the screen */
     .team-page-status { grid-column: 1; }
     .team-page-actions { grid-column: 2; grid-row: 1 / span 2; }
     #team-page-add-agent, #team-page-settings { display: none; }
@@ -292,7 +292,7 @@
 .inbox-folder-toolbar .inbox-pill-field { display: none; }
 .inbox-folder-toolbar .inbox-pill-field .team-tb-select { display: block; max-width: none; }
 .inbox-folder-head { display: flex; align-items: baseline; gap: var(--space-md, 8px); flex: 0 1 auto; min-width: 0; max-width: 40%; margin-right: 4px; }
-.inbox-folder-head h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); color: var(--text-primary); }
+.inbox-folder-head h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); color: var(--text-primary); }
 .inbox-folder-head h2:focus { outline: none; }
 .inbox-folder-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
 .inbox-folder-head .session-group-count { flex: none; font-weight: var(--fw-strong); }

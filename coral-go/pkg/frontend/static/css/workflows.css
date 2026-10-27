@@ -16,7 +16,7 @@
 .wf-page .item-bar.wf-run-actions { margin-top: var(--space-2xl); } /* a run's bar follows its steps: pinned to the foot it left a wide gap on a short page; sticky still keeps it in view on a long one (#7722) */
 
 /* An item's page: its link back, its name at 17/700 and one facts line under it (#7471) */
-.wf-item-title { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-label); overflow-wrap: anywhere; }
+.wf-item-title { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); overflow-wrap: anywhere; }
 .wf-facts-line { margin-bottom: var(--space-lg); overflow-wrap: anywhere; }
 .wf-desc { margin: 0 0 var(--space-lg); font-size: var(--fs-md); color: var(--text-secondary); }
 .wf-phone-back { display: none; }
