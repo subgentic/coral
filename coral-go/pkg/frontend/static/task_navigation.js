@@ -12,6 +12,6 @@ export function taskHref(project, id) {
 export function openTask(project, id, from) {
     const team = textOf(project), task = idOf(id);
     if (!team || !task) return;
-    if (from && from.closest && from.closest('#inbox-view, #inbox-page')) return go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: task });
+    if (from && from.closest && (from.closest('#inbox-view, #inbox-page, #group-table-view') && document.body.getAttribute('data-nav-tab') === 'hub-inbox')) return go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: task });
     return window.openTeamPage(team, { tab: 'tasks', item: task });
 }
