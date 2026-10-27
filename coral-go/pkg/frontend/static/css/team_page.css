@@ -359,7 +359,9 @@
 .inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; }
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
 .inbox-review-error:empty { display: none; }
-.inbox-review-metadata { display: flex; flex-wrap: wrap; gap: 0 8px; }
+.inbox-review-metadata { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0 8px; min-width: 0; max-width: 9rem; } /* one line (#9060): For review, then the task, cut with an ellipsis when it is long (its full words are the link's tooltip) */
+.inbox-review-metadata > * { flex: none; }
+.inbox-review-metadata > .inbox-review-task { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inbox-review-team { display: none; }
 .inbox-review-goal { display: flex; flex-direction: column; min-width: 0; align-items: flex-start; } /* a review's goal, its task under it (#8917) */
 .inbox-review-task, .inbox-review-nogoal { font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
