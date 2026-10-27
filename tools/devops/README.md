@@ -170,6 +170,44 @@ script, sets `CORAL_TELEMETRY_DISABLED=1`. CI's own builds carry no PostHog key 
   stack"). The global git identity is never used.
 - Stage by explicit path, never amend or rebase `main`, and remove temp folders by exact path.
 
+## The landing rule is the release rule (#8645, Goal #65)
+
+A batch lands on `main` by the same test a release is tagged by. Two parts, both required:
+
+1. **Go checks green.** `go-tests` (both tag sets), `go-race`, `gofmt` and the cross-build on the candidate's `ci/<version>` branch; `windows-tests` too when the batch touches `_windows.go` or a Windows test. Every job, not the suite count (the summary's first line says `green:` only when all of them are).
+2. **The full `cdp-gate` is no worse than `main`.** The suites that FAILED or timed out on the candidate must be a subset of those that failed on `main`'s latest daily baseline (below), and the end-check count must be 0. A suite that is green on the baseline and FAILED or timed out on the candidate blocks the landing: the batch is not pushed until that suite is green again or the commit that broke it is taken out. A suite that failed on both is not a new red and does not block; it keeps its owner and task (next section). **A FLAKY suite (red on the first attempt, green on the retry) does not block by itself**: some flake on `main` too, and one that merely hits on a candidate's first attempt would block every landing. It blocks only when a repeat of it (`gh workflow run cdp-gate.yml --ref <ci branch> -f suites=<suite> -f runs=10`, and the same on `main`) shows a worse pass rate on the candidate than on `main`. The same comparison holds for `windows-tests`: its reds on the candidate are compared with the latest `windows-tests` run on `main`, and a Windows-only red that `main` already has under an owned task is not new. A red that is explicitly accepted for a release is the existing `Accepted-red` trailer on the notes commit (#8643), approved by the Orchestrator, and never a reason to land a batch.
+
+To compare: read the candidate's `cdp-summary` artifact (`cdp-summary-a<attempt>`, the `failed` and `flaky` lists in `cdp-summary.json`) and the baseline's the same way:
+
+```bash
+gh run download <candidate-run-id> -n cdp-summary-a1 -D "$(mktemp -d /tmp/cdp-cand.XXXX)"
+gh run download <baseline-run-id>  -n cdp-summary-a1 -D "$(mktemp -d /tmp/cdp-base.XXXX)"
+```
+
+The new reds are `failed` of the candidate minus `failed` of the baseline (`flaky` is listed, not subtracted). `ends` (the count of end-check failures) must be 0 on the candidate whatever the baseline says. Post the list with the verdict (`no worse than main` or `blocked by: <suites>`), and the FLAKY suites with their repeat result, before pushing `main`.
+
+### A new red has an owner and a task the same day
+
+- The landing agent names the suites of the new-red set on the board the moment the gate finishes, with the failing line the summary prints under each suite's name, and its proposed owner.
+- The owner is the author of the commit in the batch that changed what the suite drives (a grep of the suite's ids and routes over the batch's diff; the batch order says which commit it is). When that is not clear, the Orchestrator names the owner within the same day.
+- Only the Orchestrator and the Operator create shared tasks, so the landing agent asks the Orchestrator in the same post to create it the same day, assigned at creation (`coral-board task add "<suite>: red on <sha>" --assignee "<owner>" --goal 65`; creating it and then reassigning broadcasts "tasks available"). A flake that the repeat shows is worse than on `main` gets the same task; the repeat (about 20 runs on the candidate and on `main` when it must name a commit) comes before anyone is blamed.
+- A red already on `main` with no open task is named in the next daily post for the Orchestrator to give a task; a red whose task is more than a day old is listed again in that post.
+
+### A daily full cdp-gate on `main`
+
+Once a day (the same time each day, off the top of the hour) the landing agent dispatches the gate on `main` and posts the result to the board:
+
+```bash
+gh workflow run cdp-gate.yml --ref main
+gh run list --workflow cdp-gate.yml --branch main --limit 1 --json databaseId,status,conclusion
+gh run view <id> --json status,conclusion   # poll this every few minutes until status is completed; gh run watch hangs a session
+# then download the cdp-summary artifact as above
+```
+
+The post is one summary line (`green: N/N` or `NOT green: ...`, copied from the run's summary), then a numbered list: each red suite, its first failing line, its owner and its task (or `no task: asking the Orchestrator`), and the new reds since the previous daily run. The run's id is the next day's baseline: keep it in the post, so the comparison above always names a run. Before the first daily run, the baseline is the latest completed `cdp-gate` run on `main` that `gh run list --workflow cdp-gate.yml --branch main` finds (and the latest `windows-tests` run on `main` for the Windows comparison). Two reds in a row on the same suite with no task is a failure of this rule, and the Orchestrator is told.
+
+The dispatch runs on GitHub's runners with no secrets and read-only contents, as every `cdp-gate` run does (the file's header says why); the posting is the landing agent's own `coral-board post --file`, since the Coral board is not reachable from a workflow.
+
 ## No programs and no big files (#5444)
 
 A built program carries the build machine's paths and account name, so one committed by mistake is a leak in a public repository. `tools/devops/check_binaries.py BASE TIP` refuses a range in which any commit (each on its own) adds or changes a file over 5 MB or one that starts with an ELF, Mach-O or PE header, except the paths in `tools/devops/binary-allowlist.txt` (icons today). `apply-patches.sh` runs it after each patch, `land-main.sh` before it pushes, `prepush.sh` before a gate, and `install-pre-push-hook.sh` installs `pre-push-hook.sh` as the shared git hook so that any worktree's `git push` is checked (`--no-verify` skips it, as for any hook). Tests: `tests/release/check_binaries_test.sh`, `tests/release/pre_push_hook_test.sh`.
