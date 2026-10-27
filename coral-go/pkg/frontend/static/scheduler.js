@@ -84,6 +84,7 @@ async function loadWorkflowsById() {
     return workflowsById;
 }
 
+let _saved = null; // a job was just created or updated: its page says so once, under the title (#9298)
 export async function selectScheduledJob(jobId) {
     selectedJobId = jobId;
 
@@ -146,6 +147,9 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         job.flags ? ['Flags', `<code>${escapeHtml(job.flags)}</code>`] : null,
     ].filter(Boolean);
 
+    const saved = _saved && _saved.id === job.id ? _saved : null; _saved = null;
+    const savedLine = saved ? `<p class="item-meta sched-saved" role="status">${saved.kind === 'updated' ? 'Updated.' : 'Created.'}${job.enabled && job.next_fire_at ? ` Next run ${escapeHtml(atWords(job.next_fire_at))} your time.` : ''}</p>` : '';
+
     const moreId = `sched-more-${Number(job.id)}`;
     const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Paused'), lastWords(job.last_run), job.enabled && job.next_fire_at ? `next ${awayWords(job.next_fire_at)}` : ''].filter(Boolean).join(' \u00b7 ');
     // A short prompt is shown; a long one is folded (it would push the runs off the page)
@@ -163,6 +167,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             <h2>${escapeHtml(job.name)}</h2>
         </div>
         <p class="item-meta sched-status-line">${escapeHtml(status)}</p>
+        ${savedLine}
         ${job.description ? `<p class="sched-desc">${escapeHtml(job.description)}</p>` : ''}
         <dl class="facts sched-facts">
             <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${job.timezone ? ` (${escapeHtml(job.timezone)})` : ''}</dd>
@@ -296,7 +301,7 @@ function toggleJobMore(btn, open) {
 export function refreshJobs() { return fetchJobs(); }
 
 export function initScheduler() {
-    document.addEventListener('job-saved', async e => { await fetchJobs(); selectScheduledJob(e.detail.id); }); // the job dialog saved one: the list is read again and the job opened
+    document.addEventListener('job-saved', async e => { await fetchJobs(); _saved = { id: e.detail.id, kind: e.detail.saved }; selectScheduledJob(e.detail.id); }); // the job dialog saved one: the list is read again and the job opened
     // A click elsewhere and Escape close an open More (it is redrawn with the page, never kept)
     document.addEventListener('click', (e) => { for (const b of document.querySelectorAll('.sched-more-btn[aria-expanded="true"]')) if (!b.parentElement.contains(e.target)) toggleJobMore(b, false); });
     document.addEventListener('focusout', (e) => { const b = document.querySelector('.sched-more-btn[aria-expanded="true"]'); if (b && e.relatedTarget && !b.parentElement.contains(e.relatedTarget)) toggleJobMore(b, false); }); // Tab out of More closes it

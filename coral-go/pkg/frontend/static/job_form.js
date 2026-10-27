@@ -273,9 +273,9 @@ async function submitJob() {
         throw new Error(data.error);
     }
     if (data.error) throw new Error(data.error);
-    showToast(isEdit ? 'Job updated' : 'Job created');
+    // no toast: the job's page says it, in words, under the title (scheduler.js, "Created. Next run today 06:00 your time."), where a toast would cover the title on a phone or the page's own actions (#9298)
     hideJobModal();
-    document.dispatchEvent(new CustomEvent('job-saved', { detail: { id: data.id } })); // the Jobs page reads the list again and opens it
+    document.dispatchEvent(new CustomEvent('job-saved', { detail: { id: data.id, saved: isEdit ? 'updated' : 'created' } })); // the Jobs page reads the list again and opens it
 }
 
 // -- the dialog ----------------------------------------------------------------------------------------

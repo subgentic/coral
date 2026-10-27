@@ -281,6 +281,7 @@
 1	scheduler.js	fails === 1 ? 'The last run failed' : `The last ${fails} runs failed`
 1	scheduler.js	k
 1	scheduler.js	promptHtml
+1	scheduler.js	savedLine
 1	scheduler.js	settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')
 1	scheduler.js	v
 1	server_status.js	count

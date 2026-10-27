@@ -90,8 +90,23 @@ export function showToast(message, isError = false, duration, opts = {}) {
         };
     }
     toastHost().appendChild(toast);
+    watchPinnedBar();
     if (Number.isFinite(duration)) timer = setTimeout(dismiss, duration);
     return toast;
+}
+
+/** A page's pinned bar can appear after a toast does (a job that was just created opens its page, whose Edit, Pause and More are the bar at the foot): while a notice is on screen the page is watched, and the column is placed again when it changes, so a toast is never over the bar (#9298). It stops watching when the column is empty. */
+let _pinWatch = null;
+function watchPinnedBar() {
+    if (_pinWatch || typeof MutationObserver !== "function") return;
+    let frame = 0;
+    const check = () => {
+        const col = document.getElementById("notices");
+        if (!col || !col.querySelector(".toast, #warning-toasts > *")) { _pinWatch.disconnect(); _pinWatch = null; return; }
+        placeNotices();
+    };
+    _pinWatch = new MutationObserver(() => { cancelAnimationFrame(frame); frame = requestAnimationFrame(check); });
+    _pinWatch.observe(document.body, { childList: true, subtree: true });
 }
 
 // Everything that appears over the page shares one column, #notices: the warnings and the update notice first (#warning-toasts), the short toasts below them (#toast-host), so none sits on another (the second short
