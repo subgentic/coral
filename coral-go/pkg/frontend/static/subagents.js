@@ -5,7 +5,7 @@ import { _formatTokenCount, formatTaskDate } from './task_format.js';
 import { redrawBoardTaskList, closeTaskDetailModal } from './task_hooks.js';
 import { serverFetch, serverForSession, dropBody } from './server_base.js';
 import { state } from './state.js';
-import { formatCost, formatDuration } from './format.js';
+import { formatCost, compactDuration } from './format.js';
 
 // Which session state.currentSubagents belongs to. Lets a session switch drop
 // the previous agent's subagents at once instead of showing them until the
@@ -85,7 +85,7 @@ function _formatDuration(startIso, endIso) {
     if (endIso === undefined || endIso === '') return null;
     const start = Date.parse(startIso), end = endIso === null ? Date.now() : Date.parse(endIso);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
-    return formatDuration(Math.round((end - start) / 1000), { unit: 's' });
+    return compactDuration((end - start) / 1000);
 }
 
 // How long an in-progress board task has been claimed, e.g. "42m" or "3h 5m".
@@ -95,10 +95,7 @@ export function _claimedFor(task) {
     if (!Number.isFinite(ms) || ms < 0) return null;
     const mins = Math.floor(ms / 60000);
     if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ${mins % 60}m`;
-    return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+    return compactDuration(mins * 60, { days: true });
 }
 
 // Prompt and result are model-written and almost always markdown. They are
