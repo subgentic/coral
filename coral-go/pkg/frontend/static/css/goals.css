@@ -31,7 +31,7 @@
 
 
 .goals-failed { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border: 1px dashed var(--border-light); border-radius: var(--radius-lg); color: var(--text-secondary); }
-.goals-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; padding: 0; color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: 1.5; } /* the one empty line (14/400, no box; UI/UX 170 consistency pass 2): Goals, Tasks, Agents, as Artifacts and Knowledge */
+.goals-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; padding: 0; color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-body); } /* the one empty line (14/400, no box; UI/UX 170 consistency pass 2): Goals, Tasks, Agents, as Artifacts and Knowledge */
 .goals-empty p { margin: 0; }
 .goals-failed { flex-direction: row; flex-wrap: wrap; align-items: center; border-style: solid; border-color: var(--error); }
 

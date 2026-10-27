@@ -66,7 +66,7 @@ function _showCLINotFoundModal(agentType, server = LOCAL_SERVER, { retry = null 
     modal.innerHTML = `
         <div class="modal-content" style="width:480px">
             <h3>${label} is not installed</h3>
-            <p style="color:var(--text-secondary);font-size:var(--fs-md);line-height:1.5;margin:8px 0 12px">
+            <p style="color:var(--text-secondary);font-size:var(--fs-md);line-height:var(--lh-body);margin:8px 0 12px">
                 Coral starts ${label} for you, but it is not installed ${where}. Run this in a terminal, then press Check again.
             </p>
             <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:var(--fs-md);display:flex;align-items:center;gap:8px">
@@ -74,7 +74,7 @@ function _showCLINotFoundModal(agentType, server = LOCAL_SERVER, { retry = null 
                 <button class="btn btn-small" data-on-click="info-copy" data-cmd="${escapeAttr(info.cmd)}">Copy</button>
             </div>
             ${/^https:\/\/[^\s"'<>]+$/.test(info.url || '') ? `<p style="font-size:var(--fs-md);margin:10px 0 0">Or use the official install page:<br><a href="${escapeAttr(info.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--link-text);overflow-wrap:anywhere">${escapeHtml(info.url.replace(/^https:\/\//, ''))}</a></p>` : ''}
-            ${info.note ? `<p style="color:var(--text-secondary);font-size:var(--fs-base);line-height:1.5;margin:8px 0 0">${escapeHtml(info.note)}</p>` : ''}
+            ${info.note ? `<p style="color:var(--text-secondary);font-size:var(--fs-base);line-height:var(--lh-body);margin:8px 0 0">${escapeHtml(info.note)}</p>` : ''}
             <p class="cli-recheck-status" role="status" aria-live="polite"></p>
             <div class="modal-actions" style="margin-top:16px">
                 ${remote ? '' : '<button class="btn" data-action="settings">It is installed somewhere else</button>'}
@@ -129,7 +129,7 @@ function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER, picked
         modal.innerHTML = `
             <div class="modal-content" style="width:460px">
                 <h3>Permission Prompt Warning</h3>
-                <p style="color:var(--text-secondary);font-size:var(--fs-md);line-height:1.5;margin:8px 0 16px">
+                <p style="color:var(--text-secondary);font-size:var(--fs-md);line-height:var(--lh-body);margin:8px 0 16px">
                     Agents may get stuck on permission prompts without <code>${escapeHtml(permFlag)}</code>. Would you like to enable it?
                 </p>
                 <div class="modal-actions" style="gap:8px">

@@ -111,7 +111,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     transition: border-color 0.15s;
     resize: none;
     min-height: 0;
-    line-height: 1.5;
+    line-height: var(--lh-body);
 }
 
 .command-pane textarea:focus {
@@ -532,7 +532,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     background: rgba(var(--error-rgb), 0.1);
     color: var(--error-text); /* red as text on its own tint: 4.5:1 (#6171) */
     font-size: var(--fs-md);
-    line-height: 1.35;
+    line-height: var(--lh-ui);
 }
 .composer-error[hidden] { display: none; }
 .composer-hint { margin: 0 0 6px; font-size: var(--fs-sm); color: var(--text-secondary); }
@@ -620,7 +620,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     .model-chip { min-height: 44px; min-width: 44px; } /* a touch target (#4276) */
     /* One Options button holds Model and Thinking (#7623): the two chips are not drawn, their wraps stay so each menu opens as the sheet it is, from the Options sheet's choice. Keys is only for the terminal view. */
     .options-chip-wrap { display: inline-flex; }
-    .options-chip { max-width: 5.5rem; white-space: normal; text-align: center; line-height: 1.15; } /* "Model and thinking" on two lines: the box keeps its width */
+    .options-chip { max-width: 5.5rem; white-space: normal; text-align: center; line-height: var(--lh-label); } /* "Model and thinking" on two lines: the box keeps its width */
     .model-chip-bar .model-chip-wrap:not(.options-chip-wrap) { display: contents; }
     .model-chip-bar .model-chip-wrap[hidden] { display: none; }
     .model-chip-bar .model-chip-wrap:not(.options-chip-wrap) > .model-chip { display: none; }

@@ -10,6 +10,7 @@
 
 body {
     font-family: var(--font-sans);
+    line-height: var(--lh-ui);
     background: var(--bg-primary);
     color: var(--text-primary);
     height: 100vh;

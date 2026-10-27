@@ -146,6 +146,10 @@
     --fw-regular: 400;
     --fw-medium: 500;     /* UI text, buttons, labels */
     --fw-strong: 600;     /* titles, selected, badges, uppercase labels */
+    /* Line heights: three (Goal #84) */
+    --lh-label: 1.2;      /* badges, tabs, single-line controls, the 20 and 32 px titles */
+    --lh-ui: 1.4;         /* the default */
+    --lh-body: 1.5;       /* reading text, chat prose, descriptions */
 
     /* Shared UI roles. User themes may override the prose family and size. */
     --type-page-size: 1.25rem;   /* 20px */

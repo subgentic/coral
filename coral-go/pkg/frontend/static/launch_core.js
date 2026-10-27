@@ -156,7 +156,7 @@ export function showTeamLaunchFailures(failed, started, openSettings) {
         <div class="modal-content" style="width:500px">
             <h3>Team Launch — ${failed.length} agent${failed.length > 1 ? 's' : ''} failed</h3>
             <p style="color:var(--text-secondary);font-size:var(--fs-md);margin:8px 0">${started} launched successfully, ${failed.length} failed:</p>
-            <ul style="color:var(--error);font-size:var(--fs-md);line-height:1.6;margin:8px 0 16px;padding-left:20px">${failList}</ul>
+            <ul style="color:var(--error);font-size:var(--fs-md);line-height:var(--lh-body);margin:8px 0 16px;padding-left:20px">${failList}</ul>
             <div class="modal-actions">
                 <button class="btn" data-action="settings">Set CLI paths</button>
                 <button class="btn btn-primary" data-action="close">OK</button>
