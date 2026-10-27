@@ -11,6 +11,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
+const { TOUCH_AREA } = require('./helpers/touch_area');
 
 const ONE = [{ id: 'm1', label: 'studio-mac.local', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }];
 const THREE = [
@@ -227,7 +228,7 @@ const SETTINGS_PRELOAD = `(() => {
             const coarse = matchMedia('(pointer: coarse)').matches;
             const sizes = [...document.querySelectorAll('#mobile-agent-list .server-group-toggle, #mobile-agent-list .server-group-more-btn, #mobile-agent-list [data-display-button], #mobile-agent-list [data-group-toggle]')]
                 .filter(el => el.getBoundingClientRect().width > 0)
-                .map(el => ({ cls: el.className, h: Math.round(el.getBoundingClientRect().height), w: Math.round(el.getBoundingClientRect().width) }));
+                .map(el => { const a = (${TOUCH_AREA})(el); return { cls: el.className, h: Math.round(a.h), w: Math.round(a.w) }; }); // what a finger hits: a dense kebab is a 24 px box with a 44 px ::after (#9332)
             return { coarse, overflow: document.documentElement.scrollWidth - innerWidth, small: sizes.filter(s => s.h < 44 || s.w < 44), count: sizes.length };
         })()`);
         assert.ok(phone.coarse, 'coarse pointer emulated');
