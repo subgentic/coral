@@ -23,3 +23,16 @@ func TestQueryGitFieldsSurviveAUnitSeparatorInANameAndASubject(t *testing.T) {
 	assert.Regexp(t, `^\d{4}-\d\d-\d\dT`, info.CommitTimestamp, "the date is the date, not a name")
 	assert.Equal(t, "ann@example.test", info.authorEmail, "the e-mail is the e-mail (the poller hashes it later)")
 }
+
+// A commit with an empty message: -z ends the record with one NUL after the empty subject, and only that one is trimmed, so the five fields are still five.
+func TestQueryGitAnEmptySubjectIsAnEmptySubject(t *testing.T) {
+	repo := t.TempDir()
+	runGit(t, repo, "init", "-q", "-b", "main")
+	runGit(t, repo, "-c", "user.name=Ann", "-c", "user.email=ann@example.test", "commit", "-q", "--allow-empty", "--allow-empty-message", "-m", "")
+	info, err := queryGit(context.Background(), repo)
+	require.NoError(t, err)
+	assert.Equal(t, "", info.CommitSubject)
+	assert.Equal(t, "Ann", info.AuthorName)
+	assert.Equal(t, "ann@example.test", info.authorEmail)
+	assert.Regexp(t, `^[0-9a-f]{40}$`, info.CommitHash)
+}
