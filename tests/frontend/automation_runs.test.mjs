@@ -42,23 +42,47 @@ assert.equal(AR.tookWords(at(0), at(60)), '1 h');
 assert.equal(AR.tookWords(at(0), ''), '', 'not finished: no time');
 assert.equal(AR.tookWords(at(5), at(0)), '', 'a finish before the start is no time');
 
-// unread: finished, began after the baseline, not opened
-const base = { since: Date.parse(at(15)), ids: [] };
-assert.deepEqual(items.map(i => AR.isUnread(i, base)), [false, true, true, false, false], 'a run still going is not unread (its dot comes when it ends); runs from before the baseline are not');
-assert.equal(AR.isUnread(items[1], { ...base, ids: ['job-5'] }), false, 'an opened run is not');
-// what was opened is kept in the browser, and the baseline is set once, the first time this browser looks
-let AR2 = await import(`${URL_OF}?first`);
-const fresh = { key: 'job-99', over: true, atMs: Date.now() + 60000 };
-assert.equal(AR2.isUnread(fresh), true, 'a run that began after the first look is unread');
-const stored = JSON.parse(localStorage.getItem('coral-automation-runs-seen'));
-assert.ok(Math.abs(stored.since - Date.now()) < 5000 && stored.ids.length === 0, 'the baseline is the first look');
-let told = 0; const off = AR2.onRunsChanged(() => told++);
-AR2.markSeen(fresh); AR2.markSeen(fresh);
-assert.equal(told, 1, 'opening a run tells the listeners once');
+// unread: finished and not opened (the server's seen_at)
+assert.deepEqual(items.map(i => AR.isUnread(i)), [false, true, true, true, true], 'a run still going is not unread (its dot comes when it ends)');
+assert.equal(AR.isUnread({ over: true, run: { seen_at: '2026-10-27T10:00:00Z' } }), false, 'an opened run is not');
+
+// the reads carry seen_at, opening a run tells the server once, and a read that raced the open does not bring the dot back
+const calls = [];
+let jobList = jobRuns.map(r => ({ ...r })), wfList = wfRuns.map(r => ({ ...r })), postStatus = 200;
+globalThis.fetch = async (url, o = {}) => {
+    calls.push(`${o.method || 'GET'} ${url}`);
+    if (o.method === 'POST') return new Response('{}', { status: postStatus });
+    return new Response(JSON.stringify({ runs: /scheduled/.test(url) ? jobList : wfList }), { status: 200 });
+};
+let told = 0; const off = AR.onRunsChanged(() => told++);
+await AR.refreshRuns(true);
+assert.deepEqual(AR.recentRuns().map(i => AR.isUnread(i)), [false, true, true, true, true]);
+assert.deepEqual(AR.failedUnread().map(i => i.key), ['job-5'], 'the failed unopened run is a Needs you row (the workflow run it made is the job\'s)');
+assert.equal(AR.unreadCount(), 4);
+const failed = AR.recentRuns().find(i => i.key === 'job-5');
+told = 0;
+await AR.markSeen(failed);
+assert.ok(calls.includes('POST /api/scheduled/runs/5/seen'), 'the server is told: ' + calls.join());
+assert.equal(AR.isUnread(failed), false);
+assert.ok(told >= 1);
+await AR.markSeen(failed);
+assert.equal(calls.filter(c => c.startsWith('POST')).length, 1, 'a run already opened is not told again');
+// a read that answered before the server heard (no seen_at in it) keeps the run read here
+await AR.refreshRuns(true);
+assert.equal(AR.unreadCount(), 3, 'the stale read did not bring the dot back');
+jobList = jobList.map(r => (r.id === 5 ? { ...r, seen_at: '2026-10-27T10:05:00Z' } : r));
+await AR.refreshRuns(true);
+assert.equal(AR.unreadCount(), 3, 'and once the server says so, it is its time');
+// a workflow run goes to the workflow route; a failure to tell the server makes the run unread again
+const wf = AR.recentRuns().find(i => i.key === 'wf-8'); postStatus = 500;
+await AR.markSeen(wf);
+assert.ok(calls.includes('POST /api/workflows/runs/8/seen'));
+assert.equal(AR.isUnread(wf), true, 'the server could not be told: unread again');
+// another screen opened it meanwhile: the next read has it
+wfList = wfList.map(r => (r.id === 8 ? { ...r, seen_at: '2026-10-27T10:06:00Z' } : r));
+await AR.refreshRuns(true);
+assert.equal(AR.recentRuns().find(i => i.key === 'wf-8').run.seen_at, '2026-10-27T10:06:00Z', 'what another screen opened is read from the server');
 off();
-AR2 = await import(`${URL_OF}?reloaded`); // a new page: the module starts again and reads what was kept
-assert.equal(AR2.isUnread(fresh), false, 'a reloaded page remembers it was opened');
-assert.deepEqual(JSON.parse(localStorage.getItem('coral-automation-runs-seen')).ids, ['job-99']);
 assert.deepEqual(AR.runRoute(items[1]), { view: 'automations', folder: 'jobs', id: 1 });
 assert.deepEqual(AR.runRoute(items[3]), { view: 'automations', folder: 'workflows', id: 7, run: 8 });
 assert.equal(AR.failureWords({ run: { error_msg: 'step 2 (Test) failed:\n exit code 3' } }), 'step 2 (Test) failed: exit code 3');
