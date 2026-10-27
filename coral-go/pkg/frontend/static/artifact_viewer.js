@@ -53,10 +53,10 @@ function _build() {
         <div class="artifact-viewer-header">
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
             <a class="btn artifact-viewer-download" rel="noopener noreferrer" download>Download</a>
-            <button type="button" class="btn artifact-viewer-close" aria-label="Close">✕</button>
         </div>
         <div class="artifact-viewer-readers" hidden></div>
         <div class="artifact-viewer-main"><div class="artifact-viewer-body"></div></div>
+        <div class="modal-actions modal-footer artifact-viewer-foot"><button type="button" class="btn artifact-viewer-close">Close</button></div>
     </div>`;
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers') });
     d.querySelector('.artifact-viewer-title').after(_details.button); // between the name and Download: the content is straight under the header
