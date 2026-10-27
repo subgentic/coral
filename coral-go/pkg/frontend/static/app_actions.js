@@ -21,7 +21,6 @@ import { setLiveViewMode, showTerminalView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { copyBranchName, showToast } from './utils.js';
 import { showJobModal, hideJobModal } from './job_form.js';
-import { selectLiveJobRun } from './live_jobs.js';
 import { selectBoardProject, postBoardMessage, deleteMessageBoardProject, toggleBoardPause, showExportBoardModal, toggleSelectMode } from './message_board.js';
 import { showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolderTag } from './folder_tags.js';
 import { pinFolder, unpinFolder, showOpenFolderModal, hideOpenFolderModal, submitOpenFolder } from './pinned_folders.js';
@@ -272,8 +271,6 @@ Object.assign(window, {
     setLiveViewMode, showTerminalView,
     // scheduler
     showJobModal, hideJobModal,
-    // live_jobs
-    selectLiveJobRun,
     // preview_pane
     // sidebar
     toggleAgenticPanel, toggleSidebarRail,
