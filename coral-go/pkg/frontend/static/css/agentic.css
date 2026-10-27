@@ -944,19 +944,6 @@ body.panel-dragging .agentic-state {
     cursor: pointer;
 }
 
-/* A finished task's verification (#4564), quietly: a small muted icon after the title for a task nothing independently confirmed; its words are the tooltip and the accessible name.
-   The icon keeps 3:1 (the muted text colour), and the task detail has one plain muted line (below). */
-.board-task-verify-mark {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 6px;
-    color: var(--text-muted);
-    vertical-align: middle;
-    cursor: help;
-    border-radius: var(--radius-xs);
-}
-.board-task-verify-mark .material-icons { font-size: 0.9375rem; }
-.board-task-verify-mark:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .task-detail-verification { margin: -4px 0 10px; font-size: var(--fs-md); color: var(--text-muted); }
 
 /* ── Task Detail Modal ─────────────────────────────────────── */
@@ -2212,3 +2199,7 @@ body.panel-dragging .agentic-state {
 .list-bar-extras[hidden] { display: none; }
 .list-bar-menu-grid > .list-bar-extras { grid-column: 1 / -1; }
 .board-task-solo { display: flex; justify-content: flex-end; padding: 6px 12px; } /* + Task alone, when there are no tasks to search (#7924) */
+
+/* The dock's task list stays one line, including on phones (#8792). */
+#board-task-list .dt-box { --table-row-h: var(--table-touch); }
+#board-task-list .dt-primary { display: block; width: 100%; min-width: var(--table-touch); min-height: var(--table-touch); }

@@ -40,7 +40,7 @@ const BASE = require('./test_base').BASE;
             return rows.map(row => {
                 const wrapper = row.querySelector('.board-task-status-wrap');
                 return {
-                    id: row.querySelector('.board-task-id')?.textContent.trim(),
+                    id: '#' + row.dataset.taskId,
                     text: wrapper?.textContent.trim() || '',
                     title: wrapper?.getAttribute('title'),
                     aria: wrapper?.getAttribute('aria-label'),

@@ -54,10 +54,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
         }
         const paged = await rows();
         check('Load more paged past the first page (over 50 rows)', paged > 50, String(paged));
-        const idsBefore = await ev(`[...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')].map(r => r.querySelector('.board-task-id').textContent).join()`);
+        const idsBefore = await ev(`[...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')].map(r => r.dataset.key).join()`);
         await load(); await load(); // what the 10 s poll does
         await ev(`new Promise(r => setTimeout(r, 400))`); // sleep-ok: a refresh, if it came, would redraw the list within this
-        check('a poll leaves the list as it was (same rows, same order)', (await rows()) === paged && (await ev(`[...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')].map(r => r.querySelector('.board-task-id').textContent).join()`)) === idsBefore, `${await rows()} vs ${paged}`);
+        check('a poll leaves the list as it was (same rows, same order)', (await rows()) === paged && (await ev(`[...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')].map(r => r.dataset.key).join()`)) === idsBefore, `${await rows()} vs ${paged}`);
         check('and the count is still the whole match', (await ev(`document.querySelector('#board-task-bar .list-bar-count').textContent`)) === `${N} of ${N}`);
 
         console.log('A phone');
