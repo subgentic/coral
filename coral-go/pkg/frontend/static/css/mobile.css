@@ -1328,6 +1328,13 @@
     html.kb-open:has(#xterm-container:focus-within) #command-pane:not(.chat-mode) { display: none !important; }
 }
 
+/* The open Needs you item's actions are a bottom bar on a phone (#9562; UI/UX's spec #9529): the answers of a permission or question card stay at the foot of the chat while the card is on screen, a row of 44 px buttons, so no scrolling and no gesture reaches them. */
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .chat-needs-input .cni-options-chips { position: sticky; bottom: 0; z-index: 2; margin: 12px -18px -12px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg-secondary); }
+    .chat-needs-input .cni-options-chips .cni-answer:not(.btn):not(.cni-link) { flex: 1 1 8rem; justify-content: center; }
+    .chat-needs-input .cni-options-chips .cni-key { display: none; } /* a digit is a keyboard's shortcut */
+}
+
 /* The answers of a question or permission card are 44 px targets on a phone (#6727): a short one ("Yes") was 37 px, shorter than the long ones. */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .cni-answer:not(.btn):not(.cni-link) { min-height: var(--control-touch-height, 44px); align-items: center; }
