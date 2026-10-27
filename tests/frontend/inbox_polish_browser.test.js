@@ -70,18 +70,14 @@ const path = require('node:path');
                 check(`${label}: Escape shuts it and the focus is back on the icon`, !(await panelOpen()) && /toggle/.test(await activeId()), await activeId());
             }
 
-            // the goal's Tasks button (a phone's way into the list)
+            // the goal page on a phone (the Tasks button is gone: the list sits under the tab strip, #8914)
             if (mobile) {
                 await load(`/inbox/goals/${board}/${goalId}`);
-                await waitFor(`!!document.querySelector('#inbox-page .goal-tasks-open')`, 'the goal page', 15000); await settle(300);
-                const b = await ev(`(() => { const e = document.querySelector('#inbox-page .goal-tasks-open'), r = e.getBoundingClientRect(), s = getComputedStyle(e), c = e.querySelector('.goal-tasks-chevron').getBoundingClientRect(), n = e.querySelector('.goal-tasks-counts').getBoundingClientRect(), t = e.querySelector('.goal-tasks-label').getBoundingClientRect(); const p = e.parentElement.getBoundingClientRect();
-                    return { h: Math.round(r.height), full: Math.abs(r.width - p.width) < 4, border: parseFloat(s.borderTopWidth) >= 1 && s.borderTopStyle !== 'none', chevronRight: c.right > r.right - 24, countsAfterLabel: n.left > t.right, aria: e.getAttribute('aria-label'), text: e.textContent }; })()`);
+                await waitFor(`!!document.querySelector('#inbox-page .goal-list')`, 'the goal page', 15000); await settle(300);
                 await shot('inbox-polish-goal-390-dark', 'dark'); await shot('inbox-polish-goal-390-light', 'light');
-                check(`${label}: the Tasks button is a full-width bordered row, 44 px, with the label, the counts at the right and a chevron at the edge`, b.h >= 44 && b.full && b.border && b.chevronRight && b.countsAfterLabel && /^Tasks\d+ open, \d+ done$/.test(b.text), JSON.stringify(b));
                 await waitFor(`/Goals \\([1-9]/.test((document.querySelector('#inbox-page .view-list select') || {}).selectedOptions?.[0]?.textContent || '')`, 'the folder select keeping the Goals total', 8000).catch(() => {});
                 check(`${label}: the open goal's folder select keeps the folder's total (Goals (N), not 0)`, await ev(`/Goals \\([1-9]/.test((document.querySelector('#inbox-page .view-list select') || {}).selectedOptions?.[0]?.textContent || '')`), await ev(`(document.querySelector('#inbox-page .view-list select') || {}).selectedOptions?.[0]?.textContent`));
                 check(`${label}: the goal's heading does not take the focus on arrival`, await ev(`document.activeElement !== document.getElementById('goals-detail-title')`), await activeId());
-                check(`${label}: it keeps its accessible name ("Tasks, N open, M done")`, /^Tasks, \d+ open, \d+ done$/.test(b.aria), b.aria);
             }
         }
     } finally { await removeBoards?.(ev, [board]).catch?.(() => {}); await client.close(); }

@@ -53,10 +53,10 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             assert.ok(await ev(`/In progress/.test(document.querySelector('#team-panel-goals').textContent)`), 'the first draw: In progress, with a rollup that agrees');
             assert.equal(await ev(`document.querySelector('.goals-updating').textContent`), '', 'nothing says Updating while they agree');
             await ev(`window.__done = true; window.__hold = true; window.dispatchEvent(new Event('focus')); true`); await settle(600); // the goals feed or a window focus reads the goals again: the rollup is fresh, the rows are held
-            const held = await ev(`(() => ({ text: document.querySelector('.goals-updating').textContent, busy: document.querySelector('#team-panel-goals .goal-side-list[aria-busy="true"]') !== null, height: Math.round(document.querySelector('.goals-updating').getBoundingClientRect().height) }))()`);
-            assert.equal(held.text, 'Updating…', 'it says it is updating'); assert.equal(held.busy, true, 'the task column is aria-busy'); assert.ok(held.height >= 12, `the slot has its height (${held.height})`);
+            const held = await ev(`(() => ({ text: document.querySelector('.goals-updating').textContent, busy: document.querySelector('#team-panel-goals .goal-list[aria-busy="true"]') !== null, height: Math.round(document.querySelector('.goals-updating').getBoundingClientRect().height) }))()`);
+            assert.equal(held.text, 'Updating…', 'it says it is updating'); assert.equal(held.busy, true, 'the task list is aria-busy'); assert.ok(held.height >= 12, `the slot has its height (${held.height})`);
             await ev(`window.__hold = false; window.__release(); true`); await settle(600);
-            const fresh = await ev(`(() => ({ text: document.querySelector('.goals-updating').textContent, busy: document.querySelector('#team-panel-goals .goal-side-list[aria-busy="true"]') !== null, done: /Done/.test(document.querySelector('#team-panel-goals .goal-side-list').textContent) }))()`);
+            const fresh = await ev(`(() => ({ text: document.querySelector('.goals-updating').textContent, busy: document.querySelector('#team-panel-goals .goal-list[aria-busy="true"]') !== null, done: /Done/.test(document.querySelector('#team-panel-goals .goal-list').textContent) }))()`);
             assert.deepEqual(fresh, { text: '', busy: false, done: true }, 'fresh: no line, not busy, the row is Done');
         });
         await removeBoards(ev, [TEAM]); S.finish();

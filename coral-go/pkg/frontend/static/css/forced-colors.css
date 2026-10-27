@@ -15,9 +15,6 @@
        background fill is drawn behind a text backplate. */
     .settings-tab[aria-selected="true"] { border-left: 4px solid Highlight; padding-left: calc(.7rem - 4px); }
 
-    /* The goal page's column handle: its line is a background, which forced colors drop; hover, drag and keyboard focus draw it in Highlight (the same states as the accent line). */
-    .goal-side-grip:hover::before, .goal-side-grip.dragging::before, .goal-side-grip:focus-visible::before { background: Highlight; }
-
     /* The resize handles (the agent dock's, the sidebar's, the preview's and the dock's blocks'): the divider is a 1 px background and its hover and drag colour is one too, which forced colors drop (the divider
        was not drawn at all). Drawn in ButtonText, and in Highlight while hovered or dragged. */
     :is(.task-bar-resize-handle, .sidebar-resize-handle, .preview-pane-resize-handle, .agentic-block-resize-handle) { background: ButtonText; }
