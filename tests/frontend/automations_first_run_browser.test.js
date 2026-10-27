@@ -40,7 +40,8 @@ const BASE = require('./test_base').BASE;
             // the second card: New workflow, with an example step and the hint
             await ev(`document.querySelectorAll('#group-table-view .start-card')[1].click(); true`);
             await waitFor(`getComputedStyle(document.getElementById('wf-create-modal')).display !== 'none'`, 'New workflow opens', 8000);
-            assert.equal(await ev(`document.querySelector('.wf-step-name-input').value + ' / ' + document.querySelector('.wf-step-content').value`), 'Run tests / npm test', at + 'the example step');
+            assert.equal(await ev(`document.querySelector('.wf-step-name-input').value + ' / ' + document.querySelector('.wf-step-content').value`), 'Run tests / ', at + 'the example step is named, its command empty');
+            assert.equal(await ev(`document.querySelector('.wf-step-content').placeholder`), 'e.g. npm test', at + 'with the example as its placeholder');
             assert.equal(await ev(vis('#wf-build-hint')), true, at + 'the Build with Agent hint');
             await shot(`first-run-workflow-${w}`);
             await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); true`);

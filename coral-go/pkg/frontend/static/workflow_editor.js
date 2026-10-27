@@ -137,8 +137,9 @@ function limitField() {
 
 // -- the fields -------------------------------------------------------------------------------------------
 
-// The first step a new workflow starts with: a real one to edit, so the form shows what a step is for (#9297). Edit and Save keep what the person typed.
-const EXAMPLE_STEP = { name: 'Run tests', type: 'shell', command: 'npm test' };
+// The first step a new workflow starts with: a named one to fill in, so the form shows what a step is for (#9297). Its command is empty with an example as the placeholder, so nothing runnable is saved by accident.
+const EXAMPLE_STEP = { name: 'Run tests', type: 'shell', command: '' };
+const EXAMPLE_COMMAND = 'e.g. npm test';
 
 function workflowFields() {
     return [
@@ -214,7 +215,8 @@ export function showWorkflowCreateModal(onClose) {
     editingWorkflowId = null;
     returnTo = typeof onClose === 'function' ? onClose : null;
     v.reset(); // every field at its default, no errors, an empty status line
-    v.set('steps', [EXAMPLE_STEP]); // the example step, to edit
+    v.set('steps', [EXAMPLE_STEP]); // the example step, to fill in
+    document.querySelector('#wf-steps-editor .wf-step-content').placeholder = EXAMPLE_COMMAND;
     document.getElementById('wf-build-hint').hidden = false;
     v.fold(false);
     openModal('New workflow', 'Create workflow');

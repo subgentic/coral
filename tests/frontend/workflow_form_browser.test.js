@@ -41,7 +41,8 @@ const STUB = `(() => {
             assert.ok(pat.xRight >= 0 && pat.xRight <= 40 && pat.xTop <= 40, at + 'the X is at the top right: ' + JSON.stringify(pat));
             assert.ok(pat.btnRight <= 40, at + 'the buttons are at the bottom right, as in New job: ' + JSON.stringify(pat));
             assert.equal(await ev(`document.querySelectorAll('#wf-steps-editor .wf-step-editor-item').length`), 1, at + 'one step is already there');
-            assert.deepEqual(await ev(`[document.querySelector('.wf-step-type-select').value, document.querySelector('.wf-step-name-input').value, document.querySelector('.wf-step-content').value]`), ['shell', 'Run tests', 'npm test'], at + 'it is an example step to edit (#9297)');
+            assert.deepEqual(await ev(`[document.querySelector('.wf-step-type-select').value, document.querySelector('.wf-step-name-input').value, document.querySelector('.wf-step-content').value]`), ['shell', 'Run tests', ''], at + 'it is a named step to fill in, with no command saved by accident (#9297)');
+            assert.equal(await ev(`document.querySelector('.wf-step-content').placeholder`), 'e.g. npm test', at + 'the example is the placeholder');
             assert.equal(await ev(vis('#wf-build-hint')), true, at + 'a hint offers Build with Agent');
             assert.match(await ev(`document.getElementById('wf-build-hint').textContent.replace(/\\s+/g, ' ').trim()`), /^Not sure what the steps are\? An agent can write them with you\. Build with Agent$/, at);
             for (const id of ['#wf-input-desc', '#wf-input-repo', '#wf-input-max-dur']) assert.equal(await ev(vis(id)), false, at + id + ' is behind More options');
