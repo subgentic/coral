@@ -4,6 +4,7 @@
 // pattern as agent_bar_tweaks.test.js (pre-navigation fetch + WebSocket stub).
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
+const { TOUCH_AREA } = require('./helpers/touch_area');
 const CDP_PORT = parseInt(process.env.CDP_PORT || '9222', 10);
 const results = []; const check = (l, c, d) => { const v = c ? 'PASS' : 'FAIL'; results.push(v); console.log(`[${v}] ${l}${d !== undefined ? ' — ' + d : ''}`); };
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -164,7 +165,8 @@ async function run() {
     check('exceptions none (desktop)', exceptions.length === 0, JSON.stringify(exceptions.slice(0, 2)));
     // phone
     await boot(390, 844, true);
-    const m = await ev(`(() => { const li = document.querySelector('#mobile-session-list [data-session-id="${B}"]'); if (!li) return null; const q = s => li.querySelector(s); const k = q('.sidebar-kebab-btn, [class*="kebab"]'); const kr = k ? k.getBoundingClientRect() : null; const goal = q('.session-goal'); return { h: li.getBoundingClientRect().height, avatar: !!q('.agent-avatar'), activity: !!q('.session-activity-text'), chip: !!q('.session-status-chip'), unread: !!q('.session-mobile-meta-pill'), kebab: kr ? [kr.width, kr.height] : null, clamp: goal ? getComputedStyle(goal).webkitLineClamp : null, banner: q('.session-mobile-banner-row') ? getComputedStyle(q('.session-mobile-banner-row')).display : null }; })()`);
+    // the kebab is the button (not its wrapper), measured as what a finger hits: a 24 px box with a 44 px ::after (#9332)
+    const m = await ev(`(() => { const li = document.querySelector('#mobile-session-list [data-session-id="${B}"]'); if (!li) return null; const q = s => li.querySelector(s); const k = q('.sidebar-kebab-btn'); const kr = k ? (${TOUCH_AREA})(k) : null; const goal = q('.session-goal'); return { h: li.getBoundingClientRect().height, avatar: !!q('.agent-avatar'), activity: !!q('.session-activity-text'), chip: !!q('.session-status-chip'), unread: !!q('.session-mobile-meta-pill'), kebab: kr ? [kr.w, kr.h] : null, clamp: goal ? getComputedStyle(goal).webkitLineClamp : null, banner: q('.session-mobile-banner-row') ? getComputedStyle(q('.session-mobile-banner-row')).display : null }; })()`);
     const hierM = await ev(HIER.replace('LIST_ID', JSON.stringify('mobile-session-list')));
     const mrows = hierM.flatMap(g => g.rows.map(r => ({ ...r, headerWeight: g.headerWeight, headerColor: g.headerColor })));
     check('155 phone: goal line aligned with the agent name (±1px), names lighter than headers, goal contrast >= 4.5:1', mrows.length >= 3 && mrows.filter(r => r.goalX !== null).every(r => Math.abs(r.goalX - r.nameX) <= 1) && mrows.every(r => r.weight <= 500 && (r.active || r.attention || r.color !== r.headerColor) && (r.goalContrast === null || r.goalContrast >= 4.5)), JSON.stringify(mrows.map(r => [r.goalX === null ? null : +(r.goalX - r.nameX).toFixed(1), r.weight, r.goalContrast === null ? null : +r.goalContrast.toFixed(2)])));
