@@ -425,7 +425,7 @@
 /* Tokens per commit and Task time: the Group by switch and the comparison (Goal #77, analytics_efficiency.js) */
 .eff-switch { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; container-type: inline-size; }
 .eff-switch-label { font-size: var(--fs-base); color: var(--text-secondary); }
-.eff-pick { display: none; width: 100%; min-height: var(--control-touch-height, 44px); }
+.eff-pick { display: none; width: 100%; min-height: var(--control-touch-height, 44px); font: inherit; font-size: var(--fs-md); } /* a select takes the browser's 13.3 px unless it is told: the Group by choice did not grow with the text */
 /* Eight buttons need about 40em: below 44em of the control's own width (a phone, a tablet at 200% text: the em is the text's, so the switch follows the text size) it is the select (#9317). */
 @container (max-width: 44em) { .eff-seg { display: none; } .eff-pick { display: block; } }
 .eff-view { display: flex; flex-direction: column; gap: 16px; }
