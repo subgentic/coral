@@ -2,19 +2,12 @@
  * then its type, size, when and who made it; the name opens the artifact. Nothing here builds HTML from text: names and producers are written by agents (textContent only). The section is not drawn
  * when the task has no artifact or the list cannot be read (a Coral Hub viewer's: the team's artifacts are the owner's alone). Lazy: team_tasks_page.js imports it. */
 import { boardFetch, pathId } from './server_base.js';
-import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
-const { el } = await importOnce('./team_table.js'); // lazy: its failure is retried
+const { artifactTable, serverArtifactSort } = await importOnce('./artifact_table.js');
+const { el, tableState } = await importOnce('./data_table.js'); // lazy: its failure is retried
 
 const SHOWN = 50;
 const HEX = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i;
-
-function sizeWords(n) {
-    if (!Number.isFinite(n) || n < 0) return '';
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB`;
-    return `${(n / (1024 * 1024)).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
-}
 
 /** Opens the artifact the way the Artifacts tab's Open does: a task result's inline text in the preview, a stored file in the viewer. */
 function openIt(item) {
@@ -26,10 +19,10 @@ function openIt(item) {
 }
 
 /** The section for `task` on `project`'s board, or null when there is nothing to show. */
-export async function taskArtifactsSection(project, task) {
+export async function taskArtifactsSection(project, task, sort = serverArtifactSort()) {
     let data;
     try {
-        const resp = await boardFetch(project, `/artifacts?task=${pathId(task.id)}&limit=${SHOWN}`);
+        const resp = await boardFetch(project, `/artifacts?task=${pathId(task.id)}&limit=${SHOWN}&sort=${encodeURIComponent(sort)}`);
         if (!resp.ok) return null;
         data = await resp.json();
     } catch { return null; }
@@ -37,18 +30,17 @@ export async function taskArtifactsSection(project, task) {
     if (!items.length) return null;
     const section = el('div', 'team-task-artifacts');
     const head = el('h3', 'goals-sub', 'Artifacts'); head.id = `team-task-artifacts-head-${Number(task.id)}`;
-    const list = el('ul', 'team-task-artifact-list'); list.setAttribute('aria-labelledby', head.id);
-    for (const item of items) {
-        const li = el('li', 'team-task-artifact');
-        const opens = item.inline || HEX.test(String(item.uri || ''));
-        const name = el(opens ? 'button' : 'span', opens ? 'team-link team-task-artifact-name' : 'team-task-artifact-name', String(item.name || 'Artifact'));
-        if (opens) { name.type = 'button'; name.addEventListener('click', () => { const p = openIt(item); if (p) p.catch(() => {}); }); }
-        const type = String(item.media_type || '').split(';')[0];
-        const meta = [type, sizeWords(Number(item.size)), item.created_at ? whenText(item.created_at) : '', item.produced_by ? `by ${item.produced_by}` : ''].filter(Boolean).join(' · ');
-        li.append(name, el('span', 'team-task-artifact-meta', meta));
-        list.append(li);
+    const body = el('div');
+    const state = tableState();
+    function draw() {
+        const table = artifactTable({ label: 'Task artifacts', rows: items, state,
+            paged: !!data.has_more || Number(data.total) > items.length,
+            onPageSort: next => { taskArtifactsSection(project, task, next).then(updated => { if (updated && section.isConnected) section.replaceWith(updated); }).catch(() => {}); },
+            open: item => { const p = openIt(item); if (p) p.catch(() => {}); },
+        });
+        body.replaceChildren(table.el);
     }
-    section.append(head, list);
+    draw(); section.append(head, body);
     const total = Number(data.total);
     if (Number.isFinite(total) && total > items.length) section.append(el('p', 'goals-note', `${total - items.length} more are in the team's Artifacts tab.`));
     return section;
