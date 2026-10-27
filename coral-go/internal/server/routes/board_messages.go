@@ -103,7 +103,7 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	msg, warnings, ok := h.postMessageCore(w, r, project, derr, body, answer)
+	msg, ok := h.postMessageCore(w, r, project, derr, body, answer)
 	if !ok {
 		return
 	}
@@ -124,14 +124,6 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		if filled, err := h.bs.GetMessageByID(r.Context(), project, msg.ID); err == nil {
 			msg = filled // the answer carries ask and reply_to
 		}
-	}
-	// A mention that names no member is warned about, never refused (#4583): the post is already made.
-	if len(warnings) > 0 {
-		writeJSON(w, http.StatusOK, struct {
-			*board.Message
-			Warnings []string `json:"warnings"`
-		}{msg, warnings})
-		return
 	}
 	writeJSON(w, http.StatusOK, msg)
 }
@@ -161,12 +153,12 @@ type taskReply struct {
 
 // postMessageCore is the one place a board message is posted: the post route and the reply-to-task route both end here, with the same caps, cleaning, board-name rule,
 // hub-user and Operator rules, stamping, waits and notification. reply is nil for a plain post. It writes the error answer itself and returns ok=false; on success the
-// caller writes the reply, with the mention warnings.
-func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, project string, derr error, body postMessageBody, reply *taskReply) (*board.Message, []string, bool) {
+// caller writes the reply. A mention that names no member is refused before anything is stored (#9047).
+func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, project string, derr error, body postMessageBody, reply *taskReply) (*board.Message, bool) {
 	if derr == nil && !cloud.Tunneled(r) {
 		attrWho, attrOK := attributedTo(w, r, body.SubscriberID)
 		if !attrOK {
-			return nil, nil, false
+			return nil, false
 		}
 		body.SubscriberID = attrWho
 		// A reply names no sender in its body (#5463): the sender is whoever the request proves it is. In log mode attributedTo returns the claim, which a reply does not have, so
@@ -179,7 +171,7 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	}
 	if derr != nil || body.Content == "" {
 		errBadRequest(w, "content required")
-		return nil, nil, false
+		return nil, false
 	}
 	// A post is a message, not a document: reports and logs go to artifacts. The 4 MiB body cap alone let one post be 4 MiB in the
 	// database and in every agent's terminal (#4602).
@@ -192,16 +184,16 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 			"max_bytes": maxBoardPostContent,
 			"not_sent":  true,
 		})
-		return nil, nil, false
+		return nil, false
 	}
 	if refuseIfDiskLow(w) {
-		return nil, nil, false
+		return nil, false
 	}
 	if reply != nil {
 		// A reply needs text of its own: the creator's mention is not text, so the emptiness a post is refused for is checked before it is added.
 		if strings.TrimSpace(clitext.Clean(unescapeLineBreaks(body.Content))) == "" {
 			errBadRequest(w, "content required")
-			return nil, nil, false
+			return nil, false
 		}
 		// The mention of the task's creator goes first, before the text is cleaned and before a hub operator's own prefix is added, so both survive (#5463).
 		m := h.bs.TaskReplyMention(r.Context(), project, reply.creator)
@@ -213,10 +205,21 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	// stored post all see what readers will see.
 	if body.Content = clitext.Clean(body.Content); strings.TrimSpace(body.Content) == "" {
 		errBadRequest(w, "content required")
-		return nil, nil, false
+		return nil, false
 	}
 	if refuseNewBoardName(w, r, h.bs, project) {
-		return nil, nil, false
+		return nil, false
+	}
+	if problems := h.bs.UnknownMentions(r.Context(), project, body.Content); len(problems) > 0 {
+		msg := "not posted: " + strings.Join(problems, "; ") + ". Mention a member of this board (coral-board targets lists them), or take the @ out of the text"
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error":    msg,
+			"message":  msg,
+			"code":     "unknown_mention",
+			"mentions": problems,
+			"not_sent": true,
+		})
+		return nil, false
 	}
 
 	subscriberID := body.SubscriberID
@@ -228,7 +231,7 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		} else {
 			errBadRequest(w, "subscriber_id required")
 		}
-		return nil, nil, false
+		return nil, false
 	}
 
 	// Through Coral Hub, a chat post's sender is the Coral Hub user named by the
@@ -243,7 +246,7 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		user, hubOrigin, status, msg := h.tunnelChatSender(r, project)
 		if status != 0 {
 			writeJSON(w, status, map[string]any{"error": msg, "code": "hub_user_required"})
-			return nil, nil, false
+			return nil, false
 		}
 		asksOperator := strings.EqualFold(strings.TrimSpace(subscriberID), operatorIdentity) || strings.EqualFold(strings.TrimSpace(body.As), operatorIdentity)
 		if hubOrigin == board.OriginHubUser && asksOperator && h.hubOperatorAllowed != nil && h.hubOperatorAllowed(r) {
@@ -294,7 +297,7 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	}
 	if err != nil {
 		errInternalServer(w, err.Error())
-		return nil, nil, false
+		return nil, false
 	}
 	if cloud.Tunneled(r) {
 		// Every board write through the tunnel is recorded, not only the Operator's (#3428).
@@ -324,7 +327,7 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	// Resolve any active registered waits for this message
 	h.goBG(func() { h.resolveMessageWaits(project, subscriberID, body.Content) })
 
-	return msg, h.bs.MentionWarnings(r.Context(), project, body.Content), true
+	return msg, true
 }
 
 // hubUserRe is the X-Coral-Hub-User value coral-hub sends (#3377).
