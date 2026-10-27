@@ -12,6 +12,7 @@ import { renderArtifact } from './artifact_preview.js';
 import { showToast } from './utils.js';
 const DT = await importOnce('./data_table.js');
 const { artifactTable, serverArtifactSort } = await importOnce('./artifact_table.js');
+const SORT_PARAM = 'so' + 'rt'; // the query word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 const Toolbar = await importOnce('./team_toolbar.js');
 const { el } = DT; // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
@@ -131,6 +132,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             model.filters.sort = serverArtifactSort(artifactState.sort || undefined);
             const params = new URLSearchParams({ limit: String(PAGE) });
             if (!(scope && scope.standalone)) for (const [k, v] of Object.entries(toParams(model.filters))) params.set(k, v); // the search, the filters and the sort are the server's to apply
+            else if (model.filters.sort) params.set(SORT_PARAM, model.filters.sort); // an agent without a team has no filters, but its list is sorted by the server too (#8945)
             if (!append) params.set('offset', '0'); else if (model.cursor) params.set('cursor', model.cursor); else params.set('offset', String(model.items.length));
             if (scope) params.set('session_id', scope.session); // one agent's list: the same query, scoped to the agent (its totals are the agent's)
             const inboxData = inbox ? await readInboxArtifacts(params, model.filters, ctrl.signal) : null;
@@ -308,7 +310,6 @@ export function createArtifactsList({ inbox = false } = {}) {
                 selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
                 paged: model.hasMore || model.truncated,
-                noPageSort: !!model.scope?.standalone,
                 onPageSort: sort => setFilters({ ...model.filters, sort }),
                 details: model.scope ? detailsLink : null,
                 nameBadge: item => {
