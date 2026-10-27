@@ -54,16 +54,13 @@
     .cs-dot { box-sizing: border-box; border: 1.5px solid CanvasText; }
     .cs-dot.online { background: CanvasText; }
     .cs-dot.offline { background: transparent; }
-    .status-dot, .status-dot-stale { box-sizing: border-box; border: 1.5px solid CanvasText; }
-    .status-dot { background: CanvasText; animation: none; }
-    .status-dot.status-dot-stale, .status-dot-stale { background: transparent; }
 
     /* A text field or a list loses its focus mark here: its rule drops the outline and changes only the border colour, which forced colors replaces. */
     :is(input, select, textarea):focus-visible { outline: 2px solid Highlight !important; outline-offset: 2px !important; }
 
     /* Chips and badges that are only a coloured pill (the Inbox count in the top bar, tab and section counts, state and kind pills, the job badges): the
        background goes, so a border keeps the shape and the number or word stays a label of its own (#5735). They all carry their meaning as text. */
-    :is(.nav-tab-badge, .agentic-tab-count, .section-count-badge, .session-group-count, .saved-count, .live-job-badge, .badge, .session-state-pill,
+    :is(.nav-tab-badge, .agentic-tab-count, .section-count-badge, .session-group-count, .saved-count, .badge, .session-state-pill,
         .terminal-state-pill, .wf-status-badge, .availability-badge, .display-badge,
         .hf-tag-pill, .dep-tag, .session-ctx-pill, .team-distill-chip, .chat-system-count, .selection-pause-badge, .xterm-disconnected-badge, .session-status-chip,
         .session-mobile-meta-pill) { border: 1px solid CanvasText; }

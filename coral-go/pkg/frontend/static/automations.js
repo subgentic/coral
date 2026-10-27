@@ -1,7 +1,7 @@
 /* Automations (Goal #74; UI/UX #8862): Workflows and Jobs as one screen, built like the Inbox: the folders in the sidebar (view_list.js), each folder's page one table on the shared list toolbar
  * (inbox_toolbar.js: search, state pills, Filters), a job or a workflow opened in place with a way back to its folder. Loaded the first time the tab is shown (lazy_panels.js); scheduler.js, which
  * loads at startup, keeps the jobs (read, polled, the job's page and its actions) and workflows.js keeps the workflows' pages; this file draws the folders. Jobs and Workflows are the library;
- * Running now and Failed join them in a later commit.
+ * Running now and Failed are the two that need attention: the jobs and workflows with a run going, and those whose last run failed (a run with no job of its own, an API one-off, is a row of Running now).
  *
  * The address follows what is on screen (/automations/<folder>[/<id>[/runs/<run>]]): a folder or an item is opened by going to its route, and the route handler (app_routes.js) calls
  * openAutomationsRoute, so a link, Back and a reload all end in the same place. */
@@ -12,6 +12,7 @@ import { setHidden } from './dom_write.js';
 import { importOnce } from './import_once.js';
 import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf } from './scheduler.js';
 import { lastWords, atWords, whenWords } from './job_words.js';
+import { liveRuns, onLiveRuns, selectLiveJobRun } from './live_jobs.js';
 const DT = await importOnce('./data_table.js'); // a lazy module imports only what loads at startup (import_hygiene): these load with it
 const VL = await importOnce('./view_list.js');
 const IT = await importOnce('./inbox_toolbar.js');
@@ -20,6 +21,8 @@ const W = await importOnce('./workflows.js');
 
 const $ = id => document.getElementById(id);
 const FOLDERS = [
+    { key: 'running', label: 'Running now', noun: ['run', 'runs'], search: 'Search what is running', attention: true },
+    { key: 'failed', label: 'Failed', noun: ['item', 'items'], search: 'Search what failed', attention: true },
     { key: 'jobs', label: 'Jobs', noun: ['job', 'jobs'], search: 'Search jobs' },
     { key: 'workflows', label: 'Workflows', noun: ['workflow', 'workflows'], search: 'Search workflows' },
 ];
@@ -38,19 +41,28 @@ const nameOfWorkflow = id => workflowNames().get(Number(id)) || '';
 const allJobs = () => jobList().map(j => AF.jobItem(j, nameOfWorkflow));
 const usedBy = id => jobList().filter(j => Number(j.workflow_id) === Number(id)).length;
 const allWorkflows = () => W.workflowList().map(w => AF.workflowItem(w, usedBy(w.id)));
-const ITEMS = { jobs: allJobs, workflows: allWorkflows };
-const rowsOf = key => AF.ordered(ITEMS[key]().filter(i => AF.matches(i, filtersOf(key))), filtersOf(key));
+/** The runs with no job of their own (an API one-off: POST /api/tasks/run) that are going now: a row of Running now that opens the run's agent. */
+const oneOffRuns = () => liveRuns().filter(r => !r.job_id).map(r => ({ kind: 'run', id: `run-${r.id}`, name: r.display_name || (r.job_name && r.job_name !== '__oneshot__' ? r.job_name : `Job run ${r.id}`), enabled: true, run: r,
+    result: 'running', runs: '', agent: String(r.agent_type || ''), does: '', stepTypes: [], at: 0, last: Date.parse(r.started_at || '') || 0, live: r }));
+const liveJobIds = () => new Set(liveRuns().filter(r => r.job_id).map(r => Number(r.job_id)));
+/** What needs attention: the jobs and workflows with a run going (their own last run, or the websocket's live run), and those whose last run failed. */
+const runningItems = () => { const live = liveJobIds(); return [...allJobs().filter(i => i.result === 'running' || live.has(i.id)), ...allWorkflows().filter(i => i.result === 'running'), ...oneOffRuns()]; };
+const failedItems = () => [...allJobs(), ...allWorkflows()].filter(i => i.result === 'failed');
+const ITEMS = { jobs: allJobs, workflows: allWorkflows, running: runningItems, failed: failedItems };
+const folderFilters = key => { const f = filtersOf(key); return folderOf(key).attention && f.sort === 'next' ? { ...f, sort: 'last' } : f; }; // what needs attention is read newest first unless the person chose an order
+const rowsOf = key => AF.ordered(ITEMS[key]().filter(i => AF.matches(i, filtersOf(key))), folderFilters(key));
 const runsWords = i => i.runs === 'workflow' ? `Workflow ${nameOfWorkflow(i.job.workflow_id) || i.job.workflow_id}` : `Agent prompt (${AF.AGENT_LABEL[i.agent] || i.agent})`;
 const stepsWords = i => `${i.stepCount} step${i.stepCount === 1 ? '' : 's'}`;
 const usedByWords = i => (i.usedBy ? `${i.usedBy} job${i.usedBy === 1 ? '' : 's'}` : 'No jobs');
 const countOf = key => ITEMS[key]().length;
 
 // ── The folders ──────────────────────────────────────────────────────────
-const sections = () => [{ title: 'Library', items: FOLDERS.map(f => ({ key: f.key, label: f.label, count: countOf(f.key) })) }];
+const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f.attention).map(f => ({ key: f.key, label: f.label, count: countOf(f.key), alert: f.key === 'failed' })) },
+    { title: 'Library', items: FOLDERS.filter(f => !f.attention).map(f => ({ key: f.key, label: f.label, count: countOf(f.key) })) }];
 function renderNav(force = false) {
     const list = $('automations-nav-list');
     if (!list) return;
-    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), openJobId(), W.openWorkflowId(),
+    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), filtersOf('running'), filtersOf('failed'), openJobId(), W.openWorkflowId(), liveRuns().map(r => r.id),
         rowsOf('jobs').map(i => [i.id, i.name, i.enabled, i.at, i.run && i.run.status, i.run && i.run.id, runsWords(i)]), rowsOf('workflows').map(i => [i.id, i.name, i.enabled, i.stepCount, i.usedBy, i.run && i.run.status, i.run && i.run.id])]);
     if (!force && key === navKey) return;
     navKey = key;
@@ -76,6 +88,8 @@ function setFolder(key) {
 const resultClass = run => run.status === 'failed' ? 'team-state-bad' : run.status === 'running' ? 'goal-state-task-active' : run.status === 'completed' && run.exit_reason !== 'ended_while_coral_was_down' ? 'goal-state-task-done' : '';
 const resultSelect = key => ({ type: 'select', key: 'result', id: `automations-${key}-result`, label: 'Result', values: AF.RESULTS, labels: AF.RESULT_LABEL, any: 'Any result' });
 const FIELDS = {
+    running: () => [],
+    failed: () => [],
     jobs: () => [resultSelect('jobs'),
         { type: 'select', key: 'runs', id: 'automations-jobs-runs', label: 'Runs', values: AF.RUNS, labels: AF.RUNS_LABEL, any: 'Anything' },
         { type: 'select', key: 'agent', id: 'automations-jobs-agent', label: 'Agent', values: AF.AGENTS, labels: AF.AGENT_LABEL, any: 'Any agent' }],
@@ -87,9 +101,20 @@ const button = (label, action, cls = 'btn btn-primary', icon = '') => {
     if (icon) { const i = document.createElement('span'); i.className = 'material-icons'; i.setAttribute('aria-hidden', 'true'); i.textContent = icon; b.append(i, ' '); }
     b.append(label); return b;
 };
+/** Running now and Failed create either kind: a New button with a menu of the two (the shared menu button: ArrowDown, Escape, a choice closes it). */
+function newMenu() {
+    const box = document.createElement('span'); box.className = 'automations-create gt-menu';
+    const toggle = button('New', ''); toggle.id = 'automations-new-btn'; toggle.setAttribute('data-on-click', 'automations-new-toggle'); // the action's name is spelled out where the markup is made (action_census)
+    toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', 'automations-new-menu');
+    const menu = document.createElement('div'); menu.id = 'automations-new-menu'; menu.className = 'team-more-menu list-bar-more-menu'; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'New'); menu.hidden = true;
+    for (const [label, action] of [['New job', 'job-new'], ['New workflow', 'wf-create']]) { const b = button(label, action, ''); b.setAttribute('role', 'menuitem'); menu.append(b); }
+    box.append(toggle, menu);
+    return box;
+}
 /** The create actions at the toolbar's right: New job, or New workflow with Build with Agent beside it (the agent that builds a workflow with you). */
 function createAction(key) {
     if (key === 'jobs') return button('New job', 'job-new');
+    if (folderOf(key).attention) return newMenu();
     const box = document.createElement('span'); box.className = 'automations-create';
     box.append(button('Build with Agent', 'wf-build-agent', 'btn', 'smart_toy'), button('New workflow', 'wf-create'));
     return box;
@@ -108,7 +133,7 @@ function toolbarOf(key) {
     const counts = AF.STATES.map(s => rows.filter(i => i.enabled === (s === 'active')).length);
     const node = bars.get(key).draw({
         filters: filt,
-        pills: { label: `Show ${f.noun[1]} that are`, current: filt.state || 'all',
+        pills: f.attention ? null : { label: `Show ${f.noun[1]} that are`, current: filt.state || 'all',
             items: [{ key: 'all', label: 'All', count: rows.length }, ...AF.STATES.map((s, i) => ({ key: s, label: AF.STATE_LABEL[s], count: counts[i] }))],
             onPick: pick => { setFilters(key, { ...filtersOf(key), state: pick === 'all' ? '' : pick }); renderNav(true); } },
         action: createAction(key),
@@ -116,11 +141,49 @@ function toolbarOf(key) {
     return { node, signature: JSON.stringify([filt, counts, rows.length]) };
 }
 
-const openRow = (key, i) => { const t = $('group-table-view'); opener = { key: i.id, scroll: t ? t.scrollTop : 0 }; go(routeOf(key, i.id)); };
+/** An item of Running now or Failed: a job's or a workflow's page, or a one-off run's agent. */
+const openItem = i => {
+    if (i.kind === 'run') { if (i.run.session_id) selectLiveJobRun(i.run.session_id, i.run.agent_type || 'claude'); return; }
+    openRow(i.kind === 'workflow' ? 'workflows' : 'jobs', i, itemKey(i));
+};
+const openRow = (key, i, rowKey = i.id) => { const t = $('group-table-view'); opener = { key: rowKey, scroll: t ? t.scrollTop : 0 }; go(routeOf(key, i.id)); };
 const lastRunCell = i => (i.run ? DT.chip(lastWords(i.run), resultClass(i.run)) : lastWords(null));
 const workflowResult = i => W.lastResult(i.run);
+const KIND_WORD = { job: 'Job', workflow: 'Workflow', run: 'One-off' };
+const itemKey = i => (i.kind === 'run' ? i.id : `${i.kind}-${i.id}`); // a job and a workflow can share a number
+const scheduleWords = i => (i.kind === 'job' ? scheduleOf(i.job) : 'No schedule');
+const whatWords = i => (i.kind === 'job' ? runsWords(i) : i.kind === 'workflow' ? stepsWords(i) : '');
+function nextCell(i) {
+    if (i.kind !== 'job') return 'Not scheduled';
+    const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip('Paused');
+    if (i.enabled && i.job.next_fire_at) cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`;
+    return cell;
+}
+function lastCell(i) {
+    if (i.kind === 'job') return lastRunCell(i);
+    if (i.kind === 'workflow') return i.run ? DT.chip(workflowResult(i) || 'Run', resultClass(i.run)) : 'Never run';
+    return DT.chip('running now', resultClass(i.run));
+}
+/** Running now and Failed: the jobs and workflows together, one table, the same five columns in both. */
+function attentionTable(key, rows, narrowed) {
+    const f = folderOf(key), failed = key === 'failed';
+    return { title: f.label, noun: f.noun, rows,
+        empty: { line: narrowed ? `No ${f.noun[0]} matches the search.` : failed ? 'Nothing has failed.' : 'Nothing is running.', hint: narrowed ? '' : failed ? 'A job or workflow whose last run failed shows here.' : 'A job or workflow with a run going shows here.' },
+        signature: JSON.stringify(rows.map(i => [i.kind, i.id, i.name, i.run && i.run.status, i.run && i.run.id, i.kind === 'job' ? nextOf(i.job) : ''])),
+        node: () => DT.dataTable({
+            label: `${f.label}, ${rows.length}`, rows, layout: 'fixed', rowKey: itemKey, rowName: i => i.name, state: stateOf(key), open: openItem,
+            columns: [
+                { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: i => i.name, cell: i => DT.primaryButton(i.name), subtitle: whatWords },
+                { key: 'kind', label: 'Kind', width: '7rem', line: 2, sort: true, sortValue: i => KIND_WORD[i.kind], cell: i => DT.tag(KIND_WORD[i.kind]) },
+                { key: 'schedule', label: 'Schedule', width: '12rem', line: 2, sort: true, sortValue: scheduleWords, cell: scheduleWords },
+                { key: 'last-run', label: 'Last run', width: '12rem', line: 2, tone: 'tertiary', sort: 'date', sortValue: i => i.last, cell: lastCell },
+                { key: 'next', label: 'Next', width: '7rem', line: 1, tone: 'tertiary', sort: 'date', sortValue: i => (i.kind === 'job' && i.enabled ? i.job.next_fire_at : ''), cell: nextCell },
+            ],
+        }).el };
+}
 function folderTable(key) {
     const f = folderOf(key), rows = rowsOf(key), filt = filtersOf(key), narrowed = AF.isFiltered(filt) || filt.q;
+    if (f.attention) return attentionTable(key, rows, narrowed);
     const base = { title: f.label, noun: f.noun, rows,
         empty: { line: narrowed ? `No ${f.noun[0]} matches the search and filters.` : `No ${f.noun[1]} yet.`, hint: narrowed ? '' : key === 'jobs' ? 'New job schedules one.' : 'Build with Agent starts an agent that builds one with you; New workflow opens an empty form. A workflow runs when you press Run, when a job schedules it, or through the API.' } };
     if (key === 'jobs') {
@@ -174,6 +237,7 @@ function mount() {
     mounted = true;
     onJobsChanged(() => renderNav());
     W.onWorkflowsChanged(() => renderNav());
+    onLiveRuns(() => renderNav());
     W.refreshWorkflows();
 }
 
@@ -228,11 +292,14 @@ export async function openAutomationsRoute(r) {
 export function backToFolder(key) {
     const open = key === 'workflows' ? W.openWorkflowId() : openJobId();
     if (!opener && open) opener = { key: open, scroll: 0 }; // the item that was open gets the keyboard back, however it was opened
-    const route = routeOf(folderOf(key) ? key : 'jobs');
-    if (backIs(route)) history.back(); else go(route);
+    const route = routeOf(folderOf(key) ? key : 'jobs'), prev = history.state && history.state.prev;
+    if (backIs(route) || (typeof prev === 'string' && /^\/automations\/[a-z]+\/?$/.test(prev))) history.back(); else go(route); // back to the folder the item was opened from (Failed, say), else to its own
 }
 
 /** The sidebar's search box was typed in (app_actions.js): it narrows the folder on screen, and the page's box shows the same words. */
 export function filterAutomations(value) { setFilters(folder, { ...filtersOf(folder), q: String(value || '').trim() }); renderNav(true); }
 
-registerActions({ 'automations-back': el => backToFolder(textOf(el.dataset.folder)) });
+registerActions({
+    'automations-back': el => backToFolder(textOf(el.dataset.folder)),
+    'automations-new-toggle': el => { importOnce('./menu_button.js').then(m => m.toggleMenu(el)).catch(() => {}); }, // Running now and Failed make either kind: the New button's menu
+});
