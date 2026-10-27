@@ -270,6 +270,16 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		body.CrossTeamServers = &clean
 	}
 	if body.Health != nil {
+		if msg := body.Health.Landing.Problem(); msg != "" {
+			errBadRequest(w, msg)
+			return
+		}
+		if who := strings.TrimSpace(body.Health.Landing.Nudge); who != "" {
+			if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), who); err != nil || sub == nil {
+				errBadRequest(w, fmt.Sprintf("health.landing.nudge: %q is not a member of this team", board.OneLine(who)))
+				return
+			}
+		}
 		// The check's recipient is a member of this team, never anyone else (#4176 rule 18).
 		if rcpt := strings.TrimSpace(body.Health.Recipient); rcpt != "" {
 			if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), rcpt); err != nil || sub == nil {

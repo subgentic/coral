@@ -63,7 +63,13 @@ type GitPoller struct {
 	// PollOnce runs on the poller's own goroutine only.
 	failing map[string]time.Time
 	now     func() time.Time
+
+	// landing, when set, is told each pass where the agents' repositories are (the landing alert, #8942).
+	landing *LandingWatch
 }
+
+// SetLandingWatch gives the poller the landing alert to feed.
+func (p *GitPoller) SetLandingWatch(w *LandingWatch) { p.landing = w }
 
 // gitFailureBackoff is how long a folder whose git query failed is left alone before it is
 // checked again (it may have become a repository since).
@@ -185,6 +191,10 @@ func (p *GitPoller) PollOnce(ctx context.Context) error {
 	}
 	for workdir, dirAgents := range dirToAgents {
 		p.pollDir(ctx, workdir, dirAgents, seen)
+	}
+
+	if p.landing != nil {
+		p.landing.Observe(ctx, dirToAgents)
 	}
 
 	// Forget agents that are gone, so the map stays bounded.
