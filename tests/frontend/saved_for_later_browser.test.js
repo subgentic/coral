@@ -351,9 +351,14 @@ const hex = i => i.toString(16).padStart(20, '0');
         // The top bar keeps the Saved button on a phone, with its count.
         await ev(`document.dispatchEvent(new CustomEvent('coral:saved-changed')); true`); // the test changed the bookmarks behind the page's back
         await waitFor(`document.querySelector('#saved-btn .saved-count').textContent === '2'`, 'the count to follow the list', 6000);
-        const tbtn = await ev(`(() => { const b = document.getElementById('saved-btn'); const r = b.getBoundingClientRect(); return { shown: getComputedStyle(b).display !== 'none' && r.width > 0, w: Math.round(r.width), h: Math.round(r.height), count: b.querySelector('.saved-count').textContent, name: b.getAttribute('aria-label'), page: document.documentElement.scrollWidth <= document.documentElement.clientWidth }; })()`);
-        assert.ok(tbtn.shown && tbtn.w >= 44 && tbtn.h >= 44 && tbtn.page, 'the top bar button is there, 44 px, and the page does not scroll sideways: ' + JSON.stringify(tbtn));
-        assert.equal(tbtn.count, '2'); assert.equal(tbtn.name, 'Saved for later, 2 open');
+        const menuSaved = () => ev(`(() => { const e = document.querySelector('#nav-more-menu:not([hidden]) [data-on-click="m-show-saved"]'); if (!e) return null; const r = e.getBoundingClientRect(); return { h: Math.round(r.height), text: e.textContent.trim(), onScreen: r.left >= 0 && r.right <= innerWidth }; })()`);
+        // Under 640 px the top row is one hamburger (#9021): Saved for later is its entry, 44 px high, with the count in its words.
+        await ev(`document.getElementById('top-menu-btn').click(); true`);
+        await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) [data-on-click="m-show-saved"]')`, 'the hamburger menu', 6000);
+        const tbtn = await menuSaved();
+        assert.ok(tbtn && tbtn.h >= 44 && tbtn.onScreen && await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), 'the hamburger menu has Saved for later, 44 px, on screen, and the page does not scroll sideways: ' + JSON.stringify(tbtn));
+        assert.match(tbtn.text, /Saved for later \(2\)/, 'its words carry the count');
+        await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
         await select('sv-a');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the page's own Saved tab; the top bar's bookmark is the Inbox's (#4905)
         await waitFor(`document.getElementById('agentic-state').classList.contains('mobile-panel-overlay') && ${TAB_OPEN} && document.querySelectorAll('${ROWS}').length === 2`, 'the side panel overlay open on Saved on the phone', 8000);
@@ -384,22 +389,21 @@ const hex = i => i.toString(16).padStart(20, '0');
             const nt = next.getBoundingClientRect().top; for (const btn of b.querySelectorAll('.chat-save-btn, .chat-copy-btn')) { const r = btn.getBoundingClientRect(); if (r.width && r.bottom > nt + 1) out.push(Math.round(r.bottom - nt)); } } return { over: out, checked: bubbles.length }; })()`);
         assert.ok(gap.checked > 4); assert.deepEqual(gap.over, [], 'no button hangs over the next message: ' + JSON.stringify(gap));
         await shot('saved-button-phone');
-        console.log('9. A phone at 200% text: Saved keeps its bookmark and Inbox folder, with no gear-menu duplicate');
+        console.log('9. A phone at 200% text: the hamburger names the view and keeps Saved for later (with its count) and Settings in its menu, with no gear-menu duplicate');
         await ev(`document.documentElement.style.fontSize = '32px'; true`);
-        await waitFor(`document.body.classList.contains('saved-bar-wrap') && (() => { const b = document.getElementById('saved-btn').getBoundingClientRect(), s = document.getElementById('nav-select').getBoundingClientRect(); return s.top >= b.bottom; })()`, 'the view selector to wrap at large text', 6000);
-        const big = await ev(`(() => { const b = document.getElementById('saved-btn'), br = b.getBoundingClientRect(); const sel = document.querySelector('.nav-select'), sr = sel.getBoundingClientRect(); const label = document.getElementById('nav-select-label'); return { btn: getComputedStyle(b).display, count: b.querySelector('.saved-count').textContent, w: br.width, h: br.height, right: br.right, selW: sr.width, separate: sr.top >= br.bottom, labelFits: label.scrollWidth <= label.clientWidth + 1 }; })()`);
-        assert.notEqual(big.btn, 'none', 'the bookmark stays visible at large text');
-        assert.ok(big.w >= 44 && big.h >= 44 && big.right <= 390, 'the bookmark remains an on-screen touch target: ' + JSON.stringify(big));
-        assert.equal(big.count, '2');
-        assert.ok(big.selW >= 100 && big.separate && big.labelFits, 'the view selector keeps its name on its own row: ' + JSON.stringify(big));
-        await ev(`document.querySelector('[data-on-click="m-toggle-top-bar-settings"]').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('top-bar-settings-menu')).display !== 'none'`, 'the settings menu', 4000);
-        assert.equal(await ev(`document.getElementById('top-bar-settings-menu').querySelector('[data-on-click="m-close-top-bar-settings-then-show-saved"]') === null`), true, 'the gear menu has no Saved duplicate');
-        await ev(`document.querySelector('[data-on-click="m-toggle-top-bar-settings"]').click(); document.getElementById('saved-btn').click(); true`);
+        await waitFor(`(() => { const b = document.getElementById('top-menu-btn').getBoundingClientRect(); return b.width > 0 && b.height >= 44; })()`, 'the hamburger at large text', 6000);
+        const big = await ev(`(() => { const b = document.getElementById('top-menu-btn'), br = b.getBoundingClientRect(), label = document.getElementById('top-menu-label'); return { w: br.width, h: br.height, left: br.left, right: br.right, labelFits: label.scrollWidth <= label.clientWidth + 1, page: document.documentElement.scrollWidth <= innerWidth }; })()`);
+        assert.ok(big.w >= 100 && big.h >= 44 && big.left >= 0 && big.right <= 390 && big.labelFits && big.page, 'the hamburger is an on-screen touch target that names the view: ' + JSON.stringify(big));
+        await ev(`document.getElementById('top-menu-btn').click(); true`);
+        await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) [data-on-click="m-show-saved"]')`, 'the hamburger menu at large text', 6000);
+        const bigMenu = await menuSaved();
+        assert.ok(bigMenu && bigMenu.h >= 44 && bigMenu.onScreen && /\(2\)/.test(bigMenu.text), 'Saved for later stays in the menu with its count: ' + JSON.stringify(bigMenu));
+        assert.equal(await ev(`document.querySelectorAll('#nav-more-menu [data-on-click="m-show-saved"]').length`), 1, 'once: no duplicate');
+        await ev(`document.querySelector('#nav-more-menu [data-on-click="m-show-saved"]').click(); true`);
         await waitFor(`${INBOX_SAVED} && true`, 'the bookmark to open the Inbox at Saved', 8000);
         await shot('saved-bookmark-phone-200');
         // The folder remains a second way in, through the ordinary Inbox navigation.
-        await ev(`document.getElementById('saved-btn').click(); window.switchNavTab('hub-inbox'); true`);
+        await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`!!document.querySelector('#inbox-nav-list .view-list-item[data-key="saved"]')`, 'the Inbox Saved folder', 6000);
         await ev(`document.querySelector('#inbox-nav-list .view-list-item[data-key="saved"]').click(); true`);
         await waitFor(`${INBOX_SAVED} && true`, 'the Inbox folder to open Saved', 8000);

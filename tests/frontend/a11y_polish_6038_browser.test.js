@@ -35,13 +35,14 @@ const BASE = require('./test_base').BASE;
         for (const w of [390, 1280]) {
             console.log(`-- ${w} px`);
             await load(w); await stub();
-            // 1. the Settings menu by Enter
-            await ev(`document.querySelector('[aria-controls="top-bar-settings-menu"]').focus(); true`);
+            // 1. the Settings menu by Enter (under 640 px the top row is the hamburger and its menu holds Settings, #9021)
+            const menuId = w < 640 ? 'nav-more-menu' : 'top-bar-settings-menu', btnSel = w < 640 ? '#top-menu-btn' : '[aria-controls="top-bar-settings-menu"]';
+            await ev(`document.querySelector(${JSON.stringify(btnSel)}).focus(); true`);
             await key('Enter'); await settle(300);
-            const open = await ev(`(() => { const m = document.getElementById('top-bar-settings-menu'), a = document.activeElement; return { shown: !!m && m.style.display !== 'none' && m.getClientRects().length > 0, inMenu: !!a && !!a.closest('#top-bar-settings-menu'), item: !!a && a.classList.contains('overflow-menu-item') }; })()`);
+            const open = await ev(`(() => { const m = document.getElementById(${JSON.stringify(menuId)}), a = document.activeElement; return { shown: !!m && !m.hidden && m.style.display !== 'none' && m.getClientRects().length > 0, inMenu: !!a && !!a.closest(${JSON.stringify('#' + menuId)}), item: !!a && /overflow-menu-item|nav-more-item/.test(a.className) }; })()`);
             check(`${w}: Enter on the Settings button opens the menu and the focus is on its first item (${JSON.stringify(open)})`, open.shown && open.inMenu && open.item);
             await key('Escape'); await settle(300);
-            const shut = await ev(`(() => { const m = document.getElementById('top-bar-settings-menu'); return { closed: !m || m.style.display === 'none', onButton: document.activeElement === document.querySelector('[aria-controls="top-bar-settings-menu"]') }; })()`);
+            const shut = await ev(`(() => { const m = document.getElementById(${JSON.stringify(menuId)}); return { closed: !m || m.hidden || m.style.display === 'none', onButton: document.activeElement === document.querySelector(${JSON.stringify(btnSel)}) }; })()`);
             check(`${w}: Escape closes it and the focus is back on the button (${JSON.stringify(shut)})`, shut.closed && shut.onButton);
             // 2. the install link
             await ev(`(async () => { const el = document.createElement('div'); el.id = 'qa-cli'; el.className = 'acf-cli-warning'; document.body.appendChild(el); const m = await import(${S} + 'prerequisites.js'); await m.checkAgentCLI('claude', el, { force: true }); return true; })()`);

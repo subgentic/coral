@@ -14,6 +14,9 @@ const BASE = require('./test_base').BASE;
         const r = await ev(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
         for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await Input.dispatchMouseEvent({ type, x: r.x, y: r.y, button: 'left', clickCount: type === 'mouseMoved' ? 0 : 1 });
     };
+    // Under 640 px the top row is one hamburger (#9021) and the bookmark is its "Saved for later" entry: the same intent, the same real mouse click and key.
+    const SAVED_ENTRY = '#nav-more-menu:not([hidden]) [data-on-click="m-show-saved"]';
+    const bookmark = async mobile => { if (!mobile) return click('#saved-btn'); await click('#top-menu-btn'); await waitFor(`!!document.querySelector('${SAVED_ENTRY}')`, 'the menu\'s Saved for later entry', 6000); await click(SAVED_ENTRY); };
     const KEYS = { Enter: [13, '\r'], Escape: [27] };
     const key = async k => { const [vk, text] = KEYS[k]; for (const type of ['keyDown', 'keyUp']) await Input.dispatchKeyEvent({ type, key: k, code: k, windowsVirtualKeyCode: vk, ...(type === 'keyDown' && text ? { text } : {}) }); };
     // Saved's Open and Done are the page toolbar's pills (#8602), in its one header row (#8700; a phone has the choice in the Filters sheet): the row is the strip the sampler follows.
@@ -47,7 +50,7 @@ const BASE = require('./test_base').BASE;
             // 1 and 2: from Agents and from the Inbox's Needs you and Tasks groups, the bookmark (a real click) lands on Saved: no other group first, no scroll, one chips position
             for (const [name, start] of [['from Agents', ''], ['from the Inbox on Needs you', 'needs'], ['from the Inbox on Tasks', 'tasks']]) {
                 await open(w, h, mobile, start);
-                await ev(SAMPLE); await click('#saved-btn'); await sleep(2000); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
+                await ev(SAMPLE); await bookmark(mobile); await sleep(2000); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
                 const fr = await frames(); const inbox = fr.filter(f => f.k.inbox);
                 assert.ok(inbox.length > 0, `${tag} ${name}: the Inbox is shown`);
                 assert.ok(inbox.every(f => f.k.group === '' || f.k.group === 'saved'), `${tag} ${name}: no frame shows another group before Saved (${JSON.stringify(inbox.map(f => f.k.group))})`);
@@ -59,7 +62,7 @@ const BASE = require('./test_base').BASE;
             }
             // The Inbox tab afterwards opens on the same group (the bookmark's choice is the last group) at the same place
             await open(w, h, mobile, 'needs');
-            await click('#saved-btn'); await sleep(1500); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
+            await bookmark(mobile); await sleep(1500); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
             const viaBookmark = await ev(`({ group: document.getElementById('group-table-view').getClientRects().length ? (document.getElementById('group-table-view').dataset.group || '').split(':')[1] : '', scroll: (() => { let n = 0; for (let e = document.getElementById('group-table-view'); e; e = e.parentElement) n += Math.round(e.scrollTop); return n; })(), top: document.getElementById('group-table-view').getClientRects().length ? Math.round(document.querySelector('#group-table-view .group-table-chips, #group-table-view .inbox-folder-toolbar .team-tb-pills, #group-table-view .inbox-folder-toolbar .list-bar-search-row').getBoundingClientRect().top) : null })`);
             await ev(`window.switchNavTab('agents'); true`); await sleep(400); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
             if (mobile) await ev(`window.switchNavTab('hub-inbox'); true`); else await click('#nav-tab-hub-inbox'); // a phone's navigation is not the top row: the switch is the same call
@@ -72,13 +75,15 @@ const BASE = require('./test_base').BASE;
 
             // 3: after a key, the ring shows
             await open(w, h, mobile, '');
-            await ev(`document.getElementById('saved-btn').focus(); true`); await key('Enter'); await sleep(1500); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
-            const kring = await ringOnFocus(); assert.equal(kring.visible, true, `${tag}: after Enter on the bookmark the focus ring shows (${JSON.stringify(kring)})`);
+            if (mobile) { await ev(`document.getElementById('top-menu-btn').focus(); true`); await key('Enter'); await waitFor(`!!document.querySelector('${SAVED_ENTRY}')`, 'the menu', 6000); await ev(`document.querySelector('${SAVED_ENTRY}').focus(); true`); } else await ev(`document.getElementById('saved-btn').focus(); true`);
+            const ringBefore = mobile ? await ringOnFocus() : null; // the menu closes on Enter and takes its focus with it: on a phone the ring is read on the entry, reached by the keyboard, before it is pressed
+            await key('Enter'); await sleep(1500); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
+            const kring = ringBefore || await ringOnFocus(); assert.equal(kring.visible, true, `${tag}: after Enter on the bookmark the focus ring shows (${JSON.stringify(kring)})`);
 
             // 4: a slow list: the chips and the search keep their tops, one line says it is loading, then the list fills in without moving them
             await open(w, h, mobile, '');
             await ev(`(() => { const real = window.fetch; window.fetch = async (u, o) => { if (/^\\/api\\/saved(\\?|$)/.test(String(u)) && (!o || !o.method || o.method === 'GET')) await new Promise(r => setTimeout(r, 800)); return real(u, o); }; return true; })()`); // sleep-ok: the held-back saved list is the point of the case
-            await ev(SAMPLE); await click('#saved-btn'); await sleep(2500); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
+            await ev(SAMPLE); await bookmark(mobile); await sleep(2500); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
             const slow = await frames(); const shown = slow.filter(f => f.k.inbox && f.k.savedPanel);
             assert.ok(shown.some(f => f.k.loading), `${tag}: while the list loads the Saved tab says "Loading saved items"`);
             assert.equal(new Set(shown.filter(f => f.k.stripTop !== null).map(f => f.k.stripTop)).size, 1, `${tag}: the chips do not move while the list loads`);

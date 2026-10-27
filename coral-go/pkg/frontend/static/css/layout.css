@@ -128,7 +128,7 @@
 .nav-more-sep { height: 1px; margin: 4px 8px; background: var(--border); }
 a.nav-more-item { text-decoration: none; }
 @media (max-width: 639px) {
-    .nav-select, .top-bar-actions > .top-bar-btn, .top-bar-actions .top-bar-settings-wrapper, .top-bar-actions .cloud-account-wrapper { display: none !important; }
+    .nav-select, .top-bar-actions > .top-bar-btn:not(.hub-indicator), .top-bar-actions .top-bar-settings-wrapper, .top-bar-actions .cloud-account-wrapper { display: none !important; }
     .top-menu-btn { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; min-height: 44px; margin: 0 8px; padding: 0 12px; background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-ml); color: var(--text-primary); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
     .top-menu-btn .material-icons { font-size: 1.5rem; flex-shrink: 0; }
     .top-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

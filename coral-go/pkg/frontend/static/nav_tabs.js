@@ -89,7 +89,10 @@ function entry(icon, label, { action, href, onClick } = {}) {
 function menuEntries() {
     const cloud = document.body.classList.contains('cloud-mode');
     const out = [entry('home', 'Home', { action: 'm-go-home' })];
-    if (!cloud) out.push(entry('star', 'Saved for later', { action: 'm-show-saved' }));
+    if (!cloud) {
+        const count = (document.querySelector('#saved-btn .saved-count')?.textContent || '').trim(); // the bookmark's count (hidden on a phone with the rest of the row): it stays in the menu entry's words
+        out.push(entry('star', count && count !== '0' ? `Saved for later (${count})` : 'Saved for later', { action: 'm-show-saved' }));
+    }
     out.push(entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }), entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
     if (isHub() || cloud) out.push(entry('dns', 'Servers', { action: 'm-close-top-bar-settings-then-show-servers-modal' }));
@@ -184,7 +187,9 @@ function syncNav() {
 registerActions({
     'm-top-menu': (el, event) => {
         event.stopPropagation();
-        if (_menuFor === el) closeMenu(); else { closeMenu(); openMenu(el); }
+        if (_menuFor === el) { closeMenu(); return; }
+        closeMenu(); openMenu(el);
+        if (event.detail === 0) document.querySelector('#nav-more-menu .nav-more-item')?.focus(); // opened by the keyboard (Enter or Space): the focus goes to the first item, as the Settings menu's did; Escape gives it back to the button
     },
     'm-nav-more': (el, event) => {
         event.stopPropagation();

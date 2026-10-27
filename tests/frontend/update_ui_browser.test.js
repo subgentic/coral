@@ -104,7 +104,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             const au = await auditRegion(ev, ['#update-pill']);
             check(`${tag}: the control has 4.5:1 text contrast (${JSON.stringify((au.fails || []).slice(0, 2))})`, (au.fails || []).length === 0);
 
-            // a phone: the control is a row under the bar, not a sixth button in it; the bar keeps its picker's name and its gear at every width, with the list and with an agent open
+            // a phone: the control is a row under the bar, not a sixth button in it; the bar keeps its view's name and its menu button at every width, with the list and with an agent open
             if (view.phone) {
                 await setStatus(staged(3));
                 const where = await ev(`(() => { const p = document.getElementById('update-pill'), st = document.getElementById('update-strip'), bar = document.querySelector('.top-bar').getBoundingClientRect(), r = p.getBoundingClientRect(); return { inStrip: st.contains(p) && !st.hidden, below: r.top >= bar.bottom - 1, full: r.width >= innerWidth - 32, h: Math.round(r.height) }; })()`);
@@ -114,10 +114,11 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
                     for (const agent of [false, true]) {
                         await Emulation.setDeviceMetricsOverride({ width: w, height: view.h, deviceScaleFactor: 1, mobile: true });
                         if (agent) await ev(`window.selectLiveSession('upd-a', 'claude', 'upd-a-id', 'local'); true`); else await ev(`window.__coral && window.__coral.closeTopBarSettings && window.__coral.closeTopBarSettings(); window.showView && window.showView('sessions'); true`);
+                        // under 640 px the row is one hamburger (#9021): it names the view; Settings and Check for updates are in its menu
                         await settle(500);
-                        const g = await ev(`(() => { const nav = document.getElementById('nav-select'), label = nav.firstElementChild, gear = [...document.querySelectorAll('.top-bar-actions .top-bar-btn')].pop().getBoundingClientRect(); return { over: document.documentElement.scrollWidth - document.documentElement.clientWidth, labelW: Math.round(label.clientWidth), cut: label.scrollWidth > label.clientWidth + 1, gearIn: gear.right <= innerWidth + 0.5 && gear.left >= 0 }; })()`);
-                        await setStatus(idle); const b = await ev(`(() => { const nav = document.getElementById('nav-select'); return { labelW: Math.round(nav.firstElementChild.clientWidth) }; })()`); await setStatus(staged(3));
-                        check(`${tag}: ${w}px, ${agent ? 'an agent open' : 'the list'}, update ready: no sideways scroll, the gear in view, and the picker's name as wide as with no update (${g.labelW} px, ${b.labelW} px without)`, g.over <= 0 && g.gearIn && g.labelW === b.labelW && g.labelW > 20);
+                        const g = await ev(`(() => { const label = document.getElementById('top-menu-label'), gear = document.getElementById('top-menu-btn').getBoundingClientRect(); return { over: document.documentElement.scrollWidth - document.documentElement.clientWidth, labelW: Math.round(label.clientWidth), cut: label.scrollWidth > label.clientWidth + 1, gearIn: gear.right <= innerWidth + 0.5 && gear.left >= 0 }; })()`);
+                        await setStatus(idle); const b = await ev(`(() => { return { labelW: Math.round(document.getElementById('top-menu-label').clientWidth) }; })()`); await setStatus(staged(3));
+                        check(`${tag}: ${w}px, ${agent ? 'an agent open' : 'the list'}, update ready: no sideways scroll, the menu button in view, and the view's name as wide as with no update (${g.labelW} px, ${b.labelW} px without)`, g.over <= 0 && g.gearIn && g.labelW === b.labelW && g.labelW > 20);
                     }
                 }
                 await Emulation.setDeviceMetricsOverride({ width: view.w, height: view.h, deviceScaleFactor: 1, mobile: true });
