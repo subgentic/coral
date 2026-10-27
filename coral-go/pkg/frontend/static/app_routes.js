@@ -11,7 +11,7 @@ import { showTerminalView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { showView, showToast } from './utils.js';
 import { sessionServer } from './server_base.js';
-import { loadWorkflows, loadAutomations, loadDocs } from './lazy_panels.js';
+import { loadAutomations, loadDocs } from './lazy_panels.js';
 import { isCloud } from './server_base.js';
 import { setHistoryPage } from './history_state.js';
 import { syncFilterDomToState } from './history_filters.js';
@@ -100,21 +100,13 @@ function registerRouteHandlers() {
         await openTeamPage(routeKey(r), { tab: 'messages', replace: true });
     });
 
-    route('workflows', async r => {
-        switchNavTab('workflows', { fromHistory: true });
-        const m = await loadWorkflows();
-        const found = r.run ? await m.selectWorkflowRun(r.run, { workflowId: r.id }) : r.id ? await m.selectWorkflow(r.id) : m.workflowsBackToList();
-        if (found === false) {
-            m.workflowsBackToList();
-            notFound(r.run ? 'That workflow run was not found' : 'That workflow was not found', { view: 'workflows' });
-        }
-    });
+    route('workflows', r => go({ view: 'automations', folder: 'workflows', ...(r.id ? { id: r.id } : {}), ...(r.run ? { run: r.run } : {}) }, { replace: true })); // the old Workflows address: Workflows is a folder of Automations (Goal #74)
 
     route('jobs', () => go({ view: 'automations', folder: 'jobs' }, { replace: true })); // the old Jobs address: Jobs is a folder of Automations (Goal #74)
     route('automations', async r => { // /automations[/<folder>[/<id>]]: the folder or the job's page it names, the address stays
         switchNavTab('automations', { fromHistory: true });
         const m = await loadAutomations();
-        if (await m.openAutomationsRoute(r) === false) notFound('That job was not found', { view: 'automations', folder: r.folder });
+        if (await m.openAutomationsRoute(r) === false) notFound(r.folder === 'workflows' ? (r.run ? 'That workflow run was not found' : 'That workflow was not found') : 'That job was not found', { view: 'automations', folder: r.folder });
     });
     route('analytics', r => {
         state.analyticsAsk = { view: r.sub || 'overview', open: !!r.sub }; // the Analytics page the path names (#8606); showViews reads it once the tab has loaded
