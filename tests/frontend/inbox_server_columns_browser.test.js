@@ -71,6 +71,26 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     await waitFor(`${cells}.length>0&&${cells}.every(e=>${is('Remote box')})`,'Server filter narrows '+folder);
     // Clear the choice before testing mode changes or the next folder.
     await ev(`(()=>{const s=${select};s.value='';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+    if(artifacts){
+     // #8892: selecting one team removes its redundant Team column; Server and
+     // its sort return. Clearing the team restores the cross-team layout (#8839).
+     const team=`document.querySelector('#group-table-view #ia-team')`;
+     await waitFor(`!!(${team})&&[...(${team}).options].some(o=>o.value==='same-team')`,'Artifacts Team filter choice');
+     await ev(`(()=>{const s=${team};s.value='same-team';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+     await waitFor(`!!document.querySelector('#group-table-view th[data-key="server"]')&&!document.querySelector('#group-table-view th[data-key="team"]')`,'selected team shows Server instead of Team');
+     const servers=`[...document.querySelectorAll('#group-table-view td[data-key="server"]')]`;
+     await waitFor(`${servers}.length===1&&${servers}.every(e=>e.textContent==='This computer'&&e.getClientRects().length>0)`,'selected local team has its visible Server cell');
+     // Use the phone's visible Sort by select, or the desktop's header button.
+     assert.ok(await ev(`(()=>{const s=document.querySelector('#group-table-view .dt-sortbar select');if(s&&s.getClientRects().length){if(![...s.options].some(o=>o.value==='server'))return false;s.value='server';s.dispatchEvent(new Event('change',{bubbles:true}));return true;}const b=document.querySelector('#group-table-view th[data-key="server"] button.dt-sort');if(!b||!b.getClientRects().length)return false;b.click();return true;})()`),'selected team exposes a visible Server sort control');
+     await waitFor(`document.querySelector('#group-table-view th[data-key="server"]')?.getAttribute('aria-sort')==='ascending'`,'selected team Server ascending sort');
+     await ev(`(()=>{const s=document.querySelector('#group-table-view .dt-sortbar select');if(s&&s.getClientRects().length)document.querySelector('#group-table-view .dt-sortbar-dir').click();else document.querySelector('#group-table-view th[data-key="server"] button.dt-sort').click();return true;})()`);
+     await waitFor(`document.querySelector('#group-table-view th[data-key="server"]')?.getAttribute('aria-sort')==='descending'`,'selected team Server descending sort');
+     await ev(`(()=>{const s=${team};s.value='';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+     await waitFor(`!!document.querySelector('#group-table-view th[data-key="team"]')&&!document.querySelector('#group-table-view th[data-key="server"]')`,'clearing team restores Team without Server');
+     await waitFor(`${cells}.length===2&&${cells}.some(e=>e.textContent.includes('This computer'))&&${cells}.some(e=>e.textContent.includes('Remote box'))`,'clearing team restores both sources');
+     assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-sortbar select option')].some(o=>o.value==='server')`),false,'clearing team also removes Server from Sort by');
+     console.log('PASS Artifacts team/Server column and sort round trip '+width);
+    }
     console.log('PASS server '+folder+' '+width);
    }catch(e){failures.push(folder+' '+width+': '+e.message);console.error(failures.at(-1));}}
    // Same id on two sources: a remote Inbox preview must not capture a local URL.
