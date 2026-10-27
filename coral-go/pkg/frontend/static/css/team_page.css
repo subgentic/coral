@@ -24,26 +24,19 @@
 .team-more-menu > button:hover { background: var(--bg-hover); }
 .team-more-menu > button.mb-action-danger { color: var(--error-text); }
 
-.team-tabs { flex: none; display: flex; gap: 4px; padding: 6px 24px 0; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; scroll-padding-inline: 2rem; } /* one row that never changes height: when the tabs are wider than the window the strip scrolls sideways, the selected tab is scrolled into view, and a fade at the edge says there is more */
-.team-tabs::-webkit-scrollbar { display: none; }
+.team-tabs { flex: none; padding: 6px 24px 0; scroll-padding-inline: 2rem; } /* one row that never changes height: when the tabs are wider than the window the strip scrolls sideways, the selected tab is scrolled into view, and a fade at the edge says there is more */
 /* the tab row: the tab list and, on a phone, the More button beside it (Artifacts, Knowledge and Settings behind it, #8648) */
 .team-tabs-row { flex: none; position: relative; display: flex; align-items: flex-end; }
 .team-tabs-row::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--border); pointer-events: none; } /* the strip's line runs under More too */
 .team-tabs-row > .team-tabs { flex: 1 1 auto; min-width: 0; border-bottom: 0; padding-bottom: 1px; } /* the strip keeps its height: its 1px line is the row's */
 .team-tabs-row > .team-tab-more { display: none; } /* a desktop shows every tab */
-.team-tab-more.is-current { color: var(--text-primary); border-bottom-color: var(--accent); } /* not bolder: the strip keeps its width */
+.team-tab-more.is-current { font-weight: 500; } /* not bolder: the strip keeps its width */
 .team-tab-more::after { content: ''; display: inline-block; margin-left: 6px; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-2px) rotate(45deg); }
 .team-more-menu.team-tabs-more-menu > button { display: flex !important; align-items: center; justify-content: space-between; gap: 12px; }
 .team-more-menu.team-tabs-more-menu > button[aria-current="true"] { font-weight: 600; }
 .team-tabs[data-more="end"] { mask-image: linear-gradient(to right, currentColor calc(100% - 2rem), transparent); }
 .team-tabs[data-more="start"] { mask-image: linear-gradient(to left, currentColor calc(100% - 2rem), transparent); }
 .team-tabs[data-more="both"] { mask-image: linear-gradient(to right, transparent, currentColor 2rem, currentColor calc(100% - 2rem), transparent); }
-.team-tab { flex: none; min-height: 40px; padding: 0 12px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-secondary); font: inherit; font-size: var(--fs-lg); cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; }
-.team-tab:hover { color: var(--text-primary); }
-.team-tab[aria-selected="true"] { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--accent); }
-.team-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-sm); }
-.team-tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-sm); font-weight: 600; line-height: 1.5; }
-.team-tab-count[hidden] { display: none; }
 
 .team-page-row { flex: 1; min-height: 0; display: flex; }
 .team-page-scroll { flex: 1; min-width: 0; min-height: 0; overflow: auto; display: flex; flex-direction: column; position: relative; }
@@ -160,7 +153,6 @@
     .team-page-actions { grid-column: 2; grid-row: 1 / span 2; }
     #team-page-add-agent, #team-page-settings { display: none; }
     .team-page-health { min-height: 44px; grid-column: 1; }
-    .team-tab { min-height: 44px; }
     .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"] { display: none; } /* behind More: the row never scrolls sideways */
     .team-tabs-row > .team-tab-more { display: inline-flex; align-items: center; flex: none; margin: 6px 8px 0 0; padding: 0 8px; }
     .team-tabs-row .team-tab { padding: 0 8px; }
@@ -243,11 +235,7 @@
 .goal-detail-pane .team-task-page { padding: 0; min-height: 0; }
 .goals-page.goals-open.goals-table-page { max-width: none; padding: 0; gap: 0; min-height: 0; overflow: hidden; } /* an open goal fills the page area to the window's right edge: the padding belongs to the main pane */
 .goals-page.goals-open .goals-body { gap: 0; }
-.goal-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-top: 8px; }
-.goal-tab { min-height: 44px; padding: 0 12px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--text-secondary); font: inherit; font-size: var(--fs-lg); font-weight: 600; cursor: pointer; }
-.goal-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
-.goal-tab-count { font-weight: 400; color: var(--text-secondary); }
-.goal-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.goal-tabs { margin-top: 8px; }
 .goal-list { min-height: 0; padding-bottom: 12px; }
 .goal-side-group { margin: 0; padding: 10px 0 4px; font-size: var(--fs-base); font-weight: 600; color: var(--text-secondary); }
 .goal-list .goals-note, .goal-list .goals-failed, .goal-list .goals-more { margin: 10px 0; }
