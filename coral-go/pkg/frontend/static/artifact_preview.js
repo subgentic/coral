@@ -109,7 +109,7 @@ function _renderManifest(body, manifest, filename, ctx) {
     body.querySelector('.artifact-manifest-raw')?.addEventListener('click', () => {
         ctx.renderContent(body, manifest.raw, filename);
         const back = document.createElement('button');
-        back.type = 'button'; back.className = 'artifact-manifest-back'; back.textContent = 'Back to file collection';
+        back.type = 'button'; back.className = 'back-link artifact-manifest-back'; back.textContent = 'Back to file collection';
         back.addEventListener('click', () => _renderManifest(body, manifest, filename, ctx));
         body.prepend(back);
     });

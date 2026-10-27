@@ -1351,7 +1351,7 @@
     #scheduler-view[data-phone-item] .sched-view-header { display: none; }
     #scheduler-view[data-phone-item] #scheduler-detail { flex: 1; display: flex; flex-direction: column; min-height: 0; } /* the job's bar is at the foot of its screen too */
     #history-back { display: none; } /* a phone has its own back (Chats) */
-    #scheduler-detail > .group-back { display: none; } /* and its own (the folder's table above the job) */
+    #scheduler-detail > .back-link { display: none; } /* and its own (the folder's table above the job) */
     #mobile-history-list .sidebar-header { padding: 12px; }
     #mobile-history-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide (#7443) */
 }

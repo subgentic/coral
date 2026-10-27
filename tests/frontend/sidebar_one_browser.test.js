@@ -177,8 +177,8 @@ const STUB = `(() => {
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table')[0].querySelectorAll('th')].map(h => h.querySelector('.dt-sort > span').textContent)`), ['Job', 'Schedule', 'Last run', 'Next'], at + 'the jobs table columns');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), [11, 12, 13, 14, 17, 20])`), [], at + 'every text of the jobs table is on the scale');
             await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
-            await waitFor(`!!document.querySelector('#scheduler-detail .item-bar') && document.querySelector('#scheduler-detail .group-back').checkVisibility()`, at + "the job's page", 8000);
-            assert.equal(await ev(`document.querySelector('#scheduler-detail .group-back').textContent`), '\u2190 Jobs', at + 'the job page has its way back');
+            await waitFor(`!!document.querySelector('#scheduler-detail .item-bar') && document.querySelector('#scheduler-detail .back-link').checkVisibility()`, at + "the job's page", 8000);
+            assert.equal(await ev(`document.querySelector('#scheduler-detail .back-link').textContent`), '\u2190 Jobs', at + 'the job page has its way back');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#scheduler-detail .sched-header h2')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + "the job's name is 17/700");
             assert.match(await ev(`document.querySelector('#scheduler-detail .sched-status-line').textContent`), /^Active \u00b7 /, at + 'a status line under the name');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-facts dt')].slice(0, 3).map(e => { const c = getComputedStyle(e), v = getComputedStyle(e.nextElementSibling); return [c.fontSize, c.fontWeight, v.fontSize, v.fontWeight].join(' '); })`), ['13px 500 13px 400', '13px 500 13px 400', '13px 500 13px 400'], at + 'facts: labels 13/500, values 13/400');
@@ -189,7 +189,7 @@ const STUB = `(() => {
             assert.equal(bar, true, at + 'the bar is on screen without scrolling');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('scheduler-detail'), [11, 12, 13, 14, 17, 20])`), [], at + "every text of the job's page is on the scale");
             await shot(`sidebar-one-job-${w}`);
-            await ev(`document.querySelector('#scheduler-detail .group-back').click(); true`);
+            await ev(`document.querySelector('#scheduler-detail .back-link').click(); true`);
             await waitFor(`document.getElementById('group-table-view').checkVisibility()`, at + 'back is the jobs table', 8000);
 
             // Hide turns the column into the tab's own rail

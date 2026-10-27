@@ -943,7 +943,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); margin: 0; padding: var(--space-2xl); color: var(--text-primary); font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; }
 .empty-state[hidden] { display: none; }
 .empty-state-tight { padding: var(--space-md); }
-.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
+.empty-state-line, .goals-note.empty-state-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
 .empty-state-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
 .empty-state-action { margin-top: var(--space-sm); }
 .welcome > .empty-state { margin: 0; align-self: stretch; }
@@ -952,20 +952,22 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-table-back { margin-bottom: var(--space-lg); }
 .group-table-head .group-table-back { margin: 0; flex: 0 0 auto; } /* a phone's way back sits in the title row (#7722) */
 @media (max-width: 760px) { .group-table-head:has(.group-table-back) { flex-wrap: wrap; row-gap: 0; } }
-.group-back { display: inline-flex; align-items: center; align-self: flex-start; min-height: 32px; margin: 0 0 var(--space-xs); padding: 4px 0; border: 1px solid transparent; border-radius: var(--radius-md); background: none; color: var(--link-text, var(--accent)); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; }
-.group-back[hidden] { display: none; }
+:where(.back-link) { display: inline-flex; margin: 0 0 var(--space-xs); } /* placement: zero specificity, so a page's own rule for where it sits or whether it shows always wins */
+.back-link { align-items: center; gap: 4px; align-self: flex-start; min-height: 32px; padding: 4px 0; border: 1px solid transparent; border-radius: var(--radius-md); background: none; color: var(--link-text, var(--accent)); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; } /* the look */
+.back-link[hidden] { display: none; }
+/* The one Back link (#9097, Goal #84 item 5): 13/500 in the accent colour, "\2190 Name" where the name is where it goes. Its placement (display, margin) has zero specificity (:where), so a page's own rule that places it or hides it always wins; the look is only ever declared here. */
 /* A phone's way back and the page's title are one row, the title dropping under the link only when less than 10 rem would be left beside it (#7734; the way #7721 did Analytics); elsewhere the row is not a box */
 .phone-title-row { display: contents; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .phone-title-row { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 0; }
-    .phone-title-row > .group-back, .phone-title-row > .sched-back, .phone-title-row > .goals-back { flex: 0 0 auto; margin: 0; }
+    .phone-title-row > .back-link, .phone-title-row > .sched-back, .phone-title-row > .goals-back { flex: 0 0 auto; margin: 0; }
     .phone-title-row > h1, .phone-title-row > h2, .phone-title-row > .sched-header { flex: 1 1 10rem; min-width: 10rem; margin: 0; }
 }
-.group-back:hover { text-decoration: underline; }
+.back-link:hover { text-decoration: underline; }
 /* A group header of a tab's list: the name opens the table, so it reads as a link on hover */
 .session-list .sgroup-header { align-items: center; } /* the list's own rule starts the items at the top: a header's chevron sits level with its name */
 .sgroup-header .group-chevron { margin-left: -6px; }
-@media (pointer: coarse) { .group-back { min-height: 44px; } .group-back { min-width: 44px; } } /* a short name ("\2190 Jobs") is still a 44 px target both ways (#7734) */
+@media (pointer: coarse) { .back-link { min-height: 44px; } .back-link { min-width: 44px; } } /* a short name ("\2190 Jobs") is still a 44 px target both ways (#7734) */
 
 /* ── The Inbox on the shared sidebar (inbox_sidebar.js, #7472) ── */
 /* The chips above a table that show one part of a list (Saved: Open and Done, with their counts) */
@@ -996,7 +998,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
     #inbox-view:not([data-phone-item]) .inbox-local { display: none; }
     #inbox-view[data-phone-item] #mobile-inbox-list { display: none; }
     #inbox-view .inbox-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
-    #inbox-page > .group-back:not(.inbox-phone-back) { display: none; } /* a phone has its own back, to the list */
+    #inbox-page > .back-link:not(.inbox-phone-back) { display: none; } /* a phone has its own back, to the list */
     #mobile-inbox-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
     #mobile-inbox-list .sidebar-header { padding: 12px; }
     .inbox-page { padding: 12px; }

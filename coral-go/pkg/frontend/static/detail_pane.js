@@ -67,7 +67,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     const head = el('div', 'detail-head');
     const text = el('div', 'detail-head-text');
     if (backLabel && (!host || host.classList.contains('inbox-detail-pane') || host.classList.contains('goal-detail-pane'))) { // the phone's way back (the Inbox's pane has its own host, and a way back like the team page's): a text link named for where it goes, on the title's line (#7734); a pane that is not a sheet has the close button
-        const back = el('button', 'goals-back detail-back'); back.type = 'button';
+        const back = el('button', 'back-link goals-back detail-back'); back.type = 'button';
         const arrow = el('span', 'goals-back-arrow', '\u2190'); arrow.setAttribute('aria-hidden', 'true');
         back.append(arrow, document.createTextNode(` ${backLabel}`));
         back.addEventListener('click', () => closeDetailPane({ restoreFocus: true }));

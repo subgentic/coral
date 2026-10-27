@@ -389,7 +389,7 @@ async function openDockSavedSheet(id, opener) {
         key: `saved:${id}`, title: f.title, sub: [f.said ? `Said ${f.said}` : '', `Saved ${f.saved}`, f.state, f.serverName].filter(Boolean).join(' · '),
         host: $('agentic-saved-detail-pane'), opener, actions,
         body: doc => {
-            const link = el('button', 'group-back', '\u2190 Saved'); link.type = 'button'; link.addEventListener('click', back);
+            const link = el('button', 'back-link', '\u2190 Saved'); link.type = 'button'; link.addEventListener('click', back);
             snippetEl = el('p', 'inbox-saved-snippet', f.snippet || '(no text)');
             doc.append(link, snippetEl);
             if (cannotOpen && f.why) doc.append(el('p', 'inbox-saved-why', f.why));
@@ -574,9 +574,9 @@ function openPageShell(kindLabel, groupKey) {
     $('inbox-local').hidden = false;
     if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', '');
     host.replaceChildren();
-    const back = el('button', 'group-back', `\u2190 ${kindLabel}`); // the link back to the group's table (the shared one, sidebar_groups.js)
+    const back = el('button', 'back-link', `\u2190 ${kindLabel}`); // the link back to the group's table (the shared one, sidebar_groups.js)
     back.type = 'button'; back.setAttribute('data-on-click', 'inbox-back'); back.dataset.kind = 'hub-inbox'; back.dataset.group = groupKey; // the way back puts the focus on the row it came from
-    const phoneBack = el('button', 'group-back inbox-phone-back', `\u2190 ${kindLabel}`); // a phone: back to the folder's table, which has the folders' select on top
+    const phoneBack = el('button', 'back-link inbox-phone-back', `\u2190 ${kindLabel}`); // a phone: back to the folder's table, which has the folders' select on top
     phoneBack.type = 'button'; phoneBack.setAttribute('data-on-click', 'inbox-phone-back');
     host.append(back, phoneBack);
     return host;

@@ -32,7 +32,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-body .md, #inbox-page .ibx-saved-body .ibx-why')`, `${tag}: the message page with its text`, 8000);
             const page = async () => [await btnNames('#inbox-page .item-bar button, #inbox-page .item-bar .btn')];
             check(await page(), 'a message page');
-            await ev(`document.querySelector('#inbox-page .group-back:not(.inbox-phone-back)').click(); true`);
+            await ev(`document.querySelector('#inbox-page .back-link:not(.inbox-phone-back)').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, `${tag}: back at the table`, 8000);
             // two items from one source that start alike are named apart, and a cut at 40 characters never leaves half an emoji
             // fixed times, so the list's own order (newest saved first) does not depend on the clock

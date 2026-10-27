@@ -189,7 +189,7 @@ const AGENTS = (waiting) => waiting ? [
             // a saved message's page: its link back, the message, and a bar with the primary last
             await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#inbox-page .item-bar') && document.getElementById('inbox-page').checkVisibility()`, at + "the saved message's page", 8000);
-            assert.equal(await ev(`document.querySelector('#inbox-page > .group-back').textContent`), '← Saved', at + 'back names Saved');
+            assert.equal(await ev(`document.querySelector('#inbox-page > .back-link').textContent`), '← Saved', at + 'back names Saved');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#inbox-page .wf-item-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + 'the title is 17/700');
             assert.match(await ev(`document.querySelector('#inbox-page .inbox-saved-snippet').textContent`), /rollback step|Tuesday/, at + 'the message is on the page');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#inbox-page .item-bar > .btn, #inbox-page .item-bar > .wf-more > .btn')].filter(b => b.getClientRects().length).map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['More', 'Open in Chats*'], at + 'the bar: More, Open, the primary last (no Read the whole message: the text is on the page)');

@@ -156,8 +156,8 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             : `<section class="sched-prompt-section sched-prompt-shown"><h3>Prompt</h3><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></section>`)
         : '';
     container.innerHTML = `
-        <button type="button" class="group-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
-        <button type="button" class="sched-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
+        <button type="button" class="back-link" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
+        <button type="button" class="back-link sched-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
         ${failBanner}
         <div class="sched-header">
             <h2>${escapeHtml(job.name)}</h2>

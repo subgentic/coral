@@ -194,8 +194,8 @@ function renderWorkflowDetail(wf, runs) {
     // One facts line under the name (folder, time limit, when it was made, and that it is off)
     const facts = [`Folder ${wf.repo_path || 'not set'}`, `Time limit ${limitWords(wf.max_duration_s || 3600)}`, wf.created_at ? `Created ${formatTime(wf.created_at)}` : '', wf.enabled ? '' : 'Disabled'].filter(Boolean).join(' \u00b7 ');
     container.innerHTML = `
-        <button type="button" class="group-back" id="wf-back-btn" data-on-click="automations-back" data-folder="workflows">\u2190 Workflows</button>
-        <button type="button" class="group-back wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
+        <button type="button" class="back-link" id="wf-back-btn" data-on-click="automations-back" data-folder="workflows">\u2190 Workflows</button>
+        <button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
         <h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2>
         <p class="item-meta wf-facts-line">${esc(facts)}</p>
         ${wf.description ? `<p class="wf-desc">${esc(wf.description)}</p>` : ''}
@@ -306,11 +306,11 @@ function renderRunDetail(run) {
     const focusKey = document.activeElement && container.contains(document.activeElement) ? (document.activeElement.getAttribute('aria-controls') ? `c:${document.activeElement.getAttribute('aria-controls')}` : `a:${document.activeElement.dataset.onClick || ''}:${document.activeElement.dataset.session || document.activeElement.dataset.runId || ''}`) : '';
     // The run's own page: a link back to its workflow, its title, and its actions in the pinned bar (Re-run is the primary; Kill is all there is while it runs)
     const backHtml = run.workflow_id
-        ? `<button type="button" class="group-back" id="wf-run-back" data-on-click="wf-select" data-workflow-id="${Number(run.workflow_id)}">\u2190 ${esc(run.workflow_name || 'Workflow')}</button>`
+        ? `<button type="button" class="back-link" id="wf-run-back" data-on-click="wf-select" data-workflow-id="${Number(run.workflow_id)}">\u2190 ${esc(run.workflow_name || 'Workflow')}</button>`
         : '';
     container.innerHTML = `
         ${backHtml}
-        <button type="button" class="group-back wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
+        <button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
         <h2 class="wf-item-title wf-run-title">Run #${run.id}</h2>
         ${startedNote && startedNote.runId === Number(run.id) ? `<p class="item-meta wf-started-line">${esc(startedNote.text)}</p>` : ''}
         ${runMetaHtml(run, signInFailure, errorExcerpt)}

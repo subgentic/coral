@@ -207,7 +207,7 @@ function sessionOf(agent) {
 export function renderAgentPage(host, agent, ctx) {
     host.replaceChildren();
     host.setAttribute('aria-label', agent.name);
-    const back = el('button', 'goals-back'); back.type = 'button';
+    const back = el('button', 'back-link goals-back'); back.type = 'button';
     const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true');
     back.append(arrow, document.createTextNode(' Agents'));
     back.addEventListener('click', () => ctx.onBack());

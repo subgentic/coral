@@ -88,8 +88,7 @@
 .goals-table-page .goals-chips-row::-webkit-scrollbar { display: none; }
 .goals-table-page .goals-chip { flex: none; min-height: 32px; white-space: nowrap; }
 .goals-table-page .goals-new { flex: none; }
-.goals-table-page .goals-back, .inbox-board-head .goals-back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 4px 0; min-height: 36px; }
-.goals-table-page .goals-back:hover, .inbox-board-head .goals-back:hover { text-decoration: underline; }
+.goals-table-page .goals-back, .inbox-board-head .goals-back { display: inline-flex; align-items: center; align-self: flex-start; min-height: 36px; }
 .team-count-line { margin: 0; }
 .team-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .team-link { background: none; border: 0; padding: 0; color: var(--link-text, var(--accent)); font: inherit; text-align: left; cursor: pointer; }
@@ -125,8 +124,7 @@
 .detail-facts dd { margin: 0; overflow-wrap: anywhere; }
 .detail-doc { min-width: 0; }
 .detail-grip { position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; outline: none; } /* the goal page column's handle (#7702) on the pane's left edge: an 8 px target, the 2 px line drawn in the middle */
-.detail-back { padding: 4px 0; min-height: 36px; gap: 4px; align-items: center; } /* the phone's way back (#7734): shown where the pane is a sheet */
-.detail-back:hover { text-decoration: underline; }
+.detail-back { min-height: 36px; align-items: center; }
 .team-page.detail-sheet .detail-back { display: inline-flex; min-height: 44px; min-width: 44px; }
 .detail-head-text > .phone-title-row > .detail-back { flex: 0 0 auto; margin: 0; }
 .knowledge-facts { font-size: var(--fs-base); } /* the entry's front matter: a quiet block of facts, behind the pane's Details button */

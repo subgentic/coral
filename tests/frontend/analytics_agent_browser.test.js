@@ -84,7 +84,7 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         assert.ok(await ev(`[...document.querySelectorAll('#cost-agent-detail .viz-more .viz-bar')].some(p => p.getAttribute('fill') === 'var(--danger)')`), 'failed calls are drawn in the error colour');
         console.log('   ✓');
 
-        assert.equal(await ev(`document.querySelector('#cost-agent-detail .viz-back').textContent`), '\u2190 By agent'); assert.ok(await ev(`document.querySelector('#cost-agent-detail .viz-back').classList.contains('group-back')`), 'the back link of the page, not a button');
+        assert.equal(await ev(`document.querySelector('#cost-agent-detail .viz-back').textContent`), '\u2190 By agent'); assert.ok(await ev(`document.querySelector('#cost-agent-detail .viz-back').classList.contains('back-link')`), 'the back link of the page, not a button');
         console.log('4. Back to By agent; a failing read leaves the rest');
         await ev(`document.querySelector('#cost-agent-detail .viz-back').click(); true`);
         await waitFor(`document.getElementById('cost-dashboard-view').dataset.view === 'agent'`, 'back on By agent', 6000);

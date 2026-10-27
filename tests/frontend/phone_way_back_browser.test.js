@@ -9,7 +9,7 @@ const { install: installTP, seed, openTeam, goTab } = require('./helpers/team_pa
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 
-const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back, .docs-phone-back, .cost-phone-back, .group-back, .goals-back, .mobile-history-back';
+const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back, .docs-phone-back, .cost-phone-back, .back-link, .goals-back, .mobile-history-back';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();

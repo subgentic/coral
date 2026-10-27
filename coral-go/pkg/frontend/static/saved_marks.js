@@ -174,7 +174,7 @@ document.addEventListener('keydown', (e) => {
     if (document.querySelector('.goal-detail-pane:not([hidden])')) return; // a goal's task or file pane beside its list: Escape closes that first (detail_pane.js), with the focus on its row (#8914)
     if (document.querySelector('#agentic-saved-detail-pane:not([hidden])')) return; // a message's sheet over the dock is one level back (detail_pane.js closes it); the next Escape leaves
     e.preventDefault();
-    const back = savedViewShowing() ? document.querySelector('#inbox-page:not([hidden]) > .group-back') : null; // on a message's (or a task's) page inside the Inbox Escape is one level back, to its table with the focus on its row; the next Escape leaves
+    const back = savedViewShowing() ? document.querySelector('#inbox-page:not([hidden]) > .back-link') : null; // on a message's (or a task's) page inside the Inbox Escape is one level back, to its table with the focus on its row; the next Escape leaves
     if (back) { back.click(); return; }
     importOnce('./saved.js').then(m => m.closeSaved()).catch(() => {});
 });

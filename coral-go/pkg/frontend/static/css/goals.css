@@ -4,7 +4,7 @@
 .goals-note { margin: 2px 0 0; color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .goals-detail-col { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .goals-detail-col { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; background: var(--bg-secondary); }
-.goals-back { display: none; align-self: flex-start; background: none; border: none; color: var(--link-text, var(--accent)); font: 500 var(--fs-md)/1.4 var(--font-sans); padding: 8px 0; min-height: var(--control-touch-height, 44px); cursor: pointer; }
+.goals-back { display: none; align-self: flex-start; min-height: var(--control-touch-height, 44px); }
 
 .goals-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .goals-chip { min-height: var(--control-touch-height, 44px); padding: 4px 10px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: var(--fs-md); cursor: pointer; }

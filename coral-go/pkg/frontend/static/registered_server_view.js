@@ -152,7 +152,7 @@ function pageHtml(s) {
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
            <button type="button" class="btn btn-danger servers-remove" data-action="delete" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Remove</button>`;
     return `<section class="servers-page" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}" aria-labelledby="servers-page-name">
-        <button type="button" class="group-back" id="servers-back" data-action="back">&larr; Servers</button>
+        <button type="button" class="back-link" id="servers-back" data-action="back">&larr; Servers</button>
         <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="chip chip-tag servers-tag" title="Private network addresses are allowed for this server">private network</span>' : ''}</h3>
         <p class="item-meta">${statusPill(status)}</p>
         <dl class="servers-facts">
@@ -222,7 +222,7 @@ function render() {
     const topBar = `<div class="servers-top"><span class="servers-summary">${allRemotes.length} servers, ${online} online${online < allRemotes.length ? `, ${allRemotes.length - online} not` : ''}</span><button type="button" class="btn btn-primary" data-action="add">Add server</button></div>`;
     const restoreFocus = rememberFocus(m); // a control the redraw replaced (Add server, Test, Edit) gets focus back (#4882)
     const table = '<div id="servers-table-slot"></div>'; // the data_table goes in once the markup is set
-    const back = '<button type="button" class="group-back" id="servers-back" data-action="back">&larr; Servers</button>';
+    const back = '<button type="button" class="back-link" id="servers-back" data-action="back">&larr; Servers</button>';
     const body = _open && page
         ? (_editing === _open ? `<section class="servers-page" id="server-row-${escHtml(_open)}" tabindex="-1" data-id="${escHtml(_open)}">${back}${formHtml()}</section>` : pageHtml(page))
         : `${many && _editing === null ? topBar : ''}

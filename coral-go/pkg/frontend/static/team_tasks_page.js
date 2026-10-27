@@ -368,7 +368,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     host.replaceChildren();
     host.setAttribute('aria-label', `Task ${task.id}`);
     const acts = { project: ctx.project, redraw: (t, m) => renderTaskPage(host, t || task, ctx, m), reload: (message) => reloadTask(host, task.id, ctx, message) };
-    const back = el('button', 'goals-back'); back.type = 'button'; back.hidden = !!ctx.hideBack;
+    const back = el('button', 'back-link goals-back'); back.type = 'button'; back.hidden = !!ctx.hideBack;
     const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true');
     back.append(arrow, document.createTextNode(` ${ctx.backLabel}`));
     back.addEventListener('click', () => ctx.onBack());

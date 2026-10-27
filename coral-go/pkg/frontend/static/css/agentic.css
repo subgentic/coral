@@ -1896,7 +1896,7 @@ body.panel-dragging .agentic-state {
 .artifact-manifest-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .artifact-manifest-type { color:var(--text-secondary); font-size:var(--fs-base); white-space:nowrap; }
 .artifact-manifest-uri { grid-column:1 / -1; overflow:hidden; color:var(--text-secondary); font-size:var(--fs-sm); text-overflow:ellipsis; white-space:nowrap; }
-.artifact-manifest-back { margin:0 0 12px; padding:6px 10px; border:1px solid var(--border); border-radius:5px; background:var(--bg-secondary); color:var(--text-primary); cursor:pointer; }
+.artifact-manifest-back { margin:0 0 12px; }
 @media (max-width: 600px) { .artifact-manifest-entry { grid-template-columns:minmax(0,1fr); gap:5px; } .artifact-manifest-type { justify-self:start; } }
 
 /* Optional team artifact source within the Files viewer. */

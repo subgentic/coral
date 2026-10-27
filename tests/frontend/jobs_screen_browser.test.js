@@ -68,7 +68,7 @@ const S = `(window.__coralStatic || '/static/')`;
             console.log(`${at}: the job page, failure first`);
             await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click(); true`);
             await waitFor(vis('#scheduler-detail .sched-fail-banner'), `${at}: the job page`, 8000);
-            const order = (await ev(`[...document.querySelectorAll('#scheduler-detail > *:not(.sched-back):not(.group-back)')].map(e => e.className.split(' ')[0])`)).filter(c => c !== 'phone-title-row'); // the phone's back row (#7121) and the row that holds it with the title (#7734) are not content
+            const order = (await ev(`[...document.querySelectorAll('#scheduler-detail > *:not(.sched-back):not(.back-link)')].map(e => e.className.split(' ')[0])`)).filter(c => c !== 'phone-title-row'); // the phone's back row (#7121) and the row that holds it with the title (#7734) are not content
             assert.equal(order[0], 'sched-fail-banner', `${at}: the failure is the first thing on the page: ${JSON.stringify(order)}`);
             assert.match(await text('#scheduler-detail .sched-fail-banner'), /The last run failed.*step 2 \(Test\) exited with 3/s);
             assert.equal(await ev(`/\\benabled\\b/i.test(document.querySelector('#scheduler-detail .sched-header').textContent)`), false, `${at}: no "enabled" pill`);

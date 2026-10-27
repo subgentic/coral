@@ -19,7 +19,7 @@
     max-width: 800px;
 }
 .docs-toolbar #docs-copy-agent-line { margin-left: auto; } /* the button is the page's header action, at its right whether or not there is a way back */
-.docs-toolbar .group-back { margin: 0; }
+.docs-toolbar .back-link { margin: 0; }
 
 .docs-toolbar .btn { display: inline-flex; align-items: center; gap: 6px; margin: 0; } /* .btn-small carries a 20px margin for the sidebars */
 .docs-toolbar .material-icons { font-size: var(--fs-xl); }
