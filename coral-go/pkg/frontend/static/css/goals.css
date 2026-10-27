@@ -33,7 +33,7 @@
 .goals-failed { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border: 1px dashed var(--border-light); border-radius: var(--radius-lg); color: var(--text-secondary); }
 .goals-failed { flex-direction: row; flex-wrap: wrap; align-items: center; border-style: solid; border-color: var(--error); }
 
-.goals-dialog { margin: auto; /* the base reset gives every dialog margin 0, which pinned it to the corner */ border: 1px solid var(--border-light); border-radius: var(--dlg-radius); background: var(--bg-secondary); color: var(--text-primary); padding: 16px; width: min(var(--dlg-w-confirm), calc(100vw - 32px)); }
+.goals-dialog { margin: auto; /* the base reset gives every dialog margin 0, which pinned it to the corner */ border: 1px solid var(--border-light); border-radius: var(--dlg-radius); background: var(--bg-secondary); color: var(--text-primary); padding: 16px; }
 .goals-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .goals-form { display: flex; flex-direction: column; gap: 10px; }
 .goals-form h3 { margin: 0; }

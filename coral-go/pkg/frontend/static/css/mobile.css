@@ -640,8 +640,8 @@
     .dlg-confirm,
     .dlg-form,
     .dlg-flow {
-        width: 95vw !important;
-        max-width: 95vw !important;
+        width: var(--dlg-max) !important;
+        max-width: var(--dlg-max) !important;
         max-height: 90vh;
     }
 
@@ -1074,7 +1074,7 @@
     .welcome-header { margin-bottom: 22px; }
     .welcome-launch-list { grid-template-columns: 1fr; }
     .editions-home-list { grid-template-columns: 1fr; }
-    .editions-modal .editions-content { width: 100%; max-width: calc(100vw - 32px); padding: 20px; }
+    .editions-modal .editions-content { width: 100%; max-width: var(--dlg-max); padding: 20px; }
     .editions-actions .btn { min-height: 44px; }
 
     /* Welcome team cards: stack vertically on mobile */
@@ -1161,18 +1161,6 @@
     .mobile-tab-bar {
         display: none !important;
     }
-}
-
-/* ── Medium screens: 768px–1023px refinements ─────────────── */
-
-@media (min-width: 768px) and (max-width: 1023px) and (min-height: 501px), (min-width: 768px) and (max-width: 1023px) and (pointer: fine), (min-width: 951px) and (max-width: 1023px) {
-    /* Modal: better sizing for tablets */
-    .modal-content,
-    .dlg-form,
-    .dlg-flow {
-        max-width: 85vw;
-    }
-
 }
 
 /* ── Pull-to-Refresh Indicator ────────────────────────────── */

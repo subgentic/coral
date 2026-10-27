@@ -676,7 +676,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     padding: var(--space-2xl);
-    max-width: 90vw;
+    max-width: var(--dlg-max);
     max-height: 85vh;
     display: flex;
     flex-direction: column;
@@ -3207,7 +3207,6 @@ button.auto-accept-header-chip:focus-visible { outline: 2px solid var(--accent);
 
 dialog.auto-accept-confirm {
     margin: auto;
-    width: min(460px, calc(100vw - 32px));
     box-sizing: border-box;
     padding: 20px 22px;
     border: 1px solid rgba(var(--warning-rgb), 0.5);
@@ -3740,7 +3739,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-tab .sd-dot { margin-left: auto; width: .5rem; height: .5rem; flex: none; border-radius: 50%; background: var(--danger, #f85149); }
 .settings-tab .sd-dot[hidden] { display: none; }
 .sd-modal-content .settings-pane label { display: block; margin-bottom: .9rem; }
-.sd-modal-content .settings-pane :is(input[type="text"], select, textarea) { max-width: 38rem; width: 100%; box-sizing: border-box; }
+.sd-modal-content .settings-pane :is(input[type="text"], select, textarea) { max-width: var(--dlg-w-form); width: 100%; box-sizing: border-box; }
 .sd-modal-content .settings-pane textarea.acf-prompt { max-width: none; min-height: 16rem; resize: vertical; font-family: var(--font-mono, monospace); font-size: var(--fs-md); }
 @container sd (max-width: 40rem) {
     .sd-modal-content .settings-nav { width: auto; flex: none; border-right: 0; border-bottom: 1px solid var(--border); padding: .6rem 1rem; overflow: visible; }

@@ -107,7 +107,7 @@ export function autoAcceptMenuItem(s) {
 export function confirmAutoAccept(name, onConfirm, onCancel, { hub = isCloud() } = {}) {
     document.querySelectorAll('dialog.auto-accept-confirm').forEach(d => d.remove());
     const dlg = document.createElement('dialog');
-    dlg.className = 'auto-accept-confirm';
+    dlg.className = 'dlg-confirm auto-accept-confirm'; // a confirmation: the dialog size by kind
     dlg.setAttribute('aria-labelledby', 'auto-accept-confirm-title');
     dlg.setAttribute('aria-describedby', 'auto-accept-confirm-text');
     const h = document.createElement('h3');
