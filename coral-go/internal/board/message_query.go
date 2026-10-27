@@ -274,24 +274,18 @@ func (s *Store) QueryMessages(ctx context.Context, q *MessageQuery) (*MessageQue
 	if q.Oldest {
 		dir = "ASC"
 	}
+	if q.sqlTextOnly(allowed) {
+		if res, ok, err := s.queryTextInSQL(ctx, q, where, args, dir); err != nil || ok {
+			return res, err
+		}
+	}
 	rows, err := s.reader().QueryxContext(ctx, listMessagesSelect+" WHERE "+strings.Join(where, " AND ")+" ORDER BY m.id "+dir, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	pg := &querypage.Pager[Message]{Limit: q.Limit}
-	if q.cursor != nil {
-		cur := q.cursor.ID
-		pg.Prev = q.cursor.Prev
-		pg.After = func(m Message) bool { // the message comes after the cursor in the query's order
-			if q.Oldest {
-				return m.ID > cur
-			}
-			return m.ID < cur
-		}
-		pg.AtCursor = func(m Message) bool { return m.ID == cur }
-	}
+	pg := q.pager()
 	res := &MessageQueryResult{}
 	scannedRows, scannedBytes := 0, 0
 	for rows.Next() {
@@ -314,6 +308,29 @@ func (s *Store) QueryMessages(ctx context.Context, q *MessageQuery) (*MessageQue
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	q.fill(res, pg)
+	return res, nil
+}
+
+// pager is the page cutter around the query's cursor, in the query's order.
+func (q *MessageQuery) pager() *querypage.Pager[Message] {
+	pg := &querypage.Pager[Message]{Limit: q.Limit}
+	if q.cursor != nil {
+		cur := q.cursor.ID
+		pg.Prev = q.cursor.Prev
+		pg.After = func(m Message) bool { // the message comes after the cursor in the query's order
+			if q.Oldest {
+				return m.ID > cur
+			}
+			return m.ID < cur
+		}
+		pg.AtCursor = func(m Message) bool { return m.ID == cur }
+	}
+	return pg
+}
+
+// fill sets the result's page, total and cursors from a finished pager.
+func (q *MessageQuery) fill(res *MessageQueryResult, pg *querypage.Pager[Message]) {
 	res.Total = pg.Total
 	res.Messages = pg.Page
 	if res.Messages == nil {
@@ -325,7 +342,73 @@ func (s *Store) QueryMessages(ctx context.Context, q *MessageQuery) (*MessageQue
 	if pg.HasPrev() {
 		res.PrevCursor = messageCursor{Finger: q.finger, ID: pg.Page[0].ID, Prev: true}.encode()
 	}
-	return res, nil
+}
+
+// sqlTextOnly says the query is a plain text search the database can narrow: an ASCII needle, no sender, mention or member list, and
+// no redaction (a tunneled viewer matches on the redacted text, which only Go computes).
+func (q *MessageQuery) sqlTextOnly(allowed map[int64]bool) bool {
+	if q.Text == "" || len(q.From) > 0 || q.Mentions != "" || allowed != nil || q.Shown != nil {
+		return false
+	}
+	for i := 0; i < len(q.Text); i++ {
+		if q.Text[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}
+
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// queryTextInSQL answers a text search with LIKE (ASCII case-folded, as the Go match is for an ASCII needle) so only the ids of the
+// matches reach Go; the page's rows are read after. ok is false when the Go scan must answer instead: the scan caps would truncate the
+// board, or the needle has an i or k and a message holds U+0130 or U+212A (which Go's ToLower folds to i and k; LIKE does not).
+func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []string, args []any, dir string) (*MessageQueryResult, bool, error) {
+	w := " WHERE " + strings.Join(where, " AND ")
+	var n, bytes int64
+	if err := s.reader().QueryRowxContext(ctx, "SELECT COUNT(*), COALESCE(SUM(LENGTH(CAST(m.content AS BLOB))), 0) FROM board_messages m"+w, args...).Scan(&n, &bytes); err != nil {
+		return nil, false, err
+	}
+	if n > int64(messageScanRows) || bytes > int64(messageScanBytes) {
+		return nil, false, nil
+	}
+	if strings.ContainsAny(q.Text, "ik") {
+		var odd int
+		err := s.reader().QueryRowxContext(ctx, "SELECT EXISTS(SELECT 1 FROM board_messages m"+w+" AND (instr(m.content, char(304)) > 0 OR instr(m.content, char(8490)) > 0))", args...).Scan(&odd)
+		if err != nil || odd != 0 {
+			return nil, false, err
+		}
+	}
+	likeArgs := append(append([]any{}, args...), "%"+likeEscaper.Replace(q.Text)+"%")
+	var ids []int64
+	if err := s.reader().SelectContext(ctx, &ids, "SELECT m.id FROM board_messages m"+w+` AND m.content LIKE ? ESCAPE '\' ORDER BY m.id `+dir, likeArgs...); err != nil {
+		return nil, false, err
+	}
+	pg := q.pager()
+	for _, id := range ids {
+		pg.Add(Message{ID: id})
+	}
+	byID := make(map[int64]Message, len(pg.Page))
+	for i := 0; i < len(pg.Page); i += 500 {
+		end := min(i+500, len(pg.Page))
+		marks, in := make([]string, 0, end-i), make([]any, 0, end-i)
+		for _, m := range pg.Page[i:end] {
+			marks, in = append(marks, "?"), append(in, m.ID)
+		}
+		var rows []Message
+		if err := s.reader().SelectContext(ctx, &rows, listMessagesSelect+" WHERE m.id IN ("+strings.Join(marks, ",")+")", in...); err != nil {
+			return nil, false, err
+		}
+		for _, m := range rows {
+			byID[m.ID] = m
+		}
+	}
+	for i, m := range pg.Page {
+		pg.Page[i] = byID[m.ID]
+	}
+	res := &MessageQueryResult{}
+	q.fill(res, pg)
+	return res, true, nil
 }
 
 // matches reports whether m passes every filter: the sender, the member it tags, and the text, each as a viewer sees it.
