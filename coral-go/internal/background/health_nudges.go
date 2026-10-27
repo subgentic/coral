@@ -165,7 +165,7 @@ func (h *HealthNudges) runProject(ctx context.Context, project string, bySession
 	if err != nil {
 		return
 	}
-	tasks, err := h.store.ListOpenTasks(ctx, project)
+	tasks, err := h.store.ListOpenTaskStates(ctx, project)
 	if err != nil {
 		return
 	}

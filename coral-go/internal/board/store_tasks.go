@@ -296,6 +296,23 @@ func (s *Store) ListOpenTasks(ctx context.Context, project string) ([]Task, erro
 	return tasks, nil
 }
 
+// ListOpenTaskStates is ListOpenTasks for a caller that reads a task's state and not its text: id, title, status, priority, assignee, the times, parking and goal, and BlockedBy; no body, completion
+// message, session or cost columns (they are empty). The board status read (polled by every open sidebar), the health monitor and the claim nudges read the whole open set of a board on a timer, and
+// the wide rows were megabytes of text they never read (#9114).
+func (s *Store) ListOpenTaskStates(ctx context.Context, project string) ([]Task, error) {
+	var tasks []Task
+	err := s.reader().SelectContext(ctx, &tasks,
+		`SELECT id, revision, board_id, title, status, priority, created_by, assigned_to, created_at, claimed_at, parked_reason, parked_until, remind_at, goal_id, `+updatedAtSQL+` AS updated_at FROM board_tasks
+		 WHERE board_id = ? AND status IN ('pending', 'in_progress', 'blocked', 'draft')
+		 ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, id ASC`,
+		project)
+	if err != nil {
+		return nil, err
+	}
+	s.loadBlockedBy(ctx, tasks)
+	return tasks, nil
+}
+
 // TasksUnderReview returns a board's tasks waiting for their completion review, by id,
 // with their assignees: a candidate submitted for review (still in_progress, or
 // review_pending once the worker's slot is released). The team status says
