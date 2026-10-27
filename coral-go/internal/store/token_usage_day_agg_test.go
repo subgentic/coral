@@ -54,6 +54,8 @@ func TestUsageSummariesThroughTheDayAggregateMatchTheHourlyRows(t *testing.T) {
 			for k := range want {
 				require.Equal(t, normalizeJSON(t, want[k]), normalizeJSON(t, got[k]), "%s: since %q, %s", stage, since, k)
 			}
+			// on and off run the same new code: the day series is also held to the SQL as it was before the aggregate, over token_usage_all
+			require.Equal(t, normalizeJSON(t, oldSeries1d(t, db, since)), normalizeJSON(t, got["series 1d"]), "%s: since %q, the day series against the old SQL", stage, since)
 			if strings.Contains(frag, "token_usage_day_agg") {
 				withDay++
 			}
