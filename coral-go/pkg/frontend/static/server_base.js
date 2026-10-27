@@ -111,6 +111,28 @@ export function serverFetch(server, url, options) {
     return fetch(target, options);
 }
 
+/** How long a registered computer has to answer a list the Inbox merges (#8904). This computer is not timed: it is the one the page came from. */
+const SERVER_READ_MS = 8000;
+
+/** serverFetch for a read that is merged with other computers' (the Inbox's artifacts, goals, tasks, saved messages): a registered computer that does not answer in `ms` (hung, port still
+ *  accepting) rejects with { timedOut: true } instead of holding the whole list on "Loading", so the reachable computers' rows show at once. The body is read inside the limit too; the Response
+ *  returned is whole. The caller's own signal still cancels it. */
+export async function serverRead(server, url, options = {}, ms = SERVER_READ_MS) {
+    if (normServer(server) === LOCAL_SERVER) return serverFetch(server, url, options);
+    const ctrl = new AbortController(); let timedOut = false;
+    const outer = options.signal;
+    if (outer) { if (outer.aborted) ctrl.abort(); else outer.addEventListener('abort', () => ctrl.abort(), { once: true }); }
+    const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
+    try {
+        const r = await serverFetch(server, url, { ...options, signal: ctrl.signal });
+        const text = await r.text();
+        return new Response(text, { status: r.status, statusText: r.statusText, headers: r.headers });
+    } catch (e) {
+        if (timedOut) throw Object.assign(new Error('did not answer'), { timedOut: true });
+        throw e;
+    } finally { clearTimeout(timer); }
+}
+
 /** An id that goes into a request path: a positive safe integer, as a number, or an error. Ids come from lists a registered server sent, and that is another machine: an id
  *  such as "1/../../x" must never become part of a URL (Security, #4551). */
 export function pathId(v) {

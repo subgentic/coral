@@ -6,7 +6,7 @@ import { makeLinkPolicy } from './safe_markdown.js';
 import { openTask, taskHref } from './task_navigation.js';
 import { onAccountForgotten } from './local_store.js';
 import { loadSafeMarkdown } from './vendor_loader.js';
-import { keyLabel, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels } from './server_base.js';
+import { keyLabel, pathId, serverFetch, serverRead, boardFetch, identityKey, noteBoardLabels } from './server_base.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Tasks tab
 const { mountInbox, clearInboxDrafts, INBOX_CONTRACT } = await importOnce('./inbox_panel.js'); // the component (shared with the hub); this file is the one that is Coral's
 
@@ -25,7 +25,7 @@ async function json(resp) {
 async function inboxRows(path, field) {
     const servers = ['local', ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
     const results = await Promise.allSettled(servers.map(async server => {
-        const data = await json(await serverFetch(server, path));
+        const data = await json(await serverRead(server, path)); // a computer that does not answer in time is left out (allSettled below), not waited for (#8904)
         const rows = Array.isArray(data[field]) ? data[field] : [];
         noteBoardLabels(rows, 'board_id', server);
         return rows.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) }));
