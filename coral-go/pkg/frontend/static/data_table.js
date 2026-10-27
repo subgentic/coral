@@ -113,7 +113,7 @@ const MAIL_QUERY = '(max-width: 767px)';
 const mailCell = (m, label, open, pick) => { // open: the row opens (a button), pick: a function that selects it, or null
     const td = el('td', 'dt-mail-cell'); td.setAttribute('role', 'cell');
     const lead = el(pick ? 'button' : 'span', 'dt-mail-lead');
-    if (pick) { lead.type = 'button'; lead.setAttribute('aria-label', `Select ${label}`); lead.setAttribute('aria-pressed', 'false'); lead.addEventListener('click', pick); } else lead.setAttribute('aria-hidden', 'true'); // a list that can be selected: the avatar is the select button (a tap, no gesture)
+    if (pick) { lead.type = 'button'; lead.setAttribute('role', 'checkbox'); lead.setAttribute('aria-label', `Select ${label}`); lead.setAttribute('aria-checked', 'false'); lead.addEventListener('click', pick); } else lead.setAttribute('aria-hidden', 'true'); // a list that can be selected: the avatar is its checkbox (a tap, no gesture), as the desktop's is
     const l = m.lead || {}, shape = l.icon ? el('span', 'dt-mail-avatar material-icons', l.icon) : el('span', 'dt-mail-avatar', [...String(l.text || m.title || '?')][0].toUpperCase());
     if (l.square) shape.classList.add('dt-mail-square');
     shape.style.background = `var(--avatar-${(hash(String(l.name || m.title || '').toLowerCase()) % 8) + 1})`;
@@ -145,6 +145,8 @@ export function dataTable(cfg) {
     const mailQuery = cfg.mail && typeof window.matchMedia === 'function' ? window.matchMedia(MAIL_QUERY) : null, mailOn = () => !!mailQuery && mailQuery.matches; // a phone's rows are mail rows
     box.classList.toggle('dt-mail-on', mailOn());
     const bar = el('div', 'dt-bar'); bar.hidden = true;
+    const live = el('span', 'sr-only'); live.setAttribute('role', 'status'); // the selection bar comes and goes: a screen reader hears "3 selected" from a region that stays in the page
+    box.append(live);
     const selectButton = button('btn btn-small dt-select-toggle', 'Select', () => { st.select = !st.select; syncSelectMode(); });
     selectButton.setAttribute('aria-pressed', 'false'); selectButton.hidden = !sel;
     let rows = cfg.rows.slice();
@@ -386,7 +388,7 @@ export function dataTable(cfg) {
     function syncSelection(quiet) {
         if (!sel) return;
         const present = new Set(rows.map(keyOf));
-        for (const tr of tbody.querySelectorAll(':scope > .dt-row')) { const on = st.selected.has(tr.dataset.key); tr.classList.toggle('dt-selected', on); tr.setAttribute('aria-selected', String(on)); const cb = tr.querySelector('.dt-check input'); if (cb) cb.checked = on; tr.querySelector('.dt-mail-lead')?.setAttribute('aria-pressed', String(on)); }
+        for (const tr of tbody.querySelectorAll(':scope > .dt-row')) { const on = st.selected.has(tr.dataset.key); tr.classList.toggle('dt-selected', on); tr.setAttribute('aria-selected', String(on)); const cb = tr.querySelector('.dt-check input'); if (cb) cb.checked = on; tr.querySelector('.dt-mail-lead')?.setAttribute('aria-checked', String(on)); }
         if (st.mailSelect && !st.selected.size) { st.select = false; st.mailSelect = false; syncSelectMode(); } // selecting began with an avatar and the last row was unselected: a tap opens a row again
         const all = thead.querySelector('.dt-check-all');
         if (all) { const available = rows.filter(eligible), n = available.filter(r => st.selected.has(keyOf(r))).length; all.disabled = !available.length; all.checked = n > 0 && n === available.length; all.indeterminate = n > 0 && n < available.length; }
@@ -398,6 +400,7 @@ export function dataTable(cfg) {
     function drawBar() {
         const n = st.selected.size;
         bar.hidden = n === 0; bar.replaceChildren();
+        live.textContent = n ? `${n} selected` : '';
         if (!n) { st.confirming = -1; st.choices = null; return; }
         bar.append(el('span', 'dt-bar-count', `${n} selected`));
         const actions = sel.actions || [];

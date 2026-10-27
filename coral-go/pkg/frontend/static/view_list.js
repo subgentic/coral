@@ -78,7 +78,7 @@ function wireKeys(nav) {
     });
 }
 
-/** The drawer (a phone's, with `drawer`): a button that names the current view opens the column as a panel over the page, 86 percent of the width, a scrim behind it; a view, the scrim and Escape close it, and the focus goes back to the button. */
+/** The drawer (a phone's, with `drawer`): a button that names the current view opens the column as a panel over the page, 86 percent of the width, a scrim behind it; a view, the scrim and Escape close it, and the focus goes back to the button; Tab stays inside the open panel. */
 function wireDrawer(root, nav) {
     const trigger = el('button', 'view-list-trigger'); trigger.type = 'button'; trigger.setAttribute('aria-expanded', 'false');
     const scrim = el('div', 'view-list-scrim'); scrim.setAttribute('aria-hidden', 'true');
@@ -92,7 +92,16 @@ function wireDrawer(root, nav) {
     };
     trigger.addEventListener('click', () => (root.classList.contains('view-list-open') ? close() : open()));
     scrim.addEventListener('click', () => close());
-    root.addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('view-list-open')) { e.stopPropagation(); close(); } });
+    root.addEventListener('keydown', e => {
+        if (!root.classList.contains('view-list-open')) return;
+        if (e.key === 'Escape') { e.stopPropagation(); close(); return; }
+        if (e.key !== 'Tab') return;
+        const stops = [...nav.querySelectorAll('.view-list-item:not(:disabled)')].filter(b => b.tabIndex >= 0); // the open drawer is a modal panel over the page: Tab goes round its own stops and never into the page behind the scrim
+        if (!stops.length) return;
+        const first = stops[0], last = stops[stops.length - 1], at = document.activeElement;
+        if (e.shiftKey && (at === first || !nav.contains(at))) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && (at === last || !nav.contains(at))) { e.preventDefault(); first.focus(); }
+    });
     root.prepend(trigger); root.append(scrim);
     return close;
 }
@@ -104,7 +113,8 @@ export function build({ id, label, sections, current, onPick, drawer = false }) 
     root.append(nav); if (select) root.append(select);
     const closeDrawer = drawer ? wireDrawer(root, nav) : () => {};
     wireKeys(nav);
-    nav.addEventListener('click', e => { const b = e.target instanceof Element && e.target.closest('.view-list-item'); if (b && !b.disabled) { closeDrawer({ refocus: false }); onPick(b.dataset.key); } });
+    // a picked view hides with the panel: the focus goes back to the button, not to the page's top
+    nav.addEventListener('click', e => { const b = e.target instanceof Element && e.target.closest('.view-list-item'); if (b && !b.disabled) { closeDrawer(); onPick(b.dataset.key); } });
     select?.addEventListener('change', () => onPick(select.value));
     draw(root, { sections, current });
     return root;
