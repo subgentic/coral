@@ -60,6 +60,7 @@ const SERVERS = [
             assert.deepEqual(look.title, ['20px', '700'], at + 'the page title is 20/700: ' + JSON.stringify(look));
             assert.deepEqual(look.intro, ['13px', '400', true, true], at + 'the intro is secondary 13/400 on one line: ' + JSON.stringify(look));
             assert.equal(look.more, 'About API keys', at + 'the encryption sentence is behind a disclosure');
+            assert.equal(await ev(`(() => { const r = document.createRange(); r.selectNodeContents(document.querySelector('.servers-intro-more > summary')); return r.getClientRects().length; })()`), 1, at + 'the About API keys link stays on one line');
             if (mobile) assert.equal(look.bar, 'Servers', at + 'the phone app bar names the view: ' + JSON.stringify(look));
             const clipped = await ev(`[...document.querySelectorAll('table.dt-table tbody td.dt-td')].filter(td => td.getClientRects().length).filter(td => { const r = td.getBoundingClientRect(), edge = r.right - parseFloat(getComputedStyle(td).paddingRight); return [...td.querySelectorAll('*')].some(x => x.getClientRects().length && x.getBoundingClientRect().right > edge + 1); }).map(td => td.dataset.key + ': ' + td.textContent.trim().slice(0, 20))`); // an element wider than its cell runs into the next column
             assert.deepEqual(clipped, [], at + 'no cell content runs past its column (the longest status word, Unreachable, fits its column): ' + JSON.stringify(clipped));
