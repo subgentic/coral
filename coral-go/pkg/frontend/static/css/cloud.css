@@ -79,7 +79,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cs-actions .btn { min-width: 64px; }
 .cloud-sub { font-size: var(--fs-md); margin: 14px 0 4px; opacity: .8; font-weight: 600; }
 .cloud-note { font-weight: 400; opacity: .7; }
-.cs-launch select { margin-left: 4px; padding: 3px 6px; border-radius: var(--radius-md); border: 1px solid var(--control-border, var(--border, var(--fx-navy-line))); background: var(--bg-primary, var(--fx-navy-ink)); color: inherit; }
+.cs-launch select { font-size: var(--fs-md); margin-left: 4px; padding: 3px 6px; border-radius: var(--radius-md); border: 1px solid var(--control-border, var(--border, var(--fx-navy-line))); background: var(--bg-primary, var(--fx-navy-ink)); color: inherit; }
 
 body.cloud-mode .settings-modal-body [hidden], body.cloud-mode #about-section[hidden] { display: none !important; }
 body.cloud-mode .settings-cloud-note { margin: 0 0 12px; }
