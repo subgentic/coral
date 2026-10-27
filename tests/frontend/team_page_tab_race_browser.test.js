@@ -22,7 +22,8 @@ const TEAM = `qa-tabrace-${Date.now() % 100000}`;
             await S.run(`pressing ${a} and then another tab at once leaves only the other tab's panel`, async () => {
                 for (const b of TABS) {
                     if (a === b) continue;
-                    await ev(`(() => { const by = n => window.__tp.allTabs().find(x => window.__tp.tabLabel(x) === n); by('Settings').click(); return true; })()`); await settle(150);
+                    const rest = ['Goals', 'Agents', 'Tasks', 'Artifacts', 'Knowledge', 'Board'].find(n => n !== a && n !== b); // a tab that is neither: the pair starts from it (Settings is a popout now, #8853, not a tab to rest on)
+                    await ev(`(() => { const by = n => window.__tp.allTabs().find(x => window.__tp.tabLabel(x) === n); by(${JSON.stringify(rest)}).click(); return true; })()`); await settle(150);
                     await ev(`(() => { const by = n => window.__tp.allTabs().find(x => window.__tp.tabLabel(x) === n); by(${JSON.stringify(a)}).click(); by(${JSON.stringify(b)}).click(); return true; })()`);
                     await settle(500);
                     assert.deepEqual(await shown(), [b === 'Board' ? 'messages' : b.toLowerCase()], `${a} then ${b}`); // the Board tab's panel keeps its old id, messages
