@@ -415,7 +415,7 @@ func checkReviewTaskOpen(ctx context.Context, tx *sqlx.Tx, project string, id, r
 func concludeRound(ctx context.Context, tx *sqlx.Tx, project string, id int64, w *TaskWorkflow, round *ReviewRound, approve bool, v *ReviewVerdict) error {
 	if !approve {
 		round.Result = "rejected"
-		if _, err := tx.ExecContext(ctx, "UPDATE board_tasks SET status='pending', assigned_to=?, claimed_at=NULL, edited_at=? WHERE id=? AND board_id=?", ptr.NullIfEmpty(w.OriginalAuthor), nowUTC(), id, project); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE board_tasks SET status='pending', assigned_to=?, "+keepWorkBeforeSQL+", claimed_at=NULL, edited_at=? WHERE id=? AND board_id=?", ptr.NullIfEmpty(w.OriginalAuthor), submittedAtOf(w.CompletionReview), submittedAtOf(w.CompletionReview), nowUTC(), id, project); err != nil {
 			return err
 		}
 		w.CompletionReview = nil

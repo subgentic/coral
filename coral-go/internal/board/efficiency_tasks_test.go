@@ -72,9 +72,6 @@ func TestEfficiencyTasksCountWorkNotReview(t *testing.T) {
 	none, err := rt.s.EfficiencyTasks(rt.ctx, "2026-10-21T00:00:00Z", "2026-10-22T00:00:00Z")
 	require.NoError(t, err)
 	assert.Empty(t, none)
-	sessions, err := rt.s.SubscriberSessions(rt.ctx)
-	require.NoError(t, err)
-	assert.Equal(t, "Worker-session", sessions["team|Worker"])
 }
 
 // A task a reviewer sent back is marked sent back, and its work time is from the last claim to the last hand-in.
@@ -136,4 +133,93 @@ func newEffTeam(t *testing.T, reviewers ...string) *effTeam {
 		et.review[*r.AssignedTo] = r
 	}
 	return et
+}
+
+// #8968: a send-back keeps the work of the round it ended: the task's time is every round's claim to hand-in, not only the last.
+func TestEfficiencyTasksKeepTheWorkOfTheRoundsBeforeTheLast(t *testing.T) {
+	rt := newEffTeam(t, "Security")
+	handedIn := func(claimed, submitted string) {
+		_, err := rt.s.db.ExecContext(rt.ctx, `UPDATE board_tasks SET claimed_at = ? WHERE id = ?`, claimed, rt.parent.ID)
+		require.NoError(t, err)
+		w, err := loadWorkflow(rt.ctx, rt.s.db, rt.parent.ID)
+		require.NoError(t, err)
+		require.NotNil(t, w.CompletionReview)
+		w.CompletionReview.SubmittedAt = submitted
+		require.NoError(t, saveWorkflow(rt.ctx, rt.s.db, rt.parent.ID, w))
+	}
+	handedIn("2026-10-20T10:00:00Z", "2026-10-20T10:01:40Z") // round one: 100 s of work
+	_, err := rt.s.ClaimTask(rt.ctx, "team", "Security", rt.review["Security"].ID)
+	require.NoError(t, err)
+	_, err = rt.s.RejectReview(rt.ctx, "team", rt.parent.ID, "Security", "no", 1) // a day of waiting for the verdict is not work
+	require.NoError(t, err)
+	var before float64
+	require.NoError(t, rt.s.db.GetContext(rt.ctx, &before, `SELECT COALESCE(work_before_seconds, 0) FROM board_tasks WHERE id = ?`, rt.parent.ID))
+	assert.InDelta(t, 100, before, 0.001, "the rejection kept round one's work")
+	_, err = rt.s.ClaimTask(rt.ctx, "team", "Worker", rt.parent.ID)
+	require.NoError(t, err)
+	_, err = rt.s.SubmitCompletionReview(rt.ctx, "team", rt.parent.ID, "Worker", "again", "success", "fixed", nil)
+	require.NoError(t, err)
+	handedIn("2026-10-21T12:00:00Z", "2026-10-21T12:10:00Z") // round two: 600 s
+	_, _, err = rt.s.HandToOrchestrator(rt.ctx, "team", rt.parent.ID, "Worker")
+	require.NoError(t, err)
+	_, err = rt.s.ApproveReview(rt.ctx, "team", rt.parent.ID, "Security", "ok", 2)
+	require.NoError(t, err)
+	_, err = rt.s.CompleteApprovedReview(rt.ctx, "team", rt.parent.ID, "Lead", nil)
+	require.NoError(t, err)
+	_, err = rt.s.db.ExecContext(rt.ctx, `UPDATE board_tasks SET completed_at = '2026-10-21T13:00:00Z' WHERE id = ?`, rt.parent.ID)
+	require.NoError(t, err)
+	got, err := rt.s.EfficiencyTasks(rt.ctx, "2026-10-21T00:00:00Z", "2026-10-22T00:00:00Z")
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.NotNil(t, got[0].WorkSeconds)
+	assert.InDelta(t, 700, *got[0].WorkSeconds, 0.001, "100 s of round one and 600 s of round two, not the review of either")
+	assert.True(t, got[0].SentBack)
+
+	// an approved task sent back after completion keeps its round too
+	_, err = rt.s.SendBack(rt.ctx, "team", rt.parent.ID, "Lead", "one more thing")
+	require.NoError(t, err)
+	require.NoError(t, rt.s.db.GetContext(rt.ctx, &before, `SELECT COALESCE(work_before_seconds, 0) FROM board_tasks WHERE id = ?`, rt.parent.ID))
+	assert.InDelta(t, 100+600, before, 0.001)
+}
+
+// #8968: a review task is not work even when its workflow cannot be read or is missing, and the window is compared as instants.
+func TestEfficiencyTasksLeaveOutReviewTitlesAndReadTheWindowAsInstants(t *testing.T) {
+	rt := newEffTeam(t, "Security")
+	rv, err := rt.s.CreateTask(rt.ctx, "team", "Review #42: something", "", "low", "Lead", "Worker")
+	require.NoError(t, err)
+	_, err = rt.s.ClaimTask(rt.ctx, "team", "Worker", rv.ID)
+	require.NoError(t, err)
+	_, err = rt.s.CompleteTask(rt.ctx, "team", rv.ID, "Worker", nil)
+	require.NoError(t, err)
+	_, err = rt.s.db.ExecContext(rt.ctx, `UPDATE board_tasks SET claimed_at = '2026-10-20T10:00:00Z', completed_at = '2026-10-20T10:05:00Z' WHERE id = ?`, rv.ID)
+	require.NoError(t, err)
+	_, err = rt.s.db.ExecContext(rt.ctx, `DELETE FROM task_workflows WHERE task_id = ?`, rv.ID)
+	require.NoError(t, err)
+	plain, err := rt.s.CreateTask(rt.ctx, "team", "Real", "", "low", "Lead", "Worker")
+	require.NoError(t, err)
+	_, err = rt.s.ClaimTask(rt.ctx, "team", "Worker", plain.ID)
+	require.NoError(t, err)
+	_, err = rt.s.CompleteTask(rt.ctx, "team", plain.ID, "Worker", nil)
+	require.NoError(t, err)
+	_, err = rt.s.db.ExecContext(rt.ctx, `UPDATE board_tasks SET claimed_at = '2026-10-20T09:00:00Z', completed_at = '2026-10-20T10:00:00.500Z' WHERE id = ?`, plain.ID)
+	require.NoError(t, err)
+
+	got, err := rt.s.EfficiencyTasks(rt.ctx, "2026-10-20T10:00:00Z", "2026-10-20T11:00:00Z")
+	require.NoError(t, err)
+	require.Len(t, got, 1, "the review-titled task is out; the task completed half a second after the start is in")
+	assert.Equal(t, plain.ID, got[0].ID)
+	got, err = rt.s.EfficiencyTasks(rt.ctx, "2026-10-20T00:00:00Z", "2026-10-20T10:00:00Z")
+	require.NoError(t, err)
+	assert.Empty(t, got, "and half a second after the end is not in the window before it")
+}
+
+// #8968: the session recorded at the claim is the task's session.
+func TestEfficiencyTasksNameTheSessionRecordedAtTheClaim(t *testing.T) {
+	rt := newEffTeam(t, "Security")
+	_, err := rt.s.db.ExecContext(rt.ctx, `UPDATE board_tasks SET session_id = 'sess-at-claim', claimed_at = '2026-10-20T10:00:00Z', completed_at = '2026-10-20T10:30:00Z', status = 'completed' WHERE id = ?`, rt.parent.ID)
+	require.NoError(t, err)
+	got, err := rt.s.EfficiencyTasks(rt.ctx, "2026-10-20T00:00:00Z", "2026-10-21T00:00:00Z")
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "sess-at-claim", got[0].Session)
 }

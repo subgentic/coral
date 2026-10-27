@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/efficiency"
-	"github.com/subgentic/coral/internal/logparse"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -46,7 +46,7 @@ var efficiencyRanges = map[string]time.Duration{"24h": 24 * time.Hour, "7d": 7 *
 
 const (
 	efficiencyUsual       = 7 * 24 * time.Hour
-	efficiencyCommitSlack = 14 * 24 * time.Hour // commits are read this far before a window, so a task claimed before it still has its commits
+	efficiencyCommitSlack = 14 * 24 * time.Hour // commits are read this far before a window, so a task claimed before it still has its commits; a task open longer than that has only the commits of its last 14 days before the window
 )
 
 type efficiencyAverage struct {
@@ -90,9 +90,28 @@ func (h *EfficiencyHandler) Efficiency(w http.ResponseWriter, r *http.Request) {
 	now := h.clock()
 	since := now.Add(-dur)
 	ctx := r.Context()
-	in, err := h.input(ctx, since, now, team)
+	fail := func(err error) {
+		slog.Error("efficiency read failed", "error", err) // the detail is the log's: a reply never carries a store's error text
+		errInternalServer(w, "the efficiency read failed")
+	}
+	// what does not depend on the window is read once for both windows
+	live, err := h.ss.GetAllLiveSessions(ctx)
 	if err != nil {
-		errInternalServer(w, err.Error())
+		fail(err)
+		return
+	}
+	branches, err := h.ss.LatestBranches(ctx)
+	if err != nil {
+		fail(err)
+		return
+	}
+	shared := efficiencyShared{branches: branches, live: make(map[string]store.LiveSession, len(live))}
+	for _, ls := range live {
+		shared.live[ls.SessionID] = ls
+	}
+	in, err := h.input(ctx, since, now, team, shared)
+	if err != nil {
+		fail(err)
 		return
 	}
 	cur, err := efficiency.Compute(metric, dim, in)
@@ -100,9 +119,9 @@ func (h *EfficiencyHandler) Efficiency(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, err.Error())
 		return
 	}
-	prevIn, err := h.input(ctx, since.Add(-efficiencyUsual), since, team)
+	prevIn, err := h.input(ctx, since.Add(-efficiencyUsual), since, team, shared)
 	if err != nil {
-		errInternalServer(w, err.Error())
+		fail(err)
 		return
 	}
 	prev, _ := efficiency.Compute(metric, dim, prevIn)
@@ -112,40 +131,66 @@ func (h *EfficiencyHandler) Efficiency(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, efficiencyAnswer{
 		Metric: metric, GroupBy: dim, Range: rng, GeneratedAt: now.Format(time.RFC3339), MinSample: efficiency.MinSample,
-		Total: cur.Total, Average: efficiencyAverage{Value: cur.Average, Usual: prev.Average}, Groups: groups, Unmeasured: cur.Unmeasured,
+		Total: cur.Total, Average: efficiencyAverage{Value: cur.Median, Usual: prev.Median}, Groups: groups, Unmeasured: cur.Unmeasured,
 	})
 }
 
 // measuredProviders are the CLIs whose usage Coral reads (the same set as the Spend read): Gemini writes no usage rows.
 var measuredProviders = map[string]bool{"claude": true, "codex": true, "pi": true, "agy": true}
 
+// efficiencyShared is what both windows of one read share.
+type efficiencyShared struct {
+	live     map[string]store.LiveSession
+	branches map[string]string
+}
+
+// foundThere is how long before a session began a commit may be dated and still be the session's own (clock slack): an earlier one was already on the branch when the agent started.
+const foundThere = time.Minute
+
 // input reads one window [from, to) and shapes it for efficiency.Compute. team, when set, keeps one board's rows only.
-func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team string) (efficiency.Input, error) {
+func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team string, sh efficiencyShared) (efficiency.Input, error) {
 	in := efficiency.Input{Measured: measuredProviders, Sessions: map[string]efficiency.Session{}, TeamLabels: map[string]string{}}
 	usage, err := h.ts.EfficiencyUsage(ctx, from.Format(time.RFC3339), to.Format(time.RFC3339))
 	if err != nil {
 		return in, err
 	}
-	live, err := h.ss.GetAllLiveSessions(ctx)
+	commits, err := h.ss.EfficiencyCommits(ctx, from.Add(-efficiencyCommitSlack), to)
 	if err != nil {
 		return in, err
 	}
-	branches, err := h.ss.LatestBranches(ctx)
+	tasks, err := h.bs.EfficiencyTasks(ctx, from.Format(time.RFC3339), to.Format(time.RFC3339))
 	if err != nil {
 		return in, err
 	}
-	liveByID := make(map[string]store.LiveSession, len(live))
-	for _, ls := range live {
-		liveByID[ls.SessionID] = ls
+	// the sessions whose facts are asked of the store: every one that made or saw a commit, or claimed a task, that is not live (a live row has them)
+	var wantFacts []string
+	seenFact := map[string]bool{}
+	want := func(id string) {
+		if id != "" && !seenFact[id] {
+			seenFact[id] = true
+			wantFacts = append(wantFacts, id)
+		}
 	}
-	// every session that shows up (a usage row, a commit, a task's claimer) gets its labels from its live row, else from the row that named it
+	for _, c := range commits {
+		for _, sg := range c.Seen {
+			want(sg.SessionID)
+		}
+	}
+	for _, t := range tasks {
+		want(t.Session)
+	}
+	facts, err := h.ss.SessionFacts(ctx, wantFacts)
+	if err != nil {
+		return in, err
+	}
+	// every session that shows up (a usage row, a commit, a task's claim) gets its labels from its live row, else from the row that named it
 	addSession := func(id, agent, provider, boardName string) {
 		if id == "" {
 			return
 		}
 		s := in.Sessions[id]
 		s.ID = id
-		if ls, ok := liveByID[id]; ok {
+		if ls, ok := sh.live[id]; ok {
 			if s.Agent == "" {
 				s.Agent = firstNonEmptyStr(deref(ls.DisplayName), ls.AgentName)
 			}
@@ -162,10 +207,13 @@ func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team 
 		if s.Provider == "" {
 			s.Provider = provider
 		}
+		if s.Provider == "" {
+			s.Provider = facts[id].Provider
+		}
 		if s.Team == "" {
 			s.Team = boardName
 		}
-		s.Branch = branches[id]
+		s.Branch = sh.branches[id]
 		in.Sessions[id] = s
 	}
 	for _, u := range usage {
@@ -175,68 +223,86 @@ func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team 
 		addSession(u.SessionID, u.AgentName, u.AgentType, u.Team)
 		in.Usage = append(in.Usage, efficiency.UsageRow{Session: u.SessionID, Provider: u.AgentType, Team: u.Team, Model: u.Model, Thinking: u.Thinking, Tokens: u.Tokens, CostUSD: u.CostUSD})
 	}
-	dominantModel := dominantModels(in.Usage)
+	dominantModel := efficiency.DominantModels(in.Usage)
 
-	commits, err := h.ss.EfficiencyCommits(ctx, from.Add(-efficiencyCommitSlack), to)
-	if err != nil {
-		return in, err
-	}
+	// A commit belongs to the first session that saw it and had begun by then: one that started after the commit was dated found it on the branch (a session that is not known to have begun is taken to have
+	// begun before it).
 	type timed struct {
 		session string
 		at      time.Time
+		hash    string
 	}
-	var commitTimes []timed
+	bySession := map[string][]timed{}
 	for _, c := range commits {
-		ls, isLive := liveByID[c.SessionID]
-		if isLive {
-			if started, err := time.Parse(time.RFC3339, ls.CreatedAt); err == nil && c.At.Before(started.Add(-time.Minute)) {
-				continue // made before the session began: the agent found it there
+		var owner *store.CommitSighting
+		for i := range c.Seen {
+			sg := &c.Seen[i]
+			start := sh.sessionStart(sg.SessionID, facts)
+			if !start.IsZero() && c.At.Before(start.Add(-foundThere)) {
+				continue
 			}
+			owner = sg
+			break
 		}
-		addSession(c.SessionID, c.AgentName, c.AgentType, "")
-		if team != "" && in.Sessions[c.SessionID].Team != team {
+		if owner == nil {
 			continue
 		}
-		commitTimes = append(commitTimes, timed{c.SessionID, c.At})
+		addSession(owner.SessionID, owner.AgentName, owner.AgentType, "")
+		if team != "" && in.Sessions[owner.SessionID].Team != team {
+			continue
+		}
+		bySession[owner.SessionID] = append(bySession[owner.SessionID], timed{owner.SessionID, c.At, c.Hash})
 		if !c.At.Before(from) {
-			in.Commits = append(in.Commits, efficiency.Commit{Hash: c.Hash, Session: c.SessionID, Branch: c.Branch})
+			in.Commits = append(in.Commits, efficiency.Commit{Hash: c.Hash, Session: owner.SessionID, Branch: owner.Branch})
 		}
 	}
 
-	tasks, err := h.bs.EfficiencyTasks(ctx, from.Format("2006-01-02T15:04:05Z"), to.Format("2006-01-02T15:04:05Z"))
-	if err != nil {
-		return in, err
+	// A task is the work of the session recorded at its claim, which a restart of the agent since does not change; one with none recorded has no session, no provider and no commits.
+	type window struct {
+		claimed, ended time.Time
+		row            int
 	}
-	subscribers, err := h.bs.SubscriberSessions(ctx)
-	if err != nil {
-		return in, err
-	}
+	windows := map[string][]window{}
 	for _, t := range tasks {
 		if team != "" && t.Board != team {
 			continue
 		}
-		var provider, sid string
-		if name := subscribers[t.Board+"|"+t.Claimer]; name != "" {
-			provider, sid = logparse.ParseSessionName(name)
+		var provider string
+		if t.Session != "" {
+			addSession(t.Session, t.Claimer, "", t.Board)
+			provider = in.Sessions[t.Session].Provider
 		}
-		addSession(sid, t.Claimer, provider, t.Board)
-		row := efficiency.TaskRow{ID: t.ID, Title: t.Title, Team: t.Board, Agent: t.Claimer, Provider: provider, Thinking: t.Thinking, Branch: branches[sid],
+		row := efficiency.TaskRow{ID: t.ID, Title: t.Title, Team: t.Board, Agent: t.Claimer, Provider: provider, Thinking: t.Thinking, Branch: sh.branches[t.Session],
 			WorkSeconds: t.WorkSeconds, SentBack: t.SentBack, Tokens: t.Tokens, CostUSD: t.CostUSD}
-		if m, ok := dominantModel[sid]; ok {
+		if m, ok := dominantModel[t.Session]; ok {
 			row.Model = m
-		} else if ls, ok := liveByID[sid]; ok {
+		} else if ls, ok := sh.live[t.Session]; ok {
 			row.Model = deref(ls.Model)
 		}
 		claimed, errClaimed := time.Parse(time.RFC3339, t.ClaimedAt)
 		ended, errEnded := time.Parse(time.RFC3339, t.EndedAt)
-		if sid != "" && errClaimed == nil && errEnded == nil {
-			for _, c := range commitTimes {
-				if c.session == sid && !c.at.Before(claimed) && !c.at.After(ended) {
-					row.Commits++
-				}
-			}
+		if t.Session != "" && errClaimed == nil && errEnded == nil {
+			windows[t.Session] = append(windows[t.Session], window{claimed.UTC(), ended.UTC(), len(in.Tasks)})
 		}
 		in.Tasks = append(in.Tasks, row)
+	}
+	// each commit goes to one task: of its session's tasks that were open when it was made (from the claim, up to but not including the end), the one claimed last; the same instant, the higher number
+	for sid, cs := range bySession {
+		ws := windows[sid]
+		for _, c := range cs {
+			best := -1
+			for i, w := range ws {
+				if c.at.Before(w.claimed) || !c.at.Before(w.ended) {
+					continue
+				}
+				if best < 0 || w.claimed.After(ws[best].claimed) || (w.claimed.Equal(ws[best].claimed) && in.Tasks[w.row].ID > in.Tasks[ws[best].row].ID) {
+					best = i
+				}
+			}
+			if best >= 0 {
+				in.Tasks[ws[best].row].Commits++
+			}
+		}
 	}
 	teams := map[string]bool{}
 	for _, s := range in.Sessions {
@@ -256,29 +322,14 @@ func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team 
 	return in, nil
 }
 
-// dominantModels is each session's model that spent most of its tokens in the rows (ties: the smaller name); a session whose rows name no model is left out.
-func dominantModels(rows []efficiency.UsageRow) map[string]string {
-	by := map[string]map[string]int64{}
-	for _, r := range rows {
-		if r.Model == "" {
-			continue
+// sessionStart is when a session began, from its live row, else the store's facts; zero when unknown.
+func (sh efficiencyShared) sessionStart(id string, facts map[string]store.SessionFacts) time.Time {
+	if ls, ok := sh.live[id]; ok {
+		if t, err := time.Parse(time.RFC3339, ls.CreatedAt); err == nil {
+			return t.UTC()
 		}
-		if by[r.Session] == nil {
-			by[r.Session] = map[string]int64{}
-		}
-		by[r.Session][r.Model] += r.Tokens
 	}
-	out := map[string]string{}
-	for s, m := range by {
-		best, bestT := "", int64(-1)
-		for k, v := range m {
-			if v > bestT || (v == bestT && k < best) {
-				best, bestT = k, v
-			}
-		}
-		out[s] = best
-	}
-	return out
+	return facts[id].Start
 }
 
 func firstNonEmptyStr(a, b string) string {
