@@ -476,7 +476,7 @@ func TestALazyBuildThatPanicsIsSkipped(t *testing.T) {
 	index, _ := fs.ReadFile(Templates, "templates/index.html")
 	real := buildLazy
 	t.Cleanup(func() { buildLazy = real })
-	const single, main = "docs.js", "workflows.js"
+	const single, main = "docs.js", "automations.js"
 	buildLazy = func(static fs.FS, entry, name string, plugin api.Plugin) (lazyOutput, error) {
 		if name == single || name == main {
 			panic("the build of " + name + " blew up")

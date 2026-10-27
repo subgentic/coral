@@ -50,11 +50,11 @@ const AUDIT = `(() => { const root = window.__scanRoot ? document.querySelector(
         await ev(`window.__m.add('icon-bot', 'A', 6, { sleeping: false }); true`); await settle(ev, 900); // sleep-ok: views and dialogs fill from several answers; there is no completion event
         await scan('welcome (no agent open)');
         await ev(`document.documentElement.style.fontSize = '200%'; true`); await settle(ev, 500); await scan('welcome at 200% text, where the top bar names its controls from their text');
-        await Emulation.setDeviceMetricsOverride({ width: 900, height: 900, deviceScaleFactor: 1, mobile: false }); await settle(ev, 600);
-        if (!await ev(`!!document.querySelector('.nav-more-btn') && document.querySelector('.nav-more-btn').getClientRects().length > 0`)) problems.push('the top bar has no More button at 900 px and 200% text: the scene that names it from its contents did not open');
+        await Emulation.setDeviceMetricsOverride({ width: 800, height: 900, deviceScaleFactor: 1, mobile: false }); await settle(ev, 600); // narrow enough that the six tabs (Workflows and Jobs are one since #8863) overflow at 200% text
+        if (!await ev(`!!document.querySelector('.nav-more-btn') && document.querySelector('.nav-more-btn').getClientRects().length > 0`)) problems.push('the top bar has no More button at 800 px and 200% text: the scene that names it from its contents did not open');
         await scan('the top bar with its More button (named from its text and a chevron icon)');
         await ev(`document.documentElement.style.fontSize = ''; true`); await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await settle(ev, 400);
-        for (const tab of ['history', 'workflows', 'jobs', 'tokens', 'docs', 'board']) { await ev(`window.switchNavTab('${tab}'); true`); await settle(ev, 900); await scan('tab ' + tab); } // sleep-ok: views and dialogs fill from several answers; there is no completion event
+        for (const tab of ['history', 'automations', 'tokens', 'docs', 'board']) { await ev(`window.switchNavTab('${tab}'); true`); await settle(ev, 900); await scan('tab ' + tab); } // sleep-ok: views and dialogs fill from several answers; there is no completion event
         await ev(`window.switchNavTab('agents'); window.selectLiveSession('icon-bot', 'claude', 'icon-bot-id', 'local'); true`); await settle(ev, 1500); // sleep-ok: views and dialogs fill from several answers; there is no completion event
         await scan('agent chat and its header');
         await ev(`(document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); true`); await settle(ev, 700); // sleep-ok: views and dialogs fill from several answers; there is no completion event
