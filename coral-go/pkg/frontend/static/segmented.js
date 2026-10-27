@@ -7,7 +7,7 @@ let seq = 0;
 export function segmentSelect(select, { label = '', labelledby = '', cards = false, className = '' } = {}) {
     if (!select || select._segmented) return select && select._segmented;
     const group = document.createElement('div');
-    group.className = `seg-group${cards ? ' seg-cards' : ''}${className ? ' ' + className : ''}`;
+    group.className = `seg-group${cards ? ' seg-cards' : ' btn-seg'}${className ? ' ' + className : ''}`;
     group.setAttribute('role', 'radiogroup');
     if (labelledby) group.setAttribute('aria-labelledby', labelledby); else if (label) group.setAttribute('aria-label', label);
     group.id = `seg-${++seq}`;
@@ -26,7 +26,7 @@ export function segmentSelect(select, { label = '', labelledby = '', cards = fal
         const cur = select.value;
         for (const o of options()) {
             const b = document.createElement('button');
-            b.type = 'button'; b.className = 'seg-btn'; b.setAttribute('role', 'radio'); b.dataset.value = o.value;
+            b.type = 'button'; b.className = 'btn seg-btn'; b.setAttribute('role', 'radio'); b.dataset.value = o.value;
             const on = o.value === cur;
             b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
             const name = document.createElement('span'); name.className = 'seg-name'; name.textContent = o.textContent.trim();
