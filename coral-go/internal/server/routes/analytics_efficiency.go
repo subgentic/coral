@@ -130,7 +130,7 @@ func (h *EfficiencyHandler) Efficiency(w http.ResponseWriter, r *http.Request) {
 		fail(err)
 		return
 	}
-	in, err := h.input(ctx, since, now, team, shared)
+	in, err := h.input(ctx, since, now, team, shared, dim != efficiency.Thinking)
 	if err != nil {
 		fail(err)
 		return
@@ -140,7 +140,7 @@ func (h *EfficiencyHandler) Efficiency(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, err.Error())
 		return
 	}
-	prevIn, err := h.input(ctx, since.Add(-efficiencyUsual), since, team, shared)
+	prevIn, err := h.input(ctx, since.Add(-efficiencyUsual), since, team, shared, false) // a window that ends inside a day cannot be read from the day aggregate
 	if err != nil {
 		fail(err)
 		return
@@ -171,9 +171,10 @@ type efficiencyShared struct {
 const foundThere = time.Minute
 
 // input reads one window [from, to) and shapes it for efficiency.Compute. team, when set, keeps one board's rows only.
-func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team string, sh efficiencyShared) (efficiency.Input, error) {
+// coarse: the window runs to now and the grouping does not read the thinking level of the usage rows (every grouping but thinking: the commits' dominant level is only the thinking grouping's), so the usage is read from the day aggregate (#9442).
+func (h *EfficiencyHandler) input(ctx context.Context, from, to time.Time, team string, sh efficiencyShared, coarse bool) (efficiency.Input, error) {
 	in := efficiency.Input{Measured: measuredProviders, Sessions: map[string]efficiency.Session{}, TeamLabels: map[string]string{}}
-	usage, err := h.ts.EfficiencyUsage(ctx, from.Format(time.RFC3339), to.Format(time.RFC3339))
+	usage, err := h.ts.EfficiencyUsage(ctx, from.Format(time.RFC3339), to.Format(time.RFC3339), coarse)
 	if err != nil {
 		return in, err
 	}

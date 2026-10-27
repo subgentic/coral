@@ -24,7 +24,13 @@ type EfficiencyUsageRow struct {
 
 // EfficiencyUsage reads the usage recorded in [since, until) (RFC 3339 UTC, until "" for no end): raw rows and rolled-up hourly rows alike, a session counted once however it was read (the same rule
 // as every other usage total). A row with no model or no thinking level has "" there.
-func (s *TokenUsageStore) EfficiencyUsage(ctx context.Context, since, until string) ([]EfficiencyUsageRow, error) {
+//
+// coarse (#9442) says the caller does not read the thinking level and the window runs to the present: the rolled-up rows then come from the day aggregate where it can answer (usageCoarseRelation, about 24
+// times fewer rows than the hourly ones), and Thinking is "" in every row. Nothing is recorded at or after until in that case but a stamp in the future, which the filter below still leaves out.
+func (s *TokenUsageStore) EfficiencyUsage(ctx context.Context, since, until string, coarse bool) ([]EfficiencyUsageRow, error) {
+	if coarse {
+		return s.efficiencyUsageCoarse(ctx, since, until)
+	}
 	q := `SELECT t.session_id, COALESCE(NULLIF(ls.display_name, ''), MIN(t.agent_name), '') AS agent_name, t.agent_type,
 	             COALESCE(NULLIF(t.board_name, ''), ls.board_name, '') AS team, COALESCE(t.model, '') AS model, COALESCE(t.thinking, '') AS thinking,
 	             COALESCE(SUM(t.input_tokens + t.output_tokens), 0) AS tokens, COALESCE(SUM(t.cost_usd), 0) AS cost_usd
@@ -38,6 +44,25 @@ func (s *TokenUsageStore) EfficiencyUsage(ctx context.Context, since, until stri
 	// the grouping is by the usage row's own columns: the live session has a model and a thinking level of its own, which are not these
 	q += ` GROUP BY t.session_id, t.agent_type, COALESCE(NULLIF(t.board_name, ''), ls.board_name, ''), COALESCE(t.model, ''), COALESCE(t.thinking, '')
 	       ORDER BY t.session_id, COALESCE(t.model, ''), COALESCE(t.thinking, '')`
+	var rows []EfficiencyUsageRow
+	err := s.db.Reader().SelectContext(ctx, &rows, q, args...)
+	return rows, err
+}
+
+// efficiencyUsageCoarse is EfficiencyUsage over the coarse relation: the same groups without the thinking level, summed from the day aggregate for the clean whole days.
+func (s *TokenUsageStore) efficiencyUsageCoarse(ctx context.Context, since, until string) ([]EfficiencyUsageRow, error) {
+	rel, args := usageCoarseRelation(ctx, s.db.Reader(), since)
+	q := `SELECT t.session_id, COALESCE(NULLIF(ls.display_name, ''), MIN(t.agent_name), '') AS agent_name, t.agent_type,
+	             COALESCE(NULLIF(t.board_name, ''), ls.board_name, '') AS team, COALESCE(t.model, '') AS model, '' AS thinking,
+	             COALESCE(SUM(t.input_tokens + t.output_tokens), 0) AS tokens, COALESCE(SUM(t.cost_usd), 0) AS cost_usd
+	      FROM ` + rel + ` t LEFT JOIN live_sessions ls ON ls.session_id = t.session_id
+	      WHERE ` + usageDedup("t.")
+	if until != "" {
+		q += ` AND t.recorded_at < ?`
+		args = append(args, windowBound(until))
+	}
+	q += ` GROUP BY t.session_id, t.agent_type, COALESCE(NULLIF(t.board_name, ''), ls.board_name, ''), COALESCE(t.model, '')
+	       ORDER BY t.session_id, COALESCE(t.model, '')`
 	var rows []EfficiencyUsageRow
 	err := s.db.Reader().SelectContext(ctx, &rows, q, args...)
 	return rows, err
