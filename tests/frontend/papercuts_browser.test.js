@@ -3,7 +3,7 @@
 // with nothing open has its own empty state; the phone nav strip has no
 // scrollbar and fades the edge with more tabs; the team-send button is a
 // labelled icon; the API key is masked full width with Show/Copy; the agent
-// search placeholder fits its box; the Servers tab's Local row and an
+// search placeholder fits its box; the Servers tab's This computer row and an
 // unreachable row; opening a view before the first list load is not re-opened.
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
@@ -149,14 +149,14 @@ const BASE = require('./test_base').BASE;
         assert.ok(fit.text <= fit.room, `placeholder "${fit.placeholder}" (${fit.text.toFixed(1)}px) fits the box's minimum width (${fit.room.toFixed(1)}px)`);
         console.log(`PASS (13) search placeholder "${fit.placeholder}" fits at the minimum width`);
 
-        // ── (14) Servers tab (a hub): the Local row and an unreachable row.
+        // ── (14) Servers tab (a hub): the This computer row and an unreachable row.
         const rows = await ev(`(async () => {
             const S = window.__coralStatic || '/static/';
             const { state } = await import(S + 'state.js');
             const real = window.fetch;
             window.fetch = (u, o) => (new URL(String(u), location.origin).pathname === '/api/servers' && (!o || !o.method || o.method === 'GET'))
                 ? Promise.resolve(new Response(JSON.stringify([
-                    { id: 'local', label: 'Local', local: true, status: 'online' },
+                    { id: 'local', label: 'This computer', local: true, status: 'online' },
                     { id: 'r1', label: 'Remote', url: 'https://r1.example:8420', status: 'unreachable', last_error: 'dial tcp: connection refused', last_seen: new Date(Date.now() - 600000).toISOString() },
                   ]), { status: 200, headers: { 'content-type': 'application/json' } }))
                 : real(u, o);
@@ -173,10 +173,10 @@ const BASE = require('./test_base').BASE;
             window.fetch = real;
             return out;
         })()`);
-        assert.match(rows.local, /^This hub · Coral 9\.9\.9 · \d+ agents?$/, 'the Local row shows its version and agent count: ' + rows.local);
+        assert.match(rows.local, /^This hub · Coral 9\.9\.9 · \d+ agents?$/, 'the This computer row shows its version and agent count: ' + rows.local);
         assert.match(rows.r1meta, /Last contact\s*\d/, 'an unreachable server\'s page says last contact: ' + rows.r1meta);
         assert.equal(rows.r1hint, 'Is Coral running on that machine? Check the URL.');
-        console.log('PASS (14) Servers: Local row version + agents; unreachable row explains and says last contact');
+        console.log('PASS (14) Servers: This computer row version + agents; unreachable row explains and says last contact');
 
         // ── (15) A view the user opens while the first list loads is not opened
         // again by the deep-link restore (it only restores the hash the page was
