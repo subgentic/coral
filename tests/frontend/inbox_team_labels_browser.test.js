@@ -60,6 +60,16 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             check(`${label}: Tasks has a Team filter with both teams, by their computer`, tchoices.filter(([v]) => v).length === 2 && tchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)) && tchoices.some(([v, t]) => v === 'alpha' && /This computer/.test(t)), JSON.stringify(tchoices));
             await ev(`(() => { const s = document.getElementById('inbox-tk-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500);
             check(`${label}: choosing the remote one shows its task, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(b => b.textContent.replace(/^#\\d+\\s*/, '').trim())`)) === '["Remote task"]' && /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`)), JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(b => b.textContent.trim())`)));
+
+            // Needs you: two agents waiting, one on each computer's alpha
+            await ev(`(async () => { const S = window.__coralStatic || '/static/'; const ago = m => new Date(Date.now() - m * 60000).toISOString();
+                window.__m.add('Local Dev', 'A', 4, { sleeping: false, board_project: 'alpha', session_id: 'ld-id' }); window.__m.add('Remote Dev', 'B', 4, { sleeping: false, board_project: 'alpha', session_id: 'rd-id', server: 'box-2' });
+                window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, waiting_for_input: true, waiting_kind: 'permission', waiting_since: ago(5) }));
+                (await import(S + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
+            await open('needs');
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: two waiting agents`, 10000);
+            const nteams = await column('Team');
+            check(`${label}: Needs you's Team column tells the two alpha teams apart`, nteams && nteams.length === 2 && nteams[0] !== nteams[1] && nteams.some(t => /alpha.*This computer/.test(t)) && nteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(nteams));
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
