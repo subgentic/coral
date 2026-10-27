@@ -24,7 +24,7 @@ const AUDIT_SRC = `(() => {
     const hex = c => '#' + c.slice(0, 3).map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
     const fmt = n => Math.round(n * 100) / 100;
     window.__audit = (roots, opts = {}) => {
-        const fails = [], borders = []; let checked = 0;
+        const fails = [], borders = [], samples = []; let checked = 0;
         const note = (el, what, r, need, fg, bg) => fails.push({ sel: sel(el), what, text: (el.value || el.placeholder || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 40), ratio: fmt(r), need, fg: hex(fg), bg: hex(bg) });
         const seen = new Set();
         const text = (el, color, label) => {
@@ -32,6 +32,7 @@ const AUDIT_SRC = `(() => {
             const px = parseFloat(cs.fontSize), bold = Number(cs.fontWeight) >= 700 || cs.fontWeight === 'bold'; const large = px >= 24 || (px >= 18.66 && bold);
             const glyph = el.classList.contains('material-icons') || /^[\\uE000-\\uF8FF]/.test((el.textContent || '').trim());
             const need = large || glyph ? 3 : 4.5; const r = ratio(fg, bg); checked++; // an icon is a graphic: 3:1 (1.4.11), not the text's 4.5
+            if (opts.samples) samples.push({ sel: sel(el), text: (el.textContent || '').trim(), ratio: fmt(r), fg: hex(fg), bg: hex(bg) });
             if (r < need) note(el, label, r, need, fg, bg);
         };
         for (const rs of roots) for (const root of document.querySelectorAll(rs)) {
@@ -63,7 +64,7 @@ const AUDIT_SRC = `(() => {
             if (cs.borderTopColor !== bcBefore && parseFloat(cs.borderTopWidth) > 0) { const c = rgba(cs.borderTopColor); const cc = c[3] < 1 ? over(c, bg) : c; const r = ratio(cc, bg); if (r > best) { best = r; fg = cc; } } // a border that changes colour on focus is a focus indicator too
             checked++; if (best < 3) fails.push({ sel: sel(el), what: 'focus ring', text: (el.value || el.placeholder || el.textContent || '').trim().slice(0, 30), ratio: fmt(best), need: 3, fg: hex(fg), bg: hex(bg) });
             el.blur(); }
-        return { checked, fails, borders };
+        return { checked, fails, borders, ...(opts.samples ? { samples } : {}) };
     };
     return true; })()`;
 
