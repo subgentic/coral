@@ -78,7 +78,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(searchCompleteResult.isError, false, 'status="complete" must NOT be treated as an error');
         assert.equal(searchCompleteResult.hitCount, 1, 'Rendered 1 hit card for status="complete"');
         assert.equal(searchCompleteResult.markText, 'search', 'Highlighted matched excerpt with <mark>');
-        assert.equal(searchCompleteResult.markWeight, '700', 'Matched excerpt is visibly bold');
+        assert.equal(searchCompleteResult.markWeight, '600', 'Matched excerpt is visibly bold: the strong weight, 700 being only for the 20 and 32 px titles (Goal #84)');
 
         // 3. Exercise searchChats with status: "partial"
         const searchPartialResult = await ev(`(async () => {
