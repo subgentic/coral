@@ -39,7 +39,7 @@
 .update-status-text { flex: 1 1 auto; min-width: 0; } .update-status-text b { display: block; } .update-status-text p { margin: 2px 0 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); overflow-wrap: anywhere; }
 .update-act { flex: none; }
 .update-act:disabled { opacity: .55; cursor: not-allowed; } /* a disabled Settings button no longer looks live (#7338, UI Accessibility) */
-.update-bar { margin-top: 8px; height: 6px; border-radius: var(--radius-xs); background: var(--bg-tertiary); overflow: hidden; } .update-bar span { display: block; height: 100%; background: var(--accent); }
+.update-bar { margin-top: 8px; height: 6px; border-radius: var(--radius-xs); background: var(--bg-tertiary); overflow: hidden; } .update-bar span { display: block; height: 100%; background: var(--accent); transition: none; }
 .update-managed { display: flex; gap: var(--space-lg, 12px); padding: var(--space-lg, 12px); margin: 0 0 var(--space-lg, 12px); border-radius: var(--radius-lg, 8px); border: 1px solid var(--border); background: var(--bg-secondary); }
 .update-managed .material-icons { color: var(--text-secondary); flex: none; } .update-managed p { margin: 4px 0; color: var(--text-secondary); }
 .update-cmd { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 12px; border-radius: var(--radius-md); background: var(--bg-primary); border: 1px solid var(--border); }
@@ -68,7 +68,6 @@
 .update-note { color: var(--text-primary); }
 .update-error { color: var(--error); }
 .update-fact { font: var(--dlg-control); } /* a fact and the hub line: the dialog's value size, as every other row's value */
-.update-bar span { transition: none; }
 @media (pointer: coarse) { .update-fail-close { min-width: 44px; min-height: 44px; } }
 
 /* a link in the Settings > Updates card: a 44 px target on a phone, and a darker accent in the light theme (the accent was 4.44:1 on the panel) */
