@@ -23,3 +23,19 @@ export function whenText(stamp, now = new Date(), locale) {
     if (days === 0 || days === 1) return `${DAY_WORDS[days].toLowerCase()} ${clock(d, locale)}`;
     return `${MONTHS[d.getMonth()]} ${d.getDate()}${d.getFullYear() !== now.getFullYear() ? `, ${d.getFullYear()}` : ''}`;
 }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** The short form a phone's mail row ends in (UI/UX, #9545): "now", "5m", "2:32 PM" today, "Yesterday", "Mon" within the week, then "Oct 17" ("Sep 18, 2025" for another year); '' when `stamp` is empty or not a date. */
+export function shortWhen(stamp, now = new Date(), locale) {
+    const d = new Date(stamp);
+    if (!stamp || isNaN(d)) return '';
+    const mins = Math.floor((now - d) / 60000);
+    if (mins < 1 && mins > -2) return 'now';
+    if (mins >= 1 && mins < 60) return `${mins}m`;
+    const day0 = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((day0(now) - day0(d)) / 86400000);
+    if (days === 0) return clock(d, locale);
+    if (days === 1) return DAY_WORDS[1];
+    if (days > 1 && days < 7) return WEEKDAYS[d.getDay()];
+    return `${MONTHS[d.getMonth()]} ${d.getDate()}${d.getFullYear() !== now.getFullYear() ? `, ${d.getFullYear()}` : ''}`;
+}

@@ -56,6 +56,9 @@ const AGENTS = [
                 assert.ok(x.bold <= 500, at + 'no unread bold where nothing is unread ' + JSON.stringify(x));
             }
             assert.deepEqual(r.map(x => x.snippet), ['Queued', 'In progress', 'In review'], at + 'the state is the first words');
+            const edge = await ev(`(() => { const b = document.querySelector('${T} .dt-box').getBoundingClientRect(), tr = document.querySelector('${T} tr.dt-mailed').getBoundingClientRect(), sb = document.querySelector('${T} .dt-sortbar'); return { left: Math.round(b.left), right: Math.round(innerWidth - b.right), tr: [Math.round(tr.left), Math.round(tr.right)], sort: !!sb && getComputedStyle(sb).display !== 'none', border: getComputedStyle(document.querySelector('${T} .dt-box')).borderLeftWidth }; })()`);
+            assert.ok(edge.left === 0 && edge.right === 0 && edge.border === '0px' && !edge.sort, at + 'the rows run edge to edge, no card, no Sort row ' + JSON.stringify(edge));
+            assert.ok(r.every(x => /^(now|\d+m|\d+:\d\d\s?[AP]M|Yesterday|[A-Z][a-z]{2}( \d+(, \d{4})?)?)$/.test(x.time)), at + 'short times ' + JSON.stringify(r.map(x => x.time)));
             assert.deepEqual(r.map(x => x.title), ['Pick the release date', 'Check <img src=x onerror="window.__pwn=1"> the logo', 'Approve the budget'], at + 'the titles, as text');
             assert.equal(await ev(`window.__pwn`), undefined, at + 'a title is text, never markup');
             await shot(`inbox-mail-tasks-${w}`);

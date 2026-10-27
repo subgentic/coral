@@ -417,3 +417,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .gt-toolbar.team-toolbar-selecting > :is(.list-bar-search-wrap, .dt-select-toggle) { display: none; }
     .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
 }
+@media (max-width: 767px) { /* a phone's mail rows run edge to edge (UI/UX, #9545): no card around them, the page's side padding given back, and no Sort row (a mail list has none) */
+    .group-table-view .dt-box.dt-mail-on { margin-inline: calc(-1 * var(--space-2xl)); border-inline: 0; border-radius: 0; }
+    .dt-box.dt-mail-on .dt-sortbar { display: none; }
+}

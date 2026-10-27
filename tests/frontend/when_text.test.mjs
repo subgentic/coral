@@ -1,7 +1,7 @@
 // The one "when" format of every list (#6961, #6986): under a minute "just now", under an hour "N min ago", then today and yesterday with the time of day in the viewer's clock (12 or 24 hour by locale),
 // an older day by its date alone, the year when it is not this one; '' for nothing or a non-date.
 import assert from 'node:assert/strict';
-import { whenText } from '../../coral-go/pkg/frontend/static/when_text.js';
+import { whenText, shortWhen } from '../../coral-go/pkg/frontend/static/when_text.js';
 
 const now = new Date(2026, 9, 24, 15, 0, 0); // Oct 24 2026, 15:00 local
 const at = (y, mo, d, h = 0, mi = 0, s = 0) => new Date(y, mo, d, h, mi, s).toISOString();
@@ -28,3 +28,13 @@ assert.equal(whenText('', now), ''); assert.equal(whenText(null, now), ''); asse
 // the viewer's own locale is used when none is given: the result is one of the two clocks
 assert.match(whenText(at(2026, 9, 24, 14, 0), now), /^today (\d{1,2}:\d\d( ?[AP]M)?)$/i);
 console.log('when_text: ok (just now, N min ago, then a time of day in the viewer\'s clock, older by date, the year when it is not this one)');
+
+// the phone's short form (#9545): now, 5m, the clock today, Yesterday, a weekday within the week, then the date
+assert.equal(shortWhen(at(2026, 9, 24, 14, 59, 30), now), 'now');
+assert.equal(shortWhen(at(2026, 9, 24, 14, 55), now), '5m');
+assert.equal(shortWhen(at(2026, 9, 24, 11, 42), now, 'en-US'), '11:42 AM');
+assert.equal(shortWhen(at(2026, 9, 23, 17, 20), now), 'Yesterday');
+assert.equal(shortWhen(at(2026, 9, 21, 9, 0), now), 'Wed');
+assert.equal(shortWhen(at(2026, 9, 17, 9, 0), now), 'Oct 17');
+assert.equal(shortWhen(at(2025, 8, 18, 9, 0), now), 'Sep 18, 2025');
+assert.equal(shortWhen('', now) + shortWhen('nope', now), '');
