@@ -13,7 +13,7 @@ import { getToolIcon, renderToolCard, renderQuestionCard } from './chat_tool_car
 
 // Agent replies carry a copy button that copies the reply's markdown as the
 // agent wrote it (not the rendered text).
-const COPY_BUTTON = `<button type="button" class="chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
+const COPY_BUTTON = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
 
 export const bubbleSource = new WeakMap();
 

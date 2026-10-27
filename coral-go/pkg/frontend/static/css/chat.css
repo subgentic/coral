@@ -1251,35 +1251,18 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 
 /* Copy button on agent replies: top-right of a bubble, or tucked into the
    space under the reply's right edge in prose mode. Shown on hover or keyboard focus. */
-.chat-bubble.assistant .chat-copy-btn {
+.chat-bubble.assistant button.chat-copy-btn {
     position: absolute;
     top: 6px;
     right: 6px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--text-muted);
-    cursor: pointer;
+    margin: 0;
     opacity: 0;
     transition: opacity 0.12s;
-}
-.chat-bubble.assistant .chat-copy-btn .material-icons {
-    font-size: var(--icon-inline-size);
 }
 .chat-bubble.assistant:hover .chat-copy-btn,
 .chat-bubble.assistant .chat-copy-btn:focus-visible,
 .chat-bubble.assistant .chat-copy-btn.copied {
     opacity: 1;
-}
-.chat-bubble.assistant .chat-copy-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
 }
 .chat-bubble.assistant .chat-copy-btn.copied {
     color: var(--success, var(--accent));
@@ -1419,29 +1402,17 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 
 /* Save for later (#4510): a bookmark one slot to the left of Copy on each reply, and on your own messages; filled and in the accent colour when saved. Shown on
    hover or keyboard focus, always while saved; on touch both are always shown at 44 px (touch.css). */
-.chat-bubble .chat-save-btn {
+.chat-bubble button.chat-save-btn {
     position: absolute;
     top: 6px;
     right: 34px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--text-muted);
-    cursor: pointer;
+    margin: 0;
     opacity: 0;
 }
 .chat-bubble.human .chat-save-btn { right: 6px; }
-.chat-bubble .chat-save-btn svg { width: var(--icon-inline-size); height: var(--icon-inline-size); }
 .chat-bubble:hover .chat-save-btn,
 .chat-bubble .chat-save-btn:focus-visible,
 .chat-bubble .chat-save-btn[aria-pressed="true"] { opacity: 1; }
-.chat-bubble .chat-save-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 .chat-bubble .chat-save-btn[aria-pressed="true"] { color: var(--accent); }
 .chat-bubble .chat-save-btn[aria-pressed="true"] svg path, .mb-save-btn[aria-pressed="true"] svg path { fill: currentColor; }
 .chat-bubble .chat-save-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
