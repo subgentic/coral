@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
         return true; })()`;
     const probe = () => ev(`(() => { const box = document.querySelector('.zz-chat'), br = box.getBoundingClientRect(), card = box.querySelector('.chat-needs-input'), opts = card && card.querySelector('.cni-options'), cr = card.getBoundingClientRect();
         const answers = [...card.querySelectorAll('.cni-answer')].map(b => { const r = b.getBoundingClientRect(); return { inBar: !!b.closest('.cni-options'), standing: !!b.closest('.cni-standing'), bg: getComputedStyle(b).backgroundColor, h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom), key: b.querySelector('.cni-key') && getComputedStyle(b.querySelector('.cni-key')).display }; });
-        return { pos: opts ? getComputedStyle(opts.closest('.cni-sticky') || opts).position : null, answers, scrollerBottom: Math.round(br.bottom), cardTop: Math.round(cr.top), naturalBelow: cr.bottom > br.bottom, hint: (card.querySelector('.cni-hint') || {}).textContent || '', text: card.textContent.replace(/\\s+/g, ' ').slice(0, 160) }; })()`);
+        return { pos: opts ? getComputedStyle(opts).position : null, answers, scrollerBottom: Math.round(br.bottom), cardTop: Math.round(cr.top), naturalBelow: cr.bottom > br.bottom, hint: (card.querySelector('.cni-hint') || {}).textContent || '', text: card.textContent.replace(/\\s+/g, ' ').slice(0, 160) }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
