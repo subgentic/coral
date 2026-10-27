@@ -42,6 +42,9 @@ type Store struct {
 	waitTimeoutClaims       map[int64]bool // under waitDispatchMu: claimed until callback/receipt completes
 	waitTimeoutCursor       int64          // under waitDispatchMu: failed old targets cannot starve later waits
 	stmts                   *hotStmts      // the hot fixed queries, prepared (#4463); nil: unprepared
+	msgIndex                atomic.Int32   // the message search index's state (message_fts.go): off, building, ready
+	msgIndexStop            atomic.Pointer[context.CancelFunc]
+	msgIndexAnswers         atomic.Int64 // searches the index answered (tests check it is used)
 }
 
 func isInMemoryPath(dbPath string) bool {
@@ -154,6 +157,7 @@ func newStore(dbPath, key string, schemaDone bool) (*Store, error) {
 		s.readDB = db
 		s.stmts = prepareHotStmts(context.Background(), s.reader())
 		s.stmts.prepareWriter(context.Background(), s.db)
+		s.applyMessageSearchIndexSetting()
 		return s, nil
 	}
 
@@ -171,11 +175,15 @@ func newStore(dbPath, key string, schemaDone bool) (*Store, error) {
 	s.readDB = readDB
 	s.stmts = prepareHotStmts(context.Background(), s.reader())
 	s.stmts.prepareWriter(context.Background(), s.db)
+	s.applyMessageSearchIndexSetting()
 	return s, nil
 }
 
 // Close closes the database connection.
 func (s *Store) Close() error {
+	if stop := s.msgIndexStop.Swap(nil); stop != nil {
+		(*stop)() // a build in progress ends
+	}
 	// The prepared statements first: each holds its pool connections' statements.
 	firstErr := s.stmts.close()
 	if s.readDB != nil && s.readDB != s.db {
