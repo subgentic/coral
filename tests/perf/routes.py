@@ -15,7 +15,8 @@ def pct(xs, p):
 class Sampler(threading.Thread):
     def __init__(self, pid):
         super().__init__(daemon=True)
-        self.pid, self.stop_ev, self.rss, self.cpu0 = pid, threading.Event(), [], self.cpu()
+        self.pid, self.stop_ev, self.rss = pid, threading.Event(), []
+        self.cpu0 = self.cpu()  # after the pid is stored (a first run read it before, and every CPU figure was null)
         self.t0 = time.time()
 
     def cpu(self):
