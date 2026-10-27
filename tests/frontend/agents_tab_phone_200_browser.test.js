@@ -25,15 +25,15 @@ const TEAM = `qa-agents200-${Date.now() % 100000}`;
         await agentsUp(ev); // the seeded members have no terminal, so they are Ended and have no Remind (#8271): this suite is about Remind's place on a folded row
         await openTeam(ev, waitFor, TEAM).catch(() => {});
         await goTab(ev, settle, 'Agents'); await waitFor(`document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-box tbody tr').length >= 2`, 'the agents', 10000);
-        await S.run('390 px, 100% text: shared folded rows keep Status and Remind visible', async () => {
+        await S.run('390 px, 100% text: Status is its column on a one-line row (it drops under 16 rem, i.e. at 200% text), Remind is visible', async () => { // the team Agents rows are one line a row (#8960): no fold under the name
             const t = await table(); await shot('agents-100');
-            assert.deepEqual([t.sideways, t.statusColumn, t.foldedStatus.some(Boolean)], [false, false, true], JSON.stringify(t)); assert.ok(t.remind.length && t.remind.every(Boolean), 'Remind is on the screen: ' + JSON.stringify(t));
+            assert.deepEqual([t.sideways, t.statusColumn, t.foldedStatus.some(Boolean)], [false, true, true], JSON.stringify(t)); assert.ok(t.remind.length && t.remind.every(Boolean), 'Remind is on the screen: ' + JSON.stringify(t));
         });
-        await S.run('390 px, 200% text: Status is under the name, Remind is on the screen, no sideways scroll', async () => {
+        await S.run('390 px, 200% text: the row stays one line (Status gives way under 16 rem), Remind is on the screen, no sideways scroll', async () => {
             await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(500);
             const t = await table(); await shot('agents-200');
             assert.equal(t.sideways, false, 'the table does not scroll sideways: ' + JSON.stringify(t)); assert.equal(t.statusColumn, false, 'the Status column is gone: ' + JSON.stringify(t));
-            assert.ok(t.foldedStatus.length && t.foldedStatus.every(Boolean), 'Status is under each name: ' + JSON.stringify(t)); assert.ok(t.remind.length && t.remind.every(Boolean), 'Remind is on the screen: ' + JSON.stringify(t));
+            assert.ok(t.foldedStatus.length && t.foldedStatus.every(v => !v), 'Status has given way on each one-line row (#8960): ' + JSON.stringify(t)); assert.ok(t.remind.length && t.remind.every(Boolean), 'Remind is on the screen: ' + JSON.stringify(t));
         });
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
     S.finish();
