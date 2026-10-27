@@ -55,6 +55,9 @@ func TestRemoteURLWarningEdgeCases(t *testing.T) {
 		"http://10.0.0.2:8420/%zz": true,
 		"http://exa mple.com":      true,
 		"http://127.0.0.1:8420x":   true, // this computer, but the URL is unreadable: still warns
+		"https://":                 true, // https with no host cannot be dialled: nothing says where the key goes (#9690 LOW)
+		"https:///path":            true,
+		"https://:8420":            true,
 		"https://10.0.0.2:8420x":   true, // an unparseable https URL too: nothing says where the key goes
 	} {
 		w := remoteURLWarning(raw)
