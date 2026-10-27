@@ -56,12 +56,15 @@ const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) =
     // network accounting for the run in progress
     let inflight = new Map(), reqs = [], last = Date.now();
     Network.requestWillBeSent(e => { if (!/^https?:/.test(e.request.url)) return; inflight.set(e.requestId, { url: e.request.url, t0: e.timestamp, bytes: 0, at: Date.now() }); last = Date.now(); });
+    // A response whose headers are in is the browser's to finish: a fetch whose body the page never reads (a keepalive POST, a refused status it does not parse) is never reported finished, and run 2 of the
+    // baseline waited 8 s on three of them per load (#9360: the server answered in 2 ms). Only a request still waiting for its headers is the page's wait.
+    Network.responseReceived(e => { const r = inflight.get(e.requestId); if (r) r.headers = true; });
     Network.loadingFinished(e => { const r = inflight.get(e.requestId); if (r) { r.ms = (e.timestamp - r.t0) * 1000; r.bytes = e.encodedDataLength; reqs.push(r); inflight.delete(e.requestId); last = Date.now(); } });
     Network.loadingFailed(e => { inflight.delete(e.requestId); last = Date.now(); });
     // settled: no request in flight for 600 ms, then two frames. A request still open after 8 s is a stream or a long poll (the live feed), not part of the page's work: it is not waited for (a first baseline run
     // waited the full 60 s on every load for one of them).
-    const abandoned = () => [...inflight.values()].filter(r => Date.now() - r.at >= 8000).map(r => ({ url: new URL(r.url).pathname + new URL(r.url).search, ageMs: Date.now() - r.at }));
-    const open = () => [...inflight.values()].filter(r => Date.now() - r.at < 8000).length;
+    const abandoned = () => [...inflight.values()].filter(r => !r.headers && Date.now() - r.at >= 8000).map(r => ({ url: new URL(r.url).pathname + new URL(r.url).search, ageMs: Date.now() - r.at }));
+    const open = () => [...inflight.values()].filter(r => !r.headers && Date.now() - r.at < 8000).length;
     const settled = async (timeoutMs = 30000) => {
         const until = Date.now() + timeoutMs;
         for (;;) { await sleep(50); if (open() === 0 && Date.now() - last > 600) break; if (Date.now() > until) return false; }
