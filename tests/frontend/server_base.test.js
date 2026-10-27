@@ -96,6 +96,11 @@ const { pathToFileURL } = require('url');
     assert.notStrictEqual(m.sessionTeamKey(a), m.sessionTeamKey(b));
     assert.strictEqual(m.sessionTeamKey(b), 'T');
     assert.ok(m.inTeam(a, '@ws1/T') && !m.inTeam(b, '@ws1/T'));
+    // a waiting agent's goal link names the goal's team by the qualified key (#8861): the same bare name on two servers is two teams
+    assert.strictEqual(m.goalTeamKey({ ...a, goal: { id: 3, title: 'G', board: 'T' } }), '@ws1/T');
+    assert.strictEqual(m.goalTeamKey({ ...b, goal: { id: 3, title: 'G', board: 'T' } }), 'T');
+    assert.strictEqual(m.goalTeamKey({ name: 'x', server: 'ws1', goal: { id: 3, title: 'G', board: 'T' } }), 'T', 'no board on the session: the goal\'s own');
+    assert.strictEqual(m.goalTeamKey({ name: 'x' }), '');
     assert.notStrictEqual(m.sessionFolderKey(a), m.sessionFolderKey(b));
 
     // Popout paths.
