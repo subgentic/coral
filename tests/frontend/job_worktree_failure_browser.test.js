@@ -57,7 +57,7 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             const quiet = await ev(`document.getElementById('jobs-live').textContent`);
             check(`${tag}: the status is in the page and empty while nothing failed`, quiet === '' && await ev(`document.getElementById('jobs-live').getAttribute('role') === 'status' && !document.getElementById('jobs-live').closest('[hidden]')`));
             await ev(`window.__jobs[0] = { ...window.__jobs[0], last_run: { id: 2, status: 'failed', started_at: new Date().toISOString(), error_msg: ${JSON.stringify(MISSING)}, error_code: 'base_branch_missing' }, consecutive_failures: 1 }; window.__sched.refreshJobs().then(() => true)`);
-            await waitFor(`/failed/.test((document.querySelector('#group-table-view tbody tr[data-key] .dt-chip') || {}).textContent || '')`, 'the failure on the row', 6000);
+            await waitFor(`/Failed/.test((document.querySelector('#group-table-view tbody tr[data-key] .dt-chip') || {}).textContent || '')`, 'the failure on the row', 6000);
             const r = await ev(`({ chip: document.querySelector('#group-table-view tbody tr[data-key] .dt-chip').textContent, live: document.getElementById('jobs-live').textContent })`);
             check(`${tag}: the row's chip says the last run failed`, r.chip === 'Failed', JSON.stringify(r));
             check(`${tag}: and it is announced once, with the job's name, in the status`, r.live === `nightly-agent: the last run failed. ${MISSING}`, JSON.stringify(r.live));
