@@ -40,7 +40,7 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'settings')`);
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-automations-')) localStorage.removeItem(k); } catch {} true`);
-            await ev(`window.switchNavTab('automations'); true`);
+            await ev(`document.getElementById('nav-tab-automations').click(); true`); // the tab's own click (its action must know the tab), not the page function
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 3`, `${at}the three jobs in the folder's table`, 10000);
             assert.equal(await pathname(), '/automations/jobs', `${at}the address is the folder's`);
             const folderWords = mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`;
