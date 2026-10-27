@@ -23,7 +23,7 @@ const BASE = require('./test_base').BASE;
         box.scrollTop = box.querySelector('.chat-needs-input').offsetTop - 220;
         return true; })()`;
     const probe = () => ev(`(() => { const box = document.querySelector('.zz-chat'), br = box.getBoundingClientRect(), card = box.querySelector('.chat-needs-input'), opts = card && card.querySelector('.cni-options'), cr = card.getBoundingClientRect();
-        const answers = [...card.querySelectorAll('.cni-answer')].map(b => { const r = b.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom), key: b.querySelector('.cni-key') && getComputedStyle(b.querySelector('.cni-key')).display }; });
+        const answers = [...card.querySelectorAll('.cni-answer')].map(b => { const r = b.getBoundingClientRect(); return { inBar: !!b.closest('.cni-options'), standing: !!b.closest('.cni-standing'), bg: getComputedStyle(b).backgroundColor, h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom), key: b.querySelector('.cni-key') && getComputedStyle(b.querySelector('.cni-key')).display }; });
         return { pos: opts ? getComputedStyle(opts).position : null, answers, scrollerBottom: Math.round(br.bottom), cardTop: Math.round(cr.top), naturalBelow: cr.bottom > br.bottom, hint: (card.querySelector('.cni-hint') || {}).textContent || '', text: card.textContent.replace(/\\s+/g, ' ').slice(0, 160) }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -42,8 +42,13 @@ const BASE = require('./test_base').BASE;
             }
             // the card's top is in view at the foot of a 420 px scroller, its answers below the fold: the bar is still at the foot of the scroller
             assert.equal(p.pos, 'sticky', at + 'the answers are a bar ' + JSON.stringify(p));
+            // UI/UX's call (#9583): the bar is Yes and No; the standing permission ("Yes, and don't ask again ...") is a quiet text button in the card above it, 44 px, no fill
+            const bar = p.answers.filter(a => a.inBar), apart = p.answers.filter(a => a.standing);
+            assert.equal(bar.length, 2, at + 'the bar holds two answers ' + JSON.stringify(p.answers));
+            assert.equal(apart.length, 1, at + 'the standing permission is its own button ' + JSON.stringify(p.answers));
             assert.ok(p.answers.every(a => a.h >= 44), at + 'every answer is a 44 px target ' + JSON.stringify(p.answers));
-            assert.ok(p.answers.every(a => a.bottom <= p.scrollerBottom + 1 && a.top >= p.scrollerBottom - 140 && p.naturalBelow), at + 'the bar is at the foot of the chat though its answers are below the fold ' + JSON.stringify(p));
+            assert.ok(bar.every(a => a.bottom <= p.scrollerBottom + 1 && a.top >= p.scrollerBottom - 140 && p.naturalBelow), at + 'the bar is at the foot of the chat though its answers are below the fold ' + JSON.stringify(p));
+            assert.ok(apart[0].bottom <= Math.min(...bar.map(a => a.top)) && apart[0].bg === 'rgba(0, 0, 0, 0)', at + 'the standing permission is above the bar, with no fill ' + JSON.stringify(p.answers));
             assert.ok(p.answers.every(a => a.key === 'none'), at + 'no keyboard digit on a phone ' + JSON.stringify(p.answers));
             await shot('needs-item-bar-390');
             // where the person may not act: no answers at all, and a word that says why
