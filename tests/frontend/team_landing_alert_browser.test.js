@@ -63,6 +63,22 @@ const BASE = require('./test_base').BASE;
             await waitFor(`/not a member/.test((document.querySelector('${P} .sv-row[data-key=landing_nudge] .sv-error') || {}).textContent || '')`, 'the refusal at the field', 8000);
             assert.match(await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`), /not a member|Could not save/, at + 'and in the bar');
             await shot(`landing-alert-refused-${w}`);
+
+            console.log(`${at}goals ready to close and open tasks with no goal or assignee (#9006)`);
+            await fire('landing_nudge', ''); // the refused member from above is not wanted any more
+            const defs = await ev(`(() => { const g = n => document.querySelector('${P} [name=' + n + ']'); return { gOn: g('goals_ready_on').checked, gWait: g('goals_ready_wait_min').value, gRange: [g('goals_ready_wait_min').min, g('goals_ready_wait_min').max], uOn: g('unowned_tasks_on').checked, uWait: g('unowned_tasks_wait_min').value, hints: [...document.querySelectorAll('${P} .sv-row[data-key=landing_wait_min] .sv-help, ${P} .sv-row[data-key=goals_ready_wait_min] .sv-help')].map(e => e.textContent.trim()), opts: [...g('unowned_tasks_nudge').options].map(o => o.value), unlabelled: ['goals_ready_on', 'goals_ready_wait_min', 'goals_ready_nudge', 'unowned_tasks_on', 'unowned_tasks_wait_min', 'unowned_tasks_nudge'].filter(n => { const e = g(n); return !((e.labels && e.labels.length) || e.getAttribute('aria-label') || e.getAttribute('aria-labelledby')); }) }; })()`);
+            assert.deepEqual([defs.gOn, defs.gWait, defs.uOn, defs.uWait], [true, '30', true, '15'], at + 'both on by default, 30 and 15 minutes'); assert.deepEqual(defs.gRange, ['5', '10080']);
+            assert.deepEqual(defs.hints, ['15 minutes to 7 days', '5 minutes to 7 days'], at + 'the wait says its range in words'); assert.deepEqual(defs.opts, ['', 'Boss', 'Dev One']); assert.deepEqual(defs.unlabelled, []);
+            await fire('goals_ready_wait_min', '4'); await save();
+            await waitFor(`/5 to 10080/.test((document.querySelector('${P} .sv-row[data-key=goals_ready_wait_min] .sv-error') || {}).textContent || '')`, 'the goals-ready range refusal', 5000);
+            await fire('goals_ready_wait_min', '45'); await fire('goals_ready_nudge', 'Dev One'); await fire('unowned_tasks_on', false); await fire('unowned_tasks_wait_min', '20'); await save();
+            let kept;
+            for (let i = 0; i < 30 && !(kept && kept.goals_ready && kept.goals_ready.nudge); i++) { kept = ((await api('/settings')).body || {}).health; if (!(kept && kept.goals_ready && kept.goals_ready.nudge)) await new Promise(r => setTimeout(r, 200)); } // sleep-ok: the PUT lands a frame after the click
+            assert.deepEqual([kept.goals_ready, kept.unowned_tasks], [{ on: true, wait_min: 45, nudge: 'Dev One' }, { on: false, wait_min: 20, nudge: '' }], at + 'what the server kept');
+            await ev(`{ const s = document.querySelector('${P} [name=unowned_tasks_nudge]'); s.append(Object.assign(document.createElement('option'), { value: 'Ghost', textContent: 'Ghost' })); } true`);
+            await fire('unowned_tasks_on', true); await fire('unowned_tasks_nudge', 'Ghost'); await save();
+            await waitFor(`/not a member/.test((document.querySelector('${P} .sv-row[data-key=unowned_tasks_nudge] .sv-error') || {}).textContent || '')`, 'the unowned-tasks refusal at its field', 8000);
+            await shot(`health-wait-checks-${w}`);
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, at + 'no sideways scroll');
             console.log('   ✓');
         }
