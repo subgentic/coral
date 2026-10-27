@@ -88,7 +88,7 @@
 }
 
 /* The page is one view at a time (#7473): its title, then that view's sections. The sidebar lists the views. */
-.cost-page { display: flex; flex-direction: column; min-width: 0; padding: 24px 32px; }
+.cost-page { display: flex; flex-direction: column; min-width: 0; padding: 24px; } /* the page's 24 px, like #group-table-view: Analytics starts where the other pages do (#9452 item 2) */
 .cost-phone-back { display: none; }
 #mobile-analytics-list { display: none; }
 

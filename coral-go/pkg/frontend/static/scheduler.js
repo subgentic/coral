@@ -227,7 +227,7 @@ function renderRunsTable(page) {
     const open = r => withId(r.id, id => window.selectWorkflowRun(id));
     const table = DT.dataTable({ label: 'Job runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false, oneLine: true,
         footer: runs.length < page.total ? { text: `Showing the newest ${runs.length} of ${page.total} runs`, more: { label: 'Show older runs', busy: page.busy, run: () => readOlderRuns(page) } } : undefined,
-        open: workflowHistory ? open : undefined, empty: { line: 'No runs yet.' },
+        open: workflowHistory ? open : undefined, empty: { line: 'No runs yet.', hint: 'A run is listed here once the job has run.' },
         columns: [
             { key: 'started', label: 'Started', primary: true, width: '9.5rem', cell: r => {
                 const time = DT.timeCell(workflowHistory ? r.started_at || r.created_at : r.scheduled_at || r.started_at);
