@@ -40,9 +40,13 @@ mkdir -p "$BUILD_DIR"
 
 cd "$GO_DIR"
 
+# The agent docs are embedded from the static tree: sync them in first, as each build job of release.yml does (a build without them serves no /api/agent-docs).
+bash "$PROJECT_DIR/tools/sync-agent-docs.sh"
+
 OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only the go build commands below read it
 [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
-trap 'go run ./tools/strip-static -clean "$OVERLAY"' EXIT
+# The script changes folder later (to the dist folder), so the cleanup runs from the module folder, where `go run` finds go.mod: it used to print "go.mod file not found" and leave the folder.
+trap '(cd "$GO_DIR" && go run ./tools/strip-static -clean "$OVERLAY")' EXIT
 
 for cmd in coral launch-coral coral-board coral-agent coral-hook-agentic-state coral-hook-message-check coral-hook-session-start coral-hook-task-sync coral-update; do
     echo "==> Compiling $cmd"

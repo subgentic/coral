@@ -56,10 +56,14 @@ fi
 
 cd "$GO_DIR"
 
+# The agent docs are embedded from the static tree: sync them in first, as each build job of release.yml does (a build without them serves no /api/agent-docs).
+bash "$PROJECT_DIR/tools/sync-agent-docs.sh"
+
 OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only the go build commands below read it
 [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
 # one EXIT trap for both: delete the overlay's folder, and put the .syso files back when this run replaced them
-trap 'go run ./tools/strip-static -clean "$OVERLAY"; if declare -F restore_syso >/dev/null; then restore_syso; fi' EXIT
+# The cleanup runs from the module folder (the script changes folder later), where `go run` finds go.mod.
+trap '(cd "$GO_DIR" && go run ./tools/strip-static -clean "$OVERLAY"); if declare -F restore_syso >/dev/null; then restore_syso; fi' EXIT
 
 echo "==> Compiling coral.exe"
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -overlay "$OVERLAY" $BUILD_TAGS -ldflags="-s -w" -o "$BUILD_DIR/coral.exe" ./cmd/coral/
