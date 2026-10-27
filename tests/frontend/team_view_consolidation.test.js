@@ -149,7 +149,7 @@ const BASE = require('./test_base').BASE;
     await Emulation.clearDeviceMetricsOverride();
 
     // Close Team view
-    await ev(`document.querySelector('#team-availability-dialog header button').click()`);
+    await ev(`document.querySelector('#team-availability-dialog [data-dialog-close]').click()`);
     await ev(`new Promise(r => setTimeout(r, 50))`);
 
     // The team's working mode starts from none, so the Save below always has something to save: a repeat on the same server (--stress) saw the last run's saved mode and answered "Nothing to save".
