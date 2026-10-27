@@ -58,7 +58,7 @@ const BASE = require('./test_base').BASE;
         const blocked = status.find(row => row.id === '#1498');
         assert.equal(working.text, 'In progress', 'the dock says the Tasks view words (#8060); the old Open is in the tooltip');
         assert.equal(working.title, 'Open · Working');
-        assert.equal(working.aria, 'Open · Working');
+        assert.equal(working.aria, 'In progress (Open · Working)', 'the chip is spoken as the word it shows, then its detail (#8830)');
         assert.equal(working.tabIndex, -1, 'the status is not a tab stop (#5813): its words are in the Open button\'s name');
         assert.equal(working.role, null);
         assert.equal(working.label, true);
@@ -75,14 +75,14 @@ const BASE = require('./test_base').BASE;
         const finished = status.find(row => row.id === '#1499');
         assert.equal(finished.text, 'Done');
         assert.equal(finished.title, 'Finished');
-        assert.equal(finished.aria, 'Finished');
+        assert.equal(finished.aria, 'Done', 'the chip is spoken as the word it shows (#8830); the tooltip keeps Finished');
         assert.equal(finished.tabIndex, -1, 'the status is not a tab stop (#5813): its words are in the Open button\'s name');
         assert.equal(finished.label, true);
 
         const claimed = status.find(row => row.id === '#1500');
         assert.equal(claimed.text, 'In progress');
         assert.equal(claimed.title, 'Claimed · Working');
-        assert.equal(claimed.aria, 'Claimed · Working');
+        assert.equal(claimed.aria, 'In progress (Claimed · Working)');
         assert.equal(claimed.tabIndex, -1, 'the status is not a tab stop (#5813): its words are in the Open button\'s name');
         assert.equal(claimed.label, true);
 
@@ -95,12 +95,12 @@ const BASE = require('./test_base').BASE;
         assert.equal(review.text, 'In review');
         assert.equal(review.title, 'Open · Review pending');
 
-        // the row's one keyboard control says the task and its status (#5813): "Open task #N: title, Open · Working"
+        // the row's one keyboard control says the task and its status (#5813, #8830): "Open task: title, In progress (Open · Working)"
         const focus = await ev(`(() => { const row = document.querySelector('#board-task-list .board-task-item:not(.board-task-header)'); const el = row.querySelector('.board-task-status-wrap'); el.focus(); return { label: el.getAttribute('aria-label'), tabIndex: el.tabIndex, focused: document.activeElement === el, open: row.querySelector('.board-task-open').getAttribute('aria-label') }; })()`);
-        assert.equal(focus.label, 'Open · Working');
+        assert.equal(focus.label, 'In progress (Open · Working)');
         assert.equal(focus.tabIndex, -1);
         assert.equal(focus.focused, false, 'the status image takes no focus');
-        assert.match(focus.open, /^Open task #\d+: .+, Open · Working$/, 'the Open button carries the status: ' + focus.open);
+        assert.match(focus.open, /^Open task: .+, In progress \(Open · Working\)$/, 'the Open button carries the status: ' + focus.open);
         await ev(`document.getElementById('board-tasks-section').scrollIntoView({block:'start'})`);
         require('node:fs').writeFileSync(require('node:os').tmpdir() + '/coral-1497-task-status-hover.png', Buffer.from((await Page.captureScreenshot()).data, 'base64'));
         console.log(JSON.stringify({working, blocked, focus}));

@@ -35,7 +35,7 @@ const { connect } = require('./agent_view_harness');
         assert.ok(kinds.length >= 1 && kinds.every(k => k.tab === 0 && k.role === null), 'the headings are focusable buttons: ' + JSON.stringify(kinds));
         // a task row is neither (#5813): its one keyboard control is the native Open button, named by the task and its status
         const rowKinds = await ev(`[...document.querySelectorAll('#board-task-list [data-on-click="task-open"]')].map(e => ({ tab: e.tabIndex, role: e.getAttribute('role'), open: e.querySelector('button.board-task-open')?.getAttribute('aria-label') || '' }))`);
-        assert.ok(rowKinds.length === 2 && rowKinds.every(k => k.tab === -1 && k.role === 'row' && /^Open task #\d+: .+, .+$/.test(k.open)), 'rows are not buttons; each holds a named native Open button: ' + JSON.stringify(rowKinds));
+        assert.ok(rowKinds.length === 2 && rowKinds.every(k => k.tab === -1 && k.role === 'row' && /^Open task: .+, .+$/.test(k.open)), 'rows are not buttons; each holds a named native Open button: ' + JSON.stringify(rowKinds));
         const sortLabel = () => ev(`document.querySelector('#board-task-list .dt-sort[data-key="task"]').textContent`);
         assert.equal((await sortLabel()).includes('↑') || (await sortLabel()).includes('↓'), false, 'not explicitly sorted by task yet');
         for (const [k, code, vk] of [['Enter', 'Enter', 13], [' ', 'Space', 32]]) {

@@ -99,23 +99,30 @@ function _renderTabs() {
         html += `<div class="preview-tab${active}${preview}" data-tab-id="${escapeAttr(tab.id)}" title="${tab.pinned ? '' : 'Preview — double-click to keep open'}">
             <span class="preview-tab-icon">${_fileIcon(tab)}</span>
             <span class="preview-tab-name" title="${escapeAttr(title)}">${escapeHtml(_tabTitle(tab))}${_isDirty(tab) ? ' •' : ''}</span>
-            <button class="preview-tab-close" data-tab-id="${escapeAttr(tab.id)}" title="Close">&times;</button>
+            ${tab.pinned ? '' : `<button class="preview-tab-keep" data-tab-id="${escapeAttr(tab.id)}" aria-label="Keep ${escapeAttr(_tabTitle(tab))} open" title="Keep open">Keep</button>`}
+            <button class="preview-tab-close" aria-label="Close ${escapeAttr(_tabTitle(tab))}" data-tab-id="${escapeAttr(tab.id)}" title="Close">&times;</button>
         </div>`;
     }
     bar.innerHTML = html;
 
     bar.querySelectorAll('.preview-tab').forEach(el => {
         el.addEventListener('click', (e) => {
-            if (e.target.closest('.preview-tab-close')) return;
+            if (e.target.closest('.preview-tab-close, .preview-tab-keep')) return;
             switchTab(el.dataset.tabId);
         });
     });
     bar.querySelectorAll('.preview-tab').forEach(el => {
         el.addEventListener('dblclick', (e) => {
-            if (e.target.closest('.preview-tab-close')) return;
+            if (e.target.closest('.preview-tab-close, .preview-tab-keep')) return;
             _pin(_tabs.find(t => t.id === el.dataset.tabId));
         });
     });
+    bar.querySelectorAll('.preview-tab-keep').forEach(btn => btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const tab = _tabs.find(t => t.id === btn.dataset.tabId);
+        _pin(tab);
+        bar.querySelector(`.preview-tab-close[data-tab-id="${CSS.escape(btn.dataset.tabId)}"]`)?.focus(); // the keep button is gone once the tab is kept: the focus stays in the tab
+    }));
     bar.querySelectorAll('.preview-tab-close').forEach(btn => {
         btn.addEventListener('keydown', e => {
             if (e.key === 'Escape' && _tabs.find(t => t.id === btn.dataset.tabId)?.kind === 'task') { e.preventDefault(); e.stopPropagation(); closeTab(btn.dataset.tabId); }
@@ -287,10 +294,10 @@ function switchTab(tabId) {
     _activate(tab);
 }
 
-function _disposeTab(tab) {
+function _disposeTab(tab, { keyboard = false } = {}) {
     tab.abort?.abort();
     tab.abort = null;
-    if (tab.kind === 'task') { tab.onClose?.(); tab.onClose = null; }
+    if (tab.kind === 'task') { tab.onClose?.({ keyboard }); tab.onClose = null; }
     tab.renderGen++;
 }
 
@@ -310,8 +317,9 @@ function _closeTabNow(tabId) {
     const idx = _tabs.findIndex(t => t.id === tabId);
     if (idx === -1) return;
     const tab = _tabs[idx];
+    const keyboard = (() => { const a = document.activeElement; try { return !!a && a !== document.body && a.matches(':focus-visible'); } catch { return false; } })(); // a keyboard close: the focus ring is on what was focused (read before the task page is cleared)
     if (tab.id === _activeId) { _destroyEditor(); _clearTaskPreview(); }
-    _disposeTab(tab);
+    _disposeTab(tab, { keyboard });
     _tabs.splice(idx, 1);
 
     if (_tabs.length === 0) {

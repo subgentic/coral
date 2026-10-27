@@ -60,10 +60,11 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         assert.deepEqual(head.texts, ['State', 'Task', 'Who'], 'the words as written: the dock shows State, Task and Assigned to only (#7962, #8060)');
         const row = await ev(`(() => { const r = document.querySelector('#board-task-list .board-task-item:not(.board-task-header)'); const b = [...r.querySelectorAll('button')]; return { buttons: b.length, name: b[0] && b[0].getAttribute('aria-label'), inDesc: !!(b[0] && b[0].closest('.board-task-desc')), idIsButton: !!r.querySelector('button.board-task-id') }; })()`);
         assert.equal(row.buttons, 1, 'one real button on the row: ' + JSON.stringify(row)); assert.ok(row.inDesc && !row.idIsButton, 'the name is the only row action');
-        assert.ok(/^Open task #\d+: [A-Z]/.test(row.name), 'its name says what it opens: ' + row.name);
-        await ev(`document.querySelector('#board-task-list .board-task-item:not(.board-task-header) .board-task-desc').click(); true`);
+        assert.ok(/^Open task: [A-Z]/.test(row.name), 'its name says what it opens: ' + row.name);
+        const mouse = async sel => { const r = await ev(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: r.x, y: r.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 }); }; // a real mouse: the page's last input is the pointer (a scripted click() sets no input modality)
+        await mouse('#board-task-list .board-task-item:not(.board-task-header) .board-task-desc');
         await waitFor(`!!document.querySelector('#preview-pane #team-task-title') && document.getElementById('task-detail-modal') && getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`, 'the task opens in the shared preview pane (#8788)', 12000);
-        await ev(`document.querySelector('#preview-pane .preview-tab-close').click(); true`);
+        await mouse('#preview-pane .preview-tab-close');
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-item').length > 0 && document.getElementById('board-task-list').getClientRects().length > 0`, 'the dock\'s list again', 8000);
         const ring = await ev(`[...document.querySelectorAll('#board-task-list *')].filter(e => { const c = getComputedStyle(e); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0; }).map(e => e.className)`);
         assert.deepEqual(ring, [], 'no element of the list wears a ring after a mouse click and the page being left');
