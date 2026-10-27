@@ -202,6 +202,7 @@ var routeTable = cat(
 		"/api/board/{project}/tasks",
 		"/api/board/{project}/tasks/{id}",
 		"/api/board/{project}/tasks/{id}/cost",
+		"/api/board/{project}/tasks/{id}/history",
 		// A board's goals and each one's rollup (#7087): read like its tasks, redacted like them.
 		"/api/board/{project}/goals",
 		"/api/board/{project}/goals/{id}",

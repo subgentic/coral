@@ -336,6 +336,7 @@ func (s *Store) reviewVerdictBefore4599(ctx context.Context, project string, id 
 	if !approve {
 		outcome, verdict = "failed", "rejected"
 	}
+	me.TaskVersion = 1 // #8951: these legacy oracle scenarios all review their unchanged creation text (v1).
 	me.State, me.Note, me.At = verdict, note, now
 	msg := fmt.Sprintf("%s task #%d", strings.ToUpper(verdict[:1])+verdict[1:], id)
 	if note != "" {

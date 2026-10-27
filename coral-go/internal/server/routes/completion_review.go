@@ -193,6 +193,7 @@ func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, app
 	var body struct {
 		SubscriberID string `json:"subscriber_id"`
 		Note         string `json:"note"`
+		TaskVersion  int    `json:"task_version"`
 		Round        int    `json:"round"`    // the round reviewed; an earlier one is refused (#3787)
 		Revision     *int   `json:"revision"` // the revision of the round read (patches that joined it, #5689); absent: not stated
 	}
@@ -215,7 +216,7 @@ func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, app
 		if body.Revision != nil {
 			rev = *body.Revision
 		}
-		v, err = h.bs.ApproveReviewAt(ctx, project, id, body.SubscriberID, body.Note, body.Round, rev)
+		v, err = h.bs.ApproveReviewTextVersion(ctx, project, id, body.SubscriberID, body.Note, body.Round, rev, body.TaskVersion)
 	} else {
 		v, err = h.bs.RejectReview(ctx, project, id, body.SubscriberID, body.Note, body.Round)
 	}

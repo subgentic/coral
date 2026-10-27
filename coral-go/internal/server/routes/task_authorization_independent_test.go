@@ -192,7 +192,7 @@ func TestTaskAuthorization_ComprehensiveIndependentVerification(t *testing.T) {
 		r.Body.Close()
 	})
 
-	t.Run("Worker_PATCH_NonAssignmentField_Allowed", func(t *testing.T) {
+	t.Run("Worker_PATCH_Title_RefusedUnlessCreator", func(t *testing.T) {
 		b, _ := json.Marshal(map[string]any{
 			"subscriber_id": "dev-worker",
 			"title":         "Updated Title by Worker",
@@ -201,12 +201,12 @@ func TestTaskAuthorization_ComprehensiveIndependentVerification(t *testing.T) {
 		require.NoError(t, err)
 		r, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, r.StatusCode)
+		require.Equal(t, http.StatusForbidden, r.StatusCode)
 		r.Body.Close()
 
 		saved, err := h.bs.GetTask(ctx, "main-board", sharedTaskID)
 		require.NoError(t, err)
-		assert.Equal(t, "Updated Title by Worker", saved.Title)
+		assert.NotEqual(t, "Updated Title by Worker", saved.Title)
 		assert.Equal(t, "dev-worker", *saved.AssignedTo)
 	})
 

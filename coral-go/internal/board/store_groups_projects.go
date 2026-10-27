@@ -220,6 +220,7 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		sql  string
 		args int // how many times the project is bound
 	}{
+		{"DELETE FROM task_versions WHERE task_id IN " + mine, 1},
 		{"DELETE FROM task_amendments WHERE task_id IN " + mine, 1},
 		{"DELETE FROM task_dependencies WHERE task_id IN " + mine + " OR blocked_by_task_id IN " + mine, 2},
 		{"DELETE FROM task_workflows WHERE task_id IN " + mine, 1},

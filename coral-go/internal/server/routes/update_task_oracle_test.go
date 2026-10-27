@@ -29,7 +29,7 @@ var updateTaskOutcomes = map[string]int{
 	"removing blockers mixed with other edits":   20,
 	"not a planner (assign or remove blockers)":  20,
 	"title or priority of a missing task":        10,
-	"title or priority by a non-assignee":        20,
+	"title or priority by a non-creator":         20,
 	"title or priority without an actor":         10,
 	"archived assignee":                          10,
 	"bad blocked_by":                             10,
@@ -265,7 +265,7 @@ func runUpdateTaskOracle(t *testing.T, seed int64, counts map[string]int) {
 		case msg == "Task not found":
 			counts["title or priority of a missing task"]++
 		case strings.Contains(msg, "change its title or priority"):
-			counts["title or priority by a non-assignee"]++
+			counts["title or priority by a non-creator"]++
 		case msg == "subscriber_id required":
 			counts["title or priority without an actor"]++
 		case code == "assignee_archived":
@@ -412,14 +412,34 @@ func (h *BoardHandler) updateTaskBefore4756(w http.ResponseWriter, r *http.Reque
 			errNotFound(w, "Task not found")
 			return
 		}
-		if !h.requirePlannerOrAssignee(w, r.Context(), project, current, raw.SubscriberID, "change its title or priority") {
+		if !h.requireTaskTextEditor(w, r, project, current, raw.SubscriberID) {
 			return
 		}
 	}
 	if raw.AssignedTo != nil && h.refuseArchivedAssignee(w, r.Context(), project, *raw.AssignedTo) {
 		return
 	}
+	// #8951 deliberately changes text-only edits: creator authority, immutable
+	// versions and edits during review. This adapter applies that new contract;
+	// the oracle below still compares the legacy reassignment/blocker behavior.
+	if (raw.Title != nil || raw.Priority != nil) && raw.AssignedTo == nil && len(raw.BlockedBy) == 0 && !removingBlockers {
+		before, _ := h.bs.GetTask(r.Context(), project, taskID)
+		task, err := h.bs.EditTaskText(r.Context(), project, taskID, raw.SubscriberID, raw.Title, raw.Priority, 0, 0)
+		if err != nil {
+			if strings.Contains(err.Error(), "cannot be edited") {
+				errConflict(w, err.Error())
+			} else {
+				errBadRequest(w, err.Error())
+			}
+			return
+		}
+		_ = h.bs.TouchTask(r.Context(), project, taskID)
+		h.goBG(func() { h.announceTaskTextEdit(context.Background(), project, raw.SubscriberID, before, task) })
+		writeJSON(w, http.StatusOK, task)
+		return
+	}
 	update := board.TaskUpdate{
+		Editor:     raw.SubscriberID,
 		Title:      raw.Title,
 		Body:       raw.Body,
 		Priority:   raw.Priority,
@@ -498,6 +518,9 @@ func (h *BoardHandler) updateTaskBefore4756(w http.ResponseWriter, r *http.Reque
 					h.sendTaskNudge(ctx, project, current, taskClaimNudge(task.ID))
 				}
 			}
+		}
+		if task.Version > before.Version {
+			h.announceTaskTextEdit(ctx, project, raw.SubscriberID, before, task)
 		}
 	})
 	writeJSON(w, http.StatusOK, task)

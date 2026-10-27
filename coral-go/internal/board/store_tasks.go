@@ -4,6 +4,7 @@ package board
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -30,12 +31,29 @@ func (s *Store) GetTask(ctx context.Context, project string, taskID int64) (*Tas
 func (s *Store) getTaskByID(ctx context.Context, project string, taskID int64) (*Task, error) {
 	var t Task
 	err := s.reader().GetContext(ctx, &t,
-		"SELECT id, revision, board_id, title, body, status, priority, created_by, assigned_to, completed_by, completion_message, created_at, claimed_at, completed_at, session_id, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, parked_reason, parked_until, remind_at, goal_id, "+updatedAtSQL+" AS updated_at FROM board_tasks WHERE id = ? AND board_id = ?", taskID, project)
+		"SELECT id, revision, (SELECT COALESCE(MAX(version),1) FROM task_versions WHERE task_id=board_tasks.id) AS version, board_id, title, body, status, priority, created_by, assigned_to, completed_by, completion_message, created_at, claimed_at, completed_at, session_id, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, parked_reason, parked_until, remind_at, goal_id, "+updatedAtSQL+" AS updated_at FROM board_tasks WHERE id = ? AND board_id = ?", taskID, project)
 	if err != nil {
 		return nil, err
 	}
 	if err := s.hydrateWorkflow(ctx, &t); err != nil {
 		return nil, err
+	}
+	// Keep the text and its approval token consistent if an edit committed while
+	// the workflow was being hydrated. Workflow-only lifecycle updates remain live.
+	var latestVersion int
+	if err := s.reader().GetContext(ctx, &latestVersion, "SELECT COALESCE(MAX(version),1) FROM task_versions WHERE task_id=?", taskID); err != nil {
+		return nil, err
+	}
+	if latestVersion != t.Version {
+		var snapshot string
+		if err := s.reader().GetContext(ctx, &snapshot, "SELECT snapshot_json FROM task_versions WHERE task_id=? AND version=?", taskID, t.Version); err != nil {
+			return nil, err
+		}
+		var text TaskText
+		if err := json.Unmarshal([]byte(snapshot), &text); err != nil {
+			return nil, err
+		}
+		t.Workflow.EffectiveInstructions = text.Instructions
 	}
 	t.BlockedBy, err = s.GetTaskDependencies(ctx, t.ID)
 	if err != nil {
@@ -115,9 +133,9 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 		return nil, err
 	}
 	result, err := s.db.ExecContext(ctx,
-		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id, remote_board_uid, remote_goal_uid, request_id, request_server, request_board)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID, remoteBoard, remoteGoal, requestID, requestServer, requestBoard)
+		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id, remote_board_uid, remote_goal_uid, request_id, request_server, request_board, initial_instructions)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID, remoteBoard, remoteGoal, requestID, requestServer, requestBoard, w.Instructions)
 	if err != nil {
 		return nil, err
 	}
@@ -753,6 +771,7 @@ func (s *Store) ReassignTask(ctx context.Context, project string, taskID int64, 
 // TaskUpdate holds optional fields for updating a task.
 // TaskUpdate holds optional fields for updating a task.
 type TaskUpdate struct {
+	Editor     string     `json:"-"`
 	Title      *string    `json:"title,omitempty"`
 	Body       *string    `json:"body,omitempty"`
 	Priority   *string    `json:"priority,omitempty"`
@@ -823,12 +842,35 @@ func (s *Store) UpdateTask(ctx context.Context, project string, taskID int64, up
 		args = append(args, nowUTC())
 		query := fmt.Sprintf("UPDATE board_tasks SET %s WHERE id = ? AND board_id = ? AND status NOT IN ('completed', 'skipped', 'review_pending') AND NOT EXISTS (SELECT 1 FROM task_workflows w WHERE w.task_id=board_tasks.id AND json_extract(w.data,'$.completion_review') IS NOT NULL)", strings.Join(setClauses, ", "))
 		args = append(args, taskID, project)
-		result, err := s.db.ExecContext(ctx, query, args...)
+		tx, err := s.db.BeginTxx(ctx, nil)
+		if err != nil {
+			return nil, "", err
+		}
+		defer tx.Rollback()
+		beforeText, err := readTaskText(ctx, tx, taskID)
+		if err != nil {
+			return nil, "", err
+		}
+		result, err := tx.ExecContext(ctx, query, args...)
 		if err != nil {
 			return nil, "", err
 		}
 		if n, _ := result.RowsAffected(); n == 0 {
 			return nil, "", fmt.Errorf("task has already finished")
+		}
+		afterText, err := readTaskText(ctx, tx, taskID)
+		if err != nil {
+			return nil, "", err
+		}
+		editor := updates.Editor
+		if editor == "" {
+			editor = "System"
+		}
+		if err = recordTaskText(ctx, tx, taskID, editor, beforeText, afterText); err != nil {
+			return nil, "", err
+		}
+		if err = tx.Commit(); err != nil {
+			return nil, "", err
 		}
 	}
 

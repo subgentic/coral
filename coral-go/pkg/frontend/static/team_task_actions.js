@@ -26,7 +26,7 @@ async function failure(resp) { const data = await resp.json().catch(() => ({}));
 // ── the bar ──────────────────────────────────────────────────────────────
 
 export function taskButtons(task, ctx) {
-    if (!isOpen(task)) return [];
+    if (!isOpen(task)) return ['completed', 'skipped'].includes(task.status) ? [] : [btn('btn', 'Edit', () => ctx.redraw(task, 'edit'))];
     const out = [];
     const canComplete = task.status !== 'blocked' && task.status !== 'draft';
     const canNudge = (task.status === 'pending' || task.status === 'in_progress') && !!task.assigned_to;
@@ -94,7 +94,8 @@ const option = (value, text, selected) => { const o = el('option', null, text); 
 
 /** The edit form for a task: title, description, instructions and why they change, priority, assignee, goal, and the tasks it waits for. save() writes what changed. */
 export async function editForm(task, ctx) {
-    const project = ctx.project;
+    if (reviewRequested(task)) return textEditForm(task, ctx);
+ const project = ctx.project;
     // Subscriber presence is not assignment authority: an inactive or unavailable assignee stays selected even if discovery fails.
     const assignee = el('select'); assignee.id = 'task-edit-assignee';
     assignee.append(option('', 'Unassigned', !task.assigned_to));
@@ -158,14 +159,16 @@ export async function editForm(task, ctx) {
         if (!Object.keys(updates).length && !Object.keys(amendments).length && !goalChanged) { ctx.redraw(task, 'view'); return; }
         try {
             if (goalChanged && !goalValue && goalRead.requireGoal) { showGoalInvalid(goal, goalError, `${chooseGoalLabel}: this board needs a goal on every task.`); return; }
+            let textVersion = task.version;
             if (Object.keys(amendments).length) {
                 const reason = value('task-edit-reason').trim();
                 if (!reason) throw new Error('An amendment reason is required for description or instruction changes');
                 const r = await boardFetch(project, `/tasks/${pathId(task.id)}/amend`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', base_revision: revision, reason, changes: amendments }) });
                 if (!r.ok) throw await failure(r);
+                const amended = await r.json(); textVersion = amended.version || textVersion;
             }
             if (Object.keys(updates).length) {
-                const r = await boardFetch(project, `/tasks/${pathId(task.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', ...updates }) });
+                const r = await boardFetch(project, `/tasks/${pathId(task.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', base_version: textVersion, ...updates }) });
                 if (!r.ok) throw await failure(r);
             }
             if (goalChanged) {
@@ -238,4 +241,17 @@ export function completeForm(task, ctx) {
         }
     }
     return { node: section, focus: () => message.focus(), submit };
+}
+
+/** Reviews keep their lifecycle; only task text changes in this form. */
+function textEditForm(task, ctx) {
+ const form = el('form', 'team-task-form'); form.addEventListener('submit', e => e.preventDefault());
+ const title = input('task-edit-title', task.title), priority = el('select'); priority.id='task-edit-priority';
+ for (const p of ['critical','high','medium','low']) priority.append(option(p,p,p===task.priority));
+ const error=el('p');error.setAttribute('role','alert');
+ form.append(labelled('Title',title,title.id),labelled('Priority',priority,priority.id),error);
+ return {node:form,mount:()=>title.focus(),save:async()=>{try {
+ const r=await boardFetch(ctx.project,`/tasks/${pathId(task.id)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Operator',title:title.value,priority:priority.value,base_version:task.version})});
+ if(!r.ok) throw await failure(r);ctx.reload('Task updated');
+ }catch(e){error.textContent=e.message;}}};
 }

@@ -856,7 +856,7 @@ func TestBoardUpdateTask_PartialEdit(t *testing.T) {
 		for _, m := range messages {
 			msg, _ := m.(map[string]any)
 			content, _ := msg["content"].(string)
-			if content == "[Task #1 edited] Updated title" {
+			if strings.Contains(content, "Task #1 edited to v2 by Operator") && strings.Contains(content, `title "Original title" → "Updated title"`) {
 				return true
 			}
 		}

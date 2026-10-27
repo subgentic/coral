@@ -145,6 +145,7 @@ func cmdTaskReviewFlow(st *boardState, args []string, action string) {
 	fs := flag.NewFlagSet(action, flag.ContinueOnError)
 	to := fs.String("to", "", "Reviewers, comma-separated (review)")
 	note := fs.String("note", "", "Your note (approve; required for reject)")
+	taskVersion := fs.Int("task-version", 0, "The task text version reviewed (default: last task detail)")
 	revision := fs.Int("revision", -1, "The revision of the round you read (approve): patches that joined it since it opened; default: the one task detail last showed you")
 	round := fs.Int("round", 0, "The review round you reviewed (default: the one task detail or your review task last showed you); a verdict on an earlier round is refused")
 	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
@@ -180,6 +181,11 @@ func cmdTaskReviewFlow(st *boardState, args []string, action string) {
 	default:
 		body["note"] = *note
 		body["round"] = *round
+		if *taskVersion > 0 {
+			body["task_version"] = *taskVersion
+		} else {
+			body["task_version"] = loadSeenRounds()[fmt.Sprintf("%s/%d#task-version", st.Project, id)]
+		}
 		if *revision >= 0 {
 			body["revision"] = *revision
 		} else {
@@ -244,11 +250,18 @@ func loadSeenRounds() map[string]int {
 func noteSeenRound(project string, task map[string]any) {
 	id, _ := task["id"].(float64)
 	w, _ := task["workflow"].(map[string]any)
-	if id <= 0 || w == nil {
+	if id <= 0 {
 		return
+	}
+	if w == nil {
+		w = map[string]any{}
 	}
 	seen := loadSeenRounds()
 	changed := false
+	if v, _ := task["version"].(float64); v > 0 {
+		seen[fmt.Sprintf("%s/%d#task-version", project, int64(id))] = int(v)
+		changed = true
+	}
 	if rounds, _ := w["review_rounds"].([]any); len(rounds) > 0 {
 		if last, _ := rounds[len(rounds)-1].(map[string]any); last != nil {
 			if n, _ := last["round"].(float64); n > 0 {
