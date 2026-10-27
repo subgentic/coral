@@ -60,6 +60,17 @@ func (r *landingRig) finish(title string) {
 	require.NoError(r.t, err)
 }
 
+// finishWith completes a task with an outcome (failed, cancelled...).
+func (r *landingRig) finishWith(title, outcome string) {
+	r.t.Helper()
+	_, err := r.s.CreateTask(context.Background(), "team", title, "", "medium", "Orchestrator", "Dev")
+	require.NoError(r.t, err)
+	task, err := r.s.ClaimTask(context.Background(), "team", "Dev")
+	require.NoError(r.t, err)
+	_, err = r.s.CompleteTaskWithArtifacts(context.Background(), "team", task.ID, "Dev", nil, outcome, nil)
+	require.NoError(r.t, err)
+}
+
 func (r *landingRig) check() string {
 	r.w.Observe(context.Background(), r.byRoot)
 	return r.next()
@@ -89,6 +100,32 @@ func TestLandingAlertNeedsFinishedTasksAndTheWait(t *testing.T) {
 	assert.Contains(t, r.check(), "has not moved")
 }
 
+// #9001: only tasks that ended in success are work waiting to land.
+func TestLandingAlertCountsOnlySuccessfulTasks(t *testing.T) {
+	r := newLandingRig(t)
+	r.finishWith("broke", "failed")
+	assert.NotContains(t, r.check(), "has not moved", "nothing succeeded: nothing to land")
+	r.finish("worked") // no outcome stated: a success
+	assert.Contains(t, r.check(), "1 task was completed since it did")
+}
+
+// #9001: "moved" is the reflog's time when there is one, else when Coral first saw the tip: never the tip's own commit time, which can be old when it was pulled in just now.
+func TestLandingAlertFirstSightWithNoReflogIsNow(t *testing.T) {
+	r := newLandingRig(t)
+	r.finish("work")
+	r.moved = time.Time{} // the reflog says nothing
+	assert.NotContains(t, r.check(), "has not moved", "first sight: it moved just now as far as Coral knows")
+	r.w.mu.Lock()
+	for _, st := range r.w.seen {
+		assert.WithinDuration(t, r.now, st.moved, time.Minute)
+	}
+	r.w.mu.Unlock()
+	// the reflog later says it moved 3 h ago (a new tip): that is when it moved
+	r.hash = "cccccccccccccccccccc"
+	r.moved = r.now.Add(-3 * time.Hour)
+	assert.Contains(t, r.check(), "main has not moved for 3 h")
+}
+
 func TestLandingAlertForgetsWhatLandedBeforeTheBranchMoved(t *testing.T) {
 	r := newLandingRig(t)
 	r.finish("work")
@@ -100,12 +137,13 @@ func TestLandingAlertResetsWhenTheBranchMoves(t *testing.T) {
 	r := newLandingRig(t)
 	assert.NotContains(t, r.check(), "has not moved") // first sight, 3 h old, nothing finished
 	r.finish("work")
-	r.hash = "bbbbbbbbbbbbbbbbbbbb" // it moved: the wait starts again from when Coral saw it
+	r.hash = "bbbbbbbbbbbbbbbbbbbb" // it moved just now, by the reflog: the wait starts again
+	r.moved = r.now
 	assert.NotContains(t, r.check(), "has not moved", "the work before the move is landed")
 	r.w.mu.Lock()
 	for k, st := range r.w.seen {
 		assert.Equal(t, r.hash, st.hash)
-		assert.WithinDuration(t, r.now, st.moved, time.Minute, "the wait runs from the move Coral saw")
+		assert.WithinDuration(t, r.now, st.moved, 15*time.Minute, "the wait runs from the move the reflog said")
 		st.moved = r.now.Add(-3 * time.Hour) // three hours pass
 		r.w.seen[k] = st
 	}
@@ -182,6 +220,42 @@ func TestGitTipReadsTheLocalBranchAndSharesWorktreeRepository(t *testing.T) {
 	assert.WithinDuration(t, time.Now(), when, time.Minute)
 	_, _, _, err = gitTip(context.Background(), dir, "nope")
 	assert.Error(t, err)
+}
+
+// #9001: the later of the local branch and origin's is the tip, and its reflog says when it moved.
+func TestGitTipTakesTheLaterOfTheLocalAndRemoteBranchAndReadsTheReflog(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir := t.TempDir()
+	run := func(env []string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), env...)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	file := func(name string) {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600))
+		run(nil, "add", name)
+	}
+	run(nil, "init", "-q")
+	file("a")
+	run([]string{"GIT_AUTHOR_DATE=2020-01-01T00:00:00Z"}, "commit", "-q", "-m", "a") // an old author date: the reflog still says it moved just now
+	_, local, moved, err := gitTip(context.Background(), dir, "main")
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now(), moved, time.Minute, "when the ref moved, by its reflog")
+	// origin's ref is ahead (a fetch saw a newer commit, dated later): it is the tip
+	run(nil, "checkout", "-q", "-b", "other")
+	file("b")
+	run([]string{"GIT_COMMITTER_DATE=2035-01-01T00:00:00Z", "GIT_AUTHOR_DATE=2035-01-01T00:00:00Z"}, "commit", "-q", "-m", "b")
+	run(nil, "update-ref", "refs/remotes/origin/main", "other")
+	run(nil, "checkout", "-q", "main")
+	_, tip, _, err := gitTip(context.Background(), dir, "main")
+	require.NoError(t, err)
+	assert.NotEqual(t, local, tip, "origin's later tip, not the local one")
+	assert.Len(t, tip, 40)
 }
 
 // The git poller hands the watch each team's repositories every pass, and a member's repository is the one the alert reads.
@@ -311,4 +385,38 @@ func TestGitReleaseReadsTheNewestMatchingTagTheBranchContains(t *testing.T) {
 	assert.Equal(t, "", none.Tag)
 	_, err = gitRelease(context.Background(), dir, "nobranch", "v*")
 	assert.Error(t, err)
+}
+
+// #9001 for the release alert: a branch that origin has moved past the tag counts, though the local branch has not pulled.
+func TestGitReleaseCountsCommitsOnOriginsBranchTheLocalOneHasNotPulled(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir := t.TempDir()
+	run := func(env []string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), env...)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	commit := func(name string, env []string) {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600))
+		run(nil, "add", name)
+		run(env, "commit", "-q", "-m", name)
+	}
+	run(nil, "init", "-q")
+	commit("a", nil)
+	run(nil, "tag", "v1.0.0")
+	run(nil, "checkout", "-q", "-b", "fetched")
+	later := []string{"GIT_COMMITTER_DATE=2035-01-01T00:00:00Z", "GIT_AUTHOR_DATE=2035-01-01T00:00:00Z"}
+	commit("b", later)
+	commit("c", later)
+	run(nil, "update-ref", "refs/remotes/origin/main", "fetched")
+	run(nil, "checkout", "-q", "main")
+	st, err := gitRelease(context.Background(), dir, "main", "v*")
+	require.NoError(t, err)
+	assert.Equal(t, "v1.0.0", st.Tag)
+	assert.Equal(t, 2, st.Commits, "origin's two commits past the tag, the local branch has none")
 }

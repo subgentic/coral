@@ -38,19 +38,44 @@ func NewLandingWatch(store *board.Store) *LandingWatch {
 	return &LandingWatch{store: store, tip: gitTip, release: gitRelease, roots: map[string][]string{}, seen: map[string]landingBranch{}}
 }
 
-// gitTip is the commit a local branch points at, its committer time, and the repository's common directory (what worktrees of one repository share).
-func gitTip(ctx context.Context, root, branch string) (repo, hash string, committed time.Time, err error) {
+// branchRefs are the refs of a branch Coral reads: the local branch and the remote-tracking one (what the last fetch saw; Coral fetches nothing). Work lands on the remote, and a checkout that has not
+// pulled yet is behind it.
+func branchRefs(branch string) []string {
+	return []string{"refs/heads/" + branch, "refs/remotes/origin/" + branch}
+}
+
+// laterBranchRef is the ref of the branch that is further on: the later by commit time of the local branch and the remote-tracking one, with the commit it points at.
+func laterBranchRef(ctx context.Context, root, branch string) (ref, hash string, err error) {
+	var bestAt int64
+	for _, r := range branchRefs(branch) {
+		out, lerr := gitutil.Command(ctx, root, "log", "-1", "--format=%H|%ct", r, "--").Output()
+		if lerr != nil {
+			continue // no such ref here (a repository with no remote has no origin ref)
+		}
+		parts := strings.SplitN(strings.TrimSpace(string(out)), "|", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		at, perr := strconv.ParseInt(parts[1], 10, 64)
+		if perr != nil {
+			continue
+		}
+		if ref == "" || at > bestAt {
+			ref, hash, bestAt = r, parts[0], at
+		}
+	}
+	if ref == "" {
+		return "", "", fmt.Errorf("no such branch")
+	}
+	return ref, hash, nil
+}
+
+// gitTip is the commit the branch points at (the later of the local branch and its remote-tracking ref), the repository's common directory (what worktrees of one repository share), and when that ref last
+// moved by its reflog, zero when the reflog says nothing.
+func gitTip(ctx context.Context, root, branch string) (repo, hash string, moved time.Time, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	out, err := gitutil.Command(ctx, root, "log", "-1", "--format=%H|%cI", "refs/heads/"+branch, "--").Output()
-	if err != nil {
-		return "", "", time.Time{}, err
-	}
-	parts := strings.SplitN(strings.TrimSpace(string(out)), "|", 2)
-	if len(parts) != 2 {
-		return "", "", time.Time{}, fmt.Errorf("unexpected git log format")
-	}
-	committed, err = time.Parse(time.RFC3339, parts[1])
+	bestRef, hash, err := laterBranchRef(ctx, root, branch)
 	if err != nil {
 		return "", "", time.Time{}, err
 	}
@@ -58,7 +83,16 @@ func gitTip(ctx context.Context, root, branch string) (repo, hash string, commit
 	if err != nil {
 		return "", "", time.Time{}, err
 	}
-	return strings.TrimSpace(string(dir)), parts[0], committed, nil
+	// the reflog's newest entry is when the ref last moved here (a commit, a pull, a fetch); the tip's own commit time is not: an old commit can be pulled in just now
+	if rl, rerr := gitutil.Command(ctx, root, "log", "-g", "-1", "--date=unix", "--format=%gd", bestRef, "--").Output(); rerr == nil {
+		sel := strings.TrimSpace(string(rl))
+		if i, j := strings.LastIndex(sel, "{"), strings.LastIndex(sel, "}"); i >= 0 && j > i {
+			if sec, perr := strconv.ParseInt(sel[i+1:j], 10, 64); perr == nil && sec > 0 {
+				moved = time.Unix(sec, 0).UTC()
+			}
+		}
+	}
+	return strings.TrimSpace(string(dir)), hash, moved, nil
 }
 
 // Observe notes which git roots each team's members work in, from the pass's agents grouped by root. Teams that have the alert off cost nothing here.
@@ -102,7 +136,7 @@ func (w *LandingWatch) note(ctx context.Context, project string, ls board.Health
 	wait := time.Duration(ls.WaitMin) * time.Minute
 	done := map[string]bool{}
 	for _, root := range roots {
-		repo, hash, committed, err := w.tip(ctx, root, ls.Branch)
+		repo, hash, reflogMoved, err := w.tip(ctx, root, ls.Branch)
 		if err != nil || done[repo] { // no such local branch here, or this repository was already looked at (worktrees share one)
 			continue
 		}
@@ -111,9 +145,10 @@ func (w *LandingWatch) note(ctx context.Context, project string, ls board.Health
 		w.mu.Lock()
 		st, known := w.seen[key]
 		if !known || st.hash != hash {
+			// it moved: when the reflog says, else when Coral first saw it. Never the tip's commit time: an old commit can have been pulled in just now.
 			st = landingBranch{hash: hash, moved: now}
-			if !known && committed.Before(now) { // first sight: the tip's own time is when it last moved, as far as Coral can tell
-				st.moved = committed
+			if !reflogMoved.IsZero() && reflogMoved.Before(now) {
+				st.moved = reflogMoved
 			}
 			w.seen[key] = st
 		}
@@ -165,7 +200,11 @@ func gitRelease(ctx context.Context, root, branch, pattern string) (releaseState
 		return st, err
 	}
 	st.Repo = strings.TrimSpace(string(dir))
-	out, err := gitutil.Command(ctx, root, "for-each-ref", "--sort=-version:refname", "--sort=-creatordate", "--count=1", "--merged=refs/heads/"+branch, "--format=%(refname)|%(creatordate:iso-strict)", "refs/tags/"+pattern).Output()
+	tip, _, err := laterBranchRef(ctx, root, branch) // the local branch or origin's, whichever is further on
+	if err != nil {
+		return st, err
+	}
+	out, err := gitutil.Command(ctx, root, "for-each-ref", "--sort=-version:refname", "--sort=-creatordate", "--count=1", "--merged="+tip, "--format=%(refname)|%(creatordate:iso-strict)", "refs/tags/"+pattern).Output()
 	if err != nil {
 		return st, err
 	}
@@ -182,7 +221,7 @@ func gitRelease(ctx context.Context, root, branch, pattern string) (releaseState
 	}
 	ref := parts[0]
 	st.Tag = strings.TrimPrefix(ref, "refs/tags/")
-	count, err := gitutil.Command(ctx, root, "rev-list", "--count", ref+"..refs/heads/"+branch).Output()
+	count, err := gitutil.Command(ctx, root, "rev-list", "--count", ref+".."+tip).Output()
 	if err != nil {
 		return st, err
 	}
@@ -192,7 +231,7 @@ func gitRelease(ctx context.Context, root, branch, pattern string) (releaseState
 	if st.Commits == 0 {
 		return st, nil
 	}
-	times, err := gitutil.Command(ctx, root, "log", "--format=%cI", ref+"..refs/heads/"+branch).Output()
+	times, err := gitutil.Command(ctx, root, "log", "--format=%cI", ref+".."+tip).Output()
 	if err != nil {
 		return st, err
 	}
