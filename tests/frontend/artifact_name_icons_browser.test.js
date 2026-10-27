@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const { connect } = require('./agent_view_harness');
+const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 (async () => {
  const {client, Page, Emulation, ev, PRELOAD, install} = await connect();
@@ -19,7 +20,7 @@ const BASE = require('./test_base').BASE;
    })()`);
    assert.equal(rows.length,7);
    for(const row of rows){assert.equal(row.icon,row.expected,row.name);assert.equal(row.hidden,'true');assert.equal(row.before,true);assert.ok(row.height<=56);assert.equal(row.overflow,false);}
-   const dir=process.env.CORAL_SCREENSHOT_DIR;if(dir){fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,`artifact-icons-${width}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
+   const dir=process.env.CORAL_SCREENSHOT_DIR;if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(dir,`artifact-icons-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
   }
  } finally {await client.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
