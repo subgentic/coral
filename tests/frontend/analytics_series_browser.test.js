@@ -138,7 +138,7 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         assert.equal(await ev(`document.querySelectorAll('#cost-series-team .viz-seg').length`), 3, 'Metrics, Show and, for one row with several metrics, Scale');
         await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[2].querySelectorAll('button')].find(b => b.textContent === 'Log').click(); true`);
         const lg = await ev(`({ scale: document.querySelector('#cost-series-team .viz-svg').getAttribute('data-scale'), ticks: [...document.querySelectorAll('#cost-series-team .viz-svg text.viz-axis')].map(t => t.textContent).slice(0, 5) })`);
-        assert.equal(lg.scale, 'log'); assert.deepEqual(lg.ticks.slice(0, 4), ['0', '10', '100', '1.0K'], 'a log axis steps by powers of ten: ' + JSON.stringify(lg));
+        assert.equal(lg.scale, 'log'); assert.deepEqual(lg.ticks.slice(0, 4), ['0', '10', '100', '1K'], 'a log axis steps by powers of ten: ' + JSON.stringify(lg));
         await shot('series-metrics-one-row-log');
         await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[2].querySelectorAll('button')].find(b => b.textContent === 'Linear').click(); true`);
         await ev(`[...document.querySelectorAll('#cost-series-team .viz-hint button')].find(b => /top 7/.test(b.textContent)).click(); true`);

@@ -3,16 +3,16 @@
  * brings its line forward), the lines are the top 7 by cost and the rest as Other, and the chart is aria-hidden: the table beside it is its text alternative. Under the table a line says whether the
  * rows add up to where the chart ends. It reads GET /api/token-usage/timeseries?group_by=team|agent|provider|model (each bucket lists its series). Everything is built with the DOM and textContent:
  * names are written by agents. */
-import { compactCount, formatCost } from './format.js';
+import { compactFigure, formatCost } from './format.js';
 import { watchScrollCue } from './scroll_cue.js';
 
 export const METRICS = [
     { key: 'cost_usd', label: 'Cost', fmt: v => formatCost(v, { zeroAsTwo: true }), table: 'cost_usd' },
-    { key: 'input_tokens', label: 'Input', fmt: compactCount, table: 'input_tokens' },
-    { key: 'output_tokens', label: 'Output', fmt: compactCount, table: 'output_tokens' },
-    { key: 'cache_read_tokens', label: 'Cache read', fmt: compactCount, table: 'cache_read_tokens' },
-    { key: 'cache_write_tokens', label: 'Cache write', fmt: compactCount, table: 'cache_write_tokens' },
-    { key: 'num_requests', label: 'Requests', fmt: compactCount, table: 'requests' },
+    { key: 'input_tokens', label: 'Input', fmt: compactFigure, table: 'input_tokens' },
+    { key: 'output_tokens', label: 'Output', fmt: compactFigure, table: 'output_tokens' },
+    { key: 'cache_read_tokens', label: 'Cache read', fmt: compactFigure, table: 'cache_read_tokens' },
+    { key: 'cache_write_tokens', label: 'Cache write', fmt: compactFigure, table: 'cache_write_tokens' },
+    { key: 'num_requests', label: 'Requests', fmt: compactFigure, table: 'requests' },
 ];
 export const METRIC_SLOT = { input_tokens: 0, output_tokens: 1, cache_read_tokens: 2, cache_write_tokens: 3, cost_usd: 0, num_requests: 0 }; // a metric's own colour when metrics are the lines
 export const GROUPS = { provider: 'provider', model: 'model', team: 'team', agent: 'agent' };
@@ -100,7 +100,7 @@ export function agrees(a, b) { return Math.abs(a - b) <= 1e-6 * Math.max(1, Math
 // ── the chart ───────────────────────────────────────────────────────────
 
 /** An axis label: money from $100 up drops the cents (the axis steps are round numbers), so a label never outgrows the margin. */
-const axisLabel = (fmt, v) => { const t = fmt(v); return t.startsWith('$') && v >= 100 ? (v >= 1000 ? `$${compactCount(v)}` : `$${Math.round(v)}`) : t; };
+const axisLabel = (fmt, v) => { const t = fmt(v); return t.startsWith('$') && v >= 100 ? (v >= 1000 ? `$${compactFigure(v)}` : `$${Math.round(v)}`) : t; };
 const niceMax = v => { if (!(v > 0)) return 1; const p = 10 ** Math.floor(Math.log10(v)), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
 const colorOf = line => (line.other ? 'var(--viz-other)' : `var(--viz-${((line.slot ?? 0) % 7) + 1})`);
 

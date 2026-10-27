@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
 import { keyLabel } from './server_base.js';
-import { formatTokens, formatDuration, formatCost } from './format.js';
+import { compactFigure, formatDuration, formatCost } from './format.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 const { dataTable, tableState, link: dtLink, chip, tag, avatar } = await importOnce('./data_table.js'); // the shared table (#7743)
@@ -324,10 +324,10 @@ export async function _refreshCostDashboard({ force = false } = {}) {
         if (summaryResp && summaryResp.ok) {
             const data = await summaryResp.json();
             const t = data.totals || {};
-            _setText('cost-input-tokens', formatTokens(t.input_tokens || 0));
-            _setText('cost-output-tokens', formatTokens(t.output_tokens || 0));
-            _setText('cost-cache-read', formatTokens(t.cache_read_tokens || 0));
-            _setText('cost-cache-write', formatTokens(t.cache_write_tokens || 0));
+            _setText('cost-input-tokens', compactFigure(t.input_tokens || 0));
+            _setText('cost-output-tokens', compactFigure(t.output_tokens || 0));
+            _setText('cost-cache-read', compactFigure(t.cache_read_tokens || 0));
+            _setText('cost-cache-write', compactFigure(t.cache_write_tokens || 0));
             _setText('cost-total-requests', String(t.num_requests || 0)); // the calls recorded: the figure By agent's Requests column adds up to
             _setText('cost-total-cost', formatCost(t.cost_usd || 0, { zeroAsTwo: true }));
 
@@ -389,7 +389,7 @@ function _setText(id, text) {
 // filter button opens the choice list below), and each table's sort, kept across the refresh.
 const _tables = {};
 const _numCol = (key, label, get, show, extra) => ({ key, label, numeric: true, sort: 'number', firstDir: 'desc', sortValue: get, cell: r => show(get(r)), ...extra });
-const _tokCol = (key, label, extra) => _numCol(key, label, r => r[key] || 0, formatTokens, extra);
+const _tokCol = (key, label, extra) => _numCol(key, label, r => r[key] || 0, compactFigure, extra);
 const _cacheCols = () => [_tokCol('cache_read_tokens', 'Cache read', { narrowHide: true }), _tokCol('cache_write_tokens', 'Cache write', { narrowHide: true })]; // the two that wait when the table's box is narrow
 const _costCol = () => _numCol('cost_usd', 'Cost', r => r.cost_usd || 0, c => formatCost(c, { zeroAsTwo: true }), { foldFirst: true }); // the figure the page is opened for: on a phone it follows the name (#5056)
 const _shareCol = () => _numCol('cost_pct', 'Share', r => r.cost_pct || 0, v => `${Math.round(v * 100)}%`, { foldFirst: true });
@@ -575,7 +575,7 @@ function _renderThinkingTable(rows) {
         _textCol('thinking', 'level', 'Thinking level', r => r.level || '', { sortValue: r => (r.level_key ? r.level : 'zzzz Not reported') }), // after the named levels when ascending (localeCompare puts '~' first)
         _numCol('requests', 'Calls', r => r.requests || 0, v => (v ? String(v) : '–')),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
-        _numCol('thinking_tokens', 'Thinking', r => r.thinking_tokens, v => (v === null ? '–' : formatTokens(v)), { sortValue: r => r.thinking_tokens || 0 }),
+        _numCol('thinking_tokens', 'Thinking', r => r.thinking_tokens, v => (v === null ? '–' : compactFigure(v)), { sortValue: r => r.thinking_tokens || 0 }),
         _costCol(), _shareCol(),
     ], filtered, null, { quiet: r => !r.level_key }); // the usage with no thinking level recorded (#4969) is not a level: quieter than the rows that are
 }
@@ -795,6 +795,7 @@ function _renderSparklines(buckets) {
 function _renderBurnRate(buckets, periodHours) {
     const el = document.getElementById('cost-burn-rate');
     if (!el || buckets.length === 0) return;
+    el.title = 'Estimated from the buckets in this range'; // the arithmetic is the cost over the hours between the first and the last bucket (UI/UX, #9511): an estimate, said on hover only
 
     const totalCost = buckets[buckets.length - 1].cumulative_cost || 0;
 

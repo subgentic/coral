@@ -47,7 +47,7 @@ const TT = { metric: 'task_time', range: '24h', min_sample: 10, total: { n: 260 
                 else await ev(`[...document.querySelectorAll('#cost-spend-section .eff-seg-btn')].find(b => b.textContent === 'Model').click(); true`);
                 await waitFor(`document.querySelectorAll('#cost-eff-per-commit .eff-bar').length === 6`, 'the six bars', 8000);
                 const m = await ev(`(() => { const v = document.getElementById('cost-eff-per-commit'); return { text: v.textContent.replace(/\\s+/g, ' '), few: v.querySelectorAll('.eff-fill.eff-few').length, avg: v.querySelectorAll('.eff-avg').length, rows: v.querySelectorAll('tbody tr').length, old: document.getElementById('cost-spend').hidden, over: document.documentElement.scrollWidth - innerWidth, reads: window.__effReads }; })()`);
-                assert.match(m.text, /Most efficient \(at least 10 commits\)claude-haiku-5-5/); assert.match(m.text, /Average, all commits304 K/); assert.match(m.text, /2 groups below 10 commits, shown but not ranked/);
+                assert.match(m.text, /Most efficient \(at least 10 commits\)claude-haiku-5-5/); assert.match(m.text, /Average, all commits304K/); assert.match(m.text, /2 groups below 10 commits, shown but not ranked/);
                 assert.equal(m.few, 2); assert.equal(m.avg, 6); assert.equal(m.rows, 6); assert.equal(m.old, true); assert.ok(m.over <= 1, 'no sideways scroll: ' + m.over);
                 assert.match(m.reads[0], /metric=tokens_per_commit&group_by=model&range=24h/);
                 await shot(`analytics-efficiency-commit-model-${label}-light`, 'light'); await shot(`analytics-efficiency-commit-model-${label}-dark`, 'dark');

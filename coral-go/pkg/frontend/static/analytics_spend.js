@@ -4,6 +4,7 @@
  *  - task time: tasks done, median and slowest 1 in 10 from claimed to done, the wait before claimed, review time (assignment to approval), sent back 2 or more times, tasks done a day or an hour, and by agent. A measure the endpoint does not return is left out.
  * One read feeds both: GET /api/board/<team>/spend?range=24h|7d sends counts and seconds, not ratios; the page divides. Everything is built with the DOM and textContent: agent names are written by agents. Lazy: cost_dashboard.js imports it. */
 import { state } from './state.js';
+import { compactFigure } from './format.js';
 import { boardFetch, identityKey, isCloud, noteBoardLabels, serverFetch, spendTeamKeys } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { browserLocal } from './safe_storage.js';
@@ -20,16 +21,8 @@ let root = null, timeRoot = null;
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
-/** 517 K, 0.8 M, 61 M: tokens as a person reads them. */
-export function fmtTokens(n) {
-    const v = Number(n);
-    if (!Number.isFinite(v)) return '';
-    if (v >= 999.5e6) return `${(v / 1e9).toFixed(1)} B`;
-    if (v >= 1e7) return `${Math.round(v / 1e6)} M`;
-    if (v >= 999500) return `${(v / 1e6).toFixed(1)} M`; // a figure that rounds up to the next unit moves into it
-    if (v >= 1e3) return `${Math.round(v / 1e3)} K`;
-    return String(Math.round(v));
-}
+/** 517K, 1.2M, 61M: tokens as a person reads them, the one figure format of the Analytics pages (format.js compactFigure, #9516); '' for a figure that is not a number. */
+export function fmtTokens(n) { return Number.isFinite(Number(n)) ? compactFigure(Math.round(Number(n))) : ''; }
 /** 38 min, 2 h 05 min, 45 s: a time as a person reads it. */
 export function fmtDur(s) {
     const v = Number(s);

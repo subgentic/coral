@@ -37,8 +37,8 @@ try {
     assert.match(reads[0], /metric=tokens_per_commit&group_by=model&range=7d/);
     const v = sec('cost-eff-per-commit'), text = v.textContent.replace(/\s+/g, ' ');
     assert.match(text, /Most efficient \(at least 10 commits\)claude-haiku-5-5/, 'the most efficient group with enough commits');
-    assert.match(text, /141 K per commit, 53% under the 300 K average/, 'its figure against the average');
-    assert.match(text, /Average, all commits300 KUsual last week: 310 K/);
+    assert.match(text, /141K per commit, 53% under the 300K average/, 'its figure against the average');
+    assert.match(text, /Average, all commits300KUsual last week: 310K/);
     assert.match(text, /pi: qwen3-coder4 commits · too few to rank/, 'a group under 10 is said to be too few');
     assert.match(text, /gemini writes no usage rows, so its commits are left out\./);
     assert.match(text, /Provider not recorded: commits of no recorded session are left out\./, 'work of no recorded session is named, not hidden');
