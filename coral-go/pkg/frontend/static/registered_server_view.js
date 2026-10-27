@@ -121,12 +121,12 @@ function serversTable(local, remotes) {
     const live = s => (isLocal(s) ? { id: 'local', status: 'online' } : liveOf(s));
     return buildServersTable(DT, {
         label: 'Registered servers', state: _dt, rows, oneLine: true, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
-        columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); Needs you and the name's warning never go
+        columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); the name's warning never goes and Needs you only under 16 rem (a phone at 200% text: three columns do not fit 12 rem)
             { key: 'server', label: 'Server', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: serverCell, title: s => s.label || s.id },
             { key: 'tags', label: 'Tags', width: '11rem', dropAt: 36, cell: tagsCell },
-            { key: 'status', label: 'Status', width: '9rem', sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusDotWord(live(s).status || s.status) },
+            { key: 'status', label: 'Status', width: '8rem', sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusDotWord(live(s).status || s.status) },
             { key: 'agents', label: 'Agents', width: '5rem', dropAt: 28, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => { const n = serverAgentCount(live(s)); return n ? String(n) : ''; } }, // the count alone under its header, nothing at zero (UI/UX #9679)
-            { key: 'needs', label: 'Needs you', width: '6rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
+            { key: 'needs', label: 'Needs you', width: '6rem', dropAt: 16, align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
             { key: 'seen', label: 'Last seen', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: s => seenValue(s, live(s)), cell: s => seenWords(s, live(s)) },
             { key: 'version', label: 'Version', width: '7.5rem', dropAt: 52, tone: 'tertiary', sort: true, sortValue: s => versionWords(s, live(s)), cell: s => versionWords(s, live(s)) || '\u2014' },
         ],
