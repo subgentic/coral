@@ -2,6 +2,8 @@
  * the menu is role="menu" with role="menuitem" buttons. It opens on a click or ArrowDown with its first item focused; ArrowUp and ArrowDown, Home and End move; Escape closes it and gives the focus back
  * to the button (and is not the dialog's Escape); Tab, a click elsewhere or a choice closes it. It opens below the button, or above it when there is not room below inside the dialog's body: a menu
  * is never cut off by the footer. Only one is open at a time. */
+import { menuMove } from './menu_keys.js';
+
 let current = null; // { toggle, menu }
 
 const items = menu => [...menu.querySelectorAll('[role="menuitem"]:not([disabled]):not([hidden])')];
@@ -49,8 +51,8 @@ document.addEventListener('keydown', e => {
     const i = list.indexOf(on);
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenus({ restoreFocus: true }); return; }
     if (e.key === 'Tab') { closeMenus(); return; }
-    const to = { ArrowDown: on === toggle ? 0 : (i + 1) % list.length, ArrowUp: on === toggle ? list.length - 1 : (i - 1 + list.length) % list.length, Home: 0, End: list.length - 1 }[e.key];
-    if (to === undefined) return;
+    const to = menuMove(e.key, list.length, on === toggle ? -1 : i);
+    if (to < 0) return;
     e.preventDefault();
     list[to]?.focus();
 }, true); // capture: before the page's Escape closes the dialog behind the menu

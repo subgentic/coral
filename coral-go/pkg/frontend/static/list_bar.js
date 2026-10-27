@@ -35,9 +35,9 @@ export function buildMoreMenu(id, items, noun = '') {
     for (const [k, v] of [['width', '18'], ['height', '18'], ['viewBox', '0 0 24 24'], ['fill', 'currentColor'], ['aria-hidden', 'true']]) svg.setAttribute(k, v);
     for (const x of [5, 12, 19]) { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('cx', String(x)); c.setAttribute('cy', '12'); c.setAttribute('r', '1.8'); svg.append(c); }
     btn.append(svg);
-    const menu = make('div', 'team-more-menu list-bar-more-menu'); menu.id = `${id}-more-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', name);
+    const menu = make('div', 'menu team-more-menu list-bar-more-menu'); menu.id = `${id}-more-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', name);
     for (const it of items) {
-        const b = make('button', null, it.label); b.type = 'button'; b.setAttribute('role', 'menuitem');
+        const b = make('button', 'menu-item', it.label); b.type = 'button'; b.setAttribute('role', 'menuitem');
         b.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); it.run(); });
         menu.append(b);
     }

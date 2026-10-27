@@ -1024,3 +1024,13 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
     .inbox-saved-actions .wf-more { flex: 1 1 100%; }
     .inbox-saved-actions .wf-more-menu { position: static; margin-top: 4px; }
 }
+
+/* The one menu (#9243, Goal #88 item 1): a list of actions that opens beside its button. A page's own class (team-more-menu, ...) says only where it sits and how wide it is, never what a menu looks like. .menu-item is a row: 13/500, 32 px on a fine pointer and 44 on a touch screen, hover and keyboard focus the same, .menu-item-danger red and last.
+ * The keyboard is menu_keys.js. menu_census.test.mjs fails a class named *-menu that declares its own surface, with a down-only list of those still to move. */
+.menu { display: flex; flex-direction: column; gap: 2px; min-width: 12rem; padding: 4px; background: var(--bg-secondary); border: var(--card-border); border-radius: var(--card-radius); box-shadow: var(--shadow-md); }
+.menu[hidden] { display: none; }
+.menu-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); font-weight: 500; text-align: left; text-decoration: none; cursor: pointer; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--bg-hover); }
+.menu-item[hidden] { display: none; }
+.menu-item-danger { color: var(--error-text); }
+@media (pointer: coarse) { .menu-item { min-height: var(--control-touch-height, 44px); } }

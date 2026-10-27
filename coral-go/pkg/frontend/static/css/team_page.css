@@ -16,13 +16,8 @@
 .team-page-status.needs .team-status-dot { background: var(--warning); }
 .team-page-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
 .team-page-actions .btn { min-height: 36px; }
-.team-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 200px; display: flex; flex-direction: column; padding: 4px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
-.team-more-menu[hidden] { display: none; }
+.team-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .team-more-menu > button.team-more-add { display: none !important; }
-.team-more-menu > button { display: block !important; width: 100%; text-align: left; min-height: 36px; padding: 6px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-lg); cursor: pointer; }
-.team-more-menu > button[hidden] { display: none !important; }
-.team-more-menu > button:hover { background: var(--bg-hover); }
-.team-more-menu > button.mb-action-danger { color: var(--error-text); }
 
 .team-tabs { flex: none; padding: 6px 24px 0; scroll-padding-inline: 2rem; } /* one row that never changes height: when the tabs are wider than the window the strip scrolls sideways, the selected tab is scrolled into view, and a fade at the edge says there is more */
 /* the tab row: the tab list and, on a phone, the More button beside it (Artifacts, Knowledge and Settings behind it, #8648) */
@@ -153,7 +148,7 @@
     .team-tabs-row .team-tab-count { margin-left: 4px; padding: 0 5px; }
     .team-tabs-row > .team-tabs { padding-right: 0.3rem; } /* room after the last tab in the strip's scroll range, in rem so it grows with the text: at 200% text the row's fourth tab, Artifacts, ended 5 px past the strip at its farthest scroll (#8791); at normal size it stays under the strip's slack, so the row does not scroll */
     .team-tabs-more-menu { right: 8px; }
-    .team-page-actions .btn, .goals-pinbar .btn, .team-more-menu > button { min-height: 44px; }
+    .team-page-actions .btn, .goals-pinbar .btn { min-height: 44px; }
     .team-more-menu > button.team-more-add { display: block !important; }
     .goals-table-page { padding: var(--team-page-padding, 12px 16px 0); }
     .goals-pinbar .btn { flex: 1 1 auto; }
