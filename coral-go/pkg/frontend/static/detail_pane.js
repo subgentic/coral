@@ -152,9 +152,10 @@ document.addEventListener('keydown', (e) => {
     closeDetailPane({ restoreFocus: true });
 });
 
-// Tab stays in the pane on a phone, where it is a sheet over the page.
+// Tab stays in the pane on a phone, where it is a sheet over the page. A goal screen's preview is a sheet only where it covers the list (900 px and under): beside the list it is a region, and Tab leaves it (#8952).
 document.addEventListener('keydown', (e) => {
     const aside = current && current.aside;
-    if (!current || e.key !== 'Tab' || !aside || !aside.contains(document.activeElement) || !(current.hosted || window.matchMedia('(max-width: 760px)').matches)) return;
+    if (!current || e.key !== 'Tab' || !aside || !aside.contains(document.activeElement)) return;
+    if (!(aside.classList.contains('goal-detail-pane') ? window.matchMedia('(max-width: 900px)').matches : (current.hosted || window.matchMedia('(max-width: 760px)').matches))) return;
     trapTab(aside, e);
 });
