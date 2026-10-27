@@ -1,5 +1,5 @@
 import { inboxSources, serverColumns, multipleServers, serverLabel, serverOf } from './inbox_servers.js';
-import { serverFetch, isCloud } from './server_base.js';
+import { serverFetch, isCloud, nativeInbox } from './server_base.js';
 /* The mailbox's chat folders (#7776, UI/UX's mock #7773): All chats, Board history, With notes, Starred, Active now and Archived; by CLI (Claude, Codex, Antigravity, Pi); and the chat tags. One chat is one line of
  * the one table (data_table.js): the chat's title, the agent, when it last spoke (and the server with more than one): one line per chat (#8961); the days are its dividers, the list grows as it is read (the footer scrolls into view),
  * and the folders' counts come from one grouped read (GET /api/sessions/history/counts). A chat is starred or archived with its own two quiet buttons (PATCH /api/sessions/history/{id}/flags: only the person).
@@ -51,7 +51,7 @@ export function chatSections(c = counts) {
     const out = [{ title: 'Chats', items: FOLDERS.map(f => ({ key: f.key, label: f.label, count: folderCount(f.key, c) })) },
         { title: 'By CLI', items: CLIS.map(([t, label]) => ({ key: `chats-cli-${t}`, label, count: folderCount(`chats-cli-${t}`, c) })) }];
     const tags = (c && c.tags) || [];
-    if (tags.length) out.push({ title: 'Tags', items: tags.map(t => ({ key: `chats-tag-${t.id}`, label: t.name, count: t.count, dot: /^#[0-9a-f]{3,8}$/i.test(t.color || '') ? t.color : undefined })) });
+    if (tags.length && !nativeInbox()) out.push({ title: 'Tags', items: tags.map(t => ({ key: `chats-tag-${t.id}`, label: t.name, count: t.count, dot: /^#[0-9a-f]{3,8}$/i.test(t.color || '') ? t.color : undefined })) });
     return out;
 }
 
@@ -60,8 +60,12 @@ export const chatTags = () => (counts && counts.tags) || [];
 
 export async function loadChatCounts(redraw) {
     try {
-        const replies = await Promise.all(inboxSources().map(async server => { const r = await serverFetch(server, '/api/sessions/history/counts'); if (!r.ok) throw new Error('Chat counts unavailable'); return r.json(); }));
+        const sources = inboxSources();
+        const read = async server => { const r = await serverFetch(server, '/api/sessions/history/counts'); if (!r.ok) throw new Error('Chat counts unavailable'); return r.json(); };
+        // one computer that does not answer must not blank the others' counts on a Hub (the folders add up what answered); a local Coral's one source still fails as a whole
+        const replies = isCloud() ? (await Promise.allSettled(sources.map(read))).filter(r => r.status === 'fulfilled').map(r => r.value) : await Promise.all(sources.map(read));
         counts = { ...replies[0], by_agent_type: Object.create(null) };
+        if (nativeInbox()) delete counts.tags; // tags are per computer: the Hub-served Inbox has no Tags folder
         for (const key of ['all','group','notes','starred','active','archived']) counts[key] = replies.reduce((sum, d) => sum + (Number(d[key]) || 0), 0);
         for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
     } catch { /* the folders keep their last counts */ }
@@ -81,6 +85,7 @@ async function readMore(key, folder, q, extra, redraw) {
         const p = new URLSearchParams({ ...query, ...folder.params, page: String(L.page + 1), page_size: String(PAGE) }); // the folder's own rule wins over a filter
         if (q) p.set('q', q);
         const sources = inboxSources().filter(server => (!selected || server === selected) && (!p.has('tag_ids') || server === 'local'));
+        if (!inboxSources().length) throw new Error('No computers online.'); // a Hub with none linked or none online: say so, not "No chats"
         const replies = await Promise.all(sources.map(async server => {
             const r = await serverFetch(server, `/api/sessions/history?${p}`);
             if (!r.ok) throw new Error('Chats could not be read');

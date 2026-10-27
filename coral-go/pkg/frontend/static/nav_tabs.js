@@ -19,9 +19,9 @@ const isPhone = () => window.matchMedia(PHONE_QUERY).matches;
 
 /** The tabs that exist right now, in order: {id, arg, label, active, el}. */
 function availableTabs() {
-    const cloud = document.body.classList.contains('cloud-mode');
+    const cloud = document.body.classList.contains('cloud-mode'), nativeInbox = document.body.classList.contains('native-inbox');
     return [...document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]')]
-        .filter(el => !el.hidden && el.style.display !== 'none' && !(cloud && el.hasAttribute('data-local-only')) && !(!cloud && el.hasAttribute('data-cloud-only')))
+        .filter(el => !el.hidden && el.style.display !== 'none' && !(cloud && el.hasAttribute('data-local-only')) && !(nativeInbox && el.hasAttribute('data-native-inbox-hides')) && !(!cloud && el.hasAttribute('data-cloud-only')))
         .map(el => ({ id: el.id, arg: el.dataset.arg, label: (el.dataset.label || el.textContent).trim(), active: el.classList.contains('active'), el }));
 }
 

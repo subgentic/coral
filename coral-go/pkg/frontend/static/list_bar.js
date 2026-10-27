@@ -182,6 +182,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     }
     const apply = next => { f = clean(trimmed(next)); announce = true; onChange({ ...f }); };
     const later = next => { clearTimeout(timer); timer = setTimeout(() => apply(next), DEBOUNCE_MS); };
+    const typed = next => { if (!spec.commitOnEnter) later(next); }; // commitOnEnter: a typed word is sent on Enter, not after a pause (a bar whose search is a request to another computer)
     // the first field that is drawn: a hidden one (the Inbox's Server field with one computer, showField) takes no focus, and the panel would open with the focus on the page (#8812)
     const focusFirstField = () => (fields.find(x => !x.wrap.hidden) || fields[0])?.input.focus();
     // the panel of a collapsible bar: opened and shut by the icon (the state is the panel's owner's to keep: hooks.onPanel)
@@ -196,7 +197,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     const closeMenu = (focus) => { if (tog) { if (!menu.hidden) { setOpen(false, { silent: false }); if (focus) tog.focus(); } return; } if (inline || menu.hidden) return; menu.hidden = true; filterBtn.setAttribute('aria-expanded', 'false'); if (focus) filterBtn.focus(); };
 
     if (!noSearch) {
-        q.addEventListener('input', () => { clearQ.hidden = !q.value; later({ ...f, q: q.value }); });
+        q.addEventListener('input', () => { clearQ.hidden = !q.value; typed({ ...f, q: q.value }); });
         q.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); apply({ ...f, q: q.value }); } });
         clearQ.addEventListener('click', () => { clearTimeout(timer); q.value = ''; clearQ.hidden = true; apply({ ...f, q: '' }); q.focus(); });
     }
@@ -213,7 +214,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     document.addEventListener('click', outside);
     for (const fld of fields) {
         const key = fld.spec.key;
-        if (fld.spec.type === 'text') fld.input.addEventListener('input', () => later({ ...f, [key]: fld.input.value }));
+        if (fld.spec.type === 'text') { fld.input.addEventListener('input', () => typed({ ...f, [key]: fld.input.value })); if (spec.commitOnEnter) fld.input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply({ ...f, [key]: fld.input.value }); } }); }
         else if (fld.spec.type === 'check') fld.input.addEventListener('change', () => apply({ ...f, [key]: fld.input.checked }));
         else fld.input.addEventListener('change', () => apply({ ...f, [key]: fld.input.value }));
     }

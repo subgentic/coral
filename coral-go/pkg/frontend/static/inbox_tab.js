@@ -9,7 +9,7 @@ import { needsInputAttention } from './display_activity_hint.js';
 import { state } from './state.js';
 import { unreadReviewItems, refreshReviews, onReviewsChanged } from './inbox_reviews.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
-import { isCloud, sessionServer } from './server_base.js';
+import { isCloud, nativeInbox, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
 import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy Inbox modules import it, and a lazy module imports only what loads at startup (import_hygiene)
@@ -97,7 +97,7 @@ export function selectInboxTab(name) { return importOnce('./inbox_sidebar.js').t
 export function showInboxTabContent({ folder = '', quiet = false } = {}) {
     const view = document.getElementById('inbox-view');
     if (!view) return;
-    if (!isCloud()) {
+    if (!isCloud() || nativeInbox()) {
         const local = document.getElementById('inbox-local');
         if (local) local.hidden = false;
         importOnce('./inbox_sidebar.js').then(m => m.showInbox({ folder, quiet })).catch(() => {}); // the groups, their tables and a task's or a message's page

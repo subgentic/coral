@@ -6,6 +6,7 @@
 //   view_sandbox.js     the constant address of the custom-view host page
 //   inbox_tab.js        the constant '/inbox'
 //   artifacts_tab.js    the constant '/artifacts'
+//   inbox_sidebar.js    the three constants of HUB_FRAMES (/inbox/hub/needs, /tasks, /saved): the Hub-served dashboard's own Inbox frames the Hub's pages (Goal #100)
 // node iframe_src_census.test.mjs
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
-const ALLOWED = { 'artifact_preview.js': 1, 'panel_sandbox.js': 1, 'view_sandbox.js': 1, 'inbox_tab.js': 1, 'artifacts_tab.js': 1 };
+const ALLOWED = { 'artifact_preview.js': 1, 'panel_sandbox.js': 1, 'view_sandbox.js': 1, 'inbox_tab.js': 1, 'artifacts_tab.js': 1, 'inbox_sidebar.js': 1 };
 const found = {};
 for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
     const src = fs.readFileSync(path.join(STATIC, f), 'utf8');
@@ -53,4 +54,13 @@ assert.match(inbox, /createElement\('iframe'\)/);
 assert.match(inbox, /frame\.setAttribute\('referrerpolicy', 'no-referrer'\)/);
 assert.match(inbox, /frame\.setAttribute\('allow', ''\)/);
 assert.ok(!/sandbox/.test(inbox.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')), 'the Inbox frame is the hub\'s own page, no sandbox attribute is set');
+// The Hub-served Inbox's frames (Goal #100): the addresses are the constants of HUB_FRAMES, the one src is taken from it, and the frame is as locked down as the Inbox frame.
+const sidebar = fs.readFileSync(path.join(STATIC, 'inbox_sidebar.js'), 'utf8');
+assert.match(sidebar, /const HUB_FRAMES = \{ needs: '\/inbox\/hub\/needs', tasks: '\/inbox\/hub\/tasks', saved: '\/inbox\/hub\/saved' \};/);
+assert.equal((sidebar.match(/setAttribute\('src', /g) || []).length, 1);
+assert.match(sidebar, /setAttribute\('src', HUB_FRAMES\[key\]\)/);
+assert.match(sidebar, /createElement\('iframe'\)/);
+assert.match(sidebar, /f\.setAttribute\('referrerpolicy', 'no-referrer'\)/);
+assert.match(sidebar, /f\.setAttribute\('allow', ''\)/);
+assert.ok(!/sandbox/.test(sidebar.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')), 'the Hub pages are the hub\'s own, no sandbox attribute is set');
 console.log('PASS iframe_src_census: ' + Object.keys(found).join(', '));

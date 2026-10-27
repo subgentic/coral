@@ -424,6 +424,13 @@ export function isCloud() {
     return bootConfig().mode === 'cloud';
 }
 
+/** The Hub-served dashboard draws its own Inbox (Chats folders and Boards) in place of the Hub's framed one, and the top row's Chats and Board tabs go (Goal #100). One switch, set by the Hub's
+ *  boot value `inbox: 'native'`; off until the Hub's own pages have moved off /inbox. Read by: the Inbox tab (inbox_tab.js), the folder list and sources (inbox_sidebar.js, inbox_servers.js, mailbox_chats.js)
+ *  and the tab filter (nav_tabs.js, through the body class that cloud.js sets). */
+export function nativeInbox() {
+    return isCloud() && bootConfig().inbox === 'native';
+}
+
 /** Read /api/health once and cache the flag in state.hub. Safe to call often.
  *  The Cloud Hub is always a hub; it does not need /api/health to say so. */
 export function initHub() {
