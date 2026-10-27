@@ -4,7 +4,7 @@
 //   - the last list is cached and shown at once, then the server's replaces it; the agent type switches the list; no list: free text;
 //   - what is chosen or typed is what the form returns; values set from code show in the list (or under Other…);
 //   - the small refresh button posts, polls while the server says refreshing, and says why when refused (429, 403);
-//   - the agent's row and the terminal header show the real model: "Claude · Opus 4.1" (display name from the list, else from the id).
+//   - the real model is shown by its display name from the list, else from the id: in the agent's hover tip and in the agent page's header (#terminal-header-model), never in the row (a row is one line, #9686).
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -113,19 +113,20 @@ const { connect } = require('./agent_view_harness');
             assert.match(await ev(`document.querySelector('.toast').textContent`), text, `${status} says why`);
         }
 
-        console.log('6. the model on the agent row and in the header');
+        console.log('6. the model in the agent tip and in the header, not in the row');
         await ev(`document.getElementById('acf-t').remove(); window.__m.add('opus-bot', 'A', 3, { sleeping: false }); window.__m.add('sonnet-bot', 'B', 3, { sleeping: false });
             for (const s of T.state.liveSessions) { if (s.name === 'opus-bot') s.model = ${JSON.stringify(OPUS.value)}; if (s.name === 'sonnet-bot') s.model = 'claude-sonnet-4-5-20250929'; }
             localStorage.setItem('coral-show-agent-type', 'true'); localStorage.setItem('coral-models:v1:local:claude', JSON.stringify({ models: [${JSON.stringify(OPUS)}], fetched_at: null, source: 'account' }));
             T.render.renderLiveSessions(T.state.liveSessions); true`);
-        await waitFor(`document.querySelectorAll('.session-model').length >= 2`, 'the model lines', 4000);
-        const rows = await ev(`Object.fromEntries([...document.querySelectorAll('#live-sessions-list li[data-session-id]')].map(li => [li.dataset.sessionId, li.querySelector('.session-model') && li.querySelector('.session-model').textContent]))`);
-        assert.equal(rows['opus-bot-id'], 'Claude · Opus 4.1', 'the display name from the list');
-        assert.equal(rows['sonnet-bot-id'], 'Claude · Sonnet 4.5', 'a short name from the id when the list has none');
+        await waitFor(`document.querySelectorAll('#live-sessions-list li[data-session-id]').length >= 2`, 'the two rows', 4000);
+        assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-model').length`), 0, 'a row draws no model line (one line a row, #9686)');
+        const tip = name => ev(`String(window.buildSessionTooltip(T.state.liveSessions.find(s => s.name === ${JSON.stringify(name)}))).replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ')`);
+        assert.match(await tip('opus-bot'), /Opus 4\.1/, 'the tip has the display name from the list');
+        assert.match(await tip('sonnet-bot'), /Sonnet 4\.5/, 'and a short name from the id when the list has none');
         await ev(`window.selectLiveSession('opus-bot', 'claude', 'opus-bot-id', 'local'); true`);
         await waitFor(`document.getElementById('terminal-header-label') && document.getElementById('terminal-header-label').textContent.length > 0`, 'the header', 5000);
-        // The model is in the input toolbar's chip and the row's tooltip, not in the agent header (#5142).
-        assert.equal(await ev(`!!document.getElementById('terminal-header-model') || /Opus 4\\.1/.test(document.querySelector('#live-session-view .terminal-header').textContent)`), false, 'the header does not repeat the model');
+        // The row no longer says the model, so the agent page's header does (#9686): the same fields, "Opus 4.1" first; the composer's chip still changes it.
+        await waitFor(`!!document.getElementById('terminal-header-model') && /Opus 4\\.1/.test(document.getElementById('terminal-header-model').textContent)`, 'the header model', 5000);
         console.log('7. a custom model (#5480) is marked, and its own levels drive the thinking picker');
         await ev(`window.__serve.claude = { thinking: ['low', 'medium', 'high', 'xhigh', 'max'], models: [${JSON.stringify(OPUS)}, { value: 'global-opus-5-5', display_name: 'Global Opus 5.5', custom: true, efforts: ['low', 'high'] }, { value: 'global-plain', display_name: '<img src=x onerror="window.__pwn=1">', custom: true, efforts: [] }], refreshing: false }; localStorage.removeItem('coral-models:v1:local:claude');
             (() => { const old = document.getElementById('acf-t'); if (old) old.remove(); const host = document.createElement('div'); host.id = 'acf-t'; document.body.appendChild(host); window.__acf.renderAgentConfigForm('acf-t', {}); })(); true`);
