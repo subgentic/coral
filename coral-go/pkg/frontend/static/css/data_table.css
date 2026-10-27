@@ -368,3 +368,6 @@
 
 .dt-one-line .dt-title-cell { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; min-width: 0; }
 .dt-one-line .team-artifact-badge { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A one-line table on a phone (#8931, #8982, #9051): a name (a row's primary button) and a row's own link are 44 px targets, as they are in the folded rows */
+@media (max-width: 760px), (pointer: coarse) { .dt-box.dt-one-line .dt-link, .dt-box.dt-one-line .dt-primary { display: inline-flex; align-items: center; min-height: var(--table-touch); min-width: var(--table-touch); } }
