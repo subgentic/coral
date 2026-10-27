@@ -12,9 +12,10 @@ const ASKS_ARE_TASKS_HINT = 'When an agent needs another agent to do something, 
 const WORKFLOW_HINT = 'Guidance the agents get on how to share the folder. It does not create worktrees.';
 
 let _view = null;
+let _defaultMode = 'none'; // the working mode a new team starts with: 'none', or the one the chosen team template names (#8919)
 
 // What a new team starts with: nothing from the last team stays.
-const startValues = () => ({ first_task: '', custom_instructions: '', mode: 'none', dependency_guidance: false, asks_are_tasks: true, require_goal: false, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: false, cross_team_artifacts: false });
+const startValues = () => ({ first_task: '', custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, require_goal: false, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: false, cross_team_artifacts: false });
 
 // The health check's own rows, less who gets it: at launch that is the Orchestrator (a list of one is noise); another recipient is in Team settings.
 const healthRows = () => healthFields({
@@ -27,6 +28,7 @@ export function mountTeamLaunchSettings() {
     const host = document.getElementById('team-start-host');
     if (!host) return;
     if (_view) _view.destroy();
+    _defaultMode = 'none';
     host.replaceChildren();
     _view = mountSettingsView(host, {
         mode: 'settings', saveBar: false, group: 'start', label: 'Team settings sections', groupLabel: 'Team settings section',
@@ -72,6 +74,12 @@ export function readTeamLaunchSettings() {
     if (v.cross_team_artifacts) board.cross_team_artifacts = true;
     if (Object.keys(board).length) out.board = board;
     return out;
+}
+
+/** The working mode a team template names becomes the step's choice (and what it starts with if the step is still loading); the person can change it. */
+export function setTeamLaunchMode(mode) {
+    _defaultMode = mode;
+    if (_view) _view.set('mode', mode);
 }
 
 /** Apply the held board settings to the launched team. Returns '' when it worked (or there was nothing), else a sentence for the toast. */
