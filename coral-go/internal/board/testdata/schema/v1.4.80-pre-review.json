@@ -325,6 +325,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_task_versions_1",
+      "sql": null,
+      "tbl_name": "task_versions",
+      "type": "index"
+    },
+    {
       "name": "artifact_tags",
       "sql": "CREATE TABLE artifact_tags (\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\thex      TEXT NOT NULL,\n\t\t\ttag      TEXT NOT NULL,\n\t\t\tPRIMARY KEY (board_id, hex, tag)\n\t\t)",
       "tbl_name": "artifact_tags",
@@ -434,7 +440,7 @@
     },
     {
       "name": "board_tasks",
-      "sql": "CREATE TABLE \"board_tasks\" (\n\t\t\tid INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\trevision INTEGER NOT NULL DEFAULT 1,\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\ttitle TEXT NOT NULL,\n\t\t\tbody TEXT,\n\t\t\tstatus TEXT NOT NULL DEFAULT 'pending'\n\t\t\t\tCHECK (status IN ('pending', 'in_progress', 'completed', 'skipped', 'review_pending', 'blocked', 'draft')),\n\t\t\tpriority TEXT NOT NULL DEFAULT 'medium'\n\t\t\t\tCHECK (priority IN ('critical', 'high', 'medium', 'low')),\n\t\t\tcreated_by TEXT NOT NULL,\n\t\t\tassigned_to TEXT,\n\t\t\tcompleted_by TEXT,\n\t\t\tcompletion_message TEXT,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tclaimed_at TEXT,\n\t\t\tcompleted_at TEXT,\n\t\t\tlast_activity_at TEXT,\n\t\t\tidle_snoozed_until TEXT\n\t\t, session_id TEXT, cost_usd REAL, input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, parked_reason TEXT, parked_until TEXT, remind_at TEXT, reminded_at TEXT, edited_at TEXT, claim_thinking TEXT, work_before_seconds REAL, work_windows TEXT, goal_id INTEGER, remote_board_uid TEXT, remote_goal_uid TEXT, request_id TEXT, request_server TEXT, request_board TEXT)",
+      "sql": "CREATE TABLE \"board_tasks\" (\n\t\t\tid INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\trevision INTEGER NOT NULL DEFAULT 1,\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\ttitle TEXT NOT NULL,\n\t\t\tbody TEXT,\n\t\t\tstatus TEXT NOT NULL DEFAULT 'pending'\n\t\t\t\tCHECK (status IN ('pending', 'in_progress', 'completed', 'skipped', 'review_pending', 'blocked', 'draft')),\n\t\t\tpriority TEXT NOT NULL DEFAULT 'medium'\n\t\t\t\tCHECK (priority IN ('critical', 'high', 'medium', 'low')),\n\t\t\tcreated_by TEXT NOT NULL,\n\t\t\tassigned_to TEXT,\n\t\t\tcompleted_by TEXT,\n\t\t\tcompletion_message TEXT,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tclaimed_at TEXT,\n\t\t\tcompleted_at TEXT,\n\t\t\tlast_activity_at TEXT,\n\t\t\tidle_snoozed_until TEXT\n\t\t, session_id TEXT, cost_usd REAL, input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, parked_reason TEXT, parked_until TEXT, remind_at TEXT, reminded_at TEXT, edited_at TEXT, initial_instructions TEXT NOT NULL DEFAULT '', claim_thinking TEXT, work_before_seconds REAL, work_windows TEXT, goal_id INTEGER, remote_board_uid TEXT, remote_goal_uid TEXT, request_id TEXT, request_server TEXT, request_board TEXT)",
       "tbl_name": "board_tasks",
       "type": "table"
     },
@@ -541,6 +547,12 @@
       "type": "table"
     },
     {
+      "name": "task_versions",
+      "sql": "CREATE TABLE task_versions (\n task_id INTEGER NOT NULL REFERENCES board_tasks(id) ON DELETE CASCADE, version INTEGER NOT NULL,\n editor TEXT NOT NULL, created_at TEXT NOT NULL, snapshot_json TEXT NOT NULL, changes_json TEXT NOT NULL,\n PRIMARY KEY(task_id,version))",
+      "tbl_name": "task_versions",
+      "type": "table"
+    },
+    {
       "name": "task_workflows",
       "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL, has_artifacts INTEGER NOT NULL DEFAULT 0)",
       "tbl_name": "task_workflows",
@@ -628,6 +640,12 @@
       "name": "boards_cross_team_id",
       "sql": "CREATE TRIGGER boards_cross_team_id AFTER INSERT ON boards WHEN NEW.cross_team_id IS NULL\n\t\t\tBEGIN UPDATE boards SET cross_team_id = 'x-' || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) WHERE id = NEW.id; END",
       "tbl_name": "boards",
+      "type": "trigger"
+    },
+    {
+      "name": "task_initial_version",
+      "sql": "CREATE TRIGGER task_initial_version AFTER INSERT ON board_tasks BEGIN\n INSERT INTO task_versions VALUES(NEW.id,1,NEW.created_by,NEW.created_at,json_object('title',NEW.title,'body',COALESCE(NEW.body,''),'priority',NEW.priority,'instructions',NEW.initial_instructions),'{}'); END",
+      "tbl_name": "board_tasks",
       "type": "trigger"
     }
   ],
@@ -3015,6 +3033,15 @@
         },
         {
           "cid": 27,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "initial_instructions",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 28,
           "dflt_value": null,
           "hidden": 0,
           "name": "claim_thinking",
@@ -3023,7 +3050,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 28,
+          "cid": 29,
           "dflt_value": null,
           "hidden": 0,
           "name": "work_before_seconds",
@@ -3032,7 +3059,7 @@
           "type": "REAL"
         },
         {
-          "cid": 29,
+          "cid": 30,
           "dflt_value": null,
           "hidden": 0,
           "name": "work_windows",
@@ -3041,7 +3068,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 30,
+          "cid": 31,
           "dflt_value": null,
           "hidden": 0,
           "name": "goal_id",
@@ -3050,7 +3077,7 @@
           "type": "INTEGER"
         },
         {
-          "cid": 31,
+          "cid": 32,
           "dflt_value": null,
           "hidden": 0,
           "name": "remote_board_uid",
@@ -3059,7 +3086,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 32,
+          "cid": 33,
           "dflt_value": null,
           "hidden": 0,
           "name": "remote_goal_uid",
@@ -3068,7 +3095,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 33,
+          "cid": 34,
           "dflt_value": null,
           "hidden": 0,
           "name": "request_id",
@@ -3077,7 +3104,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 34,
+          "cid": 35,
           "dflt_value": null,
           "hidden": 0,
           "name": "request_server",
@@ -3086,7 +3113,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 35,
+          "cid": 36,
           "dflt_value": null,
           "hidden": 0,
           "name": "request_board",
@@ -3239,7 +3266,7 @@
               "seqno": 0
             },
             {
-              "cid": 30,
+              "cid": 31,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
@@ -3272,7 +3299,7 @@
               "seqno": 0
             },
             {
-              "cid": 34,
+              "cid": 35,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
@@ -3280,7 +3307,7 @@
               "seqno": 1
             },
             {
-              "cid": 35,
+              "cid": 36,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
@@ -3288,7 +3315,7 @@
               "seqno": 2
             },
             {
-              "cid": 33,
+              "cid": 34,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
@@ -4968,6 +4995,99 @@
         }
       ],
       "indexes": []
+    },
+    "task_versions": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "version",
+          "notnull": 1,
+          "pk": 2,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "editor",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "snapshot_json",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "changes_json",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "version",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_task_versions_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
     },
     "task_workflows": {
       "columns": [

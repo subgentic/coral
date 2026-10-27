@@ -397,3 +397,11 @@
 
 .task-more { position: relative; display: inline-block; }
 .task-more-menu.team-menu-up { top: auto; bottom: calc(100% + 4px); } /* the bar is at the page's foot: the menu opens upward (menu_button.js place) */
+
+/* Task text history keeps its versions and field diffs readable in the page. */
+.task-version-history { margin-block: 12px; }
+.task-version-history summary { min-height: 24px; cursor: pointer; }
+.task-version-history p { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (pointer: coarse), (max-width: 767px) {
+    .task-version-history summary { min-height: var(--control-touch-height, 44px); }
+}

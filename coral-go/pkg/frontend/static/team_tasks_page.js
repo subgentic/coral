@@ -374,7 +374,8 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     back.addEventListener('click', () => ctx.onBack());
     const page = el('div', 'goals-page goals-table-page team-task-page');
     const h = el('h2', 'goals-detail-title', `#${task.id} ${task.title}`); h.tabIndex = -1; h.id = 'team-task-title';
-    const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
+    if (task.version > 1) { const edited = el('span', 'text-muted-sm', ` edited, v${task.version}`); h.append(edited); }
+ const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
     if (ctx.teamLink) {
         const links = el('div', 'goal-back-row'), teamLink = el('a', 'goal-team-link inbox-team-link', 'Open on team page');
@@ -405,6 +406,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         return;
     }
     page.append(factsOf(task, ctx));
+ if (task.version) { const versions = el('div', 'task-version-slot'); page.append(versions); importOnce('./task_versions.js').then(m => m.taskVersionHistory(ctx.project, task, acts.reload)).then(section => { if (versions.isConnected) versions.append(section); }).catch(() => {}); }
     if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body); }
     const followUps = followUpsSection(task, ctx); if (followUps) page.append(followUps);
     Promise.all([importOnce('./task_detail_html.js'), importOnce('./task_list.js')]).then(([m, list]) => { // the dialog's other sections, escaped as it escaped them

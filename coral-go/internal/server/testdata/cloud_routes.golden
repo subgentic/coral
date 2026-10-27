@@ -93,6 +93,7 @@ GET /api/board/{project}/tasks/{taskID} view
 GET /api/board/{project}/tasks/{taskID}/artifact-content view
 GET /api/board/{project}/tasks/{taskID}/changes.diff never
 GET /api/board/{project}/tasks/{taskID}/cost view
+GET /api/board/{project}/tasks/{taskID}/history view
 GET /api/board/{project}/waits never
 GET /api/board/{project}/waits/poll never
 GET /api/board/{project}/working-mode view

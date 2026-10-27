@@ -64,7 +64,7 @@ const BASE = require('./test_base').BASE;
         check('the title field has the focus', await ev(`document.activeElement && document.activeElement.id === 'task-edit-title'`));
         await set('task-edit-title', 'Build the task page'); await set('task-edit-priority', 'high');
         await click('Save');
-        await waitFor(`document.querySelector('#team-task-title').textContent === '#${open1} Build the task page'`, 'the saved page', 8000);
+        await waitFor(`document.querySelector('#team-task-title').textContent.startsWith('#${open1} Build the task page')`, 'the saved page', 8000);
         const t1 = await task(open1);
         check('the title and priority were written', t1.title === 'Build the task page' && t1.priority === 'high', JSON.stringify([t1.title, t1.priority]));
         await click('Edit'); await waitFor(`!!document.getElementById('task-edit-body')`, 'the form again');
@@ -152,7 +152,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!!document.querySelector('${ownRow} .board-task-name') && document.querySelectorAll('#board-task-list .board-task-item[data-kind="board"]').length === 1`, 'the worker\'s assigned board task', 12000);
         assert.deepEqual(await ev(`[...document.querySelectorAll('#board-task-list .board-task-item[data-kind="board"]')].map(r => r.dataset.taskId)`), [String(open1)], 'the worker dock contains only its assigned board task');
         await ev(`document.querySelector('${ownRow} .board-task-name').click(); true`);
-        await waitFor(`document.querySelector('#preview-pane #team-task-title')?.textContent === '#${open1} Build the task page'`, 'the assigned task from the worker dock, in the shared preview (#8788)', 12000);
+        await waitFor(`document.querySelector('#preview-pane #team-task-title')?.textContent.startsWith('#${open1} Build the task page')`, 'the assigned task from the worker dock, in the shared preview (#8788)', 12000);
         check('a task name in the dock opens its detail in the shared preview pane and no dialog', await ev(`getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`));
     } finally { await api('DELETE', `/api/board/${B}`).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

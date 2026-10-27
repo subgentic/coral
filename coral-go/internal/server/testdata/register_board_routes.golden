@@ -43,6 +43,7 @@ GET /api/board/{project}/tasks/{taskID} | (*BoardHandler).GetTask-fm
 GET /api/board/{project}/tasks/{taskID}/artifact-content | (*BoardHandler).TeamArtifactContent-fm
 GET /api/board/{project}/tasks/{taskID}/changes.diff | (*BoardHandler).TaskChangesDiff-fm
 GET /api/board/{project}/tasks/{taskID}/cost | (*BoardHandler).TaskLiveCost-fm
+GET /api/board/{project}/tasks/{taskID}/history | (*BoardHandler).TaskHistory-fm
 GET /api/board/{project}/waits | (*BoardHandler).GetActiveWait-fm
 GET /api/board/{project}/waits/poll | (*BoardHandler).PollWait-fm
 GET /api/board/{project}/working-mode | (*BoardHandler).GetWorkingMode-fm

@@ -37,6 +37,7 @@ type GroupInfo struct {
 
 // Task represents a board task.
 type Task struct {
+	Version           int      `db:"version" json:"version,omitempty"`
 	ID                int64    `db:"id" json:"id"`
 	Revision          int      `db:"revision" json:"revision"`
 	BoardID           string   `db:"board_id" json:"board_id"`

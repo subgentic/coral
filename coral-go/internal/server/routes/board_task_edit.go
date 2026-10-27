@@ -38,6 +38,23 @@ func (h *BoardHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	if !h.allowTaskEdit(w, r, project, taskID, &edit) {
 		return
 	}
+	// Text-only edits are versioned and may correct a task under open review.
+	if (edit.Title != nil || edit.Priority != nil || edit.RestoreVersion > 0) && edit.AssignedTo == nil && len(edit.BlockedBy) == 0 && !edit.removesBlockers() {
+		before, _ := h.bs.GetTask(r.Context(), project, taskID)
+		task, err := h.bs.EditTaskText(r.Context(), project, taskID, edit.SubscriberID, edit.Title, edit.Priority, edit.RestoreVersion, edit.BaseVersion)
+		if err != nil {
+			if strings.Contains(err.Error(), "changed to v") || strings.Contains(err.Error(), "cannot be edited") {
+				errConflict(w, err.Error())
+			} else {
+				errBadRequest(w, err.Error())
+			}
+			return
+		}
+		_ = h.bs.TouchTask(r.Context(), project, taskID)
+		h.goBG(func() { h.announceTaskTextEdit(context.Background(), project, edit.SubscriberID, before, task) })
+		writeJSON(w, http.StatusOK, task)
+		return
+	}
 	before, task, prevStatus, err := h.applyTaskEdit(r.Context(), project, taskID, &edit)
 	if err != nil {
 		errBadRequest(w, err.Error())
@@ -45,28 +62,43 @@ func (h *BoardHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = h.bs.TouchTask(r.Context(), project, taskID)
 	reassigned := edit.AssignedTo != nil
-	h.goBG(func() { h.announceTaskEdit(context.Background(), project, reassigned, before, task, prevStatus) })
+	h.goBG(func() {
+		h.announceTaskEdit(context.Background(), project, reassigned, before, task, prevStatus)
+		if task.Version > before.Version {
+			h.announceTaskTextEdit(context.Background(), project, edit.SubscriberID, before, task)
+		}
+	})
 	writeJSON(w, http.StatusOK, task)
 }
 
 // taskEdit is an UpdateTask request: edits to a task's title, priority, assignee or blockers.
 type taskEdit struct {
-	SubscriberID  string          `json:"subscriber_id"`
-	Title         *string         `json:"title,omitempty"`
-	Body          *string         `json:"body,omitempty"`
-	Priority      *string         `json:"priority,omitempty"`
-	AssignedTo    *string         `json:"assigned_to,omitempty"`
-	BlockedBy     json.RawMessage `json:"blocked_by,omitempty"`
-	RemoveBlocker *int64          `json:"remove_blocker,omitempty"`
-	ClearBlockers bool            `json:"clear_blockers,omitempty"`
+	RestoreVersion int             `json:"restore_version,omitempty"`
+	BaseVersion    int             `json:"base_version,omitempty"`
+	SubscriberID   string          `json:"subscriber_id"`
+	Title          *string         `json:"title,omitempty"`
+	Body           *string         `json:"body,omitempty"`
+	Priority       *string         `json:"priority,omitempty"`
+	AssignedTo     *string         `json:"assigned_to,omitempty"`
+	BlockedBy      json.RawMessage `json:"blocked_by,omitempty"`
+	RemoveBlocker  *int64          `json:"remove_blocker,omitempty"`
+	ClearBlockers  bool            `json:"clear_blockers,omitempty"`
 }
 
 func (e *taskEdit) removesBlockers() bool { return e.RemoveBlocker != nil || e.ClearBlockers }
 
 // allowTaskEdit refuses an edit that is too large, changes the body (that is /amend), mixes removing blockers with
 // other edits, or isn't its actor's to make: assigning or removing blockers is a planner's, the title or priority
-// a planner's or the assignee's, and an archived member is never assigned.
+// a planner's or the creator's, and an archived member is never assigned.
 func (h *BoardHandler) allowTaskEdit(w http.ResponseWriter, r *http.Request, project string, taskID int64, e *taskEdit) bool {
+	if e.RestoreVersion < 0 || e.BaseVersion < 0 {
+		errBadRequest(w, "versions must be positive")
+		return false
+	}
+	if e.RestoreVersion > 0 && (e.Title != nil || e.Priority != nil || e.AssignedTo != nil || len(e.BlockedBy) > 0 || e.removesBlockers()) {
+		errBadRequest(w, "restore_version cannot be mixed with fields")
+		return false
+	}
 	if e.Title != nil && refuseTextTooLarge(w, "title_too_large", "a task title", len(*e.Title), maxTaskTitleBytes) {
 		return false
 	}
@@ -82,15 +114,18 @@ func (h *BoardHandler) allowTaskEdit(w http.ResponseWriter, r *http.Request, pro
 	if (e.AssignedTo != nil || removing) && !h.requireTaskPlanner(w, r, project, e.SubscriberID) {
 		return false
 	}
-	// A task's title is typed into its assignee's terminal: only a planner or the assignee
-	// changes what it says (#3668).
-	if e.Title != nil || e.Priority != nil {
+	// Task text is versioned; its creator or a planner may change the requirements (#8951).
+	if e.Title != nil || e.Priority != nil || e.RestoreVersion > 0 {
 		current, err := h.bs.GetTask(r.Context(), project, taskID)
 		if err != nil || current == nil {
 			errNotFound(w, "Task not found")
 			return false
 		}
-		if !h.requirePlannerOrAssignee(w, r.Context(), project, current, e.SubscriberID, "change its title or priority") {
+		if e.BaseVersion > 0 && current.Version != e.BaseVersion {
+			errConflict(w, "task text changed; reread before editing")
+			return false
+		}
+		if !h.requireTaskTextEditor(w, r, project, current, e.SubscriberID) {
 			return false
 		}
 	}
@@ -101,6 +136,7 @@ func (h *BoardHandler) allowTaskEdit(w http.ResponseWriter, r *http.Request, pro
 // before and after, and the status it had.
 func (h *BoardHandler) applyTaskEdit(ctx context.Context, project string, taskID int64, e *taskEdit) (before, task *board.Task, prevStatus string, err error) {
 	update := board.TaskUpdate{
+		Editor:     e.SubscriberID,
 		Title:      e.Title,
 		Body:       e.Body,
 		Priority:   e.Priority,
@@ -197,6 +233,7 @@ func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 	if !h.requireTaskPlanner(w, r, project, body.SubscriberID) {
 		return
 	}
+	beforeTextTask, _ := h.bs.GetTask(r.Context(), project, taskID)
 	task, err := h.bs.AmendTask(r.Context(), project, taskID, body.SubscriberID, body.BaseRevision, body.Reason, body.Changes)
 	if err != nil {
 		if strings.Contains(err.Error(), "revision") {
@@ -210,6 +247,9 @@ func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("record amendment identity failed", "project", project, "task", task.ID, "error", err)
 	}
 	h.goBG(func() {
+		if beforeTextTask != nil && task.Version > beforeTextTask.Version {
+			h.announceTaskTextEdit(context.Background(), project, body.SubscriberID, beforeTextTask, task)
+		}
 		notice := fmt.Sprintf("[Task #%d amended to revision %d] %s", task.ID, task.Revision, task.Title)
 		if task.AssignedTo != nil && *task.AssignedTo != "" {
 			notice += fmt.Sprintf(" — @%s reread task detail before acting", *task.AssignedTo)
