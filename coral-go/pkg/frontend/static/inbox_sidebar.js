@@ -360,9 +360,9 @@ function savedListSpec(where = '') {
             columns: [
                 { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; if (multi && f.serverName) b.title = `${f.which} · ${f.serverName}`; return b; } }, // a narrow row drops the Computer column (#8981): its name stays one hover or one sheet away
                 ...(dock ? (multi ? [{ key: 'machine', label: 'Computer', line: 0, cell: f => f.serverName || '' }] : []) : serverColumns().map(c => ({ ...c, line: 0 }))), // a folded row is one line: the message, when it was saved and its action (#8981); the machine and the state stay as columns where the table is wide
-                { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, cell: f => f.saved },
+                { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, tiny: true, cell: f => f.saved },
                 { key: 'state', label: 'State', line: 0, cell: f => (f.state ? DT.tag(f.state) : '') },
-                { key: 'action', label: 'Action', hideLabel: true, line: 1, cell: f => {
+                { key: 'action', label: 'Action', hideLabel: true, line: 1, tiny: true, cell: f => {
                     if (f.gone) return '';
                     const b = DT.el('button', 'btn btn-small dt-quiet', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`);
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });

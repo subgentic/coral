@@ -218,6 +218,7 @@ export function dataTable(cfg) {
         for (const c of columns) {
             const th = el('th', `dt-th${c.numeric || c.align === 'end' ? ' dt-end' : ''}`); th.scope = 'col'; th.setAttribute('role', 'columnheader'); th.dataset.key = c.key;
             if (cfg.oneLine && c.dropAt) th.setAttribute('data-drop-at', String(c.dropAt));
+            if (c.tiny) th.setAttribute('data-tiny', 'hide');
             if (c.width && /rem$/.test(c.width)) th.style.width = c.width;
             if (c.width === 'grow') th.classList.add('dt-grow');
             if (c.width === 'content') th.classList.add('dt-content');
@@ -273,6 +274,7 @@ export function dataTable(cfg) {
         if (c.width === 'content') td.classList.add('dt-content');
         td.setAttribute('role', 'cell'); td.dataset.label = c.label; td.dataset.key = c.key;
         if (cfg.oneLine && c.dropAt) td.setAttribute('data-drop-at', String(c.dropAt));
+        if (c.tiny) td.setAttribute('data-tiny', 'hide');
         td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
         if (c.foldFirst) td.classList.add('dt-fold-first');
@@ -423,6 +425,7 @@ export function dataTable(cfg) {
                 on = table.getBoundingClientRect().width > w + 1;
             }
             box.classList.toggle('dt-folded', on);
+            box.classList.toggle('dt-tiny', w < 20 * root()); // a phone at large text: the columns that say tiny: true go, so the name keeps its room (20 rem is a 390 px screen at 200% text)
         };
         new ResizeObserver(syncFold).observe(box);
         document.fonts?.ready.then(syncFold);

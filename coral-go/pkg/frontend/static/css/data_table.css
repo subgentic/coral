@@ -350,6 +350,7 @@
 
 /* Shared one-line tables: column priorities use the list's width, including a narrow dock. */
 .dt-one-line { container-type: inline-size; }
+.dt-box.dt-tiny [data-tiny="hide"] { display: none !important; } /* a folded table narrower than 20 rem (a phone at 200% text): the columns that say tiny: true are not drawn */
 .dt-one-line .dt-table { width: 100%; table-layout: fixed; }
 .dt-one-line .dt-td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dt-one-line .dt-primary { min-height: 44px; display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
