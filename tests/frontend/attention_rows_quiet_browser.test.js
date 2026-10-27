@@ -65,7 +65,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                 assert.deepEqual(['r2', 'r3', 'r4', 'r5'].map(id => s.pills[id].text), ['Needs input · Permission', 'Needs input · Question', 'Check terminal', 'Stuck'], 'the words say which state it is');
             } else {
                 assert.equal(s.chips.r2.bg, s.tertiary, `${v.name}: the Needs input chip is on the neutral surface (${s.chips.r2.bg})`);
-                assert.equal(s.chips.r5.bg, s.tertiary, `${v.name}: the error chip too`);
+                assert.equal(s.chips.r5, null, `${v.name}: a Stuck card has no state chip, its banner says it (#9464)`);
                 assert.equal(s.banners.r2, null, `${v.name}: a Needs input card is one chip, no banner saying it again (#9464)`);
                 assert.equal(s.banners.r5.bg, s.tertiary, `${v.name}: the Stuck card's banner is on the neutral surface (${s.banners.r5.bg})`);
                 assert.equal(s.banners.r5.border, s.borderVar, `${v.name}: with the neutral hairline (${s.banners.r5.border})`);
