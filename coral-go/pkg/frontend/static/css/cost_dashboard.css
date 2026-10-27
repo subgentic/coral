@@ -462,7 +462,7 @@
 .eff-switch { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; }
 .eff-switch-label { font-size: 0.75rem; color: var(--text-secondary); }
 .eff-seg { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; width: fit-content; max-width: 100%; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
-.eff-seg-btn { min-height: 30px; padding: 4px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-weight: 500; cursor: pointer; }
+.eff-seg-btn { min-height: 30px; padding: 4px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: var(--fs-md); font-weight: 500; cursor: pointer; }
 .eff-seg-btn:hover { background: var(--bg-hover); }
 .eff-seg-btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
 .eff-pick { display: none; width: 100%; min-height: var(--control-touch-height, 44px); }
