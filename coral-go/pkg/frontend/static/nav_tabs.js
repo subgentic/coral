@@ -78,7 +78,9 @@ function entry(icon, label, { action, href, onClick } = {}) {
     if (action) b.dataset.onClick = action;
     if (onClick) b.addEventListener('click', onClick);
     const i = document.createElement('span');
-    i.className = 'material-icons'; i.setAttribute('aria-hidden', 'true'); i.textContent = icon;
+    i.setAttribute('aria-hidden', 'true');
+    if (icon instanceof Element) { i.className = 'nav-more-drawn'; i.append(icon); } // a drawn icon (the top bar's bookmark): the icon font has no glyph for it (#9160)
+    else { i.className = 'material-icons'; i.textContent = icon; }
     const l = document.createElement('span');
     l.textContent = label;
     b.append(i, l);
@@ -91,7 +93,8 @@ function menuEntries() {
     const out = [entry('home', 'Home', { action: 'm-go-home' })];
     if (!cloud) {
         const count = (document.querySelector('#saved-btn .saved-count')?.textContent || '').trim(); // the bookmark's count (hidden on a phone with the rest of the row): it stays in the menu entry's words
-        out.push(entry('star', count && count !== '0' ? `Saved for later (${count})` : 'Saved for later', { action: 'm-show-saved' }));
+        const bookmark = document.querySelector('#saved-btn svg')?.cloneNode(true); // Saved is the bookmark everywhere else: the top bar's own drawing
+        out.push(entry(bookmark || 'star', count && count !== '0' ? `Saved for later (${count})` : 'Saved for later', { action: 'm-show-saved' }));
     }
     out.push(entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }), entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
