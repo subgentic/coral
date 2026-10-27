@@ -400,25 +400,10 @@
 .wf-step-editor-top select { width: 80px; }
 .wf-step-editor-top input { flex: 1; }
 
-.wf-step-remove-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 2px;
-    font-size: var(--fs-xl);
-    line-height: 1;
-}
-
-/* On touch or a phone-width window a workflow's editor and run detail controls are 44 px targets: the run step's output toggle (81 x 16), the editor's close and Remove step (12 x 19, 13 x 20) and the step's text box (#6130) */
+/* On touch or a phone-width window a workflow's editor and run detail controls are 44 px targets: the run step's output toggle (81 x 16), the editor's close (12 x 19) and the step's text box (Remove step is a .btn-icon, 44 on touch) (#6130) */
 @media (pointer: coarse), (max-width: 767px) {
     .wf-run-step-output-toggle { min-height: var(--control-touch-height, 44px); }
-    .wf-step-remove-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
     .wf-step-editor-body textarea.wf-step-content { min-height: var(--control-touch-height, 44px); }
-}
-
-.wf-step-remove-btn:hover {
-    color: var(--error);
 }
 
 .wf-step-editor-body textarea {

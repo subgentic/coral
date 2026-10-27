@@ -41,7 +41,7 @@ function stepRow(step) {
     for (const t of ['shell', 'agent']) { const o = el('option', '', t); o.value = t; select.append(o); }
     select.value = type;
     const nameInput = el('input', 'wf-step-name-input'); nameInput.type = 'text'; nameInput.placeholder = 'Step name'; nameInput.value = name;
-    const remove = el('button', 'wf-step-remove-btn', '×'); remove.type = 'button'; remove.title = 'Remove step';
+    const remove = el('button', 'btn btn-quiet btn-icon btn-xs wf-step-remove-btn'); remove.type = 'button'; remove.title = 'Remove step'; { const x = el('span', 'material-icons', 'close'); x.setAttribute('aria-hidden', 'true'); remove.append(x); } // the icon button (#9457): the glyph is the family's, not a typed ×
     const num = el('span', 'wf-step-num'); num.setAttribute('aria-hidden', 'true');
     top.append(num, select, nameInput, remove);
     const body = el('div', 'wf-step-editor-body');
