@@ -91,3 +91,16 @@ export function showViews() {
     selectView(ask ? ask.view : current, { fromHistory: true });
     if (el && isPhoneLayout() && !(ask && ask.open)) el.removeAttribute('data-phone-item');
 }
+
+/** An Analytics table on a phone is one line a row (#8982): its name column (the primary one, else the first) and the figure the table is read for (`keep`: column keys) stay, a row's own link stays (a column
+ *  `details`), the others drop as the table narrows, the later columns first (the shared one-line table's dropAt, #8931). Returns the table's config to spread: { columns } as it was on a wider screen, or with
+ *  oneLine and the columns' widths and dropAt on a phone. */
+const DROP_AT = [28, 36, 52]; // the one-line table's thresholds in rem (data_table.css): the 52 goes first as the table narrows, the 28 last
+export function phoneOneLine(columns, keep) {
+    if (!isPhoneLayout()) return { columns };
+    const first = (columns.find(c => c.primary) || columns[0]).key, kept = new Set([first, 'details', ...keep]);
+    let later = 0;
+    return { oneLine: true, columns: columns.map(c => (kept.has(c.key)
+        ? { ...c, width: c.key === first ? 'grow' : c.key === 'details' ? '4.5rem' : '6rem' }
+        : { ...c, width: '6rem', dropAt: DROP_AT[Math.min(later++, 2)] })) };
+}

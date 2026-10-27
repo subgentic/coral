@@ -1,4 +1,4 @@
-// The Analytics tables fold when the page is narrow (task 7738, UI/UX's #7721 follow-up): at 390 px, and at 1280 px with 200% text, no table scrolls sideways; each row is its name, then its figures as "label value" under it,
+// The Analytics tables at 390 px are one line a row (#8982: the name and Cost, Calls in the calls table, a row's own Details link; the other columns drop), no table scrolls sideways. At 1280 px with 200% text they fold (task 7738, UI/UX's #7721 follow-up): no table scrolls sideways; each row is its name, then its figures as "label value" under it,
 // Cost (Calls in the calls table) first; the header row is not drawn but the table keeps its roles and each cell is read with its column's name; a "Sort by" select and an Ascending/Descending button above the table sort it. At 1280 px and
 // normal text the tables are tables, as they were. Drives Chrome over CDP through agent_view_harness.js with the census data world.
 const assert = require('node:assert/strict');
@@ -28,11 +28,24 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
             sortBar: !!(bar && bar.getClientRects().length), sortKey: bar && bar.querySelector('select') ? bar.querySelector('select').value : '',
             strong: cells.filter(c => c.classList.contains('dt-fold-key')).map(c => { const st = getComputedStyle(c), k = parseFloat(getComputedStyle(document.documentElement).fontSize) / 16; return [c.dataset.label, Math.round(parseFloat(st.fontSize) / k) + 'px', st.fontWeight]; }),
             rest: [...new Set(cells.filter(c => !c.classList.contains('dt-fold-key') && !c.classList.contains('dt-tone-primary') && c.dataset.label).map(c => { const st = getComputedStyle(c), k = parseFloat(getComputedStyle(document.documentElement).fontSize) / 16; return Math.round(parseFloat(st.fontSize) / k) + 'px,' + st.fontWeight; }))], rows: t.querySelectorAll('tbody tr').length }; })()`);
+    const lineProbe = () => ev(`(() => { const box = [...document.querySelectorAll('#cost-dashboard-view .dt-box')].find(b => b.getClientRects().length && b.querySelector('table')); if (!box) return null; const t = box.querySelector('table'), row = t.querySelector('tbody tr');
+        const heads = [...t.querySelectorAll('thead th')].filter(h => h.getClientRects().length && getComputedStyle(h).display !== 'none' && !h.classList.contains('dt-check')).map(h => h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim());
+        const cells = row ? [...row.querySelectorAll('td:not(.dt-check)')].filter(c => c.getClientRects().length) : [], tops = cells.map(c => Math.round(c.getBoundingClientRect().top)), rr = row ? row.getBoundingClientRect() : { height: 0 };
+        return { sideways: box.scrollWidth > box.clientWidth + 1, pageSw: document.documentElement.scrollWidth > innerWidth + 1, heads, cells: cells.length, sameTop: tops.every(t => Math.abs(t - tops[0]) <= 3), rowH: Math.round(rr.height), folded: box.classList.contains('dt-folded'), rows: t.querySelectorAll('tbody tr').length }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
         for (const [label, w, h, mobile, big] of [['390 px', 390, 844, true, false], ['1280 px at 200% text', 1280, 800, false, true]]) {
             await open(w, h, mobile); if (big) await ev(`document.documentElement.style.fontSize = '32px'; true`);
-            for (const key of VIEWS) await S.run(`${label}: ${key} folds, no sideways scroll`, async () => {
+            if (mobile) for (const key of VIEWS) await S.run(`${label}: ${key} is one line a row: the name and ${key === 'calls' ? 'Calls' : 'Cost'}, the rest dropped`, async () => {
+                await view(key);
+                const p = await lineProbe(); assert.ok(p && p.rows > 0, 'the table is there'); await shot(`oneline-390-${key}`);
+                assert.deepEqual([p.sideways, p.pageSw], [false, false], 'no sideways scroll: ' + JSON.stringify(p));
+                assert.equal(p.folded, false, 'not stacked: ' + JSON.stringify(p));
+                assert.ok(p.heads.length >= 2 && p.heads.length <= 3, 'the name, the figure (and a row link): ' + JSON.stringify(p.heads));
+                assert.ok(p.heads.includes(key === 'calls' ? 'Calls' : 'Cost'), 'the figure the table is read for stays: ' + JSON.stringify(p.heads));
+                assert.ok(p.sameTop && p.rowH <= 72, 'one line: the cells are level and the row is short: ' + JSON.stringify(p));
+            });
+            else for (const key of VIEWS) await S.run(`${label}: ${key} folds, no sideways scroll`, async () => {
                 await view(key); if (big) await settle(500);
                 const p = await probe(); assert.ok(p, 'the table is there'); await shot(`fold-${mobile ? '390' : '200'}-${key}`);
                 assert.deepEqual([p.sideways, p.pageSw], [false, false], 'no sideways scroll: ' + JSON.stringify(p));
@@ -43,7 +56,7 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
                 assert.deepEqual([p.strong.length, p.strong[0] && p.strong[0].slice(1)], [1, ['13px', '600']], 'one stronger figure, the sort key\'s, 13/600: ' + JSON.stringify(p.strong)); assert.deepEqual(p.rest, ['12px,400'], 'the other lines 12/400: ' + JSON.stringify(p.rest));
                 if (key !== 'calls') assert.ok(p.sortBar, 'a Sort by select is above it: ' + JSON.stringify(p));
             });
-            await S.run(`${label}: Sort by changes the order, and the reverse button reverses it`, async () => {
+            if (!mobile) await S.run(`${label}: Sort by changes the order, and the reverse button reverses it`, async () => {
                 await view('provider');
                 const names = () => ev(`[...document.querySelectorAll('#cost-by-provider tbody tr')].map(r => r.querySelector('td:not(.dt-check)').textContent.trim())`);
                 const before = await names();

@@ -130,12 +130,12 @@ function draw() {
     else {
         const num = (key, label, extra) => ({ key, label, numeric: true, sort: 'number', firstDir: 'desc', sortValue: t => t[key] || 0, cell: t => compactCount(t[key] || 0), ...extra });
         const state = tableState(); state.sort = { key: 'cost_usd', dir: 'desc' };
-        h.append(dataTable({ label: 'Biggest turns', fold: 'labeled', scroll: true, state, rows: st.biggest, rowKey: t => `${t.session_id}|${t.timestamp}|${t.cost_usd}`, columns: [
+        h.append(dataTable({ label: 'Biggest turns', fold: 'labeled', scroll: true, state, rows: st.biggest, rowKey: t => `${t.session_id}|${t.timestamp}|${t.cost_usd}`, ...views.phoneOneLine([
             { key: 'timestamp', label: 'Time', tone: 'primary', sort: 'date', sortValue: t => t.timestamp, cell: t => timeCell(t.timestamp), firstDir: 'desc' },
             num('cost_usd', 'Cost', { cell: t => money(t.cost_usd || 0), foldFirst: true }),
             { key: 'model', label: 'Model', sort: true, sortValue: t => t.model || '', cell: t => t.model || '—', tone: 'secondary' },
             num('input_tokens', 'Input'), num('output_tokens', 'Output'), num('cache_read_tokens', 'Cache read', { narrowHide: true }), num('cache_write_tokens', 'Cache write', { narrowHide: true }),
-        ] }).el);
+        ], ['cost_usd']) }).el);
     }
 
     // more charts: tool calls, cache hit
