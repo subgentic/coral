@@ -177,6 +177,24 @@ func noteAcceptance(source string) {
 	}
 }
 
+// AcceptedSource is how the current terms were accepted according to the marker on disk: "dialog", "legacy" or "hub". It is for a process that did not see the acceptance itself: the server the
+// Coral app starts is a child process, and the terms were accepted in the app's own dialog before it ran (#10106). ok is false when the terms are not accepted, or the marker names a source the funnel has no
+// word for. A bare legacy marker (the Windows installer's) is "legacy".
+func AcceptedSource() (source string, ok bool) {
+	m, found := readEULAMarker()
+	if !found || !m.current() {
+		return "", false
+	}
+	if m.Legacy {
+		return "legacy", true
+	}
+	switch m.Source {
+	case "dialog", "legacy", "hub":
+		return m.Source, true
+	}
+	return "", false
+}
+
 // TakeAcceptanceSource returns, once, how the terms were accepted in this process (dialog, legacy or hub); ok is false when they were not accepted in this run (an earlier run's marker is no news).
 func TakeAcceptanceSource() (source string, ok bool) {
 	acceptance.mu.Lock()

@@ -10,9 +10,39 @@ import (
 // The new-user funnel (#10004). Each event is a one-time milestone of the install, sent only while analytics are on, and carries a closed vocabulary or a bounded integer: never a prompt,
 // a reply, a path or a name. They are emitted by the server, never accepted from the browser endpoint.
 
-// TrackEULAAccepted records, once, that the Terms were accepted and how. It is called only after the acceptance marker is written: nothing is sent for an install that has not accepted.
+// TrackEULAAccepted records, once, that the Terms were accepted and how. It is called only once the acceptance is on disk and the saved analytics choice has been applied: nothing is sent for an install
+// that has not accepted. An acceptance that was reached while analytics were off (it was recorded as reached, never sent, and nothing is waiting to be retried) is never sent later: turning analytics on
+// afterwards does not announce an acceptance that happened while they were off.
 func TrackEULAAccepted(source string) {
+	if milestoneLostToOptOut(EventEULAAccepted) {
+		return
+	}
 	TrackOnce(EventEULAAccepted, map[string]string{"source": source})
+}
+
+// milestoneLostToOptOut reports whether name was reached before and was neither sent nor left waiting for a retry: analytics were off when it happened.
+func milestoneLostToOptOut(name string) bool {
+	if !stateDirReady() {
+		return false
+	}
+	milestoneMu.Lock()
+	defer milestoneMu.Unlock()
+	s := loadMilestones()
+	_, reached := s.Reached[name]
+	_, fired := s.Fired[name]
+	_, pending := s.Pending[name]
+	return reached && !fired && !pending
+}
+
+// IsFirstRun reports whether this data folder has not yet had a tracked open (the install event comes after the server starts), so an acceptance the marker records is this install's own and not an old
+// install's from before the funnel had the event.
+func IsFirstRun() bool {
+	if !stateDirReady() {
+		return false
+	}
+	milestoneMu.Lock()
+	defer milestoneMu.Unlock()
+	return loadMilestones().FirstOpenAt == ""
 }
 
 // TrackDashboardSignedIn records, once, the first dashboard sign-in and which kind of credential it used.
