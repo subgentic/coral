@@ -29,6 +29,7 @@ func scheduleTestServer(t *testing.T) (*httptest.Server, *store.ScheduleStore) {
 	h := NewScheduleHandler(db, &config.Config{})
 	r := chi.NewRouter()
 	r.Post("/api/scheduled/jobs", h.CreateJob)
+	r.Post("/api/scheduled/jobs/init-repo", h.InitJobRepo)
 	r.Get("/api/scheduled/jobs/{jobID}", h.GetJob)
 	r.Put("/api/scheduled/jobs/{jobID}", h.UpdateJob)
 	r.Delete("/api/scheduled/jobs/{jobID}", h.DeleteJob)
@@ -44,7 +45,8 @@ func gitRepo(t *testing.T) string {
 		t.Skip("git not installed")
 	}
 	dir := t.TempDir()
-	require.NoError(t, exec.Command("git", "init", "-q", dir).Run())
+	require.NoError(t, exec.Command("git", "init", "-q", "-b", "main", dir).Run())
+	require.NoError(t, exec.Command("git", "-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "init").Run()) // a job needs a first commit to branch from (#10276)
 	return dir
 }
 

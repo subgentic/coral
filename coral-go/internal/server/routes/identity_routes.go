@@ -54,6 +54,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/workflows/{workflowID}/trigger":          "run a workflow",
 	"POST /api/workflows/by-name/{name}/trigger":        "run a workflow",
 	"POST /api/scheduled/jobs":                          "schedule a job",
+	"POST /api/scheduled/jobs/init-repo":                "make a folder a git repository with a first commit",
 	"PUT /api/scheduled/jobs/{jobID}":                   "change a scheduled job",
 	"DELETE /api/scheduled/jobs/{jobID}":                "delete a scheduled job",
 	"POST /api/scheduled/jobs/{jobID}/run":              "run a scheduled job now",

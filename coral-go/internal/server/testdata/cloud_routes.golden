@@ -331,6 +331,7 @@ POST /api/notifications never
 POST /api/pinned-folders launch
 POST /api/saved interact
 POST /api/scheduled/jobs never
+POST /api/scheduled/jobs/init-repo never
 POST /api/scheduled/jobs/{jobID}/run never
 POST /api/scheduled/jobs/{jobID}/toggle never
 POST /api/scheduled/runs/{runID}/seen interact
