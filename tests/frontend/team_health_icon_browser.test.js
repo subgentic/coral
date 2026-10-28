@@ -139,7 +139,7 @@ const { setTheme } = require('./helpers/contrast');
             await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
             await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
             await ev(`{ const n = document.getElementById('team-board-name'); n.value = ${JSON.stringify(name)}; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/project'; d.dispatchEvent(new Event('input', { bubbles: true })); window._validateTeamName(); } window._addTeamAgent('Orchestrator', 'First.'); document.getElementById('launch-team-next').click(); true`); // the members are step 2
-            await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length === 1`, 'the member');
+            await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length >= 1`, 'the members'); // the form opens with the default team's three members (#9877): the suite needs at least one
             await ev(`document.getElementById('launch-team-next').click(); true`); // step 3
             await waitFor(`!!document.querySelector('#launch-step-team [name=on]')`, 'the Health check tab');
             assert.equal(await ev(`document.querySelector('#launch-step-team [name=on]').checked`), false, 'the health check switch is off by default');
