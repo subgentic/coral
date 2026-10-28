@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/subgentic/coral/internal/agent"
@@ -28,6 +29,8 @@ type SessionIndexer struct {
 	runMu sync.Mutex
 	// kick asks for a pass soon (Kick); one pending request is enough.
 	kick chan struct{}
+	// firstPass is set once the first pass after start has finished (well or not): until then a list that is empty may only be a history that has not been read yet (#10291).
+	firstPass atomic.Bool
 }
 
 // kickDelay is how long a kicked pass waits for more to arrive (a reply and the file write behind it), and kickGap is the least time between the start of one kicked pass and the next, so a busy agent
@@ -48,6 +51,9 @@ func NewSessionIndexer(sessionStore *store.SessionStore, scanners []agent.Histor
 		kick:         make(chan struct{}, 1),
 	}
 }
+
+// FirstPassDone reports whether the first index pass after start has finished: History says "reading your past sessions" until it has, not "no chats" (#10291).
+func (idx *SessionIndexer) FirstPassDone() bool { return idx.firstPass.Load() }
 
 // Kick asks for an index pass within a few seconds instead of at the next interval (#6198): a new conversation's transcript is written as it is replied to, and was listed in History only at the next
 // pass, up to the whole interval later. Calls are cheap and coalesce; a pass is never started more often than every kickGap.
@@ -81,6 +87,7 @@ func (idx *SessionIndexer) Run(ctx context.Context) error {
 	if err := idx.RunOnce(ctx); err != nil {
 		idx.logger.Error("indexer pass failed", "error", err)
 	}
+	idx.firstPass.Store(true)
 	lastPass := time.Now()
 
 	for {

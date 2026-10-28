@@ -151,7 +151,7 @@ async function readPage(page, folder, q, extra) {
         const d = await r.json(); return { ...d, sessions: (d.sessions || []).map(row => ({ ...row, server })) };
     }));
     const rows = replies.flatMap(d => d.sessions);
-    return { rows, total: replies.reduce((sum, d) => sum + (Number(d.total) || d.sessions.length), 0) };
+    return { rows, total: replies.reduce((sum, d) => sum + (Number(d.total) || d.sessions.length), 0), indexing: replies.some(d => d.indexing) };
 }
 const byNewest = rows => rows.sort((a, b) => stampOf(b).localeCompare(stampOf(a)));
 const STALE_MS = 20000; // a kept list older than this is read again at the next draw
@@ -163,18 +163,20 @@ async function readMore(key, folder, q, extra, redraw) {
     try {
         if (L.refresh) { // read again because the folder's count moved (#10230): the rows on screen stay until the new ones are in, the same pages come back at once
             const keep = Math.min(L.page, REFRESH_PAGES); // not named for the Material icon of that word: a name before a semicolon makes the icon scan want the icon in the font subset (#10261)
-            let rows = [], total = 0;
-            for (let page = 1; page <= keep; page++) { const got = await readPage(page, folder, q, extra); rows = rows.concat(got.rows); total = got.total; if (!got.rows.length) break; }
+            let rows = [], total = 0, indexing = false;
+            for (let page = 1; page <= keep; page++) { const got = await readPage(page, folder, q, extra); rows = rows.concat(got.rows); total = got.total; indexing = got.indexing; if (!got.rows.length) break; }
             L.rows = byNewest(rows); L.page = keep; L.total = Number.isFinite(total) ? total : rows.length; L.error = ''; L.refresh = false;
-            L.done = !rows.length || L.rows.length >= L.total; L.at = Date.now();
+            L.done = !rows.length || L.rows.length >= L.total; L.at = Date.now(); L.indexing = indexing; // the first index pass after start is still going (#10291)
         } else {
             const got = await readPage(L.page + 1, folder, q, extra), rows = got.rows;
+            L.indexing = got.indexing; // the first index pass after start is still going (#10291)
             L.rows = byNewest(L.rows.concat(rows)); L.page += 1; L.total = Number.isFinite(got.total) ? got.total : L.rows.length; L.error = '';
             L.done = !rows.length || L.rows.length >= L.total; L.at = Date.now();
             if (L.page > 1 && rows.length) importOnce('./notifications.js').then(m => m.announceNotice(`${rows.length} more chats loaded`)).catch(() => {}); // heard once: the rows came in below the footer the person was on (#8022)
         }
     } catch (e) { L.refresh = false; L.error = e.message || 'Chats could not be read'; L.done = true; }
     L.busy = false; redraw();
+    if (L.indexing) setTimeout(() => { L.refresh = true; L.done = false; redraw(); }, 4000); // interval-ok: while the history is still being read for the first time the list is read again every few seconds, and the flag ends it (#10291)
 }
 /** Forget what was read (a chat was starred or archived): the folders are read again from their first page. */
 /** Forget the kept lists: all of them, or only a folder's (a search sent on Enter reads that folder again, though the same words were read before: the Hub-served Inbox, #9574). The key is `sources|folder|words|filters`. */
@@ -244,7 +246,7 @@ function chatFolderSpec(key, ctx) {
     if (!L.page && !L.busy && !L.done) readMore(key, folder, q, extra, ctx.redraw);
     else if (!L.busy && !L.error && L.page > 0 && (L.refresh || (L.at && Date.now() - L.at > STALE_MS))) { L.refresh = true; readMore(key, folder, q, extra, ctx.redraw); } // a list kept from an earlier look is read again once it is a while old, its rows staying until the new ones land (#10262: after a restart the folder listed the one chat that was indexed when it was first opened, and not the other agent's)
     const rows = L.rows;
-    return { title: folder.title, noun: ['chat', 'chats'], rows, count: filtered ? (L.done && !L.error ? rows.length : null) : folderCount(key) ?? null, /* a search or filter counts the chats it shows once the read is whole, not the folder's total (#10357: "All chats 0" over one result) */ empty: { line: L.error ? (q ? 'Search failed' : 'Chats could not be read') : L.busy || !L.page ? 'Loading chats\u2026' : (filtered ? 'No chat matches the search and filters.' : key === 'chats-archived' ? 'No archived chats yet. Archive a chat or an agent and it is kept here.' : key === 'chats-starred' ? 'Nothing starred yet.' : key === 'chats-notes' ? 'No chats with notes yet. A chat you add a note to is listed here.' : key === 'chats-active' ? 'No chat is active now. Chats of agents that are running are listed here.' : key === 'chats' ? 'No chats yet. Start an agent and its conversation is listed here.' : 'No chats here.'), ...(key === 'chats-starred' && !filtered && !L.error && !L.busy && L.page ? { hint: 'Star a chat or an artifact (the star on its row) and it is kept here.' } : {}) },
+    return { title: folder.title, noun: ['chat', 'chats'], rows, count: filtered ? (L.done && !L.error ? rows.length : null) : folderCount(key) ?? null, /* a search or filter counts the chats it shows once the read is whole, not the folder's total (#10357: "All chats 0" over one result) */ empty: { line: L.error ? (q ? 'Search failed' : 'Chats could not be read') : L.busy || !L.page ? 'Loading chats\u2026' : L.indexing && !rows.length ? 'Reading your past sessions\u2026' : (filtered ? 'No chat matches the search and filters.' : key === 'chats-archived' ? 'No archived chats yet. Archive a chat or an agent and it is kept here.' : key === 'chats-starred' ? 'Nothing starred yet.' : key === 'chats-notes' ? 'No chats with notes yet. A chat you add a note to is listed here.' : key === 'chats-active' ? 'No chat is active now. Chats of agents that are running are listed here.' : key === 'chats' ? 'No chats yet. Start an agent and its conversation is listed here.' : 'No chats here.'), ...(key === 'chats-starred' && !filtered && !L.error && !L.busy && L.page ? { hint: 'Star a chat or an artifact (the star on its row) and it is kept here.' } : {}) },
         signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec, IR.isUnread(readKind(s), readKey(s), stampOf(s))])]),
         node: () => { const table = DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => `${s.server}:${s.session_id}`, state: chatState,
             onModeChange: () => ctx.redraw?.(), // the window crossed 767 px: this spec's selectable (phone only) is decided at draw, so the owner draws the table again

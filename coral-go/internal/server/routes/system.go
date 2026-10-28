@@ -21,6 +21,12 @@ type Indexer interface {
 // IndexKicker is an indexer that can be asked for a pass soon (background.SessionIndexer).
 type IndexKicker interface{ Kick() }
 
+// IndexProgress is an indexer that says whether its first pass after start has finished (background.SessionIndexer).
+type IndexProgress interface{ FirstPassDone() bool }
+
+// SetIndexReady sets the question History asks before it says there are no chats: has the first index pass finished (#10291).
+func (h *HistoryHandler) SetIndexReady(f func() bool) { h.indexReady = f }
+
 // SetIndexKick sets what a finished turn asks of the indexer (#6198).
 func (h *SessionsHandler) SetIndexKick(f func()) { h.indexKick = f }
 

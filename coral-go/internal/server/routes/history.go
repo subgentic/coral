@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -30,6 +31,7 @@ type HistoryHandler struct {
 	bs          *board.Store
 	cfg         *config.Config
 	summarizeFn func(ctx context.Context, sessionID string) error
+	indexReady  func() bool
 
 	presenceOnce sync.Once
 	presence     *savedPresence // the Saved list's kept answers (#5802)
@@ -86,12 +88,16 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 			if h.indexKick != nil {
 				h.indexKick() // an empty, unfiltered History: a first conversation may just not be indexed yet. On a machine with no history at all each opening of Chats kicks, at most one pass per kickGap (#6198)
 			}
-			writeJSON(w, http.StatusOK, map[string]any{
+			cold := map[string]any{
 				"sessions":  agentSessions,
 				"total":     0,
 				"page":      1,
 				"page_size": 0,
-			})
+			}
+			if h.indexing() {
+				cold["indexing"] = true
+			}
+			writeJSON(w, http.StatusOK, cold)
 			return
 		}
 
@@ -129,13 +135,20 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 		// type == "all": merge agent + board, sorted by last_timestamp desc
 		rows, total = mergeByLastTimestamp(agentSessions, boardSessions), agentTotal+len(boardSessions)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	out := map[string]any{
 		"sessions":  pageRows(rows, page, pageSize),
 		"total":     total,
 		"page":      page,
 		"page_size": pageSize,
-	})
+	}
+	if h.indexing() {
+		out["indexing"] = true
+	}
+	writeJSON(w, http.StatusOK, out)
 }
+
+// indexing is whether the first index pass after start is still going: what the list shows is then what has been read so far (#10291).
+func (h *HistoryHandler) indexing() bool { return h.indexReady != nil && !h.indexReady() }
 
 // parseHistoryListQuery reads the history list's query: the page (from 1) and its size (1 to 200, else 50), the
 // filters, and the chat type (agent, group, or all). A tag id that isn't a number is skipped; agy and Gemini share
@@ -649,11 +662,21 @@ func (h *HistoryHandler) GetResumeInfo(w http.ResponseWriter, r *http.Request) {
 			if nativeID := nativeResumeID(idx.SourceType, idx.SourceFile, sid); nativeID != "" {
 				result["resume_session_id"] = nativeID
 			}
+			// where the session ran: its transcript says, for a chat Coral has no live row for (#10291)
+			if dir := transcriptCwd(idx.SourceFile); dir != "" {
+				result["working_dir"] = dir
+				result["working_dir_from"] = "session"
+				_, statErr := os.Stat(dir)
+				result["working_dir_exists"] = statErr == nil
+			}
 		}
 	}
 
 	if ls, err := h.ss.GetLiveSession(r.Context(), sid); err == nil && ls != nil {
 		result["working_dir"] = ls.WorkingDir
+		result["working_dir_from"] = "session"
+		_, statErr := os.Stat(ls.WorkingDir)
+		result["working_dir_exists"] = statErr == nil
 		result["agent_type"] = ls.AgentType
 		result["board_name"] = ptr.Value(ls.BoardName)
 		result["display_name"] = ptr.Value(ls.DisplayName)
