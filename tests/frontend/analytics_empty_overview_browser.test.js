@@ -19,8 +19,8 @@ const BASE = require('./test_base').BASE;
             }
             await waitFor(`!!document.querySelector('#cost-spend-chart .empty-state') && !/Loading/.test(document.getElementById('cost-spend-chart').textContent) && !!document.querySelector('#cost-series-overview .empty-state')`, `${w}: both empty states`, 15000);
             const t = await ev(`({ team: document.getElementById('cost-series-overview').textContent.trim(), cumulative: document.getElementById('cost-spend-chart').textContent.trim() })`);
-            assert.equal(t.team, 'No data in this range yet. It appears once an agent has used tokens; try a longer range.', `${w}: Cost by team does not stay a bare heading`);
-            assert.equal(t.cumulative, 'Not enough data yet. It appears once an agent has used tokens; try a longer range.', `${w}: Cumulative spend says what makes the line appear`);
+            assert.equal(t.team, 'No data in this range yet. It appears once an agent has done some work; try a longer range.', `${w}: Cost by team does not stay a bare heading`);
+            assert.equal(t.cumulative, 'Not enough data yet. It appears once an agent has done some work; try a longer range.', `${w}: Cumulative spend says what makes the line appear`);
         }
         console.log('PASS analytics overview empty states');
     } finally { await client.close(); }
