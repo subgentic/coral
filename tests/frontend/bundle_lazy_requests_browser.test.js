@@ -41,7 +41,7 @@ const BASE = require('./test_base').BASE;
 
         console.log('1. A first visit is one file for a tab family, and no stub');
         await visit('automations', ['automations.js', 'inbox_toolbar.js', 'team_toolbar.js', 'view_list.js']);
-        await visit('tokens', ['cost_dashboard.js']);
+        await visit('tokens', ['cost_dashboard.js', 'info_toggle.js']); // info_toggle.js is shared with the team pages, so it stays a file of its own (like the Inbox's toolbar for Automations)
         await visit('docs', ['docs.js']);
 
         console.log('2. One instance: importOnce and the URL of a group member are the group\'s');
