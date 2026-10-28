@@ -34,6 +34,8 @@
                         <div id="capture-wrapper" class="capture-wrapper">
                             <div class="terminal-header">
                                 <div class="terminal-header-left" id="popout-header-identity" aria-live="polite">
+                                    <!-- A phone's way back to the agent list (#9999): the page's own header is hidden there, so the arrow lives in this one -->
+                                    <button class="btn btn-quiet btn-icon terminal-header-btn terminal-back-btn" type="button" data-on-click="mobile-back" title="Agents" aria-label="Agents"><span aria-hidden="true">&larr;</span></button>
                                     <span class="terminal-status-dot" id="terminal-status-dot"></span>
                                     <span class="terminal-identity" id="terminal-header-identity" tabindex="0">
                                         <span class="terminal-session-label" id="terminal-header-label"></span>
@@ -69,7 +71,7 @@
                                     </a>
                                     <!-- Popout: back to the full dashboard (noopener new tab). -->
                                     <!-- Side panel expand/collapse control -->
-                                    <button class="btn btn-quiet btn-icon btn-xs terminal-header-btn session-panel-toggle-btn" id="popout-panel-toggle-btn" type="button" data-on-click="agentic-panel-toggle" title="Toggle side panel" aria-label="Toggle side panel" aria-pressed="false">
+                                    <button class="btn btn-quiet btn-icon btn-xs terminal-header-btn session-panel-toggle-btn" id="popout-panel-toggle-btn" type="button" data-on-click="agentic-panel-toggle" title="Files, tasks and notes" aria-label="Files, tasks and notes" aria-pressed="false">
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/></svg>
                                     </button>
                                     <!-- View toggle: raw terminal vs. rendered chat transcript, the last of the header's actions, at the far right after Search and Pop out (#9927, the operator) -->
