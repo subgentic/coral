@@ -32,6 +32,7 @@ const BASE = require('./test_base').BASE;
     assert.equal(await saved(), '');
     await openDialog();
     assert.deepEqual(await state(), { value: '', notSet: true, first: 'Not set (Auto)', mode: 'Nothing is saved: new agents use Auto.', warn: false }, 'unset: "Not set (Auto)" is chosen, with its line and no warning');
+    assert.equal(await ev(`(document.getElementById('settings-permission-mode').closest('.settings-row, .sv-row').querySelector('.perm-mode-compare') || {}).textContent`), 'Default asks before acting (Pi has no prompts); Auto acts on its own (Claude with safety checks, Codex inside a workspace sandbox, Antigravity, Gemini and Pi with none); Not set uses Auto.', 'one line says what Default, Auto and Not set are, per CLI, whichever is chosen (#10000)');
     await save();
     assert.equal(await saved(), '', 'a Save that never touched the select leaves it unset');
 
