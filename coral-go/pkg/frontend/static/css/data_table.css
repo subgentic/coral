@@ -482,3 +482,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .inbox-review-actions-star > .dt-star { width: 16px; margin-inline-end: -4px; } /* on a phone the starred glyph is not a button: 16 px, and it leans 4 px into the gap (#9922) */
     .dt-box.dt-fold-column.dt-folded tr:has(.inbox-review-actions-star > .dt-star-on) td.dt-line-1.dt-grow { flex-basis: 3.5rem; } /* a starred row name has 3.5 rem of its own, not 5, so the actions stay on its line at 360 px (#9922) */
 }
+
+/* The team of a chat's agent, in a table of chats when two or more teams exist (#10134): a dot in the team's colour (the person's pick, else neutral) and its name. */
+.dt-team { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.dt-team-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--team-accent, var(--text-muted)); }

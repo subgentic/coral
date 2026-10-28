@@ -9,6 +9,7 @@ import { serverFetch, isCloud, nativeInbox } from './server_base.js';
  *   loadChatCounts(redraw)      the counts, read again (after a flag, on the Inbox's own refresh)
  * Text of a chat (its title, the agent's name, a tag) is written by an agent or a person: it is only ever textContent. */
 import { importOnce } from './import_once.js';
+import { manyTeams, teamOfChat } from './team_names.js';
 const DT = await importOnce('./data_table.js');
 const IR = await importOnce('./inbox_read.js'); // which chats and boards the person has opened since they changed (#9687)
 const readKey = s => `${s.server}:${s.session_id}`, readKind = s => (isGroup(s) ? 'board' : 'chat');
@@ -187,7 +188,7 @@ export function chatsSpec(key, ctx) {
     if (!L.page && !L.busy && !L.done) readMore(key, folder, q, extra, ctx.redraw);
     const rows = L.rows;
     return { title: folder.title, noun: ['chat', 'chats'], rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : 'No chats here.') },
-        signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec, IR.isUnread(readKind(s), readKey(s), stampOf(s))])]),
+        signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec, IR.isUnread(readKind(s), readKey(s), stampOf(s)), (teamOfChat(s) || {}).name || '', (teamOfChat(s) || {}).color || '']), manyTeams()]),
         node: () => { const table = DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => `${s.server}:${s.session_id}`, state: chatState,
             onModeChange: () => ctx.redraw?.(), // the window crossed 767 px: this spec's selectable (phone only) is decided at draw, so the owner draws the table again
             selectable: isCloud() || !window.matchMedia?.('(max-width: 767px)').matches ? null : { contextKey: key, canSelect: s => !isGroup(s) && (!s.server || s.server === 'local'), onChange: keys => ctx.selection?.(keys.size ? table.bar : null),
@@ -195,7 +196,7 @@ export function chatsSpec(key, ctx) {
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
             unread: s => IR.isUnread(readKind(s), readKey(s), stampOf(s)),
-            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)); return { unread: IR.isUnread(readKind(s), readKey(s), stampOf(s)), lead: { text: who, name: who, square: group }, title: who, medium: true, live: s.active ? 'Active now' : '', snippet: group ? '' : historyLabel(s), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
+            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)), t = group ? null : teamOfChat(s); return { unread: IR.isUnread(readKind(s), readKey(s), stampOf(s)), lead: { text: who, name: who, square: group }, title: who, medium: true, live: s.active ? 'Active now' : '', snippet: group ? '' : (t ? `${t.name} \u00b7 ${historyLabel(s)}` : historyLabel(s)), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, extra, ctx.redraw) } },
             oneLine: true, resize: false, sortBar: false, // one line per chat, never folded (#8961, the shared one-row table of #8931): Server, then Agent drop as the box narrows; the role and the first message are in the chat that opens
             columns: [
@@ -203,6 +204,7 @@ export function chatsSpec(key, ctx) {
                     const marks = []; /* one chip a row at most (Goal #79, #9730): the first of Active now, Archived (an archived board stays in Board history, marked), Board; a folder that already says it (Archived, Board history) leaves its own word off */ const word = s.active ? 'Active now' : (s.archived && key !== 'chats-archived') ? 'Archived' : (group && key !== 'chats-group') ? 'Board' : ''; if (word) marks.push(DT.tag(word)); if (word && word !== 'Board') b.setAttribute('aria-label', `${b.getAttribute('aria-label')}, ${word.toLowerCase()}`); /* the chip beside the button is its state: the name ends with it, as the phone row's does (#9747; a board's own name already says Board) */
                     if (!marks.length) return b; const w = DT.el('span', 'dt-title-cell'); w.append(b, ...marks); return w; } },
                 ...(key === 'chats-group' ? [] : [{ key: 'agent', label: 'Agent', width: '9rem', dropAt: 36, cell: s => name(s) }]),
+                ...(key === 'chats-group' || !manyTeams() ? [] : [{ key: 'team', label: 'Team', width: '9rem', dropAt: 36, cell: s => { const t = teamOfChat(s); if (!t) return ''; const w = DT.el('span', 'dt-team'), dot = DT.el('i', 'dt-team-dot'); if (t.color) dot.style.setProperty('--team-accent', t.color); dot.setAttribute('aria-hidden', 'true'); w.append(dot, t.name); return w; } }]), // two or more teams: which team each chat's agent is on (#10134)
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '7.5rem', cell: s => DT.timeCell(stampOf(s)) },
                 ...serverColumns().map(c => ({ ...c, line: undefined, sort: false, width: '7rem', dropAt: 52 })),
                 { key: 'flags', label: 'Star and archive', hideLabel: true, width: '6.5rem', dropAt: 36, /* the two icon buttons are about 100 px: at 5 rem the second was cut by the table's edge, a stray mark (#9458) */ cell: s => {
