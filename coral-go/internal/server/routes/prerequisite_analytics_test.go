@@ -136,6 +136,10 @@ func TestCLICheckReportsAvailableMissingProbeFailedAndTimeoutSeparately(t *testi
 	assert.Equal(t, "timeout", r["status"])
 	assert.Equal(t, "timeout", r["probe"])
 
+	// The Settings dialog's Claude account Check has a source of its own (#10671), apart from the New agent dialog's recheck.
+	r = cliCheck(t, h, "type=claude&source=settings_check")
+	assert.Equal(t, true, r["found"])
+
 	// Missing: not found anywhere, with the install hint but no installer claim.
 	delete(cli.present, "claude")
 	r = cliCheck(t, h, "type=claude")
@@ -145,17 +149,18 @@ func TestCLICheckReportsAvailableMissingProbeFailedAndTimeoutSeparately(t *testi
 	assert.NotEmpty(t, r["install_command"])
 
 	// Analytics: one event per distinct result, fixed values only.
-	require.Eventually(t, func() bool { return len(prereqEvents(sink)) >= 4 }, 3*time.Second, 5*time.Millisecond)
+	require.Eventually(t, func() bool { return len(prereqEvents(sink)) >= 5 }, 3*time.Second, 5*time.Millisecond)
 	type key struct{ tool, status, source string }
 	got := map[key]bool{}
 	for _, e := range prereqEvents(sink) {
 		got[key{e["tool"].(string), e["status"].(string), e["source"].(string)}] = true
 	}
 	assert.Equal(t, map[key]bool{
-		{"claude", "available", "cli_check"}:   true,
-		{"codex", "probe_failed", "cli_check"}: true,
-		{"codex", "timeout", "cli_recheck"}:    true,
-		{"claude", "missing", "cli_check"}:     true,
+		{"claude", "available", "cli_check"}:      true,
+		{"claude", "available", "settings_check"}: true,
+		{"codex", "probe_failed", "cli_check"}:    true,
+		{"codex", "timeout", "cli_recheck"}:       true,
+		{"claude", "missing", "cli_check"}:        true,
 	}, got)
 	raw := sink.allRaw()
 	for _, leaked := range []string{cli.dir, "2.1.0", "secret detail", "Claude Code", "installer"} {

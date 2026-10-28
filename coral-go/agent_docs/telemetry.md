@@ -47,7 +47,7 @@ Update telemetry (#5952): the update check itself (an anonymous request to GitHu
 
 ## Prerequisite setup observations
 
-`prerequisite_check` reports `tmux`, `claude`, or `codex` with a controlled availability status and check source. Repeated identical observations are deduplicated within a server run. Explicit CLI rechecks use `cli_recheck`; ordinary checks use `cli_check`, and tmux discovery in server status uses `system_status`. Custom binary paths are not recorded in this event.
+`prerequisite_check` reports `tmux`, `claude`, or `codex` with a controlled availability status and check source. Repeated identical observations are deduplicated within a server run. Explicit CLI rechecks use `cli_recheck`, the Settings dialog's Claude account Check uses `settings_check`; ordinary checks use `cli_check`, and tmux discovery in server status uses `system_status`. Custom binary paths are not recorded in this event.
 
 Claude and Codex also report `signed_in` or `signed_out` (source `launch_probe`), only when the CLI's own non-interactive status command gives a clear answer, and only where Coral already runs that command (the first launch, background jobs, and a person's Check again). Coral reads one fact from the answer, signed in or not, and discards the rest before the event is built; the CLI's output is never logged or sent. A CLI that errors, times out, or answers in a form Coral cannot read reports nothing: a slow start is not a signed-out user. Antigravity and Pi have no such command and report no sign-in status.
 
