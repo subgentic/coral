@@ -753,6 +753,7 @@ async function launchTeam() {
             // A team in which nobody started (the server answered an error, #122): the dialog stays open, to fix the setup and launch again.
             if (result.ok !== false) {
                 hideLaunchModal();
+                if (launched.length - failed.length > 0) importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first agents are when alerts make sense: once per browser (#10068)
                 setTimeout(loadLiveSessions, 2000);
                 setTimeout(loadBoardProjects, 4000);
                 const boardId = result.board_id || boardName; // the id the server made (a repeated name gets its own, "Create another"), not the label that was typed
