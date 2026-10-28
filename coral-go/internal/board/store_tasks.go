@@ -368,6 +368,7 @@ const reviewParentsSQL = `SELECT t.id, t.status, t.assigned_to, t.created_at, w.
 // in review_pending or submitted for their review, and the review tasks still pending or in progress that those tasks' rounds name. ListOpenTaskStates carries no workflows and has no review_pending,
 // and finding the review tasks by their workflows' review_of cost one lookup per open task on every poll (0.9 ms of a board with 1,600 open tasks); the rounds of the few tasks in review name
 // them directly, as DelegateReview and the review pool record every review task they make in a round.
+// A review task left open for a task that is no longer in review (one of two reviewers rejected, the task is back with its author) is stale and not listed.
 func (s *Store) ListReviewStates(ctx context.Context, project string) ([]Task, error) {
 	var rows []struct {
 		ID         int64   `db:"id"`
