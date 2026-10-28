@@ -37,6 +37,12 @@ const TEAM = `qa-restore-${Date.now() % 100000}`;
             else {
                 check(`${tag}: the next start at "/" reopens that team, not Home`, v.path === ('/team/' + TEAM) && v.team && !v.home, JSON.stringify(v));
                 await shot(`restore-last-place-${w}`);
+                // a real click on the Inbox tab right after a restored start opens the Inbox (#10151: the restore must never hold the person on the Agents tab)
+                const at = await ev(`(() => { const b = document.getElementById('nav-tab-hub-inbox').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+                await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: at.x, y: at.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+                await sleep(1200); // sleep-ok: the Inbox draws after the click
+                v = await ev(`({ tab: document.body.getAttribute('data-nav-tab'), path: location.pathname, inbox: !!document.getElementById('group-table-view') && document.getElementById('group-table-view').getClientRects().length > 0 })`);
+                check(`${tag}: a real click on the Inbox tab after a restored start opens the Inbox`, v.tab === 'hub-inbox' && v.inbox && /^\/inbox/.test(v.path), JSON.stringify(v));
             }
 
             // a link is shown as written
