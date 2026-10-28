@@ -32,7 +32,7 @@ const board = 'task-preview-' + Date.now().toString(36);
    assert.equal(await ev(`window.__previewOpener.getAttribute('aria-current')`),'true','clicked row remains highlighted');
    const detail=await ev(`document.querySelector('#preview-pane .team-task-page').textContent`);
    for(const label of ['Assigned to','Goal','Priority','Created','Description'])assert.ok(detail.includes(label),label+' remains in detail');
-   await waitFor(`document.querySelector('#preview-pane .team-task-page').textContent.includes('Workflow')`,'Workflow section');
+   await waitFor(`document.querySelector('#preview-pane .team-task-page').textContent.includes('Instructions for the agent')`,'the instructions section (Workflow before #10603)');
    assert.ok(await ev(`[...document.querySelectorAll('#preview-pane .preview-tab')].some(e=>e.textContent.includes(${JSON.stringify(before.title)}))`),'tab uses task title');
    assert.ok(await ev(`!!document.getElementById('preview-max-btn')&&!!document.querySelector('#preview-pane .preview-tab-close')`),'shared preview controls');
    await waitFor(`[...document.querySelectorAll('#preview-pane .goals-pinbar button')].some(b=>b.textContent==='Edit')`,'task actions');

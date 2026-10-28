@@ -1,5 +1,5 @@
 // Settings > Network and Hub, the groups (#6579 part 2; Security's #6559, UI Accessibility's #6558, the Orchestrator's fold of #6629 LOW 4):
-//   the groups are sections with an h5 under the pane's h4 (#7282) (the headings list reads Remote access, [Setup code], Coral Hub, Manage other computers), Coral Hub first on a phone;
+//   the groups are sections with an h5 under the pane's h4 (#7282) (the headings list reads Use from other devices, Remote access, [Setup code], Coral Hub, Manage other computers), Coral Hub first on a phone;
 //   Remote access turning on is an explicit act (it waits for Save and says what it then lets in); the setup code is there only while Remote access is on or a Coral Hub link is being made, is not on the screen
 //   until "Show setup code" (a button that says whether it is open), is spelled for a screen reader, is copied with "Copy setup code", and hides itself after a minute; "Manage other computers from this one" says
 //   a hub controls those computers, and the switch says who can use that; an Operator opt-out is still said on the card when the computer is not linked. 1280 and 390 px; both themes for contrast. Routes are stood in at the page's fetch.
@@ -43,7 +43,7 @@ const BASE = require('./test_base').BASE;
             const remote = () => ev(`(() => { const c = document.getElementById('settings-remote-access-enabled'); c.click(); return c.checked; })()`);
 
             // 1. the groups: headings, and the order (one order at every width)
-            assert.deepEqual(await headings(), ['Remote access', 'Status', 'Coral Hub', 'Manage other computers from this one'], at + 'the headings list, with nothing that could use a setup code yet');
+            assert.deepEqual(await headings(), ['Use from other devices', 'Remote access', 'Status', 'Coral Hub', 'Manage other computers from this one'], at + 'the headings list, with nothing that could use a setup code yet');
             const order = await ev(`(() => { const t = id => (document.getElementById(id).closest('.sv-row') || document.getElementById(id)).getBoundingClientRect().top; const A = 'settings-remote-access-enabled', M = 'settings-hub-mode-enabled'; return { hubFirst: t('net-group-hub') < t(A), accessFirst: t(A) < t('net-group-hub'), manageLast: t(M) > t('net-group-hub') && t(M) > t(A) }; })()`);
             assert.equal(order.accessFirst, true, at + 'Remote access comes first at every width (#7040)');
             assert.equal(order.manageLast, true, at + 'Manage other computers last');
@@ -78,7 +78,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.getElementById('net-remote-note').getAttribute('role')`), 'status');
             assert.equal(await ev(`document.getElementById('net-remote-note').hasAttribute('hidden')`), false, at + 'the live region is always in the page');
             await waitFor(`!document.getElementById('net-group-setup').hidden`, 'the Setup code group once Remote access is on', 8000);
-            assert.deepEqual(await headings(), ['Remote access', 'Setup code', 'Status', 'Coral Hub', 'Manage other computers from this one'], at + 'Setup code is a heading under Remote access');
+            assert.deepEqual(await headings(), ['Use from other devices', 'Remote access', 'Setup code', 'Status', 'Coral Hub', 'Manage other computers from this one'], at + 'Setup code is a heading under Remote access');
             await ev(`document.getElementById('settings-remote-access-enabled').click(); true`);
             assert.equal(await text('#net-remote-note'), '', at + 'back to what is saved: no note');
             assert.equal(await ev(vis('#net-group-setup')), false, at + 'and the group goes');
