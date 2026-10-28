@@ -42,7 +42,7 @@ export async function loadTelemetryInstallID() {
     const hint = document.getElementById('settings-telemetry-install-hint'); // "Send it with a deletion request.": only when there is an ID to send (#7040)
     if (!input || !copy || isCloud()) return;
     input.textContent = 'Loading…';
-    copy.disabled = true;
+    copy.disabled = true; copy.hidden = false;
     if (status) status.textContent = '';
     if (!copy.dataset.wired) {
         copy.dataset.wired = '1';
@@ -55,8 +55,8 @@ export async function loadTelemetryInstallID() {
     try {
         const data = await requestJson('GET', '/api/system/telemetry');
         const available = data.install_id_status === 'available' && typeof data.install_id === 'string' && data.install_id.length > 0;
-        input.textContent = available ? data.install_id : data.install_id_status === 'missing' ? 'No install ID has been created.' : 'Install ID unavailable.';
-        copy.disabled = !available;
+        input.textContent = available ? data.install_id : data.install_id_status === 'missing' ? 'Not created yet' : 'Install ID unavailable.'; // not 'No install ID has been created.': that reads as an error, and nothing is wrong (#9955)
+        copy.disabled = !available; copy.hidden = data.install_id_status === 'missing'; // nothing to copy: no Copy button either
         if (hint) hint.hidden = !available;
     } catch (_) {
         input.textContent = 'Install ID unavailable.';
