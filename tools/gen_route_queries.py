@@ -87,6 +87,8 @@ ENUM = {
     'GET /ws/coral': {'feed': ['hub'], 'diff': ['fields']},
     # The artifact link form (#3168): only v=2 passes; any other value or a second v is refused.
     'GET /api/artifacts/{}': {'v': ['2']},
+    # The token-usage summary without its per-session list (#9820, coral-hub): include accepts only totals; any other word is refused here as it is by the handler.
+    'GET /api/token-usage/summary': {'include': ['totals']},
     # The prerequisite check (#4579, Launch tier): type is one of the agent types the handler knows (an UNKNOWN type answers found:true, so
     # it must never pass), source only the recheck word. A Go test keeps the types equal to agent.agentCLIs.
     'GET /api/system/cli-check': {'type': ['claude', 'agy', 'antigravity', 'gemini', 'codex', 'pi'], 'source': ['cli_recheck']},
