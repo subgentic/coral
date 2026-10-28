@@ -197,18 +197,22 @@ function _applyListHtml(list, html, focusedSid, focusedInMenu) {
     for (const item of _within(added, ".session-group-item")) {
         const tip = item.querySelector(".session-tooltip");
         if (!tip) continue;
-        item.addEventListener("mouseenter", () => {
-            // Built when the pointer comes, from the session as it is now: a row carries an empty tooltip until then (#4497; the table was built for every row on every render).
+        const show = () => {
+            // Built when the pointer (or the keyboard) comes, from the session as it is now: a row carries an empty tooltip until then (#4497; the table was built for every row on every render).
             const sess = _rowSession(item);
             if (sess) tip.innerHTML = buildSessionTooltip(sess);
             const rect = item.getBoundingClientRect();
             tip.style.left = rect.right + 8 + "px";
             tip.style.top = rect.top + "px";
             tip.style.display = "block";
-        });
-        item.addEventListener("mouseleave", () => {
-            tip.style.display = "none";
-        });
+        };
+        const hide = () => { tip.style.display = "none"; };
+        item.addEventListener("mouseenter", show);
+        item.addEventListener("mouseleave", hide);
+        // The same tip for the keyboard (#9831: a cut name was readable only with a mouse): it shows when the keyboard puts focus on the row or a control in it, goes when focus leaves the row or on Escape, and takes no focus (the row's name for a screen reader is its own, unchanged).
+        item.addEventListener("focusin", (e) => { if (e.target.matches(":focus-visible")) show(); });
+        item.addEventListener("focusout", (e) => { if (!item.contains(e.relatedTarget)) hide(); });
+        item.addEventListener("keydown", (e) => { if (e.key === "Escape" && tip.style.display === "block") hide(); });
     }
 
     // Attach drag-and-drop listeners for reordering
