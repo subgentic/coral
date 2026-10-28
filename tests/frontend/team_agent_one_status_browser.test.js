@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const fs = require('node:fs');
 const TEAM = `qa-onestatus-${Date.now() % 100000}`;
 
 (async () => {
@@ -23,13 +24,20 @@ const TEAM = `qa-onestatus-${Date.now() % 100000}`;
         await openTeam(ev, waitFor, TEAM); await settle(600);
         await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); t.click(); return true; })()`);
         await waitFor(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).length === 3`, 'the three agents', 8000);
-        const all = await ev(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).map(r => { const chip = r.querySelector('.dt-chip'); return { status: chip ? chip.textContent.trim() : '', cut: chip ? chip.scrollWidth > chip.clientWidth + 1 : null, text: r.innerText.replace(/\\s+/g, ' ') }; })`);
+        const all = await ev(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).map(r => { const chip = r.querySelector('.dt-chip'); return { status: chip ? chip.textContent.trim() : '', cut: chip ? [chip, ...chip.querySelectorAll('*')].some(e => e.scrollWidth > e.clientWidth + 1) || chip.getBoundingClientRect().right > chip.closest('td').getBoundingClientRect().right + 1 : null, text: r.innerText.replace(/\\s+/g, ' ') }; })`);
         const rows = { Worker: all.find(r => /Worker/.test(r.text)), Waiter: all.find(r => /Waiter/.test(r.text)) };
         assert.equal(rows['Worker'].status, 'Working on #1', 'an idle agent with a task in progress is "Working on #1": ' + JSON.stringify(rows['Worker']));
         assert.ok(!/Task assigned/.test(rows['Worker'].text), 'no "Task assigned, idle" beside it: ' + rows['Worker'].text);
         assert.equal(rows['Worker'].cut, false, 'the chip is whole: ' + JSON.stringify(rows['Worker']));
         assert.equal(rows['Waiter'].status, 'Task assigned, idle', 'an agent whose task is not started keeps the idle word: ' + JSON.stringify(rows['Waiter']));
         assert.equal(rows['Waiter'].cut, false, 'its chip is whole too: ' + JSON.stringify(rows['Waiter']));
+        const shotDir = process.env.CORAL_SCREENSHOT_DIR; const shot = async n => { if (!shotDir) return; fs.mkdirSync(shotDir, { recursive: true }); fs.writeFileSync(`${shotDir}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+        await shot('agents-tab-1280');
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true }); await settle(600);
+        await shot('agents-tab-390');
+        // the filter chips do not count one agent under a status its row does not say: Worker (Working on #1) and Waiter (Task assigned, idle) are both "Has a task"
+        const chips = await ev(`[...document.querySelectorAll('.goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`);
+        assert.ok(chips.includes('Has a task 2') && !chips.some(c => /Task assigned, idle/.test(c)), 'the filter chip is Has a task, 2: ' + JSON.stringify(chips));
         console.log('PASS one status per agent');
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

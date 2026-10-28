@@ -20,7 +20,7 @@ let agentsTableState = DT.tableState();
 const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Ended', unknown: 'No signal yet', unavailable: 'Unavailable' };
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
 const FIRST = ['available', 'busy', 'queued', 'sleeping', 'offline'];
-const CHIP_WORD = { available: 'Free', unknown: 'Unknown' };
+const CHIP_WORD = { available: 'Free', unknown: 'Unknown', task_idle: 'Has a task' }; // an idle agent with a task, started or not: its row says which ("Working on #1" or "Task assigned, idle"), so the filter does not repeat one of the two
 const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', needs_input: 'goal-state-blocked', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
 const PROVIDER = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', terminal: 'Terminal' };
 
@@ -159,7 +159,7 @@ function draw() {
         columns: [
             { key: 'agent', label: 'Agent', primary: true, width: 'grow', line: 1, field: 'name', sort: true,
                 cell: ag => { const b = DT.primaryButton('', ''); b.append(DT.avatar(ag.name)); const dot = el('span', `team-agent-dot team-agent-dot-${ag.availability === 'available' || ag.availability === 'busy' ? 'ok' : ag.availability === 'needs_input' ? 'ask' : 'quiet'}`); dot.setAttribute('aria-hidden', 'true'); dot.title = statusWord(ag); b.prepend(dot); b.append(el('span', 'team-agent-state sr-only', `, ${statusWord(ag)}`)); if (ag.availability === 'needs_input' || ag.availability === 'unavailable') { const ask = DT.chip(statusWord(ag), CLASS[ag.availability]); ask.classList.add('team-agent-ask'); ask.setAttribute('aria-hidden', 'true'); b.append(ask); } return b; } }, // the state as a dot by the name where the Status column has given way (a phone); a state that asks something of a person also keeps its word there, as a chip the dot already names for a screen reader (#9713)
-            { key: 'status', label: 'Status', line: 2, width: '8rem', dropAt: 28, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
+            { key: 'status', label: 'Status', line: 2, width: '11rem', dropAt: 28, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
             { key: 'doing', label: 'Doing', line: 2, width: '18rem', dropAt: 52, sort: true, sortValue: doingOf, cell: ag => { const t = doingOf(ag), span = el('span', null, t); if (t) span.title = t; return span; } }, // one line a row (Goal #79): the whole line is the tooltip
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
             { key: 'chat', label: 'Chat', line: 1, width: '7rem', cell: chatButton },
