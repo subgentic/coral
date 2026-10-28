@@ -19,7 +19,24 @@ function blocksLaunch(element, on) {
     if (on) element.dataset.blocksLaunch = '1'; else delete element.dataset.blocksLaunch;
     element.dispatchEvent(new CustomEvent('cli-blocks-launch', { bubbles: true }));
 }
-function renderCLI(element, text, recheck, {pending = false, command = '', url = '', note = ''} = {}) {
+const PATH_FIELD = { claude: 'claude', codex: 'codex', pi: 'pi', agy: 'agy', antigravity: 'agy', gemini: 'agy' }; // the Settings field of each CLI (one for Antigravity and Gemini)
+/** A 'Set path' button for a launch that a missing CLI blocks (Mobile and Desktop testers, #10013): it opens Settings > Agents with the CLI paths open and that CLI's field in it, and when Settings is closed again `onClosed` runs (the check again), so the person is back in the dialog with the blocker gone or still named. */
+export function cliPathButton(type, onClosed) {
+    const field = PATH_FIELD[String(type).toLowerCase()];
+    if (!field) return null;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small btn-primary cli-set-path';
+    b.textContent = 'Set path'; b.setAttribute('aria-label', `Set the ${type} CLI path in Settings`);
+    b.addEventListener('click', async () => {
+        await window.showSettingsModal?.('agents');
+        const paths = document.getElementById('settings-cli-paths'); if (paths) paths.open = true;
+        const input = document.getElementById(`settings-cli-path-${field}`); if (input) { input.scrollIntoView({ block: 'center' }); input.focus(); }
+        const modal = document.getElementById('settings-modal'); if (!modal || !onClosed) return;
+        const watch = new MutationObserver(() => { if (getComputedStyle(modal).display === 'none') { watch.disconnect(); onClosed(); } });
+        watch.observe(modal, { attributes: true, attributeFilter: ['style', 'class'] });
+    });
+    return b;
+}
+function renderCLI(element, text, recheck, {pending = false, command = '', url = '', note = '', pathType = ''} = {}) {
     element.replaceChildren(); element.style.display = '';
     element.setAttribute('role','status'); element.setAttribute('aria-live','polite');
     const label = document.createElement('span'); label.textContent = text; element.append(label);
@@ -35,7 +52,10 @@ function renderCLI(element, text, recheck, {pending = false, command = '', url =
     if (note && typeof note === 'string') { const p = document.createElement('p'); p.className = 'cli-install-note'; p.textContent = String(note); element.append(p); }
     const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small';
     button.textContent = pending ? 'Checking…' : 'Check again'; button.disabled = pending;
-    button.addEventListener('click', recheck); element.append(button);
+    button.addEventListener('click', recheck);
+    const setPath = pathType && !pending ? cliPathButton(pathType, recheck) : null; // the fix, one tap away, beside the re-check button (#10013)
+    if (!setPath) { element.append(button); return; }
+    const actions = document.createElement('span'); actions.className = 'cli-actions'; actions.append(button, setPath); element.append(actions); // the two wrap together, right-aligned
 }
 
 export async function checkAgentCLI(type, element, {force = false, command = '', url = '', note = '', server = 'local'} = {}) {
@@ -52,9 +72,9 @@ export async function checkAgentCLI(type, element, {force = false, command = '',
         }
         if (data.found) { element.style.display = 'none'; blocksLaunch(element, false); return; }
         // A configured path that cannot be run (#4354): say so, not that the CLI is missing (it is never swapped for the one on PATH).
-        if (data.configured && data.message) { renderCLI(element, `${type}: ${data.message}`, recheck); blocksLaunch(element, true); return; }
+        if (data.configured && data.message) { renderCLI(element, `${type}: ${data.message}`, recheck, {pathType: type}); blocksLaunch(element, true); return; }
         blocksLaunch(element, true);
-        renderCLI(element, `${type} CLI was not found.`, recheck, {command:data.install_command || command, url:data.install_url || url, note:data.install_note || note});
+        renderCLI(element, `${type} CLI was not found.`, recheck, {command:data.install_command || command, url:data.install_url || url, note:data.install_note || note, pathType: type});
     };
     if (force) cache.delete(cacheKey);
     const cached = cache.get(cacheKey);

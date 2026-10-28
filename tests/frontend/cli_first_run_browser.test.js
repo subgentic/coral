@@ -28,7 +28,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await waitFor(`(() => { const s = document.getElementById('launch-cli-slot'); const w = s && s.querySelector('.acf-cli-warning'); return !!w && w.offsetParent !== null && /claude CLI was not found/.test(w.textContent); })()`, 'the line on step 3', 8000);
         const line = await ev(`(() => { const s = document.getElementById('launch-cli-slot'); const w = s.querySelector('.acf-cli-warning'); const r = w.getBoundingClientRect(); const go = document.getElementById('launch-agent-go');
             return { stage: document.getElementById('launch-step-agent').dataset.stage, goShown: !go.hidden, button: [...w.querySelectorAll('button')].map(b => b.textContent), command: /npm install -g @anthropic-ai\\/claude-code/.test(w.textContent), role: w.getAttribute('role'), inForm: !!document.querySelector('#launch-agent-acf .acf-top-row ~ .acf-cli-warning') }; })()`);
-        assert.deepEqual(line, { stage: 'agent', goShown: true, button: ['Check again'], command: true, role: 'status', inForm: false });
+        assert.deepEqual(line, { stage: 'agent', goShown: true, button: ['Check again', 'Set path'], command: true, role: 'status', inForm: false });
 
         await installAudit(ev);
         for (const theme of ['dark', 'light']) {

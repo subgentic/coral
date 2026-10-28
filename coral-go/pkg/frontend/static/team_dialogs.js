@@ -7,6 +7,7 @@ import { loadBoardProjects } from './message_board.js';
 import { recordRecentDir, getRecentDirs } from './browser.js';
 import { teamForm, showTeamWorktree, showTeamWorkers } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
+import { cliPathButton } from './prerequisites.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
@@ -145,7 +146,13 @@ function _syncTeamGate() {
     recap.classList.toggle('launch-recap-warn', !!reason && step !== 'team' && step !== 'members');
     recap.classList.toggle('launch-recap-error', !!reason && (step === 'team' || step === 'members')); // steps 1 and 2: one red line naming the first thing wrong (step 1: the field errors are under the fields)
     recap.replaceChildren();
-    if (reason) { recap.append(reason); return; }
+    if (reason) {
+        recap.append(reason);
+        const blocked = step === 'start' ? (document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)')?.textContent || '').trim().match(/^(claude|codex|agy|antigravity|gemini|pi)\b/i) : null; // a member's CLI blocks Launch team: the fix is one tap away, on this line (#10013)
+        const setPath = blocked && cliPathButton(blocked[1].toLowerCase(), () => document.querySelectorAll('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot) button:not(.cli-set-path)').forEach(b => b.click())); // when Settings closes: every blocked member's own Check again (a team has one warning per member)
+        if (setPath) recap.append(' ', setPath);
+        return;
+    }
     if (step === 'team') return;
     const name = (document.getElementById('team-board-name')?.value || '').trim(), dir = (document.getElementById('launch-team-dir')?.value || '').trim(), n = teamRows().length;
     const b = document.createElement('b'); b.textContent = name || 'unnamed';
