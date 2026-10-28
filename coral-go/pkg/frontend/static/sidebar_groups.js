@@ -198,7 +198,8 @@ export function openGroupTable(kind, key, { focus = false } = {}) {
     if (!drawTable()) { open = null; return false; }
     showView('group-table-view');
     // a group opened by the person: the keyboard starts at the page's search box (the first control of the toolbar, #7404), else the first row, else the heading (a ring round the word was the arrival's look)
-    if (focus) (document.querySelector('#group-table-view .inbox-frame') || document.querySelector('#group-table-view .gt-search, #group-table-view .list-bar-search') || document.querySelector('#group-table-view .dt-primary') || document.getElementById('group-table-title'))?.focus({ preventScroll: true }); // a Hub page in a frame (the native Inbox): the keyboard starts in the frame
+    // On a phone the search box is not where the keyboard starts: focusing a text field raises the screen keyboard over the page that just opened (Mobile tester, #9985); the first row, else the heading, takes it there.
+    if (focus) (document.querySelector('#group-table-view .inbox-frame') || (isPhoneLayout() ? null : document.querySelector('#group-table-view .gt-search, #group-table-view .list-bar-search')) || document.querySelector('#group-table-view .dt-primary') || document.getElementById('group-table-title'))?.focus({ preventScroll: true }); // a Hub page in a frame (the native Inbox): the keyboard starts in the frame
     document.querySelectorAll('.sidebar-pane .session-list > li.active').forEach(li => { li.classList.remove('active'); li.querySelector('[aria-current]')?.removeAttribute('aria-current'); });
     return true;
 }
