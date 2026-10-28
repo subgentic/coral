@@ -45,7 +45,7 @@ export function commandPlaceholder(identity, agentType) {
     const name = nameInBox(identity);
     if (isPhoneLayout()) return 'Message\u2026'; // the phone's box holds about 16 characters beside its buttons, and the header names the agent
     if (agentType === 'terminal') return `Type a command in ${name}`;
-    return `Message ${name}, or paste an image`;
+    return `Message ${name}, @ to mention a file, or paste an image`; // the box teaches @ (#10147): a file of the project is mentioned, not attached
 }
 
 /** The box's words while a new agent's CLI is not up yet (#6382): it says so. That a message typed now is held for it is on Send's own title (agent_starting.js), not in the box. */

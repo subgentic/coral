@@ -25,7 +25,7 @@ const { connect } = require('./agent_view_harness');
                 starting: ss.startingPlaceholder('proj1'), normal: ss.commandPlaceholder('proj1', 'claude') };
         })()`);
         check('a row the list marks starting is starting; one that is not marked, a terminal or a sleeping one is not', words.fresh === true && !words.wrote && !words.working && !words.terminal && !words.old, JSON.stringify(words));
-        check('the box says Starting <name>, and the normal words are unchanged', /^Starting proj1/.test(words.starting) && words.normal === 'Message proj1, or paste an image', JSON.stringify([words.starting, words.normal]));
+        check('the box says Starting <name>, and the normal words are unchanged', /^Starting proj1/.test(words.starting) && words.normal === 'Message proj1, @ to mention a file, or paste an image', JSON.stringify([words.starting, words.normal]));
 
         await ev(`(() => { const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), starting: true }); return true; })()`);
         await ev(`window.__m.add('start-agent', 'A', 3, { sleeping: false }); true`);

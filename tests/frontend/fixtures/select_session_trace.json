@@ -4,13 +4,13 @@
   "awake agent, chat view": [
    {
     "step": "select a1",
-    "sha256": "e96a32c650822cc0ce7bed8fa6da4ad07cd73c95d79603ebfc8e22cbdb10d031"
+    "sha256": "0e62fdd8238dcfe045da7a09a6c42bc41aa2b6350cc8356e8f7a20566a3797e8"
    }
   ],
   "awake agent, terminal view": [
    {
     "step": "select a1",
-    "sha256": "cea2939262cbde1ddad94e21b2cdfe47a2d18d573d457b9537ecd29576cacd84"
+    "sha256": "60e63aa056991fdaa4e3753bde309bb5e7a5b402f123c7bfcb377bbeaab0ae73"
    }
   ],
   "sleeping agent": [
@@ -34,55 +34,55 @@
   "board agent, no saved tab": [
    {
     "step": "select b1",
-    "sha256": "f8c170cf27870479e9598f7296788dfd8af60b8a4871f269fc448251827dedee"
+    "sha256": "8a9131bc5dcb44d77b931cfccd01a02901ba1a7abee9daac44984b12d6ea8215"
    }
   ],
   "board agent, saved tab files": [
    {
     "step": "select b1",
-    "sha256": "f8c170cf27870479e9598f7296788dfd8af60b8a4871f269fc448251827dedee"
+    "sha256": "8a9131bc5dcb44d77b931cfccd01a02901ba1a7abee9daac44984b12d6ea8215"
    }
   ],
   "no-board agent, saved tab board": [
    {
     "step": "select a1",
-    "sha256": "e96a32c650822cc0ce7bed8fa6da4ad07cd73c95d79603ebfc8e22cbdb10d031"
+    "sha256": "0e62fdd8238dcfe045da7a09a6c42bc41aa2b6350cc8356e8f7a20566a3797e8"
    }
   ],
   "switching with a draft": [
    {
     "step": "select a1",
-    "sha256": "e96a32c650822cc0ce7bed8fa6da4ad07cd73c95d79603ebfc8e22cbdb10d031"
+    "sha256": "0e62fdd8238dcfe045da7a09a6c42bc41aa2b6350cc8356e8f7a20566a3797e8"
    },
    {
     "step": "type a draft",
-    "sha256": "364618212d385c4d5f0f854ad16ac20b9435d6a835dc709e9d3ef8074940fd76"
+    "sha256": "ddb1b7740f07b0e584da3383e507684227a66beef25be5941caa059241a6f2e3"
    },
    {
     "step": "select a2",
-    "sha256": "516dfb414a655e3030538c9fe6ea8c9819e0dc9e341f14e869ba3b45248ba119"
+    "sha256": "7bfb80e6536f32844a84901fd7b99eca8f3494cfd1751f7da7e67cdbcf2d90cc"
    },
    {
     "step": "back to a1",
-    "sha256": "901f0af26934454ffceabdb3bb7c74f3449c0b1694ca54cdfee5f51d4f915107"
+    "sha256": "9b693f3c354ad525c9ead3be13f651808cb57edc73ee5bac6f0fae3935114a49"
    }
   ],
   "remote agent on a hub": [
    {
     "step": "select x1",
-    "sha256": "596be0211938845e6a3ec5cc4e266e6777bb82c3508ff451c5709365cb476834"
+    "sha256": "2263283c998363681163ce8457d83ebe54a747251b2bc478f28250511b63cb00"
    }
   ],
   "selection by id only": [
    {
     "step": "select a1 without a server",
-    "sha256": "970ab48da976c26904288e2f7c05e477352a1adccaa9c387a468a204497f8e63"
+    "sha256": "1d938dae9985953b4cd02f505cc9e2395a655f7a903230faf23be5225d03d47a"
    }
   ],
   "leaving a team view that agrees": [
    {
     "step": "select a1",
-    "sha256": "e96a32c650822cc0ce7bed8fa6da4ad07cd73c95d79603ebfc8e22cbdb10d031"
+    "sha256": "0e62fdd8238dcfe045da7a09a6c42bc41aa2b6350cc8356e8f7a20566a3797e8"
    }
   ],
   "leaving a team view that declines": [
@@ -94,16 +94,16 @@
   "three quick switches": [
    {
     "step": "select a1, a2, a3 without waiting",
-    "sha256": "c7cf59c0bfddb7a5a89d640c850c70a32d30c5a5939d85dbacac72f80a06f246"
+    "sha256": "87799ebf4b2a3b58b2a4e56416039e0b20e3745661b87be3c1d40cd3d06f83c0"
    }
   ]
  },
  "lines": {
   "awake agent, chat view": [
-   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
+   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
   ],
   "awake agent, terminal view": [
-   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets /ws/terminal/a1 | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id ; POST /api/sessions/live/a1/resize"
+   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets /ws/terminal/a1 | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id ; POST /api/sessions/live/a1/resize"
   ],
   "sleeping agent": [
    "select s1 | session s1/local | header s1 / s1 | composer {\"placeholder\":\"\",\"value\":\"\",\"disabled\":true} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/s1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/s1/files?session_id ; GET /api/sessions/live/s1/notes?session_id ; GET /api/sessions/live/s1/poll?agent_type&session_id ; GET /api/sessions/live/s1/subagents?session_id ; GET /api/token-usage?session_id"
@@ -115,34 +115,34 @@
    "select t1 | session t1/local | header t1 / t1 | composer {\"placeholder\":\"Type a command in t1\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets /ws/terminal/t1 | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/t1/files?session_id ; GET /api/sessions/live/t1/notes?session_id ; GET /api/sessions/live/t1/poll?agent_type&session_id ; GET /api/sessions/live/t1/subagents?session_id ; GET /api/token-usage?session_id ; POST /api/sessions/live/t1/resize"
   ],
   "board agent, no saved tab": [
-   "select b1 | session b1/local | header b1 / b1 | composer {\"placeholder\":\"Message b1, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/board/team-a/messages/all?format&limit&offset ; GET /api/board/team-a/paused ; GET /api/board/team-a/subscribers ; GET /api/board/team-a/tasks?limit ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/b1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/b1/files?session_id ; GET /api/sessions/live/b1/notes?session_id ; GET /api/sessions/live/b1/poll?agent_type&session_id ; GET /api/sessions/live/b1/subagents?session_id ; GET /api/token-usage?session_id"
+   "select b1 | session b1/local | header b1 / b1 | composer {\"placeholder\":\"Message b1, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/board/team-a/messages/all?format&limit&offset ; GET /api/board/team-a/paused ; GET /api/board/team-a/subscribers ; GET /api/board/team-a/tasks?limit ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/b1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/b1/files?session_id ; GET /api/sessions/live/b1/notes?session_id ; GET /api/sessions/live/b1/poll?agent_type&session_id ; GET /api/sessions/live/b1/subagents?session_id ; GET /api/token-usage?session_id"
   ],
   "board agent, saved tab files": [
-   "select b1 | session b1/local | header b1 / b1 | composer {\"placeholder\":\"Message b1, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/board/team-a/messages/all?format&limit&offset ; GET /api/board/team-a/paused ; GET /api/board/team-a/subscribers ; GET /api/board/team-a/tasks?limit ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/b1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/b1/files?session_id ; GET /api/sessions/live/b1/notes?session_id ; GET /api/sessions/live/b1/poll?agent_type&session_id ; GET /api/sessions/live/b1/subagents?session_id ; GET /api/token-usage?session_id"
+   "select b1 | session b1/local | header b1 / b1 | composer {\"placeholder\":\"Message b1, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/board/team-a/messages/all?format&limit&offset ; GET /api/board/team-a/paused ; GET /api/board/team-a/subscribers ; GET /api/board/team-a/tasks?limit ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/b1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/b1/files?session_id ; GET /api/sessions/live/b1/notes?session_id ; GET /api/sessions/live/b1/poll?agent_type&session_id ; GET /api/sessions/live/b1/subagents?session_id ; GET /api/token-usage?session_id"
   ],
   "no-board agent, saved tab board": [
-   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
+   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
   ],
   "switching with a draft": [
-   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id",
-   "type a draft | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, or paste an image\",\"value\":\"half a thought\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/sessions/live/a1/chat?after&agent_type&session_id&working_directory",
-   "select a2 | session a2/local | header a2 / a2 | composer {\"placeholder\":\"Message a2, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/board/team-a/messages/all?format&limit&offset ; GET /api/board/team-a/paused ; GET /api/board/team-a/subscribers ; GET /api/board/team-a/tasks?limit ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a2/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a2/files?session_id ; GET /api/sessions/live/a2/notes?session_id ; GET /api/sessions/live/a2/poll?agent_type&session_id ; GET /api/sessions/live/a2/subagents?session_id ; GET /api/token-usage?session_id",
-   "back to a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, or paste an image\",\"value\":\"half a thought\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&session_id&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
+   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id",
+   "type a draft | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, @ to mention a file, or paste an image\",\"value\":\"half a thought\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/sessions/live/a1/chat?after&agent_type&session_id&working_directory",
+   "select a2 | session a2/local | header a2 / a2 | composer {\"placeholder\":\"Message a2, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/board/team-a/messages/all?format&limit&offset ; GET /api/board/team-a/paused ; GET /api/board/team-a/subscribers ; GET /api/board/team-a/tasks?limit ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a2/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a2/files?session_id ; GET /api/sessions/live/a2/notes?session_id ; GET /api/sessions/live/a2/poll?agent_type&session_id ; GET /api/sessions/live/a2/subagents?session_id ; GET /api/token-usage?session_id",
+   "back to a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, @ to mention a file, or paste an image\",\"value\":\"half a thought\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&session_id&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
   ],
   "remote agent on a hub": [
-   "select x1 | session x1/m1 | header x1 / x1 | composer {\"placeholder\":\"Message x1, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/remote/m1/api/agent/ui?session_id ; GET /api/remote/m1/api/saved?agent&limit ; GET /api/remote/m1/api/saved?limit ; GET /api/remote/m1/api/sessions/live/x1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/remote/m1/api/sessions/live/x1/files?session_id ; GET /api/remote/m1/api/sessions/live/x1/notes?session_id ; GET /api/remote/m1/api/sessions/live/x1/poll?agent_type&session_id ; GET /api/remote/m1/api/sessions/live/x1/subagents?session_id ; GET /api/remote/m1/api/token-usage?session_id ; GET /api/saved?limit"
+   "select x1 | session x1/m1 | header x1 / x1 | composer {\"placeholder\":\"Message x1, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/remote/m1/api/agent/ui?session_id ; GET /api/remote/m1/api/saved?agent&limit ; GET /api/remote/m1/api/saved?limit ; GET /api/remote/m1/api/sessions/live/x1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/remote/m1/api/sessions/live/x1/files?session_id ; GET /api/remote/m1/api/sessions/live/x1/notes?session_id ; GET /api/remote/m1/api/sessions/live/x1/poll?agent_type&session_id ; GET /api/remote/m1/api/sessions/live/x1/subagents?session_id ; GET /api/remote/m1/api/token-usage?session_id ; GET /api/saved?limit"
   ],
   "selection by id only": [
-   "select a1 without a server | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
+   "select a1 without a server | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
   ],
   "leaving a team view that agrees": [
-   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
+   "select a1 | session a1/local | header a1 / a1 | composer {\"placeholder\":\"Message a1, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/token-usage?session_id"
   ],
   "leaving a team view that declines": [
    "select a1 | session null/null | header  /  | composer {\"placeholder\":\"Type a command or paste an image...\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-saved | sockets  | fetches "
   ],
   "three quick switches": [
-   "select a1, a2, a3 without waiting | session a3/local | header a3 / a3 | composer {\"placeholder\":\"Message a3, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/sessions/live/a2/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a2/notes?session_id ; GET /api/sessions/live/a2/poll?agent_type&session_id ; GET /api/sessions/live/a2/subagents?session_id ; GET /api/sessions/live/a3/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a3/files?session_id ; GET /api/sessions/live/a3/notes?session_id ; GET /api/sessions/live/a3/poll?agent_type&session_id ; GET /api/sessions/live/a3/subagents?session_id ; GET /api/token-usage?session_id"
+   "select a1, a2, a3 without waiting | session a3/local | header a3 / a3 | composer {\"placeholder\":\"Message a3, @ to mention a file, or paste an image\",\"value\":\"\",\"disabled\":false} | path /agents | tab agentic-tab-files | sockets  | fetches GET /api/agent/ui?session_id ; GET /api/saved?agent&limit ; GET /api/saved?limit ; GET /api/sessions/live/a1/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a1/files?session_id ; GET /api/sessions/live/a1/notes?session_id ; GET /api/sessions/live/a1/poll?agent_type&session_id ; GET /api/sessions/live/a1/subagents?session_id ; GET /api/sessions/live/a2/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a2/notes?session_id ; GET /api/sessions/live/a2/poll?agent_type&session_id ; GET /api/sessions/live/a2/subagents?session_id ; GET /api/sessions/live/a3/chat?after&agent_type&limit&offset&session_id&trim&working_directory ; GET /api/sessions/live/a3/files?session_id ; GET /api/sessions/live/a3/notes?session_id ; GET /api/sessions/live/a3/poll?agent_type&session_id ; GET /api/sessions/live/a3/subagents?session_id ; GET /api/token-usage?session_id"
   ]
  }
 }
