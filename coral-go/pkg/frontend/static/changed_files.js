@@ -453,7 +453,7 @@ async function _createFile(filePath) {
 /* ── Refresh & Render ──────────────────────────────────────── */
 
 // What each comparison lists, in the words of what it shows (#10054): "vs HEAD~1" and "vs merge-base" named refs and not the list, and on main listed only uncommitted changes. The server says what the
-// comparison is in this repository too (compare.label): where that differs from the option (the branch point on main is HEAD), the panel shows it beside the choice.
+// comparison is in this repository too (compare.label): where that differs from the option (on the main branch there is nothing older than the last commit), the panel shows it beside the choice.
 const _diffModes = ['uncommitted', 'last_commit', 'branch_point', 'previous_commit', 'main_head'];
 const _diffModeLabels = { uncommitted: 'Since my last commit', last_commit: 'In my last commit', branch_point: 'Since I branched', previous_commit: 'Last commit + uncommitted', main_head: 'Compared with the main branch' };
 let _compareLabel = '';
@@ -571,14 +571,14 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             { adds: 0, dels: 0 }
         );
         const modeSelect = `<select class="field field-dense diff-mode-select" data-on-change="diff-mode" title="${escapeAttr(_compareLabel || 'What the list compares')}" aria-label="Compare">${options}</select>`;
-        // where the server's words differ from the chosen option's (the branch point on main is HEAD), they are said beside it, so the list is never read as something it is not
+        // where the server's words differ from the chosen option's (on the main branch), they are said beside it, so the list is never read as something it is not
         const compareNote = _compareLabel && _compareLabel !== _diffModeLabels[diffMode] ? `<span class="changed-files-count files-compare-note">${escapeHtml(_compareLabel)}</span>` : '';
         const stats = files.length > 0
             ? `<span class="file-adds">+${totals.adds}</span><span class="file-dels">-${totals.dels}</span>`
             : '';
         const html = `<span class="changed-files-count">${files.length} file${files.length !== 1 ? 's' : ''} changed</span>
             ${stats}
-            ${modeSelect}${compareNote}`;
+            ${modeSelect}${compareNote}${files.length > 0 ? '<span class="changed-files-count files-compare-note files-legend">New files are green, deleted ones red, the rest changed.</span>' : ''}`; // what the colours mean, said once under the header (#10386, Beta)
         // The list is redrawn on every poll: the header is written only when it says something new, so its select and counts are not replaced under a person's pointer or a layout pass (#7671).
         if (titleEl._html !== html) { titleEl.innerHTML = html; titleEl._html = html; }
     }
