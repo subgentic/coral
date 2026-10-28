@@ -15,7 +15,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
             await ev(`window.__m.add('focus-a', 'P', 4, { sleeping: false, session_id: 'focus-a-id' }); true`);
-            await ev(`document.body.focus(); import(${S} + 'sessions.js').then(m => m.selectLiveSession('focus-a', 'claude', 'focus-a-id', undefined, { focusChat: true })).then(() => true)`);
+            await ev(`document.body.focus(); Promise.resolve(window.selectLiveSession('focus-a', 'claude', 'focus-a-id', undefined, { focusChat: true })).then(() => true)`);
             await waitFor(`getComputedStyle(document.getElementById('live-session-view')).display !== 'none'`, label + ': the chat shows', 8000);
             const where = await ev(`(() => { const a = document.activeElement; return { id: a && a.id, tag: a && a.tagName, visible: !!a && a.getClientRects().length > 0 }; })()`);
             const want = mobile ? 'session-name' : 'command-input';

@@ -89,6 +89,15 @@ async function run() {
     await until(`document.querySelector('#live-sessions-list [data-session-id="${B}"]')?.getAttribute('aria-current') === 'true' && /Auto Bot/.test(document.getElementById('session-name').textContent)`, 'row B selected');
     check('7 Enter on a focused row selects it (aria-current + header identity)', await ev(`document.querySelector('#live-sessions-list [data-session-id="${B}"]').getAttribute('aria-current') === 'true' && /Auto Bot/.test(document.getElementById('session-name').textContent)`));
     check('13 focus survives the re-render triggered by selection', await ev(`document.activeElement && document.activeElement.dataset && document.activeElement.dataset.sessionId === '${B}'`));
+    // a real mouse click on a row that is not the open one puts the cursor in the composer, as it always did (#9794); the Enter above left focus on its row (13). It goes through window.selectLiveSession (mobile.js wraps it: the wrapper once dropped the options).
+    const clickPt = await ev(`(() => { const r = document.querySelector('#live-sessions-list [data-session-id="${C}"]').getBoundingClientRect(); return { x: Math.round(r.left + 40), y: Math.round(r.top + r.height / 2) }; })()`);
+    await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: clickPt.x, y: clickPt.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: clickPt.x, y: clickPt.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: clickPt.x, y: clickPt.y, button: 'left', clickCount: 1 });
+    await until(`document.querySelector('#live-sessions-list [data-session-id="${C}"]')?.getAttribute('aria-current') === 'true'`, 'row C selected by a click');
+    await ev(`new Promise(r => setTimeout(r, 500))`); // sleep-ok: a late focus move (the list's redraw) would have landed by now
+    check('13b a mouse click on a row puts the cursor in the composer', await ev(`document.activeElement && document.activeElement.id === 'command-input'`), await ev(`document.activeElement.id + '|' + (document.activeElement.dataset || {}).sessionId`));
+    await ev(`document.querySelector('#live-sessions-list [data-session-id="${B}"]').focus(); true`); // back to row B for the checks that follow
+    await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    await until(`document.querySelector('#live-sessions-list [data-session-id="${B}"]')?.getAttribute('aria-current') === 'true'`, 'row B selected again');
     const scrollBefore = await ev(`document.getElementById('live-sessions-list').scrollTop`);
     await client.Input.dispatchKeyEvent({ type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
     await waitStable(`document.getElementById('live-sessions-list').scrollTop`, 'the list scroll position', 200).catch(() => {}); // a Space scroll is smooth: give it frames to show
