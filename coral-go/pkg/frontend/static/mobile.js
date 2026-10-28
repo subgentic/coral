@@ -20,8 +20,14 @@ function toggleTabletSidebar() {
 
     const isOpen = sidebar.classList.toggle('tablet-open');
     if (backdrop) backdrop.classList.toggle('active', isOpen);
+    document.querySelector('.tablet-sidebar-toggle')?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 }
 window.toggleTabletSidebar = toggleTabletSidebar;
+// Escape closes the drawer (#10306), and the focus goes back to the button that opened it; a click outside is the backdrop's.
+if (typeof document.addEventListener === 'function') document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || e.defaultPrevented || !document.querySelector('.sidebar.tablet-open')) return;
+    e.preventDefault(); toggleTabletSidebar(); document.querySelector('.tablet-sidebar-toggle')?.focus();
+});
 
 // ── Bottom Tab Bar Navigation ─────────────────────────────────────────────
 
@@ -238,6 +244,7 @@ function syncMobileDocsList() {
         const backdrop = document.querySelector('.tablet-sidebar-backdrop');
         if (sidebar) sidebar.classList.remove('tablet-open');
         if (backdrop) backdrop.classList.remove('active');
+        document.querySelector('.tablet-sidebar-toggle')?.setAttribute('aria-expanded', 'false');
         return selection; // preserve the async team-exit/navigation contract for callers
     };
 }
