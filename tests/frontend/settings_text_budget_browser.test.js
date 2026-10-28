@@ -13,6 +13,8 @@ const BUDGET = { 'Network and Hub': 186, 'Agents': 153, 'Storage and cleanup': 1
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await client.Emulation.setFocusEmulationEnabled({ enabled: true });
+        // the normal state: a browser that has not been asked for alerts (a headless one reports denied, which shows the blocked line)
+        await Page.addScriptToEvaluateOnNewDocument({ source: `try { Object.defineProperty(Notification, 'permission', { get: () => 'default', configurable: true }); } catch (e) {}` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.then(() => true)`);
