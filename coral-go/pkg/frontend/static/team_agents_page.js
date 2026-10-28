@@ -153,7 +153,7 @@ function draw() {
         columns: [
             { key: 'agent', label: 'Agent', primary: true, width: 'grow', line: 1, field: 'name', sort: true,
                 cell: ag => { const b = DT.primaryButton('', ag.name); b.append(DT.avatar(ag.name)); const dot = el('span', `team-agent-dot team-agent-dot-${ag.availability === 'available' || ag.availability === 'busy' ? 'ok' : ag.availability === 'needs_input' ? 'ask' : 'quiet'}`); dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', statusWord(ag)); dot.title = statusWord(ag); b.prepend(dot); return b; } }, // the state as a dot by the name: it shows only where the Status column has given way (a phone at 200% text), so the state is never lost
-            { key: 'status', label: 'Status', line: 2, width: '8rem', dropAt: 16, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
+            { key: 'status', label: 'Status', line: 2, width: '8rem', dropAt: 28, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
             { key: 'doing', label: 'Doing', line: 2, width: '18rem', dropAt: 52, sort: true, sortValue: doingOf, cell: ag => { const t = doingOf(ag), span = el('span', null, t); if (t) span.title = t; return span; } }, // one line a row (Goal #79): the whole line is the tooltip
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
             { key: 'chat', label: 'Chat', line: 1, width: '7rem', cell: chatButton },

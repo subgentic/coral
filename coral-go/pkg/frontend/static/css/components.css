@@ -3923,7 +3923,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agent-dot { display: none; flex: none; width: 0.5rem; height: 0.5rem; margin-inline-end: 6px; border-radius: 50%; background: var(--text-muted); vertical-align: middle; }
 .team-agent-dot-ok { background: var(--success); }
 .team-agent-dot-ask { background: var(--warning); }
-@container (max-width: 16rem) { .team-agent-dot { display: inline-block; } }
+@container (max-width: 28rem) { .team-agent-dot { display: inline-block; } } /* with the Status column: it drops under 28 rem (a phone), so the name keeps the room and the state stays as this dot (#9713) */
 .team-agents-count { margin: 0 0 6px; color: var(--text-secondary); font-size: var(--fs-sm); }
 .team-agents-count:empty { display: none; }
 .team-agents-list { display: flex; flex-direction: column; }
