@@ -12,6 +12,7 @@ import { limitSeconds, limitParts } from './time_limit.js';
 let view = null;
 let editingJobId = null;  // non-null when editing an existing job
 let openedJob = null;     // what the editor showed for the job it opened (#4423): Save sends only what the person changed since
+let noOwnWorkflows = false; // none of the workflows is the person's own: the list is empty or holds only the seeded example (its description starts with Example, #9965)
 let noWorkflows = false;  // the workflow list came back empty: the form says so and offers to make one
 
 const DEFAULT_CRON = '0 * * * *';
@@ -343,6 +344,7 @@ async function loadWorkflowOptions() {
         const data = await resp.json();
         const workflows = data.workflows || [];
         noWorkflows = workflows.length === 0;
+        noOwnWorkflows = workflows.every(w => /^Example/.test(w.description || ''));
         select.innerHTML = `<option value="">${workflows.length ? 'Select a workflow\u2026' : 'No workflows yet'}</option>` +
             workflows.map(w => `<option value="${Number(w.id)}">${escapeHtml(w.name)}${w.description ? ' \u2014 ' + escapeHtml(w.description) : ''}</option>`).join('');
     } catch (e) {
@@ -366,7 +368,7 @@ export function showJobModal() {
     if (state.settings?.default_working_dir) v.set('repo_path', state.settings.default_working_dir);
     v.fold(false);
     openModal('New job', 'Create job');
-    loadWorkflowOptions().then(() => { if (noWorkflows && editingJobId === null) v.set('job_type', 'prompt'); }); // a first job with no workflow to pick opens on the Agent prompt (#9297)
+    loadWorkflowOptions().then(() => { if (noOwnWorkflows && editingJobId === null) v.set('job_type', 'prompt'); }); // a first job with no workflow of the person's own to pick (none, or only the example) opens on the Agent prompt (#9297, #9965)
     document.getElementById('cron-preview').textContent = '';
     checkSchedule();
     document.getElementById('job-modal-name').focus();
