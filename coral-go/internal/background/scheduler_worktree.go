@@ -73,6 +73,8 @@ func (s *JobScheduler) prepareRunWorktree(ctx, watchCtx context.Context, runID i
 		var missing *gitutil.BranchMissingError
 		if errors.As(err, &missing) {
 			errMsg, errCode = missing.Error(), "base_branch_missing" // one plain sentence, no git text
+		} else if errors.Is(err, gitutil.ErrNoCommits) {
+			errMsg = `The run could not start: the repository has no commits yet. Make a first commit, or turn on "Run in the folder itself".` // the person's words and the way out, not git's (#10558)
 		} else {
 			errMsg = fmt.Sprintf("git worktree add failed: %v", err)
 		}

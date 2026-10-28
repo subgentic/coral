@@ -237,6 +237,22 @@ func TestRunWithAWorktreeThatCannotBeMadeFailsBeforeLaunching(t *testing.T) {
 	assert.False(t, launched)
 }
 
+// A repository with no commit has nothing to start a copy of the folder from: the run says so in plain words with the way out, not "git worktree add failed" with git's sentence (#10558, the Mobile tester).
+func TestRunInARepositoryWithNoCommitsSaysWhatToDo(t *testing.T) {
+	launched := false
+	e := newExitEnv(t, "exit-nocommits")
+	e.launch(t, func(context.Context) error { launched = true; return nil })
+	empty := t.TempDir()
+	require.NoError(t, exec.Command("git", "-C", empty, "init", "-q").Run())
+	e.s.launchAndWatch(e.runID, store.ScheduledJob{AgentType: "claude"}, runConfig{repoPath: empty, createWorktree: true})
+	r := e.run(t)
+	assert.Equal(t, "failed", r.Status)
+	require.NotNil(t, r.ErrorMsg)
+	assert.Equal(t, `The run could not start: the repository has no commits yet. Make a first commit, or turn on "Run in the folder itself".`, *r.ErrorMsg)
+	assert.NotContains(t, *r.ErrorMsg, "git worktree")
+	assert.False(t, launched)
+}
+
 // A job that keeps its worktree (create on, cleanup off) finds it, and its run branch, still there after the run.
 func TestRunWorktreeIsKeptWhenTheJobKeepsIt(t *testing.T) {
 	e := newExitEnv(t, "exit-keep")

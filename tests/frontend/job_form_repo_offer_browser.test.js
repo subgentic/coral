@@ -32,6 +32,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!!document.getElementById('job-repo-offer') && document.getElementById('job-repo-offer').getClientRects().length > 0`, 'the offer', 5000);
         assert.match(await offer(), /needs a git repository with one commit\. Make this folder a git repo Run without a worktree$/, 'the offer says why and has both buttons');
         assert.match(await ev(`document.getElementById('job-form').textContent`), /That folder is not a git repository: \/work\/plain/);
+        assert.doesNotMatch(await ev(`document.body.innerText`), /repo_path/, 'no field name from the code reaches the person (#10558): the field says it, the foot says to fix the folder');
 
         await ev(`window.__refusal = 'repo_path has no commit yet: /work/plain'; true`); await create();
         await waitFor(`/has no commit yet/.test(document.getElementById('job-form').textContent)`, 'a repository with no commit is said', 5000);
