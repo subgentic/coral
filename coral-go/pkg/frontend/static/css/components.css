@@ -1410,6 +1410,11 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     to { opacity: 1; }
 }
 
+/* A tap leaves the pointer "hovering": on a touch screen the desktop tooltips never draw (#10388: "Sends the text from the input box below to the terminal" stayed over Send options). */
+@media (pointer: coarse) {
+    .btn-nav[data-tooltip]:hover::after, .macro-btn-wrap [data-tooltip]:hover::after, .btn-send[data-tooltip]:hover::after, .btn-enter[data-tooltip]:hover::after { content: none; }
+}
+
 /* ── Emoji Picker ──────────────────────────────────────────── */
 
 .emoji-picker {
