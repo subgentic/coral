@@ -3562,6 +3562,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .sd-modal-content .launch-modal-step { overflow: hidden; }
 .sd-step-header { flex: none; padding: 24px 24px 12px; border-bottom: 1px solid var(--border); }
 .sd-step-header h3 { margin: 0; }
+.sd-step-title-row { display: flex; align-items: center; } /* the back arrow is a button beside the heading, not inside it: the heading's name is its title alone (#10374) */
+.sd-step-title-row > h3 { margin: 0; }
 .sd-step-header .sd-sub { margin: .15rem 0 0; color: var(--text-secondary); font-size: var(--fs-md); }
 .sd-modal-content .launch-modal-step > .modal-actions { position: static; flex: none; margin: 0; padding: 16px 24px; border-top: 1px solid var(--border); background: none; }
 .sd-acf { display: contents; }
