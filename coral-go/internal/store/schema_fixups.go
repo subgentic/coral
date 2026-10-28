@@ -15,6 +15,8 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
+	// A job's runs work in a worktree of its folder (0, as every job before this did) or in the folder itself (1): a folder that is not a git repository can be one (#10276).
+	{"scheduled_jobs", "no_worktree", "INTEGER NOT NULL DEFAULT 0"},
 	// The thinking level a call ran at, kept on each usage row from now on (#8915): what the transcript recorded for the call, else the level the agent's session was set to when a live call was
 	// recorded. NULL on every older row (the analytics show "Not recorded"); a rolled-up hourly row keeps it too (token_usage_hourly groups by it).
 	{"token_usage", "thinking", "TEXT"},

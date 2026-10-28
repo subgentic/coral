@@ -46,7 +46,7 @@ func TestScheduledJobRefusesAnOptionAsBaseBranch(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, code, base)
 		assert.Contains(t, body["error"], "base_branch", base)
 	}
-	code, _ = sendJSON(t, http.MethodPut, srv.URL+"/api/scheduled/jobs/"+id, map[string]any{"base_branch": "origin/main"})
+	code, _ = sendJSON(t, http.MethodPut, srv.URL+"/api/scheduled/jobs/"+id, map[string]any{"base_branch": "main"})
 	assert.Equal(t, http.StatusOK, code)
 }
 

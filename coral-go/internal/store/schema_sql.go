@@ -269,6 +269,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs (
 	enabled         INTEGER NOT NULL DEFAULT 1,
 	max_duration_s  INTEGER NOT NULL DEFAULT 3600,
 	cleanup_worktree INTEGER NOT NULL DEFAULT 1,
+	no_worktree     INTEGER NOT NULL DEFAULT 0,
 	flags           TEXT DEFAULT '',
 	created_at      TEXT NOT NULL,
 	updated_at      TEXT NOT NULL

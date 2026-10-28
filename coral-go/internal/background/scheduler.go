@@ -333,17 +333,21 @@ func (s *JobScheduler) startRun(ctx context.Context, job store.ScheduledJob, now
 			s.triggerWorkflowForJob(runID, job, trigger)
 		}()
 	} else if s.launchFn != nil {
-		rc := runConfig{
-			repoPath:        job.RepoPath,
-			baseBranch:      job.BaseBranch,
-			maxDurationS:    job.MaxDurationS,
-			cleanupWorktree: job.CleanupWorktree == 1,
-			createWorktree:  true,
-			tag:             "scheduled",
-		}
-		s.watch(runID, job, rc)
+		s.watch(runID, job, jobRunConfig(job))
 	}
 	return runID, nil
+}
+
+// jobRunConfig is how a stored prompt job runs: in a worktree of its folder, or (no_worktree, #10276) in the folder itself, which need not be a git repository.
+func jobRunConfig(job store.ScheduledJob) runConfig {
+	return runConfig{
+		repoPath:        job.RepoPath,
+		baseBranch:      job.BaseBranch,
+		maxDurationS:    job.MaxDurationS,
+		cleanupWorktree: job.CleanupWorktree == 1,
+		createWorktree:  job.NoWorktree != 1,
+		tag:             "scheduled",
+	}
 }
 
 // runConfig holds launch parameters for a run.
