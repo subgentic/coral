@@ -27,8 +27,8 @@ const BASE = require('./test_base').BASE;
         // the job's page
         await ev(`document.querySelector('#group-table-view tbody tr .dt-primary').click(); true`);
         await waitFor(`!!document.querySelector('#scheduler-detail .sched-facts')`, 'the job page', 8000);
-        const row = await ev(`(() => { const dt = [...document.querySelectorAll('#scheduler-detail .sched-facts dt')].find(d => d.textContent.trim() === 'Runs'); return dt ? dt.nextElementSibling.textContent.trim() : null; })()`);
-        assert.equal(row, 'Only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again, unless the job was edited or turned on after it was due.', 'the job page says when it runs');
+        const row = await ev(`(document.querySelector('#scheduler-detail .sched-when-note') || {}).textContent || null`);
+        assert.equal(row, 'Runs only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again, unless the job was edited or turned on after it was due.', 'the job page says when it runs');
         // the New job form
         await ev(`document.querySelector('#scheduler-detail .back-link, #scheduler-detail .sched-back')?.click(); true`);
         await ev(`(window.openJobForm || window.showJobModal || (() => {}))(); true`);

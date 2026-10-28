@@ -219,13 +219,13 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         ${job.description ? `<p class="sched-desc">${escapeHtml(jobDescription(job))}</p>` : ''}
         <dl class="facts sched-facts">
             <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${escapeHtml(zoneNote(job.timezone))}</dd>
-            <dt>Runs</dt><dd>${escapeHtml(RUNS_WHILE_OPEN[0].toUpperCase() + RUNS_WHILE_OPEN.slice(1))}</dd>
             ${job.enabled
                 ? (job.next_fire_at ? `<dt>Next</dt><dd title="${escapeAttr(awayWords(job.next_fire_at))}">${escapeHtml(atWords(job.next_fire_at))} your time</dd>` : '<dt>Next</dt><dd>not scheduled</dd>')
                 : `<dt>${job.paused_reason ? 'Paused' : 'Turned off'}</dt><dd>${job.paused_reason ? `${escapeHtml(job.paused_reason)}. Fix the cause, then turn it on to resume.` : 'Turn it on to run it on schedule.'}</dd>`}
             <dt>Does</dt><dd>${doesHtml}</dd>
             ${job.repo_path ? `<dt>Folder</dt><dd><span class="sched-path">${escapeHtml(job.repo_path)}</span></dd>` : ''}
         </dl>
+        <p class="sched-when-note">${escapeHtml(`Runs ${RUNS_WHILE_OPEN}`)}</p>
         ${promptHtml}
         <details class="disclosure sched-settings">
             <summary>Settings: ${isWorkflow ? 'time limit' : 'branch, time limit'}</summary>
