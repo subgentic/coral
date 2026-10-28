@@ -225,6 +225,7 @@ function jobFields(host) {
             },
         },
         { key: 'name', type: 'text', id: 'job-modal-name', label: 'Name', required: true, requiredMessage: 'Give the job a name.', placeholder: 'e.g. nightly-tests' },
+        scheduleField(), // When is the heart of a job: right after its name, in view when the dialog opens, not under the prompt where a short window cut it (#9965)
         { key: 'workflow_id', type: 'select', id: 'job-modal-workflow', label: 'Workflow', required: true, requiredMessage: 'Pick the workflow this job runs.', options: [{ value: '', label: 'Select a workflow\u2026' }], visibleWhen: workflow },
         {
             key: 'no_workflows', type: 'notice', visibleWhen: v => workflow(v) && noWorkflows,
@@ -241,7 +242,6 @@ function jobFields(host) {
             setup: e => e.setAttribute('data-on-change', 'flag-agent-change'),
         },
         { key: 'prompt', type: 'textarea', id: 'job-modal-prompt', label: 'Prompt', required: true, requiredMessage: 'Write the prompt the agent runs.', rows: 4, placeholder: 'Run the full test suite and report failures...', visibleWhen: prompt },
-        scheduleField(),
         { key: 'extras', type: 'heading', fold: true, id: 'job-modal-more', label: 'More options' },
         { key: 'description', type: 'text', id: 'job-modal-description', label: 'Description', placeholder: 'e.g. Runs the full test suite' },
         {
