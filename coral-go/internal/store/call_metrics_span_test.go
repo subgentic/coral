@@ -13,7 +13,7 @@ import (
 func TestCallMetricSpanIsReadWithSeeksAndIsTheSameNumber(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	const q = `SELECT COALESCE((SELECT MAX(id) FROM call_metrics) - (SELECT MIN(id) FROM call_metrics) + 1, 0)`
+	const q = callMetricSpanSQL // the very statement trimToRowCap runs
 	span := func() int64 {
 		var n int64
 		require.NoError(t, db.GetContext(ctx, &n, q))

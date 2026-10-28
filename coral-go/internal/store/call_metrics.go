@@ -229,9 +229,12 @@ func (d *DB) writeCallMetrics(ctx context.Context, batch []*CallMetric) error {
 // from the old end, so the span stays close to the count and errs toward dropping early.
 // The two probes are separate MAX and MIN subqueries on purpose: SQLite answers one MIN or MAX of the rowid with a seek, but MAX(id) - MIN(id) in one SELECT is a scan of every row (400,000 of them
 // near the cap: 35 ms of every flush and 38% of the server's CPU in the #9742 profile, #9771).
+// callMetricSpanSQL is the raw rows' id span trimToRowCap reads; the test of its plan runs this very constant.
+const callMetricSpanSQL = `SELECT COALESCE((SELECT MAX(id) FROM call_metrics) - (SELECT MIN(id) FROM call_metrics) + 1, 0)`
+
 func (d *DB) trimToRowCap(ctx context.Context, tx *sqlx.Tx, batch []*CallMetric) ([]*CallMetric, error) {
 	var span int64
-	if err := tx.GetContext(ctx, &span, `SELECT COALESCE((SELECT MAX(id) FROM call_metrics) - (SELECT MIN(id) FROM call_metrics) + 1, 0)`); err != nil {
+	if err := tx.GetContext(ctx, &span, callMetricSpanSQL); err != nil {
 		return nil, err
 	}
 	room := callMetricMaxRows - span
