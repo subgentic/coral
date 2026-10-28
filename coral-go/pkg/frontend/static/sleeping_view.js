@@ -6,6 +6,7 @@
 
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
+import { askedBefore, dismissAsked } from './asked_before_restart.js';
 
 const lastState = new Map(); // session_id -> the words its state last had, to say a change once (#6213)
 let stateFlip = false;
@@ -54,6 +55,14 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
     if (text) {
         const next = archived ? 'This agent is archived' : gone ? "This agent's terminal is gone" : ended ? endedText : 'This agent is sleeping';
         if (text.textContent !== next) text.textContent = next; // a status line: written only when it changes, so it is announced once
+    }
+    // What it asked before Coral restarted (#10368): its CLI is gone, so the words, with Restart (below) and Dismiss; written only when they change, so a status is announced once.
+    const asked = sleeping && row ? askedBefore(row) : null;
+    const askedBox = document.getElementById('sleeping-composer-asked'), askedText = document.getElementById('sleeping-composer-asked-text');
+    if (askedBox && askedText) {
+        const words = asked ? `Asked before Coral restarted: ${asked.text}` : '';
+        if (askedText.textContent !== words) askedText.textContent = words;
+        askedBox.hidden = !asked;
     }
     // A change of the open agent's state is said once, in a status that stays in the page: asleep (or ended, archived), then awake. Opening an agent that already sleeps says nothing: that is not a change.
     if (cur && cur.session_id) {
@@ -151,4 +160,11 @@ document.addEventListener('click', (e) => {
     if (btn.dataset.action === 'wake') wakeCurrent(btn);
     else if (btn.dataset.action === 'unarchive') unarchiveCurrent(btn);
     else if (btn.dataset.action === 'restart') window.restartSession();
+    else if (btn.dataset.action === 'dismiss-asked') {
+        const cur = state.currentSession, row = cur && (state.liveSessions || []).find(x => x.session_id === cur.session_id);
+        if (row) dismissAsked(row);
+    }
 });
+
+// Dismissed from Needs you or the chat: this view is drawn again (the Needs you list redraws on the same event).
+document.addEventListener('coral:asked-dismissed', () => { if (state.currentSession) applySleepingView(!!state.currentSession.sleeping, { manageInput: false }); });

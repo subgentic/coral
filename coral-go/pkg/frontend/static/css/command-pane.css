@@ -388,6 +388,19 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     flex: 1;
     min-width: 0;
 }
+.sleeping-composer-asked {
+    flex: 1 1 100%;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+.sleeping-composer-asked[hidden] {
+    display: none;
+}
 .sleeping-composer-actions {
     display: flex;
     gap: 8px;

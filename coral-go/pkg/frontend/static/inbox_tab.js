@@ -1,5 +1,5 @@
 import './inbox_servers.js'; // source helpers shared by lazy Inbox filters and lists
-import { needsInputAttention } from './display_activity_hint.js';
+import { needsYou, askedRow } from './asked_before_restart.js';
 /* Inbox tab (#4718, #4811, #7472): on every Coral. Where the hub serves the dashboard it is the Coral Hub's /inbox page (what needs the Operator, what was saved) inside the dashboard, in a
  * frame whose address is the constant below: never built from a URL, a hash or a message, and nothing is posted to or read from the frame. On every other Coral the dashboard builds its own
  * Inbox on the shared sidebar: three groups, Needs you (the agents waiting for input, from the live list the dashboard already holds, each opening that agent), Tasks and Saved for later, whose names
@@ -17,10 +17,11 @@ import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy In
 const INBOX_URL = '/inbox';
 onReviewsChanged(() => updateInboxTab());
 onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
+document.addEventListener('coral:asked-dismissed', () => updateInboxTab()); // a question asked before Coral restarted leaves Needs you (#10368)
 
 /** How many agents are waiting for input right now, from the feed's list. */
 export function waitingCount() {
-    return (state.liveSessions || []).filter(needsInputAttention).length;
+    return (state.liveSessions || []).filter(needsYou).length;
 }
 
 /** Keep the tab's badge (and, where the dashboard builds its own Inbox, the Needs you list) in step with the live list. Safe to call often (after each list update). */
@@ -67,7 +68,7 @@ const waitingKey = s => `${sessionServer(s)}|${s.session_id}`;
  *  the list, a refresh of the same agents, or the page loading with agents already waiting says nothing. It speaks only while the Inbox is on screen: elsewhere the toast ("needs input") and the tab's badge
  *  carry it, and a second voice for the same agent would only repeat it. The look is kept up while the Inbox is not shown, so what waited meanwhile is in the list but not announced when it is opened. */
 function announceNewlyWaiting(tab) {
-    const rows = (state.liveSessions || []).filter(needsInputAttention);
+    const rows = (state.liveSessions || []).filter(needsYou).map(askedRow);
     const now = new Set(rows.map(waitingKey));
     const before = _announced;
     _announced = now;
