@@ -253,7 +253,8 @@
                             <div class="team-more-wrap">
                                 <button type="button" class="btn" id="team-template-more" aria-haspopup="menu" aria-expanded="false" aria-controls="team-template-menu" data-on-click="team-menu">More</button>
                                 <div class="menu team-menu" id="team-template-menu" role="menu" aria-label="Template options" hidden>
-                                    <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-import-team-templates">Import a template</button>
+                                    <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-import-team-templates" title="A Coral team template: a .json file made by Export this template">Import a template (.json)</button>
+                                    <button type="button" role="menuitem" class="menu-item team-menu-item" id="team-template-export" data-on-click="m-export-team-template">Export this template (.json)</button>
                                     <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-import-team-from-folder" title="A folder with SKILL.md (the Orchestrator's prompt) and agents/role-name.md (one agent each)">Import from a folder</button>
                                     <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-save-team-template">Save this team as a template</button>
                                 </div>
@@ -342,6 +343,7 @@
             </div>
             <div class="modal-body">
                 <p class="team-agent-modal-subtitle">Name this team configuration so it shows up alongside your reusable templates.</p>
+                <p class="team-agent-modal-subtitle" id="save-template-kept">Kept: the members, their roles, instructions, models and flags. Not kept: the goal, tasks, notes and chats.</p>
                 <label for="save-template-name">Template Name
                     <input type="text" id="save-template-name" placeholder="e.g. Startup Launch Team">
                 </label>
