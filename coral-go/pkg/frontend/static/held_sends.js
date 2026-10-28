@@ -86,6 +86,9 @@ const ownAnswer = new Map();  // sid -> `at` of an answer this browser gave: the
 /** An answer this browser gave (the server's `at`): the note about another device is not for it. */
 export function noteOwnAnswer(sid, at) { if (sid && at) { ownAnswer.set(sid, at); seenAnswer.set(sid, at); } }
 
+/** What a second device says of an answer: the option that was picked when the server could show its words, else only that it was answered. */
+function answeredWords(a) { const w = firstWords(a && a.label); return w ? `Answered “${w}” from another device.` : 'Answered from another device.'; }
+
 /** The row says a prompt was answered lately (`last_answer: {label, at}`). When it was answered on another device, this one's card is gone with it and the region says what was picked and where (#10301). Nothing is said for a row first seen with its answer already in it, or for this browser's own answer. */
 export function syncAnswerFromRow(row) {
     if (!row || !row.session_id) return;
@@ -95,7 +98,7 @@ export function syncAnswerFromRow(row) {
     if (seenAnswer.get(sid) === a.at) return;
     seenAnswer.set(sid, a.at);
     if (first || ownAnswer.get(sid) === a.at) return;
-    if (state.currentSession && state.currentSession.session_id === sid) say(`Answered “${firstWords(a.label)}” from another device.`);
+    if (state.currentSession && state.currentSession.session_id === sid) say(answeredWords(a));
 }
 
 /** This browser's own answer was refused because the prompt is gone: when the row says another device answered it a moment ago, that is said instead of an error. True when it was. */
@@ -103,7 +106,7 @@ export function answeredElsewhere(sid) {
     const row = sessionOf(sid), a = row && row.last_answer;
     if (!a || !a.at || ownAnswer.get(sid) === a.at) return false;
     seenAnswer.set(sid, a.at);
-    say(`Answered “${firstWords(a.label)}” from another device.`);
+    say(answeredWords(a));
     return true;
 }
 

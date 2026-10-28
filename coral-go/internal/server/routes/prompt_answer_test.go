@@ -383,3 +383,27 @@ func TestLastAnswerIsKeptBriefly(t *testing.T) {
 	h.answers.mu.Unlock()
 	assert.False(t, kept, "a new answer drops the expired ones")
 }
+
+// #10301 (Security): the option's words are the agent's own text. The row's last_answer.label goes through the waiting line's cleaning and redaction (a token, the home folder, control characters),
+// and a label that cannot be checked is not shown at all (the other device still says it was answered).
+func TestLastAnswerLabelIsRedactedLikeAWaitingLine(t *testing.T) {
+	h := &SessionsHandler{}
+	home := homeFolder
+	homeFolder = func() string { return "/home/someone" }
+	defer func() { homeFolder = home }()
+	const token = "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD"
+	h.answers.note("s1", "Yes, and don't ask again for curl -H 'Authorization: Bearer "+token+"' /home/someone/project\x1b[31m")
+	got, _ := h.lastAnswerOf("s1").(map[string]any)
+	require.NotNil(t, got)
+	label, _ := got["label"].(string)
+	assert.NotContains(t, label, token, "a token in an option's words never reaches a row")
+	assert.NotContains(t, label, "/home/someone", "the home folder is shown as ~")
+	assert.NotContains(t, label, "\x1b", "control characters are gone")
+
+	old := redactWaiting
+	redactWaiting = func(string) (string, bool) { return "", false }
+	defer func() { redactWaiting = old }()
+	got, _ = h.lastAnswerOf("s1").(map[string]any)
+	require.NotNil(t, got, "the answer is still said to have happened")
+	assert.Equal(t, "", got["label"], "words that cannot be checked are not shown")
+}
