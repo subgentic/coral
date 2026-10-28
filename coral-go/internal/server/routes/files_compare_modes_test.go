@@ -107,7 +107,7 @@ func TestFilesCompareModesListWhatTheirLabelsSay(t *testing.T) {
 	write("base.py", "print('base')\nprint('wip')\n") // uncommitted on the branch
 	names, cmp = list("branch_point")
 	assert.Equal(t, []string{"base.py", "feature.py"}, names, "on a branch: what the branch added since main, plus its uncommitted work")
-	assert.Equal(t, "Changes since the branch point", label(cmp))
+	assert.Equal(t, "Changes since this branch began", label(cmp))
 	names, _ = list("last_commit")
 	assert.Equal(t, []string{"feature.py"}, names)
 	names, cmp = list("main_head")

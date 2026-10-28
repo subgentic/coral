@@ -109,7 +109,7 @@ func DiffRefs(ctx context.Context, workdir, mode string) []string {
 // IncludesWorkingTree reports whether a comparison lists the working tree's own changes (uncommitted edits, untracked files): all but the last commit alone.
 func IncludesWorkingTree(mode string) bool { return mode != DiffLastCommit }
 
-// CompareLabel says in words what a comparison shows in this repository (#10054): the panel's caption, so its words match the list. On main or master the branch point is HEAD, which the label says.
+// CompareLabel says in words what a comparison shows in this repository (#10054): the panel's caption, so its words match the list. On main or master a branch has nothing older than HEAD, which the label says in plain words (#10386).
 func CompareLabel(ctx context.Context, workdir, mode string) string {
 	switch mode {
 	case DiffUncommitted:
@@ -122,9 +122,9 @@ func CompareLabel(ctx context.Context, workdir, mode string) string {
 		return "Changes compared with main"
 	}
 	if GetDiffBase(ctx, workdir, mode) == "HEAD" {
-		return "Uncommitted changes (on main the branch point is HEAD)"
+		return "Uncommitted changes (you are on the main branch)"
 	}
-	return "Changes since the branch point"
+	return "Changes since this branch began"
 }
 
 // GetDiffBase returns the base ref for diffing.
