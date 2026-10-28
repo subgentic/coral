@@ -7,14 +7,15 @@ export function isWindows() {
     return /^win/i.test(p);
 }
 
-/** The keys that let go of the terminal, in words, for this person's OS. */
+/** The keys that let go of the terminal, in words, for this person's OS. Ctrl+Shift+Enter needs no layout's punctuation: Ctrl+] cannot be typed on an AltGr keyboard (#10497). */
 export function leaveKeyWords(windows = isWindows()) {
-    return windows ? 'Ctrl+]' : 'Ctrl+Shift+Escape or Ctrl+]';
+    return windows ? 'Ctrl+] or Ctrl+Shift+Enter' : 'Ctrl+Shift+Escape, Ctrl+] or Ctrl+Shift+Enter';
 }
 
-/** Whether a keydown is one of the leave keys. */
+/** Whether a keydown is one of the leave keys. Escape is not one: the agent CLIs use it (Esc stops a turn, Esc Esc goes back to edit a message). */
 export function isLeaveKey(ev) {
     if (!ev || ev.type !== 'keydown') return false;
     if (ev.key === 'Escape' && ev.ctrlKey && ev.shiftKey) return true;
+    if (ev.key === 'Enter' && ev.ctrlKey && ev.shiftKey && !ev.altKey && !ev.metaKey) return true;
     return ev.ctrlKey && !ev.shiftKey && !ev.altKey && !ev.metaKey && (ev.key === ']' || ev.code === 'BracketRight');
 }
