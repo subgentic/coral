@@ -531,5 +531,5 @@
 1	workflows.js	lastHtml
 1	workflows.js	progressBarHtml
 1	workflows.js	retriggerBtn
-1	workflows.js	runMetaHtml(run, signInFailure, errorExcerpt)
+1	workflows.js	runMetaHtml(run, signInFailure, errorExcerpt, job && job.name)
 1	workflows.js	stepsHtml

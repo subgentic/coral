@@ -20,6 +20,7 @@ const DT = await importOnce('./data_table.js');
 const WE = await importOnce('./workflow_editor.js'); // the create and edit form (#8360): a part of this panel that loads with it
 const WR = await importOnce('./workflow_run_html.js'); // the run page's markup (#8360): pure builders that load with this panel
 const { formatTime, runDurationHtml, runProgressHtml, runStepHtml, runMetaHtml } = WR;
+const SCH = await importOnce('./scheduler.js'); // the jobs as last read: a run a job started says which job and links back to it
 const WA = await importOnce('./workflow_agent.js'); // Build with Agent and Edit with Agent (#8360): a part of this panel that loads with it
 let workflows = [];
 let selectedWorkflowId = null;
@@ -277,6 +278,13 @@ function stopRunPolling() {
     }
 }
 
+/** The job that started the run (its trigger_context names it), when the jobs read knows it; undefined for a run started any other way. */
+function jobOf(run) {
+    let id = null;
+    try { id = JSON.parse(run.trigger_context || 'null')?.scheduled_job_id ?? null; } catch { /* a context that is not JSON names no job */ }
+    return id == null ? undefined : SCH.jobList().find(j => j.id === id);
+}
+
 function renderRunDetail(run) {
     const container = document.getElementById('wf-run-detail');
     if (!container) return;
@@ -312,14 +320,18 @@ function renderRunDetail(run) {
     const wasOpen = new Map([...container.querySelectorAll('.wf-run-step-output-toggle')].map(b => [b.getAttribute('aria-controls'), b.getAttribute('aria-expanded') === 'true']));
     const focusKey = document.activeElement && container.contains(document.activeElement) ? (document.activeElement.getAttribute('aria-controls') ? `c:${document.activeElement.getAttribute('aria-controls')}` : `a:${document.activeElement.dataset.onClick || ''}:${document.activeElement.dataset.session || document.activeElement.dataset.runId || ''}`) : '';
     // The run's own page: a link back to its workflow, its title, and its actions in the pinned bar (Re-run is the primary; Kill is all there is while it runs)
-    const backHtml = run.workflow_id
+    const job = jobOf(run);
+    const backHtml = job
+        ? `<button type="button" class="back-link" id="wf-run-back" data-on-click="job-open" data-job-id="${Number(job.id)}">\u2190 ${esc(job.name)}</button>`
+        : run.workflow_id
         ? `<button type="button" class="back-link" id="wf-run-back" data-on-click="wf-select" data-workflow-id="${Number(run.workflow_id)}">\u2190 ${esc(run.workflow_name || 'Workflow')}</button>`
         : '';
     container.innerHTML = `
         ${backHtml}
-        <button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
+        ${job ? '<button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>'
+            : '<button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>'}
         <h2 class="wf-item-title wf-run-title">${esc(run.workflow_name ? `${run.workflow_name}, run #${run.id}` : `Run #${run.id}`)}</h2>
-        ${runMetaHtml(run, signInFailure, errorExcerpt)}
+        ${runMetaHtml(run, signInFailure, errorExcerpt, job && job.name)}
         ${progressBarHtml}
         <div class="wf-run-steps wf-timeline">${stepsHtml}</div>
         ${killBtn || retriggerBtn ? `<div class="item-bar wf-run-actions">${killBtn}${retriggerBtn}</div>` : ''}

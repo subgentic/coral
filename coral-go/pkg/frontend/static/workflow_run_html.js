@@ -155,13 +155,13 @@ export function runStepHtml(run, s, i, count) {
 }
 
 /** The run's meta line: its state, trigger, start, duration, finish and why it failed. */
-export function runMetaHtml(run, signInFailure, errorExcerpt) {
+export function runMetaHtml(run, signInFailure, errorExcerpt, jobName) {
     // One line of words: the state, how it started, "Started 05:40, took 2s" (the finish time is the line's tooltip), and why it failed (#9294, the Operator's audit)
     const elapsed = runElapsedWords(run);
     return `
         <div class="wf-run-meta">
             <span><span class="chip wf-status-badge ${esc(run.status)}">${esc(run.status)}</span></span>
-            <span>${esc(triggerWords(run.trigger_type))}</span>
+            <span>${esc(jobName ? `Run by job ${jobName}` : triggerWords(run.trigger_type))}</span>
             ${run.started_at ? `<span${run.finished_at ? ` title="${escAttr('Finished ' + formatTime(run.finished_at))}"` : ''}>Started ${esc(formatTime(run.started_at))}${elapsed ? `, ${esc(elapsed)}` : ''}</span>` : ''}
             ${signInFailure ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> ${signInFailure}</span>` : run.error_msg ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> <span class="wf-run-error-text">${esc(runErrorWords(run.error_msg))}${errorExcerpt ? `<span class="wf-run-error-excerpt">: ${esc(errorExcerpt)}</span>` : ''}</span></span>` : ''}
         </div>`;
