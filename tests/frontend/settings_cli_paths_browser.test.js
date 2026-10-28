@@ -24,6 +24,10 @@ const BASE = require('./test_base').BASE;
                 assert.ok(marker.content && marker.content !== 'none' && marker.content !== 'normal' || marker.listItem, `${tag}: the CLI paths line draws a disclosure marker: ` + JSON.stringify(marker));
                 const open = await ev(`document.querySelector('#settings-pane-agents #settings-cli-paths').open`);
                 assert.equal(open, !found, `${tag}: the disclosure is ${found ? 'closed' : 'open'} (open=${open})`);
+                // it sits under Defaults, not at the foot of the page (Beta Tester, #9955), and the closed row says whether the default CLI was found
+                const order = await ev(`(() => { const pane = document.getElementById('settings-pane-agents'), at = id => { const e = pane.querySelector(id); return e ? [...pane.querySelectorAll('*')].indexOf(e) : -1; }; return { cli: at('#settings-cli-paths'), defaults: at('#settings-agents-defaults'), models: at('#settings-agents-models'), behaviour: at('#settings-agents-behaviour'), note: ((pane.querySelector('#settings-cli-paths > summary .sv-fold-note') || {}).textContent || '').trim() }; })()`);
+                assert.ok(order.defaults >= 0 && order.cli > order.defaults && order.cli < order.models && order.models < order.behaviour, `${tag}: CLI paths are under Defaults, before Default models and Behaviour: ` + JSON.stringify(order));
+                assert.equal(order.note, `· Claude ${found ? 'found' : 'not found'}`, `${tag}: the closed row says whether the default CLI was found`);
                 if (!found) assert.ok(await ev(`document.getElementById('settings-cli-path-claude').getClientRects().length > 0`), `${tag}: the Claude path field is on screen`);
             }
         }

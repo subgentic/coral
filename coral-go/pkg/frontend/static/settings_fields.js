@@ -91,6 +91,10 @@ const AGENTS_FIELDS = host => [
     { key: 'working_dir', type: 'text', id: 'settings-working-dir', label: 'Default working directory', placeholder: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' } },
     { key: 'default_thinking_claude', type: 'select', id: 'settings-default-thinking-claude', label: 'Default thinking', options: THINKING_OPTIONS, attrs: { 'aria-label': 'Claude default thinking' },
         help: hintOnly('How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.') },
+    // the CLI paths: a closed disclosure of four path fields, each with its verify result under it, and Verify All (#8460); the dialog opens it when the default agent's CLI is missing (openCliPathsWhenMissing), which also says on the closed row whether the default CLI was found; it sits under Defaults, not at the foot of the page, where a person whose agent will not start looks (#9955)
+    { key: 'cli_paths', type: 'heading', id: 'settings-cli-paths', label: 'CLI paths (empty uses PATH)', fold: true },
+    cliPath('claude', 'Claude'), cliPath('codex', 'Codex'), cliPath('agy', 'Antigravity'), cliPath('pi', 'Pi'),
+    live('verify-all-btn'),
     { key: 'default_models', type: 'heading', id: 'settings-agents-models', label: 'Default models', help: 'Used when launching an agent without a model specified. Pick from the dropdown or type any model id.' },
     modelRow('claude', 'Claude'), modelRow('codex', 'Codex'), modelRow('agy', 'Antigravity'), modelRow('pi', 'Pi'),
     { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
@@ -107,10 +111,6 @@ const AGENTS_FIELDS = host => [
     { key: 'agents_tools', type: 'heading', id: 'settings-agents-tools', label: 'Tools' },
     { key: 'codex_trust_hooks', type: 'toggle', id: 'settings-codex-trust-hooks', label: "Trust Coral's hooks in Codex", help: hintOnly("Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on and only an administrator can change Coral's tools folder (an installed Coral), Coral trusts its own hooks for each Codex agent it launches, so the agent starts without that question; your own hooks and a repository's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") },
     live('settings-prompts-live'),
-    // the CLI paths: a closed disclosure of four path fields, each with its verify result under it, and Verify All (#8460); the dialog opens it when the default agent's CLI is missing (openCliPathsWhenMissing)
-    { key: 'cli_paths', type: 'heading', id: 'settings-cli-paths', label: 'CLI paths (empty uses PATH)', fold: true },
-    cliPath('claude', 'Claude'), cliPath('codex', 'Codex'), cliPath('agy', 'Antigravity'), cliPath('pi', 'Pi'),
-    live('verify-all-btn'),
 ];
 
 export const CLEANUP_FIELDS = [
