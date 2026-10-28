@@ -13,7 +13,7 @@ const BASE = require('./test_base').BASE;
     const rows = `document.querySelectorAll('#group-table-view [data-review-artifact]')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
-        for (const width of [1280,390]) {
+        for (const width of [1280,1600,390]) {
             try {
                 await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
                 await Emulation.setTouchEmulationEnabled({enabled:width===390});
@@ -56,18 +56,18 @@ const BASE = require('./test_base').BASE;
                 assert.match(by('Review file 05.txt').task, /^No goal · Task: Loose task$/); assert.equal(by('Review file 09.txt').task, 'No goal', 'no task, none said');
                 for (const g of goals) assert.ok(g.links <= 1, 'one goal link in the Goal cell, never two stacked: ' + JSON.stringify(g));
                 if (width === 390) assert.ok(by('Review file 01.txt').inLine2, 'the goal is on the row\'s second line: ' + JSON.stringify(by('Review file 01.txt')));
-                if (width === 1280) {
+                if (width >= 1280) {
                     assert.ok(await ev(`[...document.querySelectorAll('#group-table-view th')].some(h => h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim() === 'Goal')`), 'the table has a Goal column');
                     const geo = await ev(`(() => { const r = ${row('Review file 01.txt')}, c = r.querySelector('.inbox-review-goal'), g = c.querySelector('[data-goal-link]').getBoundingClientRect(); return { oneLine: c.getBoundingClientRect().height <= g.height + 6, h: Math.round(c.getBoundingClientRect().height), gh: Math.round(g.height) }; })()`);
                     assert.ok(geo.oneLine, 'the Goal cell is one line (the goal link alone): ' + JSON.stringify(geo));
                     // the Waiting for cell is one line too, with a long task title cut by an ellipsis and its full words in the tooltip (QA Reviewer 2 on #9060)
-                    const line = await ev(`(() => { const r = ${row('Review file 04.txt')}, m = r.querySelector('.inbox-review-metadata'), t = m.querySelector('.inbox-review-task'), f = m.firstElementChild; return { mh: Math.round(m.getBoundingClientRect().height), fh: Math.round(f.getBoundingClientRect().height), sameLine: Math.abs(t.getBoundingClientRect().top - f.getBoundingClientRect().top) < 4, cut: t.scrollWidth > t.clientWidth, ellipsis: getComputedStyle(t).textOverflow, title: t.title, rowH: Math.round(r.getBoundingClientRect().height), within: t.getBoundingClientRect().right <= m.getBoundingClientRect().right + 1 }; })()`);
+                    if (width === 1280) assert.equal(await ev(`!!(${row('Review file 04.txt')}).querySelector('.inbox-review-metadata').offsetParent`), false, 'at 1280 the star and its Open and Mark reviewed leave no room: Waiting for is dropped by the table, as the column rule says (#9846), and returns at 1600'); if (width === 1600) { const line = await ev(`(() => { const r = ${row('Review file 04.txt')}, m = r.querySelector('.inbox-review-metadata'), t = m.querySelector('.inbox-review-task'), f = m.firstElementChild; return { mh: Math.round(m.getBoundingClientRect().height), fh: Math.round(f.getBoundingClientRect().height), sameLine: Math.abs(t.getBoundingClientRect().top - f.getBoundingClientRect().top) < 4, cut: t.scrollWidth > t.clientWidth, ellipsis: getComputedStyle(t).textOverflow, title: t.title, rowH: Math.round(r.getBoundingClientRect().height), within: t.getBoundingClientRect().right <= m.getBoundingClientRect().right + 1 }; })()`);
                     assert.ok(line.sameLine && line.mh <= line.fh + 6, 'For review and the task are on one line: ' + JSON.stringify(line));
                     assert.ok(line.cut && line.ellipsis === 'ellipsis' && line.within, 'a long task title is cut with an ellipsis, inside its cell: ' + JSON.stringify(line));
                     assert.match(line.title, /^Task: Write the docs for the whole installer and the update flow, every section, with a screenshot of each step$/, 'the full title is the tooltip');
                     const itemW = await ev(`Math.round((${row('Review file 04.txt')}).querySelector('.inbox-review-name').getBoundingClientRect().width)`);
                     assert.ok(itemW >= 110, 'the Item name keeps its room (the whole "Review file 04.txt"): ' + itemW);
-                    assert.ok(line.rowH <= 48, 'the row stays one line high: ' + JSON.stringify(line));
+                    assert.ok(line.rowH <= 48, 'the row stays one line high: ' + JSON.stringify(line)); }
                     // sortable: Docs sweep, Ship the installer, then No goal last
                     await ev(`[...document.querySelectorAll('#group-table-view th button.dt-sort, #group-table-view th .dt-sort')].find(b => /^Goal/.test(b.textContent.trim())).click(); true`);
                     await waitFor(`(() => { const t = [...document.querySelectorAll('#group-table-view tbody tr .inbox-review-goal')].map(c => c.firstChild.textContent); return t[0] === 'Docs sweep'; })()`, 'sorted by goal', 6000);
@@ -90,7 +90,7 @@ const BASE = require('./test_base').BASE;
                 await ev(`(() => { const x = [...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip')].find(c => /Goal/.test(c.textContent)); if (x) x.click(); return true; })()`);
                 await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length >= 12`, 'the filter cleared', 8000);
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`); fs.writeFileSync(path.join(dir, `inbox-review-goal-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
-                if (width === 1280) {
+                if (width >= 1280) {
                     // the task link opens the task in the Inbox, in place (a phone's folded row does not draw it)
                     await ev(`(${row('Review file 01.txt')}).querySelector('[data-task-link]').click(); true`);
                     await waitFor(`location.pathname.startsWith('/inbox/tasks/') && location.pathname.endsWith('/11')`, 'the task opens in the Inbox, in place: ' + await ev('location.pathname'), 8000);
