@@ -272,7 +272,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         // Leaving the team page awaits its settings guard. The mobile wrapper
         // drops the exported selector's promise even on desktop; await the real
         // selector so no late selection can navigate away after Saved opens.
-        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'sessions.js'); await m.selectLiveSession('sv-a', 'claude', 'sv-a-id', 'local'); await m.selectLiveSession('', '', '', 'local'); return true; })()`); // home: this list reads every conversation
+        await ev(`(async () => { await window.selectLiveSession('sv-a', 'claude', 'sv-a-id', 'local'); await window.selectLiveSession('', '', '', 'local'); return true; })()`); // home: this list reads every conversation
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the page's own Saved tab; the top bar's bookmark is the Inbox's (#4905)
         const INBOX_ROWS = '#group-table-view tbody tr';
         await waitFor(`${INBOX_SAVED} && [...document.querySelectorAll('${INBOX_ROWS} .dt-primary')].filter(e => e.textContent.toLowerCase().includes('saved-4510-board')).length === 2`, 'the board items (home\'s list is the Inbox\'s, everything\'s)', 6000);

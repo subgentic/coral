@@ -19,12 +19,12 @@ const REC = `(() => { const real = window.fetch.bind(window); window.__asked = [
         let a = await asked();
         assert.equal(lists(a), 0, 'a local Coral does not read the chat list at start: ' + JSON.stringify(a.filter(p => /history/.test(p))));
         console.log('PASS no chat list read at start');
-        await ev(`import(${S} + 'sessions.js').then(m => m.selectHistorySession('lazy-chat-1')).then(() => true)`);
+        await ev(`Promise.resolve(window.selectHistorySession('lazy-chat-1')).then(() => true)`);
         a = await asked();
         assert.equal(lists(a), 1, 'opening a chat reads the list once: ' + JSON.stringify(a.filter(p => /history/.test(p))));
         const iList = a.indexOf('/api/sessions/history'), iChat = a.findIndex(p => p === '/api/sessions/history/lazy-chat-1');
         assert.ok(iChat > iList && iList >= 0, 'the list is read before the chat\'s own page: ' + JSON.stringify(a.filter(p => /history/.test(p))));
-        await ev(`import(${S} + 'sessions.js').then(m => m.selectHistorySession('lazy-chat-2')).then(() => true)`);
+        await ev(`Promise.resolve(window.selectHistorySession('lazy-chat-2')).then(() => true)`);
         a = await asked();
         assert.equal(lists(a), 1, 'a second chat does not read it again');
         console.log('PASS the list is read once, when a chat is opened, before its page');
