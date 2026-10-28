@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
 
             // the first card: New job, on the Agent prompt
             await ev(`document.querySelectorAll('#group-table-view .start-card')[0].click(); true`);
-            await waitFor(`getComputedStyle(document.getElementById('job-modal')).display !== 'none' && document.querySelector('.job-type-btn[data-type="prompt"]').getAttribute('aria-pressed') === 'true'`, 'New job opens on the Agent prompt', 8000);
+            await waitFor(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none' && document.querySelector('.job-type-btn[data-type="prompt"]').getAttribute('aria-pressed') === 'true'; })()`, 'New job opens on the Agent prompt', 8000);
             assert.equal(await ev(vis('#job-modal-prompt')), true, at + 'the Prompt is the first thing to fill in');
             await waitFor(`(() => { const [a, b] = ['workflow', 'prompt'].map(t => getComputedStyle(document.querySelector('.job-type-btn[data-type="' + t + '"]')).backgroundColor); return a !== b; })()`, 'the type buttons have settled', 8000); // the dialog fades in: the shot is the settled one
             await shot(`first-run-job-${w}`);
@@ -45,7 +45,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(vis('#wf-build-hint')), true, at + 'the Build with Agent hint');
             await shot(`first-run-workflow-${w}`);
             await ev(`[...document.querySelectorAll('#wf-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
-            assert.equal(await ev(`getComputedStyle(document.getElementById('job-modal')).display`), 'none', at + 'a workflow dialog opened from a card does not bring New job back');
+            assert.equal(await ev(`(() => { const m = document.getElementById('job-modal'); return m ? getComputedStyle(m).display : 'none'; })()`), 'none', at + 'a workflow dialog opened from a card does not bring New job back');
         }
         console.log('PASS first run: two cards in every folder, New job on the Agent prompt, New workflow with an example step and the hint');
     } finally { await client.close(); }
