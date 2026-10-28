@@ -5,7 +5,7 @@
 import { importOnce } from './import_once.js';
 import { foldWayBack } from './way_back.js';
 import { state } from './state.js';
-import { boardFetch, inTeam } from './server_base.js';
+import { boardFetch, inTeam, keyLabel } from './server_base.js';
 import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
@@ -35,7 +35,8 @@ const statusWord = (a) => WORD[a.availability] || 'No signal yet';
 const providerOf = (a) => PROVIDER[a.agent_type] || (a.agent_type ? a.agent_type.charAt(0).toUpperCase() + a.agent_type.slice(1) : 'Claude');
 const canRemind = (a) => a.availability !== 'offline' && (a.agent_type !== 'terminal' || a.reminder); // a reminder to an ended agent does nothing (#8271) // a terminal is not an agent: a reminder to it does nothing (UI audit #5589)
 // A task nobody has picked up says what it waits on (#10200): the agent it is for, not just "pending".
-const waitsOn = (t) => (Array.isArray(t.waiting_on) ? t.waiting_on : []).map(n => `#${Number(n)}`).join(', '); // the tasks it waits on, when it waits on any (#10222)
+// the tasks it waits on, when it waits on any (#10222); one on another board is named with its board (#10287), as its number alone would read as a task of this team
+const waitsOn = (t) => [...(Array.isArray(t.waiting_on) ? t.waiting_on : []).map(n => `#${Number(n)}`), ...(Array.isArray(t.waiting_on_elsewhere) ? t.waiting_on_elsewhere : []).map(b => `${keyLabel(String(b.board_id || ''))} #${Number(b.id)}`)].join(', ');
 const taskLine = (t, a) => `#${Number(t.id)} ${(t.status === 'pending' || t.status === 'blocked') && waitsOn(t) ? `waiting on ${waitsOn(t)}` : t.status === 'pending' && a && a.name ? `waiting for ${a.name} to pick it up` : String(t.status || '').replaceAll('_', ' ')}: ${t.title}`;
 /** What the agent is doing: its first task as one line, else the reason its status gives. */
 const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0], a) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : (a.reason || ''));
