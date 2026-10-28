@@ -68,6 +68,44 @@ const BASE = require('./test_base').BASE;
             await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000);
             assert.ok((await options()).includes(NAME), 'the persona is listed');
         });
+        const openMore = async () => { await ev(`(() => { const d = [...window.__na.dialog().querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))).closest('details'); d.open = true; return true; })()`); await settle(100); };
+        await S.run('Rename persona and Delete persona are on for a saved persona only (#10285)', async () => {
+            await openMore();
+            const state = pick => ev(`(() => { const s = window.__na.find('select', ${N.persona}); s.value = ${JSON.stringify(pick)}; s.dispatchEvent(new Event('change', { bubbles: true })); const r = document.getElementById('agent-rename-persona-btn'), d = document.getElementById('agent-delete-persona-btn'); return { rename: !r.disabled, del: !d.disabled, title: r.title }; })()`);
+            assert.deepEqual((await state('__blank__')).rename, false, 'off for Blank');
+            const builtin = await ev(`(() => { const g = [...window.__na.find('select', ${N.persona}).querySelectorAll('optgroup')].find(x => x.label === 'Built-in'); return g && g.querySelector('option') ? g.querySelector('option').value : null; })()`);
+            if (builtin) { const b = await state(builtin); assert.ok(!b.rename && !b.del && /saved personas/i.test(b.title), 'off for a built-in, with the reason: ' + JSON.stringify(b)); }
+            const on = await state(NAME); assert.ok(on.rename && on.del, 'on for the saved persona: ' + JSON.stringify(on));
+        });
+        const NAME2 = NAME + ' renamed';
+        await S.run('Rename persona asks for a name and renames it; a taken name is refused (#10285)', async () => {
+            await openMore(); await click('button', /^Rename persona$/i);
+            await waitFor(`getComputedStyle(document.getElementById('prompt-modal')).display !== 'none'`, 'the rename dialog', 4000);
+            assert.equal(await ev(`document.getElementById('prompt-modal-input').value`), NAME, 'it starts from the current name');
+            await ev(`(() => { document.getElementById('prompt-modal-input').value = ${JSON.stringify(NAME2)}; document.getElementById('prompt-modal-ok').click(); return true; })()`);
+            await waitFor(`(() => { const s = window.__na.find('select', ${N.persona}); return !!s && [...s.options].some(o => o.textContent.trim() === ${JSON.stringify(NAME2)}) && ![...s.options].some(o => o.textContent.trim() === ${JSON.stringify(NAME)}); })()`, 'the renamed persona in the select', 6000);
+            assert.match(await toasts(), /Renamed to/, 'a toast says so');
+            // a name that is a built-in's is refused
+            const builtin = await ev(`(() => { const g = [...window.__na.find('select', ${N.persona}).querySelectorAll('optgroup')].find(x => x.label === 'Built-in'); return g && g.querySelector('option') ? g.querySelector('option').textContent.trim() : null; })()`);
+            if (builtin) {
+                await openMore(); await click('button', /^Rename persona$/i);
+                await waitFor(`getComputedStyle(document.getElementById('prompt-modal')).display !== 'none'`, 'the rename dialog', 4000);
+                await ev(`(() => { document.getElementById('prompt-modal-input').value = ${JSON.stringify(builtin)}; document.getElementById('prompt-modal-ok').click(); return true; })()`);
+                await waitFor(`/There is already a persona called/.test([...document.querySelectorAll('.toast, [role=status]')].map(e => e.textContent).join(' '))`, 'the refusal', 4000);
+                assert.ok(await options().then(o => o.includes(NAME2)), 'the persona keeps its name');
+            }
+        });
+        await S.run('Delete persona asks first, then removes it and goes back to Blank (#10285)', async () => {
+            await openMore(); await click('button', /^Delete persona$/i);
+            await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm', 4000);
+            assert.match(await ev(`document.getElementById('confirm-modal-message').textContent`), new RegExp(NAME2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'it names the persona');
+            assert.ok((await options()).includes(NAME2), 'nothing is deleted before the answer');
+            await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+            await waitFor(`(() => { const s = window.__na.find('select', ${N.persona}); return !!s && ![...s.options].some(o => o.textContent.trim() === ${JSON.stringify(NAME2)}); })()`, 'the persona gone from the select', 6000);
+            assert.match(await toasts(), /Deleted persona/, 'a toast says so');
+            assert.equal(await ev(`window.__na.find('select', ${N.persona}).value`), '__blank__', 'the choice is Blank again');
+            await ev(`[...window.__na.dialog().querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))).closest('details').open = false; true`); // the menu is closed again for the next scenario
+        });
         await S.run('the More menu is a disclosure named "More": closed it hides Export and Import, opened (mouse) it shows both', async () => {
             const hidden = await ev(`(() => { const d = window.__na.dialog(); const s = [...d.querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))); if (!s) return null; const det = s.closest('details'); return { open: det.open, exp: !!window.__na.find('button', /^Export personas$/i), imp: !!window.__na.find('button', /^Import personas$/i) }; })()`);
             assert.ok(hidden, 'a summary named More'); assert.equal(hidden.open, false, 'closed at first'); assert.ok(!hidden.exp && !hidden.imp, 'Export and Import are not shown while closed');
