@@ -85,6 +85,7 @@ const questionMenu = "\r\n Pick a color:\r\n \u276f 1. Red\r\n   2. Blue\r\n\r\n
 //	MOCK_GO_DEAF         the mock stops reading: its box stays on screen but takes nothing and it answers nothing: a send is accepted and no reply ever comes (the chat stays blank)
 //	MOCK_STUCK_ENTER     the box takes text but an Enter does not submit it: the next send is refused (a message not submitted, then "an earlier message is still in the box"): the send-error box
 //	MOCK_BUSY [seconds]  the turn stays open (30 s without a number): the agent is working and sends no Stop until then, so a tester can reach Stop and queue sends (#10602)
+//	MOCK_SHARE_FILE <name>  the mock uploads a small generated file (a PNG for a .png name, else text; mock-share.txt when no name) as an artifact, through coral-agent as a real agent does (#10739): testers see it in Artifacts
 //	MOCK_EXIT            the mock ends at once, as a CLI that quit: the agent is over, and the next send is refused (the send-error box)
 //
 // An Enter answers an open menu (option 1) and an Escape dismisses it; both fire the hooks that end the wait. waiting says a menu is open: the line's UserPromptSubmit is sent (so Coral confirms the send) but not its Stop.
@@ -104,6 +105,10 @@ func applyControl(box *inputBox, line string) (handled, waiting bool) {
 		box.busyFor = time.Duration(secs * float64(time.Second))
 		fmt.Printf("\r\n[mock-agent] working for %gs\r\n", secs)
 		return true, true
+	}
+	if line == "MOCK_SHARE_FILE" || strings.HasPrefix(line, "MOCK_SHARE_FILE ") {
+		fmt.Print("\r\n" + shareFile(strings.TrimSpace(strings.TrimPrefix(line, "MOCK_SHARE_FILE"))) + "\r\n")
+		return true, false
 	}
 	switch line {
 	case "MOCK_ASK_PERMISSION":
