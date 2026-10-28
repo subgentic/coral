@@ -196,6 +196,8 @@
 2	group_cards.js	bKebab
 2	group_cards.js	boardLink
 2	group_cards.js	boardSleepIcon
+1	group_cards.js	changed
+1	group_cards.js	changedBadge
 2	group_cards.js	copyBtn
 2	group_cards.js	countBadge
 2	group_cards.js	distillChip(boardName)

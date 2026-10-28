@@ -457,6 +457,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     min-height: 28px;
     font-size: var(--fs-md);
 }
+.group-name-line .group-changes { flex: none; margin-left: 6px; color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-regular); white-space: nowrap; } /* what its agents changed, quiet and after the count (#10386) */
 .group-name-line .session-group-count {
     margin-left: 4px;
 }

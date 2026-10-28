@@ -139,7 +139,9 @@ function _renderFolderGroup(groupName, groupSessions) {
     let html = '';
         const sorted = _sortByOrder(groupSessions);
         const isMulti = sorted.length > 1;
-        const countBadge = ` <span class="session-group-count">${sorted.length}</span>`; void isMulti;
+        const changed = sorted.reduce((n, s) => n + (Number(s.changed_file_count) || 0), 0); // what its agents have changed, from the count the feed already carries (#10386, Beta: a folder row said nothing of the work in it)
+        const changedBadge = changed > 0 ? ` <span class="group-changes" title="${escapeAttr(`${keyLabel(groupName)}: ${changed} file${changed === 1 ? '' : 's'} changed`)}">${changed} changed</span>` : '';
+        const countBadge = ` <span class="session-group-count">${sorted.length}</span>${changedBadge}`; void isMulti;
         const collapsed = _isGroupCollapsed(groupName);
         const groupDirRaw = sorted[0]?.working_directory || pinPathForKey(groupName);
         const groupKebab = `<div class="sidebar-kebab-wrapper group-kebab">
