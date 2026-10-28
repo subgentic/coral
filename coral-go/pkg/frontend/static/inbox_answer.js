@@ -11,9 +11,13 @@ import { blockedReason, hubBlocked } from './hub_access.js';
 const MAX_CHOICES = 4;
 // Choices that last past this one answer, or change how the agent runs: never a button on a list row (each CLI's own words: Claude's "Yes, and don't ask again for ..." and "Yes, allow all edits during this session", Codex's "Yes, and don't ask again", Antigravity's "always allow").
 const LASTING = /don.?t ask|always|allow all|all edits|session|conversation|switch to|persist|remember|from now on|auto mode|accept edits/i;
-// What a permission's choice may say to be a button: a short Yes, Allow, Approve, No, Deny or Reject, and nothing about a place or a scope ("Yes, allow reading from <dir>/ from this project" reaches further than this one time): everything else is left to Open (Security Reviewer, #10462).
-const PLAIN = /^(yes|no|allow|deny|approve|reject)\b/i, SCOPE = /project|director|folder|repositor|\ball\b|\bfrom\b|\/|~/i, PERMISSION_WORDS = /^(yes|allow|approve)\b/i;
-const plainlyOneTime = (label, permission) => !LASTING.test(label) && !SCOPE.test(label) && (!permission || (PLAIN.test(label) && label.length <= (PERMISSION_WORDS.test(label) ? 40 : 60)));
+// A permission's choice is a button only when the WHOLE label (a trailing key hint like "(y)" and final punctuation dropped) is one of these one-time forms, and nothing else (Security Reviewer, #10462): Yes, Allow or Approve,
+// optionally "once", "this once", "proceed", "continue", Antigravity's "run command"; No, Deny or Reject, optionally "cancel" or Codex's "and tell <CLI> what to do differently". Everything else, including every phrasing that
+// lasts ("never ask again", "forever", "trust this workspace", "for the rest of this task") and every one that names a place, is left to Open.
+const ONE_TIME = /^(?:(?:yes|allow|approve)(?:,? (?:once|this once|proceed|continue|run command))?|(?:no|deny|reject)(?:,? (?:cancel|and tell \w+ what to do differently))?)$/i;
+const PERMISSION_WORDS = /^(yes|allow|approve)\b/i, SCOPE = /project|director|folder|repositor|\ball\b|\bfrom\b|\/|~/i;
+const wholeLabel = label => label.trim().replace(/\s*\([^)]*\)$/, '').replace(/[.!\s]+$/, '');
+const plainlyOneTime = (label, permission) => permission ? ONE_TIME.test(wholeLabel(label)) : !LASTING.test(label) && !SCOPE.test(label); // a question card's own choices (Red, Blue) pass the words that mark a lasting or wide one
 const read = new Map(); // server:session:waiting_since -> the choices, read once per ask
 
 /** The card's one-time choices and the ask they belong to: { ask, picks } ({ ask: '', picks: [] } when the card cannot be answered by one choice). */
