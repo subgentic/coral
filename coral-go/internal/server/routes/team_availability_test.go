@@ -441,3 +441,39 @@ func TestTeamAvailabilitySaysWhetherTheBoardExists(t *testing.T) {
 		require.Equal(t, want, *got.Exists, board)
 	}
 }
+
+// A task that waits on another task says which (#10222, Security Reviewer Windows on #10200): its open blockers are on the agent's task as waiting_on, so a page does not say it waits for the agent to pick it up; a task with nothing
+// blocking it has none, and a blocker that is done is not listed.
+func TestAvailabilityTaskNamesWhatItWaitsOn(t *testing.T) {
+	_, h, terminal, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	team := "waits"
+	sid := uuid.NewString()
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentName: "dev", AgentType: "claude", BoardName: &team, WorkingDir: "/tmp"}))
+	_, err := h.bs.Subscribe(ctx, team, "dev", "Developer", "claude-"+sid, nil, "all")
+	require.NoError(t, err)
+	terminal.addSession("claude-"+sid, "/tmp")
+	first, err := h.bs.CreateTask(ctx, team, "The first task", "", "high", "lead", "other")
+	require.NoError(t, err)
+	free, err := h.bs.CreateTask(ctx, team, "Nothing blocks this", "", "medium", "lead", "dev")
+	require.NoError(t, err)
+	waiting, err := h.bs.CreateTaskWithOpts(ctx, team, "Needs the first", "", "medium", "lead", &board.CreateTaskOpts{BlockedBy: []board.TaskDep{{TaskID: first.ID, BoardID: team}}}, "dev")
+	require.NoError(t, err)
+	r := chi.NewRouter()
+	r.Get("/api/board/{project}/status", h.TeamAvailability)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/board/waits/status", nil))
+	require.Equal(t, 200, w.Code, w.Body.String())
+	var out struct {
+		Agents []availableAgent `json:"agents"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+	byID := map[int64]availabilityTask{}
+	for _, a := range out.Agents {
+		for _, task := range a.Tasks {
+			byID[task.ID] = task
+		}
+	}
+	require.Equal(t, []int64{first.ID}, byID[waiting.ID].WaitingOn, "the blocked task names its open blocker")
+	require.Empty(t, byID[free.ID].WaitingOn, "a task nothing blocks waits on no task")
+}

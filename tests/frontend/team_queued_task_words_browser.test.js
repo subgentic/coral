@@ -19,17 +19,24 @@ const TEAM = `qa-queued-${Date.now() % 100000}`;
         const made = await post(ev, `/api/board/${TEAM}/tasks`, { title: 'Say hello to the team', body: 'first task', created_by: 'Operator', assigned_to: 'Orchestrator' });
         const id = made && (made.id || (made.task && made.task.id));
         assert.ok(id, 'the first task exists: ' + JSON.stringify(made));
+        const dep = await post(ev, `/api/board/${TEAM}/tasks`, { title: 'Needs the first one', body: 'second', created_by: 'Operator', assigned_to: 'Backend Dev', blocked_by: [id] });
+        const depId = dep && (dep.id || (dep.task && dep.task.id));
+        assert.ok(depId, 'the task that waits on the first exists: ' + JSON.stringify(dep));
         // the board's status: the Orchestrator has the queued task, nobody has a signal yet
         await ev(`(() => { window.__taskStatus = 'pending'; const R = window.fetch.bind(window); window.fetch = async (u, o = {}) => { const url = new URL(String(u), location.origin);
             if (/^\\/api\\/board\\/[^/]+\\/status$/.test(url.pathname)) return new Response(JSON.stringify({ summary: {}, observed_at: new Date().toISOString(), agents: [
                 { name: 'Orchestrator', subscriber_id: 'Orchestrator', session_id: 'sid-1', availability: window.__taskStatus === 'pending' ? 'queued' : 'busy', reason: '', tasks: [{ id: ${Number(id)}, status: window.__taskStatus, title: 'Say hello to the team' }] },
-                { name: 'Backend Dev', subscriber_id: 'Backend Dev', session_id: 'sid-2', availability: 'unknown', reason: '', tasks: [] }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+                { name: 'Backend Dev', subscriber_id: 'Backend Dev', session_id: 'sid-2', availability: 'queued', reason: '', tasks: [{ id: ${Number(depId)}, status: 'blocked', title: 'Needs the first one', waiting_on: [${Number(id)}] }] }] }), { status: 200, headers: { 'content-type': 'application/json' } });
             return R(u, o); }; return true; })()`);
         await openTeam(ev, waitFor, TEAM);
         await goTab(ev, settle, 'Agents');
         await waitFor(`/Orchestrator/.test(document.body.textContent) && /Say hello to the team/.test(document.body.textContent)`, 'the Orchestrator and its task on the Agents tab', { timeout: 8000 });
         const agents = await ev(`(() => { const r = [...document.querySelectorAll('tr, [role=row]')].find(x => /Orchestrator/.test(x.textContent) && /Say hello/.test(x.textContent)); return r ? r.textContent.replace(/\\s+/g, ' ') : ''; })()`);
         assert.match(agents, /waiting for Orchestrator to pick it up/i, 'the Agents tab says what the queued task waits on: ' + agents);
+        // a task that waits on another says which, not that it waits for its agent (#10222)
+        const second = await ev(`(() => { const r = [...document.querySelectorAll('tr, [role=row]')].find(x => /Backend Dev/.test(x.textContent) && /Needs the first one/.test(x.textContent)); return r ? r.textContent.replace(/\\s+/g, ' ') : ''; })()`);
+        assert.match(second, new RegExp('waiting on #' + id + '\\b'), 'the Agents tab says which task it waits on: ' + second);
+        assert.doesNotMatch(second, /to pick it up/, 'and not that it waits for the agent: ' + second);
         // the task's own page
         await goTab(ev, settle, 'Tasks');
         await waitFor(`/Say hello to the team/.test(document.body.textContent)`, 'the task on the Tasks tab', { timeout: 8000 });
@@ -37,6 +44,14 @@ const TEAM = `qa-queued-${Date.now() % 100000}`;
         await waitFor(`document.querySelector('.goals-detail-line')`, 'the task page', { timeout: 8000 });
         const line = await ev(`document.querySelector('.goals-detail-line').parentElement.textContent.replace(/\\s+/g, ' ')`);
         assert.match(line, /Queued/); assert.match(line, /Waiting for Orchestrator to pick it up/, 'the task page says what it waits on: ' + line);
+        await ev(`window.__tp.find('button, a', /Back|Tasks/i)?.click(); true`).catch(() => {});
+        await goTab(ev, settle, 'Tasks');
+        await waitFor(`/Needs the first one/.test(document.body.textContent)`, 'the waiting task on the Tasks tab', { timeout: 8000 });
+        await ev(`(() => { const b = [...document.querySelectorAll('button.dt-primary, a, button')].find(x => /Needs the first one/.test(x.textContent)); b.click(); return true; })()`);
+        await waitFor(`document.querySelector('.goals-detail-line')`, 'the second task page', { timeout: 8000 });
+        const line2 = await ev(`document.querySelector('.goals-detail-line').parentElement.textContent.replace(/\\s+/g, ' ')`);
+        assert.match(line2, new RegExp('Waiting on #' + id + '\\.'), 'the task page says which task it waits on: ' + line2);
+        assert.doesNotMatch(line2, /to pick it up/, 'and not that it waits for the agent: ' + line2);
         // picked up: the words go
         await ev(`window.__taskStatus = 'in_progress'; true`);
         await ev(`window.__tp.find('button, a', /Back|Tasks/i)?.click(); true`).catch(() => {});

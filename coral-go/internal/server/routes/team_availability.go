@@ -20,6 +20,8 @@ type availabilityTask struct {
 	Scope  string `json:"scope"`
 	Title  string `json:"title"`
 	Status string `json:"status"`
+	// WaitingOn is the tasks this one waits on, its open blockers (#10222): a pending task that waits on another is not waiting for its assignee to pick it up.
+	WaitingOn []int64 `json:"waiting_on,omitempty"`
 }
 
 type availableAgent struct {
@@ -259,7 +261,7 @@ func (h *SessionsHandler) liveAgentStatus(ctx context.Context, snap *boardStatus
 	}
 	for _, t := range personal {
 		if openAvailabilityTask(t.Status) {
-			a.Tasks = append(a.Tasks, availabilityTask{t.ID, "personal", t.Title, t.Status})
+			a.Tasks = append(a.Tasks, availabilityTask{ID: t.ID, Scope: "personal", Title: t.Title, Status: t.Status})
 		}
 	}
 	if a.SubscriberID != "" {
@@ -323,7 +325,13 @@ func boardTasksAssignedTo(tasks []board.Task, subscriber string) []availabilityT
 			assignee = *t.AssignedTo
 		}
 		if assignee == subscriber && openAvailabilityTask(t.Status) {
-			out = append(out, availabilityTask{t.ID, "board", t.Title, t.Status})
+			task := availabilityTask{ID: t.ID, Scope: "board", Title: t.Title, Status: t.Status}
+			for _, dep := range t.BlockedBy {
+				if !dep.Satisfied {
+					task.WaitingOn = append(task.WaitingOn, dep.TaskID)
+				}
+			}
+			out = append(out, task)
 		}
 	}
 	return out

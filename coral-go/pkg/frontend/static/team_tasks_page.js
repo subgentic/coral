@@ -377,7 +377,10 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     if (task.version > 1) { const edited = el('span', 'text-muted-sm', ` edited, v${task.version}`); h.append(edited); }
  const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
-    if (task.status === 'pending' && task.assigned_to) line.append(el('span', 'text-muted-sm', ` Waiting for ${task.assigned_to} to pick it up.`)); // what a queued task waits on, until it is claimed (#10200)
+    // what a queued task waits on, until it is claimed (#10200): the tasks it depends on while any is open, else the agent it is for (#10222)
+    const openBlockers = (Array.isArray(task.blocked_by) ? task.blocked_by : []).filter(d => d && d.satisfied === false).map(d => `#${Number(d.task_id)}`);
+    if ((task.status === 'pending' || task.status === 'blocked') && openBlockers.length) line.append(el('span', 'text-muted-sm', ` Waiting on ${openBlockers.join(', ')}.`));
+    else if (task.status === 'pending' && task.assigned_to) line.append(el('span', 'text-muted-sm', ` Waiting for ${task.assigned_to} to pick it up.`));
     if (ctx.teamLink) {
         const links = el('div', 'goal-back-row'), teamLink = el('a', 'goal-team-link inbox-team-link', 'Open on team page');
         teamLink.href = ctx.teamLink; teamLink.setAttribute('data-route', '');

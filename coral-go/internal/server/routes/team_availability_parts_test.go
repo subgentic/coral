@@ -12,8 +12,12 @@ import (
 // The pieces of a board's status (#4599: split out of teamAvailabilityUncached, behaviour unchanged).
 
 func TestTaskStateOf(t *testing.T) {
-	board1 := func(id int64, status string) availabilityTask { return availabilityTask{id, "board", "t", status} }
-	personal1 := func(id int64, status string) availabilityTask { return availabilityTask{id, "personal", "t", status} }
+	board1 := func(id int64, status string) availabilityTask {
+		return availabilityTask{ID: id, Scope: "board", Title: "t", Status: status}
+	}
+	personal1 := func(id int64, status string) availabilityTask {
+		return availabilityTask{ID: id, Scope: "personal", Title: "t", Status: status}
+	}
 	for _, c := range []struct {
 		name        string
 		tasks       []availabilityTask
@@ -48,8 +52,8 @@ func TestBoardTasksAssignedTo(t *testing.T) {
 		{ID: 5, Title: "e", Status: "blocked", AssignedTo: s("qa")},
 		{ID: 6, Title: "f", Status: "skipped"},
 	}
-	assert.Equal(t, []availabilityTask{{1, "board", "a", "pending"}}, boardTasksAssignedTo(tasks, "dev"), "open ones only")
-	assert.Equal(t, []availabilityTask{{3, "board", "c", "in_progress"}, {4, "board", "d", "draft"}}, boardTasksAssignedTo(tasks, ""), "unassigned: no assignee or an empty one")
+	assert.Equal(t, []availabilityTask{{ID: 1, Scope: "board", Title: "a", Status: "pending"}}, boardTasksAssignedTo(tasks, "dev"), "open ones only")
+	assert.Equal(t, []availabilityTask{{ID: 3, Scope: "board", Title: "c", Status: "in_progress"}, {ID: 4, Scope: "board", Title: "d", Status: "draft"}}, boardTasksAssignedTo(tasks, ""), "unassigned: no assignee or an empty one")
 	assert.Equal(t, []availabilityTask{}, boardTasksAssignedTo(tasks, "nobody"), "an empty list, not nil (the JSON says [])")
 }
 
