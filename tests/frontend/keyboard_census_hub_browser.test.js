@@ -41,7 +41,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
         await sc(`${tag}: hub: boards list`, async () => { await nav('board'); await waitFor(`document.querySelectorAll('#mb-projects-ul [data-project]').length===2`, 'boards'); });
         await sc(`${tag}: hub: board`, async () => { await ev(`document.querySelector('#mb-projects-ul [data-project="@m1/same-team"]').click();true`); await waitFor(`document.getElementById('mb-messages').textContent.includes('Board message from m1')`, 'board'); });
         await sc(`${tag}: hub: servers`, async () => { await nav('servers'); await waitFor(`document.getElementById('servers-view').getClientRects().length > 0`, 'servers'); });
-        await sc(`${tag}: hub: servers, a computer opened`, async () => { await tap('#servers-tab-body .cs-toggle'); }, { expect: `document.querySelector('#servers-tab-body .cs-toggle').getAttribute('aria-expanded') === 'true'` });
+        await sc(`${tag}: hub: servers, a computer opened`, async () => { await tap('#servers-tab-body .cs-toggle'); }, { expect: `!!document.querySelector('#servers-tab-body section.cs-page')` }); // a row opens the machine's page (#9722): the scene is the page, Rename and More in its foot bar
         await sc(`${tag}: hub: servers, renaming`, async () => { await tap('#servers-tab-body .cs-rename-btn'); }, { expect: `!!document.querySelector('#servers-tab-body .cs-rename input')` });
         await ev(`document.querySelector('#servers-tab-body .cs-rename button[type=button]')?.click(); true`);
         await sc(`${tag}: hub: inbox`, async () => { await nav('hub-inbox'); }, { expect: `document.getElementById('nav-select').textContent.includes('Inbox') || !!document.getElementById('nav-tab-hub-inbox')` });

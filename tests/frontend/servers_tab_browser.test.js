@@ -151,29 +151,32 @@ const contrast = (a, b) => {
             for (const theme of ['dark', 'light']) {
                 await setTheme(ev, theme);
                 const au = await auditRegion(ev, ['#servers-view .cs-launch', '#servers-view .cs-access-help', '#servers-view .cs-limit', '#servers-view .cs-note', '#servers-view .cs-access-info', '#servers-view .cs-access-matrix']);
-                assert.ok(au.checked > 0 && !au.fails.length, `${tag} ${theme}: the row's words hold 4.5:1: ${JSON.stringify(au.fails).slice(0, 300)}`);
+                assert.ok(au.checked > 0 && !au.fails.length, `${tag} ${theme}: the words hold 4.5:1: ${JSON.stringify(au.fails).slice(0, 300)}`);
                 if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/servers-access-${tag}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             }
             await setTheme(ev, 'dark');
         };
+        const listShown = n => `document.querySelectorAll('#servers-view .cs-row').length === ${n}`;
+        const openPage = async id => { await ev(`document.querySelector('#server-row-${id} .cs-toggle').click(); true`); await waitFor(`!!document.querySelector('#servers-view section.cs-page#server-row-${id}')`, `${id}'s page`, 3000); };
+        const backToList = async () => { await ev(`document.getElementById('servers-back').click(); true`); await waitFor(listShown(SERVERS.length), 'the list is back', 3000); };
         console.log('2. Row access: one lower-only control, no Raise, no Launch dialog');
         const settled = () => ev(framesJs(2));
         const focusIs = (sel, what) => waitFor(`document.activeElement === document.querySelector(${JSON.stringify(sel)})`, what, 3000,
             `(() => { const a = document.activeElement; return a ? a.tagName + '#' + a.id + '.' + a.className : null; })()`);
-        const rowView = id => ev(`(() => { const r = document.getElementById('server-row-${id}'), d = document.getElementById('server-row-${id}-detail'); const sel = r.querySelector('.cs-launch select');
+        const rowView = async id => { await openPage(id); const out = await rowViewOf(id); await backToList(); return out; };
+        const rowViewOf = id => ev(`(() => { const r = document.getElementById('server-row-${id}'), d = r.querySelector('.cs-detail-cell'); const sel = r.querySelector('.cs-launch select');
             return { options: [...sel.options].map(o => o.textContent + (o.disabled ? ' (disabled)' : '')), value: sel.value, label: r.querySelector('.cs-launch').firstChild.textContent.trim(), describedBy: sel.getAttribute('aria-describedby'),
                 help: (document.getElementById(sel.getAttribute('aria-describedby')) || {}).textContent || null,
-                effective: [...d.querySelectorAll('.cs-access-effective')].map(n => n.textContent), actions: [...r.querySelectorAll('.cs-col-actions button')].map(b => b.textContent),
+                effective: [...d.querySelectorAll('.cs-access-effective')].map(n => n.textContent), actions: [...r.querySelectorAll('.cs-actions button')].map(b => b.textContent),
                 inDetails: [...d.querySelectorAll('button:not(.cs-access-info)')].map(b => b.textContent), follow: !!r.querySelector('.cs-follow, .cs-limit'), raise: !!r.querySelector('.cs-raise'), summary: !!d.querySelector('.cs-access'), dialogs: document.querySelectorAll('dialog.cs-confirm').length }; })()`);
         let r = Object.fromEntries((await rows()).map(x => [x.id, x]));
         assert.ok(Object.values(r).every(x => x.tabindex === '-1'), 'rows are focus targets (tabindex=-1)');
-        await ev(`document.querySelectorAll('#servers-view .cs-toggle[aria-expanded="false"]').forEach(b => b.click()); true`);
         await rowShots('desktop');
         // m1: the owner chose View, the computer allows Launch: three options, none disabled; Rename and Revoke are in the row.
         let v = await rowView('m1');
         assert.deepEqual(v.options, ['View', 'Interact', 'Launch']);
         assert.equal(v.value, 'view'); assert.equal(v.label, 'Hub access for Box One');
-        assert.deepEqual(v.actions, ['Rename', 'More', 'Revoke'], 'Rename, More and (in More) Revoke are the row actions in the last column');
+        assert.deepEqual(v.actions, ['Rename', 'More', 'Revoke'], 'Rename, More and (in More) Revoke are the actions in the machine\'s page foot bar');
         assert.deepEqual(v.inDetails, [], 'no buttons in the details');
         assert.ok(!v.follow && !v.raise && !v.summary && v.dialogs === 0, 'no Follow, no Raise, no Hub/Machine/Effective line, no dialog');
         assert.deepEqual(v.effective, [], 'the effective value shows only when lower than the choice');
@@ -211,13 +214,13 @@ const contrast = (a, b) => {
         assert.equal((await rowView('m3')).dialogs, 0, 'a lower choice asks nothing');
         console.log('   ✓ Hub access: View / Interact / Launch, an option above the computer disabled with its reason as text, Rename and Revoke in the row, immediate changes, focus kept');
 
-        console.log('2b. Row cells (status, Coral version, agents) and the details line (last contact when offline), update badge, no "null"');
+        console.log('2b. Row cells (status, Coral version, agents) and the page\'s last contact (when offline), update badge, no "null"');
         const rowInfo = await ev(`Object.fromEntries([...document.querySelectorAll('#servers-view .cs-row')].map(r => {
-            const d = document.getElementById(r.id + '-detail');
             const badges = [...r.querySelectorAll('a.server-update-badge')].map(a => ({ cls: a.className, href: a.getAttribute('href'), aria: a.getAttribute('aria-label'), target: a.getAttribute('target'), rel: a.getAttribute('rel'), inVersion: !!a.closest('.cs-col-version') }));
             const cell = c => r.querySelector('.cs-col-' + c).textContent.replace(/\\s+/g, ' ').trim();
-            return [r.id.replace('server-row-', ''), { status: cell('status'), version: r.querySelector('.cs-col-version span').textContent, agents: cell('agents'), meta: (d.querySelector('.cs-lastseen') || {}).textContent || '', badges }];
+            return [r.id.replace('server-row-', ''), { status: cell('status'), version: r.querySelector('.cs-col-version span').textContent, agents: cell('agents'), meta: '', badges }];
         }))`);
+        for (const id of ['m1', 'm3']) { await openPage(id); rowInfo[id].meta = await ev(`(document.querySelector('#server-row-${id} .cs-detail-cell .cs-lastseen') || {}).textContent || ''`); await backToList(); } // the last contact is in the machine's page
         assert.deepEqual([rowInfo.m1.status, rowInfo.m1.version, rowInfo.m1.agents, rowInfo.m1.meta], ['Online', '1.4.2', '7', ''], 'm1: nothing repeated in the details, and no last contact while online (#3152)');
         assert.deepEqual([rowInfo.m2.status, rowInfo.m2.version, rowInfo.m2.agents], ['Online', '1.4.6', '1'], "m2: version from 'version'");
         assert.equal(rowInfo.m3.status, 'Offline'); assert.equal(rowInfo.m3.agents, '0');
@@ -239,6 +242,7 @@ const contrast = (a, b) => {
         console.log('   ✓ cells per row, last contact in the details, badges m1/m2 only in the Coral column, no "null"');
 
         console.log('3. Revoke reads as an action (contrast >= 4.5:1)');
+        await openPage('m3'); // Revoke is on the machine's page
         const rv = await ev(`(() => {
             const b = document.querySelector('#servers-view .cs-revoke');
             let el = b, bg = 'rgba(0, 0, 0, 0)';
@@ -260,17 +264,19 @@ const contrast = (a, b) => {
         const lratio = contrast(lt.color, lt.bg);
         await ev(`${themeJs('dark')}; true`);
         assert.ok(lratio >= 4.5, `light theme: Revoke contrast ${lratio.toFixed(2)}:1 (${lt.color} on ${lt.bg})`);
+        await backToList();
         console.log(`   ✓ Revoke dark ${rv.color} on ${rv.bg}: ${ratio.toFixed(2)}:1; light ${lt.color} on ${lt.bg}: ${lratio.toFixed(2)}:1`);
 
         console.log('4. Deep links: /servers/<id>, /servers, the old #servers/<id>, and the agent list server chip');
         await open('servers/m2');
-        await waitFor(`document.activeElement && document.activeElement.id === 'server-row-m2'`, '/servers/m2 focuses its row', 6000);
-        assert.ok((await rows()).find(x => x.id === 'server-row-m2').target, 'the linked row is highlighted');
+        await waitFor(`document.activeElement && document.activeElement.id === 'server-row-m2'`, '/servers/m2 focuses its page', 6000);
+        assert.ok(await ev(`document.getElementById('server-row-m2').classList.contains('cs-page')`), 'the link opens m2\'s page');
+        assert.ok(await ev(`document.getElementById('server-row-m2').classList.contains('server-row-target')`), 'the linked page is highlighted');
         assert.equal((await tabState()).current, 'page');
         await open('servers');
         await waitFor(`document.activeElement && document.activeElement.id === 'servers-tab-title'`, '/servers focuses the heading', 6000);
         await open('#servers/m2');
-        await waitFor(`document.activeElement && document.activeElement.id === 'server-row-m2'`, 'the old #servers/m2 link focuses its row', 6000);
+        await waitFor(`document.activeElement && document.activeElement.id === 'server-row-m2'`, 'the old #servers/m2 link focuses its page', 6000);
         assert.equal(await ev('location.pathname + location.hash'), '/servers/m2', 'and its URL becomes the path');
         await ev(`window.switchNavTab('agents'); localStorage.setItem('coral-group-by-server', 'true'); window.__m.add('chip-agent', 'C', 3, { sleeping: false, server: 'm3' }); T.render.renderLiveSessions(T.state.liveSessions); true`);
         // #4932 (replaces the removed search-row pill): a server group header's ⋮ panel has an 'Open in Servers' button that opens its row.
@@ -279,11 +285,11 @@ const contrast = (a, b) => {
         assert.ok(item && item.tag === 'BUTTON' && item.focusable, `the header's Open in Servers is a keyboard-reachable button (${JSON.stringify(item)})`);
         assert.equal(item.text, 'Open in Servers', 'its label says what it opens');
         await ev(`document.querySelector('li.server-group-header[data-server-group="m3"] button.server-open-btn[data-server-open="m3"]').click(); true`);
-        await waitFor(`document.activeElement && document.activeElement.id === 'server-row-m3'`, 'the header Open in Servers opens the tab at m3', 6000);
+        await waitFor(`document.activeElement && document.activeElement.id === 'server-row-m3'`, 'the header Open in Servers opens m3\'s page', 6000);
         assert.equal(await ev('location.pathname'), '/servers/m3', 'it writes its row\'s path');
         console.log('   ✓ /servers/m2 → row focused + highlighted; /servers → heading; #servers/m2 → /servers/m2; header Open in Servers → row m3');
 
-        console.log('5. Phone 375 px: no overflow, actions stacked under the details');
+        console.log('5. Phone 375 px: no overflow, in the list and on a machine\'s page, the foot bar inside the viewport');
         await Emulation.setDeviceMetricsOverride({ width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
         await open('servers');
         await waitFor(`document.querySelectorAll('#servers-view .cs-row').length === ${SERVERS.length}`, 'rows at 375', 6000);
@@ -294,16 +300,19 @@ const contrast = (a, b) => {
             const rows = [...v.querySelectorAll('.cs-row')];
             return {
                 doc: document.documentElement.scrollWidth - innerWidth, view: over(v), rows: Math.max(...rows.map(over)),
-                stacked: rows.every(r => { const a = r.querySelector('.cs-actions'), m = r.querySelector('.cs-main'); return !a || !m || a.getBoundingClientRect().top >= m.getBoundingClientRect().bottom - 1; }),
                 inside: rows.every(r => [...r.querySelectorAll('button, select, a')].every(b => { const x = b.getBoundingClientRect(); return x.width === 0 || (x.left >= -1 && x.right <= innerWidth + 1); })),
             };
         })()`);
         assert.ok(phone.doc <= 0 && phone.view <= 0 && phone.rows <= 0, `no horizontal overflow at 375 (${JSON.stringify(phone)})`);
-        assert.ok(phone.stacked, 'actions stack under the details');
         assert.ok(phone.inside, 'every control is inside the viewport');
+        await openPage('m1');
+        const pg = await ev(`(() => { const p = document.getElementById('server-row-m1'); const bar = p.querySelector('.cs-actions'); return { doc: document.documentElement.scrollWidth - innerWidth, page: p.scrollWidth - p.clientWidth, inside: [...p.querySelectorAll('button, select, a')].every(b => { const x = b.getBoundingClientRect(); return x.width === 0 || (x.left >= -1 && x.right <= innerWidth + 1); }), actions: bar ? [...bar.querySelectorAll('button')].filter(b => b.getClientRects().length).map(b => b.textContent) : null }; })()`);
+        assert.ok(pg.doc <= 0 && pg.page <= 0 && pg.inside, `a machine's page: no horizontal overflow at 375 and every control inside the viewport (${JSON.stringify(pg)})`);
+        assert.deepEqual(pg.actions, ['Rename', 'More'], 'the foot bar holds Rename and More (Revoke is behind More)');
         await rowShots('phone');
+        await backToList();
         await Emulation.clearDeviceMetricsOverride();
-        console.log('   ✓ overflow 0 (document, view, rows), actions stacked, controls inside');
+        console.log('   ✓ overflow 0 (document, view, rows, the machine\'s page), controls inside, the foot bar');
 
         console.log('6. Local Coral: hidden without remotes, shown on a hub with one, falls back when it goes');
         await cloudMode(false);

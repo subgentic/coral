@@ -118,16 +118,18 @@ const NONE = ['srv-current', 'srv-unknown', 'srv-odd'];
             await cs.renderServersInto(document.getElementById('servers-tab-body'), { source: 'cloud' });
             await new Promise(r => setTimeout(r, 200));
             const out = {};
-            for (const main of document.querySelectorAll('#servers-tab-body .cs-row')) {
-                const li = document.getElementById(main.id + '-detail'); // the notice is in the row's details
-                li.dataset.id = main.dataset.id;
+            const wait = ms => new Promise(r => setTimeout(r, ms));
+            for (const id of [...document.querySelectorAll('#servers-tab-body .cs-row')].map(r => r.dataset.id)) {
+                document.querySelector('#servers-tab-body .cs-row[data-id="' + id + '"] .cs-toggle').click(); await wait(80); // the notice is in the machine's page (a row opens it, #9722)
+                const li = document.querySelector('#servers-tab-body section.cs-page');
                 const note = li.querySelector('.cs-update');
-                out[li.dataset.id] = note ? {
+                out[id] = note ? {
                     cls: note.className, text: note.querySelector('span').textContent.trim(),
                     links: [...note.querySelectorAll('a')].map(a => ({ href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel'), text: a.textContent })),
                     foreign: li.querySelectorAll('img, script, iframe').length,
                 } : null;
-                out[li.dataset.id + ':disabled'] = [...main.querySelectorAll('button, select'), ...li.querySelectorAll('button, select')].filter(b => b.disabled).length;
+                out[id + ':disabled'] = [...li.querySelectorAll('button, select')].filter(b => b.disabled).length;
+                document.getElementById('servers-back').click(); await wait(80);
             }
             cs.hideServersModal();
             window.fetch = real;
