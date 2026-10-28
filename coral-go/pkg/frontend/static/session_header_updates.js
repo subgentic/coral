@@ -4,7 +4,7 @@ import { syncQueuedFromRow, paint as paintQueued } from './held_sends.js';
 import { _gitStateSummary, _repoBranch, presentationSessionState } from './session_state.js';
 import { startupSignedOut } from './signin_line.js';
 import { syncAgentKeys } from './agent_keys.js';
-import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill } from './dom_write.js';
+import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill, setAttr } from './dom_write.js';
 import { modelName, sessionLevel } from './model_labels.js';
 import { sessionServer } from './server_base.js';
 
@@ -24,10 +24,10 @@ let _headerHasBranch = false;
 function _syncHeaderFolder() {
     // The header has no folder of its own (the operator, #9837): the full path is the hover and keyboard-focus tip on the agent's name (data-folder on the header, drawn by the stylesheet), and the Details disclosure has it.
     const el = document.querySelector("#live-session-view .terminal-header");
-    if (el) { if (_headerDir) el.dataset.folder = _headerDir; else el.removeAttribute('data-folder'); }
+    if (el) { if (_headerDir) setAttr(el, 'data-folder', _headerDir); else if (el.hasAttribute('data-folder')) el.removeAttribute('data-folder'); } // written only when it changes: a message that changes nothing writes nothing (perf_budgets, #9919)
     // The tip is CSS (generated content), which a screen reader does not read: the name says the folder as its description (#9899).
     const who = document.getElementById('terminal-header-identity');
-    if (who) { if (_headerDir) who.setAttribute('aria-description', _headerDir); else who.removeAttribute('aria-description'); }
+    if (who) { if (_headerDir) setAttr(who, 'aria-description', _headerDir); else if (who.hasAttribute('aria-description')) who.removeAttribute('aria-description'); } // the same: only on a change
 }
 
 // Escape puts the folder tip away without moving the keyboard (WCAG 1.4.13, #9899); it is back when the keyboard or the pointer leaves the name and returns.
