@@ -41,6 +41,8 @@ export function artifactTable(cfg) {
             icon.innerHTML = fileIconHtml(readableName(item));
             wrap.append(icon, b);
             if (badge) wrap.append(badge);
+            const star = cfg.star?.(item); // the star: a glyph when starred, a button at a hover (artifact_star.js, #9834)
+            if (star) wrap.append(star);
             return wrap;
         } },
         ...(cfg.afterName || []), // the Inbox's list spans teams and computers: its Team (or Server) column, which drops with the optional ones
@@ -51,7 +53,7 @@ export function artifactTable(cfg) {
         ...(cfg.details ? [{ key: 'details', label: 'Details', hideLabel: true, width: '3.75rem', cell: cfg.details }] : []),
     ];
     const table = DT.dataTable({ ...cfg, columns, state, oneLine: true, resize: false, sortBar: false,
-        rowKey: cfg.rowKey || itemKey, rowName: i => Tags.nameWithTags(readableName(i), i.tags),
+        rowKey: cfg.rowKey || itemKey, rowName: i => Tags.nameWithTags(readableName(i), i.tags) + (i.starred ? ', starred' : ''),
         ...(cfg.paged ? { onSort: (key, dir) => {
             state.sort = { key, dir };
             browserLocal.set(SORT_KEY, JSON.stringify(state.sort)); cfg.onPageSort?.(serverArtifactSort(state.sort));

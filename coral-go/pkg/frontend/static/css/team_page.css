@@ -337,6 +337,8 @@
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
 .inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; }
 .inbox-review-actions-read { grid-template-columns: max-content max-content max-content; } /* a read item has Unread beside Open and Mark reviewed (#9277) */
+.inbox-review-actions-star { grid-template-columns: max-content max-content max-content; } /* the star is the first of the actions (#9834) */
+.inbox-review-actions-star.inbox-review-actions-read { grid-template-columns: max-content max-content max-content max-content; }
 .inbox-review-icon { min-width: 44px; padding-inline: 0; justify-content: center; } /* a read item's two actions are icons: the row stays one line, also on a phone */
 .inbox-review-icon .material-icons { width: var(--icon-size); height: var(--icon-size); overflow: hidden; font-size: var(--icon-size); white-space: nowrap; } /* the icon's name is its ligature: without the font it must not widen the button */
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
