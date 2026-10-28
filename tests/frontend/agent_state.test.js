@@ -94,11 +94,11 @@ const EXPECT = {
     [ID.sleeping]: { state: 'sleeping', label: 'Sleeping', dot: 'sleeping', pill: null, attention: false },
     [ID.turnMember]: { state: 'your_turn', label: 'Ready for input', dot: 'your-turn', pill: null, attention: false },
     [ID.turnOrch]: { state: 'your_turn', label: 'Ready for input', dot: 'your-turn', pill: null, attention: false },
-    [ID.taskIdle]: { state: 'task_idle', label: 'Task assigned · idle', dot: 'task-idle', pill: 'Idle · task', attention: false },
-    [ID.waiter]: { state: 'waiting_on', label: 'Waiting on Lead Developer', dot: 'task-idle', pill: 'Waiting', attention: false },
+    [ID.taskIdle]: { state: 'task_idle', label: 'Task assigned · idle', dot: 'task-idle', pill: null, attention: false },
+    [ID.waiter]: { state: 'waiting_on', label: 'Waiting on Lead Developer', dot: 'task-idle', pill: null, attention: false },
     [ID.waiterAsks]: { state: 'needs_input', label: 'Needs input', dot: 'waiting', pill: 'Needs input', attention: true },
     [ID.twinHere]: { state: 'your_turn', label: 'Ready for input', dot: 'your-turn', pill: null, attention: false },
-    [ID.twinThere]: { state: 'waiting_on', label: 'Waiting on task #5', dot: 'task-idle', pill: 'Waiting', attention: false },
+    [ID.twinThere]: { state: 'waiting_on', label: 'Waiting on task #5', dot: 'task-idle', pill: null, attention: false },
 };
 
 async function run() {
@@ -158,7 +158,7 @@ async function run() {
         // #3227: yellow is for urgent states only. Task assigned · idle: muted ring, neutral pill, no amber tint.
         const warn = await ev(`getComputedStyle(document.documentElement).getPropertyValue('--warning').trim()`);
         const ti = rows[ID.taskIdle], nd = rows[ID.needs];
-        check('#3227 task_idle: hollow muted ring (not the yellow of Needs input), neutral pill, no needs-attention tint (#5123: no row carries a tint now, Needs input included)', !!ti && /rgba\(0, 0, 0, 0\)|transparent/.test(ti.dotBg) && /inset/.test(ti.dotRing || '') && ti.dotBg !== nd.dotBg && ti.pills.length === 1 && /\bneutral\b/.test(ti.pills[0].cls) && !/waiting-badge|session-attention-pill/.test(ti.pills[0].cls) && /rgba\(0, 0, 0, 0\)|transparent/.test(ti.rowBg || '') && /rgba\(0, 0, 0, 0\)|transparent/.test(nd.rowBg || ''), JSON.stringify({ warn, ti: ti && { bg: ti.dotBg, ring: ti.dotRing, pill: ti.pills[0], row: ti.rowBg }, needs: { bg: nd.dotBg, row: nd.rowBg } }));
+        check('#3227 task_idle: hollow muted ring (not the yellow of Needs input), no chip (the dot says it, #9686), no needs-attention tint (#5123: no row carries a tint now, Needs input included)', !!ti && /rgba\(0, 0, 0, 0\)|transparent/.test(ti.dotBg) && /inset/.test(ti.dotRing || '') && ti.dotBg !== nd.dotBg && ti.pills.length === 0 && /rgba\(0, 0, 0, 0\)|transparent/.test(ti.rowBg || '') && /rgba\(0, 0, 0, 0\)|transparent/.test(nd.rowBg || ''), JSON.stringify({ warn, ti: ti && { bg: ti.dotBg, ring: ti.dotRing, pills: ti.pills.length, row: ti.rowBg }, needs: { bg: nd.dotBg, row: nd.rowBg } }));
         check('#3227 every row dot has a tooltip naming its state', Object.entries(EXPECT).every(([sid, exp]) => rows[sid] && rows[sid].dotTitle === exp.label), JSON.stringify(Object.fromEntries(Object.entries(EXPECT).map(([sid, e]) => [e.state, rows[sid] && rows[sid].dotTitle]))));
         const tipStates = await ev(`Object.fromEntries(window._coralGetLiveSessions().map(s => [s.session_id, String(window.buildSessionTooltip(s)).replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ')]))`);
         check('tooltip State row uses the same words', Object.entries(EXPECT).every(([sid, exp]) => new RegExp('State\\s+' + exp.label).test(tipStates[sid] || '')), JSON.stringify(Object.fromEntries(Object.entries(EXPECT).map(([sid, e]) => [e.state, (tipStates[sid] || '').slice(0, 40)]))));
@@ -183,7 +183,7 @@ async function run() {
         check('G high context + Needs input: attention pill only, ring kept, aria carries the context suffix', rows[ID.needs].ctxPill === null && /ctx-high/.test(rows[ID.needs].dotCls) && /, context 87%/.test(rows[ID.needs].aria), JSON.stringify({ ctx: rows[ID.needs].ctxPill, dot: rows[ID.needs].dotCls, aria: rows[ID.needs].aria }));
         await diff({ name: 'coral-go', agent_type: 'claude', session_id: ID.idle, context_pct: 91, context_window: 1000000 }); await nextFrame();
         rows = await ev(ROWS('live-sessions-list'));
-        check('G idle + high context: ring survives on the otherwise hidden slot and the ctx pill shows', rows[ID.idle].dotHidden === false && /ctx-high/.test(rows[ID.idle].dotCls) && rows[ID.idle].ctxPill === 'ctx 91%', JSON.stringify({ hidden: rows[ID.idle].dotHidden, ctx: rows[ID.idle].ctxPill }));
+        check('G idle + high context: the ring survives and no ctx pill is on the row (the context is in the hover tip and the header line, #9686)', rows[ID.idle].dotHidden === false && /ctx-high/.test(rows[ID.idle].dotCls) && rows[ID.idle].ctxPill === null, JSON.stringify({ hidden: rows[ID.idle].dotHidden, ctx: rows[ID.idle].ctxPill }));
         await diff({ name: 'coral-go', agent_type: 'claude', session_id: ID.idle, context_pct: null, context_window: null }); await nextFrame();
         rows = await ev(ROWS('live-sessions-list'));
         check('G explicit null context clears ring, pill and aria suffix', rows[ID.idle].ctxPill === null && !/ctx-high/.test(rows[ID.idle].dotCls) && !/context/.test(rows[ID.idle].aria), JSON.stringify({ dot: rows[ID.idle].dotCls, aria: rows[ID.idle].aria }));
@@ -219,7 +219,7 @@ async function run() {
             await diff(Object.assign({}, P, patch)); await nextFrame(); const r = await stateOf();
             seq.push({ want, got: r.state, dx: Math.abs(r.nameX - x0), h: r.h, focus: await ev(`(document.activeElement.dataset || {}).sessionId === '${ID.idle}'`), order: (await ev(`Array.from(document.querySelectorAll('#live-sessions-list .session-group-item')).map(l => l.dataset.sessionId).join(',')`)) === EXPECTED_ORDER });
         }
-        check('F Idle -> Working -> Ready for input -> Needs input -> Working: state, name x ±0.5px, 40px, focus kept, order kept', seq.every(s => s.want === s.got && s.dx <= 0.5 && Math.abs(s.h - 40) <= 1 && s.focus && s.order), JSON.stringify(seq));
+        check('F Idle -> Working -> Ready for input -> Needs input -> Working: state, name x ±0.5px, 36px (one line), focus kept, order kept', seq.every(s => s.want === s.got && s.dx <= 0.5 && Math.abs(s.h - 36) <= 1 && s.focus && s.order), JSON.stringify(seq));
 
         // ── I: notifications ──
         // Fresh page: the first full update already contains Needs input rows.
@@ -272,9 +272,10 @@ async function run() {
         await boot(390, 844, true, false);
         const m = await ev(ROWS('mobile-session-list'));
         const words = { [ID.working]: 'Working', [ID.idle]: 'Idle', [ID.needs]: 'Needs input', [ID.sleeping]: 'Sleeping' };
-        const banners = { [ID.check]: 'Nothing yet — open the terminal', [ID.stuck]: 'Session needs attention' }; // one chip per state (#9464): these two keep their banner, which says what to do, and have no state chip
-        check('mobile status chip uses the same sentence-case words', Object.entries(words).every(([sid, w]) => m[sid] && m[sid].mobileChip === w), JSON.stringify(Object.fromEntries(Object.entries(words).map(([sid, w]) => [w, m[sid] && m[sid].mobileChip]))));
-        check('a mobile Check terminal or Stuck card has its banner and no state chip (one chip per state)', Object.entries(banners).every(([sid, w]) => m[sid] && m[sid].mobileChip === null && m[sid].banner === w), JSON.stringify(Object.fromEntries(Object.entries(banners).map(([sid, w]) => [w, m[sid] && { chip: m[sid].mobileChip, banner: m[sid].banner }]))));
+        const banners = { [ID.check]: 'Check terminal', [ID.stuck]: 'Stuck' }; // one chip per state (#9464, #9723): these two are a word on the row, in the one chip, and the phone row has no banner line (#9686)
+        const chipOf = sid => m[sid] ? m[sid].pills.map(x => x.text) : null;
+        check('mobile: the one chip is for a state that needs you, in the same sentence-case words; every other state is the dot (#9686)', Object.entries(words).every(([sid, w]) => { const c = chipOf(sid); return c && (w === 'Needs input' ? c.length === 1 && c[0] === w : c.length === 0); }), JSON.stringify(Object.fromEntries(Object.entries(words).map(([sid, w]) => [w, chipOf(sid)]))));
+        check('a mobile Check terminal or Stuck card has the one chip and no banner line (one chip per state)', Object.entries(banners).every(([sid, w]) => { const c = chipOf(sid); return c && c.length === 1 && c[0] === w && m[sid].banner === null; }), JSON.stringify(Object.fromEntries(Object.entries(banners).map(([sid, w]) => [w, m[sid] && { chip: chipOf(sid), banner: m[sid].banner }]))));
         check('mobile Ready for input rows render no status chip; the dot and aria-label still say Ready for input', [ID.turnSolo, ID.turnMember, ID.turnOrch].every(id => m[id] && m[id].mobileChip === null && m[id].pills.length === 0 && /your-turn/.test(m[id].dotCls || '') && m[id].dotHidden === false && /, Ready for input(,|$)/.test(m[id].aria || '')), JSON.stringify([ID.turnSolo, ID.turnMember, ID.turnOrch].map(id => m[id] && { chip: m[id].mobileChip, dot: m[id].dotCls, dotHidden: m[id].dotHidden, aria: m[id].aria })));
         check('mobile clone: same data-state per row, idle dot hidden, unread chip hidden in favour of the meta pill', Object.entries(EXPECT).every(([sid, e]) => m[sid] && m[sid].state === e.state) && m[ID.idle].dotHidden === true && (!m[ID.turnMember].unread || !m[ID.turnMember].unread.shown), JSON.stringify({ idle: m[ID.idle] && m[ID.idle].dotHidden, unread: m[ID.turnMember] && m[ID.turnMember].unread }));
     } finally {

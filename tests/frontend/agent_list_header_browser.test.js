@@ -41,13 +41,12 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
             assert.equal(await dot(), false, at + 'no dot with nothing on');
             assert.equal(await label(), 'Display options');
 
-            // 2. display settings only (provider, model, thinking level hidden; branches shown): still no dot, no line
+            // 2. display settings only (what is left of them: Show server and Group by server): still no dot, no line. The switches are drawn only with servers to choose between, so they are flipped where they are in the panel (#9686 removed the other five)
             await panel(true);
-            await waitFor(`!!document.querySelector('${header} [data-display-input="provider"]')`, 'the display options', 8000);
-            for (const k of ['provider', 'model', 'thinking']) await ev(`(() => { const c = document.querySelector('${header} [data-display-input="${k}"]'); if (c.checked) c.click(); return true; })()`);
-            await ev(`(() => { const c = document.querySelector('${header} [data-display-input="branches"]'); if (!c.checked) c.click(); return true; })()`);
+            await waitFor(`!!document.querySelector('${header} [data-display-input="server"]') && !!document.querySelector('${header} [data-display-input="group"]')`, 'the display options', 8000);
+            for (const k of ['server', 'group']) await ev(`(() => { const c = document.querySelector('${header} [data-display-input="${k}"]'); c.click(); return true; })()`);
             await panel(false);
-            await gone('after hiding provider, model and thinking level');
+            await gone('after the display settings');
             assert.equal(await dot(), false, at + 'no dot for show/hide display settings');
             assert.equal(await label(), 'Display options');
 

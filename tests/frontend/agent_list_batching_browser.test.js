@@ -25,14 +25,14 @@ const { framesJs } = require('./helpers/wait');
             const ws = await import(st + 'websocket.js');
             const render = await import(st + 'render.js');
             const frames = n => ${framesJs('n')};
-            const mk = i => ({ name: 'batch-' + i, session_id: 'batch-' + i, agent_type: 'claude', server: 'local', status: 'working', summary: 's' + i, display_name: 'B' + i });
+            const mk = i => ({ name: 'batch-' + i, session_id: 'batch-' + i, agent_type: 'claude', server: 'local', status: 'working', display_name: 's' + i, display_name: 'B' + i });
             ws.handleCoralMessage({ type: 'coral_update', sessions: Array.from({ length: 20 }, (_, i) => mk(i)) });
             await frames(2);
             const out = {};
 
             // 1. A burst of 10 diffs in one task: one render, in the next frame.
             let before = window.__renders;
-            for (let k = 0; k < 10; k++) ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'batch-1', session_id: 'batch-1', server: 'local', summary: 'burst ' + k }] });
+            for (let k = 0; k < 10; k++) ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'batch-1', session_id: 'batch-1', server: 'local', display_name: 'burst ' + k }] });
             out.burstSync = window.__renders - before;
             await frames(2);
             out.burstRenders = window.__renders - before;
@@ -40,14 +40,14 @@ const { framesJs } = require('./helpers/wait');
 
             // 2. A synchronous render drops the pending scheduled one.
             before = window.__renders;
-            ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'batch-2', session_id: 'batch-2', server: 'local', summary: 'sync wins' }] });
+            ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'batch-2', session_id: 'batch-2', server: 'local', display_name: 'sync wins' }] });
             render.renderLiveSessions((await import(st + 'state.js')).state.liveSessions);
             await frames(2);
             out.syncRenders = window.__renders - before;
 
             // 3. flushLiveSessionsRender renders at once; nothing pending afterwards.
             before = window.__renders;
-            ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'batch-3', session_id: 'batch-3', server: 'local', summary: 'flushed' }] });
+            ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'batch-3', session_id: 'batch-3', server: 'local', display_name: 'flushed' }] });
             render.flushLiveSessionsRender();
             out.flushSync = window.__renders - before;
             out.flushInDom = document.getElementById('live-sessions-list').textContent.includes('flushed');

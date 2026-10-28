@@ -201,7 +201,7 @@ const stateOf = s => s.waiting_for_input ? 'needs_input' : s.sleeping ? 'asleep'
         assert.equal(await panelOpen('phone'), false); await toggleBtn('phone'); assert.equal(await panelOpen('phone'), true);
         await waitFor(`!!document.querySelector('#mobile-agent-list-bar #alm-sort')`, 'the phone bar, drawn as the panel opens', { timeout: 8000 });
         assert.equal(await ev(`document.querySelector('#mobile-agent-list-bar .list-bar-count').textContent`), '30 agents');
-        const touch = await ev(`(() => { const r = e => Math.round(document.querySelector(e).getBoundingClientRect().height); return { button: r('.mobile-list-header [data-display-button]'), toggle: r('.mobile-list-header [data-group-toggle]'), state: r('#alm-state'), sort: r('#alm-sort'), option: r('.mobile-list-header .list-display-option') }; })()`);
+        const touch = await ev(`(() => { const r = e => Math.round(document.querySelector(e).getBoundingClientRect().height); return { button: r('.mobile-list-header [data-display-button]'), toggle: r('.mobile-list-header [data-group-toggle]'), state: r('#alm-state'), sort: r('#alm-sort') }; })()`); // the display options are drawn only with servers to choose between (mobile_group_by_server measures them)
         assert.ok(Object.values(touch).every(h => h >= 44), 'targets at least 44 px: ' + JSON.stringify(touch));
         await set('#alm-state', 'needs_input', 'phone');
         assert.equal(await count(), `${byState('needs_input').length} of 30 agents`); assert.deepEqual(await chips('phone'), ['State: Needs input']);

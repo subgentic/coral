@@ -83,7 +83,7 @@ const BASE = require('./test_base').BASE;
                 for (let step = 0; step < 80; step++) {
                     const op = T.rnd(11); const s = pick(); let msg;
                     if (op === 0) msg = { type: 'coral_diff', changed: [{ ...key(s), status: ['working', 'idle', 'waiting', 'done'][T.rnd(4)] }] };
-                    else if (op === 1) msg = { type: 'coral_diff', changed: [{ ...key(s), summary: marks[T.rnd(marks.length)] + ' ' + step }] };
+                    else if (op === 1) msg = { type: 'coral_diff', changed: [{ ...key(s), display_name: marks[T.rnd(marks.length)] + ' ' + step }] };
                     else if (op === 2) msg = { type: 'coral_diff', changed: [{ ...key(s), waiting_for_input: !s.waiting_for_input }] };
                     else if (op === 3) msg = { type: 'coral_diff', changed: [{ ...key(s), sleeping: !s.sleeping }] };
                     else if (op === 4) msg = { type: 'coral_diff', changed: [{ ...key(s), archived: !s.archived }] };
@@ -91,8 +91,8 @@ const BASE = require('./test_base').BASE;
                     else if (op === 6) msg = { type: 'coral_diff', changed: [], removed: s.server === 'local' ? [s.session_id] : [], removed_remote: s.server === 'local' ? [] : [{ server: s.server, key: s.session_id }] };
                     else if (op === 7) msg = { type: 'coral_diff', changed: [{ ...key(s), board_project: T.teams[T.rnd(T.teams.length)] }] };
                     else if (op === 8) msg = { type: 'coral_diff', changed: [{ ...key(s), display_name: 'Renamed ' + step }] };
-                    else if (op === 9) msg = { type: 'coral_diff', changed: Array.from({ length: 5 }, () => { const x = pick(); return { ...key(x), summary: 'batch ' + step }; }) };
-                    else { try { localStorage.setItem('coral-group-by-server', T.rnd(2) ? '1' : '0'); } catch {} msg = { type: 'coral_diff', changed: [{ ...key(s), summary: 'regroup ' + step }] }; }
+                    else if (op === 9) msg = { type: 'coral_diff', changed: Array.from({ length: 5 }, () => { const x = pick(); return { ...key(x), display_name: 'batch ' + step }; }) };
+                    else { try { localStorage.setItem('coral-group-by-server', T.rnd(2) ? '1' : '0'); } catch {} msg = { type: 'coral_diff', changed: [{ ...key(s), display_name: 'regroup ' + step }] }; }
                     T.ws.handleCoralMessage(msg);
                     T.render.flushLiveSessionsRender();
                     if (failedAt === null && !T.check()) { failedAt = step; failedOp = op; }
@@ -125,7 +125,7 @@ const BASE = require('./test_base').BASE;
             T.render.flushLiveSessionsRender();
             const rows = () => new Map([...document.querySelectorAll('#live-sessions-list .session-group-item[data-session-id]')].map(r => [r.dataset.sessionId, r]));
             const before = rows();
-            T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'mo-5', session_id: 'mo-5', server: T.servers[5 % 3], summary: 'only me' }] });
+            T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'mo-5', session_id: 'mo-5', server: T.servers[5 % 3], display_name: 'only me' }] });
             T.render.flushLiveSessionsRender();
             const after = rows();
             const changed = [...after].filter(([id, el]) => before.get(id) !== el).map(([id]) => id);
@@ -135,12 +135,12 @@ const BASE = require('./test_base').BASE;
         // The changed row is either replaced or (same row element, new contents) patched inside;
         // no other row gets a new node.
         assert.deepEqual(keep.changed.filter(id => id !== 'mo-5'), [], 'no other row got a new node: ' + keep.changed);
-        assert.ok(keep.updated, 'the changed row shows the new summary');
+        assert.ok(keep.updated, 'the changed row shows the new name (the row draws its name, not its summary: one line, #9686)');
         assert.ok(keep.ok, 'and the DOM equals a fresh parse');
         console.log(`   ✓ one changed agent: ${keep.rows - 1} of ${keep.rows} rows kept their nodes (changed row ${keep.changed.length ? 'replaced' : 'patched inside'})`);
 
         // 3. Kept rows don't collect listeners across renders.
-        await ev(`(() => { const T = window.__mt; for (let k = 0; k < 15; k++) { T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'mo-7', session_id: 'mo-7', server: T.servers[7 % 3], summary: 'tick ' + k }] }); T.render.flushLiveSessionsRender(); } return true; })()`);
+        await ev(`(() => { const T = window.__mt; for (let k = 0; k < 15; k++) { T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'mo-7', session_id: 'mo-7', server: T.servers[7 % 3], display_name: 'tick ' + k }] }); T.render.flushLiveSessionsRender(); } return true; })()`);
         const { result } = await Runtime.evaluate({ expression: `document.querySelector('#live-sessions-list .session-group-item[data-session-id="mo-10"]')` });
         assert.ok(result.objectId, 'row mo-10 exists');
         const { listeners } = await client.DOMDebugger.getEventListeners({ objectId: result.objectId });
@@ -158,7 +158,7 @@ const BASE = require('./test_base').BASE;
             const st = window.__coralStatic || '/static/';
             const morph = await import(st + 'dom_morph.js'); const ws = await import(st + 'websocket.js'); const render = await import(st + 'render.js');
             const b = { ...morph.morphStats };
-            ws.handleCoralMessage({ type: 'coral_update', sessions: [{ name: 'u-1', session_id: 'u-1', agent_type: 'claude', server: 'local', status: 'working', summary: 'url switch' }] });
+            ws.handleCoralMessage({ type: 'coral_update', sessions: [{ name: 'u-1', session_id: 'u-1', agent_type: 'claude', server: 'local', status: 'working', display_name: 'url switch' }] });
             render.flushLiveSessionsRender();
             return { disabled: morph.morphDisabled(), touched: morph.morphStats.full - b.full + morph.morphStats.replaced - b.replaced + morph.morphStats.kept - b.kept,
                 shown: document.getElementById('live-sessions-list').textContent.includes('url switch') };
