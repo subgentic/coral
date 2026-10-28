@@ -210,7 +210,8 @@ function placeNotices() {
     const listTitle = document.querySelector(".mobile-list-title"); // the phone's list title (Live Sessions) is not covered either (Mobile tester, #10052)
     const teamHead = document.getElementById("team-page-head"); // nor is a team page's header, its name and status ("Team demo is awake" sat over both, #10359)
     const bottomOf = e => (e && e.getClientRects().length ? Math.round(e.getBoundingClientRect().bottom) : 0);
-    const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead));
+    const settingsTitle = document.querySelector("#settings-modal .settings-pane:not([hidden]) .settings-pane-title"); // the open Settings section's title: "Saved" does not sit on it (Mobile tester, #10570)
+    const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead), bottomOf(settingsTitle));
     let topPx = Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, headBottom, 0) + 8;
     // A text field just under that line (the list's filter box) is not covered either (#10458): the column starts below it. Only a field the card would reach is looked at, so a form further down never moves it.
     const shown = document.getElementById("notices");

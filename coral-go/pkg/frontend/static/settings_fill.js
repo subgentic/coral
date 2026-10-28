@@ -145,9 +145,10 @@ export async function _fillThemeSelect(s) {
             <option value="system">System</option>`;
         if (customThemes.length > 0) {
             options += `<option disabled>──────────</option>`;
+            const builtIn = new Set(['dark', 'light', 'system']);
             for (const t of customThemes) {
                 const name = escapeAttr(t.name);
-                const label = escapeHtml(t.name);
+                const label = escapeHtml(builtIn.has(String(t.name).trim().toLowerCase()) ? `${t.name} (yours)` : t.name); // a saved theme called Dark is not a second Dark in the list (#10570)
                 options += `<option value="custom:${escapeAttr(name)}">${label}</option>`;
             }
         }
