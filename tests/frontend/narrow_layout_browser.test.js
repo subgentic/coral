@@ -45,6 +45,14 @@ const BASE = require('./test_base').BASE;
             assert.ok((await rect('.sidebar')).right <= 0, `${width}: Escape shuts the drawer`);
             assert.equal(await ev(`document.activeElement === document.querySelector('.tablet-sidebar-toggle')`), true, `${width}: the focus is back on the button`);
             await ev(`document.querySelector('.tablet-sidebar-toggle').click(); true`); await settle(500);
+            // in a terminal or a field Escape is not the drawer's: it belongs to the CLI or the field (Orchestrator on #10306)
+            await ev(`(() => { const t = document.createElement('textarea'); t.id = 'esc-probe'; document.body.append(t); t.focus(); return document.activeElement === t; })()`);
+            await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await settle(500);
+            assert.ok((await rect('.sidebar')).left >= 0, `${width}: Escape in a text field leaves the drawer open`);
+            await ev(`(() => { const t = document.createElement('div'); t.className = 'xterm'; t.tabIndex = 0; t.id = 'esc-term'; document.body.append(t); t.focus(); return document.activeElement === t; })()`);
+            await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await settle(500);
+            assert.ok((await rect('.sidebar')).left >= 0, `${width}: Escape in a terminal leaves the drawer open`);
+            await ev(`document.getElementById('esc-probe').remove(); document.getElementById('esc-term').remove(); true`);
             await ev(`document.querySelector('.tablet-sidebar-backdrop').click(); true`); await settle(500);
             assert.ok((await rect('.sidebar')).right <= 0, `${width}: a click outside shuts the drawer`);
             if (width < 900) {
