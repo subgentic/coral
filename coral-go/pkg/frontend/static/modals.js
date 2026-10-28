@@ -54,6 +54,7 @@ registerActions({
         setTimeout(() => { el.textContent = 'Copy'; }, 1500);
     },
     'preset-pick': el => {
+        if (el.value === '__custom__') return; // Custom is what an Edit member already is: choosing it changes nothing (#10314)
         if (el.dataset.keep && el.dataset.kind === 'agent') { _selectAgentPreset(el.value === '__blank__' ? '' : (textOf(el.value) || '')); return; } // New Agent's persona select keeps showing the choice, Blank included (#7391)
         const v = textOf(el.value);
         if (v && el.dataset.kind === 'agent') _selectAgentPreset(v);
