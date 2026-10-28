@@ -1,6 +1,7 @@
 /* The jump to the latest message button (moved out of live_chat.js, #5065; no behaviour change). */
 import { state } from './state.js';
 import { registerActions } from './actions.js';
+import { importOnce } from './import_once.js';
 
 // ── Jump to latest (#4511, operator request) ────────────────────────────
 // Reading higher up in an agent's Chat view, a round down-arrow button above the chat input jumps to the latest message and pins
@@ -88,8 +89,23 @@ function jumpToLatest() {
     else container.focus({ preventScroll: true });
 }
 
+// A prompt card's Open terminal (#3645): the terminal shows, and the keyboard goes into it, where the person answers; a screen reader is told once how to leave it (#10247, the first run by keyboard: it
+// dropped to the page). The terminal is built after its view shows, so its input is waited for (up to 5 s); when it never comes the view is simply shown, as before.
+async function openTerminalFromCard() {
+    window.showTerminalView();
+    for (let i = 0; i < 50; i++) {
+        const input = document.querySelector('textarea[aria-label^="Terminal:"]');
+        if (input && input.getClientRects().length > 0) {
+            input.focus();
+            importOnce('./needs_input_card.js').then(m => m.announcePrompt('Terminal open. What you type goes to the agent. Press Ctrl+Shift+Escape to leave it.')).catch(() => {});
+            return;
+        }
+        await new Promise(r => setTimeout(r, 100)); // the terminal's own build
+    }
+}
+
 // A prompt card's Open terminal (#3645), and the jump to the latest message (#4511).
 registerActions({
-    'terminal-view-open': () => window.showTerminalView(),
+    'terminal-view-open': () => openTerminalFromCard(),
     'chat-jump-latest': () => jumpToLatest(),
 });
