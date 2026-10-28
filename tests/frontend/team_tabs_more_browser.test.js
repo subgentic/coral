@@ -62,7 +62,7 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
             // choose by keyboard
             await key('Enter', 13); await settle(200); await key('ArrowDown', 40); await key('Enter', 13); await settle(600);
             s = await state();
-            check('390: choosing Board from the menu opens the Board tab, More says so (named "Board, more tabs", underlined, its words still More so the strip keeps its width) and keeps the keyboard', s.selected === 'messages' && s.panel === 'messages' && s.name === 'Board, more tabs' && s.current && s.text === 'More' && s.focus === 'team-tab-more' && !s.menuOpen, JSON.stringify(s));
+            check('390: choosing Board from the menu opens the Board tab, More says so (named "Board, more tabs", underlined, and its words are Board, #10759) and keeps the keyboard', s.selected === 'messages' && s.panel === 'messages' && s.name === 'Board, more tabs' && s.current && s.text === 'Board' && s.focus === 'team-tab-more' && !s.menuOpen, JSON.stringify(s));
             await shot('team-tabs-390-board');
             // by tap
             await ev(`document.getElementById('team-tab-more').click(); true`); await settle(200);

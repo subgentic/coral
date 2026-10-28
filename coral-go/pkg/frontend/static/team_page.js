@@ -103,11 +103,12 @@ function buildTabsMore(tabs) {
     });
 }
 
-/** More follows the page: it is the current tab (underlined, named for it for a screen reader; its words stay "More", so the strip keeps its width from tab to tab) while one of its tabs is open, and its items carry the counts of their tabs. */
+/** More follows the page: it is the current tab (underlined, named for it, in its words and for a screen reader) while one of its tabs is open, and its items carry the counts of their tabs. */
 function syncTabsMore() {
     const b = $('team-tab-more'); if (!b) return;
     const here = PHONE_MORE.includes(S.tab) && !S.item ? S.tab : '';
     b.classList.toggle('is-current', !!here);
+    const word = b.querySelector('.team-tab-label'); if (word) word.textContent = here ? LABEL[here] : 'More'; // the open tab's own name (Board, Knowledge) while one behind More is open, so the row names where the person is (#10759)
     b.setAttribute('aria-label', here ? `${LABEL[here]}, more tabs` : 'More tabs');
     for (const m of document.querySelectorAll('#team-tabs-more-menu [data-tab]')) {
         const c = document.querySelector(`#team-tab-${m.dataset.tab} .team-tab-count`), mine = m.querySelector('.team-tab-count');
