@@ -33,13 +33,13 @@ export async function showResumeModal() {
     let boardName = "";
     let displayName = "";
     let resumeSessionId = sessionId;
-    let ranMode = ""; // the mode it ran in: the recorded one, else where the transcript keeps it (#10487)
+    let ranMode = "", ranFrom = ""; // the mode it ran in: Coral's own record ("session"), else where the transcript keeps it ("transcript": a hint, #10487)
     let ranIn = "", ranInExists = true; // the folder the session ran in, from its transcript or live row (#10291)
     try {
         const resp = await fetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/resume-info`);
         if (resp.ok) {
             const info = await resp.json();
-            if (info.permission_mode) ranMode = info.permission_mode;
+            if (info.permission_mode) { ranMode = info.permission_mode; ranFrom = info.permission_mode_from || "transcript"; }
             if (info.working_dir) resumeDir = info.working_dir;
             if (info.working_dir && info.working_dir_from === "session") { ranIn = info.working_dir; ranInExists = info.working_dir_exists !== false; }
             if (info.board_name) boardName = info.board_name;
@@ -60,7 +60,8 @@ export async function showResumeModal() {
     modalEl.dataset.ranIn = ranIn;
     modalEl.dataset.ranInExists = ranInExists ? "1" : "0";
     modalEl.dataset.ranMode = ranMode;
-    syncResumeModeNote();
+    modalEl.dataset.ranModeFrom = ranFrom;
+    await fillResumeModes(agentType);
     if (!dirInput.dataset.noteWired) { dirInput.dataset.noteWired = "1"; dirInput.addEventListener("input", syncResumeDirNote); }
     syncResumeDirNote();
 
@@ -83,15 +84,47 @@ export async function showResumeModal() {
     modal.style.display = "flex";
 }
 
-/** Under the folder: the mode the chat resumes in. It keeps the mode it ran in, never the saved default (a Plan or Default chat resumed in Auto was the gap, #10487); with none recorded the saved default applies and says so. */
+// How permissive each mode is, narrowest first: a transcript's mode is only taken when it is no wider than the saved default (#10487).
+const MODE_RANK = { plan: 0, default: 1, acceptEdits: 2, auto: 3, dontAsk: 4, bypassPermissions: 5 };
+const savedMode = () => (state.settings && state.settings.default_permission_mode) || "default"; // none saved: Default is what a wider mode is measured against
+
+/** The mode the dialog starts on: the one the chat ran in when Coral recorded it, or when its transcript's start is no wider than the saved default; else "" (the saved default). A transcript is a file, not Coral's record (one someone else sent could say Bypass): a wider mode is shown, and sent only when the person picks it. */
+function startingMode(ranMode, ranFrom) {
+    if (!ranMode) return "";
+    if (ranFrom !== "transcript") return ranMode;
+    return (MODE_RANK[ranMode] ?? 99) <= (MODE_RANK[savedMode()] ?? 0) ? ranMode : "";
+}
+
+/** The Resume in picker: the saved default first, then the modes this CLI has, on the starting mode. */
+async function fillResumeModes(agentType) {
+    const modal = document.getElementById("resume-modal"), row = document.getElementById("resume-mode-row"), sel = document.getElementById("resume-mode");
+    if (!modal || !row || !sel) return;
+    const { modeOffered } = await importOnce("./permission_flags.js");
+    const saved = savedMode();
+    sel.replaceChildren(new Option(`Saved default (${MODE_WORDS[saved] || saved})`, ""), ...Object.keys(MODE_WORDS).filter(m => modeOffered(agentType, m)).map(m => new Option(MODE_WORDS[m], m)));
+    sel.value = startingMode(modal.dataset.ranMode || "", modal.dataset.ranModeFrom || "");
+    modal.dataset.startMode = sel.value;
+    row.hidden = false;
+    syncResumeModeNote();
+}
+
+/** Under the folder: the mode the chat resumes in. It keeps the mode it ran in, never the saved default (a Plan or Default chat resumed in Auto was the gap, #10487); with none recorded the saved default applies and says so; a transcript's mode wider than the saved default is said and not taken. */
 function syncResumeModeNote() {
-    const modal = document.getElementById("resume-modal"), note = document.getElementById("resume-mode-note");
+    const modal = document.getElementById("resume-modal"), note = document.getElementById("resume-mode-note"), sel = document.getElementById("resume-mode");
     if (!modal || !note) return;
-    const mode = modal.dataset.ranMode || "";
-    const words = mode ? `Resumes in ${MODE_WORDS[mode] || mode} mode, the mode this chat ran in.` : "This chat's mode was not recorded: it resumes in your saved default mode.";
+    const ran = modal.dataset.ranMode || "", from = modal.dataset.ranModeFrom || "", pick = sel ? sel.value : "";
+    const name = m => `${MODE_WORDS[m] || m} mode`, saved = savedMode();
+    let words;
+    if (pick !== (modal.dataset.startMode || "")) words = pick ? `Resumes in ${name(pick)}, as you chose.` : `Resumes in your saved default mode (${MODE_WORDS[saved] || saved}), as you chose.`;
+    else if (!ran) words = "This chat's mode was not recorded: it resumes in your saved default mode.";
+    else if (from !== "transcript") words = `Resumes in ${name(ran)}, the mode this chat ran in.`;
+    else if (pick) words = `Resumes in ${name(ran)}: this chat started in it.`;
+    else words = `This chat started in ${name(ran)}; it resumes in your saved default (${MODE_WORDS[saved] || saved}). Choose the mode below to change it.`;
     if (note.textContent !== words) note.textContent = words;
     note.hidden = false;
 }
+
+export { syncResumeModeNote };
 
 /** Under the folder: where the session ran, and a warning when the folder is changed (its files may not be found) or gone. Written only when the words change. */
 function syncResumeDirNote() {
@@ -151,10 +184,10 @@ export async function resumeLaunchNew() {
             agent_type: agentType,
             resume_session_id: resumeSessionId,
         };
-        // The mode it ran in is kept: Default is the one mode a launch names (permission_mode), the others are the CLI's own flags for it; with none recorded nothing is sent and the saved default applies (#10487).
-        const ranMode = modal.dataset.ranMode || "";
-        if (ranMode === "default") payload.permission_mode = "default";
-        else if (ranMode) { const { _getPermissionFlagsForAgentMode } = await importOnce("./permission_flags.js"); const flags = _getPermissionFlagsForAgentMode(agentType, ranMode).split(/\s+/).filter(Boolean); if (flags.length) payload.flags = flags; }
+        // The mode picked (the mode the chat ran in, unless the person chose another, or it is a transcript's wider one): Default is the one mode a launch names (permission_mode), the others are the CLI's own flags for it; the saved default sends nothing (#10487).
+        const pick = (document.getElementById("resume-mode") || {}).value || "";
+        if (pick === "default") payload.permission_mode = "default";
+        else if (pick) { const { _getPermissionFlagsForAgentMode } = await importOnce("./permission_flags.js"); const flags = _getPermissionFlagsForAgentMode(agentType, pick).split(/\s+/).filter(Boolean); if (flags.length) payload.flags = flags; }
         if (displayName) payload.display_name = displayName;
         if (boardName) payload.board_id = payload.board_name = boardName; // rejoins that board (#3536)
 

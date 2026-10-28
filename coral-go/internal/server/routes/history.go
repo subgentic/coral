@@ -673,6 +673,7 @@ func (h *HistoryHandler) GetResumeInfo(w http.ResponseWriter, r *http.Request) {
 			}
 			if mode != "" {
 				result["permission_mode"] = agent.PermissionModeForCLI(idx.SourceType, mode)
+				result["permission_mode_from"] = "transcript" // a file the indexer found, the mode its first entry started in: a hint, not Coral's own record (#10487)
 			}
 		}
 	}
@@ -680,6 +681,7 @@ func (h *HistoryHandler) GetResumeInfo(w http.ResponseWriter, r *http.Request) {
 	if ls, err := h.ss.GetLiveSession(r.Context(), sid); err == nil && ls != nil {
 		if ls.PermissionMode != nil && agent.ValidPermissionMode(*ls.PermissionMode) { // the mode its session recorded: the resume keeps it (#10487)
 			result["permission_mode"] = agent.PermissionModeForCLI(ls.AgentType, *ls.PermissionMode)
+			result["permission_mode_from"] = "session" // Coral recorded it
 		}
 		result["working_dir"] = ls.WorkingDir
 		result["working_dir_from"] = "session"

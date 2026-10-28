@@ -31,6 +31,6 @@ export const {
 
 export const { showSettingsModal, hideSettingsModal, applySettings } = lazyFns(loadSettingsDialog, ['showSettingsModal', 'hideSettingsModal', 'applySettings']);
 
-export const { showResumeModal, hideResumeModal, resumeLaunchNew } = lazyFns(loadResumeDialog, ['showResumeModal', 'hideResumeModal', 'resumeLaunchNew']);
+export const { showResumeModal, hideResumeModal, resumeLaunchNew, syncResumeModeNote } = lazyFns(loadResumeDialog, ['showResumeModal', 'hideResumeModal', 'resumeLaunchNew', 'syncResumeModeNote']);
 
 export const { showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } = lazyFns(loadDefaultPromptsDialog, ['showDefaultPromptsModal', 'hideDefaultPromptsModal', 'resetDefaultPrompt', 'saveDefaultPrompts']);

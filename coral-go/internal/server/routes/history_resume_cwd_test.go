@@ -128,10 +128,12 @@ func TestResumeInfoSaysTheModeTheChatRanIn(t *testing.T) {
 		return out
 	}
 	assert.Equal(t, "plan", info("t-plan")["permission_mode"], "Claude's transcript starts in Plan")
+	assert.Equal(t, "transcript", info("t-plan")["permission_mode_from"], "a transcript's mode is a hint, said to be one")
 	assert.Equal(t, "default", info("t-default")["permission_mode"], "a Default chat is Default, never the saved default")
 	assert.NotContains(t, info("t-junk"), "permission_mode", "a string that is no mode is not offered")
 	assert.NotContains(t, info("t-none"), "permission_mode", "none recorded: nothing said, the saved default stays")
 	assert.Equal(t, "plan", info("l-plan")["permission_mode"], "the live row's recorded mode wins")
+	assert.Equal(t, "session", info("l-plan")["permission_mode_from"], "and is Coral's own record")
 	assert.Equal(t, "default", info("l-codex")["permission_mode"], "a mode Codex lacks is Default")
 	assert.NotContains(t, info("l-bad"), "permission_mode", "a recorded value that is no mode is not offered")
 }
