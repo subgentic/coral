@@ -63,10 +63,10 @@ func TestSentenceCaseTitles(t *testing.T) {
 		"agent ui":            "Agent UI",
 		"using the dashboard": "Using the dashboard",
 		"Coordination Efficiency Reporting & Metrics": "Coordination efficiency reporting & metrics",
-		"Merge queue": "Merge queue",
+		"Merge queue":  "Merge queue",
 		"How do I...?": "How do I...?", // the pronoun stays a capital (#10093)
 		"How Do I...?": "How do I...?",
-		"Hooks":       "Hooks",
+		"Hooks":        "Hooks",
 	} {
 		assert.Equal(t, want, sentenceCase(in), in)
 		assert.Equal(t, want, sentenceCase(want), "idempotent: "+want)
@@ -132,8 +132,8 @@ func TestTheDocsListUsesEachDocsOwnHeading(t *testing.T) {
 func TestListTitleIsOneShortLine(t *testing.T) {
 	for in, want := range map[string]string{
 		"Personal tasks: coral-agent CLI and API": "Personal tasks",
-		"Agent UI (POC)":                  "Agent UI",
-		"Team configuration (agent.json)": "Team configuration",
+		"Agent UI (POC)":                                           "Agent UI",
+		"Team configuration (agent.json)":                          "Team configuration",
 		"Coordination efficiency reporting & metrics architecture": "Coordination efficiency reporting",
 		"What Coral stores on this computer":                       "What Coral stores on this computer",
 		"Task workflows and completion artifacts":                  "Task workflows and completion artifacts",
