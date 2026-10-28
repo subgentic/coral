@@ -24,7 +24,7 @@ assert.match(WHAT_STAYS_ARCHIVE, /chat history and files stay/i); assert.match(W
 
 // team delete: what is lost, what stays, and that the folder is untouched
 const d = deleteTeamWords('alpha');
-assert.match(d, /Delete team "alpha"\?/); assert.match(d, /messages, tasks, goals and settings/i); assert.match(d, /cannot be undone/i);
+assert.match(d, /Delete team "alpha"\?/); for (const lost of ['messages', 'tasks', 'goals', 'members', 'reminders', 'waits', 'presets', 'settings', 'artifact tags', 'health data']) assert.match(d, new RegExp('\\b' + lost + '\\b', 'i'), 'what the delete removes is listed: ' + lost); assert.match(d, /cannot be undone/i);
 assert.match(d, /chats stay in History/i); assert.match(d, /files in the team's folder are not touched/i);
 // agents still running: said in a dialog, with the way out
 const r = deleteTeamWords('alpha', ['QA Engineer', 'Lead Developer']);

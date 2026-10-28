@@ -24,7 +24,7 @@ export function deleteTeamWords(team, running = []) {
         const shown = running.length > 5 ? `${running.slice(0, 5).join(', ')} and ${running.length - 5} more` : running.join(', ');
         return `${name} still has ${running.length} agent${running.length === 1 ? '' : 's'} running: ${shown}. Kill them or move them to another team first, then delete the team. Nothing was deleted.`;
     }
-    return `Delete team "${name}"? This deletes its messages, tasks, goals and settings for good. The agents' chats stay in History, and the files in the team's folder are not touched. This cannot be undone.`;
+    return `Delete team "${name}"? This deletes its messages, tasks, goals, members, reminders, waits, presets, settings, artifact tags and health data for good. The agents' chats stay in History, and the files in the team's folder are not touched. This cannot be undone.`;
 }
 
 /** The toast after a folder is taken off the list: what it did and did not do. */
