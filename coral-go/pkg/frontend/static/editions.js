@@ -237,7 +237,10 @@ function _dismiss(choice) {
  function syncHomeEditions() {
     const el = document.getElementById('editions-home');
     if (!el) return;
-    el.hidden = !_available() || String((state.settings || {}).home_editions_hidden) === 'True';
+    const hidden = String((state.settings || {}).home_editions_hidden) === 'True';
+    el.hidden = !_available() || hidden;
+    const again = document.querySelector('#welcome-screen [data-editions="show-home"]'); // a hidden strip can be shown again, under the cards (#10572)
+    if (again) again.hidden = !_available() || !hidden;
 }
 
 // A server enrolled with the hub's old host (#3546, hub_moved; the header indicator reports the
@@ -280,6 +283,7 @@ document.addEventListener('click', e => {
     else if (action === 'home-hub') showHubSetup('connect');
     else if (action === 'home-own') showHubSetup('own-hub');
     else if (action === 'hide-home') { _saveSettings({ home_editions_hidden: 'True' }); syncHomeEditions(); }
+    else if (action === 'show-home') { _saveSettings({ home_editions_hidden: 'False' }); syncHomeEditions(); }
     else return;
     e.preventDefault();
 });
