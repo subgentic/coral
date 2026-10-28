@@ -132,3 +132,27 @@ func TestRecentFilesInAPlainFolderAreBounded(t *testing.T) {
 	assert.Equal(t, "f0.txt", files[0].Filepath)
 	assert.Equal(t, "f99.txt", files[99].Filepath)
 }
+
+// A big dependency folder, and a big folder that sorts first, do not hide the agent's own files (#10256 review): node_modules is never walked and no one folder spends more than its share of the budget.
+func TestRecentFilesInAPlainFolderAreNotHiddenByABigFolder(t *testing.T) {
+	plain := t.TempDir()
+	fill := func(dir string, n int) {
+		require.NoError(t, os.MkdirAll(filepath.Join(plain, dir), 0o755))
+		for i := 0; i < n; i++ {
+			require.NoError(t, os.WriteFile(filepath.Join(plain, dir, "f"+strconv.Itoa(i)+".js"), []byte("x"), 0o644))
+		}
+	}
+	fill("aaa_generated", 6000) // sorts first, and is not a dependency folder
+	fill("node_modules", 6000)
+	fill("dist", 50)
+	fill("src", 1)
+	require.NoError(t, os.WriteFile(filepath.Join(plain, "zz-report.md"), []byte("x"), 0o644))
+	got := map[string]bool{}
+	for _, f := range recentFilesInPlainFolder(plain, false) {
+		got[f.Filepath] = true
+		assert.NotContains(t, f.Filepath, "node_modules/", "a dependency folder is not walked")
+		assert.NotContains(t, f.Filepath, "dist/", "nor a build folder")
+	}
+	assert.True(t, got["src/f0.js"], "src/ is read, whatever sorts before it")
+	assert.True(t, got["zz-report.md"], "the top of the folder is read first")
+}
