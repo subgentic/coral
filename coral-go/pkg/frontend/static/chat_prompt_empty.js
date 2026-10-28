@@ -8,6 +8,7 @@ import { responseError } from './server_status.js';
 import { reportSendError, noteHooksAnswered } from './terminal_gone.js';
 import { announcePrompt, promptOptionsBySession, syncNeedsInputCard } from './needs_input_card.js';
 import { importOnce } from './import_once.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 // The first seconds of a new agent (#6058): its CLI has written nothing yet (the list has no output age for it), and it was started less than STARTING_MS ago by the list's created_at AND this page first saw it less than STARTING_MS ago (the second bounds a server clock that runs ahead of this one). "No messages yet" there reads as ready; it says the CLI is coming up.
 // After that the row's own states take over (the "Waiting in the terminal" card from 25 s with no event at all).
@@ -82,9 +83,17 @@ export function syncEmptyState(container) {
     if (hasContent || busy) {
         if (el) el.remove();
         tickWhile(null, false);
+        const count = document.getElementById("composer-starting-count"); if (count && !count.hidden) { count.hidden = true; count.textContent = ""; }
         return;
     }
     const [title, hint, secs] = emptyStateWords(state.currentSession);
+    // On a phone the keyboard hides the chat's own count: the same words stand above the message box (#10504); on a desktop the chat's title says it
+    const count = document.getElementById("composer-starting-count");
+    if (count) {
+        const line = secs !== undefined && isPhoneLayout() ? `${title} ${secs} s` : "";
+        if (count.textContent !== line) count.textContent = line;
+        if (count.hidden === !!line) count.hidden = !line;
+    }
     { // one tick a second only while a count or its Ready shows
         const cur = (state.liveSessions || []).find(x => x.session_id === state.currentSession?.session_id) || state.currentSession;
         tickWhile(container, countingStart(cur) || (!!cur && readyAt.get(cur.session_id) > 0 && Date.now() - readyAt.get(cur.session_id) < READY_MS));
