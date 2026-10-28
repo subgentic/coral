@@ -28,6 +28,10 @@ const BASE = require('./test_base').BASE;
             assert.equal(r.group, 'hub-inbox:chats', `${w}: the Inbox's All chats is open: ${JSON.stringify(r)}`);
             assert.ok(r.box.some(v => v === 'build failed'), `${w}: the words are in the search box: ${JSON.stringify(r)}`);
             assert.equal(r.rows.length, 1, `${w}: the list is the search's, not everything: ${JSON.stringify(r)}`);
+            // the words have moved to the chats search: going back to Agents does not bring them along (#10512)
+            await ev(`window.switchNavTab('agents'); true`); await settle(400);
+            const back = await ev(`(() => { const i = document.getElementById('agent-search-input'); return { value: i.value, placeholder: i.placeholder, clear: !document.getElementById('agent-search-clear').hidden, offer: !document.getElementById('agent-search-all-chats').hidden }; })()`);
+            assert.deepEqual(back, { value: '', placeholder: 'Search agents', clear: false, offer: false }, `${w}: the Agents search is empty again: ${JSON.stringify(back)}`);
             console.log(`ok ${w}`);
         }
         console.log('PASS the sidebar search carries its words into the Inbox All chats search and runs it');
