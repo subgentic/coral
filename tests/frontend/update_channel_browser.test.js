@@ -125,7 +125,7 @@ const agenticSt = { ...base, channel: 'agentic', approved: { version: '1.4.142',
         }
         // 5. the toast, once (desktop dark)
         await load(views[0], agenticSt);
-        await ev(`window.hideSettingsModal && window.hideSettingsModal(); window.__ch.check = { available: true, latest: '1.4.143', current: '1.4.141', channel: 'agentic', approved: false, release_url: 'https://github.com/subgentic/coral/releases/tag/v1.4.143', release_notes: '- one\\n- two' }; import(${S} + 'update_check.js').then(m => m.checkForUpdates(true)).then(() => true)`);
+        await ev(`window.hideSettingsModal && window.hideSettingsModal(); window.__ch.check = { available: true, latest: '1.4.143', current: '1.4.141', channel: 'agentic', approved: false, release_url: 'https://github.com/subgentic/coral/releases/tag/v1.4.143', release_notes: '- one\\n- two' }; Promise.resolve(window.checkForUpdates(true)).then(() => true)`);
         await waitFor(`!!document.getElementById('update-toast')`, 'the toast', 6000);
         let t = await ev(`document.getElementById('update-toast').innerText.replace(/\\s+/g, ' ')`);
         check(`the Agentic toast says the channel and "Not yet approved" (${t})`, /Coral v1\.4\.143 available \(Agentic channel\)/.test(t) && /Not yet approved\./.test(t));
@@ -136,11 +136,11 @@ const agenticSt = { ...base, channel: 'agentic', approved: { version: '1.4.142',
         await ev(`const a = document.querySelector('#update-toast .update-toast-download'); a.addEventListener('click', e => e.preventDefault()); a.click(); true`);
         track = await ev(`window.__ch.track.filter(e => e.event.startsWith('update_'))`);
         check(`opening the Download link is reported as update_offer_opened (${JSON.stringify(track.map(e => e.event))})`, track.length === 2 && track[1].event === 'update_offer_opened' && track[1].props.to_version === '1.4.143' && track[1].props.channel === 'agentic' && Object.keys(track[1].props).sort().join() === 'channel,to_version');
-        await ev(`document.getElementById('update-toast').remove(); window.__ch.check = { available: true, latest: '1.4.143', current: '1.4.141', channel: 'agentic', approved: true, release_url: 'https://github.com/subgentic/coral/releases/tag/v1.4.143', release_notes: '- one' }; import(${S} + 'update_check.js').then(m => m.checkForUpdates(true)).then(() => true)`);
+        await ev(`document.getElementById('update-toast').remove(); window.__ch.check = { available: true, latest: '1.4.143', current: '1.4.141', channel: 'agentic', approved: true, release_url: 'https://github.com/subgentic/coral/releases/tag/v1.4.143', release_notes: '- one' }; Promise.resolve(window.checkForUpdates(true)).then(() => true)`);
         await waitFor(`!!document.getElementById('update-toast')`, 'the toast again', 6000);
         t = await ev(`document.getElementById('update-toast').innerText.replace(/\\s+/g, ' ')`);
         check(`an approved release on Agentic says the channel and not "Not yet approved" (${t})`, /\(Agentic channel\)/.test(t) && !/Not yet approved/.test(t));
-        await ev(`document.getElementById('update-toast').remove(); window.__ch.check = { available: true, latest: '1.4.143', current: '1.4.141', release_url: 'https://github.com/subgentic/coral/releases/latest', release_notes: '- one' }; import(${S} + 'update_check.js').then(m => m.checkForUpdates(true)).then(() => true)`);
+        await ev(`document.getElementById('update-toast').remove(); window.__ch.check = { available: true, latest: '1.4.143', current: '1.4.141', release_url: 'https://github.com/subgentic/coral/releases/latest', release_notes: '- one' }; Promise.resolve(window.checkForUpdates(true)).then(() => true)`);
         await waitFor(`!!document.getElementById('update-toast')`, 'the toast, no channel', 6000);
         t = await ev(`document.getElementById('update-toast').innerText.replace(/\\s+/g, ' ')`);
         check(`a server with no channel field: the toast is as before (${t})`, /Coral v1\.4\.143 available \(you have v1\.4\.141\)/.test(t) && !/Agentic|Not yet/.test(t));

@@ -24,8 +24,8 @@ const BASE = require('./test_base').BASE;
   const server = () => ev(`fetch('/api/settings').then(r=>r.json()).then(d=>d.settings)`);
   const value = key => ev(`document.getElementById(${JSON.stringify(FIELD[key])}).value`);
   const edit = (key, text) => ev(`(()=>{const e=document.getElementById(${JSON.stringify(FIELD[key])});e.value=${JSON.stringify(text)};e.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
-  const open = () => ev(`import(${MOD}+'default_prompts_dialog.js').then(m=>m.showDefaultPromptsModal()).then(()=>true)`);
-  const save = () => ev(`import(${MOD}+'default_prompts_dialog.js').then(m=>m.saveDefaultPrompts()).then(()=>true)`);
+  const open = () => ev(`Promise.resolve(window.showDefaultPromptsModal()).then(()=>true)`);
+  const save = () => ev(`Promise.resolve(window.saveDefaultPrompts()).then(()=>true)`);
   let original = {};
   const guard = await require('./helpers/settings_guard').guardSettings(); // the settings this suite changes are put back in its finally (#4849)
   try {
