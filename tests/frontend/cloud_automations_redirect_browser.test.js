@@ -9,7 +9,8 @@ const { connect } = require('./agent_view_harness');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Fetch, Network } = client;
     const ADDRESSES = ['/jobs', '/workflows', '/workflows/4', '/automations', '/automations/jobs', '/automations/jobs/3', '/automations/workflows', '/automations/workflows/2/runs/5'];
-    const where = () => ev(`({ path: location.pathname, tab: document.body.getAttribute('data-nav-tab'), screen: !!document.getElementById('automations-view') && document.getElementById('automations-view').getClientRects().length > 0, boot: JSON.parse(document.getElementById('coral-boot').textContent).mode })`);
+    // the Automations screen is its folders (Jobs, Workflows) drawn in the sidebar
+    const where = () => ev(`({ path: location.pathname, tab: document.body.getAttribute('data-nav-tab'), screen: [...document.querySelectorAll('#automations-nav-list .view-list-item')].some(b => b.getClientRects().length > 0), boot: JSON.parse(document.getElementById('coral-boot').textContent).mode })`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
@@ -17,7 +18,7 @@ const { connect } = require('./agent_view_harness');
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/jobs' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         await waitFor(`location.pathname.startsWith('/automations')`, 'a local dashboard rewrites /jobs to Automations', 10000);
         let w = await where();
-        assert.deepEqual([w.boot, w.tab], ['local', 'automations'], 'local: the Automations screen ' + JSON.stringify(w));
+        assert.deepEqual([w.boot, w.tab, w.screen], ['local', 'automations', true], 'local: the Automations screen, its folders drawn (so the check that none is drawn on the Hub is not dead) ' + JSON.stringify(w));
         // the Hub
         await Network.enable(); await Network.setBypassServiceWorker({ bypass: true });
         await Fetch.enable({ patterns: [{ urlPattern: '*', resourceType: 'Document', requestStage: 'Response' }, { urlPattern: '*/auth/session', requestStage: 'Request' }] });
