@@ -358,7 +358,7 @@ async function submitJob() {
         repoOffer = why === 'an existing directory' ? '' : why; // a folder that is not there cannot be made a repository; the other two can
         view.refresh();
         view.focus('repo_path');
-        throw new Error(data.error);
+        throw new Error('The folder above needs fixing first.'); // the dialog's foot says it in words; the server's own line names the field (repo_path) and is the field's, said above (#10558)
     }
     if (data.error) throw new Error(data.error);
     // no toast: the job's page says it, in words, under the title (scheduler.js, "Created. Next run today 06:00 your time."), where a toast would cover the title on a phone or the page's own actions (#9298)
