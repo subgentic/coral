@@ -938,6 +938,7 @@
 
     /* The open tab says its name beside its icon (#7063): the row of icons alone left a person guessing which panel is open */
     .agentic-state.mobile-panel-overlay .agentic-tab.active:not(:focus-visible)::after { content: attr(aria-label) / ''; margin-left: 6px; font-size: var(--fs-md); white-space: nowrap; }
+    .agentic-state.mobile-panel-overlay #agentic-tab-more.active:not(:focus-visible)::after { content: none; } /* More with a tab behind it open: its icon is that tab's and its name ("More: Browse, open") is 170 px of words, which ran the row 111 px past the panel and cut the last tab (#10052); the full words stay its accessible name */
     .agentic-state.mobile-panel-overlay #agentic-tab-saved.active:not(:focus-visible)::after { content: none; } /* Saved's name is too long to print beside its icon ("Saved for later on this page" ran to the edge): the open tab is the bookmark and its count, the full words stay its accessible name (#9647) */
 
     .agentic-state.mobile-panel-overlay .agentic-tab.active {
