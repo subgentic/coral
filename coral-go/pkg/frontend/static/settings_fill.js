@@ -7,7 +7,7 @@ import { getEngineNames } from './renderers.js';
 import { desktopNotifySupported, desktopNotifyEnabled, desktopNotifyBlocked, enableDesktopNotify, disableDesktopNotify, alertPrefs, setAlertPref } from './desktop_notify.js';
 import { isCloud } from './server_base.js';
 import { isPhoneLayout } from './phone_layout.js';
-import { settingBool, renderRemoteAccessStatus, renderDebugInputLogStatus, renderToolsFolderStatus, defaultThemeChoice } from './settings_core.js';
+import { settingBool, renderRemoteAccessStatus, renderDebugInputLogStatus, renderToolsFolderStatus, defaultThemeChoice, previewTheme } from './settings_core.js';
 import { browserLocal } from './safe_storage.js';
 const { _fillModelDatalist, _getAgentModels } = await importOnce('./launch_models.js');
 const { _updatePermModeDescription } = await importOnce('./permission_flags.js');
@@ -156,6 +156,7 @@ export async function _fillThemeSelect(s) {
         // Set current value
         const currentTheme = s.custom_theme ? `custom:${s.custom_theme}` : (s.theme || defaultThemeChoice()); // nothing stored shows what the page follows, never a theme that was not picked (#6114)
         themeSelect.value = currentTheme;
+        if (!themeSelect.dataset.previewWired) { themeSelect.dataset.previewWired = '1'; themeSelect.addEventListener('change', () => previewTheme(themeSelect.value)); } // the page follows the choice at once (#10481)
     }
 }
 

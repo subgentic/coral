@@ -9,7 +9,7 @@ import { renderCaptureText, syncPaneWidth } from './capture.js';
 import { getTerminal } from './xterm_renderer.js';
 import { isCloud } from './server_base.js';
 import { NOTHING_TO_SAVE } from './settings_diff.js';
-import { savedWords, renderRemoteAccessStatus, renderDebugInputLogStatus, applyTheme, clearCustomThemeVars, applyCustomThemeByName } from './settings_core.js';
+import { savedWords, renderRemoteAccessStatus, renderDebugInputLogStatus, applyTheme, clearCustomThemeVars, applyCustomThemeByName, restoreSavedTheme } from './settings_core.js';
 import { browserLocal } from './safe_storage.js';
 const { _invalidateAgentModels, _invalidateDefaultModels } = await importOnce('./launch_models.js');
 const { databaseEncryptionChanged, saveDatabaseEncryptionSettings } = await importOnce('./settings_machine.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
@@ -18,6 +18,7 @@ const { settingsAtOpen, setSettingsAtOpen, setFormAtOpen, setPayloadAtOpen } = a
 
 export function hideSettingsModal() {
     document.getElementById("settings-modal").style.display = "none";
+    restoreSavedTheme().catch(() => {}); // a theme previewed in the dialog and not saved goes back to the saved one (#10481)
     if (!isCloud()) importOnce('./custom_models.js').then(m => m.discardCustomModels()).catch(() => {}); // unsaved custom models are dropped with the dialog (#5480)
 }
 
