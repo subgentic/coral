@@ -5,7 +5,7 @@
     try { var boot = document.getElementById('coral-boot'); if (boot) mode = JSON.parse(boot.textContent).mode || 'local'; } catch (_) {}
     var t = null;
     try { t = localStorage.getItem('coral-theme'); } catch (_) {}
-    if (t !== 'dark' && t !== 'light' && t !== 'system') t = mode === 'cloud' ? 'system' : 'dark';
+    if (t !== 'dark' && t !== 'light' && t !== 'system') t = 'system'; // nothing chosen yet: the page follows the browser, here and on the Hub (a first run was Dark here, #10049)
     if (t === 'system') t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', t);
     // The browser's own bar follows the page's light or dark (#10095): the colour is the theme's page colour, set again whenever the theme changes.

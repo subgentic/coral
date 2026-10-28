@@ -4,6 +4,7 @@ import { MENU_KEYS, menuMove } from './menu_keys.js';
 import { openRowMenu } from './session_rows.js';
 import { browserLocal } from './safe_storage.js';
 import { ensureBuilt, onBuilt } from './lazy_dom.js';
+import { syncThemeChoice } from './settings_core.js';
 
 // ── Sidebar kebab menu helpers ───────────────────────────────────────────
 // With restoreFocus (Escape) the focus goes back to the button of the menu that was open, when it was inside it (#4621).
@@ -65,6 +66,7 @@ export function toggleTopBarSettings(event) {
     menu.style.display = isOpen ? 'none' : '';
     for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem'); // the items are menu items to a screen reader (#10374)
     document.querySelector('[aria-controls="top-bar-settings-menu"]')?.setAttribute('aria-expanded', String(!isOpen));
+    if (!isOpen) syncThemeChoice(); // the choice shows what is in force now (a Settings save may have changed it)
     if (!isOpen && event && event.detail === 0) [...menu.querySelectorAll('.overflow-menu-item')].find(i => i.getClientRects().length)?.focus({ preventScroll: true }); // opened from the keyboard (a click with no pointer), the focus goes into the menu (#6038)
     // Sync group-by-team checkmark
     const check = document.getElementById('group-by-team-check-top');

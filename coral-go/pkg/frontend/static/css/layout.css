@@ -430,6 +430,8 @@ body.panel-dragging .sidebar {
     right: 0;
     z-index: 1000;
 } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
+.top-bar-theme-choice { display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); padding: 6px 12px; } /* Light, Dark, System: the first thing in the gear menu (#10049) */
+.top-bar-theme-label { color: var(--text-secondary); font-size: var(--fs-md); }
 
 .sidebar-section h2 {
     font-size: var(--fs-base);

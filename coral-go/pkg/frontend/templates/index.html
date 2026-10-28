@@ -113,6 +113,16 @@
                 </button>
                 <template data-lazy="top-bar-settings-menu">
                 <div class="menu top-bar-settings-menu" id="top-bar-settings-menu" role="menu" aria-label="Settings menu" style="display:none">
+                    <!-- Light, Dark or System first (#10049): the same setting as Settings > General > Theme; the colour editor is Customize theme below -->
+                    <div class="top-bar-theme-choice">
+                        <span class="top-bar-theme-label" id="top-bar-theme-label">Theme</span>
+                        <div class="btn-seg" role="group" aria-label="Theme">
+                            <button type="button" class="btn" role="menuitemradio" aria-checked="false" data-on-click="m-set-theme" data-arg="light">Light</button>
+                            <button type="button" class="btn" role="menuitemradio" aria-checked="false" data-on-click="m-set-theme" data-arg="dark">Dark</button>
+                            <button type="button" class="btn" role="menuitemradio" aria-checked="false" data-on-click="m-set-theme" data-arg="system">System</button>
+                        </div>
+                    </div>
+                    <hr class="overflow-menu-divider">
                     <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" id="stop-all-auto-accept" hidden data-on-click="m-close-top-bar-settings-then-stop-all-auto-accept">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>
                         Stop all auto-accept
@@ -121,7 +131,7 @@
                     <hr class="overflow-menu-divider">
                     <button class="menu-item overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-theme-configurator">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5v13M1.5 8h13"/><path d="M3 3l10 10M13 3L3 13"/></svg>
-                        Themes
+                        Customize theme
                     </button>
                     <button class="menu-item overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-shortcuts">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="4" width="13" height="8" rx="1.5"/><path d="M4.5 7h.01M7 7h.01M9.5 7h.01M12 7h.01M5 9.5h6"/></svg>

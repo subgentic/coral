@@ -1,4 +1,4 @@
-// The gear menu is a menu to a screen reader (Beta #10372, #10374): the "Settings menu" button said nothing of opening anything, and its items (Themes, Keyboard shortcuts, Settings, Documentation, GitHub, Check for Updates) were
+// The gear menu is a menu to a screen reader (Beta #10372, #10374): the "Settings menu" button said nothing of opening anything, and its items (Customize theme, Keyboard shortcuts, Settings, Documentation, GitHub, Check for Updates) were
 // plain buttons and links. Read from the accessibility tree, the same one a screen reader reads: the button has a menu popup and says whether it is expanded (false closed, true open, false again after Escape, and the
 // keyboard goes back to it); the open menu is a menu whose items are menuitems; the arrow keys move among them. 1280 px. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
@@ -30,7 +30,7 @@ const { axNodes } = require('./helpers/ax_tree');
         const menu = t.find(n => n.role && n.role.value === 'menu');
         check(!!menu, 'the open menu is a menu in the tree');
         const items = t.filter(n => n.role && n.role.value === 'menuitem').map(n => n.name && n.name.value);
-        for (const word of ['Themes', 'Keyboard shortcuts', 'Settings', 'Documentation', 'GitHub']) check(items.some(x => new RegExp(word, 'i').test(x || '')), `${word} is a menuitem (the menuitems are ${JSON.stringify(items)})`);
+        for (const word of ['Customize theme', 'Keyboard shortcuts', 'Settings', 'Documentation', 'GitHub']) check(items.some(x => new RegExp(word, 'i').test(x || '')), `${word} is a menuitem (the menuitems are ${JSON.stringify(items)})`);
         const focusId = () => ev(`(document.activeElement.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 30)`);
         const first = await focusId();
         await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });

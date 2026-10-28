@@ -9,7 +9,6 @@ import { fetchSystemStatus } from './system_status.js';
 import { updateTerminalTheme } from './xterm_renderer.js';
 import { browserLocal } from './safe_storage.js';
 import { onBuilt } from './lazy_dom.js';
-import { isCloud } from './server_base.js';
 // What Save sends: only the fields the person changed (here so the module is loaded at startup, import_hygiene).
 export { changedSettings } from './settings_diff.js';
 export { savedWords } from './settings_saved_words.js'; // the Save toast's words, here for the same reason
@@ -261,8 +260,27 @@ onBuilt('top-bar-settings-menu', () => { _loadTierBadge(); });
     return theme;
 }
 
-/** What the theme control shows when no theme is stored: this computer starts dark, the Cloud Hub follows the system (theme_init.js). */
-export function defaultThemeChoice() { return isCloud() ? "system" : "dark"; }
+/** What the theme control shows when no theme is stored: the page follows the browser, here and on the Cloud Hub (theme_init.js; this computer started Dark before #10049). */
+export function defaultThemeChoice() { return "system"; }
+
+/** The gear menu's Light, Dark or System (#10049): the same setting as Settings > General > Theme, applied now and saved; a custom theme is left (the colour editor is Customize theme). */
+export async function chooseTheme(theme) {
+    if (theme !== 'light' && theme !== 'dark' && theme !== 'system') return;
+    clearCustomThemeVars();
+    applyTheme(theme);
+    if (state.settings) { state.settings.theme = theme; state.settings.custom_theme = ''; }
+    syncThemeChoice();
+    try { await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme, custom_theme: '' }) }); } catch (_) { /* the page is already themed: the next Save in Settings writes it */ }
+}
+
+/** The menu's choice shows what is in force: a saved custom theme has none chosen; else the saved theme, this browser's, or System. */
+export function syncThemeChoice() {
+    const group = document.querySelector('#top-bar-settings-menu [role=group][aria-label="Theme"]');
+    if (!group) return;
+    const now = state.settings && state.settings.custom_theme ? '' : ((state.settings && state.settings.theme) || browserLocal.get('coral-theme') || 'system');
+    for (const b of group.querySelectorAll('[role=menuitemradio]')) { const on = String(b.dataset.arg === now); if (b.getAttribute('aria-checked') !== on) b.setAttribute('aria-checked', on); }
+}
+onBuilt('top-bar-settings-menu', () => syncThemeChoice());
 
 /** Apply a theme to the document */
 export function applyTheme(theme, { remember = true } = {}) {
@@ -314,6 +332,6 @@ export async function applyCustomThemeByName(name, { remember = true } = {}) {
 
 // Listen for OS theme changes when in "system" mode
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
-    const pref = (state.settings && state.settings.theme) || "dark";
-    if (pref === "system") applyTheme("system");
+    const pref = (state.settings && state.settings.theme) || browserLocal.get("coral-theme") || "system"; // nothing saved follows the browser
+    if (pref === "system" && !(state.settings && state.settings.custom_theme)) applyTheme("system", { remember: false });
 });

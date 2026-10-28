@@ -1,6 +1,7 @@
 /* Dashboard action registrations, public window hooks, and menu event wiring. */
 
 import { importOnce, loadedModule } from './import_once.js';
+import { chooseTheme } from './settings_core.js';
 import { showTeamAvailabilityWorkspace } from './team_availability.js';
 import { state } from './state.js';
 import { loadLiveSessions } from './api.js';
@@ -140,6 +141,7 @@ registerActions({
     'm-close-top-bar-settings-then-show-servers-modal': () => { window.__coral.closeTopBarSettings(); window.showServersModal(); },
     'm-close-top-bar-settings-then-show-settings-modal': () => { window.__coral.closeTopBarSettings(); window.showSettingsModal(); },
     'm-close-top-bar-settings-then-show-shortcuts': () => { window.__coral.closeTopBarSettings(); importOnce('./shortcuts.js').then(m => m.showShortcuts()); },
+    'm-set-theme': el => { chooseTheme(el.dataset.arg); },
     'm-close-top-bar-settings-then-show-theme-configurator': () => { window.__coral.closeTopBarSettings(); window.showThemeConfigurator(); },
     'm-close-top-bar-settings-then-stop-all-auto-accept': () => { window.__coral.closeTopBarSettings(); window.stopAllAutoAccept(); },
     'm-dismiss-auto-wake': () => { window.dismissAutoWake(); },
