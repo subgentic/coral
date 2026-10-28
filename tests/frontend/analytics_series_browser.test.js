@@ -39,8 +39,11 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         await ev(`window.switchNavTab('tokens'); true`);
         // Tab entry owns the phone's list/view state. Choose after that entry has drawn,
         // rather than inspecting a chart left in the hidden page by an early selectView.
-        await waitFor(`document.querySelector('#cost-nav-list .row-btn[data-view="overview"]')?.getClientRects().length > 0`, 'the Analytics view list', 10000);
-        await ev(`document.querySelector('#cost-nav-list .row-btn[data-view="overview"]').click(); true`); // Overview opens: on a phone that is the screen after the list, and it holds the Group by
+        if (!mobile) { // a phone opens on Overview itself (#10064), which holds the Group by; a wide screen picks it from the list
+            await waitFor(`document.querySelector('#cost-nav-list .row-btn[data-view="overview"]')?.getClientRects().length > 0`, 'the Analytics view list', 10000);
+            await ev(`document.querySelector('#cost-nav-list .row-btn[data-view="overview"]').click(); true`);
+        }
+        await waitFor(`document.querySelectorAll('#cost-group-bar .eff-seg-btn').length > 0 && document.getElementById('cost-page').getClientRects().length > 0`, 'Overview with its Group by', 10000);
         await ev(`[...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(b => b.textContent === 'Team').click(); true`); // By team is Overview's Group by Team (#9236)
         await waitFor(`document.getElementById('cost-dashboard-view').dataset.view === 'team' && document.querySelector('#cost-series-team')?.getBoundingClientRect().width > 0`, 'By team is visible', 10000);
         await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length > 0 && document.querySelectorAll('#cost-by-team tbody tr').length === ${NAMES.length}`, 'the chart and the table', 15000);
