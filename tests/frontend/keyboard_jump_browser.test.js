@@ -11,6 +11,7 @@ const BASE = require('./test_base').BASE;
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a redraw settles over frames; there is no completion event
     const key = (k, code, modifiers = 0, text) => Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, modifiers, ...(text ? { text } : {}) }).then(() => Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, modifiers }));
     const CTRL = 2, META = 4, ALT = 1;
+    let MOD = CTRL; // Cmd on a Mac, Ctrl elsewhere (a Mac's Ctrl+K is its text-cursor key, #10677)
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -22,15 +23,16 @@ const BASE = require('./test_base').BASE;
             window.selectHistorySession = id => { window.__opened.push('chat:' + id); return Promise.resolve(); };
             return true; })()`);
         await ev(`window.__m.add('alpha-bot', 'A', 4, { sleeping: false }); window.__m.add('beta-bot', 'B', 4, { sleeping: false }); window.__m.add('lead-bot', 'L', 4, { sleeping: false, board_project: 'team-z' }); true`); await sleep(1000); // sleep-ok: a redraw settles over frames; there is no completion event
+        MOD = (await ev(`/Mac/i.test(navigator.platform)`)) ? META : CTRL;
         const open = () => ev(`(() => { const m = document.getElementById('jump-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`);
         const names = () => ev(`[...document.querySelectorAll('#jump-list [role=option]')].map(o => o.textContent)`);
         await ev(`document.activeElement && document.activeElement.blur(); true`);
 
         // Ctrl+K opens the box with the focus in it and the agents under it
-        await key('k', 'KeyK', CTRL);
+        await key('k', 'KeyK', MOD);
         await waitFor(`!!document.getElementById('jump-modal') && getComputedStyle(document.getElementById('jump-modal')).display !== 'none'`, 'the jump box', 5000);
         assert.equal(await ev(`document.activeElement.id`), 'jump-input', 'the focus is in the box');
-        assert.deepEqual((await names()).sort(), ['alpha-bot', 'beta-bot', 'lead-bot (team-z)'], 'every agent is listed to begin with, with its team when it has one (every team has an Orchestrator)');
+        assert.deepEqual((await names()).sort(), ['alpha-bot', 'beta-bot', 'lead-bot (team-z)', 'team-z (team)'], 'every agent is listed to begin with, with its team when it has one (every team has an Orchestrator), and the teams');
         assert.equal(await ev(`document.getElementById('jump-input').getAttribute('role')`), 'combobox');
         // nothing matches: Enter and a click on the blank list leave the box open, and nothing is pointed at
         await Input.insertText({ text: 'zzzqq' }); await sleep(600); // sleep-ok: a redraw settles over frames; there is no completion event
@@ -51,20 +53,20 @@ const BASE = require('./test_base').BASE;
         await waitFor(`window.__opened.includes('chat:chat-0001')`, 'the chat is opened', 5000);
         assert.equal(await open(), false, 'the box closes when one is chosen');
         // an agent by Enter
-        await key('k', 'KeyK', META); await waitFor(`!!document.getElementById('jump-modal') && getComputedStyle(document.getElementById('jump-modal')).display !== 'none'`, 'the box again (Cmd+K)', 5000);
+        await key('k', 'KeyK', MOD); await waitFor(`!!document.getElementById('jump-modal') && getComputedStyle(document.getElementById('jump-modal')).display !== 'none'`, 'the box again (Cmd+K)', 5000);
         await Input.insertText({ text: 'beta' }); await sleep(500); await key('Enter', 'Enter', 0, '\r'); // sleep-ok: a redraw settles over frames; there is no completion event
         await waitFor(`(window.T && T.state.currentSession && T.state.currentSession.name === 'beta-bot') || document.querySelector('#live-session-view [data-session-name="beta-bot"]')`, 'beta-bot is open', 8000).catch(async () => { throw new Error('beta-bot not opened: ' + await ev(`JSON.stringify(window.T && T.state.currentSession && T.state.currentSession.name)`)); });
         assert.equal(await open(), false, 'the box is closed');
         // Escape closes the box and gives the focus back
         await ev(`document.getElementById('agent-search-input').focus(); true`);
-        await key('k', 'KeyK', CTRL); await waitFor(`!!document.getElementById('jump-modal') && getComputedStyle(document.getElementById('jump-modal')).display !== 'none'`, 'the box', 5000);
+        await key('k', 'KeyK', MOD); await waitFor(`!!document.getElementById('jump-modal') && getComputedStyle(document.getElementById('jump-modal')).display !== 'none'`, 'the box', 5000);
         await key('Escape', 'Escape'); await sleep(300); // sleep-ok: a redraw settles over frames; there is no completion event
         assert.equal(await open(), false, 'Escape closes it');
         assert.equal(await ev(`document.activeElement.id`), 'agent-search-input', 'and the focus goes back where it was');
 
         // Ctrl+, is Settings
         await ev(`document.activeElement && document.activeElement.blur(); true`);
-        await key(',', 'Comma', CTRL);
+        await key(',', 'Comma', MOD);
         await waitFor(`(() => { const m = document.getElementById('settings-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'Settings opens', 8000);
         await key('Escape', 'Escape'); await sleep(300); // sleep-ok: a redraw settles over frames; there is no completion event
 
@@ -78,7 +80,7 @@ const BASE = require('./test_base').BASE;
         const lists = await ev(`import((window.__coralStatic || '/static/') + 'shortcuts.js').then(m => ({ mac: m.shortcutList(true).map(r => r[0] + ' ' + r[1]), pc: m.shortcutList(false).map(r => r[0] + ' ' + r[1]) }))`);
         const has = (l, re) => l.some(x => re.test(x));
         assert.ok(has(lists.mac, /^Cmd\+Option\+N New agent/) && !has(lists.mac, /Alt\+N|Ctrl\+K|Ctrl\+F/), `a Mac sees Cmd and Option: ${JSON.stringify(lists.mac)}`);
-        assert.ok(has(lists.pc, /^Alt\+N New agent/) && has(lists.pc, /^Ctrl\+K Jump to/) && has(lists.pc, /^Ctrl\+, Settings/), `another computer sees Ctrl and Alt: ${JSON.stringify(lists.pc)}`);
+        assert.ok(has(lists.pc, /^Alt\+N New agent/) && has(lists.pc, /^Ctrl\+P or Ctrl\+K Jump to/) && has(lists.pc, /^Ctrl\+, Settings/), `another computer sees Ctrl and Alt: ${JSON.stringify(lists.pc)}`);
         for (const l of [lists.mac, lists.pc]) assert.ok(has(l, /Search agents/) && has(l, /Stop a reply/), 'the list has Search agents and Stop a reply');
 
         // Cmd+Option+N is New agent on a Mac
