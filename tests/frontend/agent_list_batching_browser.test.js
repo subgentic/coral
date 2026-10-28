@@ -25,7 +25,7 @@ const { framesJs } = require('./helpers/wait');
             const ws = await import(st + 'websocket.js');
             const render = await import(st + 'render.js');
             const frames = n => ${framesJs('n')};
-            const mk = i => ({ name: 'batch-' + i, session_id: 'batch-' + i, agent_type: 'claude', server: 'local', status: 'working', display_name: 's' + i, display_name: 'B' + i });
+            const mk = i => ({ name: 'batch-' + i, session_id: 'batch-' + i, agent_type: 'claude', server: 'local', status: 'working', summary: 's' + i, display_name: 'B' + i });
             ws.handleCoralMessage({ type: 'coral_update', sessions: Array.from({ length: 20 }, (_, i) => mk(i)) });
             await frames(2);
             const out = {};
