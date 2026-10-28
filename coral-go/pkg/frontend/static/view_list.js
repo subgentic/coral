@@ -47,7 +47,8 @@ function draw(root, { sections, current }) {
             nav.append(b);
             if (it.key === current && trigger) { // the drawer's button: what is open, and how many
                 const chevron = el('span', 'material-icons view-list-trigger-icon', 'expand_more'); chevron.setAttribute('aria-hidden', 'true'); // a chevron after the name (it opens a list), not a hamburger
-                trigger.replaceChildren(el('span', 'view-list-trigger-name', it.label));
+                const lead = folderIcon(it.icon); if (lead) lead.classList.add('view-list-trigger-lead'); // the open folder's own icon in front: the button is the list's switcher, not a page title (#9999)
+                trigger.replaceChildren(...(lead ? [lead] : []), el('span', 'view-list-trigger-name', it.label));
                 if (it.count != null) trigger.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : 'view-list-count', it.count));
                 trigger.append(chevron);
                 trigger.setAttribute('aria-label', `${it.label}${it.count != null ? `, ${it.count}` : ''}. Open the folders`);
