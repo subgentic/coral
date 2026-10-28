@@ -63,6 +63,8 @@ export function isUnread(item) { return item.over && !item.run.seen_at; }
 export const unreadCount = () => runs.filter(isUnread).length;
 /** The failed runs nobody has opened: the Inbox's Needs you rows. */
 export const failedUnread = () => runs.filter(i => i.failed && isUnread(i));
+/** The runs that ended well (or were stopped) and nobody has opened: not Needs you, so a line under its list says how many (#10515 point 2), and Recent runs lists them. */
+export const finishedUnread = () => runs.filter(i => i.over && !i.failed && isUnread(i));
 /** A person opened the run: it is read at once on this screen and told to the server (which tells every other); if the server cannot be told the run is unread again. */
 const opened = new Map(); // key -> when, for runs opened here that a read answered before the server had been told: the read must not bring the dot back
 export function markSeen(item) {

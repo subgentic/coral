@@ -101,6 +101,13 @@ const STUB = `(() => {
             assert.ok(byName('nightly-build') && /Run failed: Step 2, Test, failed with exit code 3/.test(byName('nightly-build').text), `${at}and the workflow's: ${JSON.stringify(rowsText)}`);
             assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '2', `${at}the Inbox badge counts them`);
             await themed('needs', w);
+            // a run that passed is not Needs you: a line under the list says how many finished since the person looked, and opens Recent runs (#10515 point 2)
+            assert.equal(await ev(`document.querySelector('.inbox-runs-finished')?.textContent.trim()`), '2 runs finished since you looked. See them', `${at}the line under the list`);
+            assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length`), 2, `${at}and they are not rows`);
+            await ev(`[...document.querySelectorAll('.inbox-runs-finished a, .inbox-runs-finished button')].find(x => /See them/.test(x.textContent)).click(); true`);
+            await waitFor(`document.querySelector('#group-table-title') && document.querySelector('#group-table-title').textContent === 'Recent runs'`, `${at}See them opens Recent runs`, 8000);
+            await ev(`history.back(); true`);
+            await waitFor(`!!document.querySelector('.inbox-runs-finished') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}back in Needs you`, 8000);
             await ev(`document.querySelector('#group-table-view button[aria-label^="Dismiss the failed run of nightly-build-job"]').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 1`, `${at}Dismiss takes the run out`, 8000);
             assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '1', `${at}and the badge goes down`);
