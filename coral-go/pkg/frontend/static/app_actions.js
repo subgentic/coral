@@ -129,7 +129,7 @@ registerActions({
     'm-toggle-browser': el => { const ids = String(el.dataset.browser || '').split(' '); if (ids.length === 4 && ids.every(i => /^[a-z0-9-]+$/.test(i))) window.toggleBrowser(...ids); },
     'm-toggle-group-by-team': el => { window.toggleGroupByTeam(); },
     'm-validate-team-name': () => { if (window._validateTeamName) window._validateTeamName(); },
-    'm-verify-all-c-l-is': el => { window._verifyAllCLIs(); },
+    'm-verify-all-c-l-is': el => { importOnce('./cli_dialogs.js').then(() => window._verifyAllCLIs()).catch(() => {}); }, // the check is cli_dialogs.js's: only the launch dialogs loaded it, so Verify All did nothing on a page that had only opened Settings (#10693)
 });
 
 registerActions({
