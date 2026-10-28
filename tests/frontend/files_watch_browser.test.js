@@ -13,10 +13,10 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'settings')`);
         await ev(`window.__coralFilesWatchMs = 600; true`);
-        await ev(`(() => { const R = window.fetch; window.__refreshes = 0; window.__files = [];
+        await ev(`(() => { const R = window.fetch; window.__refreshes = 0; window.__gets = 0; window.__files = [];
             window.fetch = (u, o) => { const url = new URL(String(u), location.href), json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 if (/\\/api\\/sessions\\/live\\/wp\\/files\\/refresh$/.test(url.pathname)) { window.__refreshes++; return json({ files: window.__files, is_git: true, compare: { label: 'HEAD' } }); }
-                if (/\\/api\\/sessions\\/live\\/wp\\/files$/.test(url.pathname)) return json({ files: [], is_git: true, compare: { label: 'HEAD' } });
+                if (/\\/api\\/sessions\\/live\\/wp\\/files$/.test(url.pathname)) { window.__gets++; return json({ files: window.__files, is_git: true, compare: { label: 'HEAD' } }); }
                 return R(u, o); }; return true; })()`);
         await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); st.state.currentSession = { type: 'live', name: 'wp', session_id: 'sid-wp', agent_type: 'claude' }; return true; })()`);
         const shown = await ev(`(async () => { const p = document.getElementById('agentic-panel-files'); if (!p) return 'no panel'; window.switchAgenticTab('files'); for (let e = p; e && e !== document.body; e = e.parentElement) { e.hidden = false; e.classList.remove('collapsed'); if (getComputedStyle(e).display === 'none') e.style.setProperty('display', 'block', 'important'); if (!e.offsetWidth || !e.offsetHeight) { e.style.minWidth = '300px'; e.style.minHeight = '200px'; e.style.position = 'relative'; } } /* no agent is open in this bare page: its dock is shown by hand */ return p.classList.contains('active') && p.getClientRects().length > 0; })()`);
@@ -28,6 +28,14 @@ const BASE = require('./test_base').BASE;
         await ev(`window.__files = [{ filepath: 'notes.txt', status: 'modified', additions: 1, deletions: 0 }]; true`);
         await waitFor(`/notes\\.txt/.test(document.getElementById('changed-files-list').textContent)`, 'the file changed outside the agent shows in the list', 6000).catch(() => {});
         check('a file changed outside the agent shows without pressing Refresh', /notes\.txt/.test(await ev(`document.getElementById('changed-files-list').textContent`)), none);
+        // a view-only viewer on a Hub reads the list (no refresh to call): the watch's reads draw nothing while the list is the same, and draw it when it moved
+        await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); st.state.currentSession = { type: 'live', name: 'wp', session_id: 'sid-wp', agent_type: 'claude', hubReadOnly: true }; window.__mut = 0; new MutationObserver(r => { window.__mut += r.length; }).observe(document.getElementById('changed-files-list'), { childList: true, subtree: true, characterData: true, attributes: true }); window.__gets = 0; return true; })()`);
+        await waitFor(`window.__gets >= 3`, 'three reads of the list by a view-only viewer', 8000);
+        check('a view-only viewer\'s watch redraws nothing while the list is the same', (await ev(`window.__mut`)) === 0, String(await ev(`window.__mut`)));
+        await ev(`window.__files = window.__files.concat([{ filepath: 'more.txt', status: 'modified', additions: 1, deletions: 0 }]); true`);
+        await waitFor(`/more\\.txt/.test(document.getElementById('changed-files-list').textContent)`, 'the moved list is drawn for a view-only viewer', 6000).catch(() => {});
+        check('and draws it when it moved', /more\.txt/.test(await ev(`document.getElementById('changed-files-list').textContent`)));
+        await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); st.state.currentSession = { type: 'live', name: 'wp', session_id: 'sid-wp', agent_type: 'claude' }; return true; })()`);
         // not showing: the watch stops
         await ev(`document.getElementById('agentic-panel-files').classList.remove('active'); true`);
         await quiet(900); const at = await ev(`window.__refreshes`); await quiet(1800);

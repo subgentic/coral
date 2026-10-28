@@ -262,10 +262,10 @@ function _updateSearchSelection() {
 let _filesRefused = false;
 let _notGit = false; // the folder is not a git repository (#6072): there is nothing to compare, so the panel says so instead of "0 files changed vs HEAD~1"
 
-export async function loadChangedFiles(agentName, sessionId) {
+export async function loadChangedFiles(agentName, sessionId, quiet = false) { // quiet: the watch's read (#10485): nothing is drawn unless the list moved
     if (!agentName) return;
     if (state.currentSession && state.currentSession.type === 'live' && filesPanelShowing()) watchFiles();
-    if (_filesStale) { _filesStale = false; return refreshChangedFiles(); } // files changed while the panel was not showing: the server's cached list may predate them
+    if (_filesStale) { _filesStale = false; return refreshChangedFiles(quiet); } // files changed while the panel was not showing: the server's cached list may predate them
     _filesStale = false;
     try {
         const params = new URLSearchParams();
@@ -276,11 +276,13 @@ export async function loadChangedFiles(agentName, sessionId) {
         _filesRefused = !resp.ok && await refusedTooLarge(resp);
         if (!resp.ok) { dropBody(resp); throw new Error(`files fetch failed: ${resp.status}`); }
         const data = await resp.json();
+        if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles)) return;
         _currentFiles = data.files || [];
         _notGit = data.is_git === false;
         _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
         if (data.diff_mode) _cloudDiffMode = data.diff_mode;
     } catch (e) {
+        if (quiet) return; // a read that failed in the background leaves the list as it was
         _currentFiles = [];
         _notGit = false;
     }
@@ -298,13 +300,13 @@ const filesPanelShowing = () => { const p = document.getElementById('agentic-pan
 const FOLLOW_DELAY_MS = 300;
 // The follow's read: the route's refresh, not its cached list (the server keeps a list for 30 s or more, and the change that moved the count may be inside it). The refresh computes the diff, so it is
 // one at a time with at least about 2 s between two (a reply and its edits come as a burst), and a request that comes while one runs is one more after it, not one each. A view-only viewer on a Hub
-// has no refresh to call: it reads the list (#10268).
+// has no refresh to call: it reads the list (#10268). Each read of the owner's watch is that refresh, so a few git commands about every 4 s while the panel shows (#10485).
 const MIN_REFRESH_GAP_MS = 2000;
-let _refreshBusy = false, _refreshQueued = false, _refreshAt = 0;
+let _refreshBusy = false, _refreshQueued = false, _queuedQuiet = true, _refreshAt = 0;
 async function followRead(quiet = false) {
     const cur = state.currentSession;
-    if (cur && cur.hubReadOnly) { loadChangedFiles(cur.name, cur.session_id); return; }
-    if (_refreshBusy) { _refreshQueued = true; return; }
+    if (cur && cur.hubReadOnly) { loadChangedFiles(cur.name, cur.session_id, quiet); return; }
+    if (_refreshBusy) { _queuedQuiet = _refreshQueued ? _queuedQuiet && quiet : quiet; _refreshQueued = true; return; } // the one more after this read is quiet only when every request waiting for it was
     _refreshBusy = true;
     try {
         const wait = _refreshAt + MIN_REFRESH_GAP_MS - Date.now();
@@ -313,7 +315,7 @@ async function followRead(quiet = false) {
         await refreshChangedFiles(quiet);
     } finally {
         _refreshBusy = false;
-        if (_refreshQueued) { _refreshQueued = false; followRead(); }
+        if (_refreshQueued) { _refreshQueued = false; followRead(_queuedQuiet); }
     }
 }
 
