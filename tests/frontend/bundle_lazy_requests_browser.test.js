@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
         const seen = new Set(await ev(`performance.getEntriesByType('resource').map(e => new URL(e.name).pathname)`));
         const fetched = async () => {
             const all = await ev(`performance.getEntriesByType('resource').map(e => new URL(e.name).pathname)`);
-            const fresh = all.filter(p => !seen.has(p) && p.startsWith(prefix) && p.endsWith('.js')).map(p => p.slice(prefix.length));
+            const fresh = all.filter(p => !seen.has(p) && p.startsWith(prefix) && p.endsWith('.js')).map(p => p.slice(prefix.length)).filter(m => m !== 'connection_bar.js'); // the page fetches the connection bar's module itself, eight seconds after its first feed, so a stopped server cannot leave it unsaid (#10536): not a tab's request
             all.forEach(p => seen.add(p));
             return fresh.sort();
         };

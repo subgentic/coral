@@ -55,7 +55,15 @@ function feedDown() {
         }).catch(() => {});
     }, FEED_DOWN_BAR_MS);
 }
+// The bar's module is fetched while the server answers (eight seconds after the first feed), not when the feed drops: a stopped server cannot send it, and the page would then say nothing at all (#10536).
+let _barWarm = false;
+function warmConnectionBar() {
+    if (_barWarm) return;
+    _barWarm = true;
+    setTimeout(() => { importOnce('./connection_bar.js').catch(() => { _barWarm = false; }); }, 8000); // after the page's own first seconds: not a request of the start, nor of a tab's first visit
+}
 function feedUp() {
+    warmConnectionBar();
     _upCount++;
     if (_downTimer) { clearTimeout(_downTimer); _downTimer = 0; }
     if (_barShown) { _barShown = false; importOnce('./connection_bar.js').then(m => m.showBackOnline()).catch(() => {}); }
