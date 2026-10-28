@@ -1,6 +1,7 @@
 /* Changed files panel — load and render per-agent file diffs */
 
 import { state } from './state.js';
+import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, showToast, refusedTooLarge } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { fetchFileList, fuzzyFilter } from './file_mention.js';
@@ -278,6 +279,25 @@ export async function loadChangedFiles(agentName, sessionId) {
     }
     renderStarredFiles();
     renderChangedFiles();
+}
+
+// The Files list follows the agent (#10268): it was read when the tab opened and on Refresh, so a reply that changed files left a stale "+2" until the button was pressed. The session feed
+// carries each agent's changed-file count and its state: the list is read again when the open agent's count moves or its turn ends (working to anything else), once for a burst of rows.
+let _followed = { id: '', count: null, working: false };
+let _followTimer = null;
+const FOLLOW_DELAY_MS = 300;
+export function followChangedFiles(s) {
+    if (!s || !state.currentSession || state.currentSession.type !== 'live') return;
+    const id = s.session_id || s.name, count = s.changed_file_count || 0, working = deriveSessionState(s) === 'working';
+    const same = _followed.id === id;
+    const moved = same && _followed.count !== null && _followed.count !== count, ended = same && _followed.working && !working;
+    _followed = { id, count, working };
+    if (!moved && !ended) return;
+    clearTimeout(_followTimer);
+    _followTimer = setTimeout(() => {
+        const cur = state.currentSession;
+        if (cur && cur.type === 'live' && (cur.session_id || cur.name) === id) loadChangedFiles(cur.name, cur.session_id);
+    }, FOLLOW_DELAY_MS);
 }
 
 export function updateChangedFileCount(count) {
