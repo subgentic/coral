@@ -225,7 +225,8 @@ function _raiseNeedsInputAlert(s, id) {
     // Opt-in desktop alert while this tab is in the background; names only.
     const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
     // attention.js is read when the first alert is due, not at start (the start weight is guarded): the count it keeps is only ever needed from then on
-    importOnce('./attention.js').then(m => m.noteAttention(m.KIND_NEEDS_INPUT, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
+    // Whether the tab is in the background is decided now, when the alert is raised: attention.js answers after it has loaded, and a tab that was visible at the reply and hidden by then must not count it (#10396)
+    if (document.hidden) importOnce('./attention.js').then(m => m.noteAttention(m.KIND_NEEDS_INPUT, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
 }
 
 /** An agent's turn just ended and it awaits its person: a count in the tab title and, when this browser wants them, a desktop alert; only while this tab is in the background (#10068). Names only. */
@@ -236,7 +237,7 @@ function _raiseReplyAlert(s, id) {
     const sessionSrv = sessionServer(s);
     const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv));
     const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
-    importOnce('./attention.js').then(m => m.noteAttention(m.KIND_REPLY, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
+    if (document.hidden) importOnce('./attention.js').then(m => m.noteAttention(m.KIND_REPLY, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
 }
 
 /** A Codex row whose request is the agent's own approval request (its PermissionRequest hook), which Codex's reviewer may settle by itself. */
