@@ -18,7 +18,7 @@ export function ensureStarredArtifacts(done) {
     if (isCloud()) return; // the Hub-served Inbox's request plan has no artifacts read: its Starred folder stays chats only until the Hub plans it (coral-hub's request census)
     if (state.busy || (state.at && Date.now() - state.at < STALE_MS)) return;
     state.busy = true;
-    readInboxArtifacts(new URLSearchParams({ starred: '1', limit: '100' })).then(d => {
+    readInboxArtifacts(new URLSearchParams({ starred: 'true', limit: '100' })).then(d => {
         state.rows = (d.artifacts || []).filter(a => a.starred !== false); state.total = Number.isFinite(d.total) ? d.total : state.rows.length; state.error = '';
     }).catch(e => { state.error = e.message || 'Starred artifacts could not be read.'; }).finally(() => { state.busy = false; state.at = Date.now(); done?.(); });
 }

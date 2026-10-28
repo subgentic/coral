@@ -1,6 +1,6 @@
 // Inbox > Starred lists starred artifacts too (#10258, Beta #10252): the folder showed starred chats only, so a starred artifact was found nowhere obvious. It now has a second part, "Starred artifacts", one row each
 // (name, team, when) that opens the preview; the folder's count adds them; with a starred artifact and no starred chat the artifacts stand alone; with nothing starred the empty state says what puts something there.
-// GET /api/sessions/history, its counts and GET /api/team-artifacts (starred=1) are stood in. 1280 and 390 px, isolated dev server.
+// GET /api/sessions/history, its counts and GET /api/team-artifacts (starred=true) are stood in. 1280 and 390 px, isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -37,7 +37,7 @@ const ART = { id: HEX, name: 'screen.png', media_type: 'image/png', starred: tru
             await waitFor(`!!document.querySelector('.inbox-starred-artifacts')`, 'the Starred artifacts part', 10000);
             const part = await ev(`(() => { const s = document.querySelector('.inbox-starred-artifacts'); return { head: s.querySelector('h3').textContent, names: [...s.querySelectorAll('button.dt-primary')].map(b => b.textContent.trim()), chats: document.querySelectorAll('#group-table-view button.dt-primary').length }; })()`);
             assert.equal(part.head, 'Starred artifacts'); assert.deepEqual(part.names, ['screen.png'], `${label}: the artifact's row`); assert.ok(part.chats >= 2, `${label}: the starred chat is still listed`);
-            assert.equal(await ev(`window.__starRead.some(r => r.starred === '1')`), true, `${label}: it asks for the starred artifacts`);
+            assert.equal(await ev(`window.__starRead.some(r => r.starred === 'true')`), true, `${label}: it asks for the starred artifacts`);
             await waitFor(`(() => { const b = document.querySelector('.view-list-item[data-key="chats-starred"]'); return !!b && /2 in all/.test(b.title); })()`, `${label}: the folder's total adds the artifact (its tooltip, "2 in all")`, 8000);
             await shot(`both-${label}`);
             await ev(`document.querySelector('.inbox-starred-artifacts button.dt-primary').click(); true`);
