@@ -364,26 +364,9 @@ func PermissionFlagsForAgent(agentType, mode string) []string {
 
 // PermissionModeForCLI is the mode a launch of agentType may record: the one it is given when that CLI has it, else "default" (#10466, Security Reviewer Windows on #10381). A saved default of Accept
 // edits made a Codex launch record acceptEdits, a mode Codex does not have (its Accept edits flags are its Default ones): the recorded mode is what a restart, a wake and a resurrect restore and what the
-// chat says, so it must name something the CLI can be in. Claude has every mode; Codex has Default, Plan, Auto, Don't ask and Bypass; Antigravity (agy, gemini) has Default, Plan, Accept edits and Bypass;
-// the others have none of their own (their launches are Default, or Bypass where their flag exists).
+// chat says, so it must name something the CLI can be in. Only Codex's Accept edits is mapped: every other CLI records what it launched with, as before (Antigravity's Auto and Don't ask launch as they did).
 func PermissionModeForCLI(agentType, mode string) string {
-	if mode == "" || mode == "default" || !ValidPermissionMode(mode) {
-		return mode // nothing, Default, or a string no mode is called (left to be dropped, not recorded)
-	}
-	var has bool
-	switch agentType {
-	case at.Codex:
-		has = mode == "plan" || mode == "auto" || mode == "dontAsk" || mode == "bypassPermissions"
-	case at.Agy, "antigravity", "gemini":
-		has = mode == "plan" || mode == "acceptEdits" || mode == "bypassPermissions"
-	case at.Pi, at.Terminal:
-		has = false
-	case at.Claude:
-		has = true
-	default:
-		has = mode == "bypassPermissions"
-	}
-	if !has {
+	if agentType == at.Codex && mode == "acceptEdits" {
 		return "default"
 	}
 	return mode
