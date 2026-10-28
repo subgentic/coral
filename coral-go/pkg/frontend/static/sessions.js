@@ -296,7 +296,8 @@ function showAgentsTab() {
     if (active && active.id !== 'nav-tab-agents') window.switchNavTab?.('agents', { fromHistory: true });
 }
 
-export async function selectLiveSession(name, agentType, sessionId, server) {
+/** Shows an agent's page. `opts.focusChat` (Open chat) takes the keyboard to the chat; any other way in (the sidebar's row, a link) leaves focus where it was. */
+export async function selectLiveSession(name, agentType, sessionId, server, opts = {}) {
     // Identity is (server, name). Callers that only know the session id (hash
     // restore, toasts) omit `server` and it is resolved from the live list.
     const srv = normServer(server || serverForSession(name, sessionId));
@@ -395,8 +396,8 @@ export async function selectLiveSession(name, agentType, sessionId, server) {
     });
 
     _loadAgentSecondary(name, sessionId, agentData, srv, generation, transcriptReady);
-    // The keyboard goes with the person to the chat (#9794): at a mouse into the composer, on a phone to the page's heading (no keyboard pops up). Last, after the view shows and the pane is built: nothing before it keeps focus.
-    if (isPhoneLayout()) { const h = document.getElementById('session-name'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } else input.focus();
+    // Open chat takes the keyboard to the chat (#9794): at a mouse into the composer, on a phone to the page's heading (no keyboard pops up). Last, after the view shows and the pane is built: nothing before it keeps focus. The sidebar's row keeps its own focus.
+    if (opts.focusChat) { if (isPhoneLayout()) { const h = document.getElementById('session-name'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } else input.focus(); }
 }
 
 import { historyServer, historyRoute } from './history_source.js';
