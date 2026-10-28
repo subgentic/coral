@@ -9,6 +9,7 @@
 // model (default claude-opus-5-5), so stress and soak runs read real transcripts.
 // MOCK_AGENT_REPLY_DELAY=<seconds> keeps each turn's prompt in the transcript at once and writes the reply after the delay (a slow first answer); MOCK_AGENT_EXIT_ON_INPUT=1 makes it die
 // when it is first asked something, before any reply (#6050).
+// MOCK_AGENT_READY=1 (ready.go, #10010) is a CLI that is up and waiting: the input box, the first hook event and a canned reply in the transcript for each message.
 package main
 
 import (
@@ -98,6 +99,8 @@ func main() {
 	if boardName == "" {
 		boardName = boardLabel
 	}
+
+	writeTranscript = applyReadyMode(writeTranscript) // MOCK_AGENT_READY=1: a CLI that is up and waiting (ready.go)
 
 	// Apply env vars from settings (CORAL_SESSION_NAME, CORAL_PORT, etc.)
 	// Settings env overrides process env only if not already set.
@@ -197,7 +200,9 @@ func main() {
 	// one turn (so a transcript, when written, ends like Claude's), then nothing until a line is
 	// typed in or it is stopped: no reads, posts or output.
 	if os.Getenv("MOCK_AGENT_IDLE") == "1" {
-		turn("ready")
+		if !readyMode() { // a ready CLI has said nothing yet: its chat starts empty
+			turn("ready")
+		}
 		<-sig
 		fmt.Fprintf(os.Stderr, "[mock-agent] shutting down session=%s\n", short(sessionID))
 		return

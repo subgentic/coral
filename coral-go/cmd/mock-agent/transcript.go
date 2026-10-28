@@ -122,7 +122,7 @@ func (t *transcript) Turn(prompt string) error {
 	reply := t.common("assistant", start.Add(time.Second))
 	reply["message"] = map[string]any{
 		"model": t.model, "id": "msg_mock" + strings.ReplaceAll(newUUID(), "-", "")[:20], "type": "message", "role": "assistant",
-		"content":     []any{map[string]any{"type": "text", "text": fmt.Sprintf("Mock reply %d to: %s", t.turns, firstLine(prompt))}},
+		"content":     []any{map[string]any{"type": "text", "text": t.replyText(prompt)}},
 		"stop_reason": "end_turn", "stop_sequence": nil, "usage": usage,
 	}
 	reply["requestId"] = "req_mock" + strings.ReplaceAll(newUUID(), "-", "")[:20]
@@ -185,4 +185,12 @@ func firstLine(s string) string {
 		s = string(r[:80])
 	}
 	return s
+}
+
+// replyText is the assistant's answer to prompt: the canned greeting in ready mode, else the numbered line every suite reads.
+func (t *transcript) replyText(prompt string) string {
+	if readyMode() {
+		return readyReply(prompt)
+	}
+	return fmt.Sprintf("Mock reply %d to: %s", t.turns, firstLine(prompt))
 }
