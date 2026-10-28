@@ -250,6 +250,8 @@ export function _fillCliAndModels(s) {
     const agyModel = s.default_model_agy || s.default_model_gemini || "";
     if (defAgy) defAgy.value = agyModel;
     if (defPi) defPi.value = s.default_model_pi || "";
+    const picks = () => importOnce('./settings_model_pick.js').then(m => m.syncModelPicks()).catch(() => {}); // each box is a dropdown of the models with Other… behind it (#10000)
+    picks();
     // On the hub the Default Models rows are hidden (machine settings), and the hub has no model catalog of its own to ask.
     if (!isCloud()) importOnce('./custom_models.js').then(m => m.initCustomModels()).catch(() => {}); // the custom models list (#5480): hidden when this server has no such route
     if (!isCloud()) _getAgentModels().then(models => {
@@ -258,12 +260,14 @@ export function _fillCliAndModels(s) {
         if (!models || !Array.isArray(models.claude)) {
             const notice = document.getElementById("settings-default-models-notice");
             if (notice) notice.textContent = "Could not load model list — you can still type a custom model id.";
+            picks();
             return;
         }
         _fillModelDatalist(document.getElementById("settings-models-claude"), "claude", models);
         _fillModelDatalist(document.getElementById("settings-models-codex"), "codex", models);
         _fillModelDatalist(document.getElementById("settings-models-agy"), "agy", models);
         _fillModelDatalist(document.getElementById("settings-models-pi"), "pi", models);
+        picks();
     });
 }
 
