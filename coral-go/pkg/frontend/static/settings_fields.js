@@ -9,7 +9,7 @@ const GENERAL_FIELDS = [
     { key: 'theme', type: 'select', id: 'settings-theme', labelId: 'settings-theme-label', label: 'Theme', options: THEME_OPTIONS,
         action: { label: 'Customize Theme', icon: 'palette', small: true, className: 'settings-theme-btn', setup: el => el.setAttribute('data-on-click', 'm-hide-settings-modal-then-show-theme-configurator') } },
     { key: 'default_agent_type', type: 'select', id: 'settings-agent-type', labelId: 'settings-agent-type-label', label: 'Default agent type', options: AGENT_TYPE_OPTIONS },
-    { key: 'group_by_team', type: 'toggle', id: 'settings-group-by-team', label: 'Group agents by board or team', setup: el => el.setAttribute('data-on-change', 'm-toggle-group-by-team') },
+    { key: 'group_by_team', type: 'toggle', id: 'settings-group-by-team', label: 'Group agents by team', help: 'Agents on the same team sit together in the list.', setup: el => el.setAttribute('data-on-change', 'm-toggle-group-by-team') },
     { key: 'show_scrollbars', type: 'toggle', id: 'settings-show-scrollbars', label: 'Show scrollbars', help: 'Terminal and chat views.', default: true },
     { key: 'check_updates', type: 'toggle', id: 'settings-check-updates', label: 'Tell me when a new version is out', help: { text: '', more: 'A notice in this browser. Downloading and installing are under Updates.' } },
 ];
