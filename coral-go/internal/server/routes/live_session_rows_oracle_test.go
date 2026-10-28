@@ -510,6 +510,7 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"waiting_since":         waitingSince(state),
 			"waiting_kind":          nilIf(!state.NeedsInput || state.WaitingKind == "", state.WaitingKind),
 			"last_answer":           h.lastAnswerOf(agent.SessionID),
+			"pending_sends":         h.pendingSendsOf(agent.SessionID),
 			"held_messages":         h.heldMessagesOf(agent.SessionID, naming.SessionName(agent.AgentType, agent.SessionID)), // #6627: the oracle follows the row builder in this one field
 			"working":               state.Working,
 			"stuck":                 state.Stuck,

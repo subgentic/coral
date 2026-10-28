@@ -1,6 +1,7 @@
 // #10301 (Mobile pass 22, #10298): two people, one Coral. Two phone-sized browsers (two browser contexts: separate storage, as two devices have) look at the same agent, which waits on a question.
 //  1. A message queued behind the question belongs to its sender: the other device sees "Queued from another device: ..." with no Cancel, and a cancel or a send by the sender empties both
 //     screens at once (the empty list came through the feed as a null that was skipped, so the other screen kept the line).
+//  3. A message sent on one device shows on the other as pending until the transcript has it (the row's pending_sends), and is not drawn twice on the sender.
 //  2. A question answered on one device says "Answered "Red" from another device." on the other, and a tap there that finds the question gone is not an error.
 // The server is played by this test: it holds the queue and the last answer, and pushes the live row to both pages as the feed does (the Go tests cover the real server side).
 // Drives Chrome over CDP through agent_view_harness.js; run_cdp_suites.mjs finds CDP suites by that name.
@@ -129,6 +130,25 @@ async function device(name) {
         await both(d => d.ev(`window.__push({ waiting_for_input: false, last_answer: { label: '', at: 333 } })`));
         await B.waitFor(`/Answered from another device\\./.test(document.getElementById('composer-queued').textContent)`, 'B: the note without words', 4000);
         console.log('   ✓ a tap on a question another device answered is not an error');
+
+        console.log('3. a message sent on one device shows on the other before the transcript has it');
+        const pendingBubbles = d => d.ev(`[...document.querySelectorAll('#live-history-messages .pending-messages .chat-bubble.pending')].map(e => e.textContent.replace(/\\s+/g, ' ').trim())`);
+        const iso = new Date().toISOString();
+        // A sends: its own pending bubble at once; the server lists the typed message on the row for both screens.
+        await A.ev(`import(${S} + 'pending_messages.js').then(m => { m.addPendingMessage('dv-id', 'Hello from A', Date.now(), { sending: true }); return true; })`);
+        await both(d => d.ev(`window.__push({ waiting_for_input: false, pending_sends: [{ id: 'p1', text: 'Hello from A', at: ${JSON.stringify(iso)} }] })`));
+        await B.waitFor(`document.querySelectorAll('#live-history-messages .pending-messages .chat-bubble.pending').length === 1`, 'B: the pending bubble', 4000);
+        assert.match((await pendingBubbles(B))[0], /Hello from A/, 'B shows what A sent');
+        assert.equal((await pendingBubbles(A)).length, 1, 'A has its own bubble once, not twice');
+        // The same row again (every feed update repeats it): nothing is added.
+        await both(d => d.ev(`window.__push({ pending_sends: [{ id: 'p1', text: 'Hello from A', at: ${JSON.stringify(iso)} }] })`));
+        assert.equal((await pendingBubbles(B)).length, 1, 'B does not add it twice');
+        // The transcript has it: both settle it, and the row stops listing it.
+        await both(d => d.ev(`import(${S} + 'pending_messages.js').then(m => { m.rememberUserMessage('dv-id', { content: 'Hello from A', timestamp: new Date().toISOString() }); m.syncPendingBubbles(document.getElementById('live-history-messages'), 'dv-id'); return true; })`));
+        await both(d => d.ev(`window.__push({ pending_sends: null })`));
+        assert.equal((await pendingBubbles(B)).length, 0, 'B settles it when the transcript has it');
+        assert.equal((await pendingBubbles(A)).length, 0, 'and so does A');
+        console.log('   ✓ B shows A\'s message as pending, once, and settles it with the transcript');
         console.log('\nAll two-device checks passed');
     } finally {
         await A.client.close(); await B.client.close();
