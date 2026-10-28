@@ -179,7 +179,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await ev(`window.__generates`), [{ directive: 'Ship it, with two devs', composition: '' }]);
         await ev(`window.__generateAnswer = { status: 200, body: { team: { name: 'Gen Team', flags: ['--x'], agents: [{ name: 'Lead', prompt: 'lead it' }, { name: 'Dev', prompt: 'build it' }] } } }; window.generateTeamFromWizard(); true`);
         await waitFor(`!!document.querySelector('.team-wizard-success')`, 'the success state');
-        assert.equal(await ev(`document.querySelector('.team-wizard-success p').textContent`), '2 agents created for "Gen Team"');
+        assert.equal(await ev(`document.querySelector('.team-wizard-success p').textContent`), '2 members drafted for "Gen Team"');
         assert.equal(await ev(`getComputedStyle(document.getElementById('team-wizard-generate-btn')).display`), 'none');
         await ev(`document.querySelector('[data-on-click="team-generated-review"]').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
@@ -196,7 +196,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.hideLaunchModal(); window.showTeamWizardModal(); document.getElementById('team-wizard-directive').value = 'd';
             window.__generateAnswer = { status: 200, body: { job_id: 'j1' } }; window.__jobAnswer = { status: 'done', result: { name: 'Polled', agents: [{ name: 'P1', prompt: 'p' }] } }; window.generateTeamFromWizard(); true`);
         await waitFor(`!!document.querySelector('.team-wizard-success')`, 'the polled success', { timeout: 9000 });
-        assert.equal(await ev(`document.querySelector('.team-wizard-success p').textContent`), '1 agents created for "Polled"');
+        assert.equal(await ev(`document.querySelector('.team-wizard-success p').textContent`), '1 member drafted for "Polled"');
         console.log('PASS team dialogs');
     } finally {
       await removeBoards(ev, ['crew-1', 'crew-1-2', 'crew-2']);
