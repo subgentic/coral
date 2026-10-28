@@ -55,6 +55,7 @@ const SERVERS = [
             assert.deepEqual(clipped, [], at + 'no cell content runs past its column (the longest status word, Unreachable, fits its column): ' + JSON.stringify(clipped));
             assert.deepEqual(cols.sortable, [true, false, true, true, true, true, true], at + 'every header sorts but Tags: ' + JSON.stringify(cols));
             await oneLinePerRow(ev, 'table.dt-table tbody tr[data-key]', `${at}the servers`, assert, { min: 2 }); // Goal #79: a server is one line at both widths; a narrow list drops Tags, Version and Agents
+            if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('table.dt-table tbody tr[data-key]')].filter(r => r.getClientRects().length).map(r => Math.round(r.getBoundingClientRect().height))`), [36, 36, 36], at + 'a server row is 36 px at a mouse (the shared table density, #9734: it was 44 to 45 from a 44 px row button)');
             for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await sceneShot(`servers-list-${theme}-${w}`); } await setTheme(ev, 'dark'); // the scenes UI/UX looks at (written when the gate asks for shots)
             assert.equal(t.rows, 3, at + 'this hub and two servers');
             assert.deepEqual(t.links, ['epoch', 'LAN boxwarning'], at + 'each remote server\'s name opens its page (LAN box\'s button holds its warning tag too, #9679); this hub has none');
