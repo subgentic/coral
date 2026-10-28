@@ -32,6 +32,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             if (m.goal) assert.ok(m.task >= m.goal * 1.4 && m.task <= m.goal * 2.8, `${w}: the Task and the Goal share the room about 2 to 1: ` + JSON.stringify(m));
             assert.ok(m.state <= 130 && m.who <= 130 && m.updated <= 130, `${w}: the short columns stay short: ` + JSON.stringify(m));
             if (w >= 1024) assert.ok(m.goal > 0, `${w}: the Goal is still drawn at ${w}: ` + JSON.stringify(m));
+            { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/tasks-sizing-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
             console.log(`   ${w}: ok ${JSON.stringify(m)}`);
         }
         console.log('PASS the team Tasks columns fit their content and share the rest');
