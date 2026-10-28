@@ -8,7 +8,6 @@
 import { serverUrl, artifactPath } from './server_base.js';
 import { artifactRefHex } from './utils.js';
 import { importOnce } from './import_once.js';
-import { upgradeShortArtifactRefs } from './short_artifact_refs.js';
 
 /** Whether a click is a plain left click the viewer should take over. */
 function plainClick(e) {
@@ -92,5 +91,5 @@ export function resolveBoardArtifacts(root, server) {
         }
     }
     // a shortened link in an older message becomes a link once the server says which artifact it is (#9841); the links it makes are bound by this same pass
-    upgradeShortArtifactRefs(root, server, r => resolveBoardArtifacts(r, server));
+    importOnce('./short_artifact_refs.js').then(m => m.upgradeShortArtifactRefs(root, server, r => resolveBoardArtifacts(r, server))).catch(() => {}); // loaded on first use, not at start (#10218): a post that names no short ref never asks
 }
