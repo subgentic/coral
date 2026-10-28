@@ -2,6 +2,7 @@ package startup
 
 import (
 	"context"
+	"fmt"
 	"github.com/subgentic/coral/internal/backendchoice"
 	"github.com/subgentic/coral/internal/coralnames"
 	"log"
@@ -20,6 +21,8 @@ import (
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/license"
+	"github.com/subgentic/coral/internal/logexit"
 	"github.com/subgentic/coral/internal/proxy"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/secrets"
@@ -432,13 +435,54 @@ func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, 
 		if cfg.BootstrapFile != "" {
 			mgr.Bootstrap(ctx, ss, hostname, src) // records no_hub_configured; reads nothing
 		}
+		if cfg.TermsViaHub {
+			enforceHubTerms(cfg, cloud.BootstrapResult{Status: cloud.BootstrapNoHub, Detail: "no Coral Hub is configured (--cloud-url), so nothing can confirm the terms"})
+		}
 		return
 	}
 	log.Printf("[CLOUD] Coral Hub: %s (nothing is sent until this server is connected: Settings > Coral Hub)", hubURL)
 	safeGo(ctx, "cloud_connector", func() {
-		mgr.Bootstrap(ctx, ss, hostname, src)
+		res := mgr.Bootstrap(ctx, ss, hostname, src)
+		if ctx.Err() == nil {
+			enforceHubTerms(cfg, res)
+		}
 		mgr.Run(ctx)
 	})
+}
+
+// exitProcess ends the process with a status (a variable for the tests).
+var (
+	exitProcess      = logexit.Exit
+	eulaAcceptedHere = license.IsEULAAccepted // read after the bootstrap: the Hub's confirmation writes the marker
+)
+
+// hubTermsGate decides, once a bootstrap has run, whether a start whose Terms were left to the Hub (config TermsViaHub) may go on: only when the terms are now recorded as accepted
+// (the Hub confirmed exactly this version and enrollment wrote it). Otherwise it stops, with the bootstrap's own exit code, or 3 (the terms were not confirmed) when the
+// bootstrap itself ended well or did not run.
+func hubTermsGate(res cloud.BootstrapResult, accepted bool) (code int, stop bool) {
+	if accepted {
+		return 0, false
+	}
+	if c := cloud.BootstrapExitCode(res.Status); c != 0 {
+		return c, true
+	}
+	return 3, true
+}
+
+// enforceHubTerms applies hubTermsGate to a start that took the Terms from the Hub: fail closed, with a line saying why on stderr and in the log (#9936).
+func enforceHubTerms(cfg *config.Config, res cloud.BootstrapResult) {
+	if !cfg.TermsViaHub {
+		return
+	}
+	code, stop := hubTermsGate(res, eulaAcceptedHere())
+	if !stop {
+		log.Println("[EULA] the Coral Hub confirmed this terms version")
+		return
+	}
+	msg := "Terms of Service were not confirmed by Coral Hub (status " + res.Status + "); Coral is not started. Accept them by running coral once in a terminal."
+	log.Println("[EULA] " + msg)
+	fmt.Fprintln(os.Stderr, "coral: "+msg)
+	exitProcess(code)
 }
 
 // resolveBackend picks this run's terminal backend without asking what is running (the pure rules are in backendchoice, #6064).

@@ -104,6 +104,12 @@ func IsEULAAccepted() bool {
 	return ok && m.current()
 }
 
+// EULAAcceptedLocally reports whether the current terms were accepted on this computer (a legacy marker is rewritten first), without showing anything.
+func EULAAcceptedLocally() bool {
+	MigrateLegacyEULAMarker()
+	return IsEULAAccepted()
+}
+
 // The legacy marker is not only history: the Windows MSI (tools/coral.wxs, the install-time custom action) still writes the bare "accepted"
 // marker after showing license.rtf, so every Windows install makes one. Do not remove this migration (or the legacy branch of IsEULAAccepted)
 // without changing the MSI to write the versioned marker in the same change.

@@ -24,6 +24,7 @@ var ErrUnsafeCredentialFile = errors.New("cloud: credential files are not suppor
 
 func ReadWellKnownBootstrap() ([]byte, bool, error)   { return nil, false, nil }
 func RemoveWellKnownBootstrap() (bool, error)         { return false, nil }
+func WellKnownBootstrapOffered() bool                 { return false }
 func ReadCredentialFile(string) ([]byte, bool, error) { return nil, false, ErrUnsafeCredentialFile }
 func ReadProofFile(string) ([]byte, error)            { return nil, ErrUnsafeCredentialFile }
 

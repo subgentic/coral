@@ -115,6 +115,11 @@ type Config struct {
 	BootstrapFile string
 	ProofFile     string
 
+	// TermsViaHub is set at startup when the Terms of Service were not accepted on this computer and a bootstrap credential is offered: nobody is at a terminal
+	// to accept them, so the Hub's confirmation of this version, recorded when the credential is redeemed, is the acceptance (#9936). The server then exits,
+	// non-zero, if the enrollment does not end with that confirmation.
+	TermsViaHub bool
+
 	// WebSocket
 	WSPollIntervalS int
 	// WSPollInterval, when set, replaces WSPollIntervalS. Only tests set it,
