@@ -178,7 +178,7 @@ function inlineProblem(input, message) {
     if (message === 'Choose a folder') return 'Choose a folder: type a path, or use Browse.';
     if (message === 'Team name is required') return "Type a name for the team, for example auth-feature. Letters, digits, '-' and '_' only.";
     if (message === 'Agent name is required') return 'Type a name for the agent.';
-    if (dir && /^directory not found/i.test(message)) return `${message.replace(/^directory not found/i, 'Folder not found').replace(/[.\s]+$/, '')}. Pick one with Browse.`;
+    if (dir && /^directory not found/i.test(message)) return 'That folder does not exist. Pick one with Browse.'; // the same words as the check on step 1 (#10034)
     if (dir) return message.charAt(0).toUpperCase() + message.slice(1); // a folder problem that Browse cannot fix (too long, a network path): just the words, capitalised
     return message;
 }

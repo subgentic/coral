@@ -57,7 +57,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.__answer = { status: 400, body: { error: 'directory not found: /nonexistent/path/x', field: 'working_dir' } }; document.getElementById('launch-dir').value = '/nonexistent/path/x'; window.launchSession(); true`);
         await waitFor(`!!document.getElementById('launch-dir-error')`, 'the line under the field');
         f = await inline('launch-dir');
-        assert.equal(f.text, 'Folder not found: /nonexistent/path/x. Pick one with Browse.', JSON.stringify(f));
+        assert.equal(f.text, 'That folder does not exist. Pick one with Browse.', JSON.stringify(f)); // one wording for the check on step 1 and the server's answer (#10034)
         await shot('inline-folder-not-found');
         await ev(`window.hideLaunchModal(); true`);
         assert.equal(await ev(`!!document.getElementById('launch-dir-error')`), false, 'closing the dialog clears it');

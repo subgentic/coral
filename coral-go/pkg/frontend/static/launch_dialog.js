@@ -24,6 +24,23 @@ const { quietFocus } = await importOnce('./quiet_focus.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, _withServerSettings, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES, launchStages } = await importOnce('./launch_core.js');
 const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
 
+/** Whether the folder in New agent's field is missing on the machine it launches on (the folder list answers 403 for a path that is not a folder it can open). False when it cannot be told: the launch's own answer decides then. A missing folder is said on step 1, in the field, as soon as the person leaves it (#10034); the server's own answer to a launch says the same words. */
+async function _folderMissing(server, dir) {
+    try {
+        const resp = await serverFetch(server, `/api/filesystem/list?path=${encodeURIComponent(dir)}`);
+        const missing = resp.status === 403 || resp.status === 404;
+        try { await resp.body?.cancel?.(); } catch { /* the answer is not read */ }
+        return missing;
+    } catch { return false; }
+}
+/** Say "That folder does not exist" under the folder field when it does; true when it was said. */
+async function _sayFolderMissing(input) {
+    const dir = input.value.trim();
+    if (!dir || launch.member || !(await _folderMissing(_effectiveServer(launch.server), dir)) || input.value.trim() !== dir) return false; // the field was edited meanwhile: not this path's answer
+    markFieldInvalid(input, 'That folder does not exist. Pick one with Browse.');
+    return true;
+}
+
 /** New Agent's three steps (#7391): Next goes from the folder to the persona to the agent (a folder is needed first), Back returns. `arg` is a stage name, "next" or "back" (the old "details" is the persona step). Focus follows, and a screen reader hears which step. */
 function _launchStage(arg) {
     const step = document.getElementById('launch-step-agent');
@@ -350,6 +367,7 @@ function _wireDirNote() {
     const input = document.getElementById('launch-dir');
     if (!input || input.dataset.noteWired) return;
     input.dataset.noteWired = '1';
+    input.addEventListener('change', () => { if (launch.mode === 'agent') _sayFolderMissing(input); }); // leaving the field (or Browse's pick) checks it
     input.addEventListener('focus', () => input.select()); // a folder already there is selected, so typing replaces it and does not add to it (#10034)
     input.addEventListener('input', _syncDirNote); input.addEventListener('change', _syncDirNote);
     input.addEventListener('input', _syncLaunchBlock); input.addEventListener('change', _syncLaunchBlock); // Next and Launch say why they are off until there is a folder

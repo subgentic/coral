@@ -4,10 +4,12 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installNA, N, openNewAgent, scenarios } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
+const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = scenarios();
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'qa10034-')); const real = fs.realpathSync(tmp);
     const shot = require('./helpers/scene_shots')(Page, 'new-agent-start');
     const folder = () => ev(`(() => { const i = window.__na.find('input', ${N.folder}); return i ? i.value : null; })()`);
     const btn = rx => ev(`(() => { const e = window.__na.find('button', ${rx}); return e ? { ...window.__na.box(e), disabled: !!e.disabled } : null; })()`);
@@ -39,15 +41,24 @@ const BASE = require('./test_base').BASE;
             await shot('step1-1280-scratch');
         });
         await S.run('Launch on step 1 sends the folder; Advanced goes to the persona and Launch stays', async () => {
-            await recents(['/work/payments-app']); await reopen();
+            await recents([real]); await reopen();
             assert.ok(await btn(/^Advanced$/), 'a button named Advanced replaces Next on step 1');
             assert.ok(!(await btn(/^Next$/)), 'no Next on step 1');
             await ev(`window.__na.find('button', ${N.launch}).click(); true`);
             await waitFor(`window.__launches.length === 1`, 'the launch request', 6000);
-            assert.equal(await ev(`window.__launches[0].working_dir`), '/work/payments-app', 'it launches in the folder in the field');
+            assert.equal(await ev(`window.__launches[0].working_dir`), real, 'it launches in the folder in the field');
             await ev(`window.__na.find('button', /^Advanced$/).click(); true`);
             await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000);
             assert.ok(await btn(/^Next$/), 'step 2 has Next'); assert.ok(await btn(N.launch), 'Launch stays on step 2');
+        });
+        await S.run('a folder that does not exist is said on step 1, in the field, as soon as the person leaves it, and nothing is launched (#10034)', async () => {
+            await recents(['/nowhere/at-all']); await reopen();
+            const before = await ev(`window.__launches.length`);
+            await ev(`document.getElementById('launch-dir').dispatchEvent(new Event('change', { bubbles: true })); true`); // the person leaves the field
+            await waitFor(`!!document.querySelector('#launch-dir-error, #launch-dir ~ .field-error, .field-error')`, 'the folder line', 6000);
+            assert.match(await ev(`[...document.querySelectorAll('.field-error')].map(e => e.textContent).join(' | ')`), /That folder does not exist/, 'the words');
+            assert.ok(/Step 1 of 3/.test(await ev(`window.__na.dialog().textContent`)), 'still on step 1');
+            assert.equal(await ev(`window.__launches.length`), before, 'no launch request was sent');
         });
         await S.run('a folder already in the field is selected on focus (typing replaces it), every recent folder is the field\'s list, and a blocked Launch says why on step 1', async () => {
             await recents(['/work/payments-app', '/work/website', '/work/docs', '/work/old']); await reopen();
@@ -71,5 +82,5 @@ const BASE = require('./test_base').BASE;
             await shot('step1-390');
         });
         S.finish();
-    } finally { await client.close(); }
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
