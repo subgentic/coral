@@ -53,7 +53,9 @@ const BASE = require('./test_base').BASE;
             out.shown = $('set-password-new').type;
             document.querySelector('#set-password-modal .pw-toggle').click();
             out.hiddenAgain = $('set-password-new').type;
+            out.meterEmpty = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).display; out.notNowNote = document.querySelector('#set-password-modal .pw-not-now')?.textContent || '';
             type('set-password-new', 'a');
+            out.meterTyped = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).display;
             out.weak = { level: document.querySelector('#set-password-modal .pw-strength').getAttribute('data-level'), disabled: $('set-password-save').disabled };
             // empty and mismatch send nothing
             type('set-password-new', ''); submit();
@@ -150,6 +152,8 @@ const BASE = require('./test_base').BASE;
         assert.equal(out.lead2, out.lead1, 'the same words on a later visit, and no "nothing changed" notice');
         assert.doesNotMatch(out.lead1 + out.lead2, /nothing changed|now asks browsers/);
         assert.deepEqual(out.weak, { level: 'weak', disabled: false }, 'the meter advises and never blocks');
+        assert.equal(out.meterEmpty, 'none', 'no empty strength bar before anything is typed (#9971)'); assert.notEqual(out.meterTyped, 'none', 'the bar shows once something is typed');
+        assert.match(out.notNowNote, /^Not now keeps Coral open to any program on this computer\. You can set a password later in Settings, Security and privacy\.$/, 'the prompt says what Not now leaves you with');
         assert.equal(out.emptyErr, 'Enter a password.'); assert.equal(out.callsAfterEmpty, 0);
         assert.match(out.mismatchErr, /do not match/); assert.equal(out.callsAfterMismatch, 0, 'nothing is sent for a mismatch');
         assert.deepEqual(out.setCall, { url: '/api/auth/password/set', body: { password: '  a b  ' } }, 'sent exactly as typed, spaces kept');
