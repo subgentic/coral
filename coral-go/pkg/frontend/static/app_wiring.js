@@ -2,7 +2,7 @@
 import { state, loadSessionDrafts, sessionKey, saveSessionDraft } from './state.js';
 import { accountTag, setStoreOwner, ageOutStored, DAY_MS } from './local_store.js';
 import { applyTabPrefs } from './tab_customize.js';
-import { loadPendingFromStorage, initCommandInputAutosize, refreshLiveHistory } from './live_chat.js';
+import { loadPendingFromStorage, initCommandInputAutosize } from './live_chat.js';
 import { platform } from './platform/detect.js';
 import { initNative } from './platform/native.js';
 import { initMacOS } from './platform/macos.js';
@@ -19,7 +19,8 @@ import { initChatFind } from './chat_find.js';
 import { initSidebarResize, initTaskBarResize, initSidebarCollapse, initAgenticPanelCollapse, initAgenticBlockResize, initAgenticBlockCollapse, initSidebarRail } from './sidebar.js';
 import { restoreAgenticTabs } from './agentic_state.js';
 import { initPreviewPane } from './preview_pane.js';
-import { syncPaneWidth, refreshCapture } from './capture.js';
+import { syncPaneWidth } from './capture.js';
+import { wireReturnToTab } from './return_to_tab.js';
 import { fitTerminal } from './xterm_renderer.js';
 
 // What was typed and where people worked, kept in this browser (local_store.js, #3681): owned by the
@@ -168,17 +169,9 @@ export function initPanels() {
 export function wireWindowEvents() {
     // Pause polling when tab is hidden; refresh immediately when visible again.
     // Skip in native apps — WKWebView may report document.hidden=true permanently.
-    if (!platform.isNative) {
-        document.addEventListener("visibilitychange", () => {
-            if (!document.hidden && state.currentSession && state.currentSession.type === "live") {
-                refreshCapture();
-                // The transcript poll skips hidden windows, so a window that
-                // was in the background has no chat yet (or a stale one).
-                // Waiting for the next tick to notice shows an empty pane.
-                refreshLiveHistory();
-            }
-        });
-    }
+    // The transcript poll skips hidden windows, so a window that was in the background has no chat yet (or a stale one), and its feed may have been closed by the system:
+    // coming back reconnects and reads the open agent again at once, saying "Reconnecting…" or "Loading chat…" meanwhile (return_to_tab.js, #10068).
+    if (!platform.isNative) wireReturnToTab();
 
     // Sync tmux pane width on window resize and panel drag
     let resizeDebounce;
