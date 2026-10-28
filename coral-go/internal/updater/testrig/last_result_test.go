@@ -21,7 +21,7 @@ func lastResult(t *testing.T, r *rig) *verify.CheckResult {
 
 // Each check keeps what it found, for Settings and the dashboard's notice (#9726): the result word, the newest product release it saw, the stage of a failure and when.
 func TestEachCheckRecordsWhatItFound(t *testing.T) {
-	at := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
+	at := rigNow()
 
 	t.Run("up to date, from the feed alone", func(t *testing.T) {
 		r := newRig(t)

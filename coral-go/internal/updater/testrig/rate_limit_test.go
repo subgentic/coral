@@ -25,7 +25,7 @@ func nextAttempt(t *testing.T, res stage.Result) time.Time {
 func TestCheckWaitsUntilTheRateLimitIsOver(t *testing.T) {
 	r := newAPIRig(t)
 	r.publish(Spec{Version: "1.4.131", Sequence: 7})
-	t0 := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
+	t0 := rigNow()
 	now := t0
 	r.cfg.Now = func() time.Time { return now }
 	reset := t0.Add(20 * time.Minute)
@@ -102,7 +102,7 @@ func TestRateLimitAnswersAndTheirWaits(t *testing.T) {
 // failure in between starts the count again.
 func TestTheFloorOfTheWaitDoublesWithEachRateLimitInARow(t *testing.T) {
 	r := newAPIRig(t)
-	now := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
+	now := rigNow()
 	r.cfg.Now = func() time.Time { return now }
 	r.gh.Status["list"] = 403
 	r.gh.Headers = map[string]map[string]string{"list": {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": strconv.FormatInt(now.Add(-time.Hour).Unix(), 10)}} // already past
