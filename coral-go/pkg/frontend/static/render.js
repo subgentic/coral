@@ -4,6 +4,7 @@
 import './model_labels.js';
 import './import_once.js';
 import { state } from './state.js';
+import { LAUNCH_CARDS } from './launch_cards.js';
 import './settings_lists.js';
 import './hub_access.js';
 import { sessionServer, noteBoardLabels, sessionTeamKey } from './server_base.js';
@@ -323,12 +324,18 @@ function _renderLiveSessions(sessions) {
     _refreshTeamBadges(sessions);
 }
 
-// A phone has no welcome screen (the agent list is its Home): with nothing running, the list says what Coral is for and offers the same two launches as the desktop's welcome (#5990).
+// A phone has no welcome screen (the agent list is its Home): with nothing running, the list says what Coral is for and offers the launches the desktop welcome has (#5990, #9998).
 // The desktop's sidebar keeps its plain line; the CSS shows one or the other.
+// what each card does, as whole attributes (an action name is written out, never built, #3645)
+const PHONE_CARD_ACTION = {
+    agent: 'data-on-click="m-show-launch-modal-then-select-launch-type" data-arg="agent"',
+    team: 'data-on-click="m-show-launch-modal-then-select-launch-type" data-arg="team"',
+    folder: 'data-on-click="m-show-open-folder-modal"',
+};
+const phoneCard = c => `<button type="button" class="empty-launch" ${PHONE_CARD_ACTION[c.key]}><span class="empty-launch-icon material-icons" aria-hidden="true">${c.icon}</span><span class="empty-launch-copy"><strong>${c.label}</strong><span>${c.desc}</span></span><span class="material-icons empty-launch-arrow" aria-hidden="true">arrow_forward</span></button>`;
 const PHONE_WELCOME = `<li class="empty-state empty-welcome"><h2>What do you want to work on?</h2><p>Start one agent in a folder, or a team that works together.</p>
 <div class="empty-launch-list">
-<button type="button" class="empty-launch" data-on-click="m-show-launch-modal-then-select-launch-type" data-arg="agent"><span class="empty-launch-icon material-icons" aria-hidden="true">smart_toy</span><span class="empty-launch-copy"><strong>New agent</strong><span>One agent in a folder you choose.</span></span><span class="material-icons empty-launch-arrow" aria-hidden="true">arrow_forward</span></button>
-<button type="button" class="empty-launch" data-on-click="m-show-launch-modal-then-select-launch-type" data-arg="team"><span class="empty-launch-icon material-icons" aria-hidden="true">groups</span><span class="empty-launch-copy"><strong>New team</strong><span>Agents that split the work and talk to each other.</span></span><span class="material-icons empty-launch-arrow" aria-hidden="true">arrow_forward</span></button>
+${LAUNCH_CARDS.map(phoneCard).join('\n')}
 </div></li>`;
 
 // Hidden tabs skip availability polls; catch up as soon as the tab is shown.

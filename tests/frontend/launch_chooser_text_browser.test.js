@@ -5,10 +5,10 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const WORDS = {
-    'New agent': 'Launch Claude, Antigravity, or Codex with system prompt and tools',
-    'New team': 'Launch multiple agents collaborating on a shared message board',
-    'Terminal': 'Open a shell session you can use alongside your agents',
-    'Open folder': 'Pin a folder to your Agents list, ready to launch into',
+    'New agent': 'One agent in a folder you choose.',
+    'New team': 'Agents that split the work and talk to each other.',
+    'Open folder': 'Add a folder now and start an agent in it later.',
+    'Terminal': 'Open a shell next to your agents.',
 };
 
 (async () => {
