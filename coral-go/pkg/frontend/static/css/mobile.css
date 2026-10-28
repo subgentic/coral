@@ -140,7 +140,7 @@
 
 /* A phone's way back from an agent to the list (#9999): in the agent's own header, since the page's header is hidden there */
 .terminal-header-left > .btn[data-on-click="mobile-back"] { display: none; }
-@media (max-width: 767px) { .terminal-header-left > .btn[data-on-click="mobile-back"] { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 44px; min-height: 44px; font-size: var(--fs-2xl); color: var(--text-secondary); } .terminal-header-left { flex-wrap: wrap; } } /* the arrow is a button of the family, placed here: at large text the header's left side wraps rather than cut it (#9999) */
+@media (max-width: 767px) { .terminal-header-left > .btn[data-on-click="mobile-back"] { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 44px; min-height: 44px; font-size: var(--fs-2xl); color: var(--text-secondary); } .terminal-header-left { flex-wrap: wrap; } body .terminal-header-left { row-gap: 8px; } } /* the arrow is a button of the family, placed here: at large text the header's left side wraps rather than cut it (#9999) */
 
 /* ── Tablet: ≤ 1023px ─────────────────────────────────────── */
 
