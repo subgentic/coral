@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 
+	"github.com/subgentic/coral/internal/diskguard"
 	"github.com/subgentic/coral/internal/safego"
 )
 
@@ -45,6 +47,7 @@ const (
 	messageIndexOff int32 = iota
 	messageIndexBuilding
 	messageIndexReady
+	messageIndexLowDisk // wanted, not built: the disk is nearly full (#9706); the next open tries again
 )
 
 // messageSearchIndexWanted reports the setting: on unless the variable says off (0, false, off or no, in any case).
@@ -66,7 +69,7 @@ func (s *Store) messageSearchIndexAvailable(ctx context.Context) bool {
 type MessageSearchIndexStatus struct {
 	Setting   string `json:"setting"`    // "on" or "off": CORAL_BOARD_SEARCH_INDEX
 	Available bool   `json:"available"`  // false: this build of SQLite has no FTS5
-	State     string `json:"state"`      // "off", "building" or "ready"
+	State     string `json:"state"`      // "off", "building", "ready" or "low_disk"
 	SizeBytes int64  `json:"size_bytes"` // the index's tables and their indexes, 0 when there is none
 }
 
@@ -82,13 +85,15 @@ func (s *Store) MessageSearchIndexStatus(ctx context.Context) MessageSearchIndex
 	return st
 }
 
-// MessageSearchIndexState is "off", "building" or "ready".
+// MessageSearchIndexState is "off", "building", "ready" or "low_disk" (the setting is on and the disk is too full to build it).
 func (s *Store) MessageSearchIndexState() string {
 	switch s.msgIndex.Load() {
 	case messageIndexReady:
 		return "ready"
 	case messageIndexBuilding:
 		return "building"
+	case messageIndexLowDisk:
+		return "low_disk"
 	}
 	return "off"
 }
@@ -105,7 +110,7 @@ func (s *Store) applyMessageSearchIndexSetting() {
 			s.msgIndex.Store(messageIndexReady)
 			return
 		}
-		s.startMessageSearchIndexBuild()
+		s.startMessageSearchIndexBuildIfRoom(ctx)
 		return
 	}
 	if s.messageIndexExists(ctx) {
@@ -129,6 +134,44 @@ func (s *Store) messageIndexComplete(ctx context.Context) bool {
 	var n int
 	_ = s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN ('board_messages_fts_ai', 'board_messages_fts_ad', 'board_messages_fts_au')`)
 	return n == 3
+}
+
+// messageIndexFreeSpace is the free space of a folder's disk: a variable for a test.
+var messageIndexFreeSpace = diskguard.FreeBytes
+
+// messageIndexRoomFactor is how many times the text of the messages must be free on the disk before the index is built: the index takes about 0.6 times the text, and the build and the WAL need room beside it.
+const messageIndexRoomFactor = 2
+
+// messageIndexNoCheckAbove: a disk with this much free space has room for any board (the text of the messages would have to be 32 GiB), so the size of the text is not even read.
+const messageIndexNoCheckAbove = 64 << 30
+
+// diskTooFullForIndex says whether the disk of the board file is too full to build the index: under messageIndexRoomFactor times the text of the messages free. One statfs when the disk has room; the sum of the text only
+// below messageIndexNoCheckAbove. A disk that cannot be read is not low (a failed reading must not turn the index off). An in-memory database has no disk.
+func (s *Store) diskTooFullForIndex(ctx context.Context) (low bool, need, free uint64) {
+	if s.dbPath == "" || isInMemoryPath(s.dbPath) {
+		return false, 0, 0
+	}
+	free, err := messageIndexFreeSpace(filepath.Dir(s.dbPath))
+	if err != nil || free >= messageIndexNoCheckAbove {
+		return false, 0, free
+	}
+	var text int64
+	if err := s.db.GetContext(ctx, &text, `SELECT COALESCE(SUM(LENGTH(CAST(content AS BLOB))), 0) FROM board_messages`); err != nil {
+		return false, 0, free
+	}
+	need = uint64(text) * messageIndexRoomFactor
+	return free < need, need, free
+}
+
+// startMessageSearchIndexBuildIfRoom builds the index in the background unless the disk is nearly full: then it says so once, the state is low_disk (a search reads every message) and the next open tries again. A full disk
+// costs one statfs, not a build that fails and a drop of what it built at every start (#9706).
+func (s *Store) startMessageSearchIndexBuildIfRoom(ctx context.Context) {
+	if low, need, free := s.diskTooFullForIndex(ctx); low {
+		s.msgIndex.Store(messageIndexLowDisk)
+		log.Printf("board: not building the message search index: %d MiB free on the disk of the board file, and it wants %d MiB (twice the text of the messages); a search reads every message, and the next start tries again", free>>20, need>>20)
+		return
+	}
+	s.startMessageSearchIndexBuild()
 }
 
 // startMessageSearchIndexBuild builds the index in the background; the store's Close stops it.
@@ -155,7 +198,7 @@ func (s *Store) EnableMessageSearchIndex(ctx context.Context) {
 		s.msgIndex.Store(messageIndexReady)
 		return
 	}
-	s.startMessageSearchIndexBuild()
+	s.startMessageSearchIndexBuildIfRoom(ctx)
 }
 
 // BuildMessageSearchIndex builds the index now and returns when it is ready: the background build's work, for tests and for a caller that

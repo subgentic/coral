@@ -29,6 +29,7 @@ const MIB = 1024 ** 2;
             ['on and ready: the disk it takes', { setting: 'on', available: true, state: 'ready', size_bytes: 12 * MIB }, 'On and ready. It takes 12 MiB of disk.'],
             ['on and building', { setting: 'on', available: true, state: 'building', size_bytes: 0 }, 'On, building in the background: a search reads every message until it is ready.'],
             ['off by the setting', { setting: 'off', available: true, state: 'off', size_bytes: 0 }, 'Off (CORAL_BOARD_SEARCH_INDEX=off): a search reads every message.'],
+            ['the disk is nearly full', { setting: 'on', available: true, state: 'low_disk', size_bytes: 0 }, 'On, but not built: the disk is nearly full. A search reads every message. Coral tries again when it starts.'],
             ['a build without FTS5', { setting: 'on', available: false, state: 'off', size_bytes: 0 }, 'Not in this build: a search reads every message.'],
         ];
         let n = 0;
