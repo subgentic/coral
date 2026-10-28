@@ -17,11 +17,11 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         await ev(`(() => { const R = window.fetch; window.__opened = [];
             window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.origin);
-                if (url.pathname === '/api/sessions/history' && url.searchParams.get('q')) return Promise.resolve(new Response(JSON.stringify({ sessions: [{ session_id: 'chat-0001', title: 'Release notes chat', agent_name: 'Orchestrator' }], total: 1 }), { status: 200, headers: { 'content-type': 'application/json' } }));
+                if (url.pathname === '/api/sessions/history' && url.searchParams.get('q')) return Promise.resolve(new Response(JSON.stringify({ sessions: !/release/.test(url.searchParams.get('q')) ? [] : [{ session_id: 'chat-0001', title: 'Release notes chat', agent_name: 'Orchestrator' }], total: 1 }), { status: 200, headers: { 'content-type': 'application/json' } }));
                 return R(u, o); };
             window.selectHistorySession = id => { window.__opened.push('chat:' + id); return Promise.resolve(); };
             return true; })()`);
-        await ev(`window.__m.add('alpha-bot', 'A', 4, { sleeping: false }); window.__m.add('beta-bot', 'B', 4, { sleeping: false }); true`); await sleep(1000); // sleep-ok: a redraw settles over frames; there is no completion event
+        await ev(`window.__m.add('alpha-bot', 'A', 4, { sleeping: false }); window.__m.add('beta-bot', 'B', 4, { sleeping: false }); window.__m.add('lead-bot', 'L', 4, { sleeping: false, board_project: 'team-z' }); true`); await sleep(1000); // sleep-ok: a redraw settles over frames; there is no completion event
         const open = () => ev(`(() => { const m = document.getElementById('jump-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`);
         const names = () => ev(`[...document.querySelectorAll('#jump-list [role=option]')].map(o => o.textContent)`);
         await ev(`document.activeElement && document.activeElement.blur(); true`);
@@ -30,8 +30,17 @@ const BASE = require('./test_base').BASE;
         await key('k', 'KeyK', CTRL);
         await waitFor(`!!document.getElementById('jump-modal') && getComputedStyle(document.getElementById('jump-modal')).display !== 'none'`, 'the jump box', 5000);
         assert.equal(await ev(`document.activeElement.id`), 'jump-input', 'the focus is in the box');
-        assert.deepEqual((await names()).sort(), ['alpha-bot', 'beta-bot'], 'every agent is listed to begin with');
+        assert.deepEqual((await names()).sort(), ['alpha-bot', 'beta-bot', 'lead-bot (team-z)'], 'every agent is listed to begin with, with its team when it has one (every team has an Orchestrator)');
         assert.equal(await ev(`document.getElementById('jump-input').getAttribute('role')`), 'combobox');
+        // nothing matches: Enter and a click on the blank list leave the box open, and nothing is pointed at
+        await Input.insertText({ text: 'zzzqq' }); await sleep(600); // sleep-ok: a redraw settles over frames; there is no completion event
+        assert.deepEqual(await names(), [], 'no match');
+        assert.equal(await ev(`document.getElementById('jump-input').hasAttribute('aria-activedescendant')`), false, 'nothing is pointed at when nothing matches');
+        await key('Enter', 'Enter', 0, '\r'); await sleep(200); // sleep-ok: a redraw settles over frames; there is no completion event
+        assert.equal(await open(), true, 'Enter with no match does not close the box');
+        await ev(`document.getElementById('jump-list').click(); true`); await sleep(200); // sleep-ok: a redraw settles over frames; there is no completion event
+        assert.equal(await open(), true, 'a click on the blank list does not close it');
+        await ev(`document.getElementById('jump-input').value = ''; true`);
         // typing narrows it, and the chats of the History search join the agents
         await Input.insertText({ text: 'beta' }); await sleep(500); // sleep-ok: a redraw settles over frames; there is no completion event
         assert.equal((await names())[0], 'beta-bot', 'the agent that matches is first');

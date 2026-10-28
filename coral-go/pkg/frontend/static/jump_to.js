@@ -18,20 +18,21 @@ function draw(none) {
         li.className = 'menu-item jump-option'; li.id = `jump-opt-${i}`; li.setAttribute('role', 'option'); li.setAttribute('aria-selected', String(i === current)); li.textContent = m.label;
         return li;
     }));
-    $('jump-input').setAttribute('aria-activedescendant', `jump-opt-${current}`);
+    if (current >= 0) $('jump-input').setAttribute('aria-activedescendant', `jump-opt-${current}`); else $('jump-input').removeAttribute('aria-activedescendant'); // nothing to point at when nothing matches
     $('jump-status').textContent = none && !matches.length ? 'No matches' : '';
     $('jump-list').children[current]?.scrollIntoView({ block: 'nearest' });
 }
 
 function choose(i) {
+    if (!matches[i]) return; // Enter or a click with no match under it leaves the box open
     $('jump-modal').style.display = 'none'; // display-ok: the same inline state the dialog was opened with
-    matches[i]?.open();
+    matches[i].open();
 }
 
 async function search() {
     const text = $('jump-input').value.trim().toLowerCase(), mine = ++seq, words = text.split(/\s+/).filter(Boolean);
     matches = (state.liveSessions || []).filter(s => !s.archived && words.every(w => `${label(s)} ${s.name || ''} ${s.board_project || ''}`.toLowerCase().includes(w))).slice(0, 8)
-        .map(s => ({ label: label(s), open: () => window.selectLiveSession(s.name, s.agent_type, s.session_id || '', sessionServer(s), { focusChat: true }) }));
+        .map(s => ({ label: s.board_project ? `${label(s)} (${s.board_project})` : label(s), open: () => window.selectLiveSession(s.name, s.agent_type, s.session_id || '', sessionServer(s), { focusChat: true }) }));
     current = matches.length ? 0 : -1;
     draw(!words.length);
     if (!words.length) return;
