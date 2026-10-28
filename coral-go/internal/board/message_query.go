@@ -16,9 +16,10 @@ import (
 
 // The board message search (#4745): GET /api/board/{project}/messages/search. Like the Team Artifacts query it takes q, since, until,
 // sort and cursor, and answers with total and next_cursor (and prev_cursor: it pages both ways). The text and the names are matched in
-// Go on the rows the time bounds leave, on what a viewer sees (MessageQuery.Shown). A plain ASCII text search is narrowed by SQL first
-// (queryTextInSQL: a bound, escaped LIKE parameter, so nothing a caller sends reaches a statement and % and _ are ordinary characters);
-// the Go scan answers every other query and every case where LIKE and Go's match could differ. The scan is bounded by rows and by text.
+// Go on the rows the time bounds leave, on what a viewer sees (MessageQuery.Shown). A plain text search with nothing but the text to
+// match reads only each message's id and text (queryTextByIDs: the match is Go's own, so a NUL byte, a folded letter or a non-ASCII needle
+// need no special case) and the index narrows an ASCII needle first when it is ready; every other query scans whole rows. The scans are
+// bounded by rows and by text.
 
 const (
 	MessageQueryDefaultLimit = 50
@@ -276,9 +277,7 @@ func (s *Store) QueryMessages(ctx context.Context, q *MessageQuery) (*MessageQue
 		dir = "ASC"
 	}
 	if q.sqlTextOnly(allowed) {
-		if res, ok, err := s.queryTextInSQL(ctx, q, where, args, dir); err != nil || ok {
-			return res, err
-		}
+		return s.queryTextByIDs(ctx, q, where, args, dir)
 	}
 	rows, err := s.reader().QueryxContext(ctx, listMessagesSelect+" WHERE "+strings.Join(where, " AND ")+" ORDER BY m.id "+dir, args...)
 	if err != nil {
@@ -345,57 +344,67 @@ func (q *MessageQuery) fill(res *MessageQueryResult, pg *querypage.Pager[Message
 	}
 }
 
-// sqlTextOnly says the query is a plain text search the database can narrow: an ASCII needle, no sender, mention or member list, and
+// sqlTextOnly says the query is a plain text search that needs only each message's id and text: no sender, mention or member list, and
 // no redaction (a tunneled viewer matches on the redacted text, which only Go computes).
 func (q *MessageQuery) sqlTextOnly(allowed map[int64]bool) bool {
-	if q.Text == "" || len(q.From) > 0 || q.Mentions != "" || allowed != nil || q.Shown != nil {
-		return false
-	}
-	for i := 0; i < len(q.Text); i++ {
-		if q.Text[i] >= 0x80 {
-			return false
-		}
-	}
-	return true
+	return q.Text != "" && len(q.From) == 0 && q.Mentions == "" && allowed == nil && q.Shown == nil
 }
 
 var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
-// queryTextInSQL answers a text search with LIKE (ASCII case-folded, as the Go match is for an ASCII needle) so only the ids of the
-// matches reach Go; the page's rows are read after. ok is false when the Go scan must answer instead: the scan caps would truncate the
-// board, a message holds a NUL byte, or the needle has an i or k and a message holds U+0130 or U+212A (which Go's ToLower folds to i and k; LIKE does not).
-func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []string, args []any, dir string) (*MessageQueryResult, bool, error) {
-	if res, ok, err := s.queryTextViaIndex(ctx, q, where, args, dir); err != nil || ok {
-		return res, ok, err
+// queryTextByIDs answers a plain text search by reading only each message's id and text, in the query's order, and keeping the ids that match: the same match, the same caps and the same Truncated as the scan of whole rows
+// below (the match is textHasFold, the Go match itself, so no case is left to the scan: a NUL byte, a folded letter or a needle that is not ASCII), without the sender, subscriber and task columns of a whole row. The page's rows are read
+// after, by id (pageOfIDs). v2.0.2 answered this with LIKE in three passes over the text and was about twice as slow as v2.0.1's scan at 800 bytes a message, one pass was still 1.9 times slower through the server
+// (the driver's page reads); a single read of the text in rowid order is the v2.0.1 shape and measured against it (#9744).
+func (s *Store) queryTextByIDs(ctx context.Context, q *MessageQuery, where []string, args []any, dir string) (*MessageQueryResult, error) {
+	// The index (when it is ready) narrows an ASCII needle only: its case folding and LIKE's are ASCII, and Go's match folds more.
+	if asciiNeedle(q.Text) {
+		if res, ok, err := s.queryTextViaIndex(ctx, q, where, args, dir); err != nil || ok {
+			return res, err
+		}
 	}
-	w := " WHERE " + strings.Join(where, " AND ")
-	var n, bytes int64
-	if err := s.reader().QueryRowxContext(ctx, "SELECT COUNT(*), COALESCE(SUM(LENGTH(CAST(m.content AS BLOB))), 0) FROM board_messages m"+w, args...).Scan(&n, &bytes); err != nil {
-		return nil, false, err
+	rows, err := s.reader().QueryContext(ctx, "SELECT m.id, m.content FROM board_messages m WHERE "+strings.Join(where, " AND ")+" ORDER BY m.id "+dir, args...)
+	if err != nil {
+		return nil, err
 	}
-	if n > int64(messageScanRows) || bytes > int64(messageScanBytes) {
-		return nil, false, nil
-	}
-	// Where LIKE and Go's match differ, Go answers: a NUL byte (LIKE stops reading a text at it), and for a needle with an i or k, U+0130
-	// and U+212A (Go folds them to i and k; LIKE does not).
-	odd := "instr(CAST(m.content AS BLOB), CAST(char(0) AS BLOB)) > 0"
-	if strings.ContainsAny(q.Text, "ik") {
-		odd += " OR instr(m.content, char(304)) > 0 OR instr(m.content, char(8490)) > 0"
-	}
-	var differs int
-	if err := s.reader().QueryRowxContext(ctx, "SELECT EXISTS(SELECT 1 FROM board_messages m"+w+" AND ("+odd+"))", args...).Scan(&differs); err != nil || differs != 0 {
-		return nil, false, err
-	}
-	likeArgs := append(append([]any{}, args...), "%"+likeEscaper.Replace(q.Text)+"%")
+	defer rows.Close()
 	var ids []int64
-	if err := s.reader().SelectContext(ctx, &ids, "SELECT m.id FROM board_messages m"+w+` AND m.content LIKE ? ESCAPE '\' ORDER BY m.id `+dir, likeArgs...); err != nil {
-		return nil, false, err
+	truncated := false
+	scannedRows, scannedBytes := 0, 0
+	for rows.Next() {
+		var id int64
+		var content string
+		if err := rows.Scan(&id, &content); err != nil {
+			return nil, err
+		}
+		if scannedRows++; scannedRows > messageScanRows || scannedBytes+len(content) > messageScanBytes {
+			truncated = true
+			break
+		}
+		scannedBytes += len(content)
+		if textHasFold(content, q.Text) {
+			ids = append(ids, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	res, err := s.pageOfIDs(ctx, q, ids)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	return res, true, nil
+	res.Truncated = truncated
+	return res, nil
+}
+
+// asciiNeedle is true when every byte of the needle is ASCII.
+func asciiNeedle(text string) bool {
+	for i := 0; i < len(text); i++ {
+		if text[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 // pageOfIDs makes the reply of a search from the ids of the messages that match, in the query's order: the page's rows are read and the
