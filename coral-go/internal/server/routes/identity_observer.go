@@ -192,11 +192,9 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 			}
 			o.count(callerAgentToken)
 			o.attribute(owner.SessionName, r.UserAgent())
-			if o.strictFor(r) {
-				// The token is the whole identity: a command-line signature on the same
-				// request never adds the Operator's authority (#3418).
-				r.Header.Del(cliauth.CLIAuthHeader)
-			}
+			// The token is the whole identity: a command-line signature on the same request never adds the Operator's authority (#3418), in every mode (#9803: with strict local auth
+			// off it used to be kept, after a read of the kernel's socket table to find out whether the mode was strict for this connection).
+			r.Header.Del(cliauth.CLIAuthHeader)
 			r = r.WithContext(context.WithValue(r.Context(), verifiedSessionKey{}, owner))
 			if route, only, ok := guardedRoute(r); ok {
 				o.countOperatorCall(owner.SessionName, r.Method+" "+route)
@@ -287,7 +285,7 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 		// strict mode (counted in the identity report as local_other); with strict local
 		// auth, every caller needs one.
 		claimed := caller == callerCLISigned || caller == callerAPIKey || caller == callerHub
-		if o.strictFor(r) || claimed {
+		if claimed || o.strictFor(r) { // a credential that is present decides first: the same branch either way, without asking whose connection it is (#9803)
 			r2, ok := o.admit(r, caller)
 			if !ok {
 				o.countBreak(caller, r)
