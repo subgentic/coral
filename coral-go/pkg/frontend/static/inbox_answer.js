@@ -35,12 +35,6 @@ async function readAsk(s) {
     return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks } : none;
 }
 
-/** The row says what was answered; the Inbox is told, so the row goes when the agent stops waiting. */
-function settled(s, o, cell) {
-    cell.replaceChildren(Object.assign(document.createElement('span'), { className: 'inbox-answered', textContent: `Answered: ${o.label}` }));
-    document.dispatchEvent(new CustomEvent('coral:inbox-answered', { detail: { session_id: s.session_id } }));
-}
-
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
 
 async function answer(s, o, ask, cell) {
@@ -61,11 +55,15 @@ async function answer(s, o, ask, cell) {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ session_id: s.session_id, agent_type: s.agent_type || '', n: Number(o.n), label: o.label, text: '', ask_id: ask }),
         });
-        if (resp.status === 409) {
+        if (resp.status === 409) { // told apart by the server's code, never its words (#10516)
             const why = await resp.json().catch(() => ({}));
-            if (/^That question changed/.test(why.error || '')) { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('That question changed; look at it again.', true); return; } // the server saw another ask than the one drawn
-            if (why.code === 'prompt_still_open') { read.delete(askKey(s)); settled(s, o, cell); showToast(`Sent: ${o.label}. The agent's prompt is still open: look at it.`, false, 6000); return; } // the answer went; the prompt had not gone yet
-            throw new Error(why.error || 'HTTP 409');
+            if (why.code === 'ask_changed') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('That question changed; look at it again.', true); return; } // the server saw another ask than the one drawn
+            if (why.code === 'answer_sent_prompt_open') { // the key went and the prompt had not cleared: the agent may still be waiting, so the row stays in Needs you (the feed removes it when the agent stops waiting) and says so
+                read.delete(askKey(s));
+                cell.replaceChildren(Object.assign(document.createElement('span'), { className: 'inbox-answered', textContent: `Sent: ${o.label}. Still waiting: check the agent.` }));
+                return;
+            }
+            throw new Error(why.error || 'HTTP 409'); // nothing was sent (the selection did not move, Submit was not reached): the buttons stay, and the person is told
         }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         read.delete(askKey(s));

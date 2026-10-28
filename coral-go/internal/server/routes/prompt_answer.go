@@ -640,7 +640,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.AskID != "" && screen.AskID != body.AskID {
-		errConflict(w, "That question changed; look at it again.")
+		writeError(w, http.StatusConflict, "ask_changed", "That question changed; look at it again.") // a code the client matches on, not the words (#10516)
 		return
 	}
 	opt := screen.Options[body.N-1]
@@ -696,7 +696,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !cleared {
-		writeError(w, http.StatusConflict, "prompt_still_open",
+		writeError(w, http.StatusConflict, "answer_sent_prompt_open", // the key went and the prompt did not clear: told apart from "prompt_still_open" (nothing was sent), #10516
 			"The answer was sent, but the agent's prompt is still open. Check the terminal.")
 		return
 	}
@@ -955,7 +955,7 @@ func (h *SessionsHandler) submitMulti(w http.ResponseWriter, r *http.Request, na
 		return
 	}
 	if !cleared {
-		writeError(w, http.StatusConflict, "prompt_still_open",
+		writeError(w, http.StatusConflict, "answer_sent_prompt_open", // the key went and the prompt did not clear: told apart from "prompt_still_open" (nothing was sent), #10516
 			"Submit was sent, but the agent's prompt is still open. Check the terminal.")
 		return
 	}

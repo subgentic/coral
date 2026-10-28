@@ -101,7 +101,7 @@ func TestAnswerPrompt_Codex161HookTrustOnPTY(t *testing.T) {
 		term.onRaw = func(string) { setScreen(garbled) }
 		code, body := answer()
 		assert.Equal(t, http.StatusConflict, code, "%v", body)
-		assert.Equal(t, "prompt_still_open", body["code"])
+		assert.Equal(t, "answer_sent_prompt_open", body["code"])
 	})
 	// Security's N2 on #58: the same options still drawn under a changed header (a count) are not a prompt that went.
 	t.Run("the same menu under a changed header is not reported answered", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestAnswerPrompt_Codex161HookTrustOnPTY(t *testing.T) {
 		term.onEnter = func(string) { setScreen(changed) }
 		code, body := answer()
 		assert.Equal(t, http.StatusConflict, code, "%v", body)
-		assert.Equal(t, "prompt_still_open", body["code"])
+		assert.Equal(t, "answer_sent_prompt_open", body["code"])
 		assert.LessOrEqual(t, term.enters["codex-hooks"], 1, "never a second Enter")
 	})
 }
