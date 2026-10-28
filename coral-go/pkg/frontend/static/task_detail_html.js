@@ -62,15 +62,24 @@ function _taskRevisionHtml(task) {
     return html;
 }
 
+/** Where `name` is in `text` on a word boundary (not inside a longer word or file name), or -1. */
+function nameAt(text, name) {
+    for (let i = text.indexOf(name); i >= 0; i = text.indexOf(name, i + 1)) {
+        if (!/[\w.-]/.test(text[i - 1] || ' ') && !/[\w-]/.test(text[i + name.length] || ' ')) return i;
+    }
+    return -1;
+}
+
 /** A result names the files the task attached (hours.md): each name in the message is a link to its file, the way the Completion artifacts list opens it (#10603, the Beta tester). Plain text stays escaped; the first mention of each name is the link. */
 function _messageWithFiles(message, artifacts) {
     const text = String(message ?? '');
-    const files = (artifacts || []).filter(a => a && String(a.name || '').length >= 3 && /^(coral:\/\/artifacts\/[a-f0-9]{64}|https?:\/\/)/i.test(String(a.uri || '')));
+    // Only a Coral store file is linked inside the words (a web address stays in the artifacts list, where it is seen for what it is), and only a name that looks like a file: a dot and an extension (#10629, Security Reviewer).
+    const files = (artifacts || []).filter(a => a && /^[\w][\w.-]*\.[A-Za-z0-9]{1,8}$/.test(String(a.name || '')) && /^coral:\/\/artifacts\/[a-f0-9]{64}$/i.test(String(a.uri || '')));
     let out = '', rest = text;
     const used = new Set();
     for (;;) {
         let at = -1, hit = null;
-        for (const f of files) { if (used.has(f.name)) continue; const i = rest.indexOf(f.name); if (i >= 0 && (at < 0 || i < at)) { at = i; hit = f; } }
+        for (const f of files) { if (used.has(f.name)) continue; const i = nameAt(rest, f.name); if (i >= 0 && (at < 0 || i < at)) { at = i; hit = f; } }
         if (!hit) break;
         used.add(hit.name);
         const uri = String(hit.uri), isCoral = uri.startsWith('coral://');
