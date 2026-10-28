@@ -134,3 +134,24 @@ func TestArchivedAgentIsInTheArchivedChatFolder(t *testing.T) {
 	assert.Empty(t, folder(true))
 	assert.Len(t, folder(false), 2)
 }
+
+// #10654: an archived agent that has no chat yet (nothing in the session index) is counted in Archived, so Inbox > Archived is not 0 for a person who archived it; it is not in All chats, and unarchiving takes it out again.
+func TestArchivedAgentWithNoChatYetIsCountedInArchived(t *testing.T) {
+	s := NewSessionStore(openTestDB(t))
+	ctx := context.Background()
+	require.NoError(t, s.RegisterLiveSession(ctx, &LiveSession{SessionID: "quiet-one", AgentName: "QA Engineer", AgentType: "claude", WorkingDir: "/fixture", PID: 123}))
+	count := func() (all, archived int) {
+		t.Helper()
+		c, err := s.CountChatFolders(ctx, nil)
+		require.NoError(t, err)
+		return c.All, c.Archived
+	}
+	all, archived := count()
+	assert.Equal(t, []int{0, 0}, []int{all, archived}, "an agent with no chat is in neither folder")
+	require.NoError(t, s.SetSessionArchived(ctx, "quiet-one", true))
+	all, archived = count()
+	assert.Equal(t, []int{0, 1}, []int{all, archived}, "archived, it is counted in Archived and still not in All chats")
+	require.NoError(t, s.SetSessionArchived(ctx, "quiet-one", false))
+	all, archived = count()
+	assert.Equal(t, []int{0, 0}, []int{all, archived}, "unarchived, it is gone from Archived")
+}
