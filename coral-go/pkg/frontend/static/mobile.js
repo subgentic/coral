@@ -30,8 +30,10 @@ const TAB_NAMES = { agents: 'Agents', 'hub-inbox': 'Inbox', automations: 'Automa
 function syncSidebarLandmark() {
     const sidebar = document.querySelector('.sidebar');
     if (!sidebar) return;
-    const name = TAB_NAMES[document.body.getAttribute('data-nav-tab') || 'agents'];
-    if (name && sidebar.getAttribute('aria-label') !== name) sidebar.setAttribute('aria-label', name);
+    const tab = document.body.getAttribute('data-nav-tab') || 'agents';
+    const button = document.getElementById('nav-tab-' + tab); // a tab not in the list is named by its own button, never by the name the last tab left
+    const name = TAB_NAMES[tab] || (button && (button.dataset.label || button.textContent.trim())) || 'Sidebar';
+    if (sidebar.getAttribute('aria-label') !== name) sidebar.setAttribute('aria-label', name);
     const drawer = typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches;
     sidebar.inert = drawer && !sidebar.classList.contains('tablet-open');
 }
