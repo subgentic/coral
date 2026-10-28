@@ -98,7 +98,7 @@ export function switchNavTab(tab, opts = {}) {
         }
     } else if (tab === 'agents' && state.selectedTeam && !opts.fromHistory) {
         // The team page that was on screen when another tab was chosen is the Agents tab's page again, on the tab it was on (the Inbox and back no longer drops to Home, #10008)
-        window.openTeamPage?.(state.selectedTeam, { tab: state.lastTeamTab, silent: true }); // the address was written above
+        if (!document.getElementById('team-page-view')?.getClientRects().length) window.openTeamPage?.(state.selectedTeam, { tab: state.lastTeamTab, silent: true }); // the address was written above; a team page already on screen stays as it is (its tab is the one it is on, not the one it was last left on)
     } else if (tab === 'agents' && isPhoneLayout()) {
         syncMobileAgentList();
         showView('mobile-agent-list');
