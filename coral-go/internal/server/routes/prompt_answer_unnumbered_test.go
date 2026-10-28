@@ -188,7 +188,7 @@ func TestAnswerPrompt_ClaudeUnnumbered(t *testing.T) {
 		term.onArrow = func(string) { setScreen(claudeUnnumbered(t, "trust_yes.txt")) }
 		code, body := answer(2, "Yes, I trust this folder")
 		assert.Equal(t, http.StatusConflict, code)
-		assert.Equal(t, "prompt_still_open", body["code"])
+		assert.Equal(t, "answer_sent_prompt_open", body["code"])
 		assert.Equal(t, 1, term.enters["claude-trust"])
 	})
 }
