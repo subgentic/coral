@@ -33,6 +33,10 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('settings-renderer-select').title`), 'Leave this unless the terminal text looks wrong.', 'Terminal: and when to touch it, on the select (no new visible words)');
         // END Terminal
 
+        // PANE Files and Git
+        assert.deepEqual(await options('settings-file-search-mode'), ['Browse folders', 'Match any part of a name'], 'Files and Git: the two ways say what they do');
+        assert.match(await row('settings-file-search-mode'), /How @ mentions and the file browser find files/, 'Files and Git: and what they are for');
+        // END Files
 
 
 
