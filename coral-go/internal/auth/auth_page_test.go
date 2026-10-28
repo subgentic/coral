@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -8,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // #3948: the /auth page has three states, chosen by the server, and never carries a secret or runs inline script.
@@ -162,4 +165,45 @@ func TestAuthPageFirstRunDetails(t *testing.T) {
 	assert.Equal(t, "password", focus(PageState{PasswordSet: true, Local: true, Strict: true}))
 	assert.Equal(t, "password", focus(PageState{Local: true}))
 	assert.Equal(t, "setup-code", focus(PageState{}))
+}
+
+// #10094 (Mobile #10089): a phone's home-screen icon opens /auth?locked=1 on a computer that has no password yet, and the page said only "Create a password". It now says how to get in, in one sentence each: sign in on
+// the computer with coral open, or create a password here with the setup code. Strict local auth is untouched: this is words, and the page still takes nothing it did not before.
+func TestAuthPageSaysHowToGetInWhenThereIsNoPasswordYet(t *testing.T) {
+	remote := AuthPage(PageState{}) // another device, no password
+	for _, want := range []string{`id="how-in"`, "Two ways in", "coral open", "coral setup-code", "On the computer that runs Coral", "create a password"} {
+		assert.Contains(t, remote, want, "another device: "+want)
+	}
+	locked := AuthPage(PageState{Local: true, Locked: true}) // a browser on this computer sent here by a locked page
+	assert.Contains(t, locked, `id="how-in"`)
+	assert.Contains(t, locked, "coral open")
+	assert.NotContains(t, locked, "coral setup-code", "this computer needs no setup code")
+	assert.NotContains(t, AuthPage(PageState{Local: true}), `id="how-in"`, "a browser on this computer that was not locked out sees the plain page")
+	assert.NotContains(t, AuthPage(PageState{PasswordSet: true, Local: true, Locked: true}), `id="how-in"`, "with a password the sign-in form is the way in")
+	assert.NotContains(t, AuthPage(PageState{PasswordSet: true}), `id="how-in"`)
+}
+
+// The route turns ?locked=1 into the flag and nothing else of the address reaches the page (#10094): a made-up value is not echoed, and the status stays 200 as for every state.
+func TestAuthRouteLockedFlagOnlyChangesTheWords(t *testing.T) {
+	ks, err := NewKeyStore(t.TempDir())
+	require.NoError(t, err)
+	ar := NewRoutes(ks)
+	ar.SetPeerUser(func(*http.Request) (bool, bool) { return true, true }) // the request is from this computer's own user
+	get := func(target string) (int, string) {
+		r := httptest.NewRequest("GET", target, nil)
+		r.RemoteAddr = "127.0.0.1:50000"
+		r.Host = "localhost:8420"
+		w := httptest.NewRecorder()
+		ar.AuthPage(w, r)
+		return w.Code, w.Body.String()
+	}
+	code, locked := get("/auth?locked=1&return_to=%2Fapi%2Fx%3Ftoken%3Dsecret-in-the-address")
+	assert.Equal(t, 200, code)
+	assert.Contains(t, locked, `id="how-in"`)
+	assert.NotContains(t, locked, "secret-in-the-address", "the address is never echoed")
+	_, plain := get("/auth")
+	assert.NotContains(t, plain, `id="how-in"`, "this computer, not sent here by a lock: the plain page")
+	_, odd := get("/auth?locked=%3Cscript%3E")
+	assert.NotContains(t, odd, `id="how-in"`, "only locked=1 is the flag")
+	assert.NotContains(t, odd, "<script>alert")
 }

@@ -28,6 +28,9 @@ import (
 //     no sign-in action.
 //   - "": no Hub UI at all (no dead button).
 //
+// Locked (#10094) says the person was sent here by a locked page (?locked=1): with no password yet, the page then says how to get in (a sign-in link from coral open, or the setup code). A flag only: the address
+// is never echoed.
+//
 // HubURL is the Hub's own page (https, from the configured Hub host; the server checks it), shown only in the
 // disabled note. The page never reads a Hub setting from its own address: ?hub=unavailable, failed or disabled only
 // say what went wrong.
@@ -35,6 +38,7 @@ type PageState struct {
 	PasswordSet bool
 	Local       bool
 	Strict      bool
+	Locked      bool
 	HubSignin   string
 	HubURL      string
 }
@@ -112,6 +116,9 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
   .code { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.875rem; margin: 0 0 16px; }
   ol.steps { margin: 0 0 18px 18px; padding: 0; font-size: 0.875rem; line-height: 1.6; }
   ol.steps li { margin-bottom: 8px; }
+  .howin { background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 12px; margin: 0 0 20px; font-size: 0.8125rem; line-height: 1.5; color: var(--text-secondary); }
+  .howin b { color: var(--text-primary); }
+  .howin p { margin: 6px 0 0; }
   .note { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; margin: 14px 0 0; }
   .panel[hidden], .err[hidden], .lock[hidden], .warn[hidden] { display: none; }
   .or { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 0.75rem; margin: 18px 0; }
@@ -170,6 +177,18 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
   <section id="panel-create" class="panel">
     <h1>Create a password</h1>
     <p class="sub">{{if .Local}}Choose a password to open Coral in a browser. The Coral app and the tray open without it.{{else}}Coral has no password yet. Choose one to open it in this browser, with the setup code from the computer that runs Coral.{{end}}</p>
+{{if or .Locked (not .Local)}}
+    <div class="howin" id="how-in" role="note">
+      <b>Two ways in</b>
+{{if .Local}}
+      <p><b>Sign in without a password.</b> In a terminal on this computer, run <b>coral open</b>: it opens Coral signed in.</p>
+      <p><b>Or create a password below</b> to open Coral in this browser.</p>
+{{else}}
+      <p><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in.</p>
+      <p><b>Or create a password here.</b> Enter the setup code (run <b>coral setup-code</b> on that computer), then choose a password.</p>
+{{end}}
+    </div>
+{{end}}
     <div id="err" class="err" role="alert" hidden></div>
     <div id="lock" class="lock" role="status" hidden><span>&#9202;</span><span><b>Setup is paused.</b> Too many wrong attempts. It opens again in <span class="count" id="count">0:00</span>.</span></div>
     <form id="create-form" autocomplete="on">
