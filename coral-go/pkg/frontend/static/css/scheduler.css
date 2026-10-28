@@ -231,3 +231,6 @@
     .automations-act .automations-act-text { display: none; }
     .automations-act:not(.automations-act-icon)::before { display: inline; }
 }
+
+/* A run that has stayed pending: the page says so under the header, with a Refresh (#10120). */
+.sched-still-waiting { margin: 8px 0; color: var(--text-secondary); font-size: var(--fs-md); }
