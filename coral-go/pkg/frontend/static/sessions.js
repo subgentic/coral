@@ -468,6 +468,8 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
     document.getElementById("history-session-title").textContent = historyLabel(openedEntry); // the chat's title; its id is behind Details (#6200)
     const described = describeChat(openedEntry); // the way back to its group's table, and who, when and how long under the title (#7443)
     setBackLink('history-back', isCloud() ? 'history' : 'hub-inbox', isCloud() ? described.group : (state.inboxFolder || { key: 'chats', label: 'All chats' })); // a local Coral's chat goes back to the Inbox folder it came from
+    const phoneBack = document.querySelector('.mobile-history-back'); // the phone's own back control is Chats again for this chat (a job's result chat pointed it at the job for one visit, #10578)
+    if (phoneBack) { phoneBack.textContent = '\u2190 Chats'; phoneBack.setAttribute('data-on-click', 'history-list'); phoneBack.setAttribute('aria-label', 'Back to chats'); delete phoneBack.dataset.jobId; }
     drawChatFlags(openedEntry);
     const metaEl = document.getElementById('history-session-meta');
     if (metaEl) { metaEl.textContent = described.meta; metaEl.hidden = !described.meta; }
