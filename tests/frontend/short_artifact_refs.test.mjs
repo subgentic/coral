@@ -2,6 +2,8 @@
 // code and existing links are left alone; the answers are remembered, so a message drawn again asks nothing.
 //   node short_artifact_refs.test.mjs
 import assert from 'node:assert';
+
+process.env.CORAL_TELEMETRY_DISABLED = '1'; // this test starts no Coral (a jsdom page and a faked fetch); the opt-out stays on, as the telemetry census wants it in every suite that names one
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 
 installDom({ mode: 'local' });
