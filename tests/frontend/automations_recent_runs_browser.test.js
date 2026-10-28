@@ -3,6 +3,7 @@
 // its workflow's page and clears its dot and the count. A failed run nobody has opened is also a row of the Inbox's Needs you (Item, "Run failed: why", Open and Dismiss), counted in the Inbox badge; Dismiss
 // or Open takes it out. What was opened is the server's (seen_at, POST .../seen: #9315), so another screen's open is read on the next refresh. 1280 and 390 px, a stubbed server (jobs, workflows and the two recent-runs reads), light and dark. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
+const { SIZING } = require('./helpers/table_sizing');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const { oneLinePerRow } = require('./helpers/row_lines');
@@ -74,6 +75,14 @@ const STUB = `(() => {
                 `${at}every run newest first, the job's run once (the workflow run it made is left out), a dot on each finished run, none on the one still going`);
             const cols = await ev(`[...document.querySelectorAll('#group-table-view table th')].filter(h => h.getClientRects().length).map(h => (h.querySelector('.dt-sort > span, .dt-head-text') || h).textContent.trim()).filter(Boolean)`);
             assert.deepEqual(cols, mobile ? ['Run', 'Result'] : ['Run', 'Kind', 'Result', 'Started', 'Took'], `${at}the columns (a phone keeps the run, whole, and its result): ${JSON.stringify(cols)}`);
+            if (!mobile) { // the table's default sizes (#9856): the run's name is at least 24 characters and nothing scrolls sideways, at 1280 and at 1024
+                for (const bw of [1280, 1024]) {
+                    await Emulation.setDeviceMetricsOverride({ width: bw, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
+                    const z = await ev(SIZING('#group-table-view .dt-box', 'name'));
+                    assert.ok(z && !z.scroll && z.name >= z.ch24 - 1, `${bw}: the run name is at least 24 characters and the table does not scroll sideways: ` + JSON.stringify(z));
+                }
+                await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: back to the suite's width
+            }
             if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-time')].map(e => /^(today|yesterday|[A-Z][a-z]{2} \\d+) \\d\\d:\\d\\d$/.test(e.textContent.trim()))`), [true, true, true, true, true], `${at}every run says when it started, in words`);
             if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => tr.lastElementChild.textContent.trim())`), ['', '1 min', '1 min', '2 min', '1 min'], `${at}a finished run says how long it took, one still going says nothing`);
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search recent runs', `${at}the search is named for the folder`);
