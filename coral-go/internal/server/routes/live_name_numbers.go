@@ -1,14 +1,16 @@
 package routes
 
 import (
+	"sort"
 	"strings"
 )
 
 // numberUnnamedDuplicates gives each live row a "name_number" (#10249): 1 for an agent whose name is its own, and 2, 3, ... for the later agents that would otherwise show the same default name as an earlier
 // one ("Claude" twice in the home folder, the folder's name twice, two folders of one name). An agent nobody named is called by its folder, else its CLI; two with the same default were told apart by nothing
 // (Mobile #10198). The dashboard draws "<name> 2" in every place it names the agent, so a duplicate reads the same in the list, the toast, the Inbox row and the header; a person's own rename (display_name) or a
-// board job title is a name and wins, a terminal is not an agent in this sense, and an archived row is not counted. The rows are already in their stable list order (orderLiveRows), so the first keeps the plain
-// name and a later one keeps its number while the earlier ones live. The field is on every row, 1 included: the dashboard merges rows, and an omitted field would leave an old number on.
+// board job title is a name and wins, a terminal is not an agent in this sense, and an archived row is not counted. The order of the numbers is the order the agents were started (list_at, then the id), NOT the
+// list's order, which puts awake agents before sleeping ones: the first keeps the plain name and a later one keeps its number while the earlier ones live, awake or asleep (QA's repro on #10249). The field is on
+// every row, 1 included: the dashboard merges rows, and an omitted field would leave an old number on.
 func numberUnnamedDuplicates(rows []map[string]any, coralRoot string) {
 	groups := map[string][]int{}
 	for i, row := range rows {
@@ -24,7 +26,21 @@ func numberUnnamedDuplicates(rows []map[string]any, coralRoot string) {
 		key := defaultNameKey(dir, agentType, coralRoot)
 		groups[key] = append(groups[key], i)
 	}
+	startedBefore := func(a, b map[string]any) bool {
+		ta, aok := a["list_at"].(string)
+		tb, bok := b["list_at"].(string)
+		if aok != bok {
+			return aok // a row with a start time before one without
+		}
+		if ta != tb {
+			return ta < tb
+		}
+		ia, _ := a["session_id"].(string)
+		ib, _ := b["session_id"].(string)
+		return ia < ib
+	}
 	for _, idx := range groups {
+		sort.SliceStable(idx, func(x, y int) bool { return startedBefore(rows[idx[x]], rows[idx[y]]) })
 		for n, i := range idx {
 			if n > 0 {
 				rows[i]["name_number"] = n + 1
