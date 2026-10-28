@@ -238,6 +238,28 @@ func readWellKnown() (cred []byte, found bool, err error) {
 	return data, true, err
 }
 
+// WellKnownBootstrapOffered reports, reading and removing nothing, whether a credential is waiting at /run/coral/bootstrap.d/credential, or the folder
+// is there but not safe to read from (a bootstrap would say so and refuse it: that is an offer too, answered with an error, not with silence).
+func WellKnownBootstrapOffered() bool {
+	if !wellKnownSupported {
+		return false
+	}
+	return wellKnownOffered()
+}
+
+func wellKnownOffered() bool {
+	dirfd, ok, err := openWellKnown()
+	if err != nil {
+		return errors.Is(err, ErrUnsafeCredentialFile)
+	}
+	if !ok {
+		return false
+	}
+	defer unix.Close(dirfd)
+	var st unix.Stat_t
+	return unix.Fstatat(dirfd, wellKnownBootstrap[len(wellKnownBootstrap)-1], &st, unix.AT_SYMLINK_NOFOLLOW) == nil
+}
+
 // RemoveWellKnownBootstrap removes the well-known credential WITHOUT reading it
 // (the machine already has an identity). found reports whether there was one.
 func RemoveWellKnownBootstrap() (found bool, err error) {
