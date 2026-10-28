@@ -112,6 +112,3 @@ button,
         transition: none !important;
     }
 }
-
-/* Above the chat while the page that came back from the background reads it again (return_to_tab.js, #10068). */
-.chat-return-note { padding: 6px 16px; }
