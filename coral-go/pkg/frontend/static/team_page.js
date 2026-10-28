@@ -477,6 +477,7 @@ export async function applyTeamRoute(team, tab, item, query = '') {
 
 /** Leave the page: the board's column goes back to its own page and the dock's panels back to the dock. */
 function leaveTeamPage() {
+    state.lastTeamTab = S.tab; // the tab it was on, for the way back from another tab (#10008)
     S.navSeq++;
     closeItem(false);
     closeDetailPane();
