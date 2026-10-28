@@ -101,13 +101,14 @@ let _runsWatch = null;
 // A run that stays pending or running is read every 3 s for two minutes, then every 30 s, and the page says it is still waiting, with a Refresh that reads now and starts the fast pace again (#10120): a run that never ends is not polled at 3 s for ever.
 const WATCH_FAST_MS = 3000, WATCH_SLOW_MS = 30000, WATCH_BACKOFF_AFTER_MS = 120000;
 let _watchedJobId = null, _watchSince = 0;
-function paintStillWaiting(job, slow) {
+function paintStillWaiting(job, slow, running = false) {
     const host = document.getElementById('sched-run-history');
     let note = document.getElementById('sched-still-waiting');
     if (!slow || !host) { if (note) note.remove(); return; }
-    if (note) return;
+    const words = running ? 'Still running. ' : 'Still waiting to start. '; // a run that has begun is not "waiting to start"
+    if (note) { if (note.firstChild.textContent !== words) note.firstChild.textContent = words; return; }
     note = document.createElement('p'); note.id = 'sched-still-waiting'; note.className = 'sched-still-waiting'; note.setAttribute('role', 'status');
-    note.append('Still waiting to start. ');
+    note.append(words);
     const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small'; b.textContent = 'Refresh';
     b.addEventListener('click', () => { _watchSince = Date.now(); note.remove(); reloadJobDetail(job, { refresh: true }).catch(() => watchJobRuns(job, [{ status: 'pending' }])); });
     note.append(b); host.before(note);
@@ -117,7 +118,7 @@ function watchJobRuns(job, runs) {
     if (!(runs || []).some(r => r.status === 'pending' || r.status === 'running')) { _watchedJobId = null; paintStillWaiting(job, false); return; }
     if (_watchedJobId !== job.id) { _watchedJobId = job.id; _watchSince = Date.now(); }
     const slow = Date.now() - _watchSince >= WATCH_BACKOFF_AFTER_MS;
-    paintStillWaiting(job, slow);
+    paintStillWaiting(job, slow, !runs.some(r => r.status === 'pending'));
     _runsWatch = setTimeout(() => {
         if (selectedJobId !== job.id) return; // another job, or none: the watch ends
         const shown = document.getElementById('scheduler-view');
