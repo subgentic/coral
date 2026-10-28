@@ -71,6 +71,9 @@ func TestRateLimitAnswersAndTheirWaits(t *testing.T) {
 		{"403 with the quota spent and no reset", 403, map[string]string{"X-RateLimit-Remaining": "0"}, stage.KindRateLimit, time.Hour, time.Hour + time.Second},
 		{"a reset in the past waits the least", 403, map[string]string{"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": strconv.FormatInt(now.Add(-time.Hour).Unix(), 10)}, stage.KindRateLimit, time.Minute, time.Minute + time.Second},
 		{"a reset far away is a day at most", 403, map[string]string{"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": strconv.FormatInt(now.Add(72*time.Hour).Unix(), 10)}, stage.KindRateLimit, 24 * time.Hour, 24*time.Hour + time.Second},
+		{"Retry-After of 99999999999999 says nothing", 429, map[string]string{"Retry-After": "99999999999999"}, stage.KindRateLimit, time.Hour, time.Hour + time.Second},
+		{"Retry-After of 2147483648 (2^31) says nothing", 429, map[string]string{"Retry-After": "2147483648"}, stage.KindRateLimit, time.Hour, time.Hour + time.Second},
+		{"a reset of 1<<41 says nothing", 403, map[string]string{"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": strconv.FormatInt(1<<41, 10)}, stage.KindRateLimit, time.Hour, time.Hour + time.Second},
 		{"a header that is not a number says nothing", 403, map[string]string{"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "tomorrow", "Retry-After": "soon"}, stage.KindRateLimit, time.Hour, time.Hour + time.Second},
 		{"a 403 with quota left is a plain failure", 403, map[string]string{"X-RateLimit-Remaining": "12"}, stage.KindNetwork, 5 * time.Minute, 5*time.Minute + time.Second},
 		{"a 500 is a plain failure", 500, map[string]string{"Retry-After": "600"}, stage.KindNetwork, 5 * time.Minute, 5*time.Minute + time.Second},
@@ -93,4 +96,37 @@ func TestRateLimitAnswersAndTheirWaits(t *testing.T) {
 			assert.Equal(t, c.kind, st.Stage.ErrorKind)
 		})
 	}
+}
+
+// A clock ahead of GitHub's sees every reset as already past: the floor doubles with each rate limit in a row (1, 2, 4 minutes, ... at most a day), so it does not ask every minute for good; another kind of
+// failure in between starts the count again.
+func TestTheFloorOfTheWaitDoublesWithEachRateLimitInARow(t *testing.T) {
+	r := newRig(t)
+	now := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
+	r.cfg.Now = func() time.Time { return now }
+	r.gh.Status["list"] = 403
+	r.gh.Headers = map[string]map[string]string{"list": {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": strconv.FormatInt(now.Add(-time.Hour).Unix(), 10)}} // already past
+	wait := func() time.Duration {
+		res := r.check()
+		require.Equal(t, stage.ResultFailed, res.Result, "%+v", res)
+		next := nextAttempt(t, res)
+		d := next.Sub(now)
+		now = next
+		return d
+	}
+	for i, want := range []time.Duration{1, 2, 4, 8, 16} {
+		assert.Equal(t, want*time.Minute, wait(), "rate limit %d in a row", i+1)
+	}
+	for i := 0; i < 12; i++ {
+		wait()
+	}
+	assert.Equal(t, 24*time.Hour, wait(), "a day at most")
+
+	// a plain failure in between starts the count again
+	r.gh.Status["list"] = 500
+	r.gh.Headers = nil
+	assert.Equal(t, 5*time.Minute, wait(), "a network failure: its own back-off")
+	r.gh.Status["list"] = 403
+	r.gh.Headers = map[string]map[string]string{"list": {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": strconv.FormatInt(now.Add(-time.Hour).Unix(), 10)}}
+	assert.Equal(t, time.Minute, wait(), "the first rate limit after it")
 }
