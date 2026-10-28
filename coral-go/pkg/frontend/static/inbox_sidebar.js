@@ -95,8 +95,8 @@ const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id &&
 /** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
 const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automation-run:${r.key}`, display_name: r.name, board_project: '', server: '', waiting_kind: 'run', waiting_summary: failureWords(r) ? `Run failed: ${failureWords(r)}` : 'Run failed', waiting_since: r.finishedAt || r.at }));
 const isItem = s => !!(s.review || s.autorun); // a row that is not an agent: a review or a run, shown as an item
-let answered = ''; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
-document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; setTimeout(() => { answered = ''; }, 3e5); });
+let answered = '', answeredT; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
+document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; clearTimeout(answeredT); answeredT = setTimeout(() => { answered = ''; }, 3e5); }); // a newer answer restarts the five minutes: the old timer must not clear it
 const allNeeds = () => [...waitingSessions(), ...reviewRows(), ...runRows()];
 const needsText = s => [s.review?.name || '', s.autorun ? `${s.autorun.name} ${s.waiting_summary}` : '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;

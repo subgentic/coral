@@ -162,7 +162,7 @@ export function showSetPasswordModal({ local = false } = {}) {
         window.removeEventListener('focus', recheck);
         clearInterval(recheckTimer);
         modal.remove();
-        const back = opener && opener !== document.body && opener.focus && opener.isConnected && !(coarse() && opener.matches?.('input:not([type=button],[type=checkbox],[type=submit]),textarea')) ? opener : pageControl(); // a phone's Search agents (the box that had the focus) would raise the keyboard over the result (#10720) // opened at startup there is no opener (the body): the keyboard goes to the page's first control, not nowhere (#10067)
+        const back = opener && opener !== document.body && opener.focus && opener.isConnected && !(coarse() && opener.matches?.('input:not([type=button],[type=checkbox])')) ? opener : pageControl(); // a phone's Search agents (the box that had the focus) would raise the keyboard over the result (#10720) // opened at startup there is no opener (the body): the keyboard goes to the page's first control, not nowhere (#10067)
         if (back) back.focus();
         document.dispatchEvent(new CustomEvent('coral:password-prompt-closed'));
     };
