@@ -157,11 +157,27 @@ function closeAdd(container, focusSelect) {
     if (focusSelect && select) select.focus();
 }
 
+// A later check that finds the CLI (Check again, or after Set path and Save: cli-checked, #10161) draws the Model line again from a fresh list, but only where the line says the CLI was not found: the list on screen was asked for
+// while it was not found and still said so (#10323). One listener for every picker, holding each by a weak reference (a long session does not collect one per New agent dialog opened). An event with no type names no CLI and is
+// ignored. A picker whose line says nothing is left alone, so what a person has typed in the add-a-model field, a half-made choice and the focus are not thrown away by a check that finds nothing to change.
+const pickers = new Set(); pickers.listening = false;
+function onChecked(e) {
+    if (!e.detail || e.detail.found !== true || !e.detail.type) return;
+    for (const ref of [...pickers]) {
+        const container = ref.deref();
+        if (!container || !container.isConnected) { pickers.delete(ref); continue; }
+        const type = container.querySelector('.acf-agent-type')?.value || 'claude';
+        const note = container.querySelector('.acf-model-note');
+        if (e.detail.type === type && note && note.textContent.trim()) loadModelPicker(container, type);
+    }
+}
+
 /** Wire the picker's events once per form. */
 export function wireModelPicker(container) {
     const { input, select, refresh } = parts(container);
     if (!select || select.dataset.wired) return;
     select.dataset.wired = '1';
+    pickers.add(new WeakRef(container)); if (!pickers.listening) { pickers.listening = true; document.addEventListener('cli-checked', onChecked); }
     select.addEventListener('change', () => {
         if (select.value === ADD) { openAdd(container); return; }
         container._otherChosen = select.value === OTHER;   // an empty box under Other… stays Other…, not Default
