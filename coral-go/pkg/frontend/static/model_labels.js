@@ -36,7 +36,7 @@ function shortModelName(id) {
     let s = String(id || '').trim();
     if (!s) return '';
     s = s.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/\[[^\]]*\]$/, '');
-    const m = /^(opus|sonnet|haiku)-(\d+)(?:-(\d+))?(?:-.*)?$/i.exec(s) || /^(\d+)(?:-(\d+))?-(opus|sonnet|haiku)$/i.exec(s);
+    const m = /^(opus|sonnet|haiku|fable)-(\d+)(?:-(\d+))?(?:-.*)?$/i.exec(s) || /^(\d+)(?:-(\d+))?-(opus|sonnet|haiku|fable)$/i.exec(s);
     if (m) {
         const named = /^\d/.test(m[1]);
         const family = named ? m[3] : m[1], major = named ? m[1] : m[2], minor = named ? m[2] : m[3];
