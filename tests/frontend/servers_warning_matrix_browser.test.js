@@ -57,7 +57,7 @@ const SHOWS = ['lan', 'unreach', 'unauth', 'offline', 'xss', 'legacy', 'long'];
             }
             for (const id of ['https', 'loop', 'empty', 'nulled', 'local']) assert.equal(f[id], null, at + `${id}: ${id === 'local' ? 'the hub\'s own row never shows one, even if its record carried a warning' : 'no warning on the record, none shown'}`);
             assert.equal(f.lan.title, W, at + 'the tooltip is the record\'s words');
-            assert.equal(f.lan.aria, `Open LAN box, warning: ${W}`, at + 'and the button\'s name says it, for a screen reader');
+            assert.equal(f.lan.aria, `Open LAN box, Online, warning: ${W}`, at + 'and the button\'s name says it, for a screen reader');
             // the words are text, never markup: the markup in the xss record is a tooltip and a name, and nothing was made from it
             assert.equal(f.xss.title, MATRIX.find(s => s.id === 'xss').warning, at + 'markup in the words is only the tooltip text');
             assert.equal(await ev(`window.__pwn === undefined && !document.querySelector('tr[data-key="xss"] img')`), true, at + 'no element or script came from the warning\'s words');
