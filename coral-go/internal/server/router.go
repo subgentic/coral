@@ -209,6 +209,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	// Coral's own data folder (wherever --home or CORAL_DATA_DIR put it) is never served by Browse or a file read (#4531).
 	routes.ProtectDataDir(s.cfg.CoralDir())
 	sysHandler := routes.NewSystemHandler(s.db, s.cfg)
+	s.sysHandler = sysHandler
 	sysHandler.SetTerminal(s.terminal)
 	if s.boardStore != nil {
 		sysHandler.SetBoardAuthor(func(ctx context.Context, project string, id int64) (string, bool, error) {
@@ -443,7 +444,11 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	routes.SetHubOwnerLabel(ownerCloud.OwnerUser)
 	routes.SetHubOwnerRecord(ownerCloud.OwnerRecord) // and what it is enrolled as: a person's or an organisation's (#7061)
 	s.cloudHandler.SetOwnerLabelStore(ownerCloud)    // and where the person at this computer records it when it is missing (#6108)
-	upd := routes.NewUpdateRelaunchHandler(store.NewSessionStore(s.db), s.cfg.CoralDir(), func() string { return routes.TerminalKind(s.terminal) }, routes.BuildRelaunchUpdater(s.cfg.CoralDir(), endThisServer))
+	updater := routes.BuildRelaunchUpdater(s.cfg.CoralDir(), endThisServer)
+	if s.sysHandler != nil {
+		s.sysHandler.SetUpdaterRecord(updater.Record) // the update notice reads what the updater's last check found, and asks GitHub for nothing where the updater checks (#9726)
+	}
+	upd := routes.NewUpdateRelaunchHandler(store.NewSessionStore(s.db), s.cfg.CoralDir(), func() string { return routes.TerminalKind(s.terminal) }, updater)
 	r.Get("/api/system/update", upd.Status)
 	r.Post("/api/system/update/relaunch", upd.Relaunch)
 	r.Post("/api/system/update/install", s.cloudHandler.InstallUpdate) // #166: the local "Install update" (Windows), never through Coral Hub

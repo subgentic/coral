@@ -69,6 +69,7 @@ type Server struct {
 	boardHandler    *routes.BoardHandler
 	historyHandler  *routes.HistoryHandler
 	sessHandler     *routes.SessionsHandler
+	sysHandler      *routes.SystemHandler // the update notice's source is set where the updater is built (registerCloud, #9726)
 	remoteAgents    *background.RemoteAgentHub
 	goalMetrics     *routes.GoalMetricsHandler
 	systemHandler   *routes.SystemHandler

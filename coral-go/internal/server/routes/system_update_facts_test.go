@@ -101,3 +101,31 @@ func TestTheNewFactsSurviveTheHubRedactor(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, string(b), string(redact.Tokens(b)), "the redactor leaves the status as it is")
 }
+
+// What the last check found (#9726): checked_result is one of the closed words and newest a version, both only when the record has them in shape; anything else is not sent, to the Hub or to this computer.
+func TestStatusSaysWhatTheLastCheckFound(t *testing.T) {
+	e := newRelaunchEnv(t)
+	e.up.rec.Staged, e.up.rec.State = nil, updNone
+	e.up.rec.CheckResult, e.up.rec.Newest = "not_promoted", "1.4.140"
+	_, st := e.status(hubHdr(ownerA))
+	assert.Equal(t, "not_promoted", st["checked_result"])
+	assert.Equal(t, "1.4.140", st["newest"])
+	for w := range checkedResults {
+		e.up.rec.CheckResult = w
+		_, st = e.status(hubHdr(ownerA))
+		assert.Equal(t, w, st["checked_result"])
+	}
+	for _, bad := range []string{"", "Up_To_Date", "<script>", "installed", "up to date"} {
+		e.up.rec.CheckResult = bad
+		_, st = e.status(hubHdr(ownerA))
+		assert.NotContains(t, st, "checked_result", bad)
+		assert.NotContains(t, st, "newest", "no result, no version: %q", bad)
+	}
+	e.up.rec.CheckResult = "up_to_date"
+	for _, bad := range []string{"1.4.140-rc1", "v1.4.140", "1.4.140\n", "<b>", "1.4"} {
+		e.up.rec.Newest = bad
+		_, st = e.status(hubHdr(ownerA))
+		assert.Equal(t, "up_to_date", st["checked_result"])
+		assert.NotContains(t, st, "newest", bad)
+	}
+}

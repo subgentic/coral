@@ -32,6 +32,7 @@ const str = (v) => (typeof v === 'string' ? v : '');
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 const INSTALL_KINDS = ['app', 'msi', 'portable', 'tarball', 'homebrew', 'unwritable'];
+const CHECKED_RESULTS = ['up_to_date', 'staged', 'already_staged', 'not_promoted', 'failed', 'rate_limited', 'unknown'];
 const NOT_READY = ['not_checked', 'up_to_date', 'not_promoted', 'backoff', 'rate_limited', 'check_failed', 'unsupported_install', 'switch_off', 'applying'];
 const ROLLBACK_REASONS = ['did_not_start', 'not_healthy', 'swap_failed', 'verify_failed', 'other'];
 const VERSION_RE = /^\d{1,4}\.\d{1,4}\.\d{1,4}$/;
@@ -66,6 +67,8 @@ export function normalizeStatus(raw) {
         installKind: INSTALL_KINDS.includes(raw.install_kind) ? raw.install_kind : '',
         upgradeCommand: raw.install_kind === 'homebrew' ? str(raw.upgrade_command) : '',
         notReady: NOT_READY.includes(raw.not_ready_reason) ? raw.not_ready_reason : '',
+        checkedResult: CHECKED_RESULTS.includes(raw.checked_result) ? raw.checked_result : '', // what the last check found (#9726), in its own closed vocabulary
+        newest: VERSION_RE.test(str(raw.newest)) ? raw.newest : '', // the newest release that check saw
         latest: VERSION_RE.test(str(raw.latest)) ? raw.latest : '',
         rollback: raw.last_rollback && typeof raw.last_rollback === 'object' ? { at: str(raw.last_rollback.at), from: str(raw.last_rollback.from), to: str(raw.last_rollback.to), reason: ROLLBACK_REASONS.includes(raw.last_rollback.reason) ? raw.last_rollback.reason : 'other', restartFailed: raw.last_rollback.restart_failed === true } : null,
         auto: typeof raw.auto === 'boolean' ? raw.auto : null,
@@ -145,6 +148,17 @@ const ROLLBACK_TEXT = {
     verify_failed: 'The new version did not pass the check before it was installed.',
 };
 export const rollbackText = (reason) => (Object.hasOwn(ROLLBACK_TEXT, reason) ? ROLLBACK_TEXT[reason] : '');
+
+/** What the last check found, for Settings (#9726): one sentence from the server's own result word and the newest release it saw, never from the dashboard's own guess. '' when no check has recorded one or it needs no sentence (a staged release has its own notice). */
+export function foundText(s) {
+    switch (s.checkedResult) {
+        case 'up_to_date': return 'Up to date.';
+        case 'not_promoted': return s.newest ? `${s.newest} is out. Coral will take it once it is promoted.` : 'A newer release is out. Coral will take it once it is promoted.';
+        case 'rate_limited': return "GitHub's limit on requests from this network address was reached. Coral checks again when it is over.";
+        case 'failed': return 'The check could not finish. Coral tries again later.';
+        default: return '';
+    }
+}
 
 /** What Settings says when nothing is ready, from the server's own reason (#5388). Absent or unknown: it does not know, and does not say "up to date". */
 export function notReadyText(s) {

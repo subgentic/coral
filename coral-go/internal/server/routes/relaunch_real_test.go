@@ -569,3 +569,37 @@ func TestTheUpdaterProgramIsRunForACheckWithTheArgvCheckOnly(t *testing.T) {
 	b, _ := os.ReadFile(argsFile)
 	assert.Equal(t, "check\n", string(b))
 }
+
+// recordFrom keeps the last check's result and newest in shape, takes a release newer than this one as "latest" and says "not promoted" only for a newer release with no promotion yet.
+func TestTheRecordTakesTheLastChecksResultInShape(t *testing.T) {
+	now := time.Date(2026, 10, 22, 6, 0, 0, 0, time.UTC)
+	rec := func(mod func(*status.Out)) UpdaterRecord {
+		out := readyStatus()
+		out.Staged = nil
+		mod(&out)
+		return recordFrom(out, relaunchState{}, now)
+	}
+	r := rec(func(o *status.Out) {
+		o.LastResult = &status.Result{Result: "not_promoted", Newest: "1.4.160", At: "2026-10-22T05:00:00Z"}
+	})
+	assert.Equal(t, "not_promoted", r.CheckResult)
+	assert.Equal(t, "1.4.160", r.Newest)
+	assert.Equal(t, "1.4.160", r.Latest, "a release newer than this one (1.4.150) that the last check saw")
+	assert.Equal(t, "not_promoted", r.NotReady)
+
+	r = rec(func(o *status.Out) { o.LastResult = &status.Result{Result: "not_promoted", Newest: "1.4.150"} })
+	assert.Equal(t, "up_to_date", r.NotReady, "nothing newer than this one: no promotion is waited for")
+	assert.Empty(t, r.Latest)
+
+	r = rec(func(o *status.Out) { o.LastResult = &status.Result{Result: "up_to_date", Newest: "1.4.150"} })
+	assert.Equal(t, "up_to_date", r.CheckResult)
+	assert.Equal(t, "up_to_date", r.NotReady)
+
+	r = rec(func(o *status.Out) { o.LastResult = &status.Result{Result: "<b>", Newest: "1.4.160<b>"} })
+	assert.Empty(t, r.CheckResult)
+	assert.Empty(t, r.Newest)
+	assert.Empty(t, r.Latest)
+
+	r = rec(func(o *status.Out) {})
+	assert.Empty(t, r.CheckResult, "an updater that records nothing says nothing")
+}

@@ -151,15 +151,37 @@ func Check(ctx context.Context, cfg Config) Result {
 		}
 	}
 	c := &checker{cfg: cfg, dir: dir, st: st, now: now, res: res}
-	return c.run(ctx)
+	out := c.run(ctx)
+	c.recordOutcome(out)
+	return out
 }
 
 type checker struct {
-	cfg Config
-	dir string
-	st  verify.State
-	now time.Time
-	res Result
+	cfg    Config
+	dir    string
+	st     verify.State
+	now    time.Time
+	res    Result
+	newest string // the highest product release (X.Y.Z) this check saw in the feed or the API's list, "" when it saw none
+}
+
+// recordOutcome keeps what the check found for Settings and the dashboard's notice (#9726): the result, the newest release it saw and when. A result is one of verify.CheckResults; a failure that was GitHub's rate limit
+// is rate_limited (the wait is in the back-off record). Nothing from the feed or the list is kept but a version that matched productTagRe.
+func (c *checker) recordOutcome(res Result) {
+	word := res.Result
+	if word == ResultFailed && c.st.Stage != nil && c.st.Stage.ErrorKind == KindRateLimit {
+		word = "rate_limited"
+	}
+	newest := c.newest
+	if res.Version != "" {
+		if cmp, err := verify.CompareVersions(res.Version, newest); newest == "" || (err == nil && cmp > 0) {
+			if _, perr := verify.ParseVersion(res.Version); perr == nil {
+				newest = res.Version // a staged or promoted release is at least as new as anything else seen
+			}
+		}
+	}
+	c.st.LastResult = (&verify.CheckResult{Result: word, Newest: newest, Stage: res.FailedStage, At: c.now.UTC().Format(time.RFC3339)}).Clean()
+	c.save()
 }
 
 func (c *checker) save() {

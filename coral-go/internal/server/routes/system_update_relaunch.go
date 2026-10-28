@@ -117,6 +117,7 @@ type UpdateTrust struct {
 // installKinds, notReadyReasons and rollbackReasons are the vocabularies the status sends for the #5388 fields: anything else is not sent (or, for a roll-back's reason, is "other").
 var (
 	installKinds     = map[string]bool{installApp: true, installMSI: true, installPortable: true, installTarball: true, installHomebrew: true, installUnwritable: true, installUnregistered: true}
+	checkedResults   = map[string]bool{"up_to_date": true, "staged": true, "already_staged": true, "not_promoted": true, "failed": true, "rate_limited": true, "unknown": true}
 	notReadyReasons  = map[string]bool{"not_checked": true, "up_to_date": true, "not_promoted": true, "backoff": true, "rate_limited": true, "check_failed": true, "unsupported_install": true, "switch_off": true, "applying": true}
 	rollbackReasons  = map[string]bool{"did_not_start": true, "not_healthy": true, "swap_failed": true, "verify_failed": true}
 	rollbackOtherTag = "other"
@@ -156,10 +157,13 @@ type UpdaterRecord struct {
 	LastResult      *UpdateResult
 	// The fields of the #5388 status: when the last check ran (a failed one counts), how Coral was installed, why nothing is staged
 	// (one of notReadyReasons) with the newer version when one is known, and the last roll-back. Zero or empty: not sent.
-	CheckedAt    time.Time
-	InstallKind  string
-	NotReady     string
-	Latest       string
+	CheckedAt   time.Time
+	InstallKind string
+	NotReady    string
+	Latest      string
+	// What the last check found (#9726): its result word (one of checkedResults) and the newest product release it saw (X.Y.Z). Empty: no check has recorded one.
+	CheckResult  string
+	Newest       string
 	LastRollback *UpdateRollback
 }
 
@@ -585,6 +589,12 @@ func (h *UpdateRelaunchHandler) addUpdateFacts(out map[string]any, rec UpdaterRe
 		out["install_kind"] = rec.InstallKind
 		if rec.InstallKind == installHomebrew {
 			out["upgrade_command"] = upgradeCommandHomebrew
+		}
+	}
+	if checkedResults[rec.CheckResult] {
+		out["checked_result"] = rec.CheckResult // the last check's own word (closed set); what it found, not a guess from the dashboard's own request to GitHub (#9726)
+		if updateVersionRe.MatchString(rec.Newest) {
+			out["newest"] = rec.Newest
 		}
 	}
 	if rec.Staged == nil && notReadyReasons[rec.NotReady] {

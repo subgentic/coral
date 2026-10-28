@@ -48,6 +48,18 @@ type State struct {
 	History       []HistoryEntry `json:"history,omitempty"`
 	// Stage is what the staging step remembers between checks: the version it staged and its back-off (#5292).
 	Stage *StageState `json:"stage,omitempty"`
+	// LastResult is what the last check found (#9726): Settings and the dashboard's notice read it instead of asking GitHub themselves.
+	LastResult *CheckResult `json:"last_result,omitempty"`
+}
+
+// CheckResult is what a check found, as the dashboard shows it. Result is one of the stage package's result words (up_to_date, staged, already_staged, not_promoted, failed) or rate_limited (GitHub's limit on
+// anonymous requests: the wait is in Stage.NextAttempt); Newest is the highest product release (X.Y.Z, never a prerelease) the check saw, or ""; Stage names where a failure happened; At is RFC 3339.
+// Everything is read back through ReadCheckResult, which keeps only what has the shape of a word, a version or a time.
+type CheckResult struct {
+	Result string `json:"result"`
+	Newest string `json:"newest,omitempty"`
+	Stage  string `json:"stage,omitempty"`
+	At     string `json:"at,omitempty"`
 }
 
 // StageState is the staging step's own record. NextAttempt is an RFC 3339 time before which no download is tried again for Version; Attempts

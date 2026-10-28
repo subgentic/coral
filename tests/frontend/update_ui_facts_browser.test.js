@@ -73,6 +73,21 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
         await setStatus(idle({ not_ready_reason: 'up_to_date' }));
         check('and is not made up when it does not', !/Last checked/.test((await pane()).facts || ''));
 
+        // What the last check found (#9726): the server's own result word, with the newest release it saw, never a guess from the dashboard's own request
+        for (const [name, st, want] of [
+            ['up_to_date', idle({ not_ready_reason: 'up_to_date', checked_at: '2026-10-20T08:00:00Z', checked_result: 'up_to_date', newest: '1.4.125' }), /What it found.*Up to date\./],
+            ['not_promoted', idle({ not_ready_reason: 'not_promoted', latest: '1.4.140', checked_at: '2026-10-20T08:00:00Z', checked_result: 'not_promoted', newest: '1.4.140' }), /What it found.*1\.4\.140 is out\. Coral will take it once it is promoted\./],
+            ['rate_limited', idle({ not_ready_reason: 'rate_limited', checked_at: '2026-10-20T08:00:00Z', checked_result: 'rate_limited', newest: '1.4.140' }), /What it found.*limit on requests from this network address was reached/],
+            ['failed', idle({ not_ready_reason: 'check_failed', checked_at: '2026-10-20T08:00:00Z', checked_result: 'failed' }), /What it found.*could not finish/],
+        ]) {
+            await setStatus(st);
+            check(`what it found, ${name}`, want.test((await pane()).facts || ''));
+        }
+        await setStatus(idle({ not_ready_reason: 'up_to_date', checked_at: '2026-10-20T08:00:00Z', checked_result: '<script>alert(1)</script>', newest: '1.4.140<b>' }));
+        check('a result that is not in the closed set, and a version that is not one, say nothing', !/What it found/.test((await pane()).facts || ''));
+        await setStatus(idle({ not_ready_reason: 'up_to_date', checked_result: 'up_to_date' }));
+        check('and with no time of the check there is no sentence about it', !/What it found/.test((await pane()).facts || ''));
+
         console.log('4. Homebrew and other installs that do not update themselves');
         for (const [name, st, wantTitle, wantCmd] of [
             ['Homebrew (install_kind and the reason)', idle({ install_kind: 'homebrew', upgrade_command: 'brew upgrade --cask coral', relaunch: { available: false, reason: 'unsupported_install', restarts: [], ack: '' } }), 'Homebrew updates this Coral', 'brew upgrade --cask coral'],

@@ -67,6 +67,22 @@ func (h *SystemHandler) UpdateCheck(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	// Where the updater checks for this install, its own record of the last check answers, and GitHub is not asked from here at all (#9726).
+	if latest, ok := h.latestFromTheUpdater(r.Context(), ch); ok {
+		available := updatecheck.Newer(latest, config.Version)
+		if available {
+			tracking.NoteOfferedRelease(latest)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"available":   available,
+			"current":     config.Version,
+			"latest":      latest,
+			"release_url": updatecheck.ReleasePageURL(ch, latest),
+			"channel":     string(ch),
+			"approved":    true,
+		})
+		return
+	}
 	// Answered from a cache (an hour, a failure five minutes) with one request in flight at a time per feed,
 	// for every caller, an agent's token included (#4133). ?refresh=1 is the dashboard's manual
 	// "Check for Updates": it asks again, at most once a minute.
@@ -134,4 +150,32 @@ func (h *UpdateRelaunchHandler) addChannelFacts(r *http.Request, out map[string]
 		}
 		out["waiting"] = waiting
 	}
+}
+
+// updateRecordFresh is how old the updater's record of its last check may be and still answer the notice: twice the check's interval (checkEvery, six hours). An older one means the updater is off, stopped or
+// failing, and a dead updater must never show "up to date" for ever: the notice then asks GitHub as it always did.
+const updateRecordFresh = 2 * checkEvery
+
+// latestFromTheUpdater is the newest release the updater's last check saw ("" when none is newer than it knows of), and whether that record may answer: the approved channel (the agentic channel's waiting list
+// has its own feed), an install the updater checks for (feature on, supported, apply on), a record that names a result and is fresh, and not "unknown". The version is the one the record validated (X.Y.Z); the
+// release link is built from it and the pinned repository, never from anything the feed said.
+func (h *SystemHandler) latestFromTheUpdater(ctx context.Context, ch updatecheck.Channel) (string, bool) {
+	if h.updaterRecord == nil || ch != updatecheck.Approved {
+		return "", false
+	}
+	rec, err := h.updaterRecord(ctx)
+	if err != nil || !rec.Enabled || !rec.Supported || rec.CheckedAt.IsZero() || time.Since(rec.CheckedAt) > updateRecordFresh || time.Until(rec.CheckedAt) > time.Minute {
+		return "", false
+	}
+	if !checkedResults[rec.CheckResult] || rec.CheckResult == "unknown" {
+		return "", false
+	}
+	latest := rec.Newest
+	if rec.Staged != nil && updateVersionRe.MatchString(rec.Staged.Version) && (latest == "" || updatecheck.Newer(rec.Staged.Version, latest)) {
+		latest = rec.Staged.Version
+	}
+	if !updateVersionRe.MatchString(latest) {
+		latest = ""
+	}
+	return latest, true
 }

@@ -38,6 +38,8 @@ type SystemHandler struct {
 
 	// boardAuthor reads who wrote a board message, for the bookmarks saved before the author was kept (#4792); set by the server wiring.
 	boardAuthor func(ctx context.Context, project string, id int64) (string, bool, error)
+	// updaterRecord reads the updater's record (what its last check found); nil: the notice asks GitHub itself.
+	updaterRecord func(ctx context.Context) (UpdaterRecord, error)
 	// savedBoardText and savedAgentText read the source of a bookmark for "Read the whole message" (#5753): a board message by its board and id (found false when
 	// it is gone or is not on that board), an agent's message by its session id, agent type and key (reachable false when this machine has no transcript of it).
 	savedBoardText func(ctx context.Context, project string, id int64) (text string, found bool, err error)
@@ -79,6 +81,11 @@ func TerminalKind(t ptymanager.SessionTerminal) string {
 		return "pty"
 	}
 	return "unknown"
+}
+
+// SetUpdaterRecord gives the update notice the updater's own record of its last check (#9726): where the updater checks, GET /api/system/update-check answers from it and asks GitHub for nothing.
+func (h *SystemHandler) SetUpdaterRecord(f func(ctx context.Context) (UpdaterRecord, error)) {
+	h.updaterRecord = f
 }
 
 // NewSystemHandler creates a SystemHandler.

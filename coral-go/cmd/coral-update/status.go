@@ -123,6 +123,9 @@ func collectStatus(getenv func(string) string, dataDir string, now time.Time) st
 	}
 	out.Revoked = len(st.Revoked)
 	out.LastCheck = timeText(st.LastCheck)
+	if r := st.LastResult; r != nil {
+		out.LastResult = &status.Result{Result: word(r.Result), Newest: ver(r.Newest), Stage: word(r.Stage), At: timeText(r.At)}
+	}
 	if f := st.LastFailure; f != nil {
 		out.LastFailure = &statusFail{Version: ver(f.Version), Stage: word(f.Stage), Reason: text(f.Reason), At: timeText(f.At)}
 	}
@@ -212,6 +215,9 @@ func plainStatus(s statusOut, w io.Writer) {
 		p("Ready to install: nothing")
 	}
 	p("Last check: %s", orNone(s.LastCheck))
+	if r := s.LastResult; r != nil {
+		p("Last result: %s%s%s", r.Result, newestText(r.Newest), stageText(r.Stage))
+	}
 	if s.LastFailure != nil {
 		p("Last refusal: version %s stopped at %s%s%s", orNone(s.LastFailure.Version), s.LastFailure.Stage, atText(s.LastFailure.At), reasonText(s.LastFailure.Reason))
 	}
@@ -279,4 +285,18 @@ func runStatus(args []string, getenv func(string) string, stdout io.Writer) int 
 	}
 	plainStatus(out, stdout)
 	return 0
+}
+
+func newestText(v string) string {
+	if v == "" {
+		return ""
+	}
+	return " (newest release seen " + v + ")"
+}
+
+func stageText(s string) string {
+	if s == "" {
+		return ""
+	}
+	return ", at " + s
 }
