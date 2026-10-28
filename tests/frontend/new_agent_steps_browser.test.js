@@ -103,7 +103,7 @@ const BASE = require('./test_base').BASE;
             assert.ok(name, 'at least one persona to choose');
             await waitFor(`window.__na.find('input', ${N.name}).value.length > 0 && window.__na.find('textarea', ${N.prompt}).value.length > 0`, 'the persona fills the name and the prompt', 4000);
             assert.match(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /Filled from the persona\. Change it if you want a different name\./);
-            assert.match(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /Pick a ready-made persona, or skip this step\. It fills in the name and the starting prompt\./);
+            assert.match(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /It fills in the name and prompt\./);
         });
         await S.run('step 2: the recap above the buttons names the agent once there is a name', async () => {
             const r = await ev(`(() => { const d = window.__na.dialog(); const t = d.textContent.replace(/\\s+/g, ' '); return t; })()`);

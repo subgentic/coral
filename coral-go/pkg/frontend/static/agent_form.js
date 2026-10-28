@@ -24,7 +24,7 @@ export function agentStatus(text) {
 export function setAgentNameMode(member) {
     _nameView?.clearErrors();
     const hint = document.getElementById('launch-persona-hint'); // the line above says what the persona fills: the name, or the role of a member
-    if (hint) hint.textContent = `Pick a ready-made persona, or skip this step. It fills in the ${member ? 'role' : 'name'} and the starting prompt.`;
+    if (hint) hint.textContent = `It fills in the ${member ? 'role' : 'name'} and prompt.`;
     _nameView?.retext('name', member
         ? { label: 'Role', help: 'The role this member has on the team.', required: true, optional: false, requiredMessage: 'A member needs a role' }
         : { label: 'Name', help: 'Choose a persona above and its name goes here, or type your own.', required: false, optional: true });
