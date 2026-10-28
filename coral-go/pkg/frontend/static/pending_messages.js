@@ -3,6 +3,7 @@
  * makeBubble (chat_bubbles.js) and places it with lastContent and appendContent (chat_content.js), which keep the rows below the
  * transcript. live_chat.js calls syncPendingBubbles and syncWorkingIndicator after it renders. */
 import { appendWork, lastContent } from './chat_content.js';
+import { reminderWords } from './reminder_words.js';
 import { deriveSessionState } from './render.js';
 import { escapeHtml, renderMarkdown } from './utils.js';
 import { makeBubble } from './chat_bubbles.js';
@@ -153,9 +154,9 @@ export function appendCoralNotice(container, text, health = false) {
         const count = (Number(prev.dataset.count) || 1) + 1;
         prev.dataset.count = String(count);
         const textEl = prev.querySelector(".chat-system-text");
-        textEl.textContent = text;
+        textEl.textContent = reminderWords(text);
         textEl.title = text;
-        syncNoticeToggle(prev, text);
+        syncNoticeToggle(prev, reminderWords(text));
         let badge = prev.querySelector(".chat-system-count");
         if (!badge) {
             badge = document.createElement("span");
@@ -167,8 +168,8 @@ export function appendCoralNotice(container, text, health = false) {
         return;
     }
 	const pill = makeBubble(`chat-system ${noticeClass}`,
-		`<span class="material-icons" aria-hidden="true">${health ? "health_and_safety" : "notifications"}</span><span class="chat-system-label">${health ? "Coral · Health check" : "Coral reminder"}</span><span class="chat-system-text" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`);
-	syncNoticeToggle(pill, text);
+		`<span class="material-icons" aria-hidden="true">${health ? "health_and_safety" : "notifications"}</span><span class="chat-system-label">${health ? "Coral · Health check" : "Coral reminder"}</span><span class="chat-system-text" title="${escapeHtml(text)}">${escapeHtml(reminderWords(text))}</span>`);
+	syncNoticeToggle(pill, reminderWords(text));
 	appendWork(container, pill);
 }
 

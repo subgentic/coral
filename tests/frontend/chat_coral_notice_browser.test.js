@@ -58,6 +58,14 @@ const interleave = texts => texts.flatMap(t => [{ type: 'user', content: OPERATO
         assert.equal(pillText, odd, 'the notice shows its text');
         console.log('   ✓ a delivery flag wins over the text');
 
+        // 2b. a reminder reads as a sentence for the person (#10376, the Mobile tester): the command an agent runs is not on the row, and the tooltip keeps the whole text
+        const REMIND = "You have 1 unread message on the message board. Run 'coral-board read' to see them.", CLAIM = "[Task #1 available] Run 'coral-board task claim 1' to claim it when your current task is done.";
+        await fresh();
+        await render([{ type: 'user', content: OPERATOR }, { type: 'user', content: REMIND, coral_notice: true }, { type: 'user', content: OPERATOR }, { type: 'user', content: CLAIM, coral_notice: true }]);
+        const rows = await ev(`[...document.querySelectorAll('#nt-box .chat-system-text')].map(e => [e.textContent, e.title])`);
+        assert.deepEqual(rows, [['You have 1 unread message on the message board.', REMIND], ['Task #1 is available.', CLAIM]], 'the rows say it for a person and keep the whole text as their tooltip: ' + JSON.stringify(rows));
+        console.log('   ✓ a reminder reads as a sentence for the person');
+
         // 3. the operator's own words stay a bubble, even quoting a notice
         await fresh();
         const quotes = ['please check "[Task #4300 completed by QA Engineer] Outcome: success" again', 'what does You have 2 unread messages on the message board mean?', 'Task #12 completed? tell me'];
