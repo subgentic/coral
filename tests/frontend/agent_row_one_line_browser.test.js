@@ -10,7 +10,7 @@ const { connect } = require('./agent_view_harness');
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const base = o => Object.assign({ name: 'coral-go', display_name: '', agent_type: 'claude', summary: 'Ship the release plan', model: 'claude-opus-5-5', branch: 'feat/long-branch-name', repo_name: 'coral', working_directory: '/work/coral-project', context_pct: 10, working: false, waiting_for_input: false, not_started: false, stuck: false, sleeping: false, awaiting_user: false, done: false, board_project: '', board_unread: 0 }, o);
     const ROWS = [
-        base({ session_id: 'o1', display_name: 'Worker', working: true }),
+        base({ session_id: 'o1', display_name: 'Worker', working: true, thinking_actual: 'high' }), // the newest turn ran at High: the header's model line and Details say it (#9826)
         base({ session_id: 'o2', display_name: 'Asker', waiting_for_input: true, waiting_kind: 'permission' }),
         base({ session_id: 'o3', display_name: 'Held', board_project: 'team-a', board_unread: 2, skipped_send: { why: 'a prompt is open', what: 'nudge' } }),
         base({ session_id: 'o4', display_name: 'Asker and held', waiting_for_input: true, waiting_kind: 'question', board_project: 'team-a', board_unread: 1, skipped_send: { why: 'a prompt is open', what: 'nudge' } }),
@@ -62,7 +62,7 @@ const { connect } = require('./agent_view_harness');
                 await ev(`document.querySelector('#agent-phone-details > summary').click(); true`);
                 const dd = await ev(`[...document.querySelectorAll('#agent-phone-details .facts-row')].filter(r => !r.hidden).map(r => r.querySelector('dt').textContent + ': ' + r.querySelector('dd').textContent)`);
                 await shot('agent-details-390');
-                assert.ok(dd.some(x => /^Context: ctx 10%/.test(x)) && dd.some(x => /^Folder: .*coral-project/.test(x)) && dd.some(x => /^Branch: .*long-branch-name/.test(x)) && dd.some(x => /^Model: .*Opus/.test(x)), `Details has the folder, the branch and the model ${JSON.stringify(dd)}`);
+                assert.ok(dd.some(x => /^Context: ctx 10%/.test(x)) && dd.some(x => /^Folder: .*coral-project/.test(x)) && dd.some(x => /^Branch: .*long-branch-name/.test(x)) && dd.some(x => /^Model: .*Opus/.test(x)) && dd.some(x => /^Thinking[a-z ]*: High$/.test(x)), `Details has the folder, the branch and the model ${JSON.stringify(dd)}`);
                 console.log('PASS 390: Details shows the folder, branch and model');
             }
             if (!mobile) { // nothing is lost: the agent's own page header has the branch, the folder and the model with its level (the row says none of them)
@@ -70,7 +70,7 @@ const { connect } = require('./agent_view_harness');
                 await waitFor(`!document.getElementById('terminal-header-model')?.hidden && !document.getElementById('terminal-header-folder')?.hidden && !document.getElementById('terminal-header-branch')?.hidden`, 'the header: model, folder and branch', 8000);
                 const hd = await ev(`({ model: document.querySelector('#terminal-header-model .terminal-folder-text').textContent, folder: document.querySelector('#terminal-header-folder .terminal-folder-text').textContent, folderTip: document.getElementById('terminal-header-folder').title, branch: document.querySelector('#terminal-header-branch .terminal-branch-text').textContent })`);
                 await shot('agent-header-model-1280');
-                assert.match(hd.model, /Opus/, `the header names the model ${JSON.stringify(hd)}`); assert.match(hd.model, /ctx 10%/, `and the context use (the row's pill moved here) ${JSON.stringify(hd)}`);
+                assert.match(hd.model, /Opus/, `the header names the model ${JSON.stringify(hd)}`); assert.equal(hd.model, 'Opus 5.5 \u00b7 High \u00b7 ctx 10%', `the model line reads model, thinking level and context in that order (#9826) ${JSON.stringify(hd)}`); assert.match(hd.model, /ctx 10%/, `and the context use (the row's pill moved here) ${JSON.stringify(hd)}`);
                 assert.ok(hd.folder.includes('coral-project') && hd.folderTip === '/work/coral-project', `and the folder, with its full path on hover ${JSON.stringify(hd)}`);
                 assert.ok(hd.branch.includes('long-branch-name'), `and the branch beside it ${JSON.stringify(hd)}`);
                 // the header is what the pane leaves it: with the side panel open it is under 44 rem and the model line gives way to Details (it was squeezed to nothing); with the panel closed the model line is drawn (#9784, UI/UX look check)
