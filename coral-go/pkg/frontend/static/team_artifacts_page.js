@@ -106,6 +106,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const r = await fetch(`/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null);
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'star' : 'unstar'} ${name}.`, true); return; }
         item.starred = on;
+        document.dispatchEvent(new CustomEvent('artifact-star-changed')); // the Inbox's Starred folder reads its artifacts again (#10258)
         button.setAttribute('aria-pressed', String(on));
         button.textContent = on ? 'Starred' : 'Star';
         button.title = on ? 'Starred (click to remove the star)' : 'Star: find this again in Starred only';

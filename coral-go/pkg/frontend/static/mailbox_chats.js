@@ -14,6 +14,7 @@ const IR = await importOnce('./inbox_read.js'); // which chats and boards the pe
 const readKey = s => `${s.server}:${s.session_id}`, readKind = s => (isGroup(s) ? 'board' : 'chat');
 const { historyFetch } = await importOnce('./history_source.js');
 const { historyLabel } = await importOnce('./history_label.js');
+const SA = await importOnce('./mailbox_starred_artifacts.js'); // the Starred folder's second part: starred artifacts (#10258)
 
 const PAGE = 50;
 export const CHAT_KEY = /^chats(-|$)/;
@@ -38,6 +39,14 @@ export function chatFolder(key, c = counts) {
     return null;
 }
 
+/** The number shown beside a folder and in its heading: its own total, and for Starred the starred artifacts too (#10258). folderCount stays the chats' own total (the list's "Showing N of total" and its paging use it). */
+export function shownCount(key, c = counts) {
+    const chats = folderCount(key, c);
+    if (key !== 'chats-starred') return chats;
+    const arts = SA.starredArtifactCount();
+    return chats === undefined && arts == null ? undefined : (chats || 0) + (arts || 0);
+}
+
 /** A folder's total from the last counts read (undefined until it is known): the number beside the folder and the one in the table's heading, so the two never differ. */
 export function folderCount(key, c = counts) {
     const n = (v) => (c && Number.isFinite(c[v]) ? c[v] : undefined);
@@ -54,7 +63,7 @@ export const folderUnread = key => (unread && unread[key]) || undefined;
 
 /** The view list's sections for the chat folders: the number beside a folder is its unread chats, its total is the tooltip (a folder with none unread shows no number). */
 export function chatSections(c = counts) {
-    const item = (key, label) => ({ key, label, count: folderUnread(key), total: folderCount(key, c), unread: true });
+    const item = (key, label) => ({ key, label, count: folderUnread(key), total: shownCount(key, c), unread: true });
     const out = [{ title: 'Chats', items: FOLDERS.map(f => item(f.key, f.label)) },
         { title: 'By CLI', items: CLIS.map(([t, label]) => item(`chats-cli-${t}`, label)) }];
     const tags = (c && c.tags) || [];
@@ -205,7 +214,7 @@ async function setFlag(s, flag, value, after) { if (await setChatFlag(s.session_
 
 const chatState = DT.tableState(); // the chats the person has selected on a phone (an avatar tap): kept across the redraws of a folder
 /** The table spec of a chat folder. ctx: { query, params, open(session), redraw(), after() } (params: the Filters' extra parameters of the history read, chat_filters.js; open: the chat in the viewer; redraw: draw the table again; after: counts and rows read again). */
-export function chatsSpec(key, ctx) {
+function chatFolderSpec(key, ctx) {
     const folder = chatFolder(key);
     if (!folder) return null;
     const q = (ctx.query || '').trim();
@@ -214,7 +223,7 @@ export function chatsSpec(key, ctx) {
     if (!L.page && !L.busy && !L.done) readMore(key, folder, q, extra, ctx.redraw);
     else if (!L.busy && !L.error && L.page > 0 && (L.refresh || (L.at && Date.now() - L.at > STALE_MS))) { L.refresh = true; readMore(key, folder, q, extra, ctx.redraw); } // a list kept from an earlier look is read again once it is a while old, its rows staying until the new ones land (#10262: after a restart the folder listed the one chat that was indexed when it was first opened, and not the other agent's)
     const rows = L.rows;
-    return { title: folder.title, noun: ['chat', 'chats'], rows, count: folderCount(key) ?? null, empty: { line: L.error ? (q ? 'Search failed' : 'Chats could not be read') : L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : key === 'chats-archived' ? 'No archived chats yet. Archive a chat or an agent and it is kept here.' : 'No chats here.') },
+    return { title: folder.title, noun: ['chat', 'chats'], rows, count: folderCount(key) ?? null, empty: { line: L.error ? (q ? 'Search failed' : 'Chats could not be read') : L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : key === 'chats-archived' ? 'No archived chats yet. Archive a chat or an agent and it is kept here.' : key === 'chats-starred' ? 'Nothing starred yet.' : 'No chats here.'), ...(key === 'chats-starred' && !filtered && !L.error && !L.busy && L.page ? { hint: 'Star a chat or an artifact (the star on its row) and it is kept here.' } : {}) },
         signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec, IR.isUnread(readKind(s), readKey(s), stampOf(s))])]),
         node: () => { const table = DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => `${s.server}:${s.session_id}`, state: chatState,
             onModeChange: () => ctx.redraw?.(), // the window crossed 767 px: this spec's selectable (phone only) is decided at draw, so the owner draws the table again
@@ -241,4 +250,21 @@ export function chatsSpec(key, ctx) {
                     const flag = (key, on, icon, label, pressed) => { const b = DT.el('button', `dt-flag${key === 'starred' && on ? ' dt-flag-on' : ''}`); b.type = 'button'; b.title = label; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); if (pressed) b.setAttribute('aria-pressed', String(!!on)); const i = DT.el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', (e) => { e.stopPropagation(); setFlag(s, key, !on, ctx.after); }); return b; };
                     w.append(flag('starred', s.starred, 'star', s.starred ? 'Remove the star' : 'Star', true), flag('archived', s.archived, s.archived ? 'unarchive' : 'archive', s.archived ? 'Unarchive' : 'Archive', false)); return w; } },
             ] }); ctx.selection?.(chatState.selected.size ? table.bar : null); return table.el; } };
+}
+
+/** The table spec of a chat folder. The Starred folder has a second part, its starred artifacts (#10258): unfiltered only (a search or Filters narrow the chats, and the artifacts part is the whole folder's). */
+export function chatsSpec(key, ctx) {
+    const spec = chatFolderSpec(key, ctx);
+    if (!spec || key !== 'chats-starred' || (ctx.query || '').trim() || Object.keys(ctx.params || {}).length) return spec;
+    SA.ensureStarredArtifacts(() => { ctx.redraw?.(); ctx.nav?.(); }); // the page and the folder's number beside it
+    const chatsNode = spec.node;
+    const alone = !spec.rows.length && SA.hasStarredArtifacts(); // starred artifacts and no starred chat: the page is the artifacts, not the chats' empty line
+    return { ...spec, count: shownCount(key) ?? null, signature: spec.signature + SA.starredArtifactsSignature(), ...(alone ? { empty: undefined } : {}),
+        node: () => {
+            const wrap = DT.el('div', 'inbox-starred-folder');
+            if (spec.rows.length || !SA.hasStarredArtifacts()) wrap.append(chatsNode()); // with no starred chat, the artifacts stand alone; with nothing at all, the chat table says "Nothing starred yet"
+            const part = SA.starredArtifactsSection();
+            if (part) wrap.append(part);
+            return wrap;
+        } };
 }
