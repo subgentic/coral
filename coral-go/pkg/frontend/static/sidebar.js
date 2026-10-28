@@ -300,7 +300,7 @@ export function toggleAgenticPanel(forceState) {
     if (popoutBtn) {
         popoutBtn.classList.toggle('active', isOpen);
         popoutBtn.setAttribute('aria-pressed', isOpen ? 'true' : 'false');
-        popoutBtn.setAttribute('aria-label', isOpen ? 'Hide side panel' : 'Show side panel');
+        popoutBtn.setAttribute('aria-label', isOpen ? 'Hide files, tasks and notes' : 'Show files, tasks and notes');
         popoutBtn.title = popoutBtn.getAttribute('aria-label');
     }
 }
