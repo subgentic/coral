@@ -31,7 +31,7 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	content, workdir, ok := h.readWorkFile(w, r, name, sessionID, fp, maxFileBytes())
+	content, workdir, ok := h.readWorkFile(w, r, name, sessionID, fp, maxFileBytes(), "File too large to preview")
 	if !ok {
 		return
 	}
@@ -48,8 +48,8 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 }
 
 // readWorkFile reads the file fp of an agent's working tree under the bounds of GetFileContent (the folder, the tunnel's strict roots, the denylist, a folder held open); it answers the
-// request itself and returns false when there is no file to give. limit is the most bytes it reads; workdir is the tree's root.
-func (h *SessionsHandler) readWorkFile(w http.ResponseWriter, r *http.Request, name, sessionID, fp string, limit int64) (content []byte, workdir string, ok bool) {
+// request itself and returns false when there is no file to give. limit is the most bytes it reads (tooLarge is what a larger file is told); workdir is the tree's root.
+func (h *SessionsHandler) readWorkFile(w http.ResponseWriter, r *http.Request, name, sessionID, fp string, limit int64, tooLarge string) (content []byte, workdir string, ok bool) {
 	workdir = h.resolveGitRoot(agentCtx(r), name, "", sessionID)
 	if workdir == "" {
 		errBadRequest(w, "Could not determine working directory")
@@ -128,7 +128,7 @@ func (h *SessionsHandler) readWorkFile(w http.ResponseWriter, r *http.Request, n
 	content, rerr = read(rel, limit)
 	err = rerr
 	if errors.Is(err, safefs.ErrTooLarge) {
-		errPayloadTooLarge(w, "File too large to preview")
+		errPayloadTooLarge(w, tooLarge)
 		return nil, "", false
 	}
 	if err != nil {
