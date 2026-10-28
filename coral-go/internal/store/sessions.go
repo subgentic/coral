@@ -42,6 +42,8 @@ type SessionIndex struct {
 	IndexedAt        string  `db:"indexed_at" json:"-"`
 	FileMtime        float64 `db:"file_mtime" json:"-"`
 	IndexVersion     int     `db:"index_version" json:"-"`
+	// WorkingDir is the folder the chat ran in, from the start of its transcript ("" when the file has none: a chat of a CLI that does not keep it, #10390).
+	WorkingDir string `db:"working_dir" json:"-"`
 }
 
 // LiveSession represents a persistent live session record.

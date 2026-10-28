@@ -18,7 +18,7 @@ const AFTER = {
 const AFTER_DEFAULT = 'Coral is quitting to install the update. If it does not start again by itself, start it.';
 const STATE_WORDS = { working: 'working', idle: 'idle', waiting: 'waiting for you' };
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el: mk } = await importOnce('./dom_el.js');
 
 /** Which of the restarted agents come back on their own (the server's `resumes`), in words: " 2 start again on their own afterwards; 1 starts a new conversation." Empty when the server does not say. */
 function comeBack(back, fresh, n) {

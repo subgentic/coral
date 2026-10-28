@@ -1,4 +1,4 @@
-package routes
+package agent
 
 import (
 	"bufio"
@@ -7,21 +7,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
-// resumeCwdScanBytes is how much of a transcript's start is read to find the folder the session ran in: the CLIs record it in their first entries (Claude's every entry carries cwd, Codex's
+// transcriptScanBytes is how much of a transcript's start is read to find the folder the session ran in: the CLIs record it in their first entries (Claude's every entry carries cwd, Codex's
 // session_meta and Pi's header have it), so a short look is enough, and a transcript of a hundred megabytes is not read.
-const resumeCwdScanBytes = 256 << 10
+const transcriptScanBytes = 256 << 10
 
-// transcriptCwd is the folder a past session ran in, read from the start of its transcript (#10291, Desktop pass 25: Resume offered Coral's folder, not the session's own, for a chat Coral had no
+// TranscriptCwd is the folder a past session ran in, read from the start of its transcript (#10291, Desktop pass 25: Resume offered Coral's folder, not the session's own, for a chat Coral had no
 // live row for). "" when the file has none, is not readable or names no absolute path. The text is only returned: nothing is opened under it.
-func transcriptCwd(sourceFile string) string { cwd, _ := transcriptStart(sourceFile); return cwd }
+func TranscriptCwd(sourceFile string) string { cwd, _ := TranscriptStart(sourceFile); return cwd }
 
-// transcriptStart is the folder a past session ran in and, where the CLI keeps it in its transcript (Claude's entries carry permissionMode), the permission mode the chat started in, both read from
+// TranscriptStart is the folder a past session ran in and, where the CLI keeps it in its transcript (Claude's entries carry permissionMode), the permission mode the chat started in, both read from
 // the first 256 KiB of the file (#10291, #10487). Each is "" when the file has none; a mode that is no known mode is not returned.
-func transcriptStart(sourceFile string) (cwd, mode string) {
+func TranscriptStart(sourceFile string) (cwd, mode string) {
 	if sourceFile == "" {
 		return "", ""
 	}
@@ -30,7 +29,7 @@ func transcriptStart(sourceFile string) (cwd, mode string) {
 		return "", ""
 	}
 	defer f.Close()
-	r := bufio.NewReaderSize(io.LimitReader(f, resumeCwdScanBytes), 64<<10)
+	r := bufio.NewReaderSize(io.LimitReader(f, transcriptScanBytes), 64<<10)
 	for {
 		line, err := r.ReadBytes('\n')
 		if len(line) > 0 {
@@ -50,7 +49,7 @@ func transcriptStart(sourceFile string) (cwd, mode string) {
 						}
 					}
 				}
-				if mode == "" && agent.ValidPermissionMode(entry.PermissionMode) {
+				if mode == "" && ValidPermissionMode(entry.PermissionMode) {
 					mode = entry.PermissionMode
 				}
 			}

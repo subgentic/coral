@@ -17,7 +17,7 @@ const NOT_NOW_KEY = 'coral-password-not-now';
 // sendJson and postJson live in api.js now (a startup module); they are re-exported here for the modules that destructure them from this one.
 export { sendJson, postJson } from './api.js';
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el } = await importOnce('./dom_el.js');
 
 /** A labelled password input with a Show/Hide button. `autocomplete` is what tells a password manager to save or fill. */
 export function passwordField({ id, label, autocomplete, name }) {

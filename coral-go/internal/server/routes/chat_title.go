@@ -1,10 +1,13 @@
 package routes
 
 import (
+	"context"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // chatTitleLimit is how much of a chat's first message its title keeps.
@@ -44,6 +47,41 @@ func markdownLine(text string) string {
 		}
 	}
 	return ""
+}
+
+// cleanChatTitle is a name a person typed for a chat as one short line: control characters and line breaks become spaces, runs of spaces one, cut to store.ChatTitleLimit characters. "" takes the name off.
+func cleanChatTitle(s string) string {
+	t := strings.Join(strings.Fields(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+			return ' '
+		}
+		return r
+	}, s)), " ")
+	if r := []rune(t); len(r) > store.ChatTitleLimit {
+		t = strings.TrimSpace(string(r[:store.ChatTitleLimit]))
+	}
+	return t
+}
+
+// effectiveChatTitle is the title a chat shows now: the name a person gave it, else the notes' title or the first message (chatTitle).
+func (h *HistoryHandler) effectiveChatTitle(ctx context.Context, id string) string {
+	summary, chosen := h.ss.GetChatTitleParts(ctx, id)
+	if chosen != "" {
+		return chosen
+	}
+	idx, err := h.ss.GetIndexedSession(ctx, id)
+	if err != nil || idx == nil {
+		return summary
+	}
+	return chatTitle(summary, idx.FirstUserMessage, idx.DisplayName, idx.AgentName)
+}
+
+// listChatTitle is a History row's title: the name a person gave the chat, else chatTitle's.
+func listChatTitle(s store.SessionListItem) string {
+	if s.ChatTitle != "" {
+		return s.ChatTitle
+	}
+	return chatTitle(s.SummaryTitle, s.FirstUserMessage, s.DisplayName, s.AgentName)
 }
 
 // chatTitle is the one title of a chat that the History list and the sidebar both show (#7756): the title its notes give it (the agent's or the person's own), else the first real message the person typed

@@ -11,6 +11,7 @@ import { serverFetch, isCloud, nativeInbox } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 const DT = await importOnce('./data_table.js');
+const CF = await importOnce('./chat_filters.js'); // folderName: the Folder column's words
 const IR = await importOnce('./inbox_read.js'); // which chats and boards the person has opened since they changed (#9687)
 const readKey = s => `${s.server}:${s.session_id}`, readKind = s => (isGroup(s) ? 'board' : 'chat');
 const { historyFetch } = await importOnce('./history_source.js');
@@ -74,6 +75,8 @@ export function chatSections(c = counts) {
 
 /** The chat tags there are (from the last counts read): id, name, count, colour. */
 export const chatTags = () => (counts && counts.tags) || [];
+/** The folders the chats ran in, most chats first (the Folder filter's choices, #10390): [{ path, count }]. */
+export const chatDirs = () => (counts && counts.dirs) || [];
 
 /** The chats changed since the marker began, read once (at most 200 a computer), counted by folder against the read marker: how many of each folder the person has not opened. The Chats list pages by folder, so the total the counts route gives cannot say it. */
 const RECOUNT_MS = 60000; // the unread numbers are recounted from the history at most once a minute (coral-hub's rate rule, #9703)
@@ -125,7 +128,7 @@ export async function loadChatCounts(redraw) {
         // one computer that does not answer must not blank the others' counts on a Hub (the folders add up what answered); a local Coral's one source still fails as a whole
         const replies = isCloud() ? (await Promise.allSettled(sources.map(read))).filter(r => r.status === 'fulfilled').map(r => r.value) : await Promise.all(sources.map(read));
         counts = { ...replies[0], by_agent_type: Object.create(null) };
-        if (nativeInbox()) delete counts.tags; // tags are per computer: the Hub-served Inbox has no Tags folder
+        if (nativeInbox()) { delete counts.tags; delete counts.dirs; } // tags and the folders chats ran in are per computer: the Hub-served Inbox has no Tags folder and no Folder choices
         for (const key of ['all','group','notes','starred','active','archived']) counts[key] = replies.reduce((sum, d) => sum + (Number(d[key]) || 0), 0);
         for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
         dropStaleLists();
@@ -198,18 +201,28 @@ function dayOf(iso, now = new Date()) {
 const stampOf = (s) => s.last_timestamp || s.updated_at || '';
 const name = (s) => (isGroup(s) ? (s.title || String(s.session_id).replace(/^board:/, '')) : (s.display_name || s.agent_name || ''));
 
+/** Ask for a past chat's name and save it (#10390): it is the chat's title over the first message and the notes' title; an empty name takes it off. entry: the chat's row; after() runs once it is saved. */
+export async function renameChat(entry, after) {
+    (await importOnce('./prompt_modals.js')).showPromptModal('Rename chat', 'Name (empty: the automatic title)', entry.chat_title || historyLabel(entry), async name => {
+        if (name !== (entry.chat_title || '') && await setChatFlag(entry.session_id, 'title', name, entry.server || null)) after?.();
+    }, { allowEmpty: true, maxLength: 120 });
+}
+
 /** Star or archive a chat (the flags route): true when it was saved; a failure says so in a toast. */
 export async function setChatFlag(sessionId, flag, value, server = null) {
+    let reply = null;
     try {
         if (isCloud() || (server && server !== 'local')) throw new Error('Remote history is read-only');
         const read = server ? (url, options) => serverFetch(server, url, options) : historyFetch;
         const r = await read(`/api/sessions/history/${encodeURIComponent(sessionId)}/flags`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [flag]: value }) });
         if (!r || !r.ok) throw new Error('not saved');
+        if (flag === 'title') reply = await r.json(); // the title the chat shows now (an empty name gives the automatic one back)
     } catch { (await importOnce('./utils.js')).showToast?.('The chat could not be changed', true); return false; }
     const cached = (state.historySessionsList || []).find(x => x.session_id === sessionId && (!server || (x.server || 'local') === server));
-    if (cached) cached[flag] = value; // the chat's own page reads its star from this list: one star state everywhere (#10391)
+    if (cached && flag === 'title') { cached.chat_title = value; cached.title = reply.title; } else if (cached) cached[flag] = value; // the chat's own page reads its star from this list: one star state everywhere (#10391)
     for (const L of lists.values()) { // an unread chat starred or archived moves between the folders' numbers: in memory, no request (#9703)
         const row = L.rows.find(r => r.session_id === sessionId && (!server || r.server === server));
+        if (row && flag === 'title') { row.chat_title = value; row.title = reply.title; break; } // the name shows on the row at once, before the list is read again
         if (row) { if (IR.isUnread(readKind(row), readKey(row), stampOf(row)) && (flag === 'starred' || flag === 'archived')) bump([`chats-${flag}`], value ? 1 : -1); break; }
     }
     resetChatLists();
@@ -263,20 +276,19 @@ function chatFolderSpec(key, ctx) {
                     const marks = []; /* one chip a row at most (Goal #79, #9730): the first of Active now, Archived (an archived board stays in Board history, marked), Board; a folder that already says it (Archived, Board history) leaves its own word off */ const word = s.active ? 'Active now' : (s.archived && key !== 'chats-archived') ? 'Archived' : (group && key !== 'chats-group') ? 'Board' : ''; if (word) marks.push(DT.tag(word)); if (word && word !== 'Board') b.setAttribute('aria-label', `${b.getAttribute('aria-label')}, ${word.toLowerCase()}`); /* the chip beside the button is its state: the name ends with it, as the phone row's does (#9747; a board's own name already says Board) */
                     const shownHit = group ? '' : hitWithoutTitle(s); const hit = shownHit ? DT.el('span', 'dt-title-snippet') : null; if (hit) { hit.textContent = shownHit; hit.title = shownHit; } /* a search's hit: one line of the chat around the matched words (#10137) */
                     if (!marks.length && !hit) return b; const w = DT.el('span', 'dt-title-cell'); w.append(b, ...marks, ...(hit ? [hit] : [])); return w; } },
-                ...(key === 'chats-group' ? [] : [{ key: 'agent', label: 'Agent', width: '9rem', dropAt: 36, cell: s => name(s) }]),
+                ...(key === 'chats-group' ? [] : [{ key: 'agent', label: 'Agent', width: '9rem', dropAt: 36, cell: s => name(s) }, { key: 'folder', label: 'Folder', tone: 'tertiary', width: '9rem', dropAt: 44, cell: s => { if (!s.working_dir) return ''; const w = DT.el('span', 'dt-folder-cell'); w.textContent = CF.folderName(s.working_dir); w.title = s.working_dir; return w; } }]),
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '10rem', cell: s => DT.timeCell(stampOf(s)) },
                 ...serverColumns().map(c => ({ ...c, line: undefined, sort: false, width: '7rem', dropAt: 52 })),
-                { key: 'flags', label: 'Star, archive and continue', hideLabel: true, width: '8.5rem', dropAt: 36, /* the three icon buttons (star, archive, continue) are about 100 px and the cell has its padding: at 6.5 rem the third was cut by the cell's edge (#10523; at 5 rem the second was, #9458) */ cell: s => {
+                { key: 'flags', label: 'Star, archive and continue', hideLabel: true, width: '11rem', dropAt: 36, /* the four icon buttons (star, archive, rename, continue) are about 130 px and the cell has its padding: at 8.5 rem the fourth was cut by the cell's edge (#10390; at 6.5 rem the third was, #10523; at 5 rem the second was, #9458) */ cell: s => {
                     if (isCloud() || (s.server && s.server !== 'local')) return '';
                     const w = DT.el('span', 'dt-chat-flags');
                     // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat
                     const flag = (key, on, icon, label, pressed) => { const b = DT.el('button', `dt-flag${key === 'starred' && on ? ' dt-flag-on' : ''}`); b.type = 'button'; b.title = label; b.dataset.sid = s.session_id; b.dataset.flag = key; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); if (pressed) b.setAttribute('aria-pressed', String(!!on)); const i = DT.el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', (e) => { e.stopPropagation(); const who = name(s) || historyLabel(s); setFlag(s, key, !on, ctx.after, key === 'starred' ? (on ? `Star removed: ${who}` : `Starred: ${who}`) : (on ? `Unarchived: ${who}` : `Archived: ${who}`)); }); return b; };
                     w.append(flag('starred', s.starred, 'star', s.starred ? 'Unstar' : 'Star', false), flag('archived', s.archived, s.archived ? 'unarchive' : 'archive', s.archived ? 'Unarchive' : 'Archive', false));
-                    if (!isGroup(s) && s.session_id) { // Continue this chat: the chat opens and the Resume dialog asks where it goes on (#10400)
-                        const c = DT.el('button', 'dt-flag'); c.type = 'button'; c.title = 'Continue this chat'; c.setAttribute('aria-label', `Continue this chat: ${name(s) || historyLabel(s)}`);
-                        const i = DT.el('span', 'material-icons', 'play_arrow'); i.setAttribute('aria-hidden', 'true'); c.append(i);
-                        c.addEventListener('click', e => { e.stopPropagation(); Promise.resolve(window.selectHistorySession?.(s.session_id)).then(() => document.getElementById('btn-resume-session')?.click()); }); // the chat page's own Continue button: the one way to the Resume dialog
-                        w.append(c);
+                    if (!isGroup(s) && s.session_id) { // Rename (a person's name for the chat, its title from then on, #10390) and Continue (the chat opens and the Resume dialog asks where it goes on, #10400)
+                        const act = (label, glyph, run) => { const b = DT.el('button', 'dt-flag'); b.type = 'button'; b.title = label; b.dataset.flag = glyph; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); const i = DT.el('span', 'material-icons', glyph); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', e => { e.stopPropagation(); run(); }); w.append(b); };
+                        act('Rename this chat', 'edit', () => renameChat(s, ctx.after));
+                        act('Continue this chat', 'play_arrow', () => Promise.resolve(window.selectHistorySession?.(s.session_id)).then(() => document.getElementById('btn-resume-session')?.click())); // the chat page's own Continue button: the one way to the Resume dialog
                     }
                     return w; } },
             ] }); ctx.selection?.(chatState.selected.size ? table.bar : null); return table.el; } };

@@ -210,6 +210,7 @@ func parseHistoryListQuery(q url.Values) (store.SessionListParams, string) {
 		Archived:       q.Get("archived") == "1",
 		Active:         q.Get("active") == "1",
 		WithNotes:      q.Get("with_notes") == "1",
+		Folder:         q.Get("folder"),
 	}
 
 	// Chat type filter: all, agent, group
@@ -237,7 +238,7 @@ func historyFiltered(params store.SessionListParams) bool {
 	return params.Search != "" || len(params.TagIDs) > 0 ||
 		len(params.SourceTypes) > 0 || params.DateFrom != "" || params.DateTo != "" ||
 		params.MinDurationSec != nil || params.MaxDurationSec != nil ||
-		params.AgentName != "" || params.Starred || params.Archived || params.Active || params.WithNotes
+		params.AgentName != "" || params.Starred || params.Archived || params.Active || params.WithNotes || params.Folder != ""
 }
 
 // agentHistoryRows are the agent sessions' rows.
@@ -256,13 +257,15 @@ func agentHistoryRows(sessions []store.SessionListItem) []map[string]any {
 			"summary":            s.Summary,
 			"first_user_message": s.FirstUserMessage,
 			"summary_title":      s.SummaryTitle,
-			"title":              chatTitle(s.SummaryTitle, s.FirstUserMessage, s.DisplayName, s.AgentName),
+			"title":              listChatTitle(s),
+			"chat_title":         s.ChatTitle,
 			"has_notes":          s.HasNotes,
 			"tags":               s.Tags,
 			"branch":             s.Branch,
 			"duration_sec":       s.DurationSec,
 			"agent_name":         s.AgentName,
 			"display_name":       s.DisplayName,
+			"working_dir":        s.WorkingDir,
 			"type":               "agent",
 		}
 		if s.Snippet != "" { // a search's hit: one line of the chat's text around the matched words (#10137)
@@ -664,7 +667,7 @@ func (h *HistoryHandler) GetResumeInfo(w http.ResponseWriter, r *http.Request) {
 				result["resume_session_id"] = nativeID
 			}
 			// where the session ran, and the mode it ran in where its transcript keeps one: for a chat Coral has no live row for (#10291, #10487)
-			dir, mode := transcriptStart(idx.SourceFile)
+			dir, mode := agent.TranscriptStart(idx.SourceFile)
 			if dir != "" {
 				result["working_dir"] = dir
 				result["working_dir_from"] = "session"

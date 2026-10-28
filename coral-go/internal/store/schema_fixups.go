@@ -34,6 +34,7 @@ var columnMigrations = []struct {
 	{"agent_notes", "session_id", "TEXT"},
 	{"agent_tasks", "session_id", "TEXT"},
 	{"session_meta", "display_name", "TEXT"},
+	{"session_meta", "chat_title", "TEXT"},
 	{"live_sessions", "resume_from_id", "TEXT"},
 	{"live_sessions", "flags", "TEXT"},
 	{"live_sessions", "is_job", "INTEGER NOT NULL DEFAULT 0"},
@@ -118,6 +119,7 @@ var columnMigrations = []struct {
 	{"session_index", "agent_name", "TEXT"},
 	{"session_index", "display_name", "TEXT"},
 	{"session_index", "index_version", "INTEGER NOT NULL DEFAULT 0"},
+	{"session_index", "working_dir", "TEXT"},
 	{"session_index", "first_user_message", "TEXT NOT NULL DEFAULT ''"}, // what the person typed first, for History titles (#6207)
 	{"token_usage", "cache_read_tokens", "INTEGER NOT NULL DEFAULT 0"},
 	{"token_usage", "cache_write_tokens", "INTEGER NOT NULL DEFAULT 0"},

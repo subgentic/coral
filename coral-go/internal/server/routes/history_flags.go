@@ -18,13 +18,15 @@ func (h *HistoryHandler) SetChatFlags(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Starred  *bool `json:"starred"`
 		Archived *bool `json:"archived"`
+		// Title names a past agent chat (#10390); "" takes the name off.
+		Title *string `json:"title"`
 	}
 	if err := decodeJSONStrict(r, &body); err != nil {
-		errBadRequest(w, "starred and archived must be booleans")
+		errBadRequest(w, "starred and archived must be booleans and title a string")
 		return
 	}
-	if body.Starred == nil && body.Archived == nil {
-		errBadRequest(w, "supply starred or archived")
+	if body.Starred == nil && body.Archived == nil && body.Title == nil {
+		errBadRequest(w, "supply starred, archived or title")
 		return
 	}
 	// chi hands the id over as it was sent: the dashboard encodes it, so "board:team" arrives as "board%3Ateam"
@@ -34,7 +36,12 @@ func (h *HistoryHandler) SetChatFlags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	exists := false
-	if board, ok := strings.CutPrefix(id, "board:"); ok {
+	board, isBoard := strings.CutPrefix(id, "board:")
+	if isBoard && body.Title != nil {
+		errBadRequest(w, "a board chat is named by its board")
+		return
+	}
+	if isBoard {
 		if h.bs != nil {
 			projects, err := h.bs.ListProjects(r.Context())
 			if err != nil {
@@ -60,9 +67,19 @@ func (h *HistoryHandler) SetChatFlags(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "chat not found")
 		return
 	}
-	if err := h.ss.UpdateChatFlags(r.Context(), id, body.Starred, body.Archived); err != nil {
-		errInternalServer(w, "could not save chat flags")
-		return
+	if body.Starred != nil || body.Archived != nil {
+		if err := h.ss.UpdateChatFlags(r.Context(), id, body.Starred, body.Archived); err != nil {
+			errInternalServer(w, "could not save chat flags")
+			return
+		}
+	}
+	reply := map[string]any{"ok": true}
+	if body.Title != nil {
+		if err := h.ss.SetChatTitle(r.Context(), id, cleanChatTitle(*body.Title)); err != nil {
+			errInternalServer(w, "could not save the chat's name")
+			return
+		}
+		reply["title"] = h.effectiveChatTitle(r.Context(), id)
 	}
 	if body.Archived != nil && !*body.Archived { // Unarchive on a chat whose agent is archived puts the agent back in the sidebar too: the two lists are one answer (#10086); no live session is a no-op
 		if err := h.ss.SetSessionArchived(r.Context(), id, false); err != nil {
@@ -70,7 +87,7 @@ func (h *HistoryHandler) SetChatFlags(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	writeJSON(w, http.StatusOK, reply)
 }
 
 // ChatCounts returns the whole mailbox's chat counts, not a page or a separate query per folder.

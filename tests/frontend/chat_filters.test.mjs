@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 globalThis.localStorage = { _m: new Map(), getItem(k) { return this._m.has(k) ? this._m.get(k) : null; }, setItem(k, v) { this._m.set(k, String(v)); }, removeItem(k) { this._m.delete(k); } };
 const CF = await import('../../coral-go/pkg/frontend/static/chat_filters.js');
 
-assert.deepEqual(CF.fieldsFor('chats'), ['cli', 'agent', 'tagId', 'dates']);
-assert.deepEqual(CF.fieldsFor('chats-starred'), ['cli', 'agent', 'tagId', 'dates']);
-assert.deepEqual(CF.fieldsFor('chats-archived'), ['cli', 'agent', 'tagId', 'dates']);
-assert.deepEqual(CF.fieldsFor('chats-cli-claude'), ['agent', 'tagId', 'dates'], 'a CLI folder has no CLI field');
-assert.deepEqual(CF.fieldsFor('chats-tag-7'), ['cli', 'agent', 'dates'], 'a tag folder has no tag field');
+assert.deepEqual(CF.fieldsFor('chats'), ['cli', 'agent', 'tagId', 'folder', 'dates']);
+assert.deepEqual(CF.fieldsFor('chats-starred'), ['cli', 'agent', 'tagId', 'folder', 'dates']);
+assert.deepEqual(CF.fieldsFor('chats-archived'), ['cli', 'agent', 'tagId', 'folder', 'dates']);
+assert.deepEqual(CF.fieldsFor('chats-cli-claude'), ['agent', 'tagId', 'folder', 'dates'], 'a CLI folder has no CLI field');
+assert.deepEqual(CF.fieldsFor('chats-tag-7'), ['cli', 'agent', 'folder', 'dates'], 'a tag folder has no tag field');
 assert.deepEqual(CF.fieldsFor('chats-group'), ['dates'], 'a board history has dates only');
 
 const all = { ...CF.EMPTY, cli: 'codex', agent: 'Frontend Dev', tagId: '7', from: '2026-10-01', to: '2026-10-20' };
@@ -31,6 +31,13 @@ assert.deepEqual(CF.chips({ ...CF.EMPTY, to: '2026-10-20' }).map(c => c.label), 
 assert.deepEqual(CF.chips({ ...CF.EMPTY, tagId: '99' }).map(c => c.label), ['Tag: Tag'], 'a tag it does not know reads Tag');
 assert.deepEqual(CF.without({ ...CF.EMPTY, from: '2026-10-01', to: '2026-10-20', cli: 'pi' }, 'dates'), { ...CF.EMPTY, cli: 'pi' }, 'the dates are one chip');
 assert.equal(CF.isFiltered({ ...CF.EMPTY, tagId: '7' }), true); assert.equal(CF.isFiltered(CF.EMPTY), false);
+
+// #10390: the Folder filter sends the folder a chat ran in, as chosen; a value that is no absolute path is dropped; the chip and the column say the last part
+assert.deepEqual(CF.toParams('chats', { ...CF.EMPTY, folder: '/srv/app' }), { folder: '/srv/app' });
+assert.deepEqual(CF.toParams('chats-group', { ...CF.EMPTY, folder: '/srv/app' }), {}, 'a board history has no folder field');
+assert.equal(CF.clean({ folder: 'app' }).folder, '', 'a folder is an absolute path'); assert.equal(CF.clean({ folder: 'C:\\work\\app' }).folder, 'C:\\work\\app');
+assert.deepEqual(CF.chips({ ...CF.EMPTY, folder: '/srv/app' }).map(c => c.label), ['Folder: app']);
+assert.equal(CF.folderName('/srv/app/'), 'app'); assert.equal(CF.folderName('C:\\work\\app'), 'app'); assert.equal(CF.folderName('/'), '/');
 
 CF.saveFilters('chats-starred', { ...CF.EMPTY, cli: 'codex', q: 'not kept' });
 assert.deepEqual(CF.loadFilters('chats-starred'), { ...CF.EMPTY, cli: 'codex' }, 'kept for the folder, without the search words');

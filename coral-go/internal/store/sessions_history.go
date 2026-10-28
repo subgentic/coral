@@ -31,6 +31,8 @@ type SessionListParams struct {
 	Archived       bool
 	Active         bool
 	WithNotes      bool
+	// Folder is the folder the chat ran in, exactly as stored (the Folder filter, #10390); "" is every folder.
+	Folder string
 }
 
 // SessionListResult holds paginated session results.
@@ -54,14 +56,17 @@ type SessionListItem struct {
 	MessageCount   int     `json:"message_count"`
 	Summary        string  `json:"summary"`
 	// FirstUserMessage is what the person typed first ("" when the row predates it): History titles lead with it (#6207).
-	FirstUserMessage string  `json:"first_user_message"`
-	SummaryTitle     string  `json:"summary_title"`
-	HasNotes         bool    `json:"has_notes"`
-	Tags             []Tag   `json:"tags"`
-	Branch           *string `json:"branch"`
-	DurationSec      *int    `json:"duration_sec"`
-	AgentName        string  `json:"agent_name,omitempty"`
-	DisplayName      string  `json:"display_name,omitempty"`
+	FirstUserMessage string `json:"first_user_message"`
+	SummaryTitle     string `json:"summary_title"`
+	HasNotes         bool   `json:"has_notes"`
+	WorkingDir       string `json:"working_dir,omitempty"`
+	// ChatTitle is the name a person gave the chat: it is the chat's title over the notes' and the first message (#10390).
+	ChatTitle   string  `json:"chat_title,omitempty"`
+	Tags        []Tag   `json:"tags"`
+	Branch      *string `json:"branch"`
+	DurationSec *int    `json:"duration_sec"`
+	AgentName   string  `json:"agent_name,omitempty"`
+	DisplayName string  `json:"display_name,omitempty"`
 	// Snippet is, for a search, one line of the chat's text around the matched words (#10137); empty without a search.
 	Snippet string `json:"snippet,omitempty"`
 }
@@ -140,6 +145,9 @@ func sessionListQuery(params SessionListParams) sessionListSQL {
 			q.searching = true
 		}
 	}
+	if params.Folder != "" {
+		where("si.working_dir = ?", params.Folder)
+	}
 	if params.DateFrom != "" {
 		where("si.last_timestamp >= ?", params.DateFrom+"T00:00:00")
 	}
@@ -189,6 +197,7 @@ type sessionPageRow struct {
 	AgentName        *string `db:"agent_name"`
 	DisplayName      *string `db:"display_name"`
 	Snippet          string  `db:"snippet"`
+	WorkingDir       *string `db:"working_dir"`
 }
 
 // pageSessions counts the sessions the query matches and reads the requested page of them.
@@ -204,7 +213,7 @@ func (s *SessionStore) pageSessions(ctx context.Context, q sessionListSQL, param
 	offset := (params.Page - 1) * params.PageSize
 	selectFields := `si.session_id, si.source_type, si.source_file,
 		si.first_timestamp, si.last_timestamp, si.message_count, si.display_summary, si.first_user_message,
-		si.agent_name, si.display_name, COALESCE(cf.starred,0) AS starred, ` + archivedChatSQL("si.session_id") + ` AS archived, ` + activeChatSQL("si.session_id", "si.source_type") + ` AS active`
+		si.agent_name, si.display_name, si.working_dir, COALESCE(cf.starred,0) AS starred, ` + archivedChatSQL("si.session_id") + ` AS archived, ` + activeChatSQL("si.session_id", "si.source_type") + ` AS active`
 	if q.searching {
 		// one line of the chat's own text around the matched words: FTS5's snippet() over the body column, 12 tokens, no markers
 		selectFields += `, snippet(session_fts, 1, '', '', ' … ', 12) AS snippet`
@@ -233,6 +242,7 @@ type sessionListExtras struct {
 }
 
 type sessionNotesMeta struct {
+	ChatTitle    string // the name a person gave the chat (#10390); "" when none
 	HasNotes     bool
 	IsUserEdited bool
 	SummaryTitle string
@@ -257,13 +267,14 @@ func (s *SessionStore) sessionListExtras(ctx context.Context, sessionIDs []strin
 func (s *SessionStore) sessionNotesMeta(ctx context.Context, sessionIDs []string) map[string]sessionNotesMeta {
 	out := map[string]sessionNotesMeta{}
 	metaQuery, metaArgs, _ := sqlx.In(
-		"SELECT session_id, notes_md, auto_summary, is_user_edited FROM session_meta WHERE session_id IN (?)",
+		"SELECT session_id, notes_md, auto_summary, is_user_edited, COALESCE(chat_title, '') AS chat_title FROM session_meta WHERE session_id IN (?)",
 		sessionIDs)
 	var metaRows []struct {
 		SessionID    string `db:"session_id"`
 		NotesMD      string `db:"notes_md"`
 		AutoSummary  string `db:"auto_summary"`
 		IsUserEdited bool   `db:"is_user_edited"`
+		ChatTitle    string `db:"chat_title"`
 	}
 	if err := s.reader().SelectContext(ctx, &metaRows, metaQuery, metaArgs...); err == nil {
 		for _, r := range metaRows {
@@ -272,6 +283,7 @@ func (s *SessionStore) sessionNotesMeta(ctx context.Context, sessionIDs []string
 				content = r.AutoSummary
 			}
 			out[r.SessionID] = sessionNotesMeta{
+				ChatTitle:    r.ChatTitle,
 				HasNotes:     r.NotesMD != "" || r.AutoSummary != "",
 				IsUserEdited: r.IsUserEdited,
 				SummaryTitle: extractFirstHeader(content),
@@ -385,12 +397,14 @@ func (x sessionListExtras) item(r sessionPageRow) SessionListItem {
 		FirstUserMessage: r.FirstUserMessage,
 		SummaryTitle:     meta.SummaryTitle,
 		HasNotes:         meta.HasNotes,
+		ChatTitle:        meta.ChatTitle,
 		Tags:             tags,
 		Branch:           branch,
 		DurationSec:      computeDuration(r.FirstTimestamp, r.LastTimestamp),
 		AgentName:        agentName,
 		DisplayName:      displayName,
 		Snippet:          oneLine(r.Snippet, 200),
+		WorkingDir:       ptr.Value(r.WorkingDir),
 	}
 }
 

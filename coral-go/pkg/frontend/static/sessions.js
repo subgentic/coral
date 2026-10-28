@@ -418,14 +418,19 @@ export function drawChatFlags(entry) {
     star.classList.toggle('dt-flag-on', !!entry.starred); star.setAttribute('aria-pressed', String(!!entry.starred)); star.title = starLabel; star.setAttribute('aria-label', starLabel);
     arch.title = archLabel; arch.setAttribute('aria-label', archLabel); arch.firstElementChild.textContent = entry.archived ? 'unarchive' : 'archive';
 }
+const openChatEntry = () => { const cur = state.currentSession; return cur && cur.type === 'history' ? state.historySessionsList.find(x => x.session_id === cur.name && sessionServer(x) === sessionServer(cur)) : undefined; };
 export async function toggleChatFlag(flag) {
-    const cur = state.currentSession;
-    if (!cur || cur.type !== 'history' || (flag !== 'starred' && flag !== 'archived')) return;
-    const entry = state.historySessionsList.find(x => x.session_id === cur.name && sessionServer(x) === sessionServer(cur));
+    const cur = state.currentSession, entry = (flag === 'starred' || flag === 'archived') && openChatEntry();
     if (!entry) return;
     const m = await importOnce('./mailbox_chats.js');
     const next = !entry[flag]; // setChatFlag sets the cached entry itself (one star state everywhere, #10391): the value is read before it
     if (await m.setChatFlag(cur.name, flag, next, sessionServer(cur))) { entry[flag] = next; drawChatFlags(entry); }
+}
+
+/** Rename the chat that is open: the page's Rename button (#10390). */
+export async function renameOpenChat() {
+    const entry = openChatEntry();
+    if (entry) await (await importOnce('./mailbox_chats.js')).renameChat(entry, () => { document.getElementById('history-session-title').textContent = historyLabel(entry); });
 }
 
 export async function selectHistorySession(sessionId, locator = null, entry = null) {

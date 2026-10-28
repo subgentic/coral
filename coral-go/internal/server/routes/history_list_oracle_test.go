@@ -359,13 +359,15 @@ func (h *HistoryHandler) listSessionsBefore4713(w http.ResponseWriter, r *http.R
 				"summary":            s.Summary,
 				"first_user_message": s.FirstUserMessage, // the one field added since (#6207): the refactor is otherwise the same rows
 				"summary_title":      s.SummaryTitle,
-				"title":              chatTitle(s.SummaryTitle, s.FirstUserMessage, s.DisplayName, s.AgentName), // the other field added since (#7756)
+				"title":              listChatTitle(s), // the other field added since (#7756)
 				"has_notes":          s.HasNotes,
 				"tags":               s.Tags,
 				"branch":             s.Branch,
 				"duration_sec":       s.DurationSec,
 				"agent_name":         s.AgentName,
 				"display_name":       s.DisplayName,
+				"working_dir":        s.WorkingDir, // the folder the chat ran in (#10390), a field added since
+				"chat_title":         s.ChatTitle,  // the name a person gave the chat (#10390)
 				"type":               "agent",
 			}
 			agentSessions = append(agentSessions, m)

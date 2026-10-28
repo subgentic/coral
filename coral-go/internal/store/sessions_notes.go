@@ -79,6 +79,29 @@ func (s *SessionStore) SetDisplayName(ctx context.Context, sessionID, displayNam
 	return err
 }
 
+// ChatTitleLimit is the most characters of a name a person gives a chat.
+const ChatTitleLimit = 120
+
+// SetChatTitle names a past chat (#10390): the name is its title in the lists and on its page, over the notes' title and the first message. An empty title takes the name off. It is not the live agent's
+// display name (SetDisplayName), which names the agent, not the chat. It does not count as notes.
+func (s *SessionStore) SetChatTitle(ctx context.Context, sessionID, title string) error {
+	now := nowUTC()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO session_meta (session_id, chat_title, created_at, updated_at)
+		 VALUES (?, NULLIF(?, ''), ?, ?)
+		 ON CONFLICT(session_id) DO UPDATE SET
+		     chat_title = excluded.chat_title,
+		     updated_at = excluded.updated_at`,
+		sessionID, title, now, now)
+	return err
+}
+
+// GetChatTitleParts is what a chat's title is made of, read for one session: its notes' title and the name a person gave it.
+func (s *SessionStore) GetChatTitleParts(ctx context.Context, sessionID string) (summaryTitle, chatTitle string) {
+	m := s.sessionNotesMeta(ctx, []string{sessionID})[sessionID]
+	return m.SummaryTitle, m.ChatTitle
+}
+
 // GetDisplayNames returns display names for multiple sessions.
 func (s *SessionStore) GetDisplayNames(ctx context.Context, sessionIDs []string) (map[string]string, error) {
 	if len(sessionIDs) == 0 {

@@ -9,7 +9,7 @@ const { dataTable, tableState, timeCell } = await importOnce('./data_table.js');
 const series = await importOnce('./analytics_series.js');
 const views = await importOnce('./analytics_views.js');
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el } = await importOnce('./dom_el.js');
 const money = v => formatCost(v, { zeroAsTwo: true });
 const pct = v => `${Math.round(v * 100)}%`;
 const RANGES = { hour: { hours: 1, interval: '5m', word: 'last hour' }, day: { hours: 24, interval: '1h', word: 'last 24 hours' }, week: { hours: 168, interval: '1h', word: 'last 7 days' }, month: { hours: 720, interval: '1d', word: 'last 30 days' } };

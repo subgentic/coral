@@ -76,7 +76,18 @@ type ChatFolderCounts struct {
 	Archived    int             `json:"archived"`
 	ByAgentType map[string]int  `json:"by_agent_type"`
 	Tags        []ChatFolderTag `json:"tags"`
+	// Dirs are the folders the visible chats ran in, most chats first (the Folder filter's choices, #10390).
+	Dirs []ChatDirCount `json:"dirs"`
 }
+
+// ChatDirCount is one folder a chat ran in and how many visible chats ran there.
+type ChatDirCount struct {
+	Path  string `json:"path"`
+	Count int    `json:"count"`
+}
+
+// chatDirChoices is the most folders the filter offers.
+const chatDirChoices = 40
 
 // CountChatFolders aggregates all folders in one query of the history database. Each count is its list's total: All, Notes,
 // Active now and Archived are agent chats (Archived counts the archived ones, the others the visible ones); Group chats is
@@ -115,7 +126,7 @@ func (s *SessionStore) CountChatFolders(ctx context.Context, boards []string) (*
 	if err = s.reader().SelectContext(ctx, &rows, query, string(raw)); err != nil {
 		return nil, err
 	}
-	out := &ChatFolderCounts{ByAgentType: map[string]int{}, Tags: []ChatFolderTag{}}
+	out := &ChatFolderCounts{ByAgentType: map[string]int{}, Tags: []ChatFolderTag{}, Dirs: []ChatDirCount{}}
 	folders := map[string]*int{"all": &out.All, "group": &out.Group, "notes": &out.Notes, "active": &out.Active, "starred": &out.Starred, "archived": &out.Archived}
 	for _, r := range rows {
 		switch r.Kind {
@@ -126,6 +137,11 @@ func (s *SessionStore) CountChatFolders(ctx context.Context, boards []string) (*
 		case "tag":
 			out.Tags = append(out.Tags, ChatFolderTag{r.ID, r.Name, r.Color, r.N})
 		}
+	}
+	if err = s.reader().SelectContext(ctx, &out.Dirs, `SELECT si.working_dir AS path, COUNT(*) AS count FROM session_index si LEFT JOIN chat_flags cf ON cf.session_id = si.session_id
+ WHERE si.working_dir IS NOT NULL AND `+archivedChatSQL("si.session_id")+` = 0
+ GROUP BY si.working_dir ORDER BY count DESC, path LIMIT ?`, chatDirChoices); err != nil {
+		return nil, err
 	}
 	// These CLIs share one history source and the existing list expands either filter.
 	shared := out.ByAgentType["gemini"] + out.ByAgentType["agy"] + out.ByAgentType["antigravity"]

@@ -194,6 +194,7 @@ func (idx *SessionIndexer) RunOnce(ctx context.Context) error {
 			MessageCount:     s.MessageCount,
 			DisplaySummary:   s.DisplaySummary,
 			FirstUserMessage: s.FirstUserMessage,
+			WorkingDir:       agent.TranscriptCwd(s.SourceFile), // the folder the chat ran in, read once with the rest of the file (#10390)
 			FileMtime:        s.FileMtime,
 			IndexVersion:     s.IndexVersion,
 		}

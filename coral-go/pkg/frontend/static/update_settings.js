@@ -10,7 +10,7 @@ const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLoca
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el: mk } = await importOnce('./dom_el.js');
 
 let hubOn = null; // the hub switch as the server has it (GET /api/cloud/status), null when unknown
 const body = () => document.getElementById('update-pane-body');

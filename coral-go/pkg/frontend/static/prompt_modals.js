@@ -29,13 +29,14 @@ export function showPromptModal(title, label, defaultValue, onConfirm, opts = {}
     if (labelEl) labelEl.textContent = label || '';
     const input = document.getElementById("prompt-modal-input");
     input.value = defaultValue || '';
+    input.maxLength = opts.maxLength || 524288;
     const okBtn = document.getElementById("prompt-modal-ok");
     const newBtn = okBtn.cloneNode(true);
     okBtn.parentNode.replaceChild(newBtn, okBtn);
     const modal = document.getElementById("prompt-modal");
     const submit = () => {
         const val = input.value.trim();
-        if (!val) { input.focus(); return; }
+        if (!val && !opts.allowEmpty) { input.focus(); return; }
         hidePromptModal();
         onConfirm(val, pickedColor);
     };

@@ -173,12 +173,12 @@ func TestHistoryListAndCountsSendTheKeysTheFrontendReads(t *testing.T) {
 	require.NotNil(t, agentRow, "an agent chat")
 	require.NotNil(t, groupRow, "a group chat")
 	// history_list.js chatRowHtml/chatTableRow/groupOfChat, mailbox_chats.js chatsSpec, history_label.js, resume_dialog.js, board_agent_links.js
-	requireKeys(t, "an agent chat row", agentRow, "session_id", "title", "summary", "display_name", "agent_name", "last_timestamp", "duration_sec", "source_type", "branch", "tags", "starred", "archived", "active", "type")
+	requireKeys(t, "an agent chat row", agentRow, "session_id", "title", "summary", "display_name", "agent_name", "last_timestamp", "duration_sec", "source_type", "branch", "tags", "starred", "archived", "active", "working_dir", "type")
 	// the group chat row: history_list.js reads updated_at for its time and its day group, and the API does not send it (found by #8012: reported on the board; last_timestamp is what it sends)
 	requireKeys(t, "a group chat row", groupRow, "session_id", "title", "type", "message_count", "subscriber_count", "last_timestamp", "starred", "archived", "active")
 
 	counts := get("/api/sessions/history/counts")
-	requireKeys(t, "GET /api/sessions/history/counts", counts, "all", "group", "notes", "active", "starred", "archived", "by_agent_type", "tags")
+	requireKeys(t, "GET /api/sessions/history/counts", counts, "all", "group", "notes", "active", "starred", "archived", "by_agent_type", "tags", "dirs")
 }
 
 // Tasks (task_list.js, tasks_view.js, team_tasks_page.js, goals_adapter.js, inbox_coral.js): the board's task list GET /api/board/{p}/tasks (the default list) and GET /api/board/tasks (the query).

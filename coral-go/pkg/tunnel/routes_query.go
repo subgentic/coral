@@ -37,7 +37,7 @@ var routeQueries = map[string]string{
 	"GET /api/scheduled/jobs/{}/runs":             "limit,offset",
 	"GET /api/scheduled/runs/recent":              "limit",
 	"GET /api/session-artifacts":                  "limit,offset,session_id,sort",
-	"GET /api/sessions/history":                   "active,agent_name,archived,date_from,date_to,fts_mode,max_duration_sec,min_duration_sec,page,page_size,q,source_types,starred,tag_ids,tag_logic,type,with_notes",
+	"GET /api/sessions/history":                   "active,agent_name,archived,date_from,date_to,folder*,fts_mode,max_duration_sec,min_duration_sec,page,page_size,q,source_types,starred,tag_ids,tag_logic,type,with_notes",
 	"GET /api/sessions/history/search":            "page,page_size,q,type",
 	"GET /api/sessions/history/{}":                "find_key,limit,offset",
 	"GET /api/sessions/history/{}/events":         "cursor,limit,q,since,sort,type,until",

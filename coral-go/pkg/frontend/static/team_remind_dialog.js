@@ -8,7 +8,7 @@ export const REPEATS = [[0, "Don't repeat", ''], [1800, 'Every 30 minutes', 'eve
 const DEFAULT_MESSAGE = 'Check your tasks and the board, then carry on.';
 const MAX_MESSAGE = 1000;
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el: mk } = await importOnce('./dom_el.js');
 let dialog = null;
 const close = () => { if (dialog && dialog.open) dialog.close(); };
 

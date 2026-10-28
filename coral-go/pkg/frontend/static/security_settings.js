@@ -13,7 +13,7 @@ import { signOutThisBrowser } from './local_store.js';
 const { passwordProblem, timeMs, timeLeft, ageText } = await importOnce('./password_rules.js');
 const { postJson, sendJson, passwordField, usernameStub, strengthMeter, errorText, showSetPasswordModal } = await importOnce('./password_ui.js');
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el } = await importOnce('./dom_el.js');
 
 async function getJson(url) {
     const r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });

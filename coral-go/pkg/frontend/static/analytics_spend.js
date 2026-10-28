@@ -20,7 +20,7 @@ const DRIFT = 1.3; // the bar of a day is amber when it is 30% above usual (colo
 const model = { team: '', range: '24h', data: null, loading: false, error: '', seq: 0, metric: 'tokens', grain: 'day', doneGrain: 'day' };
 let root = null, timeRoot = null;
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el } = await importOnce('./dom_el.js');
 
 /** 517K, 1.2M, 61M: tokens as a person reads them, the one figure format of the Analytics pages (format.js compactFigure, #9516); '' for a figure that is not a number. */
 export function fmtTokens(n) { return Number.isFinite(Number(n)) ? compactFigure(Math.round(Number(n))) : ''; }

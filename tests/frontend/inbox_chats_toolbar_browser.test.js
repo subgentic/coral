@@ -7,10 +7,10 @@ const BASE = require('./test_base').BASE;
 const { FOLDER_ROWS } = require('./helpers/folder_rows');
 
 const ROWS = [
-    { session_id: 'sess-1', source_type: 'claude', agent_name: 'Frontend Dev', display_name: 'Frontend Dev', summary: 'Working on the importer', last_timestamp: '2026-10-25T10:00:00Z', duration_sec: 600, starred: false, archived: false, active: false, tags: [] },
+    { session_id: 'sess-1', working_dir: '/srv/app', source_type: 'claude', agent_name: 'Frontend Dev', display_name: 'Frontend Dev', summary: 'Working on the importer', last_timestamp: '2026-10-25T10:00:00Z', duration_sec: 600, starred: false, archived: false, active: false, tags: [] },
     { session_id: 'sess-2', source_type: 'codex', agent_name: 'Backend Dev', display_name: 'Backend Dev', summary: 'Cold start numbers', last_timestamp: '2026-10-24T10:00:00Z', duration_sec: 900, starred: false, archived: false, active: false, tags: [] },
 ];
-const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1, by_agent_type: { claude: 1, codex: 1 }, tags: [{ id: 7, name: 'Release', color: '#2b6cb0', count: 1 }] };
+const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1, by_agent_type: { claude: 1, codex: 1 }, tags: [{ id: 7, name: 'Release', color: '#2b6cb0', count: 1 }], dirs: [{ path: '/srv/app', count: 2 }, { path: '/srv/other', count: 1 }] };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -54,8 +54,9 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             const g = await geometry();
             check(`${label}: All chats has a search box named "Search chats" and the Filters icon in the same row, to its right`, g && g.qName === 'Search chats' && g.sameRow && g.right && /Filters/.test(g.toggleName), JSON.stringify(g));
             if (mobile) check(`${label}: the search keeps at least 10rem and nothing is wider than the screen`, g && g.searchW >= 160 && g.over <= 0, JSON.stringify(g));
+            if (!mobile) { const cell = await ev(`(() => { const e = document.querySelector('#group-table-view .dt-folder-cell'); return e && { text: e.textContent, title: e.title }; })()`); check(`${label}: the row shows the folder's last part and the whole path on hover (#10390)`, cell && cell.text === 'app' && cell.title === '/srv/app', JSON.stringify(cell)); }
             await panel();
-            check(`${label}: All chats' panel has CLI, Agent, Tag, From and To`, (await labels()) === 'CLI|Agent|Tag|From|To', await labels());
+            check(`${label}: All chats' panel has CLI, Agent, Tag, Folder, From and To`, (await labels()) === 'CLI|Agent|Tag|Folder|From|To', await labels());
 
             await setField('inbox-chats-cli', 'codex'); await waitFor(`(window.__hist || []).some(p => p.source_types === 'codex')`, 'a read with the CLI', 6000);
             const r1 = await lastRead();
@@ -63,6 +64,8 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             check(`${label}: the icon says one filter is on`, /1 on/.test(await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').getAttribute('aria-label')`)));
             await setField('inbox-chats-tag', '7'); await waitFor(`(window.__hist || []).some(p => p.tag_ids === '7')`, 'a read with the tag', 6000);
             check(`${label}: a Tag filter is tag_ids, with the earlier filters kept`, (await lastRead()).tag_ids === '7' && (await lastRead()).source_types === 'codex' && /Tag: Release/.test(await chipText()), await chipText());
+            await setField('inbox-chats-folder', '/srv/app'); await waitFor(`(window.__hist || []).some(p => p.folder === '/srv/app')`, 'a read with the folder', 6000);
+            check(`${label}: a Folder filter is folder, a chip says its last part (#10390)`, (await lastRead()).folder === '/srv/app' && /Folder: app/.test(await chipText()), await chipText());
             await setField('inbox-chats-from', '2026-10-01'); await setField('inbox-chats-to', '2026-10-20');
             await waitFor(`(window.__hist || []).some(p => p.date_from === '2026-10-01' && p.date_to === '2026-10-20')`, 'a read with the dates', 6000);
             check(`${label}: the dates are date_from and date_to and one chip`, /Dates: 2026-10-01 to 2026-10-20/.test(await chipText()), await chipText());
@@ -77,7 +80,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             await setField('inbox-chats-agent', 'QA Engineer', 'input'); await waitFor(`(window.__hist || []).some(p => p.agent_name === 'QA Engineer')`, 'a read in Starred', 6000);
             check(`${label}: Starred keeps its own rule (starred=1) beside the filter`, (await lastRead()).starred === '1' && (await lastRead()).agent_name === 'QA Engineer', JSON.stringify(await lastRead()));
             await openFolder('chats-cli-claude', mobile, 'Claude'); await panel();
-            check(`${label}: a CLI folder has no CLI field: Agent, Tag, From, To`, (await labels()) === 'Agent|Tag|From|To', await labels());
+            check(`${label}: a CLI folder has no CLI field: Agent, Tag, Folder, From, To`, (await labels()) === 'Agent|Tag|Folder|From|To', await labels());
             await openFolder('chats-group', mobile, 'Board history'); await panel();
             check(`${label}: Board history has the dates only`, (await labels()) === 'From|To', await labels());
             await setField('inbox-chats-from', '2026-10-05'); await waitFor(`(window.__hist || []).some(p => p.type === 'group' && p.date_from === '2026-10-05')`, 'a board read with the date', 6000);

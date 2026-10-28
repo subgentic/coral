@@ -20,7 +20,7 @@ const state = {}; // view key -> { group, data, loading, error, seq }
 let range = '24h';
 const RANGE_WORDS = { '24h': 'in the last 24 hours', '7d': 'in the last 7 days', '30d': 'in the last 30 days' };
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el } = await importOnce('./dom_el.js');
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const money = v => (num(v) == null ? '' : v > 0 && v < 0.01 ? '<$0.01' : `$${v >= 100 ? Math.round(v) : v.toFixed(2)}`);
 /** A cost per commit or task: under a cent is "<$0.01", a zero is $0.00 like every cost on the Analytics pages (#9540). */

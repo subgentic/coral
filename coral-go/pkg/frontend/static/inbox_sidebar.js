@@ -304,6 +304,7 @@ function inboxChatsToolbar(key) {
         if (has.has('cli')) fields.push({ type: 'select', key: 'cli', id: 'inbox-chats-cli', label: 'CLI', values: CF.CLIS.map(c => c[0]), labels: Object.fromEntries(CF.CLIS), any: 'Any CLI' });
         if (has.has('agent')) fields.push({ type: 'text', key: 'agent', id: 'inbox-chats-agent', className: 'list-bar-by', label: 'Agent', max: 80, placeholder: 'Agent name' });
         if (has.has('tagId')) fields.push({ type: 'select', key: 'tagId', id: 'inbox-chats-tag', label: 'Tag', values: [], labels: {}, any: 'Any tag' });
+        if (has.has('folder')) fields.push({ type: 'select', key: 'folder', id: 'inbox-chats-folder', label: 'Folder', values: [], labels: {}, any: 'Any folder' });
         if (has.has('dates')) fields.push({ type: 'date', key: 'from', id: 'inbox-chats-from', label: 'From' }, { type: 'date', key: 'to', id: 'inbox-chats-to', label: 'To' });
         chatBars.set(key, IT.folderToolbar({ idp: 'inbox-chats', noun: 'chat', searchLabel: 'Search chats', fields, commitOnEnter: nativeInbox(), model: { EMPTY: CF.EMPTY, clean: CF.clean, chips: CF.chips, isFiltered: CF.isFiltered, without: CF.without } }, next => {
             chatFilters.set(key, next); CF.saveFilters(key, next);
@@ -316,8 +317,9 @@ function inboxChatsToolbar(key) {
     const tags = CH.chatTags();
     CF.setTagNames(new Map(tags.map(t => [String(t.id), t.name])));
     const filters = chatFiltersOf(key);
-    const node = chatBars.get(key).draw({ filters, options: { tagId: { values: tags.map(t => String(t.id)), labels: Object.fromEntries(tags.map(t => [String(t.id), t.name])) } } });
-    return { node, signature: JSON.stringify([key, filters, tags.map(t => [t.id, t.name])]) };
+    const dirs = CH.chatDirs(), dirOptions = dirs.map(d => d.path); if (filters.folder && !dirOptions.includes(filters.folder)) dirOptions.push(filters.folder); // a kept choice stays in the list when it has no chats now
+    const node = chatBars.get(key).draw({ filters, options: { tagId: { values: tags.map(t => String(t.id)), labels: Object.fromEntries(tags.map(t => [String(t.id), t.name])) }, folder: { values: dirOptions, labels: Object.fromEntries(dirOptions.map(p => [p, CF.folderName(p)])) } } });
+    return { node, signature: JSON.stringify([key, filters, tags.map(t => [t.id, t.name]), dirOptions]) };
 }
 
 // ── Saved ────────────────────────────────────────────────────────────────

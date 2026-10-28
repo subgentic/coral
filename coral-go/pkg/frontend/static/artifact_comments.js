@@ -26,7 +26,7 @@ export function commentBoard(opts) {
     return key ? boardKeyName(key) : undefined;
 }
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el } = await importOnce('./dom_el.js');
 const btn = (cls, text, label) => { const b = el('button', 'btn ' + cls, text); b.type = 'button'; if (label) b.setAttribute('aria-label', label); return b; };
 const KIND = { owner: 'owner', hub: 'Coral Hub', agent: 'agent' };
 

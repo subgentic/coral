@@ -6,7 +6,7 @@ import { boardFetch } from './server_base.js';
 import { importOnce } from './import_once.js';
 const { STARTER, MAX_TAGS, MAX_LEN, normalizeTag } = await importOnce('./artifact_tag_rules.js');
 
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const { el: mk } = await importOnce('./dom_el.js');
 
 /** Replaces the tags of one stored file; resolves to the tags the server kept, rejects with its words. */
 export async function putTags(project, hex, tags) {
