@@ -10,7 +10,7 @@ const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
 const REQUEST_KEYS = ['board_name', 'working_dir', 'agent_type', 'flags', 'agents', 'board_server', 'worktree', 'base_branch', 'working_mode', 'health_monitor'];
-const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'model', 'thinking', 'flags'];
+const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'model', 'thinking', 'flags', 'permission_mode']; // permission_mode is Default only (#10362)
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -114,6 +114,17 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             await t.click('button', N.next); await t.step(3); await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch request', 6000);
             const a = (await sent()).launch[0].agents[0]; assert.equal(a.name, 'Orchestrator'); assert.equal(a.prompt, 'Plan the work.'); assert.equal(a.agent_type, 'codex', 'the member\'s own provider');
         });
+        for (const [mode, label] of [['default', 'Default'], ['auto', 'Auto']]) {
+            await S.run(`a member whose mode is ${label}: ${mode === 'default' ? 'the request says permission_mode default (the form sends no flag for it, which would start the saved default, Auto)' : 'no permission_mode, its mode is in its flags'} (#10362)`, async () => {
+                await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250);
+                const set = await ev(`(() => { const row = document.querySelector('#team-agents-list .team-agent-row'), acf = row && document.getElementById(row.dataset.acfId), sel = acf && acf.querySelector('.acf-permission-mode'); if (!sel) return false; sel.value = ${JSON.stringify(mode)}; sel.dispatchEvent(new Event('change', { bubbles: true })); return sel.value; })()`);
+                assert.equal(set, mode, 'the member form has a permission mode select');
+                await t.click('button', N.next); await t.step(3); await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch request', 6000);
+                const a = (await sent()).launch[0].agents[0];
+                if (mode === 'default') assert.equal(a.permission_mode, 'default', 'a Default member is sent as Default: ' + JSON.stringify(a));
+                else { assert.equal(a.permission_mode, undefined, 'no permission_mode for another mode'); assert.ok(/permission-mode auto|full-auto|-a never|dangerously/.test((a.flags || []).join(' ')), 'its mode is in its flags: ' + JSON.stringify(a.flags)); }
+            });
+        }
         await S.run('board settings (Require a goal, health Every, Send it to, Post when all is well, Messaging): ONE PUT /api/board/<the id the launch returned>/settings, after the launch answered, with those values', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
             await tab('Workflow'); assert.ok(await check(/^Require a goal/i, true), 'a Require a goal switch');

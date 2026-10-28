@@ -82,3 +82,40 @@ func TestAnExplicitDefaultModeIsNeverWidenedToTheSavedDefaultOrAuto(t *testing.T
 	assert.Contains(t, cmd, "--permission-mode plan")
 	assert.Equal(t, "plan", stored)
 }
+
+// #10362: the same for a team member. A member who picked Default is a Default agent, whatever mode is saved; a member with nothing chosen still gets the saved default; the field names Default and nothing else.
+func TestATeamMemberWhoPickedDefaultStartsInDefaultWhateverIsSaved(t *testing.T) {
+	_, h, _, ss := setupSessionsTestServer(t)
+	stubCLIPaths(t, ss)
+	ctx := context.Background()
+	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", "auto"))
+	team := func(member map[string]any) (int, string) {
+		t.Helper()
+		b, _ := json.Marshal(map[string]any{"board_name": "t" + strings.ReplaceAll(t.Name(), "/", "") + member["name"].(string), "new_board": true, "working_dir": t.TempDir(), "agent_type": at.Claude,
+			"agents": []map[string]any{member}})
+		rec := httptest.NewRecorder()
+		h.LaunchTeam(rec, httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b)))
+		if rec.Code != http.StatusOK {
+			return rec.Code, rec.Body.String()
+		}
+		var res struct {
+			Agents []map[string]any `json:"agents"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &res))
+		require.Len(t, res.Agents, 1, rec.Body.String())
+		ls, err := ss.GetLiveSession(ctx, res.Agents[0]["session_id"].(string))
+		require.NoError(t, err)
+		require.NotNil(t, ls.PermissionMode)
+		return rec.Code, *ls.PermissionMode
+	}
+	_, nothing := team(map[string]any{"name": "N", "agent_type": "claude"})
+	assert.Equal(t, "auto", nothing, "a member with nothing chosen gets the saved default, as before")
+	_, picked := team(map[string]any{"name": "D", "agent_type": "claude", "permission_mode": "default"})
+	assert.Equal(t, "default", picked, "a member who picked Default is Default")
+	_, own := team(map[string]any{"name": "P", "agent_type": "claude", "permission_mode": "default", "flags": []string{"--permission-mode", "plan"}})
+	assert.Equal(t, "plan", own, "the member's own flags still win")
+	for _, mode := range []string{"auto", "bypassPermissions", "plan"} {
+		code, body := team(map[string]any{"name": "X" + mode, "agent_type": "claude", "permission_mode": mode})
+		assert.Equal(t, http.StatusBadRequest, code, "%s: %s", mode, body)
+	}
+}
