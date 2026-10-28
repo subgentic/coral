@@ -9,7 +9,7 @@ import (
 // on (#5041, found in the v1.4.105 release QA): the row of a session that is not the agent's own or on its board carries only the fields below,
 // never the prompt, the first prompt, the summary, the waiting text, the branch, the working directory, the log path, the git state or any text a
 // later change adds to a row (an allow-list: a new field is private to the Operator until it is listed here). The agent's own row and its board
-// mates' rows are unchanged, and so is everything the Operator, the dashboard and the command line (no agent token) get.
+// mates' rows are unchanged but for the person's own words (personTextFields), and so is everything the Operator, the dashboard and the command line (no agent token) get.
 var rosterFields = map[string]bool{
 	"name": true, "agent_type": true, "session_id": true, "tmux_session": true, "display_name": true, "icon": true, "name_color": true,
 	"board_project": true, "board_label": true, "board_job_title": true, "board_is_orchestrator": true,
@@ -44,6 +44,34 @@ func agentBoardOf(rows []map[string]any, ownerSessionID string) string {
 	return ""
 }
 
+// personTextFields are the row's fields that hold what a person typed to an agent: the messages queued behind a question and the ones typed and not yet in the transcript. An agent's token never
+// gets them, not even on its own row or a board mate's (#10510, Security): a person's words to one agent are not another agent's to read through the list.
+var personTextFields = []string{"held_messages", "pending_sends"}
+
+// withoutPersonText is row as an agent may see it when it may read the row: a copy with the person's own words nulled, or the row itself when it holds none (the rows are shared with other
+// connections: never changed in place).
+func withoutPersonText(row map[string]any) map[string]any {
+	has := false
+	for _, k := range personTextFields {
+		if v, ok := row[k]; ok && v != nil {
+			has = true
+		}
+	}
+	if !has {
+		return row
+	}
+	out := make(map[string]any, len(row))
+	for k, v := range row {
+		out[k] = v
+	}
+	for _, k := range personTextFields {
+		if _, ok := out[k]; ok {
+			out[k] = nil
+		}
+	}
+	return out
+}
+
 // rosterRow is a copy of row with only the roster fields (the rows are shared with other connections: never changed in place).
 func rosterRow(row map[string]any) map[string]any {
 	out := make(map[string]any, len(rosterFields))
@@ -62,7 +90,7 @@ func scopeRowsForAgent(rows []map[string]any, ownerSessionID string) []map[strin
 	out := make([]map[string]any, len(rows))
 	for i, row := range rows {
 		if agentMayReadRow(row, ownerSessionID, board) {
-			out[i] = row
+			out[i] = withoutPersonText(row)
 		} else {
 			out[i] = rosterRow(row)
 		}
@@ -84,7 +112,12 @@ func scopeTickForAgent(tick *wsTick, ownerSessionID string) *wsTick {
 			continue
 		}
 		if agentMayReadRow(row, ownerSessionID, board) {
-			t.sessions = append(t.sessions, row)
+			if cp := withoutPersonText(row); reflect.ValueOf(cp).Pointer() != reflect.ValueOf(row).Pointer() {
+				copies[reflect.ValueOf(row).Pointer()] = cp // its serialized form is recomputed below: the words are in the shared one
+				t.sessions = append(t.sessions, cp)
+			} else {
+				t.sessions = append(t.sessions, row)
+			}
 			continue
 		}
 		cp := rosterRow(row)
