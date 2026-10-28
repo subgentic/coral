@@ -102,7 +102,7 @@
             <button class="btn btn-quiet btn-icon btn-small top-bar-btn" data-on-click="m-go-home" title="Home" aria-label="Home"><span class="material-icons top-bar-icon" aria-hidden="true">home</span></button>
             <button class="btn btn-quiet btn-icon btn-small top-bar-btn" id="panel-toggle-btn" data-on-click="m-toggle-agentic-panel" title="Files, tasks and notes" aria-label="Files, tasks and notes"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="12" rx="1.5"/><line x1="10" y1="2" x2="10" y2="14"/></svg></button>
             <div class="top-bar-settings-wrapper">
-                <button class="btn btn-quiet btn-icon btn-small top-bar-btn" data-on-click="m-toggle-top-bar-settings" title="Menu" aria-label="Settings menu" aria-controls="top-bar-settings-menu">
+                <button class="btn btn-quiet btn-icon btn-small top-bar-btn" data-on-click="m-toggle-top-bar-settings" title="Menu" aria-label="Settings menu" aria-haspopup="menu" aria-expanded="false" aria-controls="top-bar-settings-menu">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path
@@ -111,7 +111,7 @@
                     </svg>
                 </button>
                 <template data-lazy="top-bar-settings-menu">
-                <div class="menu top-bar-settings-menu" id="top-bar-settings-menu" style="display:none">
+                <div class="menu top-bar-settings-menu" id="top-bar-settings-menu" role="menu" aria-label="Settings menu" style="display:none">
                     <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" id="stop-all-auto-accept" hidden data-on-click="m-close-top-bar-settings-then-stop-all-auto-accept">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>
                         Stop all auto-accept
