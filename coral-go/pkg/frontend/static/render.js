@@ -43,7 +43,7 @@ import { _renderSidebarRail } from './sidebar_rail.js';
 import { _passesFilters, _pinMatchesFilter } from './list_filter_match.js';
 import { _renderGroups } from './group_cards.js';
 import { UPDOWN, W, dirOf, menu, withAgent, withBoard } from './action_helpers.js';
-export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, attachDirect, killSessionDirect, restartDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep } from './agent_actions.js';
+export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, attachDirect, killSessionDirect, restartDirect, restartSameDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep } from './agent_actions.js';
 export { copyFolderPath, hideAlertModal, hidePromptModal, showAlertModal, showPromptModal } from './prompt_modals.js';
 export { killBoard, killGroup, saveTeamFromSidebar, shareAgentTeam, toggleTeamSleep } from './team_actions.js';
 export { expandSleepingGroup, toggleGroupByServer, toggleGroupByTeam, toggleShowServer } from './list_display_settings.js';
@@ -405,6 +405,7 @@ registerActions({
     'agent-info': withAgent('showInfoDirect'),
     'agent-kill': withAgent('killSessionDirect'),
     'agent-restart': withAgent('restartDirect'),
+    'agent-restart-same': withAgent('restartSameDirect'),
     'agent-rename': withAgent('renameAgent'),
     'agent-instructions': withAgent('editInstructions'),
     'agent-icon': withAgent('setAgentIcon'),

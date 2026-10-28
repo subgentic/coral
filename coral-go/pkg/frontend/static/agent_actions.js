@@ -72,11 +72,24 @@ export async function attachDirect(name, agentType, sessionId) {
     }
 }
 
+/** The agent on screen is this one: it is not selected again (that reloads its chat, and a restart's earlier conversation would go, #10297). */
+function _isSelected(sessionId) {
+    return !!(state.currentSession && state.currentSession.type === 'live' && state.currentSession.session_id === sessionId);
+}
+
 export async function restartDirect(name, agentType, sessionId) {
     const { selectLiveSession } = await importOnce('./sessions.js');
-    await selectLiveSession(name, agentType, sessionId, serverForSession(name, sessionId));
+    if (!_isSelected(sessionId)) await selectLiveSession(name, agentType, sessionId, serverForSession(name, sessionId)); // selecting the agent already on screen would empty its chat
     const { restartSession } = await importOnce('./controls.js');
     restartSession();
+}
+
+/** Restart with the settings the agent was started with: one tap, no dialog (#10297). */
+export async function restartSameDirect(name, agentType, sessionId) {
+    const { selectLiveSession } = await importOnce('./sessions.js');
+    if (!_isSelected(sessionId)) await selectLiveSession(name, agentType, sessionId, serverForSession(name, sessionId)); // selecting the agent already on screen would empty its chat
+    const { restartSameSettings } = await importOnce('./restart_flow.js');
+    restartSameSettings();
 }
 
 export function toggleAgentSleep(name, agentType, sessionId, action) {

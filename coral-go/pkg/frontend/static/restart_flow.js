@@ -3,10 +3,10 @@
 import { importOnce } from './import_once.js';
 import { sectionFocus } from './section_dialog.js';
 import { moveRestarting } from './session_overlay.js';
-import { state } from './state.js';
+import { state, sessionKey, saveSessionDraft } from './state.js';
 import { showToast } from './utils.js';
 import { loadAgentEvents, renderEventTimeline } from './agentic_state.js';
-import { resetLiveHistory, effectiveLiveViewMode } from './live_chat.js';
+import { resetLiveHistory, effectiveLiveViewMode, showChatView } from './live_chat.js';
 import { serverFetch, currentServer } from './server_base.js';
 import { applySleepingView } from './sleeping_view.js';
 import { loadModals } from './lazy_panels.js';
@@ -109,17 +109,37 @@ function watchRestarted(xtermMod, name, sessionId, agentType, onLive) {
     }, 2000, { whenHidden: true }); // follows a Restart the user just asked for
 }
 
+/** The words typed to the agent being replaced are not for its replacement (#10297): the box and the saved draft are emptied before the new session takes the old one's place. */
+function forgetDraft(session, oldId, newId) {
+    for (const id of [oldId, newId]) { // the feed may already have moved the page's session to the new id: the draft is under whichever it had
+        const key = id && sessionKey({ ...session, session_id: id });
+        if (key) saveSessionDraft(key, '');
+    }
+    const input = document.getElementById('command-input');
+    if (input && state.currentSession === session) { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }
+}
+
 export async function confirmRestart() {
     const config = window.getAgentConfig ? window.getAgentConfig('restart-acf') : {};
 
     hideRestartModal();
+    return runRestart(config);
+}
 
+/** Restart with what the agent was started with: one tap, no dialog (the Restart item's dialog is for changing something). The server keeps the stored settings when the request carries none (#10297). */
+export async function restartSameSettings() {
+    if (!state.currentSession || state.currentSession.type !== 'live') { showToast('No live session selected', true); return; }
+    return runRestart({});
+}
+
+async function runRestart(config) {
     const restartId = state.currentSession && state.currentSession.session_id;
     try {
         // Show restarting overlay instead of session-ended
         const xtermMod = await _getXtermModule();
         if (xtermMod.setRestarting) xtermMod.setRestarting(true, restartId);
         showToast(`Restarting ${state.currentSession.name}...`, false, undefined, { group: { key: 'restarting', text: n => `Restarting ${n} agents` } });
+        const replaced = state.currentSession;
         const payload = { agent_type: config.agentType || state.currentSession.agent_type, session_id: state.currentSession.session_id };
         if (config.flags) {
             payload.extra_flags = config.flags;
@@ -137,15 +157,17 @@ export async function confirmRestart() {
         if (result.error) {
             xtermMod.setRestarting(false, restartId);
             showToast(result.error, true);
-        } else if (!state.currentSession || state.currentSession.session_id !== restartId) {
+        } else if (!state.currentSession || (state.currentSession.session_id !== restartId && state.currentSession.session_id !== result.session_id)) { // the feed may already have shown the replacement under the agent's name: that is still this agent (#10297)
             // The Operator switched to another agent while this one restarted: the screen belongs to that agent now, so nothing of it is
             // touched; the restarting mark moves to the replacement session and ends when that one is live (#4481).
             const replacement = result.session_id || restartId;
+            forgetDraft(replaced, restartId, result.session_id);
             moveRestarting(restartId, replacement);
             const name = result.session_name || result.agent_name || '';
             watchRestarted(xtermMod, name, replacement, config.agentType || payload.agent_type, () => {});
         } else {
             // A restarted sleeping agent is running again
+            forgetDraft(replaced, restartId, result.session_id); // before the session id changes: the saved draft is kept under the old one
             state.currentSession.sleeping = false;
             applySleepingView(false);
             // Update state with the new session_id (tmux session was renamed)
@@ -168,7 +190,8 @@ export async function confirmRestart() {
             // The replacement session has an independent transcript and count.
             // Drop the old reader generation before the next poll, otherwise an
             // empty/new transcript is queried with the old session's offset.
-            resetLiveHistory({ resume: true });
+            resetLiveHistory({ resume: true, keepEarlier: true, forSession: state.currentSession.session_id }); // the conversation so far stays above the new one (#10297)
+            showChatView(); // a restart opens in Chat: the earlier conversation and the new session's first words, not a terminal starting up
             // Clear activity data immediately so the UI shows zero for the new session
             state.currentAgentEvents = [];
             renderEventTimeline();
@@ -182,6 +205,7 @@ export async function confirmRestart() {
             const newSessionId = state.currentSession.session_id;
             const newAgentType = state.currentSession.agent_type;
             watchRestarted(xtermMod, newName, newSessionId, newAgentType, () => {
+                if (state.currentSession && state.currentSession.session_id === newSessionId) showChatView(); // the feed's replacement of the row may have selected it again, with the view the person had last (#10297)
                 // Chat view has no terminal socket to take over (#3719): the Terminal view attaches when it is shown.
                 if (state.currentSession && state.currentSession.session_id === newSessionId && effectiveLiveViewMode() === 'terminal') xtermMod.connectTerminalWs(state.currentSession.tmux_session || newName, newAgentType, newSessionId, currentServer());
             });
