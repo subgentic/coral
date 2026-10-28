@@ -550,6 +550,9 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	h.notePendingToolEvent(body.SessionID, body.EventType, body.ToolUseID)
 	if hasToken {
+		h.noteFunnelEvent(r.Context(), body.SessionID, agentType, body.EventType, body.DetailJSON, created)
+	}
+	if hasToken {
 		h.kickFeedForRequestChange(body.SessionID, body.EventType)
 		h.retrySkippedBoardNudge(r.Context(), body.SessionID, owner.SessionName, body.EventType)
 	}

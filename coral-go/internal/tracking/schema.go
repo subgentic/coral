@@ -12,7 +12,7 @@ import (
 
 // SchemaVersion identifies the event/property contract. Bump it when an event
 // or property changes meaning so downstream analysis can tell the versions apart.
-const SchemaVersion = 4
+const SchemaVersion = 5
 
 // runID is generated once per server process. It is random, never persisted
 // and unrelated to the install ID, so it can group one run's events without
@@ -35,10 +35,39 @@ const (
 	EventFirstTaskSucceeded    = "first_task_succeeded"
 	EventPromptSubmitRequested = "prompt_submit_requested"
 
+	// The new-user funnel (#10004, schema 5): the steps between the terms and a first useful reply. Closed vocabularies and bounded integers only: never a prompt, a reply or a name.
+	EventEULAAccepted      = "eula_accepted"       // the Terms were accepted (sent only after, never before)
+	EventDashboardSignedIn = "dashboard_signed_in" // the first dashboard sign-in on this install
+	EventFirstMessageSent  = "first_message_sent"  // the first message a person sent to an agent, by whichever way
+	EventFirstAgentReply   = "first_agent_reply"   // the first agent turn that ended after a person's message, once for an ok end and once for an error end
+
 	// Update telemetry (#5952, schema 4). Nothing here says an update was installed: Coral does not start or finish an update itself yet.
 	EventUpdateNoticeShown = "update_notice_shown" // the dashboard or the tray showed the notice that a newer release exists
 	EventUpdateOfferOpened = "update_offer_opened" // the person opened the release page the notice offers
 )
+
+// The new-user funnel's vocabulary (#10004).
+const (
+	EULASourceDialog = "dialog" // accepted in Coral's terms dialog
+	EULASourceLegacy = "legacy" // the Windows installer's acceptance, recorded as this version's
+	EULASourceHub    = "hub"    // the Coral Hub confirmed this version when the machine enrolled
+
+	SignInApp      = "app"      // the Coral app's own window, through the sign-in link it opens
+	SignInLink     = "link"     // the sign-in link Coral prints or opens (a login token)
+	SignInKey      = "key"      // the API key, typed into the dashboard's sign-in form
+	SignInPassword = "password" // the dashboard password
+
+	MessageViaComposerHTTP = "composer_http" // the dashboard composer, over HTTP
+	MessageViaComposerWS   = "composer_ws"   // the dashboard composer, over the terminal socket
+	MessageViaTerminal     = "terminal"      // typed in the terminal view
+	MessageViaLaunchPrompt = "launch_prompt" // the prompt written in the launch dialog
+
+	ReplyOK    = "ok"    // the turn ended normally
+	ReplyError = "error" // the turn ended in an error (rate limit, sign-in, crash)
+)
+
+// replySeconds bounds seconds_to_reply: an hour is the longest a first reply is measured.
+const replySeconds = 3600
 
 // Update vocabulary: closed sets, like the launch ones.
 const (
@@ -143,6 +172,11 @@ var eventSpecs = map[string]map[string]propSpec{
 	EventDashboardFailed:        {"code": enum("sessions_fetch_http", "sessions_fetch_network", "sessions_fetch_invalid", "status_fetch_http", "status_fetch_network", "status_fetch_invalid", "init_failed")},
 	EventFirstPromptSubmitted:   {"source": enum("http_send")},
 	EventPromptSubmitRequested:  {"source": enum("dashboard_composer")},
+
+	EventEULAAccepted:      {"source": enum(EULASourceDialog, EULASourceLegacy, EULASourceHub)},
+	EventDashboardSignedIn: {"via": enum(SignInApp, SignInLink, SignInKey, SignInPassword)},
+	EventFirstMessageSent:  {"via": enum(MessageViaComposerHTTP, MessageViaComposerWS, MessageViaTerminal, MessageViaLaunchPrompt)},
+	EventFirstAgentReply:   {"provider": enum("claude", "codex", "gemini", "other"), "seconds_to_reply": intRange(0, replySeconds), "outcome": enum(ReplyOK, ReplyError)},
 
 	EventUpdateNoticeShown: {"to_version": versionProp, "source": enum(UpdateSourceDashboard, UpdateSourceTray), "channel": enum(UpdateChannelApproved, UpdateChannelAgentic)},
 	EventUpdateOfferOpened: {"to_version": versionProp, "source": enum(UpdateSourceDashboard, UpdateSourceTray), "channel": enum(UpdateChannelApproved, UpdateChannelAgentic), "method": enum(UpdateMethodDownloadLink)},

@@ -174,6 +174,9 @@ type SessionsHandler struct {
 	resumeKnown map[string]bool
 
 	cachePrune sessionCachePruneState // session_cache_prune.go
+
+	// person tracks a person's first messages and the turns they start, for the new-user funnel (#10004); in memory only.
+	person personMarks
 }
 
 type cachedLogStatus struct {

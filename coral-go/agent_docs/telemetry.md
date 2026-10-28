@@ -6,7 +6,7 @@ Set `CORAL_TELEMETRY_DISABLED=1` before starting Coral to suppress analytics reg
 
 ## Events
 
-The runtime disclosure is generated from `internal/tracking/events.go`. New funnel events use schema version 3; the update events and `upgrade`'s `from_version` are schema version 4.
+The runtime disclosure is generated from `internal/tracking/events.go`. New funnel events use schema version 3; the update events and `upgrade`'s `from_version` are schema version 4; the new-user funnel events (`eula_accepted`, `dashboard_signed_in`, `first_message_sent`, `first_agent_reply`) are schema version 5.
 
 | Event | Meaning | Additional properties |
 |---|---|---|
@@ -26,6 +26,10 @@ The runtime disclosure is generated from `internal/tracking/events.go`. New funn
 | `dashboard_active_day` | An initialized dashboard was visible during a UTC date | — |
 | `prompt_submit_requested` | First composer submission intent, covering both HTTP and WebSocket paths | `source` |
 | `first_prompt_submitted` | First successful HTTP send accepted by the terminal transport | `source` |
+| `eula_accepted` | Once ever, right after the Terms of Service were accepted (Coral's terms dialog, the Windows installer's acceptance recorded as this version's, or the Coral Hub confirming this version as the machine enrolled). Never sent before acceptance | `source` (`dialog`, `legacy`, `hub`) |
+| `dashboard_signed_in` | Once ever: the first dashboard sign-in on this computer | `via` (`app`, `link`, `key`, `password`: the kind of sign-in, never the credential) |
+| `first_message_sent` | Once ever: the first message a person sent to an agent, from the dashboard composer over HTTP or the terminal socket, typed in the terminal view, or as a launch prompt. It says a message went, never what it said | `via` (`composer_http`, `composer_ws`, `terminal`, `launch_prompt`) |
+| `first_agent_reply` | Once ever for a turn that ended normally: the first time an agent's turn ended after a person's message (and once for a turn that ended in an error, if that happened before any ended normally). A turn is tied to the message by the server (a person's dashboard send, a terminal Enter or a launch prompt, then the agent's next stop for that session), never by reading either text | `provider` (`claude`, `codex`, `gemini`, `other`), `seconds_to_reply` (whole seconds, 0 to 3600; a longer wait sends nothing), `outcome` (`ok`, `error`) |
 | `task_completed` | A board task completion accepted by the completion route | `outcome` |
 | `first_agent_launched` | First individual launch | — |
 | `first_team_launched` | First team launch with a successful member | `agent_count` |
@@ -35,7 +39,7 @@ The runtime disclosure is generated from `internal/tracking/events.go`. New funn
 
 Weekly active installs are the distinct `distinct_id`s with `installation_active_week` in a week. `app_opened` alone cannot give that (a Coral that stays up for weeks sends it once, at startup) and `dashboard_active_day` alone cannot either (it needs the dashboard open, so an install driven from the CLI never sends it). `installation_active_week` is deduplicated like `dashboard_active_day`: the week is recorded as sent only after the service accepts the event, under an event UUID that is stable for the install and week, and an opt-out does not use the week up. It carries the standard properties only.
 
-Launch completion does not prove provider authentication, model readiness, or a response. The WebSocket composer currently lacks a transport acknowledgment suitable for the confirmed-send milestone, so `first_prompt_submitted` covers HTTP sends only. `prompt_submit_requested` measures intent, not delivery. No first-response or generic agent-ready event is emitted: existing transcript updates cannot reliably attribute new assistant output to a particular submitted prompt.
+Launch completion does not prove provider authentication, model readiness, or a response. The WebSocket composer currently lacks a transport acknowledgment suitable for the confirmed-send milestone, so `first_prompt_submitted` covers HTTP sends only. `prompt_submit_requested` measures intent, not delivery. `first_agent_reply` (schema 5) is not read from the transcript: the server marks the session when a person's message reaches the agent and counts the first stop event after it. `seconds_to_reply` includes any wait for the person to answer a permission box; a message that waits behind a running turn is measured from the send. A turn that ends in an error is `outcome: error`, so a failed turn is never counted as a reply that worked.
 
 `dashboard_ready` counts page loads, not users. Active-day records are deduplicated for the installation and UTC date, including multiple tabs. The legacy `returned_24h` event measures restarts; use dashboard activity for engagement and retention. An observed failure may precede recovery and a ready event. Missing events alone do not prove abandonment or a crash.
 

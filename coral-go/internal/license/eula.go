@@ -14,6 +14,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/subgentic/coral/internal/testguard"
+	"github.com/subgentic/coral/internal/tracking"
 	terms "github.com/subgentic/coral/pkg/license"
 )
 
@@ -159,7 +160,12 @@ func writeEULAMarker(source string) error {
 	if source == "legacy" {
 		content += "rewritten_at=" + eulaNow().UTC().Format(time.RFC3339) + "\n"
 	}
-	return os.WriteFile(marker, []byte(content), 0644)
+	if err := os.WriteFile(marker, []byte(content), 0644); err != nil {
+		return err
+	}
+	// The terms are accepted now, so the funnel may say so (never before this line, #10004): once per install, and nothing with analytics off.
+	tracking.TrackEULAAccepted(source)
+	return nil
 }
 
 // CheckAndPromptEULA checks if the EULA has been accepted. If not, uses the

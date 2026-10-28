@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // Browser sessions (#3949): every sign-in (a sign-in link, the API-key form, the password)
@@ -285,7 +287,26 @@ func (ks *KeyStore) NewSession(r *http.Request, method string, keep bool) (strin
 	if err := be.SweepSessions(ctx, now, maxSessions); err != nil {
 		log.Printf("[auth] couldn't sweep old sessions: %v", err)
 	}
+	if via := signInVia(r, method); via != "" {
+		tracking.TrackDashboardSignedIn(via) // once per install, and nothing with analytics off (#10004)
+	}
 	return token, nil
+}
+
+// signInVia is the closed value the funnel event carries for a sign-in: the kind of credential, never the credential.
+func signInVia(r *http.Request, method string) string {
+	switch method {
+	case SessionByLink:
+		if r != nil && r.URL != nil && r.URL.Query().Get(AppClientParam) == AppClientApp {
+			return tracking.SignInApp
+		}
+		return tracking.SignInLink
+	case SessionByKey:
+		return tracking.SignInKey
+	case SessionByPassword:
+		return tracking.SignInPassword
+	}
+	return "" // a method the funnel has no word for sends nothing
 }
 
 // NewSessionRotating is NewSession for a sign-in from a browser that may already hold a session: that one ends here, so a cookie a sign-in
