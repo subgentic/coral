@@ -41,4 +41,11 @@ assert.equal(w.lastChip(null), null);
 for (const [status, word] of [['completed', 'Passed'], ['failed', 'Failed'], ['killed', 'Stopped'], ['running', 'Running'], ['pending', 'Waiting to start']]) assert.deepEqual(w.lastChip({ status }), { word, detail: '' }, status);
 assert.equal(w.lastChip({ status: 'completed', exit_reason: 'ended_while_coral_was_down' }).word, 'Result not seen');
 assert.equal(w.lastChip({ status: 'failed', exit_reason: 'never_started' }).word, 'Failed');
+// The seeded example's description follows its state (#10475): it says switched off and Turn it on to try it only while it is off, and Turned off like the page says
+const seed = 'Example (switched off): would run the daily-motivation workflow every weekday at 9am. Turn it on to try it.';
+const ex = { name: 'morning-motivation', description: seed };
+assert.equal(w.jobDescription({ ...ex, enabled: 0 }), 'Example (turned off): would run the daily-motivation workflow every weekday at 9am. Turn it on to try it.');
+assert.equal(w.jobDescription({ ...ex, enabled: 1 }), 'Example: runs the daily-motivation workflow every weekday at 9am.', 'on: no switched off, no Turn it on');
+assert.equal(w.jobDescription({ name: 'my-job', description: 'Example (switched off): mine. Turn it on to try it.', enabled: 1 }), 'Example (switched off): mine. Turn it on to try it.', 'a person\'s own job is shown as written');
+assert.equal(w.jobDescription({ name: 'x', description: '', enabled: 1 }), '');
 console.log('PASS job_words');

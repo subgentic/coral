@@ -200,3 +200,9 @@ export function deleteJobWords(job, runCount) {
 /** The two items Coral seeds (store.SeedDemoWorkflow): a workflow and the job that runs it, by their exact names, with a description that starts "Example". Only these are marked and removed; a person's own job described "Example report for Acme" is theirs (#10001, QA Reviewer 2). */
 const SEEDED_EXAMPLES = new Set(['morning-motivation', 'daily-motivation']);
 export const isExample = (name, description) => SEEDED_EXAMPLES.has(String(name || '')) && /^Example\b/.test(String(description || ''));
+/** A job's description as the page shows it. The seeded example's stored text says it is switched off and to turn it on; that is only true while it is off (#10475), so it follows the job's state: off, "turned off" like the page says; on, a plain line. A person's own job is shown as written. */
+export function jobDescription(job) {
+    const text = String(job && job.description || '');
+    if (!job || !isExample(job.name, text)) return text;
+    return job.enabled ? text.replace(/^Example \(switched off\): would run /, 'Example: runs ').replace(/\s*Turn it on to try it\.$/, '') : text.replace(/^Example \(switched off\)/, 'Example (turned off)');
+}

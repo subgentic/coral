@@ -9,7 +9,7 @@ import { registerActions, withId, uuidOf } from './actions.js';
 import { pollEvery } from './overload.js';
 import { compactDuration } from './format.js';
 import { runFailure } from './run_failure.js';
-import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords, isExample } from './job_words.js';
+import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords, isExample, jobDescription } from './job_words.js';
 import { foldWayBack } from './sidebar_groups.js';
 import { note } from './nav.js';
 import { importOnce } from './import_once.js';
@@ -216,7 +216,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         </div>
         <p class="item-meta sched-status-line">${escapeHtml(status)}</p>
         ${savedLine}
-        ${job.description ? `<p class="sched-desc">${escapeHtml(job.description)}</p>` : ''}
+        ${job.description ? `<p class="sched-desc">${escapeHtml(jobDescription(job))}</p>` : ''}
         <dl class="facts sched-facts">
             <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${escapeHtml(zoneNote(job.timezone))}</dd>
             ${job.enabled
