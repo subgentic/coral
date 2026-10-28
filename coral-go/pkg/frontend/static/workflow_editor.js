@@ -5,6 +5,7 @@ import { mountSettingsView } from './settings_view.js';
 import { showToast } from './utils.js';
 import { registerActions, withId } from './actions.js';
 import { apiFetch } from './api.js';
+import { state } from './state.js';
 import { importOnce } from './import_once.js';
 const { limitSeconds, limitParts } = await importOnce('./time_limit.js'); // only the lazy forms use it (#10218)
 const { WORKFLOW_TEMPLATES, templateById } = await importOnce('./workflow_templates.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
@@ -179,7 +180,11 @@ async function submitWorkflow(values) {
         // What the step had, with what the editor shows written over it (a step whose type changed drops the other type's text).
         const step = { ...(loadedSteps.get(r.item) || {}), name: r.name, type: r.type };
         if (r.type === 'shell') { step.command = r.content; delete step.prompt; }
-        else { step.prompt = r.content; delete step.command; }
+        else {
+            step.prompt = r.content; delete step.command;
+            // The form has no field for the agent: an agent step goes with the CLI Settings names as the default (else Claude), unless it already has its own (a template's, an edited workflow's). The server refuses an agent step with no agent_type (#10732).
+            if (!(step.agent && step.agent.agent_type)) step.agent = { ...(step.agent || {}), agent_type: (state.settings || {}).default_agent_type || 'claude' };
+        }
         return step;
     });
     const name = String(values.name || '').trim();
