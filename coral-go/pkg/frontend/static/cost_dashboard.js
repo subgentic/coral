@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
 import { keyLabel } from './server_base.js';
-import { compactFigure, compactDuration, formatCost } from './format.js';
+import { compactFigure, compactDuration, formatCost, noDataWords } from './format.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 const { dataTable, tableState, link: dtLink, chip, tag, avatar } = await importOnce('./data_table.js'); // the shared table (#7743)
@@ -18,7 +18,6 @@ const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
 const COUNTS_NOTE = 'Nothing counted in this range. Spend counts the agents Coral has run; a chat you ran outside Coral is not included.';
-const NO_DATA = 'No data in this range yet. It appears once an agent has used tokens; try a longer range.';
 
 function _formatTime(isoStr) {
     if (!isoStr) return '\u2014';
@@ -427,6 +426,7 @@ const SERIES_VIEWS = {
     agent: { group: 'agent', key: r => r.agent_name || '(unknown)', rowKey: r => r.session_id || `${r.agent_name}:${r.launched_at || r.first_seen}`, name: r => r.display_name || r.agent_name || 'Agent' },
 };
 const _currentView = () => document.getElementById('cost-dashboard-view')?.dataset.view || '';
+const _period = () => document.getElementById('cost-time-range')?.value || 'day';
 const _periodHours = () => ({ hour: 1, day: 24, week: 168, month: 720 })[document.getElementById('cost-time-range')?.value || 'day'] || 24;
 const _periodInterval = () => ({ hour: '5m', day: '1h', week: '1h', month: '1d' })[document.getElementById('cost-time-range')?.value || 'day'] || '1h';
 
@@ -539,7 +539,7 @@ function _drawTable(container, table, columns, rows, empty, extra) {
     const st = _tables[table] || (_tables[table] = tableState());
     if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
     _drawn[table] = { container, columns, rows, empty, extra, phone: isPhoneLayout() };
-    if (!rows.length) { emptyState(container, empty || NO_DATA, 'empty-state'); return; }
+    if (!rows.length) { emptyState(container, empty || noDataWords(_period()), 'empty-state'); return; }
     const t = dataTable({ label: TABLE_TITLES[table], rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...phoneOneLine(columns, ['cost_usd'], PHONE_LEAD[table]), rows, ...extra }); // a phone: one line a row, the name and Cost (#8982)
     container.replaceChildren(t.el);
     if (SERIES_VIEWS[table]) _drawSeries(table); // the line under the chart compares its total with these rows
@@ -627,7 +627,7 @@ function _renderAgentTable(rows) {
         _numCol('context_pct', 'Context used', r => (r.context_pct == null ? -1 : r.context_pct), () => '', { cell: r => (r.context_pct == null ? '–' : `${r.context_pct}%`), title: r => (r.context_pct == null ? 'Only a running agent has a context used' : `${r.context_pct}% of its model\'s context window`) }), // a running agent's, next to its cost (#10272)
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         { key: 'details', label: 'Details', tone: 'secondary', cell: r => { const b = dtLink('Charts', () => agentDetail.openAgent(r, document.getElementById('cost-time-range')?.value || 'day')); b.setAttribute('aria-label', `Charts for ${r.display_name || r.agent_name || 'agent'}`); return b; } }, // one agent over the range (#7930)
-    ], filtered, NO_DATA, _seriesOpts('agent'));
+    ], filtered, noDataWords(_period()), _seriesOpts('agent'));
 }
 
 const COST_TASK_FIELDS = 'id,board_id,title,status,priority,assigned_to,claimed_at,completed_at,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens';
@@ -702,7 +702,7 @@ function _renderSpendChart(buckets) {
     _watchSpendChart(container);
 
     if (buckets.length < 2) {
-        emptyState(container, 'Not enough data yet. It appears once an agent has used tokens; try a longer range.', 'empty-state'); // says what makes it appear (Beta Tester, #9955)
+        emptyState(container, noDataWords(_period(), 'Not enough data yet.'), 'empty-state'); // says what makes it appear (Beta Tester, #9955)
         return;
     }
 

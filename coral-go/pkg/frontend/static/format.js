@@ -111,3 +111,6 @@ export function plural(n, one, many = one + 's', { localized = false } = {}) {
     const count = localized ? Number(n) : n;
     return `${localized ? count.toLocaleString() : count} ${count === 1 ? one : many}`;
 }
+
+/** What an empty Analytics chart or table says: what makes data appear, and, unless the range is already the longest (30 days, `month`), to try a longer one (#10521). */
+export const noDataWords = (period, lead = 'No data in this range yet.') => `${lead} It appears once an agent has used tokens${period === 'month' ? '.' : '; try a longer range.'}`;
