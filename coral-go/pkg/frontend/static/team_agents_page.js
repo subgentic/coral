@@ -1,5 +1,5 @@
-/* The team page's Agents tab (#7453 stage 3, UI/UX's Team view design): status chips with counts, one table of everyone on the board (Agent, Status, Doing, Provider, Remind), and an agent's own page.
- * "Remind <name>" is on every row and opens a small dialog (the message, a repeat, Remind): the message goes now as an @mention board message to the agent, and with a repeat the repeating reminder is set too; then "Reminded <name>."
+/* The team page's Agents tab (#7453 stage 3, UI/UX's Team view design): status chips with counts, one table of everyone on the board (Agent, Status, Doing, Provider, Chat), and an agent's own page.
+ * Each live row has "Open chat" (that agent's chat, local or a Hub computer's; none for an ended agent or a terminal). "Remind <name>" is on the agent's own page and opens a small dialog (the message, a repeat, Remind): the message goes now as an @mention board message to the agent, and with a repeat the repeating reminder is set too; then "Reminded <name>."
  * in a polite status. An agent that already has a repeating reminder has Edit reminder and Remove reminder on its page. Everything drawn is built with the DOM and textContent: names, reasons and task titles are written by agents.
  * Lazy: team_page.js imports it. */
 import { importOnce } from './import_once.js';
@@ -91,10 +91,15 @@ async function sendReminder(agent, { message, seconds }) {
 
 const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, onSend: (v) => sendReminder(agent, v) });
 
-function remindButton(agent) {
-    const b = btn('btn btn-small dt-action team-remind', 'Remind');
-    b.setAttribute('aria-label', `Remind ${agent.name}`); // one button per row, each named for whose
-    b.addEventListener('click', (e) => { e.stopPropagation(); askRemind(agent, b); });
+/** The agent's chat: its live session, local or a Hub computer's; null when it has none (an ended agent, a terminal). */
+const openChat = (session) => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); };
+
+function chatButton(agent) {
+    const session = agent.availability !== 'offline' && agent.agent_type !== 'terminal' ? sessionOf(agent) : null;
+    if (!session) return '';
+    const b = btn('btn btn-small dt-action team-open-chat', 'Open chat');
+    b.setAttribute('aria-label', `Open chat with ${agent.name}`); // one button per row, each named for whose
+    b.addEventListener('click', (e) => { e.stopPropagation(); openChat(session); });
     return b;
 }
 
@@ -151,7 +156,7 @@ function draw() {
             { key: 'status', label: 'Status', line: 2, width: '8rem', dropAt: 16, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
             { key: 'doing', label: 'Doing', line: 2, width: '18rem', dropAt: 52, sort: true, sortValue: doingOf, cell: ag => { const t = doingOf(ag), span = el('span', null, t); if (t) span.title = t; return span; } }, // one line a row (Goal #79): the whole line is the tooltip
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
-            { key: 'remind', label: 'Remind', line: 1, width: '6rem', cell: ag => canRemind(ag) && ag.agent_type !== 'terminal' ? remindButton(ag) : '' },
+            { key: 'chat', label: 'Chat', line: 1, width: '7rem', cell: chatButton },
         ], oneLine: true, sortBar: false,
     }).el);
     if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.goals-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
@@ -230,7 +235,7 @@ export function renderAgentPage(host, agent, ctx) {
         bar.append(b);
     }
     const session = sessionOf(agent);
-    if (session) bar.append(btn('btn', 'Open chat', () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); }));
+    if (session) bar.append(btn('btn', 'Open chat', () => openChat(session)));
     if (agent.reminder) {
         const id = agent.subscriber_id || agent.name;
         bar.append(btn('btn', 'Edit reminder', () => remindAgent(model.team, id, agent, () => load())), btn('btn', 'Remove reminder', async () => { if (await stopAgentReminder(model.team, id, () => load())) ctx.onBack(); }));
