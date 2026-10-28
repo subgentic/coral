@@ -223,7 +223,7 @@ func main() {
 			log.Printf("[WEBVIEW] download of %q refused: %v", appdownload.SafeName(name), err)
 			return "", err
 		}
-		log.Printf("[WEBVIEW] saved a download: %s", path)
+		log.Printf("[WEBVIEW] saved a download: %s", logsafe.Path(path))
 		return path, nil
 	})
 
