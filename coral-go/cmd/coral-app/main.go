@@ -32,6 +32,7 @@ import (
 
 	webview "github.com/webview/webview_go"
 
+	"github.com/subgentic/coral/internal/appdownload"
 	"github.com/subgentic/coral/internal/apptoken"
 	"github.com/subgentic/coral/internal/config"
 	_ "github.com/subgentic/coral/internal/dllpreload" // the webview's bare-name DLL loads find the system folder's modules (#5724)
@@ -168,6 +169,7 @@ func main() {
 
 	// What a link may do in this window (#5094): see linkInterceptScript.
 	w.Init(linkInterceptScript)
+	w.Init(downloadInterceptScript)
 	w.Init(titlebarFollowScript)
 
 	// The native functions are bound on every page the window shows and the Go side is not told the page's origin, so each takes a
@@ -185,6 +187,7 @@ func main() {
 		{Page: "_coralOpenExternal", Native: "__coralNativeOpenExternal"},
 		{Page: "_coralAppSignIn", Native: "__coralNativeAppSignIn"},
 		{Page: "_coralTitlebar", Native: "__coralNativeTitlebar"},
+		{Page: "_coralSaveFile", Native: "__coralNativeSaveFile"},
 	}
 
 	// Bind native URL opener — WKWebView doesn't support window.open(),
@@ -201,6 +204,27 @@ func main() {
 			return
 		}
 		log.Printf("[WEBVIEW] opening external URL: %s", loginlink.Redact(raw))
+	})
+
+	// A download the webview would drop (WKWebView ignores <a download> and blob: addresses): the page's script (downloadInterceptScript) reads the
+	// bytes and hands them here; the file goes into the person's Downloads folder under a safe name that never replaces one already there (#9894).
+	w.Bind("__coralNativeSaveFile", func(token, name, contentB64 string) (string, error) {
+		if !guard.Allowed(token) {
+			refused("saveFile")
+			return "", fmt.Errorf("refused")
+		}
+		dir, err := appdownload.DownloadsDir()
+		if err != nil {
+			log.Printf("[WEBVIEW] download: no Downloads folder: %v", err)
+			return "", err
+		}
+		path, err := appdownload.Save(dir, name, contentB64)
+		if err != nil {
+			log.Printf("[WEBVIEW] download of %q refused: %v", appdownload.SafeName(name), err)
+			return "", err
+		}
+		log.Printf("[WEBVIEW] saved a download: %s", path)
+		return path, nil
 	})
 
 	// The title bar follows the page's theme: the page reports the colours of --bg-primary and --border (see titlebarFollowScript) and the native side
