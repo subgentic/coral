@@ -8,23 +8,60 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	terms "github.com/subgentic/coral/pkg/license"
 )
 
-// #10004: eula_accepted is sent only after the acceptance is on disk, never before, and from one place only (where the marker is written), so no path can announce an acceptance it did not record.
-func TestEULAAcceptedIsTrackedOnlyAfterTheMarkerIsWritten(t *testing.T) {
+// #10004 (Security's MUST, round 1): the terms are accepted BEFORE the server has read the saved analytics choice (the terminal dialog and the legacy migration run ahead of startup.Start), so the license
+// package only remembers how they were accepted, in one bounded slot, and startup.Start says so once the choice is applied. Nothing here may send anything.
+func TestAcceptanceIsKeptForTheFunnelAndNeverSentFromHere(t *testing.T) {
+	markerAt(t)
+	TakeAcceptanceSource() // a clean slot
+	_, ok := TakeAcceptanceSource()
+	assert.False(t, ok, "nothing accepted in this run")
+
+	require(t, WriteEULAMarker())
+	src, ok := TakeAcceptanceSource()
+	assert.True(t, ok)
+	assert.Equal(t, "dialog", src)
+	_, ok = TakeAcceptanceSource()
+	assert.False(t, ok, "taken once")
+
+	require(t, RecordHubTermsAcceptance(terms.EULAVersion))
+	src, _ = TakeAcceptanceSource()
+	assert.Equal(t, "hub", src)
+
+	// The first source of the run is kept: a later one does not replace it.
+	require(t, WriteEULAMarker())
+	require(t, RecordHubTermsAcceptance(terms.EULAVersion))
+	src, _ = TakeAcceptanceSource()
+	assert.Equal(t, "dialog", src)
+
+	// A Hub that confirmed another version records nothing, so there is nothing to announce.
+	assert.Error(t, RecordHubTermsAcceptance("1999-01-01"))
+	_, ok = TakeAcceptanceSource()
+	assert.False(t, ok)
+
+}
+
+// The legacy marker the Windows installer writes is migrated to this version's at the next launch: that is an acceptance too, remembered the same way.
+func TestAMigratedLegacyMarkerIsKeptAsLegacy(t *testing.T) {
+	marker := markerAt(t)
+	TakeAcceptanceSource()
+	writeMarker(t, marker, "accepted\n")
+	MigrateLegacyEULAMarker()
+	src, ok := TakeAcceptanceSource()
+	assert.True(t, ok)
+	assert.Equal(t, "legacy", src)
+}
+
+// The license package must not import the tracking package, and eula_accepted is sent from one place only: startup.Start, after the saved analytics choice is applied.
+func TestEULAAcceptedIsSentOnlyFromStartup(t *testing.T) {
 	src, err := os.ReadFile("eula.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := string(src)
-	write := strings.Index(body, "os.WriteFile(marker,")
-	track := strings.Index(body, "tracking.TrackEULAAccepted(source)")
-	if write < 0 || track < 0 {
-		t.Fatalf("the marker write (%d) and the event call (%d) must both be in eula.go", write, track)
-	}
-	assert.Greater(t, track, write, "the event follows the write")
-	// ... and only on its success: the line between them returns the write's error.
-	assert.Contains(t, body[write:track], "return err", "a marker that could not be written announces nothing")
+	assert.NotContains(t, string(src), "internal/tracking", "license only remembers; it never talks to analytics")
 
 	var sites []string
 	root := filepath.Join("..", "..")
@@ -52,5 +89,5 @@ func TestEULAAcceptedIsTrackedOnlyAfterTheMarkerIsWritten(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, []string{"../../internal/license/eula.go"}, sites, "one call site: where the marker is written")
+	assert.Equal(t, []string{"../../internal/startup/startup.go"}, sites, "one call site, where the saved analytics choice is known")
 }
