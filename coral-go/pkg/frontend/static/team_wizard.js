@@ -53,6 +53,7 @@ function showTeamWizardModal() {
     }
     _samplePreviewed = false;
     { const tb = document.getElementById('team-wizard-test-btn'); if (tb) tb.textContent = 'Try a sample'; }
+    const from = document.activeElement; if (from && from !== document.body && !modal.contains(from)) modal._opener = from; // the keyboard goes back to the button that opened it (#10652)
     modal.style.display = 'flex';
     if (!_activeGenerateJobId) directiveEl?.focus();
 
@@ -64,9 +65,12 @@ window.showTeamWizardModal = showTeamWizardModal;
 function hideTeamWizardModal() {
     const modal = document.getElementById('team-wizard-modal');
     if (!modal) return;
+    const back = modal._opener, held = modal.contains(document.activeElement) || document.activeElement === document.body;
+    modal._opener = null;
     modal.style.display = 'none';
     _setTeamWizardError('');
     releaseEscape(modal);
+    if (back && back.isConnected && held) back.focus({ preventScroll: true }); // Escape, Cancel or a click outside: not the page, where the next Tab starts at the top (#10652)
 }
 window.hideTeamWizardModal = hideTeamWizardModal;
 
