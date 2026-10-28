@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"html/template"
+	"net/http"
 )
 
 // PageState says which screen the /auth page shows (#3948). The server decides it, so the page never asks an
@@ -227,3 +228,60 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
 <script type="module" src="/static/auth_page.js"></script>
 </body>
 </html>`))
+
+// linkUsedPage is what a used or expired sign-in link gets (#9961, the beta tester on a phone: it was one line of
+// monospace on a black page). The markup is fixed and has no user data (the token is never echoed): the sign-in
+// page's own card, what happened, the one command that fixes it, and the way to the sign-in page.
+const linkUsedPage = `<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="referrer" content="no-referrer">
+<title>This sign-in link has been used</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="stylesheet" href="/static/css/fonts.css">
+<link rel="stylesheet" href="/static/css/variables.css">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/components.css">
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
+  .card { width: 100%; max-width: 440px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 32px 30px; box-sizing: border-box; }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 1.25rem; font-weight: 600; margin: 0 0 6px; }
+  .brand img { width: 44px; height: 44px; border-radius: 10px; flex: none; display: block; }
+  h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 6px; }
+  .sub { color: var(--text-secondary); font-size: 0.875rem; line-height: 1.5; margin: 0 0 20px; }
+  .code { display: block; background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px 12px; margin: 0 0 20px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9375rem; }
+  .btn.wide { display: flex; width: 100%; padding: 10px 14px; font-size: 0.9375rem; justify-content: center; text-decoration: none; box-sizing: border-box; }
+  @media (max-width: 480px) { .card { padding: 24px 18px; } }
+  @media (max-width: 767px), (pointer: coarse) { .btn.wide { min-height: 2.75rem; align-items: center; } }
+</style>
+<script src="/static/theme_init.js"></script>
+</head>
+<body>
+<main class="card">
+  <div class="brand"><img src="/static/icon-192.png" alt="" width="44" height="44">Coral</div>
+  <h1>This sign-in link has been used</h1>
+  <p class="sub">A sign-in link works once, and for 10 minutes. To get a new one, run this in a terminal on the computer that runs Coral:</p>
+  <code class="code">coral open</code>
+  <a class="btn btn-primary wide" href="/auth">Go to the sign-in page</a>
+</main>
+</body>
+</html>
+`
+
+// writeLinkUsed answers a sign-in link that was used, expired or opened by another user of this computer: the
+// same page for all three, so it says nothing about which (#9961).
+func writeLinkUsed(w http.ResponseWriter) {
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	h.Set("Content-Security-Policy", authPageCSP)
+	h.Set("X-Frame-Options", "DENY")
+	h.Set("Referrer-Policy", "no-referrer")
+	w.WriteHeader(http.StatusForbidden)
+	_, _ = w.Write([]byte(linkUsedPage))
+}

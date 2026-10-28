@@ -184,7 +184,7 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 		switch {
 		case supported && !same:
 			log.Printf("[auth] a sign-in link was opened by another user of this computer: refused (the link still works for you)")
-			http.Error(w, "This sign-in link has already been used or has expired. In a terminal on this computer, run 'coral open' to get a new one.", http.StatusForbidden)
+			writeLinkUsed(w)
 			return true
 		case !supported:
 			ks.unknownPeer.Do(func() {
@@ -193,7 +193,7 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 		}
 	}
 	if !ks.consumeLoginToken(token) {
-		http.Error(w, "This sign-in link has already been used or has expired. In a terminal on this computer, run 'coral open' to get a new one.", http.StatusForbidden)
+		writeLinkUsed(w)
 		return true
 	}
 	session, err := ks.NewSessionRotating(r, SessionByLink, false)
