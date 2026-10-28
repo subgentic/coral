@@ -16,7 +16,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
 const SID = '0b2f6c1e-3d4a-4b5c-8d6e-000000013645';
 const NAME = 'claude-' + SID;
-const PATHS = ["src/a&b <x>.go", "docs/it's here.md"];
+const PATHS = ["src/a&b <x>.go", "docs/it's here.md", "other/it's here.md"]; // the third has the second's name in another folder: their buttons must not be named alike (#10697)
 
 (async () => {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
@@ -96,6 +96,7 @@ const PATHS = ["src/a&b <x>.go", "docs/it's here.md"];
         })()`);
         await until(`document.querySelectorAll('#changed-files-list [data-on-click="file-open"]').length === 2`, 'the changed files');
         const rowFor = p => `[...document.querySelectorAll('#changed-files-list [data-on-click="file-open"]')].find(r => r.dataset.path === ${JSON.stringify(p)})`;
+        check('two files called alike have buttons named by their folder, not named alike (#10697)', await ev(`(() => { const l = [...document.querySelectorAll('#changed-files-list .file-star-btn, #changed-files-list .file-more-btn')].map(b => b.getAttribute('aria-label')); return new Set(l).size === l.length && l.some(x => /it's here\\.md in docs$/.test(x)) && l.some(x => /it's here\\.md in other$/.test(x)); })()`), JSON.stringify(await ev(`[...document.querySelectorAll('#changed-files-list .file-star-btn, #changed-files-list .file-more-btn')].map(b => b.getAttribute('aria-label'))`)));
         check('each row carries its file\'s exact path', await ev(`!!${rowFor(PATHS[0])} && !!${rowFor(PATHS[1])}`));
 
         await ev(`${rowFor(PATHS[0])}.querySelector('[data-on-click="file-copy"]').click(); true`);

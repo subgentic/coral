@@ -1594,7 +1594,7 @@ body.panel-dragging .agentic-state {
 }
 
 .changed-files-count { white-space: nowrap; }
-.changed-files-count.files-compare-note { white-space: normal; } /* the sentence beside the count of a folder that is not a git repository wraps: at 200% text it was cut (contrast_census_desktop, v2.0.3) */
+.changed-files-count.files-compare-note { white-space: normal; min-width: 0; overflow-wrap: anywhere; } /* the comparison note and the not-a-git-folder line are sentences: they wrap at large text on a phone instead of being cut (contrast_census_desktop, #10697) */
 
 /* Expand-all sits with the browse and refresh buttons, and marks itself when
    any diff is open. */

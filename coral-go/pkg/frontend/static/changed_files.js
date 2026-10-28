@@ -596,6 +596,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
 
     const starred = new Set(_getStarredFiles());
     const heldMore = list.contains(document.activeElement) && document.activeElement.classList.contains('file-more-btn') ? document.activeElement.dataset.path : ''; // the list is drawn again on every poll: the row's More button that had the keyboard gets it back (#7652)
+    const sameNames = new Map(); for (const g of files) { const n = splitPath(g.filepath).name; sameNames.set(n, (sameNames.get(n) || 0) + 1); }
     list.innerHTML = files.map((f) => {
         const { dir, name } = splitPath(f.filepath);
         const statusCls = getStatusClass(f.status);
@@ -609,7 +610,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         const agentsHtml = f.agents && f.agents.length > 0
             ? `<span class="file-agents">${escapeHtml(f.agents.map(a => a.name).join(', '))}</span>`
             : '';
-        const rowName = splitPath(f.filepath).name;
+        const rowName = sameNames.get(splitPath(f.filepath).name) > 1 && splitPath(f.filepath).dir ? `${splitPath(f.filepath).name} in ${splitPath(f.filepath).dir.replace(/\/$/, '')}` : splitPath(f.filepath).name; // two files called alike are told apart by their folder, so their buttons are not named alike (#10697)
         const rowTitle = plain ? f.filepath : `${f.filepath} (${statusLabel})`;
         const starLabel = `${isStarred ? 'Unstar' : 'Star'} ${rowName}`, copyLabel = `Copy path of ${rowName}`, previewLabel = `Preview ${rowName}`, editLabel = `Edit ${rowName}`;
         const starBtn = `<button class="btn btn-quiet btn-icon btn-xs file-star-btn ${escapeAttr(isStarred ? 'starred' : '')}" data-filepath="${escapeAttr(f.filepath)}" data-on-click="file-star" data-path="${escapeAttr(f.filepath)}" title="${escapeAttr(isStarred ? 'Unstar' : 'Star')}" aria-label="${escapeAttr(starLabel)}">${isStarred ? '★' : '☆'}</button>`;
