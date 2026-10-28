@@ -34,7 +34,7 @@ const GIB = 1024 ** 3;
                 if (p === '/api/settings' && m === 'PUT') { window.__puts.push(JSON.parse(o.body)); return json({}); }
                 return R(u, o); };
             return true; })()`);
-        const GONE = `(window.hideSettingsModal(), (!document.getElementById('settings-modal') || getComputedStyle(document.getElementById('settings-modal')).display === 'none'))`;
+        const GONE = `(window.hideSettingsModal(true), (!document.getElementById('settings-modal') || getComputedStyle(document.getElementById('settings-modal')).display === 'none'))`;
         const close = () => waitFor(GONE, 'Settings to close', 6000);
         const apply = () => ev(`Promise.resolve(window.applySettings()).then(() => true)`);
         const line = () => ev(`(document.getElementById('settings-artifact-store-size')?.textContent ?? '')`);
