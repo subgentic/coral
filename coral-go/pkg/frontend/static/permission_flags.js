@@ -29,6 +29,7 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
 
 // What Auto really is differs by CLI (Security's review of #10000, from _getPermissionFlagsForAgentMode): Claude's --permission-mode auto has a safety classifier; Codex never asks but runs in a workspace sandbox; Antigravity and Gemini get
 // --dangerously-skip-permissions (no prompts and no checks at all); Pi has no permission system, so it always acts on its own. A description that says 'with safety checks' is true of Claude only.
+export const GENERIC_AUTO_DESCRIPTION = 'Everything; safety checks on Claude only.';
 export const NO_CHECKS_DESCRIPTION = 'Everything, with no prompts and no safety checks.';
 export const PI_NO_PERMISSIONS = 'Pi has no permission prompts: it always acts on its own.';
 const SKIPS_ALL_PROMPTS = ['', 'auto', 'dontAsk', 'bypassPermissions'];
@@ -38,6 +39,7 @@ export function permissionDescription(type, value) {
     if (t === 'pi') return PI_NO_PERMISSIONS;
     if ((t === 'agy' || t === 'antigravity' || t === 'gemini') && SKIPS_ALL_PROMPTS.includes(v)) return NO_CHECKS_DESCRIPTION;
     if (t === 'codex' && CODEX_NETWORK_MODES.includes(v)) return CODEX_AUTO_DESCRIPTION;
+    if (!t && v === 'auto') return GENERIC_AUTO_DESCRIPTION; // Settings' own select is for every CLI, and safety checks are Claude's only: it must not say 'with safety checks' (#10191)
     return PERMISSION_MODE_DESCRIPTIONS[v] || '';
 }
 
