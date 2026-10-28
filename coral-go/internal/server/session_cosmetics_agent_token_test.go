@@ -105,4 +105,6 @@ func TestOnlyTheOperatorSavesAnAgentsInstructions(t *testing.T) {
 	assert.Equal(t, http.StatusRequestEntityTooLarge, code, out)
 	code, _ = put(`{"instructions":"x"}`, dashboard)
 	assert.Equal(t, http.StatusBadRequest, code, "a session id is required")
+	code, out = put(`{"session_id":"00000000-0000-0000-0000-000000000000","instructions":"x"}`, dashboard)
+	assert.Equal(t, http.StatusNotFound, code, "an id no live agent has is not a save: %s", out)
 }

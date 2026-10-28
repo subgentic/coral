@@ -6,7 +6,8 @@ import { autoAcceptChip, autoAcceptMenuItem } from './auto_accept.js';
 import { getCachedAgentAvailability } from './team_availability.js';
 import { isGoneAsleep, isExitedAsleep } from './terminal_gone.js';
 import { isStaleSession, staleReason, serversShown } from './server_status.js';
-import { sessionServer, keyLabel, sessionTeamKey } from './server_base.js';
+import { sessionServer, keyLabel, sessionTeamKey, isCloud } from './server_base.js';
+import { instructionsOffered } from './agent_instructions_offer.js';
 import { redrawLiveList } from './list_hooks.js';
 import { state } from './state.js';
 import { skippedOf } from './waiting.js';
@@ -135,7 +136,7 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
                 Rename
             </button>
-            ${s.agent_type === 'terminal' ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">
+            ${!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h10M3 6.5h10M3 10h6"/><path d="M11.5 11.5l2 2"/></svg>
                 Edit instructions
             </button>`}
@@ -179,7 +180,7 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
                 Rename
             </button>
-            ${s.agent_type === 'terminal' ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">
+            ${!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h10M3 6.5h10M3 10h6"/><path d="M11.5 11.5l2 2"/></svg>
                 Edit instructions
             </button>`}

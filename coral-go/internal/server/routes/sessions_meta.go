@@ -62,8 +62,13 @@ func (h *SessionsHandler) SetInstructions(w http.ResponseWriter, r *http.Request
 	if trimmed := strings.TrimSpace(body.Instructions); trimmed != "" {
 		prompt = &trimmed
 	}
-	if err := h.ss.SetPrompt(r.Context(), body.SessionID, prompt); err != nil {
+	found, err := h.ss.SetPrompt(r.Context(), body.SessionID, prompt)
+	if err != nil {
 		errInternalServer(w, err.Error())
+		return
+	}
+	if !found {
+		errNotFound(w, "no such agent")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "applies": "at the next restart"})
