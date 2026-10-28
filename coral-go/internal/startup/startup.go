@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/dbcrypt"
+	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -26,6 +27,7 @@ import (
 	"github.com/subgentic/coral/internal/server"
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // Options configures optional behaviors that differ between entry points.
@@ -274,6 +276,11 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	cfg.TLS = tlsConfig != nil
 	if cfg.StrictLocalAuth, err = strictLocalAuth(cfg.CoralDir(), opts.StrictLocalAuth); err != nil {
 		return closeDB(err)
+	}
+	// The funnel's eula_accepted (#10004): the terms were accepted before this point (the dialog, the legacy migration, the Hub's confirmation), but only now has the saved analytics choice been
+	// applied (applyPrivacySettings, above), so only now may it be said; with analytics off it is dropped here. Taken once.
+	if source, ok := license.TakeAcceptanceSource(); ok {
+		tracking.TrackEULAAccepted(source)
 	}
 
 	// Bind the port now and keep the listeners open to avoid a TOCTOU race

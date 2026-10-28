@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
 	"golang.org/x/term"
 
 	"github.com/subgentic/coral/internal/testguard"
-	"github.com/subgentic/coral/internal/tracking"
 	terms "github.com/subgentic/coral/pkg/license"
 )
 
@@ -163,9 +163,32 @@ func writeEULAMarker(source string) error {
 	if err := os.WriteFile(marker, []byte(content), 0644); err != nil {
 		return err
 	}
-	// The terms are accepted now, so the funnel may say so (never before this line, #10004): once per install, and nothing with analytics off.
-	tracking.TrackEULAAccepted(source)
+	noteAcceptance(source) // for the funnel (#10004): sent from startup.Start once the saved analytics choice is applied, never from here
 	return nil
+}
+
+// The acceptance of this run, kept for the funnel's eula_accepted (#10004). It is NOT sent where the marker is written: the terms are accepted before the server has read the saved analytics
+// choice (the terminal dialog and the legacy migration run before startup.Start), so sending here could announce an acceptance to someone who had opted out. startup.Start takes it once the choice
+// is applied and the terms are known to be accepted. One bounded slot: the first source this run recorded.
+var acceptance struct {
+	mu     sync.Mutex
+	source string
+}
+
+func noteAcceptance(source string) {
+	acceptance.mu.Lock()
+	defer acceptance.mu.Unlock()
+	if acceptance.source == "" {
+		acceptance.source = source
+	}
+}
+
+// TakeAcceptanceSource returns, once, how the terms were accepted in this process (dialog, legacy or hub); ok is false when they were not accepted in this run (an earlier run's marker is no news).
+func TakeAcceptanceSource() (source string, ok bool) {
+	acceptance.mu.Lock()
+	defer acceptance.mu.Unlock()
+	source, acceptance.source = acceptance.source, ""
+	return source, source != ""
 }
 
 // CheckAndPromptEULA checks if the EULA has been accepted. If not, uses the
