@@ -511,7 +511,8 @@ func (s *Server) servePagePath(w http.ResponseWriter, r *http.Request) {
 // everything under it, serving the same shell as "/", GET only, behind the same middleware.
 // The client router reads the view from the path and validates its segments; the server
 // doesn't. An explicit list, never a NotFound
-// catch-all, so a miss under /api, /ws, /auth or /static stays a 404 that isn't HTML.
+// catch-all that serves the shell: a miss under /api, /ws, /auth or /static stays a 404 that isn't HTML, and a miss anywhere else gets the small
+// "Page not found" page with its way back (not_found_page.go, #10281), which serves no shell and names nothing of the request.
 // Coral Hub's webui serves the same families (the contract in #3532's hub spec).
 var DashboardPagePaths = []string{
 	"/agents", "/agents/*",
