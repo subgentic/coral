@@ -86,7 +86,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`document.getElementById('tb-now')?.closest('.sv-row')?.hidden === false`, 'the backend row');
         let r = await row();
         check('Settings shows the backend row: running tmux, tmux picked, both options', !r.hidden && r.now === 'Running now: tmux' && r.choice && !r.fixed && r.checked === 'tmux'
-            && r.texts[0] === 'tmux (agents keep running)' && r.texts[1] === 'pty (default)', JSON.stringify(r));
+            && r.texts[0] === 'Keep agents running when Coral restarts (tmux)' && r.texts[1] === 'Put agents to sleep when Coral restarts (pty, default)', JSON.stringify(r));
         check("the pty text has Security's crash wording", /puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash/.test(r.ptyText), r.ptyText);
         check('nothing pending to start with', r.pending === '', r.pending);
         await pick('pty');
