@@ -39,6 +39,7 @@ export function permissionDescription(type, value) {
     if (t === 'pi') return PI_NO_PERMISSIONS;
     if ((t === 'agy' || t === 'antigravity' || t === 'gemini') && SKIPS_ALL_PROMPTS.includes(v)) return NO_CHECKS_DESCRIPTION;
     if (t === 'codex' && CODEX_NETWORK_MODES.includes(v)) return CODEX_AUTO_DESCRIPTION;
+    if (t === 'codex' && v === 'default') return CODEX_DEFAULT_DESCRIPTION;
     if (!t && v === 'auto') return GENERIC_AUTO_DESCRIPTION; // Settings' own select is for every CLI, and safety checks are Claude's only: it must not say 'with safety checks' (#10191)
     return PERMISSION_MODE_DESCRIPTIONS[v] || '';
 }
@@ -47,6 +48,7 @@ export function permissionDescription(type, value) {
 // Codex launches these as workspace-write that never asks, which has the network on (Security's #7503); so does Codex with nothing chosen (the saved default or Auto). Default is not one of them since #10362: it sends no flags
 export const CODEX_NETWORK_MODES = ['auto', 'dontAsk']; // not Default: an explicit Default sends no flags (#10362), so Codex runs its own default, which asks
 export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
+export const CODEX_DEFAULT_DESCRIPTION = 'Asks before every action and cannot reach Coral from its sandbox: use Auto for a team member.'; // Codex's own default sends no flags (#10362), so its sandbox has no network and its board calls stall (Security Reviewer Windows, #10381)
 
 // The modes in which an agent's launch of a worker is refused: agent.SkipsPermissionPrompts keeps only Default as asking (Plan too, for the CLIs other than Claude, #5894)
 const WORKERS_REFUSED = { plan: 'Claude agents cannot start workers in this mode.' };
