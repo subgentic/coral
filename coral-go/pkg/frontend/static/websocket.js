@@ -30,6 +30,7 @@ import { publishGoalsBrief } from './goals_feed.js';
 import { syncAutoAcceptHeader, noteAutoAcceptPauses } from './auto_accept.js';
 import { pruneTerminalGone, syncTerminalGoneHeader } from './terminal_gone.js';
 import { setText } from './dom_write.js';
+import { withTeam } from './team_names.js';
 
 // Reconnect pacing for the live feed. A fixed 5 s retry made every open dashboard reconnect in the same second after
 // a hub restart or deploy, and kept retrying forever after the sign-in ended. Retries now back off exponentially
@@ -252,7 +253,7 @@ export const CODEX_REVIEW_HOLD_MS = 6000;
 
 /** The needs-input toast, and the opt-in desktop alert, for row s. */
 function _raiseNeedsInputAlert(s, id) {
-    const label = escapeHtml(resolveSessionIdentity(s)); // the role or the name the row shows (the row's own words), not the folder twice
+    const label = escapeHtml(withTeam(resolveSessionIdentity(s), s)); // the role or the name the row shows (the row's own words), not the folder twice; two teams: "Orchestrator (team-a)" (#10134)
     const detail = s.waiting_summary ? escapeHtml(askWords(s.waiting_summary)) : null;
     const sessionName = s.name;
     const agentType = s.agent_type;
@@ -266,7 +267,7 @@ function _raiseNeedsInputAlert(s, id) {
     const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
     // attention.js is read when the first alert is due, not at start (the start weight is guarded): the count it keeps is only ever needed from then on
     // Whether the tab is in the background is decided now, when the alert is raised: attention.js answers after it has loaded, and a tab that was visible at the reply and hidden by then must not count it (#10396)
-    if (document.hidden) importOnce('./attention.js').then(m => m.noteAttention(m.KIND_NEEDS_INPUT, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
+    if (document.hidden) importOnce('./attention.js').then(m => m.noteAttention(m.KIND_NEEDS_INPUT, { agent: withTeam(s.display_name || s.name, s), where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
 }
 
 /** An agent's turn just ended and it awaits its person: a count in the tab title and, when this browser wants them, a desktop alert; only while this tab is in the background (#10068). Names only. */
@@ -277,7 +278,7 @@ function _raiseReplyAlert(s, id) {
     const sessionSrv = sessionServer(s);
     const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv));
     const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
-    if (document.hidden) importOnce('./attention.js').then(m => m.noteAttention(m.KIND_REPLY, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
+    if (document.hidden) importOnce('./attention.js').then(m => m.noteAttention(m.KIND_REPLY, { agent: withTeam(s.display_name || s.name, s), where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
 }
 
 /** A Codex row whose request is the agent's own approval request (its PermissionRequest hook), which Codex's reviewer may settle by itself. */
