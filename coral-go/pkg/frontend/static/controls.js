@@ -745,10 +745,10 @@ function moveActiveRow() {
     if (!next) return false;
     for (const li of document.querySelectorAll(".session-list li.active")) {
         if (li === next) continue;
-        li.classList.remove("active");
+        li.classList.remove("active", "list-row-current"); // the class that draws the highlight goes with it (#10273)
         li.removeAttribute("aria-current");
     }
-    if (!next.classList.contains("active")) { next.classList.add("active"); next.setAttribute("aria-current", "true"); }
+    if (!next.classList.contains("active") || !next.classList.contains("list-row-current")) { next.classList.add("active", "list-row-current"); next.setAttribute("aria-current", "true"); }
     for (const tile of document.querySelectorAll("#sidebar-rail .sidebar-rail-item")) tile.classList.toggle("active", tile.dataset.sessionId === sid);
     return true;
 }

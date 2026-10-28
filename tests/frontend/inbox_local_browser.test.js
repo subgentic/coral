@@ -108,9 +108,15 @@ const hex = i => i.toString(16).padStart(20, '0');
             s = await state();
             check(`${dev}: Needs you lists the waiting agent, and the folder counts it`, s.needs.length === 1 && /QA Beta/.test(s.needs[0]) && (await ev(`document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count').textContent`)) === '1', JSON.stringify(s.needs));
             await shot(`inbox-local-needs-${dev}`);
+            await ev(`Promise.resolve(window.selectLiveSession('qa-a', 'claude', 'qa-a-id')).then(() => true)`); await settle(`window.T && T.state.currentSession && T.state.currentSession.session_id === 'qa-a-id'`, 'another agent open first'); // the highlight must follow the Needs you row, not stay on this one (#10273)
+            await ev(tabBtn('needs'));
+            await settle(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.getElementById('group-table-view').getClientRects().length > 0`, 'Needs you again');
             await ev(`document.querySelector('#group-table-view tbody .dt-primary').click(); true`);
             await settle(`window.T && T.state.currentSession && T.state.currentSession.session_id === 'qa-b-id' && document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'the waiting agent opened');
             check(`${dev}: a Needs you row opens that agent (the Agents tab, the agent selected)`, true);
+            await settle(`!!document.querySelector('.sidebar .session-group-item.list-row-current, #mobile-session-list .session-group-item.list-row-current')`, 'a highlighted row').catch(() => {});
+            const cur = await ev(`[...document.querySelectorAll('.session-group-item.list-row-current, .session-group-item.active')].filter(e => e.getClientRects().length).map(e => e.dataset.sessionId || e.getAttribute('data-session-id') || e.textContent.trim().slice(0, 20))`);
+            if (!mobile) check(`${dev}: the open agent's row is the highlighted one, only that one (#10273)`, cur.length === 1 && /qa-b-id|QA Beta/.test(cur[0]), JSON.stringify(cur)); // a phone's list is the page itself: no row is on screen beside an open chat
             await ev(`window.selectLiveSession('', '', '', 'local'); true`);
 
             // the Inbox's Saved folder, from home; Escape leaves it
