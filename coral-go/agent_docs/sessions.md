@@ -475,6 +475,8 @@ Launch a new agent session.
 
 Required: `working_dir`. All other fields are optional.
 
+**Permission mode (#10362):** a launch with no permission flag starts in the saved default mode, or in Auto for the Operator's launch of Claude when none is saved. `"permission_mode": "default"` says Default explicitly: the agent starts in Default, asks before it acts, and Default is what is recorded for a restart. It is the only value (any other mode is 400; send the CLI's own flags for those), and a permission flag of the request's own wins over it.
+
 **MCP servers:** Coral doesn't configure MCP servers for an agent. Set them up in the agent CLI's
 own configuration. A request that includes `mcpServers` is refused with 400
 (`mcpServers is not supported`).

@@ -66,15 +66,18 @@ const BASE = require('./test_base').BASE;
         await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); { const t = document.querySelector('#launch-agent-acf .acf-agent-type'); t.value = 'codex'; t.dispatchEvent(new Event('change', { bubbles: true })); const sel = document.querySelector('#launch-agent-acf .acf-permission-mode'); sel.value = 'default'; } document.getElementById('launch-dir').value = '/work/project'; document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').click(); true`);
         await waitFor(`window.__launches.length === ${before + 1}`, 'the Codex launch, with no question first');
         assert.deepEqual(await modals(), [], 'no Permission Prompt Warning for Codex on Default'); assert.equal(await ev(`window.__launches[window.__launches.length - 1].agent_type`), 'codex');
+        assert.equal(await ev(`window.__launches[window.__launches.length - 1].permission_mode`), 'default', 'Default is sent as Default on Codex too (#10362)');
         await ev(`window.__launches.length = 0; true`); // the scenarios below count their own launches
 
         console.log('Launch Without sends no permission flag; Enable & Launch adds it');
         await startLaunch(); await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="skip"]')`, 'the question');
         await click('skip'); await waitFor(`window.__launches.length === 1`, 'the launch');
         assert.equal(await ev(`window.__launches[0].working_dir`), '/work/project'); assert.equal(await ev(`/permission|bypass/i.test((window.__launches[0].flags || []).join(' '))`), false, 'no permission flag');
+        assert.equal(await ev(`window.__launches[0].permission_mode`), 'default', 'Keep Default says Default in the request: without it the server starts the saved default, Auto (#10362, critical)');
         await startLaunch(); await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="enable"]')`, 'the question again');
         await click('enable'); await waitFor(`window.__launches.length === 2`, 'the second launch');
         assert.equal(await ev(`/permission|bypass/i.test((window.__launches[1].flags || []).join(' '))`), true, 'the permission flag is on it: ' + JSON.stringify(await ev(`window.__launches[1].flags`)));
+        assert.equal(await ev(`window.__launches[1].permission_mode`), undefined, 'Use Auto names its mode in its flags, not as Default (#10362)');
 
         console.log('A launch whose CLI is missing: the install dialog (#7450: Claude Code is not installed), It is installed somewhere else opens Settings, Got it closes it');
         await ev(`window.__launchAnswer = { status: 400, body: { error: 'claude CLI not found on this computer' } }; true`);

@@ -11,7 +11,7 @@ import { serverFetch, identityKey, isHub, normServer, LOCAL_SERVER, keyLabel, no
 import { pickerVisible, pickerOptions, serverLabel, coerceSelection, bareBoardName } from './launch_server.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _effectiveServer, _loadServerSettings, _serverSettings, _settingsFor } = await importOnce('./launch_models.js');
-const { defaultPermissionMode, syncDefaultPermissionMode, _normalizePermFlagsForAgent, _updatePermModeDescription } = await importOnce('./permission_flags.js');
+const { defaultPermissionMode, syncDefaultPermissionMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 import { checkTmuxForLaunch } from './prerequisites.js';
 import { sectionFocus } from './section_dialog.js';
@@ -444,6 +444,8 @@ export async function launchSession() {
     }
 
     const payload = { working_dir: dir, agent_type: type };
+    // Default picked (and Keep Default in "Default mode waits for you") is Default: the form sends no flag for it, which the server cannot tell from "nothing chosen" (that starts in the saved default or Auto), so the request says it (#10362).
+    if (launch.mode !== "terminal" && permPick === 'default' && !(flagsStr && _hasPermFlag(flagsStr))) payload.permission_mode = 'default';
     if (agentName) payload.display_name = agentName;
     if (backend && !launch.addTo) payload.backend = backend; // Add agent sends what it always sent: the server's own default backend (#7778)
 
