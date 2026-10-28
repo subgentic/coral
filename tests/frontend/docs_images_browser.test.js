@@ -30,11 +30,11 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: mobile ? 2 : 1, mobile });
             await load('/docs/using-the-dashboard');
             await ev(`window.__cspSeen = []; document.addEventListener('securitypolicyviolation', e => window.__cspSeen.push(e.violatedDirective + ' ' + e.blockedURI)); true`);
-            await waitFor(`document.querySelectorAll('#docs-content img').length >= 5`, 'the page\'s screenshots', 15000);
+            await waitFor(`document.querySelectorAll('#docs-content img').length >= 4`, 'the page\'s screenshots', 15000);
             await waitFor(`[...document.querySelectorAll('#docs-content img')].every(i => i.complete && i.naturalWidth > 0)`, 'every screenshot loaded', 15000);
             const m = await ev(`({ n: document.querySelectorAll('#docs-content img').length, widest: Math.max(...[...document.querySelectorAll('#docs-content img')].map(i => Math.round(i.getBoundingClientRect().right))), vw: innerWidth,
                 alts: [...document.querySelectorAll('#docs-content img')].every(i => (i.alt || '').length > 5), csp: window.__cspSeen, page: document.documentElement.scrollWidth - document.documentElement.clientWidth })`);
-            assert.ok(m.n >= 5, JSON.stringify(m));
+            assert.ok(m.n >= 4, JSON.stringify(m)); // the page has four screenshots since #10011 matched it to today's screens
             assert.ok(m.widest <= m.vw, 'no screenshot runs off the screen: ' + JSON.stringify(m));
             assert.ok(m.alts, 'each screenshot has a description');
             assert.deepEqual(m.csp, [], 'no CSP violation: ' + JSON.stringify(m.csp));
