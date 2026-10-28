@@ -256,7 +256,8 @@ export function completeForm(task, ctx) {
             ctx.redraw(task, 'view');
         } catch (e) { error.textContent = e.message || 'Could not send it back'; error.hidden = false; showToast(e.message || 'Could not send it back', true); }
     }
-    return { node: section, sendBack, canSendBack: canSendBack(task, hubWhy), focus: () => { message.focus({ preventScroll: true }); message.scrollIntoView({ block: 'center' }); }, submit }; // the box is brought into view above the pinned bar, not left under it on a phone (#10064)
+    const dirty = () => [message, name, content, ...[...details.querySelectorAll('input[type=text], input:not([type])')]].some(f => f && String(f.value || '').trim() !== '') || !!(file.files && file.files.length); // something was written or chosen: leaving throws it away (#10633)
+    return { node: section, sendBack, canSendBack: canSendBack(task, hubWhy), dirty, focus: () => { message.focus({ preventScroll: true }); message.scrollIntoView({ block: 'center' }); }, submit }; // the box is brought into view above the pinned bar, not left under it on a phone (#10064)
 }
 
 /** Reviews keep their lifecycle; only task text changes in this form. */

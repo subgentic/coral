@@ -16,6 +16,7 @@ import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
 const { needsReview } = await importOnce('./review_pool.js');
 import { showToast } from './utils.js';
+import { showConfirmModal } from './confirm_dialog.js';
 import { foldWayBack } from './way_back.js';
 const TF = await importOnce('./task_filters.js');
 const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's renderer (DOM-built, no markup from text): a task reads the same on both pages
@@ -443,8 +444,14 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         importOnce('./team_task_actions.js').then(A => {
             const form = A.completeForm(task, acts);
             bar.before(form.node); form.focus();
-            form.node.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); e.stopPropagation(); acts.redraw(task, 'view'); } }); // Escape is Back (#10613)
-            bar.append(btn('btn', 'Back', () => acts.redraw(task, 'view')), ...(form.canSendBack ? [btn('btn', 'Not yet: send back', () => form.sendBack())] : []), btn('btn btn-primary', 'Complete', () => form.submit()));
+            // Back and Escape leave the form; with something written they ask first, Keep focused, an empty form goes back at once (#10613, #10633)
+            const leave = () => {
+                if (!form.dirty()) { acts.redraw(task, 'view'); return; }
+                showConfirmModal('Discard what you wrote?', 'What you wrote in this form is not saved.', () => acts.redraw(task, 'view'), () => form.focus(), { label: 'Discard', danger: true, cancelLabel: 'Keep' });
+                requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
+            };
+            form.node.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); e.stopPropagation(); leave(); } });
+            bar.append(btn('btn', 'Back', leave), ...(form.canSendBack ? [btn('btn', 'Not yet: send back', () => form.sendBack())] : []), btn('btn btn-primary', 'Complete', () => form.submit()));
         });
         page.append(bar);
         focus = null;
