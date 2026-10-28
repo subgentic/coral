@@ -53,6 +53,16 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 assert.equal(await ev(`[...window.__tp.table().querySelectorAll('button')].some(x => /^Remind/.test(window.__na.name(x)))`), false, 'Remind is not on a row (it is on the agent\'s page)');
             });
             { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/team-agents-open-chat-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // opt-in picture of the rows
+            await S.run(`${label}: Open chat selects that agent's live session: its name, type, session id and server (a Hub computer's too)`, async () => {
+                await ev(`(() => { window.__chat = []; window.switchNavTab = () => {}; window.selectLiveSession = (...a) => { window.__chat.push(a); }; return true; })()`);
+                const click = () => ev(`(() => { const e = [...window.__tp.table().querySelectorAll('button')].find(x => window.__na.name(x) === 'Open chat with Backend Dev'); if (e) e.click(); return true; })()`);
+                await click();
+                const want = await ev(`(() => { const s = window.__LIVE[1]; return [s.name, s.agent_type, s.session_id, s.server]; })()`);
+                assert.equal(want[0], 'Backend Dev'); assert.deepEqual(await ev(`window.__chat`), [want], 'a local agent: its own session');
+                await ev(`window.__LIVE[1].server = 'epoch'; window.__chat.length = 0; true`); await click();
+                assert.deepEqual(await ev(`window.__chat`), [[want[0], want[1], want[2], 'epoch']], 'a Hub computer\'s agent: the same call with that computer');
+                await ev(`delete window.__LIVE[1].server; true`);
+            });
             // Remind is on the agent's own page: these helpers open it and come back to the table.
             const openPage = async n => { await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button, a')].find(x => window.__na.name(x) === ${JSON.stringify(n)}); if (b) b.click(); return true; })()`); await settle(400); };
             const backToTable = async () => { await ev(`(() => { const b = window.__tp.find('button, a', /^(\u2190\s*)?Agents$/); if (b) b.click(); return true; })()`); await settle(300); };
