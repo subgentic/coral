@@ -156,9 +156,10 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         // "2 of 3 tasks done" (#7878): "3 tasks" is a link to the team Tasks tab with this goal chosen
         const progress = el('p', 'goals-tasks-head goals-progress');
         if (total) {
-            const noun = `${total} ${total === 1 ? 'task' : 'tasks'}`, link = btn('goals-tasks-link', noun, () => window.openTeamPage?.(model.project, { tab: 'tasks', query: `goal=${g.id}` }));
+            const n = (g.state === 'done' || g.state === 'dropped') && openLeft ? openLeft : total, noun = `${n} ${n === 1 ? 'task' : 'tasks'}`, link = btn('goals-tasks-link', noun, () => window.openTeamPage?.(model.project, { tab: 'tasks', query: `goal=${g.id}` }));
             link.setAttribute('aria-label', `${noun}: show them in the Tasks tab`);
-            progress.append(document.createTextNode(`${doneOf(g.rollup)} of `), link, document.createTextNode(' done'));
+            if ((g.state === 'done' || g.state === 'dropped') && openLeft) progress.append(document.createTextNode(`${g.state === 'done' ? 'Done' : 'Dropped'}, `), link, document.createTextNode(' left open')); // a closed goal's tasks are not "0 of 1 done" beside Done (#10717)
+            else progress.append(document.createTextNode(`${doneOf(g.rollup)} of `), link, document.createTextNode(' done'));
         } else progress.textContent = 'No tasks yet';
         main.append(progress);
         if (total) main.append(rollupBar(g.rollup));
@@ -364,7 +365,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const w = W.closeWarning(g.rollup); warn.append(el('strong', null, w.head), document.createTextNode(w.text));
             dlg.setAttribute('aria-describedby', warn.id); parts.push(warn);
         }
-        const choose = preset || (open === 0 && total > 0 ? 'done' : 'dropped');
+        const choose = preset || (open === 0 && total > 0 ? 'done' : ''); // with tasks open nothing is chosen for the person: one Enter must not drop the goal (#10717)
         const fs = el('fieldset', 'goals-radios'); fs.append(el('legend', null, 'Close it as'));
         const radio = (value, label) => { const l = el('label', 'goals-radio'); const r = el('input'); r.type = 'radio'; r.name = 'goal-close-state'; r.value = value; r.checked = choose === value; l.append(r, el('span', null, label)); return l; };
         fs.append(radio('done', W.closeDoneLabel), radio('dropped', W.closeDroppedLabel));
@@ -372,13 +373,15 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const hint = el('span', 'goals-note', W.closeReasonHint); hint.id = 'goal-close-hint'; reason.setAttribute('aria-describedby', hint.id);
         const rl = el('label', 'goals-field'); rl.append(el('span', null, W.closeReasonLabel), reason, hint);
         const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert'); err.id = 'goal-close-error';
-        const go = btn('btn btn-primary', 'Close goal'); go.type = 'submit';
+        const go = btn('btn btn-primary', 'Close goal'); go.type = 'submit'; go.disabled = !choose;
+        fs.addEventListener('change', () => { go.disabled = false; });
         const actions = el('div', 'goals-actions'); actions.append(btn('btn', 'Cancel', () => dlg.close()), go);
         form.append(...parts, fs, rl, err, actions);
         dlg.append(form); document.body.append(dlg);
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             err.textContent = '';
+            if (!form.querySelector('input[name="goal-close-state"]:checked')) return;
             if (!reason.value.trim()) { err.textContent = W.closeReasonNeeded; reason.setAttribute('aria-invalid', 'true'); reason.setAttribute('aria-describedby', `${hint.id} ${err.id}`); reason.focus(); return; }
             reason.removeAttribute('aria-invalid'); reason.setAttribute('aria-describedby', hint.id); go.disabled = true;
             const as = form.querySelector('input[name="goal-close-state"]:checked')?.value === 'dropped' ? 'dropped' : 'done';
@@ -395,7 +398,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             }
         });
         dlg.addEventListener('close', () => { model.creating = false; dlg.remove(); (root.querySelector('.goals-close') || root.querySelector('.goals-detail-col'))?.focus(); });
-        dlg.showModal(); (form.querySelector('input[name="goal-close-state"]:checked') || reason).focus();
+        dlg.showModal(); (form.querySelector('input[name="goal-close-state"]:checked') || form.querySelector('input[name="goal-close-state"]')).focus();
     }
 
 
