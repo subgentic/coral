@@ -36,7 +36,10 @@ export function snippetOf(content) {
         .replace(/^[ \t]*(?:[-*_][ \t]*){3,}$/gm, ' ')
         .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
         .replace(/(^|\n)\s{0,3}#{1,6}\s+/g, '$1')
-        .replace(/[`*_>~]+/g, '')
+        .replace(/(^|\n)[ \t]{0,3}>+[ \t]?/g, '$1') // a quote mark at the start of a line; a ">" in the middle of one is a word (a > b)
+        .replace(/~~/g, '')
+        .replace(/[`*]+/g, '')
+        .replace(/(^|[\s(])_+(?=\S)/g, '$1').replace(/(\S)_+(?=[\s).,;:!?]|$)/g, '$1') // emphasis marks at the edge of a word go; an underscore inside one (snake_case, a file name) is the person's own (#10597)
         .replace(/\s+/g, ' ')
         .trim();
     const chars = Array.from(text);
