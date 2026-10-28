@@ -38,10 +38,13 @@ const BASE = require('./test_base').BASE;
             await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
         };
 
-        console.log('The team form starts with no members (#5989), a hint for the name, and moves its agents');
+        console.log('The team form starts with the default team (#9877: the Orchestrator, the Lead Developer, the QA Engineer), a hint for the name, and moves its agents');
         await openTeam();
         await waitFor(`document.querySelectorAll('#team-template-select option').length > 1`, 'the template choice');
-        assert.deepEqual(await teamRows(), [], 'no members nobody picked');
+        assert.deepEqual((await teamRows()).map(r => (Array.isArray(r) ? r[0] : r.role || r)), ['Orchestrator', 'Lead Developer', 'QA Engineer'], 'the default team, in Members on open (#9877)');
+        // a blank team has none: the empty state says what to do
+        await ev(`(() => { const s = document.getElementById('team-template-select'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await waitFor(`document.querySelectorAll('#team-agents-list > *').length === 0`, 'a blank team clears the members', 4000);
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('members'); return true; })()`);
         assert.equal(await ev(`getComputedStyle(document.querySelector('#launch-step-team .empty-state.empty-state-tight')).display !== 'none'`), true, 'the line that says what to do');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('team'); return true; })()`);
