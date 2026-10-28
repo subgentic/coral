@@ -87,15 +87,14 @@ func (a *CodexAgent) HistoryGlobPattern() string { return "rollout-*.jsonl" }
 
 // ExtractSessions scans Codex history files under basePath and returns indexed sessions.
 // Files whose mtime matches knownMtimes are skipped.
-func (a *CodexAgent) ExtractSessions(basePath string, knownMtimes map[string]float64) ([]IndexedSession, error) {
+func (a *CodexAgent) walkSessions(basePath string, knownMtimes map[string]float64, add func(IndexedSession)) error {
 	if basePath == "" {
-		return nil, nil
+		return nil
 	}
 	if _, err := os.Stat(basePath); os.IsNotExist(err) {
-		return nil, nil
+		return nil
 	}
 	// Codex stores sessions in YYYY/MM/DD/rollout-*.jsonl
-	var sessions []IndexedSession
 	seen := map[string]bool{}
 	defer func() { a.forgetFailures(seen) }()
 	err := filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
@@ -129,14 +128,26 @@ func (a *CodexAgent) ExtractSessions(basePath string, knownMtimes map[string]flo
 			return nil
 		}
 		if sess != nil {
-			sessions = append(sessions, *sess)
+			add(*sess)
 		}
 		return nil
 	})
 	if err != nil {
-		return sessions, err
+		return err
 	}
-	return sessions, nil
+	return nil
+}
+
+// ExtractSessions returns every changed session at once (tests and callers that want the whole list); the indexer reads them in batches through ExtractSessionBatches.
+func (a *CodexAgent) ExtractSessions(basePath string, knownMtimes map[string]float64) ([]IndexedSession, error) {
+	var sessions []IndexedSession
+	err := a.walkSessions(basePath, knownMtimes, func(s IndexedSession) { sessions = append(sessions, s) })
+	return sessions, err
+}
+
+// ExtractSessionBatches hands the changed sessions over size at a time, so a large history never has all its search texts in memory at once (#10219).
+func (a *CodexAgent) ExtractSessionBatches(basePath string, knownMtimes map[string]float64, size int, emit func([]IndexedSession) error) error {
+	return extractInBatches(size, emit, func(add func(IndexedSession)) error { return a.walkSessions(basePath, knownMtimes, add) })
 }
 
 // parseCodexSession parses a Codex JSONL session file.

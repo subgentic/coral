@@ -88,3 +88,51 @@ func TestIndexerPassPrunesExclusionsOfFilesThatAreGone(t *testing.T) {
 	require.NoError(t, db.SelectContext(ctx, &left, `SELECT source_file FROM history_exclusions`))
 	assert.Equal(t, []string{kept}, left)
 }
+
+// batchScanner is a fakeScanner that hands its sessions over a batch at a time and records what it was asked for and how many of its sessions had been written when each batch was handed over.
+type batchScanner struct {
+	fakeScanner
+	size    int
+	sizes   []int
+	written []int // sessions in the index when each batch was emitted
+	count   func() int
+}
+
+func (b *batchScanner) ExtractSessionBatches(_ string, _ map[string]float64, size int, emit func([]agent.IndexedSession) error) error {
+	b.size = size
+	for from := 0; from < len(b.sessions); from += size {
+		to := min(from+size, len(b.sessions))
+		b.written = append(b.written, b.count())
+		b.sizes = append(b.sizes, to-from)
+		if err := emit(b.sessions[from:to]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// #10219 (Security Reviewer's SHOULD on #10163): the pass collected every session's search text before writing any, so on a large history its peak memory was the sum of all the texts. A scanner that hands its
+// sessions over in batches has each batch written before the next is read: 250 sessions come as batches of indexerFTSBatch, and when a batch is handed over the earlier ones are already in the index.
+func TestIndexerPassWritesEachBatchBeforeTheNextIsRead(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenWithKey(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
+	require.NoError(t, err)
+	defer db.Close()
+	ss := store.NewSessionStore(db)
+	bs := &batchScanner{count: func() int {
+		var c int
+		require.NoError(t, db.GetContext(ctx, &c, `SELECT COUNT(*) FROM session_index`))
+		return c
+	}}
+	const n = 250
+	for i := 0; i < n; i++ {
+		bs.sessions = append(bs.sessions, agent.IndexedSession{SessionID: fmt.Sprintf("b%03d", i), SourceType: "claude", SourceFile: fmt.Sprintf("/f/b%03d.jsonl", i), MessageCount: 3, FileMtime: float64(i + 1), FTSBody: fmt.Sprintf("body %d needle", i)})
+	}
+	require.NoError(t, NewSessionIndexer(ss, []agent.HistoryScanner{bs}, time.Hour, 0).RunOnce(ctx))
+	assert.Equal(t, indexerFTSBatch, bs.size, "the scanner is asked for batches of indexerFTSBatch")
+	assert.Equal(t, []int{100, 100, 50}, bs.sizes)
+	assert.Equal(t, []int{0, 100, 200}, bs.written, "each batch is in the index before the next is handed over")
+	var c int
+	require.NoError(t, db.GetContext(ctx, &c, `SELECT COUNT(*) FROM session_fts WHERE session_fts MATCH 'needle'`))
+	assert.Equal(t, n, c)
+}

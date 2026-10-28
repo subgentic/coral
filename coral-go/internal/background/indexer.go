@@ -121,7 +121,7 @@ func (idx *SessionIndexer) Run(ctx context.Context) error {
 	}
 }
 
-// indexerFTSBatch is how many sessions' search text one pass collects before writing it (store.UpsertFTSBatch).
+// indexerFTSBatch is how many sessions one pass reads, and writes with their search text (store.UpsertFTSBatch), before it reads the next.
 const indexerFTSBatch = 100
 
 // RunOnce performs a single indexing pass over all registered scanners.
@@ -134,88 +134,101 @@ func (idx *SessionIndexer) RunOnce(ctx context.Context) error {
 		return err
 	}
 
-	var indexed int
+	var indexed, found int
+	var writeErr error // a database failure while writing a batch ends the pass, as it did when the pass wrote after reading everything
+	// The sessions are read and written a batch at a time (#10219): a scanner that can (agent.SessionBatchScanner) hands over indexerFTSBatch sessions, they are written, and only then is the next
+	// batch read, so the search texts in memory are one batch's, whatever the size of the history. A scanner that cannot is read whole and written in the same batches.
+	write := func(batch []agent.IndexedSession) error {
+		found += len(batch)
+		// Batch-lookup agent names from live_sessions
+		sessionIDs := make([]string, 0, len(batch))
+		for _, s := range batch {
+			if !s.Excluded {
+				sessionIDs = append(sessionIDs, s.SessionID)
+			}
+		}
+		agentNames, _ := idx.store.GetAgentNames(ctx, sessionIDs)
 
-	// Collect all sessions from all scanners first
-	var allSessions []agent.IndexedSession
+		// The search text is written in one batch: a delete of a session's old text scans the whole search table, so one delete for a batch
+		// of sessions is one scan instead of one for each (#4669). If a batch fails its sessions are written one by one, to find the one.
+		var pending []store.FTSItem
+		flush := func() {
+			if len(pending) == 0 {
+				return
+			}
+			if err := idx.store.UpsertFTSBatch(ctx, pending); err != nil {
+				idx.logger.Warn("upsert FTS batch failed, writing its sessions one by one", "sessions", len(pending), "error", err)
+				for _, it := range pending {
+					if err := idx.store.UpsertFTS(ctx, it.SessionID, it.Body); err != nil {
+						idx.logger.Warn("upsert FTS failed", "session", it.SessionID, "error", err)
+					}
+				}
+			}
+			pending = nil
+		}
+		for _, s := range batch {
+			if s.Excluded {
+				if err := idx.store.RemoveExcludedSessionSource(ctx, s.SourceType, s.SourceFile, s.FileMtime, s.IndexVersion); err != nil {
+					writeErr = err
+					return err
+				}
+				continue
+			}
+			si := &store.SessionIndex{
+				SessionID:        s.SessionID,
+				SourceType:       s.SourceType,
+				SourceFile:       s.SourceFile,
+				FirstTimestamp:   s.FirstTimestamp,
+				LastTimestamp:    s.LastTimestamp,
+				MessageCount:     s.MessageCount,
+				DisplaySummary:   s.DisplaySummary,
+				FirstUserMessage: s.FirstUserMessage,
+				FileMtime:        s.FileMtime,
+				IndexVersion:     s.IndexVersion,
+			}
+			if names, ok := agentNames[s.SessionID]; ok {
+				si.AgentName = names[0]
+				si.DisplayName = names[1]
+			}
+			if err := idx.store.UpsertSessionIndex(ctx, si); err != nil {
+				idx.logger.Warn("upsert session index failed", "session", s.SessionID, "error", err)
+				continue
+			}
+
+			if s.FTSBody != "" && !s.FTSUnchanged {
+				pending = append(pending, store.FTSItem{SessionID: s.SessionID, Body: s.FTSBody})
+			}
+
+			indexed++
+		}
+		flush()
+		return nil
+	}
 	for _, scanner := range idx.scanners {
 		basePath := scanner.HistoryBasePath()
 		if basePath == "" {
 			continue
 		}
-
-		sessions, err := scanner.ExtractSessions(basePath, knownMtimes)
-		if err != nil {
-			idx.logger.Warn("scanner error", "base", logsafe.Dir(basePath), "error", err)
-			continue
-		}
-		allSessions = append(allSessions, sessions...)
-	}
-
-	// Batch-lookup agent names from live_sessions
-	sessionIDs := make([]string, 0, len(allSessions))
-	for _, s := range allSessions {
-		if !s.Excluded {
-			sessionIDs = append(sessionIDs, s.SessionID)
-		}
-	}
-	agentNames, _ := idx.store.GetAgentNames(ctx, sessionIDs)
-
-	// The search text is written in batches: a delete of a session's old text scans the whole search table, so one delete for a batch
-	// of sessions is one scan instead of one for each (#4669). If a batch fails its sessions are written one by one, to find the one.
-	var pending []store.FTSItem
-	flush := func() {
-		if len(pending) == 0 {
-			return
-		}
-		if err := idx.store.UpsertFTSBatch(ctx, pending); err != nil {
-			idx.logger.Warn("upsert FTS batch failed, writing its sessions one by one", "sessions", len(pending), "error", err)
-			for _, it := range pending {
-				if err := idx.store.UpsertFTS(ctx, it.SessionID, it.Body); err != nil {
-					idx.logger.Warn("upsert FTS failed", "session", it.SessionID, "error", err)
+		var err error
+		if bs, ok := scanner.(agent.SessionBatchScanner); ok {
+			err = bs.ExtractSessionBatches(basePath, knownMtimes, indexerFTSBatch, write)
+		} else {
+			var sessions []agent.IndexedSession
+			if sessions, err = scanner.ExtractSessions(basePath, knownMtimes); err == nil {
+				for len(sessions) > 0 && err == nil {
+					n := min(indexerFTSBatch, len(sessions))
+					err = write(sessions[:n])
+					sessions = sessions[n:]
 				}
 			}
 		}
-		pending = pending[:0]
+		if writeErr != nil {
+			return writeErr
+		}
+		if err != nil {
+			idx.logger.Warn("scanner error", "base", logsafe.Dir(basePath), "error", err)
+		}
 	}
-	for _, s := range allSessions {
-		if s.Excluded {
-			if err := idx.store.RemoveExcludedSessionSource(ctx, s.SourceType, s.SourceFile, s.FileMtime, s.IndexVersion); err != nil {
-				return err
-			}
-			continue
-		}
-		si := &store.SessionIndex{
-			SessionID:        s.SessionID,
-			SourceType:       s.SourceType,
-			SourceFile:       s.SourceFile,
-			FirstTimestamp:   s.FirstTimestamp,
-			LastTimestamp:    s.LastTimestamp,
-			MessageCount:     s.MessageCount,
-			DisplaySummary:   s.DisplaySummary,
-			FirstUserMessage: s.FirstUserMessage,
-			FileMtime:        s.FileMtime,
-			IndexVersion:     s.IndexVersion,
-		}
-		if names, ok := agentNames[s.SessionID]; ok {
-			si.AgentName = names[0]
-			si.DisplayName = names[1]
-		}
-		if err := idx.store.UpsertSessionIndex(ctx, si); err != nil {
-			idx.logger.Warn("upsert session index failed", "session", s.SessionID, "error", err)
-			continue
-		}
-
-		if s.FTSBody != "" && !s.FTSUnchanged {
-			pending = append(pending, store.FTSItem{SessionID: s.SessionID, Body: s.FTSBody})
-			if len(pending) >= indexerFTSBatch {
-				flush()
-			}
-		}
-
-		indexed++
-	}
-	flush()
 
 	// Exclusion marks of rollout files that are gone are dropped (#6098); only a file known not to exist counts as gone.
 	if n, err := idx.store.PruneHistoryExclusions(ctx, rolloutStillThere); err != nil {
@@ -225,7 +238,7 @@ func (idx *SessionIndexer) RunOnce(ctx context.Context) error {
 	}
 
 	if os.Getenv("CORAL_DEBUG_PHASES") == "1" {
-		idx.logger.Info("indexer pass complete", "indexed", indexed, "scanners", len(idx.scanners), "sessions", len(allSessions), "duration_ms", time.Since(started).Milliseconds())
+		idx.logger.Info("indexer pass complete", "indexed", indexed, "scanners", len(idx.scanners), "sessions", found, "duration_ms", time.Since(started).Milliseconds())
 	} else {
 		idx.logger.Info("indexer pass complete", "indexed", indexed, "duration_ms", time.Since(started).Milliseconds())
 	}

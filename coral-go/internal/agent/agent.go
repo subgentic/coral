@@ -113,6 +113,44 @@ type HistoryScanner interface {
 	ExtractSessions(basePath string, knownMtimes map[string]float64) ([]IndexedSession, error)
 }
 
+// SessionBatchScanner is a HistoryScanner that can hand the sessions it finds over a batch at a time (#10219): the index pass writes each batch before the next is read, so the memory it
+// holds is one batch's search texts, not the whole history's. A scanner without it is read whole by ExtractSessions.
+type SessionBatchScanner interface {
+	HistoryScanner
+	ExtractSessionBatches(basePath string, knownMtimes map[string]float64, size int, emit func([]IndexedSession) error) error
+}
+
+// extractInBatches runs walk, which calls add for each session it finds, and passes the sessions to emit size at a time (the last batch may be smaller). Once emit fails nothing more is
+// emitted and the error is returned; each batch is a slice of its own, so emit may keep it.
+func extractInBatches(size int, emit func([]IndexedSession) error, walk func(add func(IndexedSession)) error) error {
+	if size < 1 {
+		size = 1
+	}
+	var buf []IndexedSession
+	var emitErr error
+	flush := func() {
+		if emitErr != nil || len(buf) == 0 {
+			return
+		}
+		emitErr = emit(buf)
+		buf = nil
+	}
+	err := walk(func(s IndexedSession) {
+		if emitErr != nil {
+			return
+		}
+		buf = append(buf, s)
+		if len(buf) >= size {
+			flush()
+		}
+	})
+	flush()
+	if emitErr != nil {
+		return emitErr
+	}
+	return err
+}
+
 // BuildCoralSessionMarker returns a small metadata block included in each
 // agent's private instructions so Coral can map native transcript files back
 // to the corresponding Coral live session.

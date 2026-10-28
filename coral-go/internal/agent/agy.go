@@ -51,18 +51,17 @@ func (a *AgyAgent) HistoryGlobPattern() string { return "transcript.jsonl" }
 // ExtractSessions scans Antigravity brain history files (and legacy Gemini files)
 // under basePath and returns indexed sessions.
 // Files whose mtime matches knownMtimes are skipped.
-func (a *AgyAgent) ExtractSessions(basePath string, knownMtimes map[string]float64) ([]IndexedSession, error) {
+func (a *AgyAgent) walkSessions(basePath string, knownMtimes map[string]float64, add func(IndexedSession)) error {
 	if basePath == "" {
-		return nil, nil
+		return nil
 	}
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil
 		}
-		return nil, err
+		return err
 	}
-	var sessions []IndexedSession
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -77,7 +76,7 @@ func (a *AgyAgent) ExtractSessions(basePath string, knownMtimes map[string]float
 				if err != nil {
 					slog.Debug("agy: failed to parse transcript file", "path", logsafe.Dir(transcriptPath), "error", err)
 				} else if sess != nil {
-					sessions = append(sessions, *sess)
+					add(*sess)
 				}
 			}
 		}
@@ -100,12 +99,24 @@ func (a *AgyAgent) ExtractSessions(basePath string, knownMtimes map[string]float
 					continue
 				}
 				if sess != nil {
-					sessions = append(sessions, *sess)
+					add(*sess)
 				}
 			}
 		}
 	}
-	return sessions, nil
+	return nil
+}
+
+// ExtractSessions returns every changed session at once (tests and callers that want the whole list); the indexer reads them in batches through ExtractSessionBatches.
+func (a *AgyAgent) ExtractSessions(basePath string, knownMtimes map[string]float64) ([]IndexedSession, error) {
+	var sessions []IndexedSession
+	err := a.walkSessions(basePath, knownMtimes, func(s IndexedSession) { sessions = append(sessions, s) })
+	return sessions, err
+}
+
+// ExtractSessionBatches hands the changed sessions over size at a time, so a large history never has all its search texts in memory at once (#10219).
+func (a *AgyAgent) ExtractSessionBatches(basePath string, knownMtimes map[string]float64, size int, emit func([]IndexedSession) error) error {
+	return extractInBatches(size, emit, func(add func(IndexedSession)) error { return a.walkSessions(basePath, knownMtimes, add) })
 }
 
 // parseAgyTranscriptSession parses an Antigravity JSONL transcript file.

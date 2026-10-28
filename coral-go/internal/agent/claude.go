@@ -33,21 +33,20 @@ func (a *ClaudeAgent) HistoryGlobPattern() string { return "*.jsonl" }
 
 // ExtractSessions scans Claude history files under basePath and returns indexed sessions.
 // Files whose mtime matches knownMtimes are skipped.
-func (a *ClaudeAgent) ExtractSessions(basePath string, knownMtimes map[string]float64) ([]IndexedSession, error) {
+func (a *ClaudeAgent) walkSessions(basePath string, knownMtimes map[string]float64, add func(IndexedSession)) error {
 	if basePath == "" {
-		return nil, nil
+		return nil
 	}
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil
 		}
-		return nil, err
+		return err
 	}
 	// A transcript that grew is read from where the last pass stopped (#3728).
 	hist := a.history()
 	seen := map[string]bool{}
-	var sessions []IndexedSession
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -74,12 +73,24 @@ func (a *ClaudeAgent) ExtractSessions(basePath string, knownMtimes map[string]fl
 				continue
 			}
 			if sess != nil {
-				sessions = append(sessions, *sess)
+				add(*sess)
 			}
 		}
 	}
 	hist.forget(seen)
-	return sessions, nil
+	return nil
+}
+
+// ExtractSessions returns every changed session at once (tests and callers that want the whole list); the indexer reads them in batches through ExtractSessionBatches.
+func (a *ClaudeAgent) ExtractSessions(basePath string, knownMtimes map[string]float64) ([]IndexedSession, error) {
+	var sessions []IndexedSession
+	err := a.walkSessions(basePath, knownMtimes, func(s IndexedSession) { sessions = append(sessions, s) })
+	return sessions, err
+}
+
+// ExtractSessionBatches hands the changed sessions over size at a time, so a large history never has all its search texts in memory at once (#10219).
+func (a *ClaudeAgent) ExtractSessionBatches(basePath string, knownMtimes map[string]float64, size int, emit func([]IndexedSession) error) error {
+	return extractInBatches(size, emit, func(add func(IndexedSession)) error { return a.walkSessions(basePath, knownMtimes, add) })
 }
 
 // extractFirstText gets the first text string from message content.
