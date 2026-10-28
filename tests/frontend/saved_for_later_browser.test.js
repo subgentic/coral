@@ -1,5 +1,5 @@
 // Save for Later (#4510): a bookmark button on each message of an agent's Chat view (next to Copy), filled when saved, with an accessible name and aria-pressed;
-// the Saved tab of the right sidebar, opened by the top bar's button (Open and Done, newest saved first, Done, Remove); clicking an item opens that agent and pages up to the message, which is
+// the Saved tab of the right sidebar, opened by its tab, the toast's link and the jump bar (Open and Done, newest saved first, Done, Remove); clicking an item opens that agent and pages up to the message, which is
 // marked and focused; a message that is gone is said so, with its snippet kept. The bookmarks are the real server's (/api/saved, the isolated test server's
 // database); the agent and its transcript are the harness's, with each message's key added the way the server adds it.
 //
@@ -102,7 +102,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         const toast1 = await ev(`(() => { const t = document.querySelector('.toast'); return t ? { text: t.querySelector('.toast-message').textContent, action: (t.querySelector('.toast-action') || {}).textContent } : null; })()`);
         assert.deepEqual(toast1, { text: 'Saved.', action: 'View saved' }, 'a toast says so and offers the list');
         assert.equal(await ev(`!!${C}.querySelector('[data-msg-key="${hex(lastIdx)}"] .chat-save-btn svg') && !${C}.querySelector('[data-msg-key="${hex(lastIdx)}"] .chat-save-btn .material-icons')`), true, 'the bookmark is an inline SVG');
-        await waitFor(`document.querySelector('#saved-btn .saved-count').textContent === '1'`, 'the top bar count', 6000);
+        await waitFor(`document.querySelector('#agentic-tab-saved .agentic-tab-count').textContent === '1'`, 'the Saved tab count', 6000);
         let list = await saved();
         assert.equal(list.items.length, 1); assert.equal(list.items[0].kind, 'agent'); assert.equal(list.items[0].key, hex(lastIdx));
         assert.match(list.items[0].snippet, /^[SU]?\d*|lorem/); assert.ok(list.items[0].title, 'the agent\'s name is kept');
@@ -117,7 +117,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await waitFor(`${sb}.getAttribute('aria-pressed') === 'false'`, 'the bookmark to be removed', 6000);
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => t.querySelector('.toast-message').textContent === 'Removed from saved.' && (t.querySelector('.toast-action') || {}).textContent === 'Undo')`, 'the Removed toast with Undo', 4000);
         assert.equal((await saved()).items.length, 0, 'removed on the server');
-        await waitFor(`document.querySelector('#saved-btn .saved-count').hidden === true`, 'the count to go', 6000);
+        await waitFor(`document.querySelector('#agentic-tab-saved .agentic-tab-count').textContent === ''`, 'the count to go', 6000);
         await ev(`[...document.querySelectorAll('.toast')].find(t => t.querySelector('.toast-action').textContent === 'Undo').querySelector('.toast-action').click(); true`);
         await waitFor(`${sb}.getAttribute('aria-pressed') === 'true'`, 'Undo to save it again', 6000);
         assert.equal((await saved()).items.length, 1, 'saved again on the server'); assert.equal((await saved()).items[0].key, hex(lastIdx));
@@ -235,12 +235,6 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.equal(await ev(`document.activeElement.id`), 'agentic-tab-saved', 'the focus stays on the tab, as with every tab');
         assert.equal(await ev(`document.getElementById('agentic-tab-saved').getAttribute('aria-label')`), 'Saved for later on this page'); // not the top bar button's name: that one opens everything's list
         await ev(`document.getElementById('agentic-tab-files').click(); true`);
-        // The top bar's bookmark is the Inbox's, from an agent's page too (#4905): Enter on it opens the page with the focus on its Saved sub-tab, and pressing it again goes back to the agent.
-        await ev(`document.getElementById('saved-btn').focus(); true`);
-        await key('Enter', 'Enter', 13);
-        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.getElementById('group-table-view').contains(document.activeElement)`, 'the Inbox at Saved with the focus inside it', 6000);
-        await ev(`document.getElementById('saved-btn').click(); true`); // pressed again: back to the agent
-        await waitFor(`!(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'the Inbox left', 6000);
         await ev(`document.getElementById('agentic-state').classList.add('collapsed'); true`); // the sidebar closed
         await ev(`document.getElementById('agentic-tab-saved').classList.add('tab-hidden'); true`); // and the user hid the Saved tab: the toast's link and Back to Saved still open it
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`);
@@ -349,17 +343,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         console.log('8. A phone (390 px): the side panel overlay opens on Saved, it fits, the controls are 44 px, nothing scrolls sideways');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true });
-        // The top bar keeps the Saved button on a phone, with its count.
         await ev(`document.dispatchEvent(new CustomEvent('coral:saved-changed')); true`); // the test changed the bookmarks behind the page's back
-        await waitFor(`document.querySelector('#saved-btn .saved-count').textContent === '2'`, 'the count to follow the list', 6000);
-        const menuSaved = () => ev(`(() => { const e = document.querySelector('#nav-more-menu:not([hidden]) [data-on-click="m-show-saved"]'); if (!e) return null; const r = e.getBoundingClientRect(); return { h: Math.round(r.height), text: e.textContent.trim(), onScreen: r.left >= 0 && r.right <= innerWidth }; })()`);
-        // Under 640 px the top row is one hamburger (#9021): Saved for later is its entry, 44 px high, with the count in its words.
-        await ev(`document.getElementById('top-menu-btn').click(); true`);
-        await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) [data-on-click="m-show-saved"]')`, 'the hamburger menu', 6000);
-        const tbtn = await menuSaved();
-        assert.ok(tbtn && tbtn.h >= 44 && tbtn.onScreen && await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), 'the hamburger menu has Saved for later, 44 px, on screen, and the page does not scroll sideways: ' + JSON.stringify(tbtn));
-        assert.match(tbtn.text, /Saved for later \(2\)/, 'its words carry the count');
-        await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
         await select('sv-a');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the page's own Saved tab; the top bar's bookmark is the Inbox's (#4905)
         await waitFor(`document.getElementById('agentic-state').classList.contains('mobile-panel-overlay') && ${TAB_OPEN} && document.querySelectorAll('${ROWS}').length === 2`, 'the side panel overlay open on Saved on the phone', 8000);
@@ -396,19 +380,16 @@ const hex = i => i.toString(16).padStart(20, '0');
             const nt = next.getBoundingClientRect().top; for (const btn of b.querySelectorAll('.chat-save-btn, .chat-copy-btn')) { const r = btn.getBoundingClientRect(); if (r.width && r.bottom > nt + 1) out.push(Math.round(r.bottom - nt)); } } return { over: out, checked: bubbles.length }; })()`);
         assert.ok(gap.checked > 4); assert.deepEqual(gap.over, [], 'no button hangs over the next message: ' + JSON.stringify(gap));
         await shot('saved-button-phone');
-        console.log('9. A phone at 200% text: the hamburger names the view and keeps Saved for later (with its count) and Settings in its menu, with no gear-menu duplicate');
+        console.log('9. A phone at 200% text: the hamburger names the view and keeps Settings in its menu, with no Saved for later entry (the top bar has no bookmark, #9929); the Inbox\'s Saved folder is the way in');
         await ev(`document.documentElement.style.fontSize = '32px'; true`);
         await waitFor(`(() => { const b = document.getElementById('top-menu-btn').getBoundingClientRect(); return b.width > 0 && b.height >= 44; })()`, 'the hamburger at large text', 6000);
         const big = await ev(`(() => { const b = document.getElementById('top-menu-btn'), br = b.getBoundingClientRect(), label = document.getElementById('top-menu-label'); return { w: br.width, h: br.height, left: br.left, right: br.right, labelFits: label.scrollWidth <= label.clientWidth + 1, page: document.documentElement.scrollWidth <= innerWidth }; })()`);
         assert.ok(big.w >= 100 && big.h >= 44 && big.left >= 0 && big.right <= 390 && big.labelFits && big.page, 'the hamburger is an on-screen touch target that names the view: ' + JSON.stringify(big));
         await ev(`document.getElementById('top-menu-btn').click(); true`);
-        await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) [data-on-click="m-show-saved"]')`, 'the hamburger menu at large text', 6000);
-        const bigMenu = await menuSaved();
-        assert.ok(bigMenu && bigMenu.h >= 44 && bigMenu.onScreen && /\(2\)/.test(bigMenu.text), 'Saved for later stays in the menu with its count: ' + JSON.stringify(bigMenu));
-        assert.equal(await ev(`document.querySelectorAll('#nav-more-menu [data-on-click="m-show-saved"]').length`), 1, 'once: no duplicate');
-        await ev(`document.querySelector('#nav-more-menu [data-on-click="m-show-saved"]').click(); true`);
-        await waitFor(`${INBOX_SAVED} && true`, 'the bookmark to open the Inbox at Saved', 8000);
-        await shot('saved-bookmark-phone-200');
+        await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden])')`, 'the hamburger menu at large text', 6000);
+        assert.equal(await ev(`document.querySelectorAll('#nav-more-menu [data-on-click="m-show-saved"]').length`), 0, 'the menu has no Saved for later entry');
+        assert.ok(!/Saved for later/.test(await ev(`document.getElementById('nav-more-menu').textContent`)), 'and none by its words');
+        await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
         // The folder remains a second way in, through the ordinary Inbox navigation.
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`!!document.querySelector('#inbox-nav-list .view-list-item[data-key="saved"]')`, 'the Inbox Saved folder', 6000);

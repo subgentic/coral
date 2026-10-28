@@ -1,6 +1,6 @@
 // The Inbox (#7122, UI/UX's #7114 findings 7 to 11): a Needs you row says the team and the folder beside the agent (and the question when the agent sent one); Tasks are ordered by priority, then time, with a
 // High chip and the number of high ones on the tab; the reply box says the task stays open and "Open the task" is a button; the same "the transcript is gone" sentence is said once for a list, not on every
-// row; and the top bar's Saved count is not drawn beside the Inbox's own tab counts. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server (its rows are removed again).
+// row; and the top bar has no Saved button to repeat the Inbox's own count (#9929). Drives Chrome over CDP through agent_view_harness.js against the isolated dev server (its rows are removed again).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -55,9 +55,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`!!document.querySelector('#inbox-page .inbox-saved-why')`, 'the reason on the page', 8000);
         assert.equal(await ev(`document.querySelectorAll('#inbox-page .inbox-saved-why').length`), 1, 'the reason is said once on the page');
         assert.ok((await ev(`document.querySelector('#inbox-page .inbox-saved-why').textContent.trim().length`)) > 10, 'and it is a sentence');
-        // the top bar's count is not drawn on the Inbox page, where the group has its own
-        const bar = await ev(`(() => { const c = document.querySelector('#saved-btn .saved-count'); return { exists: !!c, shown: !!c && c.getClientRects().length > 0, chip: (document.querySelector('.group-chip .group-chip-count') || {}).textContent || '' }; })()`);
-        assert.ok(bar.chip.includes('3') && !bar.shown, 'the top bar does not repeat the Saved count on the Inbox page: ' + JSON.stringify(bar));
+        // the group's own count is on its chip; the top bar has no Saved button to repeat it (#9929)
+        const chip = await ev(`(document.querySelector('.group-chip .group-chip-count') || {}).textContent || ''`);
+        assert.ok(chip.includes('3'), 'the Saved group says its count: ' + chip);
+        assert.equal(await ev(`!!document.getElementById('saved-btn')`), false, 'the top bar has no Saved button');
         console.log('PASS inbox fixes');
     } finally {
         for (const id of savedIds) await api('DELETE', `/api/saved/${id}`).catch(() => {});

@@ -53,7 +53,7 @@
 
     /* Chips and badges that are only a coloured pill (the Inbox count in the top bar, tab and section counts, state and kind pills, the job badges): the
        background goes, so a border keeps the shape and the number or word stays a label of its own (#5735). They all carry their meaning as text. */
-    :is(.nav-tab-badge, .tab-count, .section-count-badge, .session-group-count, .saved-count, .chip, .session-state-pill,
+    :is(.nav-tab-badge, .tab-count, .section-count-badge, .session-group-count, .chip, .session-state-pill,
         .terminal-state-pill, .wf-status-badge, .availability-badge, .display-badge, .display-dot,
         .hf-tag-pill, .dep-tag, .team-distill-chip, .chat-system-count, .selection-pause-badge, .xterm-disconnected-badge) { border: 1px solid CanvasText; } /* restored: the agent-card commit (ce1946c0c) dropped the whole rule, and the top bar's badge lost its shape; only the classes that no longer exist are gone */
 

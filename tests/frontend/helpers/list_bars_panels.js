@@ -81,7 +81,7 @@ PANELS.push({
         await mockAgents(ctx, [{ id: 'qa-a-id', name: 'QA Alpha', team: 'th-a', job: 'QA Engineer' }]);
         await ctx.settle(`(window.__qaState.liveSessions || []).some(s => s.session_id === 'qa-a-id')`, 'agent');
         await ctx.ev(`window.selectLiveSession('QA Alpha', 'claude', 'qa-a-id', 'local'); true`);
-        // the dock's own Saved tab (the top bar's bookmark is the Inbox's since #4905), the way the toast's link opens it
+        // the dock's own Saved tab (the Inbox's Saved folder is everything's since #4905), the way the toast's link opens it
         await ctx.ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`);
         await ctx.settle(`document.getElementById('saved-ui').getAttribute('aria-label') === 'Saved: QA Alpha' && document.querySelectorAll('#saved-table tbody tr').length > 0`, 'the scoped list');
         await pick(ctx, '#sv-kind', 'agent');

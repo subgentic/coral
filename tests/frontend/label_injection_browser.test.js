@@ -200,7 +200,7 @@ const HOOK = `(() => {
             await coralReady().catch(() => {});
             await settle();
             if (path === `/agents/${sid}/files`) await waitFor(`document.documentElement.outerHTML.includes('file-name-')`, 'the changed files', { timeout: 8000, soft: true });
-            if (path === '/') { await ev(`document.getElementById('saved-btn') && document.getElementById('saved-btn').click()`); await settle(); await notify(); await waitFor(`!!document.querySelector('.notification-toast, .alert-notification')`, 'the notification toast', { timeout: 15000, soft: true }); }
+            if (path === '/') { await ev(`(async () => { document.getElementById('nav-tab-hub-inbox')?.click(); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); await m.selectInboxTab('saved'); return true; })()`).catch(() => {}); await settle(); await notify(); await waitFor(`!!document.querySelector('.notification-toast, .alert-notification')`, 'the notification toast', { timeout: 15000, soft: true }); }
             const snap = async () => { for (const f of await ev(`[...document.documentElement.outerHTML.matchAll(/data-pwn=(?:&quot;|[\"'])([A-Za-z0-9_.-]+)/g)].map(m => m[1])`)) seen.add(f); };
             await snap();
             const clicked = await crawl(path);
@@ -222,7 +222,7 @@ const HOOK = `(() => {
             await loaded;
             await coralReady().catch(() => {});
             await settle();
-            await ev(`document.getElementById('saved-btn') && document.getElementById('saved-btn').click(); true`).catch(() => {});
+            await ev(`(async () => { document.getElementById('nav-tab-hub-inbox')?.click(); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); await m.selectInboxTab('saved'); return true; })()`).catch(() => {});
             const snapT = async () => { for (const f of await ev(`[...document.documentElement.outerHTML.matchAll(/data-pwn=(?:&quot;|[\"'])(T-[A-Za-z0-9_.-]+)/g)].map(m => m[1])`)) seenT.add(f); };
             await snapT();
             const clicked = await crawl('T' + path);

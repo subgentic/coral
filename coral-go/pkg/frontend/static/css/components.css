@@ -3304,7 +3304,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .acf-model-picker:not([hidden]) + .acf-model:not([hidden]) { margin-top: var(--space-sm); }
 @media (pointer: coarse), (max-width: 767px) { .acf-model-refresh { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); } }
 
-/* Saved for later (#4510): the right sidebar's Saved tab, its list, the top bar's button with its count, and the jump. Theme tokens only. */
+/* Saved for later (#4510): the right sidebar's Saved tab, its list, and the jump. Theme tokens only. */
 
 .saved-pane { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; container-type: inline-size; }
 /* The dashboard's own Inbox (#4811), on every Coral but the hub's frame: Needs you, then Saved for later (the one Saved list, moved in by saved.js). The page scrolls as one. */
@@ -3419,13 +3419,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 
 /* While the full message is shown the snippet is not (it is the first lines of the same text); when only a reason is shown (deleted, too long) the snippet stays, it is what is left (#5882). */
 
-/* The top bar's Saved button: a bookmark with the number open. */
-.saved-top-btn { position: relative; --badge-glyph: 1rem; }
-.saved-top-btn.on { color: var(--accent); }
-/* A count on an icon button hangs off the glyph, never over it (#9572; the Saved count is 13 px high, so at 200% text it still ends inside the window's top edge, #9643): its bottom-left corner is the glyph's top-right corner (the glyph is centred in the button, --badge-glyph wide), so it grows up and to the right with its text, at 200% text too. */
-.saved-top-btn .saved-count, .display-badge { position: absolute; left: calc(50% + var(--badge-glyph, var(--icon-size)) / 2); bottom: calc(50% + var(--badge-glyph, var(--icon-size)) / 2); top: auto; right: auto; }
-.saved-top-btn .saved-count { min-width: 14px; padding: 0 4px; border-radius: var(--radius-lg); background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 13px; text-align: center; }
-.saved-top-btn .saved-count[hidden] { display: none; }
+/* A count on an icon button hangs off the glyph, never over it (#9572, #9643): its bottom-left corner is the glyph's top-right corner (the glyph is centred in the button), so it grows up and to the right with its text, at 200% text too. */
+.display-badge { position: absolute; left: calc(50% + var(--icon-size) / 2); bottom: calc(50% + var(--icon-size) / 2); top: auto; right: auto; }
 /* The jump: a slim bar above the conversation, and the "Saved" tag on the message. */
 .jumpbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: var(--fs-base); color: var(--text-secondary); flex: none; }
 .jumpbar .btn { margin: 0; padding: 2px 10px; min-height: 26px; font-size: var(--fs-base); }
@@ -3744,9 +3739,8 @@ li > .row-btn:focus-visible { outline: none; }
 li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Settings panes with several parts (#7040): a small heading over each group of rows (Agents: Defaults, Behaviour, Team and board, Tools) */
-/* The Inbox (#7122): a High chip on an urgent task, and the top bar's Saved count left out where the Inbox shows its own counts. */
+/* The Inbox (#7122): a High chip on an urgent task. */
 .ibx-chip-high { margin-right: 8px; border: 1px solid var(--warning); color: var(--warning); vertical-align: middle; }
-body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 
 /* New Agent's second step (#7066, UI/UX's #7059): Name is one field above "More options" (the Persona and the sections); a wide window shows the sections open and without the summary, as it always did, a phone has them
    closed. The summary's rows are whole targets on a phone, and their Change wraps under the value instead of leaving the screen at large text. */

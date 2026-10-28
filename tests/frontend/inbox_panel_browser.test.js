@@ -6,6 +6,7 @@
 // message opens and closes with the focus on its button and says why when there is nothing more; 44 px targets on a touch phone; both themes read at 4.5:1; no sideways scroll.
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const fs = require('node:fs');
+const { OPEN_INBOX_SAVED } = require('./helpers/open_inbox_saved');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
@@ -224,7 +225,7 @@ const STUB = `(() => {
 
             // Saved for later: the component's own "Read the whole message" (the mount without a mode, which is what Coral Hub's pinned version calls), mounted on a host of its own; then Coral's page, which reads the whole text at once and has no button (#7660)
             const savedAt = async i => {
-                await ev(`(async () => { const m = await import(${S} + 'saved.js'); await m.openSavedAll(); return true; })()`);
+                await ev(OPEN_INBOX_SAVED);
                 await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 4 && document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved'`, 'four saved items', 8000);
                 await ev(`(async () => { document.getElementById('qa-old-host')?.remove(); const h = document.createElement('div'); h.id = 'qa-old-host'; document.body.append(h);
                     const sv = await import(${S} + 'saved.js'), ic = await import(${S} + 'inbox_coral.js'), pm = await import(${S} + 'inbox_panel.js');

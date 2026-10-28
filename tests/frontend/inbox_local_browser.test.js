@@ -1,7 +1,7 @@
 // The Inbox on a regular (local) Coral (#4811), against the real isolated server: the dashboard's own Inbox: two tabs, Needs you and Saved for later (one panel at a time, as the hub's), no frame.
 //   - the Inbox tab is on a plain local Coral, right after Agents, with the number of agents waiting for input as its badge; its page lists those agents under "Needs you" (each opens that agent) and
 //     everything saved under "Saved for later" (the one Saved list, moved in: #saved-view inside #inbox-local), with no right-hand panel;
-//   - the top bar's bookmark, where the scope is all (home and any page without an agent or team), opens the Inbox at its Saved part; Escape and a second press leave it for the page it was opened from;
+//   - the Inbox's Saved folder, where the scope is all (home and any page without an agent or team), is everything's list; Escape leaves it (the top bar's bookmark is gone, #9929);
 //   - an agent's page and a team's page keep the scoped list in the right sidebar, and the list goes back to the sidebar when the Inbox is left;
 //   - Open board from the page lands at the message, the jump bar's Back to Saved returns to the Inbox; on a phone the Inbox is in the view dropdown.
 // The hub path (the frame) is inbox_tab_browser's. Seven bookmarks on two teams, three mock agents (one waiting). Drives Chrome over CDP through agent_view_harness.js.
@@ -12,6 +12,7 @@ const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
 const tabBtn = name => `import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('${name}')).then(() => true)`; // the Inbox's groups (the sidebar's): the one on screen is a table in the centre
+const openSavedFolder = async ev => { await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`); await ev(tabBtn('saved')); }; // the Inbox tab, then its Saved folder (the top bar's bookmark is gone, #9929)
 
 const hex = i => i.toString(16).padStart(20, '0');
 
@@ -32,7 +33,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             needs: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' ? [...document.querySelectorAll('#group-table-view tbody tr')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()) : [], needsEmpty: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && /Nothing needs your input/.test(document.getElementById('group-table-view').textContent),
             navActive: document.querySelector('.top-nav-tab.active') && document.querySelector('.top-nav-tab.active').dataset.arg, tabs, navBadge: (document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || '', navLabel: document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label'),
             dockShown: !!dock && getComputedStyle(dock).display !== 'none' && dock.getClientRects().length > 0 && !dock.classList.contains('collapsed') || (!!dock && dock.classList.contains('mobile-panel-overlay')), dockHasSavedTab: vis('agentic-tab-saved'),
-            savedBtn: document.getElementById('saved-btn').getAttribute('aria-pressed'), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+            over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
     let BOARD = ''; // the board this suite makes, taken away again in the finally (#4959)
     const LINK = `[...document.querySelectorAll('#group-table-view .dt-primary')].find(l => l.textContent.includes('the real board message'))`; // the saved message's row
     const ALL_ROWS = ['fe-a chat', 'qa-a chat', 'qa-b chat', 'team-a board, by the Orchestrator', 'team-a board, by the QA Engineer', 'team-b board, by the QA Engineer'];
@@ -110,23 +111,18 @@ const hex = i => i.toString(16).padStart(20, '0');
             check(`${dev}: a Needs you row opens that agent (the Agents tab, the agent selected)`, true);
             await ev(`window.selectLiveSession('', '', '', 'local'); true`);
 
-            // the bookmark, on home: the Inbox at its Saved part; Escape and the bookmark leave it
+            // the Inbox's Saved folder, from home; Escape leaves it
             await ev(`window.switchNavTab('agents'); true`);
             await settle(`document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'home');
-            await ev(`document.getElementById('saved-btn').click(); true`);
-            await rowsShown('All saved', 'the Inbox from the bookmark');
+            await openSavedFolder(ev);
+            await rowsShown('All saved', 'the Inbox at Saved');
             s = await state();
-            check(`${dev}: home: the bookmark opens the Inbox at Saved for later, the bookmark pressed, the Inbox tab current`, s.inbox && s.saved && s.navActive === 'hub-inbox' && s.savedBtn === 'true' && s.heading === 'Saved', JSON.stringify([s.inbox, s.saved, s.navActive, s.savedBtn]));
+            check(`${dev}: home: the Inbox's Saved folder is the Inbox at Saved for later, the Inbox tab current`, s.inbox && s.saved && s.navActive === 'hub-inbox' && s.heading === 'Saved', JSON.stringify([s.inbox, s.saved, s.navActive]));
             await ev(`document.activeElement && document.activeElement.blur(); true`);
             await key('Escape', 27);
             await settle(`document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'Escape leaves');
             s = await state();
-            check(`${dev}: Escape leaves the Inbox for the tab it was opened from, and the list is back in the sidebar`, !s.inbox && s.navActive === 'agents' && s.uiIn === 'agentic-panel-saved' && s.savedBtn === 'false', JSON.stringify([s.inbox, s.navActive, s.uiIn, s.savedBtn]));
-            await ev(`document.getElementById('saved-btn').click(); true`);
-            await rowsShown('All saved', 'the Inbox again');
-            await ev(`document.getElementById('saved-btn').click(); true`);
-            await settle(`document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'the bookmark leaves');
-            check(`${dev}: pressing the bookmark again leaves it too`, true);
+            check(`${dev}: Escape leaves the Inbox for the tab it was opened from, and the list is back in the sidebar`, !s.inbox && s.navActive === 'agents' && s.uiIn === 'agentic-panel-saved', JSON.stringify([s.inbox, s.navActive, s.uiIn]));
             await ev(`window.switchNavTab('agents'); true`);
         }
 
@@ -190,37 +186,31 @@ const hex = i => i.toString(16).padStart(20, '0');
         s = await state();
         check('with nothing waiting Needs you says so, the badge is empty, Saved for later still lists everything', s.needsEmpty && s.needs.length === 0 && s.navBadge === '' && s.navLabel === null, JSON.stringify([s.needsEmpty, s.needs, s.navBadge, s.navLabel]));
 
-        // The top bar's bookmark is always the global one (#4905); the dock's Saved tab keeps the scope of the page
+        // The Inbox's Saved folder is always the global one (#4905); the dock's Saved tab keeps the scope of the page
         console.log('scoped pages');
         const openDockSaved = () => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`);
-        const badge = () => ev(`(document.querySelector('#saved-btn .saved-count') || {}).textContent || ''`);
         await open(1280, false);
         await ev(`window.selectLiveSession('QA Alpha', 'claude', 'qa-a-id', 'local'); true`);
-        await settle(`document.getElementById('saved-btn').getAttribute('aria-label') === 'Saved for later, 6 open'`, 'the top bar count of everything');
-        check('on an agent\'s page the top bar badge is the count of everything (6), not the agent\'s (2)', (await badge()) === '6', await badge());
-        await ev(`document.getElementById('saved-btn').click(); true`);
+        await openSavedFolder(ev);
         await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .dt-primary').length === 6`, 'the Inbox at everything');
         s = await state();
-        check('an agent\'s page: the bookmark opens the Inbox at Saved for later, all of it', s.inbox && s.saved && s.uiIn === 'agentic-panel-saved' && s.navActive === 'hub-inbox' && s.savedBtn === 'true' && s.heading === 'Saved' && s.rows.length === ALL_ROWS.length && ALL_ROWS.every(r => s.rows.some(x => x.includes(r))), JSON.stringify([s.inbox, s.uiIn, s.navActive, s.savedBtn, s.heading, s.rows]));
-        check('and the badge is still everything', (await badge()) === '6', await badge());
+        check('an agent\'s page: the Inbox\'s Saved folder is all of it', s.inbox && s.saved && s.uiIn === 'agentic-panel-saved' && s.navActive === 'hub-inbox' && s.heading === 'Saved' && s.rows.length === ALL_ROWS.length && ALL_ROWS.every(r => s.rows.some(x => x.includes(r))), JSON.stringify([s.inbox, s.uiIn, s.navActive, s.heading, s.rows]));
         await shot('inbox-from-agent-desktop');
-        await ev(`document.getElementById('saved-btn').click(); true`);   // a second press goes back to the page it came from
+        await ev(`window.switchNavTab('agents'); true`);   // leaving the Inbox shows the agent's page again
         await settle(`document.querySelector('.top-nav-tab.active')?.dataset.arg === 'agents' && !document.getElementById('nav-tab-hub-inbox').classList.contains('active')`, 'back on the agent');
-        check('a second press goes back to the agent\'s page', (await ev(`document.getElementById('session-name')?.textContent || ''`)).includes('QA Alpha'), await ev(`document.getElementById('session-name')?.textContent || ''`));
+        check('leaving the Inbox goes back to the agent\'s page', (await ev(`document.getElementById('session-name')?.textContent || ''`)).includes('QA Alpha'), await ev(`document.getElementById('session-name')?.textContent || ''`));
         await openDockSaved();
         await settle(`document.getElementById('saved-ui').getAttribute('aria-label') === 'Saved: QA Alpha' && document.querySelectorAll('#saved-table tbody tr').length > 0`, 'the agent panel');
         s = await state();
         check('the dock\'s Saved tab on the same page is still the agent\'s: scoped, in the right sidebar', !s.inbox && s.uiIn === 'agentic-panel-saved' && s.dockShown && s.dockHeading === 'Saved: QA Alpha' && JSON.stringify(s.dockRows) === JSON.stringify(['qa-a chat', 'team-a board, by the QA Engineer']), JSON.stringify([s.inbox, s.uiIn, s.dockShown, s.dockHeading, s.dockRows]));
-        check('its tab says 2, the top bar still 6, and the Inbox tab counts the agents waiting (1)', s.navBadge === '1' && (await ev(`document.getElementById('saved-tab-count').textContent`)) === '2' && (await badge()) === '6', JSON.stringify([s.navBadge, await badge()]));
+        check('its tab says 2, and the Inbox tab counts the agents waiting (1)', s.navBadge === '1' && (await ev(`document.getElementById('saved-tab-count').textContent`)) === '2', JSON.stringify([s.navBadge]));
         await shot('inbox-scoped-agent-desktop');
         await ev(`Promise.resolve(window.openTeamPage('team-a')).then(() => true)`); // (the team page is a lazy module: the first call loads it, so wait for it)
-        await settle(`document.getElementById('saved-btn').getAttribute('aria-label') === 'Saved for later, 6 open'`, 'the count on the team page');
-        check('on a team\'s page the top bar badge is the count of everything (6)', (await badge()) === '6', await badge());
-        await ev(`document.getElementById('saved-btn').click(); true`);
+        await openSavedFolder(ev);
         await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .dt-primary').length === 6`, 'the Inbox at everything, from a team');
         s = await state();
-        check('a team\'s page: the bookmark opens the Inbox at everything too', s.inbox && s.uiIn === 'agentic-panel-saved' && s.heading === 'Saved' && s.rows.length === 6, JSON.stringify([s.inbox, s.uiIn, s.heading, s.rows.length]));
-        await ev(`document.getElementById('saved-btn').click(); true`);
+        check('a team\'s page: the Inbox\'s Saved folder is everything too', s.inbox && s.uiIn === 'agentic-panel-saved' && s.heading === 'Saved' && s.rows.length === 6, JSON.stringify([s.inbox, s.uiIn, s.heading, s.rows.length]));
+        await ev(`window.switchNavTab('agents'); true`);
         await settle(`!document.getElementById('nav-tab-hub-inbox').classList.contains('active')`, 'back on the team page');
         await ev(`window.exitTeamPage({ force: true }); window.selectLiveSession('', '', '', 'local'); true`);
         // from the Inbox, then an agent: the list is in the sidebar again

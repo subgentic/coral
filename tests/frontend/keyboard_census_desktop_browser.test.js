@@ -252,20 +252,20 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         await dlg('dialog: update confirmation', { opener: '#update-pill', // the notice goes away under Review, so focus comes back to the button that stays in the top bar
              open: () => ev(`document.querySelector('.update-ready-review').click(); true`) });
         await load(); await ev(`window.switchNavTab('agents'); true`);
-        await dlg('dialog: create task', { opener: '#saved-btn', open: () => ev(`(async () => { await window.showCreateTaskModal(); return true; })()`) });
+        await dlg('dialog: create task', { opener: '[data-on-click="m-go-home"]', open: () => ev(`(async () => { await window.showCreateTaskModal(); return true; })()`) });
         await ev(`window.openAutomationsFolder('jobs'); true`); await waitFor(`!!document.querySelector('#group-table-view button.dt-primary')`, 'jobs', 10000); await tap('#group-table-view tr[data-key="5"] .dt-primary'); await waitFor(`!!document.querySelector('#scheduler-detail [data-on-click="job-edit"]')`, 'job detail', 10000);
         await dlg('dialog: job edit', { opener: '#scheduler-detail [data-on-click="job-edit"]', open: () => ev(`document.querySelector('#scheduler-detail [data-on-click="job-edit"]').click(); true`) });
         await ev(`window.openAutomationsFolder('workflows'); true`); await waitFor(`!!document.querySelector('#group-table-view tbody tr[data-key] .dt-primary')`, 'workflows', 10000); await tap('#group-table-view tbody tr[data-key] .dt-primary'); await waitFor(`!!document.querySelector('[data-on-click="wf-edit"]')`, 'wf detail', 10000);
         await dlg('dialog: workflow edit', { opener: '[data-on-click="wf-edit"]', open: () => ev(`document.querySelector('[data-on-click="wf-edit"]').click(); true`) });
         // the dialogs the Settings sections open (#6448): the theme editor (General), the default prompts (Agents), a confirmation (Storage) and the phone link (Network)
         await load(); await ev(`window.switchNavTab('agents'); true`);
-        await dlg('dialog: theme editor', { opener: '#saved-btn', open: () => ev(`window.showThemeConfigurator(); true`) });
-        await dlg('dialog: default prompts', { opener: '#saved-btn', open: () => ev(`window.showDefaultPromptsModal(); true`) });
-        await dlg('dialog: confirmation', { opener: '#saved-btn', open: () => ev(`import(${S} + 'confirm_dialog.js').then(m => m.showConfirmModal('Delete the example?', 'This cannot be undone.', () => {})).then(() => true)`) });
-        await dlg('dialog: mobile link', { opener: '#saved-btn', open: () => ev(`window._showMobileConnectModal(); true`) });
+        await dlg('dialog: theme editor', { opener: '[data-on-click="m-go-home"]', open: () => ev(`window.showThemeConfigurator(); true`) });
+        await dlg('dialog: default prompts', { opener: '[data-on-click="m-go-home"]', open: () => ev(`window.showDefaultPromptsModal(); true`) });
+        await dlg('dialog: confirmation', { opener: '[data-on-click="m-go-home"]', open: () => ev(`import(${S} + 'confirm_dialog.js').then(m => m.showConfirmModal('Delete the example?', 'This cannot be undone.', () => {})).then(() => true)`) });
+        await dlg('dialog: mobile link', { opener: '[data-on-click="m-go-home"]', open: () => ev(`window._showMobileConnectModal(); true`) });
         await load(); await ev(`window.switchNavTab('agents'); true`);
         await ev(STUB({ filename: 'release-notes.md', content: '# Release notes\n\nThe build is green.\n', mediaType: 'text/markdown', comments: [] }));
-        await dlg('dialog: artifact viewer', { opener: '#saved-btn', open: () => ev(`import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', { filename: 'release-notes.md' })).then(() => true)`) });
+        await dlg('dialog: artifact viewer', { opener: '[data-on-click="m-go-home"]', open: () => ev(`import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', { filename: 'release-notes.md' })).then(() => true)`) });
     } finally { await httpJson('DELETE', `/api/board/${TEAM}`).catch(() => {}); if (standIn) await standIn.stop().catch(() => {}); await guard.restore().catch(() => {}); await client.close(); }
     const bad = results.filter(r => r.error).map(r => `${r.name}: the scene did not open (${r.error})`).concat(found, required(results, requiredScenes('keyboard')));
     if (process.env.KEYBOARD_REPORT) { require('node:fs').writeFileSync(process.env.KEYBOARD_REPORT, results.map(r => `${r.name}: ${r.error || r.stops + ' stops'}${process.env.KEYBOARD_PATHS ? '\n    ' + r.path : ''}`).join('\n') + '\n--\n' + bad.join('\n') + '\n'); process.exit(0); }

@@ -137,11 +137,10 @@ function watch() {
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch); else watch();
 
-// The sidebar showing the Saved tab (#4742): open (a phone: the overlay) with the Saved tab the active one. The top bar's Saved button is pressed then,
-// and clicking it again, Escape in the sidebar, or the X in its header close it.
+// The sidebar showing the Saved tab (#4742): open (a phone: the overlay) with the Saved tab the active one. Escape in the sidebar, or the X in its header, closes it.
 /** Is the dashboard's own Inbox (the nav tab, with Saved for later in it) on screen? Where the hub serves the dashboard the Inbox is the hub's frame, with no Saved. */
 export const savedViewShowing = () => !isCloud() && !!document.getElementById('nav-tab-hub-inbox')?.classList.contains('active');
-/** Is Saved on screen, as the right sidebar's tab or as the full-screen page? (the top bar button's pressed state) */
+/** Is Saved on screen, as the right sidebar's tab or as the full-screen page? */
 export function savedShowing() {
     if (savedViewShowing()) return true;
     if (currentScope().kind === 'all') return false; // the sidebar has no Saved tab for everything, hidden or not (#4811)
@@ -150,27 +149,12 @@ export function savedShowing() {
     const open = isPhoneLayout() ? dock.classList.contains('mobile-panel-overlay') : !dock.classList.contains('collapsed');
     return open && !!document.getElementById('agentic-tab-saved')?.classList.contains('active');
 }
-export function syncSavedButton() {
-    const b = document.getElementById('saved-btn');
-    if (!b) return;
-    const on = savedViewShowing() ? 'true' : 'false'; // the top bar's button is the Inbox's: the right sidebar's Saved tab is the dock's own, with its own close
-    if (b.getAttribute('aria-pressed') !== on) b.setAttribute('aria-pressed', on);
-}
-document.addEventListener('coral:dock-changed', syncSavedButton);
-// The pressed state follows the sidebar however it changes (the dock's own open state per page, a tab chosen, a persisted state at load): its class, and the Saved tab's.
-function watchDock() {
-    syncSavedButton();
-    const opts = { attributes: true, attributeFilter: ['class'] };
-    for (const id of ['agentic-state', 'agentic-tab-saved', 'nav-tab-hub-inbox']) { const el = document.getElementById(id); if (el) new MutationObserver(syncSavedButton).observe(el, opts); }
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchDock); else watchDock();
-window.addEventListener('resize', syncSavedButton); // a phone's overlay and a desktop's collapsed dock are the same sidebar at another width
-// Escape closes it with the focus back on the button, when the key is meant for the sidebar: not from a field, a dialog or a menu that has it.
+// Escape closes it, when the key is meant for the sidebar: not from a field, a dialog or a menu that has it.
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.defaultPrevented || !savedShowing()) return;
     const t = e.target instanceof Element ? e.target : document.body;
     if (t.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], .modal')) return;
-    if (!(t === document.body || t.closest('#agentic-state, #inbox-view, #group-table-view') || t.id === 'saved-btn')) return;
+    if (!(t === document.body || t.closest('#agentic-state, #inbox-view, #group-table-view, .top-nav-tab'))) return; // the top tab that opened the Inbox keeps the focus until the list is up
     if (document.querySelector('.goal-detail-pane:not([hidden])')) return; // a goal's task or file pane beside its list: Escape closes that first (detail_pane.js), with the focus on its row (#8914)
     if (document.querySelector('#agentic-saved-detail-pane:not([hidden])')) return; // a message's sheet over the dock is one level back (detail_pane.js closes it); the next Escape leaves
     e.preventDefault();
@@ -179,27 +163,17 @@ document.addEventListener('keydown', (e) => {
     importOnce('./saved.js').then(m => m.closeSaved()).catch(() => {});
 });
 
-// The top bar's Saved button shows how many are open (#saved-btn .saved-count); refreshed at start and whenever the list changes.
+// The Inbox's Saved folder shows how many are open; refreshed at start and whenever the list changes.
 let countTimer = 0;
-let savedCount = 0;
-function paintCount(badge) { badge.textContent = savedCount > 0 ? (savedCount > 99 ? '99+' : String(savedCount)) : ''; badge.hidden = !(savedCount > 0); }
-export function setSavedCount(n) {
-    const b = document.getElementById('saved-btn');
-    if (!b) return;
-    savedCount = n;
-    setInboxCount('saved', n);
-    document.querySelectorAll('#saved-btn .saved-count').forEach(paintCount);
-    b.setAttribute('aria-label', n > 0 ? `Saved for later, ${n} open` : 'Saved for later');
-    b.classList.toggle('on', n > 0);
-}
-/** The number on the dock's Saved tab: the open items of the page's own scope (an agent or a team), where the button in the top bar counts everything. */
+export function setSavedCount(n) { setInboxCount('saved', n); }
+/** The number on the dock's Saved tab: the open items of the page's own scope (an agent or a team), where the Inbox's Saved folder counts everything. */
 export function setScopedCount(n) {
     const tc = document.getElementById('saved-tab-count');
     if (tc) tc.textContent = n > 0 ? (n > 99 ? '99+' : String(n)) : '';
 }
 /** The scope of the page on screen: the agent or the team its Saved list and count are of, or everything (saved_scope.js). */
 let wantAll = false;
-/** The Inbox is being opened (the top bar's button): its Saved list is everything's even before the nav tab's switch has finished. */
+/** The Inbox's Saved folder is being opened: its Saved list is everything's even before the nav tab's switch has finished. */
 export function wantAllScope(on) { wantAll = !!on; }
 export function currentScope() {
     if (wantAll || savedViewShowing()) return ALL; // the Inbox page is the all scope whatever agent or team is behind it (#4905)
@@ -283,7 +257,7 @@ document.addEventListener('click', async (e) => {
     }
 });
 
-// Keep the bookmark in the top bar at large text sizes: the view selector gets
+// Keep the top bar's buttons whole at large text sizes: the view selector gets
 // its own row, as it does on a very narrow viewport, so neither control is cut.
 function fitSavedBar() {
     const big = isPhoneLayout() && parseFloat(getComputedStyle(document.documentElement).fontSize) >= 24;

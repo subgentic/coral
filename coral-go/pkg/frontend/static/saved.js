@@ -1,7 +1,7 @@
 import { serverMatches } from './inbox_servers.js';
 /* Save for Later (#4510), the list and the jump back: the Saved tab of the right sidebar (Open and Done, newest saved first), which stays open beside the main
  * view while you go back to a saved message. The buttons
- * on the messages and the top bar's count are in saved_marks.js. An agent still running opens in its Chat view and pages up to the message; one that has ended
+ * on the messages and the Inbox's count are in saved_marks.js. An agent still running opens in its Chat view and pages up to the message; one that has ended
  * opens in Chats (History) at the message; a board opens and jumps to the message as the board's search does. A message that is gone (the transcript no longer has
  * it, the board message was deleted) is marked Gone on its item, which keeps its snippet and can only be removed. */
 import { isPhoneLayout } from './phone_layout.js';
@@ -10,7 +10,7 @@ import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
 import { sessionServer, normServer, serverFetch, identityKey, LOCAL_SERVER } from './server_base.js';
-import { savedChanged, setSavedCount, setScopedCount, wantAllScope, validSavedItem, savedShowing, savedViewShowing, syncSavedButton, currentScope } from './saved_marks.js';
+import { savedChanged, setSavedCount, setScopedCount, wantAllScope, validSavedItem, savedShowing, savedViewShowing, currentScope } from './saved_marks.js';
 import { withScope, scopeHeading, scopeEmpty, ALL } from './saved_scope.js';
 import { effectiveLiveViewMode, setLiveViewMode, jumpToLiveMessage } from './live_chat.js';
 import { buildListBar } from './list_bar.js';
@@ -87,7 +87,7 @@ async function load() {
     for (const i of items) if (i.ref && !convTitles.has(i.ref)) convTitles.set(i.ref, i.title || i.ref);
     const open = answered.reduce((n, a) => n + (a.d.open || 0), 0), done = answered.reduce((n, a) => n + (a.d.done || 0), 0);
     totals = { open, done };
-    if (scope.kind === 'all') { setSavedCount(open); setScopedCount(open); } else setScopedCount(open); // the top bar's number is everything's: an agent's or team's list moves only its own tab's
+    if (scope.kind === 'all') { setSavedCount(open); setScopedCount(open); } else setScopedCount(open); // the Inbox's number is everything's: an agent's or team's list moves only its own tab's
 }
 
 /** The name of a server for people: its label, else its id; "This computer" for the hub itself. */
@@ -246,12 +246,12 @@ function wire() {
     document.addEventListener('coral:route-changed', () => { if (savedShowing() && currentScope().key !== scope.key) { checks.clear(); refresh(); } });
 }
 
-/** The Saved tab was shown (by a click on it, a key, or the top bar's button): read the list again. */
+/** The Saved tab was shown (by a click on it or a key): read the list again. */
 let showing = null, showAgain = false;
 let changedSince = false; // a message was saved or taken off after the read in flight began (coral:saved-changed): that read's answer is already out of date (#7955)
 document.addEventListener('coral:saved-changed', () => { changedSince = true; });
 export function showSaved() {
-    if (showing) { if (changedSince) showAgain = true; return showing; } // the tab's switch and the top bar's button can both ask at once: they share one read, unless the list changed since it began, then one more follows it
+    if (showing) { if (changedSince) showAgain = true; return showing; } // the tab's switch and another opener can both ask at once: they share one read, unless the list changed since it began, then one more follows it
     placeUi(); // the right sidebar's Saved tab: the one list is there
     wire();
     checks.clear();
@@ -270,13 +270,13 @@ function placeUi() {
 /** Whether the Inbox's Saved group (its table or a saved message's page) is what the centre shows. */
 const inboxSavedShowing = () => { const t = $('group-table-view'); return !!t && t.style.display !== 'none' && t.dataset.group === 'hub-inbox:saved' || !!$('inbox-page')?.dataset.saved && !$('inbox-page').hidden; };
 
-let _prevTab = 'agents'; // the nav tab the full-screen page was opened from: Escape and the top bar's button return there
+let _prevTab = 'agents'; // the nav tab the full-screen page was opened from: Escape returns there
 const activeNavTab = () => document.querySelector('.top-nav-tab.active')?.dataset.arg || 'agents';
 
 /** The dashboard's own Inbox was shown (switchNavTab('hub-inbox')): the Saved list is moved into it and read. */
 let viewLoad = null, viewAgain = false;
 function showSavedView() {
-    if (viewLoad) { if (changedSince) viewAgain = true; return viewLoad; } // the nav tab's switch and the top bar's button can both ask at once: one read, and one more after it when the list changed since it began (#7955)
+    if (viewLoad) { if (changedSince) viewAgain = true; return viewLoad; } // the nav tab's switch and another opener can both ask at once: one read, and one more after it when the list changed since it began (#7955)
     placeUi();
     wire();
     checks.clear();
@@ -285,12 +285,11 @@ function showSavedView() {
     return viewLoad;
 }
 
-/** The Inbox at its Saved part: from the top bar's button on any page where the scope is all. A press while it shows goes back to where it was opened from. */
-async function openSavedView({ toggle = false } = {}) {
+/** The Inbox at its Saved part, on any page where the scope is all. */
+async function openSavedView() {
     if (savedViewShowing()) {
         const onSaved = inboxSavedShowing();
-        if (toggle && onSaved) { closeSaved(); return; }
-        if (!onSaved) await selectInboxTab('saved'); // the Inbox is open on another group: the button brings its Saved table up
+        if (!onSaved) await selectInboxTab('saved'); // the Inbox is open on another group: its Saved table is brought up
         $('group-table-view')?.querySelector('.dt-primary, .group-chip')?.focus();
         return;
     }
@@ -303,36 +302,30 @@ async function openSavedView({ toggle = false } = {}) {
     $('group-table-view')?.querySelector('.dt-primary, .group-chip')?.focus();
 }
 
-let _before = null; // {open, tab}: the dock as it was when the Saved button opened it
+let _before = null; // {open, tab}: the dock as it was when Saved opened it
 function dockOpen() {
     const dock = $('agentic-state');
     return !!dock && (isPhoneLayout() ? dock.classList.contains('mobile-panel-overlay') : !dock.classList.contains('collapsed'));
 }
-/** Close the sidebar the Saved button opened: the tab the agent's dock had is shown again if it was open, the sidebar is shut if it was not. The focus goes back to the button. */
+/** Close the sidebar Saved opened: the tab the agent's dock had is shown again if it was open, the sidebar is shut if it was not. The focus goes to the active top tab (the full-screen page) or the panel toggle (the sidebar). */
 export function closeSaved({ focus = true } = {}) {
     if (savedViewShowing()) { // the full-screen page: back to the page it was opened from
         window.switchNavTab?.(_prevTab && _prevTab !== 'hub-inbox' ? _prevTab : 'agents');
-        if (focus) $('saved-btn')?.focus();
+        if (focus) document.querySelector('.top-nav-tab.active')?.focus();
         return true;
     }
     if (!savedShowing()) return false;
     const before = _before; _before = null;
     if (before && before.open && before.tab && before.tab !== 'saved') window.switchAgenticTab?.(before.tab, 'top');
     else window.toggleAgenticPanel?.(false);
-    syncSavedButton();
-    if (focus) $('saved-btn')?.focus();
+    if (focus) $('panel-toggle-btn')?.focus();
     return true;
 }
 
-/** The top bar's Saved button (#4905): always the Inbox at its Saved part, everything's list and number, on every page: an agent's, a team's, home. A second press (or Escape) goes back to the page it
- *  was opened from. The right sidebar's Saved tab, scoped to the page, is the dock's own. */
-export function openSavedAll({ toggle = false } = {}) { return openSavedView({ toggle }); }
-
 /** The right sidebar's Saved tab: the right sidebar of the page on screen open on its Saved tab (or the tab focused if it already is), the focus inside it. Every page has the
  *  sidebar and the tab (#4539), so nothing has to be selected first. */
-export async function openSaved({ toggle = false } = {}) {
-    if (currentScope().kind === 'all') return openSavedView({ toggle }); // never an all-scope list in the right sidebar (#4811)
-    if (toggle && savedShowing()) { closeSaved(); return; } // the top bar's button is a toggle: pressed, it closes the sidebar (#4742); the jump bar's Back to Saved and the toast's link only open
+export async function openSaved() {
+    if (currentScope().kind === 'all') return openSavedView(); // never an all-scope list in the right sidebar (#4811)
     dropJumpBar();
     // What the sidebar was before, so closing leaves an agent's own dock as it was: open on its tab, or shut.
     if (!savedShowing()) _before = { open: dockOpen(), tab: document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab || '' }; // opening it again (the toast's link) keeps what the dock was before the first open

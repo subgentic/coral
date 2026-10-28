@@ -15,14 +15,14 @@ const { connect } = require('./agent_view_harness');
         await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed')) window.toggleAgenticPanel(true); return true; })()`);
         await waitFor(`document.getElementById('agentic-tab-files').getBoundingClientRect().width > 0`, 'the dock is open', 8000);
         await ev(`document.getElementById('agentic-tab-files').click(); true`);
-        const st = () => ev(`({ open: !document.getElementById('agentic-state').classList.contains('collapsed'), active: document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab, pressed: document.getElementById('saved-btn').getAttribute('aria-pressed') })`);
-        await ev(`document.getElementById('saved-btn').click(); true`);
-        await waitFor(`document.getElementById('saved-btn').getAttribute('aria-pressed') === 'true'`, 'Saved shows');
+        const st = () => ev(`({ open: !document.getElementById('agentic-state').classList.contains('collapsed'), active: document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab, showing: document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab === 'saved' })`);
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the toast's "View saved" and the jump bar's Back to Saved open it this way
+        await waitFor(`document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab === 'saved'`, 'Saved shows');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`);
-        assert.equal((await st()).pressed, 'true', 'still showing after a second open');
-        await ev(`document.getElementById('saved-btn').click(); true`);
-        await waitFor(`document.getElementById('saved-btn').getAttribute('aria-pressed') === 'false'`, 'Saved closed');
-        assert.deepEqual(await st(), { open: true, active: 'files', pressed: 'false' }, 'the dock is back on Files, open');
+        assert.equal((await st()).showing, true, 'still showing after a second open');
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.closeSaved(); return true; })()`);
+        await waitFor(`document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab !== 'saved'`, 'Saved closed');
+        assert.deepEqual(await st(), { open: true, active: 'files', showing: false }, 'the dock is back on Files, open');
         console.log('PASS');
     } catch (e) { console.error(e && e.stack || e); process.exitCode = 1; } finally { try { await client.close(); } catch (_) {} }
 })();

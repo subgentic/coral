@@ -135,7 +135,6 @@ const REMOTE = `(() => {
         const merged = await items();
         assert.deepEqual(merged.map(i => i.server).sort(), ['Box B', 'Box B', 'This computer']);
         assert.equal(merged[0].src, 'box-board', 'newest saved first: the board item saved last');
-        assert.equal(await ev(`document.querySelector('#saved-btn .saved-count').textContent`), '3', 'the top bar counts both servers');
         assert.equal(await ev(`document.querySelector('#saved-table .group-chip-count').textContent`), '3');
         await shot('saved-servers-merged');
 

@@ -6,6 +6,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { OPEN_INBOX_SAVED } = require('./helpers/open_inbox_saved');
 
 const BASE = require('./test_base').BASE;
 
@@ -61,7 +62,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'and its button is not either');
         await shot('dock-board-none');
 
-        console.log('3. A chat open under the Inbox and the other pages: no sidebar at all; Saved for everything is its own page, which the top bar bookmark opens');
+        console.log('3. A chat open under the Inbox and the other pages: no sidebar at all; Saved for everything is its own page, the Inbox Saved folder');
         await ev(`switchNavTab('history'); true`);
         // The board created above is a chat even with no indexed agent history (#7809, #7953): it is in the Inbox's Board history folder.
         await waitFor(`!!document.querySelector('.view-list-item[data-key="chats-group"]')`, 'the Board history folder');
@@ -74,7 +75,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(d.tabs, [], 'no tab on Chats: ' + JSON.stringify(d));
         assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the sidebar is not shown on Chats');
         assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'and its button is not either');
-        await ev(`document.getElementById('saved-btn').click(); true`);
+        await ev(OPEN_INBOX_SAVED);
         await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'the Saved page', 8000);
         assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the page has no sidebar beside it');
         await shot('saved-page-from-chats');
@@ -115,7 +116,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.querySelector('#mb-messages [data-message-id="${mid}"] .mb-save-btn').getAttribute('aria-pressed') === 'true'`, 'saved', 6000);
         await ev(`switchNavTab('history'); import((window.__coralStatic || '/static/') + 'utils.js').then(u => { u.showView('history-session-view'); return true; })`); // a chat open under the Inbox (#7776): the Chats tab is gone, its page is the chat's
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
-        await ev(`document.getElementById('saved-btn').click(); true`); // from Chats: the Saved page
+        await ev(OPEN_INBOX_SAVED); // from Chats: the Saved page
         await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'the Saved page with the item', 10000);
         await ev(`document.querySelector('#group-table-view tbody .dt-primary').click(); true`);
         await waitFor(`!!document.querySelector('#inbox-page .item-bar .btn-primary:not([disabled])')`, 'the message page', 8000);

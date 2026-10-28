@@ -1,4 +1,4 @@
-// The top bar's buttons and the sidebar rail are the family's (#9494, group 2 of #9484): Home, Saved, Side panel and Settings are quiet icon buttons (a 32 px square), the collapsed sidebar's rail buttons the same, and the phone's menu
+// The top bar's buttons and the sidebar rail are the family's (#9494, group 2 of #9484): Home, Side panel and Settings are quiet icon buttons (a 32 px square), the collapsed sidebar's rail buttons the same, and the phone's menu
 // button is a .btn that names the view (44 px) with only its placing of its own. Drawn from the page itself, 1280 and 390, dark and light, with shots. Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -27,9 +27,6 @@ const BASE = require('./test_base').BASE;
                 const rail = await ev(`[...document.querySelectorAll('.sidebar-rail-btn')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })`);
                 assert.ok(rail.length === 3 && rail.every(([a, b]) => a >= 30 && a <= 34 && b >= 30 && b <= 34), `${at}the rail's three buttons are 32 px squares: ${JSON.stringify(rail)}`);
             }
-            // Saved pressed: the accent glyph in the quiet box, not the accent fill (UI/UX #9494)
-            const saved = await ev(`(async () => { const b = document.getElementById('saved-btn'); if (!b) return null; const idle = getComputedStyle(b).color; b.setAttribute('aria-pressed', 'true'); await new Promise(r => setTimeout(r, 400)); /* the button's colour transition */ const cs = getComputedStyle(b); const on = { bg: cs.backgroundColor, color: cs.color }; b.setAttribute('aria-pressed', 'false'); return { idle, on }; })()`); // sleep-ok: the colour transition
-            if (saved) { assert.equal(saved.on.bg, 'rgba(0, 0, 0, 0)', `${at}Saved pressed keeps its quiet box: ${saved.on.bg}`); assert.notEqual(saved.on.color, saved.idle, `${at}Saved pressed takes the accent glyph: ${saved.on.color} vs ${saved.idle}`); }
             for (const t of ['dark', 'light']) { await theme(t); await new Promise(r => setTimeout(r, 450)); await shot(`btn-topbar-${t}-${w}`); } // sleep-ok: the theme's colour transition settles
         }
         console.log('PASS top bar buttons: the family\'s quiet icon buttons and the phone menu button');

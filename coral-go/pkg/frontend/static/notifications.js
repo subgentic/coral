@@ -176,7 +176,7 @@ function toastHost() {
     return document.getElementById("toast-host");
 }
 
-// On a phone the notices and the short toasts start below the top bar (the Agents picker, home, bookmarks, panel, settings), never over it: css reads --notice-top, set here from the bar's own bottom edge on the column
+// On a phone the notices and the short toasts start below the top bar (the Agents picker, home, panel, settings), never over it: css reads --notice-top, set here from the bar's own bottom edge on the column
 // itself (not on <html>, where the theme code treats every inline custom property as a theme colour) and kept current when the window changes.
 function placeNotices() {
     const bar = document.querySelector("header.top-bar");

@@ -4,7 +4,7 @@
  *    all fit (large text, zoom, more tabs) the last ones (never the active one) move under a "More" menu in the top bar.
  *  - Phone (<= 767 px): the row is replaced by one current-view dropdown in the top bar (44 px tall): it names the view you are
  *    on and opens the list of all views. Escape and a click outside close it.
- * - Under 640 px (#9021) the top row is one hamburger button: it names the view and opens the views, then Home, Saved for later, Settings (themes, servers, updates) and the account.
+ * - Under 640 px (#9021) the top row is one hamburger button: it names the view and opens the views, then Home, Settings (themes, servers, updates) and the account.
  * The buttons drawn here carry the same data-on-click as the tabs, so switching a tab is still the one action. */
 import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
@@ -80,7 +80,7 @@ function entry(icon, label, { action, href, onClick } = {}) {
     if (onClick) b.addEventListener('click', onClick);
     const i = document.createElement('span');
     i.setAttribute('aria-hidden', 'true');
-    if (icon instanceof Element) { i.className = 'nav-more-drawn'; i.append(icon); } // a drawn icon (the top bar's bookmark): the icon font has no glyph for it (#9160)
+    if (icon instanceof Element) { i.className = 'nav-more-drawn'; i.append(icon); } // a drawn icon (the Saved folder's bookmark): the icon font has no glyph for it (#9160)
     else { i.className = 'material-icons'; i.textContent = icon; }
     const l = document.createElement('span');
     l.textContent = label;
@@ -92,18 +92,13 @@ function entry(icon, label, { action, href, onClick } = {}) {
 function menuEntries(viewLabels = new Set()) {
     const cloud = document.body.classList.contains('cloud-mode');
     const out = [entry('home', 'Home', { action: 'm-go-home' })];
-    if (!cloud) {
-        const count = (document.querySelector('#saved-btn .saved-count')?.textContent || '').trim(); // the bookmark's count (hidden on a phone with the rest of the row): it stays in the menu entry's words
-        const bookmark = document.querySelector('#saved-btn svg')?.cloneNode(true); // Saved is the bookmark everywhere else: the top bar's own drawing
-        out.push(entry(bookmark || 'star', count && count !== '0' ? `Saved for later (${count})` : 'Saved for later', { action: 'm-show-saved' }));
-    }
     out.push(entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }), entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
     if ((isHub() || cloud) && !viewLabels.has('Servers')) out.push(entry('dns', 'Servers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
     const account = document.getElementById('cloud-account-menu');
     if (account) for (const item of account.querySelectorAll('a.overflow-menu-item, button.overflow-menu-item')) {
         const label = item.textContent.trim();
-        if (label === 'Servers' || label === 'Saved for later' && !cloud) continue; // already above
+        if (label === 'Servers') continue; // already above
         out.push(entry(label === 'Sign out' ? 'lock' : label === 'Account' ? 'account_circle' : 'open_in_new', label, { onClick: () => item.click() })); // the account menu's own handler, so Sign out clears the drafts first
     }
     return out;
