@@ -20,14 +20,17 @@ New agents use it unless you choose a model when you launch them.
 
 ## Open Coral on your phone
 
-1. On Home, click **Mobile QR code** (at the bottom of the page). The **Coral Mobile** dialog opens.
-2. Scan the code with your phone, or press **Copy** and send yourself the link.
-3. Your phone must be on the same network as this computer. If the dialog says remote access is off, turn it on under **Settings > Network and Hub** and restart Coral.
+1. On Home, click **Mobile QR code** (at the bottom of the page). The **Use on your phone** dialog opens.
+2. If it says mobile access is off, press **Enable**. That lets devices on your network reach Coral; they need your password or a setup code. Or press **Use Coral Hub instead**, which needs no network access.
+3. Once it is on, the dialog shows a QR code and an address. Scan the code with your phone, or press **Copy** and send yourself the link.
+4. Your phone must be on the same network as this computer. The first time, it asks for the setup code on the sign-in page: press **Show setup code** here and type it in.
 
 ## Put a team's agents to sleep, and stop an agent
 
 - **Sleep a whole team:** open the **⋯** menu beside the team's name and choose **Sleep Team**. Its agents stop running; their chats stay. **Wake Team** (the same place) starts them again.
-- **Stop one agent for good:** open the **⋯** menu on its row and choose **Remove Agent**.
+- **Pause one agent:** open the **⋯** menu on its row and choose **Sleep**. It stops running and its chat stays; **Wake** (the same place) starts it again.
+- **Put one away:** choose **Archive**. It leaves the list and its chat is kept; **Unarchive** brings it back.
+- **Stop one for good:** choose **Kill Session**. The agent ends now and its running work is lost.
 
 ## Next
 
