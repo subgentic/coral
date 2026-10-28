@@ -17,6 +17,7 @@ const { syncEfficiency } = await importOnce('./analytics_efficiency.js'); // the
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
+const COUNTS_NOTE = 'Nothing counted in this range. Spend counts the agents Coral has run; a chat you ran outside Coral is not included.';
 const NO_DATA = 'No data in this range yet. It appears once an agent has used tokens; try a longer range.';
 
 function _formatTime(isoStr) {
@@ -330,6 +331,8 @@ export async function _refreshCostDashboard({ force = false } = {}) {
             _setText('cost-cache-write', compactFigure(t.cache_write_tokens || 0));
             _setText('cost-total-requests', String(t.num_requests || 0)); // the calls recorded: the figure By agent's Requests column adds up to
             _setText('cost-total-cost', formatCost(t.cost_usd || 0, { zeroAsTwo: true }));
+            const none = document.getElementById('cost-counts-note'); // nothing in this range: say what is counted, never a bare 0 (#10521)
+            if (none) { none.textContent = (t.num_requests || 0) === 0 ? COUNTS_NOTE : ''; none.hidden = (t.num_requests || 0) !== 0; }
 
             // By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them).
             _renderProviderTable(providerRows(data.by_agent_type));
