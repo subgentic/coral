@@ -4,7 +4,7 @@ import { openTask } from './task_navigation.js';
  * This module is the shell: each tab's own panel is built the first time the tab is opened by its own module (goals_view.js, team_tasks_page.js, team_artifacts_page.js); Messages is the board's own column moved in (message_board.js),
  * and Agents, Knowledge and Settings are today's panels of the right dock moved in, until their own builds (stage 3 of #7453). Lazy: loaded by openTeamPage (lazy_panels.js). */
 import { state } from './state.js';
-import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir } from './server_base.js';
+import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam } from './server_base.js';
 import { showView } from './utils.js';
 import { note, go } from './nav.js';
 import { keyRoute, TEAM_TABS } from './routes.js';
@@ -75,6 +75,7 @@ function buildOnce() {
     $('team-page-add-agent').addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
     $('team-page-settings').addEventListener('click', () => { openSettings(); });
     buildMore();
+    buildStop();
     // A click or a tap that opens a page or the pane puts the focus on its heading by script: no ring for a pointer, the ring for a key (the dialogs' rule, quiet_focus.js).
     $('team-page-view').addEventListener('click', () => quietFocus($('team-page-view')), true);
 }
@@ -123,6 +124,38 @@ let moreOpen = false;
 /** The team's settings, in a popout over the page (#8853): the header's Settings button and its phone More item. */
 function openSettings() { importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(S.team)).catch(e => console.error('team settings', e)); }
 
+/** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep Team or Wake Team, Reset Team, Kill All; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
+const teamAsleep = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length > 0 && m.every(s => s.sleeping); };
+function stopItems() {
+    const asleep = teamAsleep();
+    return [
+        { key: 'sleep', label: asleep ? 'Wake Team' : 'Sleep Team', run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
+        { key: 'reset', label: 'Reset Team', danger: true, run: () => window.resetTeam?.(S.team) },
+        { key: 'kill', label: 'Kill All', danger: true, run: () => window.killBoard?.(S.team) },
+    ];
+}
+/** The items in the Stop menu and in a phone's More (labels follow the team: asleep or not). */
+function syncStop() {
+    const menu = $('team-page-stop-menu'); if (!menu) return;
+    const moreMenu = $('team-page-more-menu');
+    for (const [host, cls] of [[menu, 'menu-item'], [moreMenu, 'menu-item team-more-add team-more-stop']]) {
+        if (!host) continue;
+        for (const old of host.querySelectorAll('[data-stop], .team-more-stop-sep')) old.remove();
+        const items = stopItems();
+        if (host === moreMenu) { const r = el('hr', 'overflow-menu-divider team-more-add team-more-stop-sep'); r.dataset.stop = 'sep'; host.append(r); }
+        items.forEach((it, i) => {
+            if (host === menu && it.danger && !items[i - 1]?.danger) { const r = el('hr', 'overflow-menu-divider'); r.dataset.stop = 'sep'; host.append(r); }
+            const b = el('button', `${cls}${it.danger ? ' menu-item-danger' : ''}`, it.label); b.type = 'button'; b.dataset.stop = it.key; b.addEventListener('click', () => { importOnce('./menu_button.js').then(x => x.closeMenus()); it.run(); });
+            host.append(b);
+        });
+    }
+}
+function buildStop() {
+    const b = $('team-page-stop'); if (!b) return;
+    b.addEventListener('click', async () => { syncStop(); (await importOnce('./menu_button.js')).toggleMenu(b); });
+    syncStop();
+}
+
 function buildMore() {
     const host = $('team-page-actions');
     const b = el('button', 'btn team-page-more', 'More'); b.type = 'button'; b.id = 'team-page-more'; b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
@@ -134,7 +167,7 @@ function buildMore() {
     menu.append(add, settings);
     host.append(b, menu);
     const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
-    b.addEventListener('click', () => set(!moreOpen));
+    b.addEventListener('click', () => { syncStop(); set(!moreOpen); }); // the Stop items in it follow the team (asleep or not) each time it opens
     menu.addEventListener('click', (e) => { if (e.target.closest('button')) set(false); });
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
     document.addEventListener('click', (e) => { if (moreOpen && !menu.contains(e.target) && !b.contains(e.target)) set(false); });
@@ -143,6 +176,8 @@ const BOARD_ACTIONS = ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-del
 function adoptBoardActions() {
     const menu = $('team-page-more-menu'); if (!menu) return;
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b && b.parentElement !== menu) { b.dataset.home = b.parentElement ? b.parentElement.id : ''; menu.append(b); } }
+    const pause = $('mb-pause-btn'); // what Pause Board does, in words under it (Mobile tester, #10008): a title is no help on a phone
+    if (pause && !$('mb-pause-note')) { const n = el('span', 'menu-note', /^Resume/.test(pause.textContent) ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'); n.id = 'mb-pause-note'; pause.after(n); pause.setAttribute('aria-describedby', 'mb-pause-note'); }
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the holder's markup hides these with an inline display:none, which message_board.js clears the same way
     const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages'; // selecting messages is the Messages tab's
 }
@@ -170,6 +205,7 @@ function drawHeader() {
 const ATTENTION = ['needs_input', 'waiting']; // a person has to do something: an agent waiting for input; an ended agent (no live terminal) and a queued one (waiting for a slot) are not (#8271, UI/UX); // a waiting agent (a trust prompt, a question, an approval) needs a person (UI/UX, #7513)
 function drawStatus(data) {
     const s = $('team-page-status'); if (!s) return;
+    syncStop();
     if (!data || !Array.isArray(data.agents)) { s.textContent = ''; s.className = 'team-page-status'; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
     if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }

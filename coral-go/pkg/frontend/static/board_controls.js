@@ -33,6 +33,7 @@ function updatePauseButton() {
     const btn = document.getElementById('mb-pause-btn');
     if (!btn) return;
     btn.textContent = bs.isPaused ? 'Resume Board' : 'Pause Board';
+    const note = document.getElementById('mb-pause-note'); if (note) note.textContent = bs.isPaused ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'; // what it does (#10008)
     btn.classList.toggle('mb-action-danger', bs.isPaused);
 }
 
