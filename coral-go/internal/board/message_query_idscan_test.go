@@ -64,4 +64,20 @@ func TestTextSearchByIDsAnswersAsTheWholeRowScan(t *testing.T) {
 		assert.True(t, a.Truncated, "the bytes cap: %q", needle)
 		assert.Equal(t, b.Total, a.Total)
 	}
+
+	// the exact cap: a board whose text is exactly the cap is answered whole, one byte under it is cut off; both scans cut at the same message
+	messageScanBytes = oldBytes
+	for _, needle := range []string{"progress", "école", "zzz"} {
+		messageScanBytes = int(total)
+		a, b := queryBoth(t, s, MessageQueryParams{Q: []string{needle}, Limit: []string{"200"}})
+		assert.False(t, a.Truncated, "exactly the cap answers whole: %q", needle)
+		assert.False(t, b.Truncated, needle)
+		assert.Equal(t, b, a)
+		messageScanBytes = int(total) - 1
+		a, b = queryBoth(t, s, MessageQueryParams{Q: []string{needle}, Limit: []string{"200"}})
+		assert.True(t, a.Truncated, "one byte over the cap is cut off: %q", needle)
+		assert.True(t, b.Truncated, needle)
+		assert.Equal(t, b, a, "both scans cut at the same message: %q", needle)
+	}
+	messageScanBytes = oldBytes
 }
