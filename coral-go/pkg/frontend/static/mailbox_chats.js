@@ -144,6 +144,7 @@ async function readPage(page, folder, q, extra) {
     return { rows, total: replies.reduce((sum, d) => sum + (Number(d.total) || d.sessions.length), 0) };
 }
 const byNewest = rows => rows.sort((a, b) => stampOf(b).localeCompare(stampOf(a)));
+const STALE_MS = 20000; // a kept list older than this is read again at the next draw
 const REFRESH_PAGES = 4; // a list read again keeps up to this many of its pages (200 chats), the rest load as the person scrolls
 async function readMore(key, folder, q, extra, redraw) {
     const L = listOf(key, q, JSON.stringify(extra));
@@ -155,11 +156,11 @@ async function readMore(key, folder, q, extra, redraw) {
             let rows = [], total = 0;
             for (let page = 1; page <= keep; page++) { const got = await readPage(page, folder, q, extra); rows = rows.concat(got.rows); total = got.total; if (!got.rows.length) break; }
             L.rows = byNewest(rows); L.page = keep; L.total = Number.isFinite(total) ? total : rows.length; L.error = ''; L.refresh = false;
-            L.done = !rows.length || L.rows.length >= L.total;
+            L.done = !rows.length || L.rows.length >= L.total; L.at = Date.now();
         } else {
             const got = await readPage(L.page + 1, folder, q, extra), rows = got.rows;
             L.rows = byNewest(L.rows.concat(rows)); L.page += 1; L.total = Number.isFinite(got.total) ? got.total : L.rows.length; L.error = '';
-            L.done = !rows.length || L.rows.length >= L.total;
+            L.done = !rows.length || L.rows.length >= L.total; L.at = Date.now();
             if (L.page > 1 && rows.length) importOnce('./notifications.js').then(m => m.announceNotice(`${rows.length} more chats loaded`)).catch(() => {}); // heard once: the rows came in below the footer the person was on (#8022)
         }
     } catch (e) { L.refresh = false; L.error = e.message || 'Chats could not be read'; L.done = true; }
@@ -210,7 +211,8 @@ export function chatsSpec(key, ctx) {
     const q = (ctx.query || '').trim();
     const extra = { ...(ctx.params || {}), ...(multipleServers() && ctx.server ? { server: ctx.server } : {}) }, filtered = !!q || Object.keys(extra).length > 0;
     const L = listOf(key, q, JSON.stringify(extra));
-    if ((!L.page && !L.busy && !L.done) || (L.refresh && !L.busy)) readMore(key, folder, q, extra, ctx.redraw);
+    if (!L.page && !L.busy && !L.done) readMore(key, folder, q, extra, ctx.redraw);
+    else if (!L.busy && !L.error && L.page > 0 && (L.refresh || (L.at && Date.now() - L.at > STALE_MS))) { L.refresh = true; readMore(key, folder, q, extra, ctx.redraw); } // a list kept from an earlier look is read again once it is a while old, its rows staying until the new ones land (#10262: after a restart the folder listed the one chat that was indexed when it was first opened, and not the other agent's)
     const rows = L.rows;
     return { title: folder.title, noun: ['chat', 'chats'], rows, count: folderCount(key) ?? null, empty: { line: L.error ? (q ? 'Search failed' : 'Chats could not be read') : L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : key === 'chats-archived' ? 'No archived chats yet. Archive a chat or an agent and it is kept here.' : 'No chats here.') },
         signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec, IR.isUnread(readKind(s), readKey(s), stampOf(s))])]),
