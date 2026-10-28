@@ -45,6 +45,8 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             await search('PLUM-4471');
             const body = () => ev(`document.body.innerText`);
             check(`${label}: a search for PLUM-4471 shows the hit line of the chat`, /ticket PLUM-4471 is about the billing deploy/.test(await body()), (await body()).slice(0, 200));
+            const hitBox = await ev(`(() => { const e = document.querySelector('.dt-title-snippet'); if (!e) return null; const r = e.getBoundingClientRect(), t = e.closest('.dt-title-cell').querySelector('.dt-primary').getBoundingClientRect(), row = e.closest('tr, .dt-row, li, [role=row]'), rr = row ? row.getBoundingClientRect() : null; return { w: Math.round(r.width), h: Math.round(r.height), under: r.top >= t.bottom - 1, inRow: !rr || r.bottom <= rr.bottom + 1 }; })()`);
+            if (!mobile) check(`${label}: the hit line has a size and sits under the title, inside its row (#10262)`, hitBox && hitBox.w > 80 && hitBox.h > 8 && hitBox.under && hitBox.inRow, JSON.stringify(hitBox));
             await search('BROKEN');
             check(`${label}: a search the server refuses says "Search failed", not "Loading chats"`, /Search failed/.test(await body()) && !/Loading chats/.test(await body()), (await body()).slice(0, 200));
             await search('PLUM-4471');
