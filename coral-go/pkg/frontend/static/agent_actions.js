@@ -139,9 +139,9 @@ export function toggleAgentArchive(name, agentType, sessionId, action) {
     };
     if (action === 'archive') {
         const s = state.liveSessions.find(s => s.session_id === sessionId && sessionServer(s) === server);
-        const stops = s && !s.sleeping ? ' It will be stopped.' : '';
+        const stops = s && !s.sleeping ? ' It stops now and' : ' It'; // plain words (#10074)
         return new Promise(resolve => showConfirmModal('Archive agent',
-            `Archive "${name}"?${stops} Archived agents are not woken with their team or by Wake All.`,
+            `Archive "${name}"?${stops} stays out of the way until you unarchive it.`,
             async () => resolve(await doIt()), () => resolve(false), { danger: false, label: 'Archive' }));
     }
     return doIt();

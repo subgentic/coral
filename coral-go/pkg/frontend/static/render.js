@@ -290,7 +290,7 @@ function _renderLiveSessions(sessions) {
 
     if (!sessions.length && !archived.length && !pinsShown) {
         // Coral Hub with no machine connected: say what to do (the same list is the phone's Agents page), not just that there is nothing
-        list.innerHTML = (!unfilteredCount && hubEmptyListHtml(machineState())) || `<li class="empty-state empty-state-tight empty-plain">${unfilteredCount ? 'No matching agents' : 'No live sessions'}</li>${unfilteredCount ? '' : PHONE_WELCOME}`;
+        list.innerHTML = (!unfilteredCount && hubEmptyListHtml(machineState())) || `<li class="empty-state empty-state-tight empty-plain">${unfilteredCount ? 'No agents match. Clear the filters to see them all.' : 'No live sessions'}</li>${unfilteredCount ? '' : PHONE_WELCOME}`;
         syncGroupToggle(); // no groups drawn: the header toggle goes
         return;
     }

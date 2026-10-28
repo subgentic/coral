@@ -482,7 +482,7 @@ export function syncWorkingIndicator(container, session) {
         // Just the state: the latest step is already the group summary above
         el.innerHTML = `<span class="chat-working-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="chat-working-label">Working</span>`
             + `<span class="chat-working-time" aria-hidden="true"></span><span class="chat-working-live sr-only" role="status">Working</span>`
-            + `<span class="chat-working-still" hidden>Still working. <button type="button" class="chat-working-link" data-on-click="terminal-view-open">Open the terminal</button> to see what it is doing.</span>`;
+            + `<span class="chat-working-still" hidden>Still working. <button type="button" class="chat-working-link" data-on-click="terminal-view-open">See live output</button>.</span>`;
         // How long it has been (#6058): quiet digits from 5 s, a polite status at 30 s and then once a minute, and a way to look after 30 s. Counted from the send when there was one, else from when the row first showed.
         el.dataset.since = String(lastSendAt.get(session.session_id) || Date.now());
         el._tick = setInterval(() => tickWorking(el), 1000); // interval-ok: one second of the Working row; tickWorking clears it when the row leaves the page, and syncWorkingIndicator clears it when it removes the row
