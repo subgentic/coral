@@ -3832,9 +3832,20 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .settings-pane .launch-agent-provider { margin-bottom: 0; } /* in the Agent pane the Provider is followed directly by Model: the pane's rows have their own spacing, and the notes (CLI line first, then the provider's) are under Thinking (#8528) */
 .settings-pane .launch-agent-pick { margin-bottom: 0; }
  /* a note that makes the pane scroll must not narrow Model by the scrollbar (nothing moves on a provider or CLI change, #8528) */
-.launch-agent-pick { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 2px 0 8px; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow: hidden; }
+.launch-agent-pick { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 1px; background: var(--control-border); margin: 2px 0 8px; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow: hidden; }
 #launch-agent-pick .launch-agent-opt { position: relative; border: 0; border-right: 1px solid var(--control-border); border-radius: 0; padding: 8px 16px; background: var(--bg-primary); min-height: 40px; display: grid !important; grid-template-columns: auto minmax(0, 1fr); column-gap: 6px; align-items: center; }
 #launch-agent-pick .launch-agent-opt:last-child { border-right: 0; }
+/* The providers are an even grid (#10079): equal columns in one row where they fit, two by two on a phone, one hairline between cells (the gap shows the group's own colour). */
+:is(#launch-agent-pick, .launch-agent-pick) .launch-agent-opt { border-right: 0; justify-content: center; }
+@media (max-width: 767px) { :is(#launch-agent-pick, .launch-agent-pick) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row; width: 100%; max-width: none; } }
+/* A short screen (a phone turned sideways): the wizard's header and footer take less room, so the page between them is taller (#10079; step 2's Name was cut). */
+@media (max-height: 500px) {
+    .sd-step-header { padding: 8px 16px 6px; }
+    .sd-step-header .sd-sub { margin-top: 0; font-size: var(--fs-sm); }
+    .sd-modal-content .launch-modal-step > .modal-actions { padding: 8px 16px; }
+    .sd-modal-content .launch-recap { padding-top: 6px; }
+    .sd-modal-content .launch-recap-note { font-size: var(--fs-sm); }
+}
 #launch-agent-pick .launch-agent-opt:has(input:checked) { background: var(--accent-dim); color: var(--text-on-accent); border-color: var(--control-border); font-weight: var(--fw-strong); }
 #launch-agent-pick .launch-agent-opt:has(input:checked) .launch-agent-missing { color: inherit; }
 /* a tile is the badge and two lines: the name, and under it "not installed" (11/400, tertiary) when the CLI probe says so; the line is always there, so the answer moves nothing (#8033) */

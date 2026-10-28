@@ -22,7 +22,9 @@ let kind = 'agent';
 const hooks = [];
 
 export const dockKind = () => kind;
-export function dockOpenByDefault(k = kind) { return OPEN_BY_DEFAULT[k]; }
+/** A tablet's first chat starts with the side column closed: beside it the chat would have under 400 px, and the column is an empty file list on a first visit (#10079). */
+export const DOCK_OPEN_MIN_WIDTH = 1000;
+export function dockOpenByDefault(k = kind) { return k === 'agent' ? OPEN_BY_DEFAULT.agent && window.innerWidth >= DOCK_OPEN_MIN_WIDTH : OPEN_BY_DEFAULT[k]; }
 
 /** A storage key for the page on screen: the agent page keeps its original keys, the others add their kind; a popout window has its own (it must not overwrite the dashboard's sizes). */
 export function dockKey(base, k = kind) {
