@@ -116,6 +116,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 const accepted = awaitSocketAccept(targetSession, [id]);
                 addPendingMessage(sentSessionId, command, sentAt, { sending: true });
                 input.value = "";
+                clearSentDraft(targetSession); // the box and its saved draft are empty from now: a reload before the answer must not bring the text back (#10085); a refusal puts it back
                 xterm.focusTerminal();
                 accepted.then(ok => _settleSocketSend(targetSession, command, sentAt, ok));
                 return;
@@ -137,6 +138,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 }, 300);
                 addPendingMessage(sentSessionId, command, sentAt, { sending: true });
                 input.value = "";
+                clearSentDraft(targetSession); // the box and its saved draft are empty from now: a reload before the answer must not bring the text back (#10085); a refusal puts it back
                 xterm.focusTerminal();
                 accepted.then(ok => _settleSocketSend(targetSession, command, sentAt, ok));
                 return;
@@ -148,10 +150,11 @@ export async function sendCommand({ nudge = false } = {}) {
         // is emptied meanwhile, so a second click has nothing to send again, and a refusal puts the text back.
         addPendingMessage(sentSessionId, command, sentAt, { sending: true });
         input.value = "";
+        clearSentDraft(targetSession);
         const notSent = () => {
             removePendingMessage(sentSessionId, sentAt);
             // The typed text only: the attachments stay attached until a send of them succeeds.
-            if (!input.value && state.currentSession && state.currentSession.session_id === sentSessionId) input.value = textPart;
+            if (!input.value && state.currentSession && state.currentSession.session_id === sentSessionId) { input.value = textPart; const k = sessionKey(targetSession); if (k) saveSessionDraft(k, textPart); }
         };
         try {
             const resp = await serverFetch(sessionServer(targetSession), `/api/sessions/live/${encodeURIComponent(targetSessionName)}/send`, {
@@ -198,6 +201,12 @@ export async function sendCommand({ nudge = false } = {}) {
     } finally {
         _isSending = false;
     }
+}
+
+/** The message just sent is no longer a draft: the saved text goes with the box (#10085). */
+function clearSentDraft(session) {
+    const key = sessionKey(session);
+    if (key) saveSessionDraft(key, "");
 }
 
 /** A composer send over the terminal socket was accepted or refused (#3218). */
