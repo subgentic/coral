@@ -260,6 +260,12 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	if err := prepareWithDatabase(ctx, db, cfg, opts); err != nil {
 		return closeDB(err)
 	}
+	// A start that left its Terms to the Coral Hub (a credential offered, nobody at a terminal) enrolls first: nothing listens or starts until the Hub has confirmed them (#9936).
+	if code, ok := hubTermsFirst(ctx, db, cfg); !ok {
+		_, err := closeDB(errTermsNotConfirmed)
+		exitProcess(code)
+		return nil, err
+	}
 	// Native TLS (#3355): load the pair before binding, so a bad pair stops startup.
 	tlsConfig, err := loadTLSConfig(opts.TLSCert, opts.TLSKey)
 	if err != nil {
