@@ -14,6 +14,7 @@ import { showPromptModal } from './prompt_modals.js';
 import { worktreeConfirmWords } from './worktree_words.js';
 import { showWorktreeNotice } from './worktree_notice.js';
 import { killLiveSession, killLiveTeam, dropKilledRows } from './kill_live.js';
+import { startWaking } from './team_waking.js';
 
 // The agents a folder or workflow group shows, and only those (#3053): team
 // members are listed (and killed) under their team, archived agents in the
@@ -249,6 +250,7 @@ export function toggleTeamSleep(boardName, action) {
                 // Team wake leaves archived agents asleep (#3030).
                 if (inTeam(s, boardName) && !s.archived) s.sleeping = sleeping;
             }
+            if (!sleeping) startWaking(boardName); // the team page's status counts the agents that have reported since (#10052)
             redrawLiveList();
             showToast(sleeping ? `Team "${keyLabel(boardName)}" is now sleeping` : `Team "${keyLabel(boardName)}" is awake`);
         } catch (e) {
