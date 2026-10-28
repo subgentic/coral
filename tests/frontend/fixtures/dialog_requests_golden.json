@@ -97,8 +97,8 @@
     "agentType": "codex",
     "model": "gpt-x",
     "prompt": "Test everything.\nTwice.",
-    "flags": "--verbose --sandbox workspace-write -a on-request",
-    "permissionMode": "acceptEdits",
+    "flags": "--verbose",
+    "permissionMode": "default",
     "capabilities": {
       "allow": [
         "shell",
@@ -109,14 +109,11 @@
   "agent_full": {
     "working_dir": "/work/other",
     "agent_type": "codex",
+    "permission_mode": "default",
     "display_name": "QA Engineer",
     "backend": "tmux",
     "flags": [
-      "--verbose",
-      "--sandbox",
-      "workspace-write",
-      "-a",
-      "on-request"
+      "--verbose"
     ],
     "capabilities": {
       "allow": [
