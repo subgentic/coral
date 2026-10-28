@@ -388,6 +388,14 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     flex: 1;
     min-width: 0;
 }
+.sleeping-composer-hint {
+    flex: 1 1 100%;
+    font-size: var(--fs-base);
+    color: var(--text-secondary);
+}
+.sleeping-composer-hint[hidden] {
+    display: none;
+}
 .sleeping-composer-actions {
     display: flex;
     gap: 8px;
