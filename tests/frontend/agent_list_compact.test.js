@@ -59,7 +59,7 @@ async function run() {
     check('1 no avatar / context bar / dir chip / inline status / activity text in rows', R.every(r => !r.avatar && !r.dirChip && !r.inlineStatus && !r.activity) && R.filter(r => r.ctxBar).length === 0, JSON.stringify(R.map(r => [r.avatar, r.ctxBar, r.dirChip, r.inlineStatus, r.activity])));
     check('2 the line = dot + D1 identity (+one chip) + kebab; the identity carries its title and no row shows a uuid', R.every(r => r.dot) && by[B].identity.trim() === 'Auto Bot' && by[A].identityTitle === 'Lead Dev' && R.every(r => !r.hasUuidText), JSON.stringify({ b: by[B].identity, at: by[A].identityTitle }));
     check('2 attention rows show exactly one text pill (Needs input / Check terminal)', by[B].pills.filter(p => /Needs input|Check terminal|Stuck/.test(p)).length === 1 && by[C].pills.filter(p => /Check terminal/.test(p)).length === 1 && by[A].pills.filter(p => /Needs input|Check terminal|Stuck/.test(p)).length === 0, JSON.stringify({ B: by[B].pills, C: by[C].pills, A: by[A].pills }));
-    check('12/D-C ctx pill only at >=80% (A: ctx 87%), none at 42% or unknown', by[A].pills.some(p => /^ctx 87%$/.test(p)) && !by[B].pills.some(p => /^ctx/.test(p)) && !by[C].pills.some(p => /^ctx/.test(p)), JSON.stringify({ A: by[A].pills, B: by[B].pills, C: by[C].pills }));
+    check('12/D-C no row draws a context pill, at 87% or at 42% or unknown: context fill is not an action (UI/UX, #9686); a high one still rings the dot (159 below)', R.every(r => !r.pills.some(p => /^ctx/.test(p))), JSON.stringify({ A: by[A].pills, B: by[B].pills, C: by[C].pills }));
     check('19/D-E sleeping row is one line too (36px, no goal line); its summary stays in the hover tip', by[D].goal === null && Math.abs(by[D].h - 36) <= 1, JSON.stringify({ goal: by[D].goal, h: by[D].h }));
     check('D-F rows are focusable list items, not buttons, with aria-label identity + state', R.every(r => r.tabindex === '0' && r.role !== 'button') && /^Auto Bot, Needs input$/.test(by[B].aria || '') && /^Sleeper, Sleeping$/.test(by[D].aria || ''), JSON.stringify({ B: by[B].aria, D: by[D].aria, roles: R.map(r => r.role) }));
     check('14 Open Agent Tab is still the first kebab item', by[A].kebabFirst === 'Open Agent Tab', by[A].kebabFirst);
@@ -74,6 +74,9 @@ async function run() {
     check('12 tooltip Context row prints unknown for null context', /Context:?\s*unknown/i.test(tipText), tipText.slice(0, 120));
     const tipA = await ev(`(() => { const t = typeof window.buildSessionTooltip === 'function' ? window.buildSessionTooltip(window.__fixture[0]) : ''; return String(t); })()`);
     const tipAText = tipA.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    const tipBText = String(await ev(`window.buildSessionTooltip(window.__fixture[1])`)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    check('12 the hover tip is where the context is read: 87% of 1.0M for A, 42% for B, unknown for C (the number is right)', /Context:?\s*87%/.test(tipAText) && /Context:?\s*42%/.test(tipBText) && /Context:?\s*unknown/i.test(tipText), JSON.stringify({ A: (tipAText.match(/Context[^A-Z]*/) || [''])[0], B: (tipBText.match(/Context[^A-Z]*/) || [''])[0] }));
+    check('2 the goal in the tip carries no uuid (moved from the row\'s goal title, #9686)', !/[0-9a-f]{8}-[0-9a-f]{4}-/.test(tipAText + tipBText + tipText) && /Goal:?\s*Refactoring the store layer/.test(tipAText), tipAText.slice(0, 200));
     check('4 tooltip has Context/Tokens/Branch/Last action rows for a known session', /Context:?\s*87%/.test(tipAText) && /Tokens/.test(tipAText) && /Branch/.test(tipAText) && /Last action/.test(tipAText), tipAText.slice(0, 160));
     // tooltip layout (operator screenshot): the value column must never touch the label column
     const tipGap = await ev(`(() => { const html = window.buildSessionTooltip(window.__fixture[0]); const host = document.createElement('div'); host.className = 'session-tooltip'; host.style.cssText = 'position:fixed;left:40px;top:40px;display:block;visibility:hidden'; host.innerHTML = html; document.body.appendChild(host);
@@ -94,6 +97,13 @@ async function run() {
     await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     await nextFrame(); // the key handler runs synchronously; a row selection would show by the next frame
     check('14 Enter on a row\'s own kebab button acts on the button, not row selection (the goal sparkle is gone, #9686)', await ev(`document.querySelector('#live-sessions-list [data-session-id="${B}"]').getAttribute('aria-current') === 'true'`)); await ev(`window.closeSidebarKebabs(); true`);
+    // the context moved to the agent page's header line (#9686): the number is right, and it follows a state tick
+    const hdrCtx = () => ev(`(document.getElementById('terminal-header-model') || {}).textContent || ''`);
+    await until(`/ctx 42%/.test((document.getElementById('terminal-header-model') || {}).textContent || '')`, 'the header context');
+    check('12 the selected agent\'s header line says its context (B: ctx 42%)', /ctx 42%/.test(await hdrCtx()), await hdrCtx());
+    await ev(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [${JSON.stringify({ ...SESSIONS[1], context_pct: 91 })}] }); true`);
+    await until(`/ctx 91%/.test((document.getElementById('terminal-header-model') || {}).textContent || '')`, 'the header context follows');
+    check('12 and it follows a state tick (B: ctx 91%), with no pill on the row', /ctx 91%/.test(await hdrCtx()) && (await ev(`!document.querySelector('#live-sessions-list [data-session-id="${B}"] .session-ctx-pill')`)), await hdrCtx());
     // rename/state tick updates aria-label in place
     await ev(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [${JSON.stringify({ ...SESSIONS[1], display_name: 'Renamed Bot', waiting_for_input: false, working: true })}] }); true`); await nextFrame();
     R = await rows(); const b2 = R.find(r => r.sid === B);
