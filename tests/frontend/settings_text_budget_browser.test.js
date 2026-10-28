@@ -13,6 +13,8 @@ const BUDGET = { 'Network and Hub': 186, 'Agents': 153, 'Storage and cleanup': 1
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await client.Emulation.setFocusEmulationEnabled({ enabled: true });
+        // a headless browser (CI's) has alerts blocked: the Notifications group is counted with its "your browser blocks alerts" line showing, the most it ever shows (#10068)
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { function N() {} Object.defineProperty(N, 'permission', { get: () => 'denied' }); N.requestPermission = async () => 'denied'; window.Notification = N; })();` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.then(() => true)`);

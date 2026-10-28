@@ -313,21 +313,28 @@ export function _fillTerminalAndBrowserPrefs(s) {
             }
         }
     };
-    const say = text => { if (why) { why.textContent = text; why.hidden = !text; } };
+    // When the browser blocks alerts the line is one short disclosure: how to allow them is inside it (the Notifications group stays under its word budget even then).
+    const say = (text, detail) => {
+        if (!why) return;
+        why.replaceChildren();
+        if (text && detail) { const d = document.createElement("details"), sm = document.createElement("summary"), body = document.createElement("div"); d.className = "disclosure notify-blocked-more"; sm.textContent = text; body.textContent = detail; d.append(sm, body); why.append(d); } else why.append(text);
+        why.hidden = !text;
+    };
+    const sayBlocked = () => say("Blocked by your browser", blockedText());
     const blockedText = () => desktopNotifyBlocked()
         ? `Your browser blocks alerts from Coral. Allow notifications for this site in ${isPhoneLayout() ? "your browser's site settings" : "the browser's address bar or site settings"}, then turn this on again.` // a phone has no address bar to look at (#10266)
         : "";
     if (desktopCheck) {
         desktopCheck.checked = desktopNotifyEnabled();
         desktopCheck.disabled = !desktopNotifySupported();
-        say(desktopNotifySupported() ? blockedText() : "This browser has no desktop alerts.");
+        if (desktopNotifySupported()) { if (blockedText()) sayBlocked(); else say(""); } else say("This browser has no desktop alerts.");
         paintAlertKinds();
         if (!desktopCheck.dataset.bound) {
             desktopCheck.dataset.bound = "1";
             desktopCheck.addEventListener("change", async () => {
                 if (desktopCheck.checked) {
                     desktopCheck.checked = await enableDesktopNotify();
-                    say(desktopCheck.checked ? "" : (blockedText() || "Alerts need your permission: choose Allow when the browser asks, then turn this on again."));
+                    if (desktopCheck.checked) say(""); else if (blockedText()) sayBlocked(); else say("Alerts need your permission: choose Allow when the browser asks, then turn this on again.");
                 } else {
                     disableDesktopNotify();
                     say("");

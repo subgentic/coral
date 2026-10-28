@@ -91,7 +91,7 @@ const BASE = require('./test_base').BASE;
         for (const w of wanted) assert.ok(s.labels.some(l => l.startsWith(w)), `a switch named "${w}": ${JSON.stringify(s.labels)}`);
         const helps = await ev(`['settings-notify-needs-input', 'settings-desktop-notify', 'settings-alert-sound'].map(i => { const e = document.getElementById(i); const d = (e.getAttribute('aria-describedby') || '').split(' ').map(x => document.getElementById(x)).filter(Boolean).map(x => x.textContent.trim()).join(' '); return d; })`);
         assert.match(helps[0], /when an agent needs input/);
-        assert.match(helps[1], /while this tab is in the background/);
+        assert.match(helps[1], /when the tab is hidden/);
         assert.match(helps[2], /alert sound/);
         console.log('PASS Settings > Notifications: what each switch does, a blocked or dismissed permission explained, alert kinds and sound');
     } finally { await client.close(); }
