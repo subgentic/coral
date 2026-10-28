@@ -55,12 +55,12 @@ export function strengthMeter(id) {
     const bar = el('div', 'pw-meter'); bar.setAttribute('role', 'img'); const fill = el('i'); bar.append(fill);
     const text = el('p', 'pw-hint'); text.id = id; text.setAttribute('aria-live', 'polite');
     root.append(bar, text);
-    root.hidden = true; // no empty bar before anything is typed
+    root.classList.add('pw-strength-idle'); root.setAttribute('aria-hidden', 'true'); // no empty bar before anything is typed: invisible, but its space is kept, so the first character does not push Confirm down (#10281)
     return {
         root,
         update(password) {
             const s = strengthOf(password);
-            root.hidden = !password;
+            root.classList.toggle('pw-strength-idle', !password); root.toggleAttribute('aria-hidden', !password);
             root.setAttribute('data-level', s.level);
             fill.style.width = `${s.pct}%`;
             bar.setAttribute('aria-label', s.label ? `Strength: ${s.label.replace('.', '')}` : 'Strength');
