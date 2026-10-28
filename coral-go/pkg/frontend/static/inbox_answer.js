@@ -70,7 +70,7 @@ async function answer(s, o, ask, cell) {
         cell.replaceChildren(Object.assign(document.createElement('span'), { className: 'inbox-answered', textContent: `Answered: ${o.label}` }));
         if (had) cell.closest('tr')?.querySelector('.dt-primary')?.focus({ preventScroll: true }); // the choices are gone: the keyboard stays in the row, on its Open
         showToast(`Answered: ${o.label} for ${resolveSessionIdentity(s)}`, false, 4000); // said once by the page's live region: nothing else says it
-        document.dispatchEvent(new CustomEvent('coral:inbox-answered', { detail: { session_id: s.session_id } }));
+        document.dispatchEvent(new CustomEvent('coral:inbox-answered', { detail: { session_id: s.session_id, said: `Answered: ${o.label} for ${resolveSessionIdentity(s)}.` } })); // the list says it too when the row has gone (#10720)
     } catch {
         buttons.forEach(b => { b.disabled = false; });
         // the way to answer it is a button, not a place to go looking for (#10399): Open agent shows that agent's own card
