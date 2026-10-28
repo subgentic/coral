@@ -12,7 +12,7 @@ import { needsYou, askedRow } from './asked_before_restart.js';
 import { state } from './state.js';
 
 import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
-import { failedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
+import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
@@ -534,7 +534,7 @@ registerGroupSource('hub-inbox', {
             const total = filteredNeeds().length, hidden = allNeeds().length - total; // what the filters hide is said above the list, with the way to show it (#10399)
             const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
             return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.', hint: NF.isFiltered(needsFilters) ? undefined : 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.' },
-                signature: JSON.stringify([hidden, manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0])]), // the words move on with the clock: they are part of what was drawn
+                signature: JSON.stringify([hidden, finishedUnread().length, manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0])]), // the words move on with the clock: they are part of what was drawn
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : resolveSessionIdentity(s),
                     open: s => { if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
@@ -574,6 +574,12 @@ registerGroupSource('hub-inbox', {
                     for (const g of needsOverflow()) {
                         const p = DT.el('p', 'inbox-review-more', `${g.name}: ${g.more.length} more for review. `);
                         for (const team of new Set(g.more.map(a => a.team))) p.append(DT.link(`Open ${keyLabel(team)} artifacts`, () => go(keyRoute('team', team, 'artifacts'))));
+                        wrap.append(p);
+                    }
+                    const finished = finishedUnread().length;
+                    if (finished > 0) { // a run that passed is not something that needs the person, so it is a line under the list, not a row (#10515)
+                        const p = DT.el('p', 'goals-note inbox-runs-finished', `${finished} ${finished === 1 ? 'run' : 'runs'} finished since you looked. `);
+                        p.append(DT.link('See them', () => go({ view: 'automations', folder: 'recent' })));
                         wrap.append(p);
                     }
                     return wrap; } };
