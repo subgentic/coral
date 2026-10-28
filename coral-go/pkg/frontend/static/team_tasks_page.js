@@ -443,6 +443,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         importOnce('./team_task_actions.js').then(A => {
             const form = A.completeForm(task, acts);
             bar.before(form.node); form.focus();
+            form.node.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); e.stopPropagation(); acts.redraw(task, 'view'); } }); // Escape is Back (#10613)
             bar.append(btn('btn', 'Back', () => acts.redraw(task, 'view')), ...(form.canSendBack ? [btn('btn', 'Not yet: send back', () => form.sendBack())] : []), btn('btn btn-primary', 'Complete', () => form.submit()));
         });
         page.append(bar);
