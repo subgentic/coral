@@ -3888,7 +3888,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
     #launch-agent-pick .launch-agent-opt { min-width: 0; min-height: var(--control-touch-height, 44px); white-space: normal; overflow-wrap: break-word; }
     #launch-agent-pick .launch-agent-opt:nth-child(-n+2) { border-bottom: 1px solid var(--control-border); }
     .seg-group:not(.seg-cards) > .btn:nth-child(2n+1) { border-inline-start: 0; } /* the grid's first column has no divider on its left edge */
-    .launch-persona-row .btn, .launch-persona-row .agent-preset-select { min-height: var(--control-touch-height, 44px); }
+    .launch-persona-row .btn, .launch-persona-row .btn.btn-small, .launch-persona-row .agent-preset-select { min-height: var(--control-touch-height, 44px); } /* .btn-small (38 px) is the more specific class: Save, Export and Import under More were 38 px */
 }
 
 .launch-wizard .acf-top-row { display: flex; flex-direction: column; gap: 14px; }
@@ -3907,7 +3907,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-persona-row .persona-files > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; width: auto; padding: 8px 14px; min-height: 40px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); box-sizing: border-box; }
 .launch-persona-lead { margin: 0 0 10px; font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); }
 .launch-persona-row .persona-files-row { flex-direction: column; align-items: stretch; flex-wrap: nowrap; white-space: nowrap; } /* the More menu: its three actions one under the other */
-.launch-persona-row .persona-files[open] .persona-files-row { position: absolute; right: 0; z-index: 3; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; }
+.launch-persona-row .persona-files:not([open]) > .persona-files-row { display: none; } /* closed, its three buttons took no room but were still laid out (the census saw them 38 px wide) */
+.launch-persona-row .persona-files[open] .persona-files-row { position: absolute; right: 0; width: max-content; max-width: calc(100vw - 32px); z-index: 3; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; }
 
 .launch-wizard .launch-cli-slot { margin: 0 0 6px; }
 
