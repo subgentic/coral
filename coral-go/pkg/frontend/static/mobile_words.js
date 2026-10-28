@@ -9,7 +9,9 @@ export const DISABLED_WORDS = 'Mobile access is off. Turning it on lets devices 
 export const OPEN_ON_PHONE = "Open this address on your phone's browser, then tap Add to Home Screen for an app-like experience.";
 export const SAME_NETWORK = 'Your phone must be on the same network as this computer.';
 export const SETUP_CODE_WHERE = "Your phone asks for the setup code on the sign-in page the first time, when it creates your password. This computer's own browser never asks for it.";
-export const NO_SETUP_CODE = 'No setup code is open: your phone signs in with your password. To create a password from your phone, run coral setup-code on this computer.';
+export const NO_SETUP_CODE = 'No setup code is open: your phone signs in with your password.';
+/** When the code could not be read (a dashboard opened through Coral Hub or from another computer, or a network error): where it can be shown, not that there is none. */
+export const CODE_ONLY_HERE = 'The setup code can only be shown on this computer.';
 
 export const SHOW_CODE = 'Show setup code';
 export const HIDE_CODE = 'Hide setup code';

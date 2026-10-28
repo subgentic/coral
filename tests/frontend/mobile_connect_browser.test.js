@@ -75,7 +75,7 @@ const BASE = require('./test_base').BASE;
         // Focus trap excludes controls hidden in the enabled-only details.
         await Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9,modifiers:8});
         await Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-        assert.equal(await ev('document.activeElement.textContent'),'Use Coral Hub instead');
+        assert.equal(await ev('document.activeElement.textContent'),'Cancel'); // Shift+Tab from the first button wraps to the last: Enable, Use Coral Hub instead, Cancel
         await action('Cancel');
         assert.equal(await ev(`document.getElementById('mobile-connect-modal').style.display`),'none');
         assert.equal(await ev('document.activeElement.id'),'qr-test-opener');

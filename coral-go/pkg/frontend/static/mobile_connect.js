@@ -1,7 +1,7 @@
 /* Mobile connection flow: saved preference is not proof of effective access. */
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
-const { ENABLE_LABEL, USE_HUB_LABEL, DISABLED_WORDS, OPEN_ON_PHONE, SAME_NETWORK, SETUP_CODE_WHERE, NO_SETUP_CODE, SHOW_CODE, HIDE_CODE, CODE_SHOW_MS, setupCodeHint } = await importOnce('./mobile_words.js'); // this file is loaded lazily: a module it needs is loaded through importOnce, so a failure can be retried
+const { ENABLE_LABEL, USE_HUB_LABEL, DISABLED_WORDS, OPEN_ON_PHONE, SAME_NETWORK, SETUP_CODE_WHERE, NO_SETUP_CODE, CODE_ONLY_HERE, SHOW_CODE, HIDE_CODE, CODE_SHOW_MS, setupCodeHint } = await importOnce('./mobile_words.js'); // this file is loaded lazily: a module it needs is loaded through importOnce, so a failure can be retried
 
 let generation = 0;
 let controller = null;
@@ -150,14 +150,15 @@ function useCoralHub() {
 async function renderSetupCode(gen, signal) {
     const box = byId('mobile-connect-setup');
     if (!box) return;
-    let code = '', expires = 0;
+    let code = '', expires = 0, unreadable = false;
     try {
         const r = await fetch('/api/auth/setup-code/show', { signal, cache: 'no-store' });
         if (r.ok) { const d = await r.json(); if (d && typeof d.code === 'string' && d.code) { code = d.code; expires = d.expires_in; } }
-    } catch (e) { if (e && e.name === 'AbortError') return; }
+        else unreadable = true; // refused (a dashboard opened through Coral Hub or from another computer) or not there: not the same as "no code is open"
+    } catch (e) { if (e && e.name === 'AbortError') return; unreadable = true; }
     if (!current(gen)) return;
     const line = text => { const p = document.createElement('p'); p.className = 'text-secondary-sm'; p.textContent = text; return p; };
-    if (!code) { box.replaceChildren(line(NO_SETUP_CODE)); return; }
+    if (!code) { box.replaceChildren(line(unreadable ? CODE_ONLY_HERE : NO_SETUP_CODE)); return; }
     const { spellCode } = await importOnce('./cloud_words.js');
     if (!current(gen)) return;
     const title = document.createElement('strong'); title.textContent = 'Setup code';

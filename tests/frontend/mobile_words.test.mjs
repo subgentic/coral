@@ -16,7 +16,9 @@ assert.equal(W.ENABLE_LABEL, 'Enable');
 assert.match(W.OPEN_ON_PHONE, /Open this address on your phone/); assert.match(W.OPEN_ON_PHONE, /Add to Home Screen/);
 assert.match(W.SAME_NETWORK, /same network as this computer/);
 assert.match(W.SETUP_CODE_WHERE, /phone asks for the setup code/); assert.match(W.SETUP_CODE_WHERE, /creates your password/); assert.match(W.SETUP_CODE_WHERE, /this computer's own browser never asks/i);
-assert.match(W.NO_SETUP_CODE, /password/); assert.match(W.NO_SETUP_CODE, /coral setup-code/);
+assert.match(W.NO_SETUP_CODE, /No setup code is open: your phone signs in with your password\./);
+assert.doesNotMatch(W.NO_SETUP_CODE, /coral setup-code/, 'a password cannot be created again: nothing about creating one');
+assert.equal(W.CODE_ONLY_HERE, 'The setup code can only be shown on this computer.', 'a failed read (the Hub, another computer) says where the code is, not that there is none');
 
 // the code's hint: once, and for how long
 assert.equal(W.setupCodeHint(300), 'It works once and is valid for about 5 more minutes. It hides itself in a minute.');
