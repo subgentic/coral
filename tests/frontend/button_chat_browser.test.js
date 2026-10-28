@@ -28,7 +28,7 @@ const COPY = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-co
                 assert.equal(b.pos, 'absolute', `${at}placed in the bubble's corner`);
                 assert.ok(b.w >= 24 && b.w <= 28 && b.h >= 24 && b.h <= 28, `${at}a 24 px box: ${b.w}x${b.h}`);
                 if (mobile) assert.ok(b.hit >= 44, `${at}a 44 px hit area on touch: ${b.hit}`);
-                if (!mobile) assert.equal(b.opacity, '0', `${at}revealed on hover: ${b.opacity}`); // on a real touch screen (hover: none) they are always shown: the emulated touch does not switch that media feature
+                if (!mobile) { if (/chat-copy-btn/.test(b.cls)) assert.ok(parseFloat(b.opacity) >= 0.5, `${at}Copy is on every reply without hover (#10050): ${b.opacity}`); else assert.equal(b.opacity, '0', `${at}Save is revealed on hover: ${b.opacity}`); } // on a real touch screen (hover: none) they are always shown: the emulated touch does not switch that media feature
             }
             if (!mobile) { // the hover reveal
                 const pt = await ev(`(() => { const r = document.querySelector('#chat-probe .chat-bubble.assistant').getBoundingClientRect(); return [r.left + 40, r.top + r.height / 2]; })()`);

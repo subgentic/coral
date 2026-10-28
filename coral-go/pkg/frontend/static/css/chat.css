@@ -1280,13 +1280,13 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 }
 
 /* Copy button on agent replies: top-right of a bubble, or tucked into the
-   space under the reply's right edge in prose mode. Shown on hover or keyboard focus. */
+   space under the reply's right edge in prose mode. Always there, quiet; full on hover or keyboard focus (#10050: a person who does not hover never found it). */
 .chat-bubble.assistant button.chat-copy-btn {
     position: absolute;
     top: 6px;
     right: 6px;
     margin: 0;
-    opacity: 0;
+    opacity: 0.55;
     transition: opacity 0.12s;
 }
 .chat-bubble.assistant:hover .chat-copy-btn,
