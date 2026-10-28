@@ -118,6 +118,7 @@ function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER, picked
     const mode = defaultPermissionMode(_settingsFor(server), agentType);
     const permFlag = _getPermissionFlagsForAgentMode(agentType, mode);
     if (!permFlag) return Promise.resolve('skip');
+    const modeName = { plan: 'Plan', acceptEdits: 'Accept edits', auto: 'Auto', bypassPermissions: 'Bypass permissions', dontAsk: "Don't ask" }[mode] || 'Auto'; // the saved default's name, not its CLI flag (#10074)
     return new Promise((resolve) => {
         if (flagsStr && _hasPermFlag(flagsStr)) {
             resolve('skip');
@@ -128,14 +129,14 @@ function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER, picked
         modal.style.display = 'flex';
         modal.innerHTML = `
             <div class="modal-content dlg-confirm cli-dialog cli-dialog-narrow">
-                <h3>Permission Prompt Warning</h3>
+                <h3>Default mode waits for you</h3>
                 <p class="cli-dialog-text cli-dialog-text-roomy">
-                    Agents may get stuck on permission prompts without <code>${escapeHtml(permFlag)}</code>. Would you like to enable it?
+                    Default mode stops and waits for you each time. Use ${escapeHtml(modeName)} so it keeps going?
                 </p>
                 <div class="modal-actions cli-dialog-actions-tight">
                     <button class="btn" data-action="cancel">Cancel</button>
-                    <button class="btn" data-action="skip">Launch Without</button>
-                    <button class="btn btn-primary" data-action="enable">Enable &amp; Launch</button>
+                    <button class="btn" data-action="skip">Keep Default</button>
+                    <button class="btn btn-primary" data-action="enable">Use ${escapeHtml(modeName)}</button>
                 </div>
             </div>
         `;
