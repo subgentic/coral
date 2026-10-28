@@ -111,6 +111,7 @@
 }
 .cost-title-block { min-width: 0; }
 .cost-header h2:focus { outline: none; } /* a phone's screen change puts the focus on the title: it is a place to start reading, not a control */
+.cost-view-question { margin: 2px 0 0; font-size: var(--fs-md); color: var(--text-secondary); } /* the question the page answers, under its title (#10482) */
 .cost-range-line { margin: 2px 0 0; font-size: var(--fs-md); color: var(--text-secondary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .cost-header-actions {
