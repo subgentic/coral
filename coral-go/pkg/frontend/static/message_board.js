@@ -4,6 +4,7 @@ import { emptyState } from './dom_write.js';
 import { escapeAttr, escapeHtml, showView, OPERATOR_ID, showToast } from './utils.js';
 import { keyLabel, splitKey, hasBoardLabel, boardFetch, noteBoardLabel, inTeam } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { agentWords, deleteTeamWords } from './agent_words.js';
 import { state } from './state.js';
 import { initGrowingTextarea } from './growing_textarea.js';
 import { mountBoardSearch, resetBoardSearch, highlightBoard } from './board_search.js';
@@ -224,14 +225,7 @@ document.addEventListener('coral:server-access-loaded', () => syncBoardDeleteBut
 
 /** The agents running on this board now, by name (the live list: not asleep, not archived). */
 function runningAgentsOn(project) {
-    return (state.liveSessions || []).filter(a => inTeam(a, project) && !a.sleeping && !a.archived).map(a => a.display_name || a.name);
-}
-
-/** "2 agents are still on this board (A, B): kill them or move them first": the server's words (DeleteBoard, #5043), for the answer it does not have to give. */
-function runningAgentsText(names) {
-    const shown = names.length > 5 ? [...names.slice(0, 5), '…'] : names;
-    return names.length === 1 ? `1 agent is still on this board (${shown.join(', ')}): kill it or move it first`
-        : `${names.length} agents are still on this board (${shown.join(', ')}): kill them or move them first`;
+    return (state.liveSessions || []).filter(a => inTeam(a, project) && !a.sleeping && !a.archived).map(a => agentWords(a, a.display_name || a.name).role);
 }
 
 export function deleteMessageBoardProject() {
@@ -242,8 +236,11 @@ export function deleteMessageBoardProject() {
     // A board with agents running is not deleted (#5043): they would stay live in a group named with the raw board id. Said here, before asking; the server
     // says it again for an agent this page's list does not show yet.
     const running = runningAgentsOn(project);
-    if (running.length) { showToast(runningAgentsText(running), true); return; }
-    window.showConfirmModal('Delete board', `Delete board "${keyLabel(project)}" with all its messages and tasks? This cannot be undone.`, async () => {
+    if (running.length) { // a real dialog, not a toast that is gone before it is read (#10139): which agents, and the way out; the server says it again for one this list does not show yet
+        window.showConfirmModal('Delete team', deleteTeamWords(keyLabel(project), running), () => { window.openTeamPage?.(project); }, undefined, { label: 'Show its agents', cancelLabel: 'Close', danger: false });
+        return;
+    }
+    window.showConfirmModal('Delete team', deleteTeamWords(keyLabel(project)), async () => {
         try {
             const resp = await boardFetch(project, ``, { method: 'DELETE' });
             if (!resp.ok) {
@@ -257,7 +254,7 @@ export function deleteMessageBoardProject() {
             console.error('Failed to delete project:', e);
             showToast('Could not reach Coral to delete the board.', true);
         }
-    }, undefined, { label: 'Delete board', danger: true });
+    }, undefined, { label: 'Delete team', danger: true });
 }
 
 // ── Polling ──────────────────────────────────────────────────────────────

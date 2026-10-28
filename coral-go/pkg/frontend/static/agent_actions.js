@@ -8,6 +8,8 @@ import { showToast, showView } from './utils.js';
 import { redrawLiveList } from './list_hooks.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { importOnce } from './import_once.js';
+import { resolveSessionIdentity } from './session_state.js';
+import { agentWords, WHAT_STAYS_KILL, WHAT_STAYS_ARCHIVE } from './agent_words.js';
 import { applySleepingView } from './sleeping_view.js';
 
 // What Kill does with the agent's terminal log, said in every Kill confirmation (#4399): it is kept, on both terminal backends
@@ -26,14 +28,15 @@ export function killCount(n) {
 export function killSessionDirect(name, agentType, sessionId) {
     const server = serverForSession(name, sessionId);
     const row = (state.liveSessions || []).find(s => s.session_id === sessionId);
-    showConfirmModal('Kill session', `Kill session "${name}"? This will terminate the agent. ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
+    const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label; // the agent by its role and team, not the folder it works in (#10139)
+    showConfirmModal('Kill session', `Kill ${who}? This will terminate the agent. ${WHAT_STAYS_KILL} ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
         const result = await killLiveSession({ name, agent_type: agentType, session_id: sessionId }, server);
         if (!result) throw new Error('the kill answer was not JSON');
         if (result.error) { showToast(result.error, true); return; }
         if (result.changes_artifact_error) {
             showToast(`Killed, but changes.diff could not be saved: ${result.changes_artifact_error}`, true);
         } else {
-            showToast(`Killed and saved changes.diff: ${name}`);
+            showToast(`Killed and saved changes.diff: ${who}`);
         }
         showWorktreeNotice(result.worktree, 'agent'); // what became of its worktree, if it had one (#6707); a kept one stays on screen with its path (#6818)
         // The row goes at once: the agent's chat stays in History. A killed agent is not listed again.
@@ -130,7 +133,8 @@ export function toggleAgentArchive(name, agentType, sessionId, action) {
                     applySleepingView(true, { archived: !!data.archived, manageInput: !document.body.classList.contains('popout-mode') });
                 }
             }
-            showToast(data.archived ? `"${name}" is archived` : `"${name}" is unarchived (sleeping)`);
+            const label = agentWords(s, s ? resolveSessionIdentity(s) : name).label; // by role and team (#10139)
+            showToast(data.archived ? `${label} is archived. Its chat history and files stay.` : `${label} is unarchived (sleeping)`);
             return true;
         } catch (e) {
             showToast(`Failed to ${action} agent`, true);
@@ -141,7 +145,7 @@ export function toggleAgentArchive(name, agentType, sessionId, action) {
         const s = state.liveSessions.find(s => s.session_id === sessionId && sessionServer(s) === server);
         const stops = s && !s.sleeping ? ' It will be stopped.' : '';
         return new Promise(resolve => showConfirmModal('Archive agent',
-            `Archive "${name}"?${stops} Archived agents are not woken with their team or by Wake All.`,
+            `Archive ${agentWords(s, s ? resolveSessionIdentity(s) : name).label}?${stops} Archived agents are not woken with their team or by Wake All. ${WHAT_STAYS_ARCHIVE}`,
             async () => resolve(await doIt()), () => resolve(false), { danger: false, label: 'Archive' }));
     }
     return doIt();

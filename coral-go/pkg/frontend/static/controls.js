@@ -15,6 +15,8 @@ import { renderLiveSessions, KILL_LOG_NOTE } from './render.js';
 import './agentic_state.js';
 import { addPendingMessage, confirmPendingMessage, removePendingMessage } from './live_chat.js';
 import { serverFetch, currentServer, serverForSession, sessionServer } from './server_base.js';
+import { resolveSessionIdentity } from './session_state.js';
+import { agentWords, WHAT_STAYS_KILL } from './agent_words.js';
 import './sleeping_view.js';
 import { hubBlocked } from './hub_access.js';
 import './image_attach.js';
@@ -523,7 +525,8 @@ export async function killSession() {
     }
 
     const cur = state.currentSession;
-    window.showConfirmModal('Kill session', `Kill session "${cur.name}"? This will terminate the agent. ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
+    const who = agentWords(cur, resolveSessionIdentity(cur)).label; // the agent by its role and team, not the folder it works in (#10139)
+    window.showConfirmModal('Kill session', `Kill ${who}? This will terminate the agent. ${WHAT_STAYS_KILL} ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
         try {
             const killed = state.currentSession;
             const result = await killLiveSession(killed, currentServer());
@@ -534,7 +537,7 @@ export async function killSession() {
                 if (result.changes_artifact_error) {
                     showToast(`Killed, but changes.diff could not be saved: ${result.changes_artifact_error}`, true);
                 } else {
-                    showToast(`Killed and saved changes.diff: ${killed.name}`);
+                    showToast(`Killed and saved changes.diff: ${agentWords(killed, resolveSessionIdentity(killed)).label}`);
                 }
                 showWorktreeNotice(result.worktree, 'agent'); // what became of its worktree, if it had one (#6707); a kept one stays on screen with its path (#6818)
                 // The row goes at once; the agent's chat stays in History.

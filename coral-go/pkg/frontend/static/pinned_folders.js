@@ -5,6 +5,7 @@
  * folder; any folder's menu pins or unpins it. */
 
 import { showToast } from './utils.js';
+import { unpinWords } from './agent_words.js';
 import { identityKey, LOCAL_SERVER } from './server_base.js';
 import { attachDialogFocus } from './dialog_focus.js';
 import { importOnce } from './import_once.js';
@@ -99,7 +100,7 @@ export async function unpinFolder(path) {
             return false;
         }
         await loadPinnedFolders();
-        showToast('Folder unpinned');
+        showToast(unpinWords(path), false, undefined, { action: { label: 'Undo', onClick: () => { pinFolder(path); } } }); // what it did and did not do, and the way back (#10139)
         return true;
     } catch {
         showToast('Could not unpin the folder', true);
