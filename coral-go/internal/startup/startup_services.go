@@ -434,7 +434,7 @@ func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, 
 		}
 		return
 	}
-	log.Printf("[CLOUD] Coral Hub: %s (nothing is sent until this server is connected: Settings > Coral Hub)", hubURL)
+	log.Printf("[CLOUD] Coral Hub: %s (nothing is sent until this server is connected: Settings > Network and Hub)", hubURL)
 	safeGo(ctx, "cloud_connector", func() {
 		mgr.Bootstrap(ctx, ss, hostname, src)
 		mgr.Run(ctx)

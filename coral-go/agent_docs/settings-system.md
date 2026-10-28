@@ -123,7 +123,7 @@ The refresh fetches now (202). It is the Operator's (not an agent token, not Cor
 
 A launch's `model` must be a model id: letters, digits and `. _ : / @ [ ] + -`, at most 128 characters, not starting with `-`. Anything else is answered 400.
 
-### Custom models (Settings > Custom models, #5480)
+### Custom models (Settings > Agents > Custom models, #5480)
 
 ```
 GET /api/custom-models
