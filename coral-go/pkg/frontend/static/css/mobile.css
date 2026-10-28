@@ -420,7 +420,8 @@
     #command-pane { flex-direction: row; flex-wrap: wrap; }
     #command-pane > .command-pane-body { flex: 1 1 0; min-width: 0; }
     #command-pane > .command-pane-toolbar { flex: none; padding: 6px 8px 6px 0; align-self: flex-end; }
-    #command-pane > #composer-error, #command-pane > #sleeping-composer, #command-pane > .model-chip-note:not(:empty) { flex: 0 0 100%; }
+    #command-pane > #sleeping-composer, #command-pane > .model-chip-note:not(:empty) { flex: 0 0 100%; }
+    #command-pane > #composer-error { flex: 1 1 100%; min-width: 0; } /* a line of its own that shrinks by its 8 px margins: 0 0 100% plus the margins ran 16 px past the screen's edge (#9985) */
     #command-pane:not(.chat-mode) > .command-pane-toolbar { flex: 0 0 100%; padding: 4px 8px 8px; }
     @container command-pane (max-width: 18rem) { #command-pane > .command-pane-toolbar { flex: 0 0 100%; padding: 4px 8px 8px; } } /* at 200% text the pane is about 12 rem wide: the box keeps its width and Options goes under it, as it is not squeezed to a strip */
 
