@@ -99,13 +99,15 @@ export async function maybePromptSetPassword() {
     showSetPasswordModal({ local: st.local === true });
 }
 
+const coarse = () => window.matchMedia?.('(pointer: coarse)').matches; // a touch screen: no search box takes the focus (its keyboard covers the page)
+
 /** Home's first control by keyboard: its New agent card, else the agent search box (a phone's too), else the menu button or the current top tab. */
 function pageControl() {
-    if (window.matchMedia?.('(pointer: coarse)').matches) { // a touch screen: the page's heading, not a box whose focus raises the on-screen keyboard (#10281)
+    if (coarse()) { // a touch screen: the page's heading, not a box whose focus raises the on-screen keyboard (#10281)
         const h = ['#welcome-screen h1', '#mobile-session-list h2', '#mobile-agent-list h2', '.main-content h1'].map(sel => [...document.querySelectorAll(sel)].find(x => x.getClientRects().length > 0)).find(Boolean);
         if (h) { h.tabIndex = -1; return h; }
     }
-    for (const sel of ['#welcome-screen .welcome-launch[data-arg="agent"]', '#agent-search-input', '#mobile-agent-list .mobile-search-input', '#top-menu-btn', '.top-nav-tab.active']) {
+    for (const sel of ['#welcome-screen .welcome-launch[data-arg="agent"]', ...(coarse() ? [] : ['#agent-search-input', '#mobile-agent-list .mobile-search-input']), '#top-menu-btn', '.top-nav-tab.active']) {
         const e = [...document.querySelectorAll(sel)].find(x => x.getClientRects().length > 0);
         if (e) return e;
     }
@@ -160,7 +162,7 @@ export function showSetPasswordModal({ local = false } = {}) {
         window.removeEventListener('focus', recheck);
         clearInterval(recheckTimer);
         modal.remove();
-        const back = opener && opener !== document.body && opener.focus && opener.isConnected ? opener : pageControl(); // opened at startup there is no opener (the body): the keyboard goes to the page's first control, not nowhere (#10067)
+        const back = opener && opener !== document.body && opener.focus && opener.isConnected && !(coarse() && opener.matches?.('input:not([type=button],[type=checkbox],[type=submit]),textarea')) ? opener : pageControl(); // a phone's Search agents (the box that had the focus) would raise the keyboard over the result (#10720) // opened at startup there is no opener (the body): the keyboard goes to the page's first control, not nowhere (#10067)
         if (back) back.focus();
         document.dispatchEvent(new CustomEvent('coral:password-prompt-closed'));
     };
@@ -188,7 +190,7 @@ export function showSetPasswordModal({ local = false } = {}) {
         catch { res = { ok: false, status: 0, data: { error: 'Could not reach Coral. Try again.' } }; }
         if (res.ok || res.status === 409) {
             close();
-            showToast(res.ok ? 'Password set. Browsers on other computers can now sign in with it.' : 'A password is already set. Change it in Settings, Security.');
+            showToast(res.ok ? 'Password set. Other computers can sign in.' : 'Already set: change it in Settings.'); // one line on a phone, where a toast is cut at the first (#10720)
             document.dispatchEvent(new CustomEvent('coral:password-changed'));
             return;
         }
