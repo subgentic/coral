@@ -22,11 +22,16 @@ const TEAM = `qa-count-${Date.now() % 100000}`;
             return R(u, o); }; return true; })()`);
         await openTeam(ev, waitFor, TEAM); await settle(500);
         await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); t.click(); return true; })()`);
-        await waitFor(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).length === 3`, 'the three agents in the table', { timeout: 8000 });
+        await waitFor(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).length === 2`, 'the two live agents in the table', { timeout: 8000 });
         const r = await ev(`(() => { const tab = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); const g = [...document.querySelectorAll('.session-group-count')].find(e => e.closest('.session-board-card, .session-team-group')); return { tab: (tab.querySelector('.team-tab-count') || {}).textContent || '', group: g ? g.textContent.trim() : null, chips: [...document.querySelectorAll('.goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim()) }; })()`);
         assert.equal(r.group, '2', 'the sidebar group lists the two live agents: ' + JSON.stringify(r));
         assert.equal(r.tab, r.group, 'the tab says the same number as the sidebar group: ' + JSON.stringify(r));
         assert.ok(r.chips.some(c => /^Archived\s*1/.test(c)), 'the archived agent is still found under its chip: ' + JSON.stringify(r.chips));
-        console.log('PASS the Agents tab and the sidebar group count the same agents, and the archived one is under its chip');
+        const line = await ev(`(document.querySelector('.team-agents-count') || {}).textContent || ''`);
+        assert.equal(line, '2 agents, +1 archived', 'the count line follows the badge and tells the archived one apart (#10369): ' + line);
+        assert.ok(r.chips.some(c => /^All\s*2/.test(c)), 'the All chip counts the same two: ' + JSON.stringify(r.chips));
+        await ev(`[...document.querySelectorAll('.goals-chip')].find(c => /^Archived/.test(c.textContent.trim())).click(); true`);
+        await waitFor(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).length === 1`, 'the archived agent under its chip', { timeout: 8000 });
+        console.log('PASS the Agents tab and the sidebar group count the same agents, and the archived one is under its chip'); // the table keeps it there
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });
