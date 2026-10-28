@@ -114,8 +114,15 @@ async function call(method, path, body) {
     return { ok: r.ok, status: r.status, data, code: data && typeof data.error === 'string' ? data.error : '' };
 }
 
-let dialog = null;
+let dialog = null, escapeBack = null, liveEl = null; // escapeBack: what Escape does while a question is showing (go back to the list); liveEl: the status a done revoke or link is said in
 const close = () => { if (dialog && dialog.open) dialog.close(); };
+/** The control the keyboard goes back to when the dialog closes: the one it opened from, or, when that was a menu item (the menu is shut by then), that menu's own button (#9892). */
+function giveFocusBack(from) {
+    let t = from;
+    if (!t || !t.isConnected || !t.getClientRects().length) t = from && from.closest ? (from.closest('.sidebar-kebab-wrapper') || from.closest('.overflow-menu'))?.querySelector('.sidebar-kebab-btn, [aria-haspopup]') : null;
+    if (t && t.isConnected) t.focus({ preventScroll: true });
+}
+const announce = (text) => { if (liveEl) liveEl.textContent = text; };
 
 /** Open the dialog for the team `teamKey` (an identity key: a name, or @server/name). opts: { cloud } (the mode; the dashboard's own by default), opener (the control to give the focus back to). */
 export async function showTeamLinkDialog(teamKey, opts = {}) {
@@ -125,11 +132,15 @@ export async function showTeamLinkDialog(teamKey, opts = {}) {
         dialog = mk('dialog', 'modal-content dlg-form team-link-dialog');
         dialog.id = 'team-link-dialog';
         dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true'); dialog.setAttribute('aria-labelledby', 'team-link-title');
-        dialog.addEventListener('cancel', (e) => { if (dialog.dataset.busy) e.preventDefault(); }); // Escape does not drop a request in flight
+        dialog.addEventListener('cancel', (e) => { if (dialog.dataset.busy) e.preventDefault(); else if (escapeBack) { e.preventDefault(); escapeBack(); } }); // Escape does not drop a request in flight, and in a question it goes back to the list (#9892)
         document.body.appendChild(dialog);
     }
     close();
     dialog.replaceChildren();
+    // where the keyboard goes back to: the control it opened from; but a menu item has shut its menu and dropped the focus on the page by now, so it is the team's own menu button (found by its Link item's data-board)
+    const active = document.activeElement, ownerBtn = (board) => [...document.querySelectorAll('.menu-item[data-on-click="team-link"]')].find(i => i.dataset.board === board)?.closest('.sidebar-kebab-wrapper')?.querySelector('.sidebar-kebab-btn') || null;
+    const from = opts.opener || (active && active !== document.body && active.getClientRects().length ? active : ownerBtn(opts.board || teamKey)) || active;
+    escapeBack = null;
     const teamName = keyLabel(teamKey);
     const head = mk('div', 'modal-header'); const h = mk('h3', null, 'Link a team'); h.id = 'team-link-title'; head.append(mk('div', 'team-link-title-row'));
     head.firstChild.append(h, mk('span', 'team-link-team', teamName));
@@ -137,10 +148,12 @@ export async function showTeamLinkDialog(teamKey, opts = {}) {
     const foot = mk('div', 'modal-actions modal-footer');
     const closeBtn = mk('button', 'btn team-link-close', 'Close'); closeBtn.type = 'button'; closeBtn.addEventListener('click', close);
     foot.append(closeBtn);
-    dialog.append(head, body, foot);
-    dialog.addEventListener('close', () => { if (opts.opener && opts.opener.isConnected) opts.opener.focus({ preventScroll: true }); }, { once: true });
+    liveEl = mk('p', 'sr-only team-link-live'); liveEl.setAttribute('role', 'status');
+    dialog.append(head, body, foot, liveEl);
+    dialog.addEventListener('close', () => giveFocusBack(from), { once: true });
     dialog.showModal();
     if (cloud) await renderCloud(body, own, teamName); else await renderLocal(body, own);
+    h.tabIndex = -1; h.focus({ preventScroll: true }); // the dialog's title once its content is in: showModal had put the keyboard on Close, at the bottom (#9892)
 }
 
 function say(body, text, cls = 'team-link-note') { const p = mk('p', cls, text); body.append(p); return p; }
@@ -172,9 +185,10 @@ async function renderCloud(body, own, teamName) {
     const nameOf = id => { const s = serverList.find(x => x && x.id === id); return (s && s.label) || 'Another computer'; };
     const seen = d => rowsFor(Array.isArray(d) ? d : (d && d.links) || []).map(l => linkRow(l, own)).filter(Boolean);
     const rows = seen(links.data);
-    const draw = (message = '') => {
-        body.replaceChildren();
-        body.append(mk('h4', 'team-link-h', `Teams linked to ${teamName}`), mk('p', 'team-link-hint', 'A link lets one team message the other. It is one way unless it says both.'));
+    const draw = (message = '', focusSel = '', said = '', quiet = false) => {
+        body.replaceChildren(); escapeBack = null;
+        const heading = mk('h4', 'team-link-h', `Teams linked to ${teamName}`); heading.tabIndex = -1;
+        body.append(heading, mk('p', 'team-link-hint', 'A link lets one team message the other. It is one way unless it says both.'));
         body.append(mk('h5', 'team-link-group', 'Other computers'));
         if (files) body.append(mk('p', 'team-link-hint', 'Files follow the account setting in Coral Hub.'));
         if (!rows.length) say(body, 'Not linked to any team');
@@ -188,7 +202,7 @@ async function renderCloud(body, own, teamName) {
             const filesChip = files ? mk('span', 'chip team-link-files', files.on ? 'Files allowed' : 'No files') : null;
             const state = mk('span', `team-link-state${row.state === 'Active' ? ' is-active' : row.state === 'Not delivered' ? ' is-warn' : ''}`, row.state);
             const revoke = mk('button', 'btn btn-quiet btn-small team-link-revoke', 'Revoke'); revoke.type = 'button';
-            revoke.setAttribute('aria-label', `Revoke the link: ${directionWords(row)}, ${row.end.label || row.end.team} on ${nameOf(row.end.server)}`);
+            revoke.dataset.linkId = String(row.id); revoke.setAttribute('aria-label', `Revoke the link with ${row.end.label || row.end.team} on ${nameOf(row.end.server)}, ${directionWords(row)}${row.state ? `, ${row.state}` : ''}`); // named for the team, the computer, the direction and the state (#9892)
             revoke.addEventListener('click', () => confirmRevoke(row));
             const circle = DT.avatar(who).querySelector('.dt-avatar'); circle.classList.add('team-link-avatar'); // the circle only: the name is in the text beside it
             if (filesChip) li.append(circle, text, filesChip, state, revoke); else li.append(circle, text, state, revoke);
@@ -197,25 +211,28 @@ async function renderCloud(body, own, teamName) {
         body.append(list);
         form();
         if (message) { const e = mk('p', 'team-link-error', message); e.setAttribute('role', 'alert'); body.append(e); }
+        if (said) announce(said);
+        if (!quiet) { const to = focusSel && body.querySelector(focusSel); (to || heading).focus({ preventScroll: true }); } // the control that asked, or the list's heading: the keyboard is never left on the page behind (#9892)
     };
-    const confirmView = (text, doIt, backTo) => {
+    const confirmView = (text, doIt, backTo, { destructive = false, origin = '', done = '' } = {}) => {
         body.replaceChildren();
         body.append(mk('p', 'team-link-confirm', text));
         const acts = mk('div', 'team-link-confirm-actions');
-        const back = mk('button', 'btn team-link-back', 'Back'); back.type = 'button'; back.addEventListener('click', () => draw());
+        const back = mk('button', 'btn team-link-back', 'Back'); back.type = 'button'; back.addEventListener('click', () => draw('', origin));
+        escapeBack = () => draw('', origin); // Escape in a question is Back, not closing the dialog
         const go = mk('button', 'btn btn-primary team-link-go', backTo); go.type = 'button';
         go.addEventListener('click', async () => {
             go.disabled = back.disabled = true; dialog.dataset.busy = '1';
             const res = await doIt(); delete dialog.dataset.busy;
-            if (res.ok) { await refresh(); draw(); } else draw(errorWords(res.status, res.code));
+            if (res.ok) { await refresh(); draw('', '', done); } else draw(errorWords(res.status, res.code), origin);
         });
-        acts.append(back, go); body.append(acts); go.focus();
+        acts.append(back, go); body.append(acts); (destructive ? back : go).focus(); // a revoke asks with Back focused: the safe answer, not the destructive button (#9892)
     };
     const refresh = async () => { const r = await call('GET', '/api/relay/links'); if (r.ok) { rows.length = 0; rows.push(...seen(r.data)); } };
     const confirmRevoke = (row) => {
         const who = row.end.label || row.end.team;
         const effect = row.mayMessageUs ? `${who} can no longer message this team` : `This team can no longer message ${who}`;
-        confirmView(`Revoke this link with ${who} on ${nameOf(row.end.server)}? ${effect}, at once. What was already received stays.`, () => call('DELETE', `/api/relay/links/${encodeURIComponent(row.id)}`), 'Revoke');
+        confirmView(`Revoke this link with ${who} on ${nameOf(row.end.server)}? ${effect}, at once. What was already received stays.`, () => call('DELETE', `/api/relay/links/${encodeURIComponent(row.id)}`), 'Revoke', { destructive: true, origin: `.team-link-revoke[data-link-id="${String(row.id).replace(/"/g, '')}"]`, done: `Revoked the link with ${who} on ${nameOf(row.end.server)}.` });
     };
     const form = () => {
         const computers = pickableComputers(serverList, own.server, versionsKnown);
@@ -253,11 +270,11 @@ async function renderCloud(body, own, teamName) {
             if (!c || !t) return;
             const other = { server: c.id, team: t.id };
             const words = { they: `${t.label} will be able to message ${teamName}`, we: `${teamName} will be able to message ${t.label}`, both: `${teamName} and ${t.label} will be able to message each other` }[dir.value];
-            confirmView(`Link ${t.label} on ${c.label || 'that computer'}? ${words}, starting now.`, () => call('POST', '/api/relay/links', createBody(dir.value, own, other)), 'Link');
+            confirmView(`Link ${t.label} on ${c.label || 'that computer'}? ${words}, starting now.`, () => call('POST', '/api/relay/links', createBody(dir.value, own, other)), 'Link', { origin: '.team-link-link', done: `Linked ${t.label} on ${c.label || 'that computer'}.` });
         });
         f.append(cl, computer, tl, team, dl, dir, hint, ...older, go);
         card.append(f); body.append(card);
         loadTeams();
     };
-    draw();
+    draw('', '', '', true);
 }

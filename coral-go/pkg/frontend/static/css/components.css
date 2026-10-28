@@ -4056,7 +4056,7 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .team-link-group { margin: var(--space-sm) 0 0; font-size: var(--fs-sm); font-weight: var(--fw-strong); letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--text-secondary); }
 .team-link-list { list-style: none; margin: 0; padding: 0; }
 .team-link-row { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-sm) 0; border-top: 1px solid var(--border); }
-.team-link-avatar { flex: none; }
+.team-link-dialog .team-link-avatar { flex: none; width: 1.25rem; height: 1.25rem; font-size: var(--fs-sm); } /* the circle grows with the text (it stayed 20 px at 200%, #9892) */
 .team-link-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .team-link-name { font-weight: var(--fw-medium); }
 .team-link-where, .team-link-hint, .team-link-note, .team-link-sentence { color: var(--text-secondary); font-size: var(--fs-base); margin: 0; }
