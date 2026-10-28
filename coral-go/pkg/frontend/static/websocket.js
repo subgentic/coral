@@ -221,7 +221,9 @@ function _raiseNeedsInputAlert(s, id) {
     const sessionId = s.session_id;
     const sessionSrv = sessionServer(s);
     const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv)).then(() => window.showChatView?.()); // the chat card is where the answer is (#10141)
-    showNotificationToast(label, detail, openSession);
+    // The question is announced once: with its card on screen in this agent's chat (a role=alert that says it) the toast is there to see and use but does not say it again (#10374).
+    const cardShown = state.currentSession?.session_id === sessionId && [...document.querySelectorAll('#live-history-messages > .chat-needs-input')].some(e => e.getClientRects().length > 0);
+    showNotificationToast(label, detail, openSession, { silent: cardShown });
     // Opt-in desktop alert while this tab is in the background; names only.
     const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
     // attention.js is read when the first alert is due, not at start (the start weight is guarded): the count it keeps is only ever needed from then on
