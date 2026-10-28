@@ -40,7 +40,8 @@ export async function openMessageMenu(btn) {
     }
     if (btn.getAttribute('aria-expanded') === 'true') { closeMenus({ restoreFocus: true }); return; }
     menu.replaceChildren();
-    const text = (bubble.querySelector('.message-text')?.innerText || '').trim();
+    let text = (bubble.querySelector('.message-text')?.innerText || '').trim();
+    if (bubble.classList.contains('assistant')) { const src = (await importOnce('./chat_messages.js')).bubbleSource.get(bubble); if (src) text = src.trim(); } // a reply is copied and sent as the agent wrote it (its markdown), as its Copy button does (#10540)
     item(menu, 'Copy', async () => { if (!(await copyText(text))) showToast('Could not copy', true); });
     const save = bubble.querySelector('.chat-save-btn');
     if (save) item(menu, save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', () => save.click());

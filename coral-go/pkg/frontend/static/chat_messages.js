@@ -71,7 +71,7 @@ function renderOneMessage(msg, container, agentType) {
     } else if (msg.type === "assistant") {
         if (msg.text) {
             const bubble = makeBubble(`chat-bubble assistant${msg.phase === "commentary" ? " commentary" : ""}`,
-                `<div class="message-text prose">${renderMarkdown(msg.text, undefined, 'chat')}</div>${msg.key ? SAVE_BUTTON : ""}${COPY_BUTTON}${messageTimeHtml(msg.timestamp)}`);
+                `<div class="message-text prose">${renderMarkdown(msg.text, undefined, 'chat')}</div>${msg.key ? SAVE_BUTTON : ""}${COPY_BUTTON}${messageMenuButton(msg.text)}${messageTimeHtml(msg.timestamp)}`); // a reply has the sent message's menu too (#10540)
             bubbleSource.set(bubble, msg.text);
             if (msg.key) { bubble.dataset.msgKey = msg.key; bubble.dataset.said = msg.timestamp || ""; } // Save for Later finds the message again by this (#4510)
             // Prose in a message that also makes tool calls is a one-line preamble ("Checking the CSS first."): it goes

@@ -50,6 +50,27 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.getElementById('command-input').value === ${JSON.stringify('half typed\n\n' + bubbleText)}`, `${w}: its box holds its draft, a blank line, then the message`, 5000);
             assert.match(await ev(`[...document.querySelectorAll('.toast')].map(t => t.textContent).join('|')`), /Added to .*message box\. Not sent\./, `${w}: the toast says where it went and that it was not sent`);
             assert.deepEqual(await ev(`window.__sends`), [], `${w}: nothing was sent`);
+            // an agent's reply has the same menu (#10540): Copy (the reply as the agent wrote it), the agents to send it to, on a solid background
+            await ev(`window.selectLiveSession('qa', 'claude', 'qa-sid', 'local'); true`); // back to the first agent (the menu above opened the other one)
+            await waitFor(`T.state.currentSession && T.state.currentSession.session_id === 'qa-sid' && window.__rendered && window.__rendered().length >= 3`, `${w}: the first agent's chat again`, 8000);
+            const rbtn = `#live-history-messages .chat-bubble.assistant .chat-msg-menu-btn`;
+            assert.equal(await ev(`!!document.querySelector(${JSON.stringify(rbtn)})`), true, `${w}: a reply has the menu button`);
+            if (mobile) assert.ok(await ev(`(() => { const b = document.querySelector(${JSON.stringify(rbtn)}); const r = b.getBoundingClientRect(); return getComputedStyle(b).opacity === '1' && r.width >= 20 && r.right <= innerWidth; })()`), `${w}: the reply's button is shown and on screen`);
+            const overlap = await ev(`(() => { const b = document.querySelector(${JSON.stringify(rbtn)}).closest('.chat-bubble'); const bs = [...b.querySelectorAll('.chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn')].filter(e => getComputedStyle(e).display !== 'none').map(e => e.getBoundingClientRect()); const hit = []; for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) if (bs[i].left < bs[j].right && bs[j].left < bs[i].right && bs[i].top < bs[j].bottom && bs[j].top < bs[i].bottom) hit.push([i, j]); return hit; })()`);
+            assert.deepEqual(overlap, [], `${w}: a reply's Copy, Save and menu buttons do not sit on each other`);
+            await ev(`window.__copied = null; navigator.clipboard.writeText = t => { window.__copied = t; return Promise.resolve(); }; true`);
+            await ev(`document.querySelector(${JSON.stringify(rbtn)}).click(); true`);
+            await waitFor(`!document.getElementById('chat-msg-menu').hidden && document.getElementById('chat-msg-menu').getClientRects().length > 0`, `${w}: the reply's menu opens`, 4000);
+            const rItems = await ev(`[...document.querySelectorAll('#chat-msg-menu [role=menuitem]')].map(b => b.textContent.trim())`);
+            assert.equal(rItems[0], 'Copy', `${w}: a reply's menu starts with Copy: ${JSON.stringify(rItems)}`);
+            assert.ok(rItems.some(x => /fe/i.test(x)) && rItems.some(x => /qa second/.test(x)) && !rItems.some(x => /^qa$/i.test(x)), `${w}: and offers the other agents: ${JSON.stringify(rItems)}`);
+            assert.equal(await ev(`document.querySelector('#chat-msg-menu .chat-msg-menu-head').textContent`), 'Send to another agent', `${w}: under its own heading`);
+            const bg = await ev(`(() => { const c = getComputedStyle(document.getElementById('chat-msg-menu')); return { bg: c.backgroundColor, opacity: c.opacity }; })()`);
+            assert.ok(/^rgb\(/.test(bg.bg) && bg.opacity === '1', `${w}: the menu's background is solid (the reply's words do not show through): ${JSON.stringify(bg)}`);
+            await ev(`document.querySelector('#chat-msg-menu [role=menuitem]').click(); true`);
+            await waitFor(`window.__copied !== null`, `${w}: Copy copies`, 3000);
+            const want = await ev(`import((window.__coralStatic || '/static/') + 'chat_messages.js').then(m => m.bubbleSource.get(document.querySelector(${JSON.stringify(rbtn)}).closest('.chat-bubble')).trim())`);
+            assert.equal(await ev(`window.__copied`), want, `${w}: it copies the reply as the agent wrote it`);
         }
         console.log('\nPASS a sent message has a menu: Copy, Save, and Send to another agent that fills the other box and sends nothing');
     } finally { await client.close(); }
