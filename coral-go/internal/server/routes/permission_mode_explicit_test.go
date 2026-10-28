@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -122,4 +123,54 @@ func TestARestartOfADefaultAgentStaysDefaultWhenAutoIsSaved(t *testing.T) {
 	assert.Contains(t, cmd, "--permission-mode default")
 	assert.NotContains(t, cmd, "--permission-mode auto")
 	assert.NotContains(t, cmd, "dangerously-skip-permissions")
+}
+
+// #10297 (Security, safety): Restart with the same settings sends no mode. An agent from before modes were recorded (no stored mode, no permission flags) restarts in Default, never the saved Auto, and the
+// answer says so; a stored mode, and permission flags of its own, are kept as they were.
+func TestARestartOfAnAgentWithNoRecordedModeIsInDefaultAndSaysSo(t *testing.T) {
+	server, _, term, ss := setupSessionsTestServer(t)
+	defer server.Close()
+	stubCLIPaths(t, ss)
+	ctx := context.Background()
+	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", "auto"))
+	str := func(s string) *string { return &s }
+	for _, c := range []struct {
+		sid, name string
+		mode      *string
+		flags     []string
+		want      string
+		note      bool
+	}{
+		{"00000000-0000-0000-0000-000000d00001", "default-stored", str("default"), nil, "default", false},
+		{"00000000-0000-0000-0000-000000d00002", "plan-stored", str("plan"), nil, "plan", false},
+		{"00000000-0000-0000-0000-000000d00003", "legacy-none", nil, nil, "default", true},
+		{"00000000-0000-0000-0000-000000d00004", "plan-flags-only", nil, []string{"--permission-mode", "plan"}, "plan", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			sn := naming.SessionName("claude", c.sid)
+			require.NoError(t, term.CreateSession(ctx, sn, t.TempDir()))
+			ls := &store.LiveSession{SessionID: c.sid, AgentType: "claude", AgentName: c.name, WorkingDir: t.TempDir(), PermissionMode: c.mode}
+			if c.flags != nil {
+				ls.Flags = store.MarshalFlags(c.flags)
+			}
+			require.NoError(t, ss.RegisterLiveSession(ctx, ls))
+			body, _ := json.Marshal(map[string]any{"session_id": c.sid, "agent_type": "claude"})
+			resp, err := http.Post(server.URL+"/api/sessions/live/"+sn+"/restart", "application/json", bytes.NewReader(body))
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			var res map[string]any
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&res))
+			if c.note {
+				assert.Equal(t, "Its mode was not recorded: restarted in Default", res["mode_note"])
+			} else {
+				assert.Nil(t, res["mode_note"])
+			}
+			nl, err := ss.GetLiveSession(ctx, res["session_id"].(string))
+			require.NoError(t, err)
+			require.NotNil(t, nl)
+			require.NotNil(t, nl.PermissionMode)
+			assert.Equal(t, c.want, *nl.PermissionMode)
+		})
+	}
 }

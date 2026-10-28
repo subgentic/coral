@@ -154,6 +154,7 @@ async function runRestart(config) {
             body: JSON.stringify(payload),
         });
         const result = await resp.json();
+        if (result.mode_note) showToast(result.mode_note); // an agent whose mode was never recorded restarts in Default: said, not left to be found out (#10297)
         if (result.error) {
             xtermMod.setRestarting(false, restartId);
             showToast(result.error, true);
