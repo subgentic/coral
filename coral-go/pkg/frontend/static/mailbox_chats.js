@@ -261,7 +261,14 @@ function chatFolderSpec(key, ctx) {
                     const w = DT.el('span', 'dt-chat-flags');
                     // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat
                     const flag = (key, on, icon, label, pressed) => { const b = DT.el('button', `dt-flag${key === 'starred' && on ? ' dt-flag-on' : ''}`); b.type = 'button'; b.title = label; b.dataset.sid = s.session_id; b.dataset.flag = key; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); if (pressed) b.setAttribute('aria-pressed', String(!!on)); const i = DT.el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', (e) => { e.stopPropagation(); const who = name(s) || historyLabel(s); setFlag(s, key, !on, ctx.after, key === 'starred' ? (on ? `Star removed: ${who}` : `Starred: ${who}`) : (on ? `Unarchived: ${who}` : `Archived: ${who}`)); }); return b; };
-                    w.append(flag('starred', s.starred, 'star', s.starred ? 'Unstar' : 'Star', false), flag('archived', s.archived, s.archived ? 'unarchive' : 'archive', s.archived ? 'Unarchive' : 'Archive', false)); return w; } },
+                    w.append(flag('starred', s.starred, 'star', s.starred ? 'Unstar' : 'Star', false), flag('archived', s.archived, s.archived ? 'unarchive' : 'archive', s.archived ? 'Unarchive' : 'Archive', false));
+                    if (!isGroup(s) && s.session_id) { // Continue this chat: the chat opens and the Resume dialog asks where it goes on (#10400)
+                        const c = DT.el('button', 'dt-flag'); c.type = 'button'; c.title = 'Continue this chat'; c.setAttribute('aria-label', `Continue this chat: ${name(s) || historyLabel(s)}`);
+                        const i = DT.el('span', 'material-icons', 'play_arrow'); i.setAttribute('aria-hidden', 'true'); c.append(i);
+                        c.addEventListener('click', e => { e.stopPropagation(); Promise.resolve(window.selectHistorySession?.(s.session_id)).then(() => document.getElementById('btn-resume-session')?.click()); }); // the chat page's own Continue button: the one way to the Resume dialog
+                        w.append(c);
+                    }
+                    return w; } },
             ] }); ctx.selection?.(chatState.selected.size ? table.bar : null); return table.el; } };
 }
 
