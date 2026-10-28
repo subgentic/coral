@@ -25,6 +25,11 @@ const { connect } = require('./agent_view_harness');
             tabs.push(await ev(`(() => { const a = document.activeElement; return a ? (a.getAttribute('aria-label') || a.textContent.replace(/\\s+/g, ' ').trim()).replace(/,.*$/, '').slice(0, 24) : 'body'; })()`));
         }
         check(JSON.stringify(tabs) === JSON.stringify(['Agents', 'Inbox', 'Automations']), `the first Tab stops are the top navigation: ${JSON.stringify(tabs)}`);
+        // the page start was quiet, but a later change is heard: when the notice appears after the first read, its sentence is announced once
+        check(!/Sign-in is off/.test(await ev(`(document.getElementById('notice-live') || {}).textContent || ''`)), 'the start itself said nothing of it');
+        await ev(`document.getElementById('local-auth-banner').hidden = true; import((window.__coralStatic || '/static/') + 'local_auth_banner.js').then(m => m.checkLocalAuthBanner()).then(() => true)`);
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: the status region is written a frame after the notice shows
+        check(/Sign-in is off/.test(await ev(`(document.getElementById('notice-live') || {}).textContent || ''`)), 'a notice that appears after the first read is announced (a polite status with its sentence)');
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the page start for a screen reader:\n  ' + problems.join('\n  '));
     console.log('PASS the page starts with no alert and the navigation first');
