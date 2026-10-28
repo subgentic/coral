@@ -2,7 +2,7 @@
 import { syncWaitingNotice } from './waiting.js'; // what waits for the open agent, with Send now (#7727)
 import { syncQueuedFromRow, syncAnswerFromRow, paint as paintQueued } from './held_sends.js';
 import { syncSendsFromRow } from './pending_messages.js';
-import { _gitStateSummary, _repoBranch, presentationSessionState } from './session_state.js';
+import { _gitStateSummary, _repoBranch, presentationSessionState, goalAgeWords } from './session_state.js';
 import { startupSignedOut } from './signin_line.js';
 import { syncAgentKeys } from './agent_keys.js';
 import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill, setAttr } from './dom_write.js';
@@ -147,11 +147,13 @@ export function updateWaitingIndicator(s) {
     }
 }
 
-export function updateSessionSummary(summary) {
+export function updateSessionSummary(summary, at) {
     const el = document.getElementById("session-summary");
     if (!el) return;
     if (summary) {
         setText(el.querySelector(".summary-text"), summary);
+        const age = goalAgeWords(at); // the goal is refreshed at most every 30 minutes: its age is said (#10123)
+        setText(el.querySelector(".goal-label"), age ? `Goal, ${age}` : 'Goal');
         setDisplay(el, "");
     }
     // Don't hide — a null summary from a WebSocket tick shouldn't

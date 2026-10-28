@@ -351,7 +351,7 @@ export async function selectLiveSession(name, agentType, sessionId, server, opts
     const agent = state.liveSessions.find(s => s.session_id === sessionId && sessionServer(s) === srv);
     if (agent) {
         updateSessionStatus(agent.status);
-        updateSessionSummary(agent.summary);
+        updateSessionSummary(agent.summary, agent.summary_at);
     }
     updateHeaderContext(agent || agentData || null);
     captureWrapper.classList.remove("loading-skeleton");
