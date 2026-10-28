@@ -18,7 +18,11 @@ export function trackDisplayHint(s) {
     const key = JSON.stringify([s.server || 'local', s.session_id]);
     const previous = expiries.get(key);
     if (!hasWorkingDisplayHint(s)) {
-        if (previous) { clearTimeout(previous.timer); expiries.delete(key); }
+        if (previous) {
+            clearTimeout(previous.timer); expiries.delete(key);
+            // The lease ran out and this call is the first to see it, before the timer fired: the repaint the timer owed is sent here, once (a poll in that millisecond used to cancel it, and the row kept its quiet look, #9825).
+            if (Date.now() >= previous.until) setTimeout(() => document.dispatchEvent(new CustomEvent('coral:display-hint-expired')), 0);
+        }
         return;
     }
     const until = Date.parse(s.display_activity_hint_at) + DISPLAY_HINT_MAX_AGE_MS;
