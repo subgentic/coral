@@ -23,7 +23,7 @@ const BASE = require('./test_base').BASE;
             return true; })()`);
         await ev(`window.__m.add('alpha-bot', 'A', 4, { sleeping: false }); window.__m.add('beta-bot', 'B', 4, { sleeping: false }); true`); await sleep(1000); // sleep-ok: a redraw settles over frames; there is no completion event
         const open = () => ev(`(() => { const m = document.getElementById('jump-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`);
-        const names = () => ev(`[...document.querySelectorAll('#jump-list [role=option]')].map(o => o.querySelector('.jump-label').textContent)`);
+        const names = () => ev(`[...document.querySelectorAll('#jump-list [role=option]')].map(o => o.textContent)`);
         await ev(`document.activeElement && document.activeElement.blur(); true`);
 
         // Ctrl+K opens the box with the focus in it and the agents under it
@@ -36,7 +36,7 @@ const BASE = require('./test_base').BASE;
         await Input.insertText({ text: 'beta' }); await sleep(500); // sleep-ok: a redraw settles over frames; there is no completion event
         assert.equal((await names())[0], 'beta-bot', 'the agent that matches is first');
         await ev(`document.getElementById('jump-input').value = ''; true`);
-        await Input.insertText({ text: 'release' }); await waitFor(`[...document.querySelectorAll('#jump-list .jump-label')].some(e => e.textContent === 'Release notes chat')`, 'the chat match', 5000);
+        await Input.insertText({ text: 'release' }); await waitFor(`[...document.querySelectorAll('#jump-list [role=option]')].some(e => e.textContent === 'Release notes chat (chat)')`, 'the chat match', 5000);
         // a chat by Down and Enter
         await key('ArrowDown', 'ArrowDown'); await key('Enter', 'Enter', 0, '\r');
         await waitFor(`window.__opened.includes('chat:chat-0001')`, 'the chat is opened', 5000);
