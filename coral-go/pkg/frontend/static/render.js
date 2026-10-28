@@ -430,7 +430,7 @@ function _wireListKeyboard(container) {
 
 
 registerActions({
-    'skip-to-message': (el, event) => { event.preventDefault(); const box = document.getElementById('command-input'); if (box && box.getClientRects().length) box.focus(); else showToast('Open an agent first: its message box is there.'); }, // the sidebar's skip link (#10579)
+    'skip-to-message': (el, event) => { event.preventDefault(); const box = document.getElementById('command-input'); if (box && box.getClientRects().length) box.focus(); else showToast('Open an agent first.'); }, // the sidebar's skip link (#10579)
     'agent-search-clear': () => { const i = document.getElementById('agent-search-input'); if (i) { i.value = ''; i.focus(); } filterLiveAgents(''); },
     'agent-filters-clear': () => { setListFilters(_NO_LIST_FILTERS); redrawLiveList(); },
     'kebab-close': (el, event) => { event.stopPropagation(); window.closeSidebarKebabs(); },

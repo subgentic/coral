@@ -3,16 +3,15 @@
 import { importOnce } from './import_once.js';
 
 // The list is the one place that names the keys, in the person's own: a Mac shows Cmd and Option, any other computer Ctrl and Alt (#10579).
-const onMacNow = () => /Mac|iPhone|iPad/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
-export const shortcutList = (mac = onMacNow()) => [
+export const shortcutList = (mac = onMac()) => [
     [mac ? 'Cmd+Option+N' : 'Alt+N', 'New agent'],
-    [mac ? 'Cmd+K' : 'Ctrl+K', 'Jump to an agent or chat by name'],
+    [mac ? 'Cmd+K' : 'Ctrl+K', 'Jump to an agent or chat'],
     [mac ? 'Cmd+,' : 'Ctrl+,', 'Settings'],
     ['/', 'Search agents'],
     ['?', 'Show these shortcuts'],
     ['Enter', 'Send a message'],
     ['Shift+Enter', 'A new line in a message'],
-    ['Escape', 'Stop a reply (in an empty message box); close a dialog, menu or panel'],
+    ['Escape', 'Stop a reply (empty message box); close a dialog or menu'],
     [mac ? 'Cmd+F' : 'Ctrl+F', 'Find in a chat'],
 ];
 
@@ -44,16 +43,12 @@ export function wireShortcuts() {
             if (e.key === ',') window.showSettingsModal?.(); else importOnce('./jump_to.js').then(m => m.openJumpTo());
             return;
         }
-        if (e.altKey && e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === 'KeyN' && onMac()) { // Cmd+Option+N: the key a Mac's list shows; Ctrl+Option+N below still works
-            if (dialogOpen() || (typing(e.target) && !inMessageBox(e.target))) return;
-            e.preventDefault(); newAgentShortcut(); return;
-        }
         if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target) && !dialogOpen()) { // Search agents: the sidebar's box takes the key, as in most lists
             const box = document.getElementById('agent-search-input');
             if (box && box.getClientRects().length) { e.preventDefault(); box.focus(); }
             return;
         }
-        if (e.altKey && e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'KeyN' && onMac()) { // Ctrl+Option+N: on a Mac the one way from the message box, since Option+N there is the tilde dead key (#10253); from a terminal or a dialog it does nothing, as Alt+N
+        if (e.altKey && (e.ctrlKey !== e.metaKey) && !e.shiftKey && e.code === 'KeyN' && onMac()) { // Cmd+Option+N (the key a Mac's list shows) and Ctrl+Option+N // Ctrl+Option+N: on a Mac the one way from the message box, since Option+N there is the tilde dead key (#10253); from a terminal or a dialog it does nothing, as Alt+N
             if (dialogOpen() || (typing(e.target) && !inMessageBox(e.target))) return;
             e.preventDefault(); newAgentShortcut(); return;
         }
