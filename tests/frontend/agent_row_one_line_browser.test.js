@@ -54,6 +54,10 @@ const { connect } = require('./agent_view_harness');
                 assert.ok(hd.folder.includes('coral-project') && hd.folderTip === '/work/coral-project', `and the folder, with its full path on hover ${JSON.stringify(hd)}`);
                 assert.ok(hd.branch.includes('long-branch-name'), `and the branch beside it ${JSON.stringify(hd)}`);
                 console.log('PASS 1280: the header has the branch, the folder and the model');
+                await Emulation.setDeviceMetricsOverride({ width: 1024, height: 800, deviceScaleFactor: 1, mobile: false }); // a header this narrow (the side panel takes half) has no room for the model line: Details has it
+                await waitFor(`getComputedStyle(document.getElementById('terminal-header-model')).display === 'none' && !document.getElementById('agent-phone-details').hidden && document.getElementById('agent-phone-details').getClientRects().length > 0`, '1024: the header model line gives way to Details', 6000);
+                assert.equal(await ev(`(() => { const h = document.querySelector('#live-session-view .terminal-header'); return h.scrollWidth - h.clientWidth <= 1; })()`), true, '1024: the header does not overflow');
+                console.log('PASS 1024: the header gives the model line to Details and does not overflow');
             }
         }
     } finally { await client.close(); }
