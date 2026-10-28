@@ -2,6 +2,7 @@
    Extracted from coral-app/main.go injected JS. */
 
 import { platform } from './detect.js';
+import { importOnce } from '../import_once.js';
 
 export function initNative() {
     if (!platform.isNative) return;
@@ -18,6 +19,19 @@ export function initNative() {
 
     initHealthCheck();
     initLinkInterceptor();
+    initDownloadToasts();
+}
+
+// A download the webview would drop is saved by the app (downloadInterceptScript, coral-app, #9894): the script tells the page with coral:native-download, and the toast says where the file went
+// or why it did not. The name is the file's own, put through textContent by the toast; nothing in it is run.
+function initDownloadToasts() {
+    window.addEventListener('coral:native-download', async (e) => {
+        const d = e.detail || {};
+        const { showToast } = await importOnce('./utils.js');
+        if (d.error) { showToast(`Could not save the download: ${d.error}`, true); return; }
+        const saved = String(d.path || d.name || '').split(/[\\/]/).pop();
+        showToast(`Saved to Downloads: ${saved}`);
+    });
 }
 
 // Server health check — detect when the backend crashes.
