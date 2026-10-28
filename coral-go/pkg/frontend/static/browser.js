@@ -140,7 +140,7 @@ async function loadBrowserEntries(path) {
         pathDisplay.textContent = data.path;
         const dirInput = document.getElementById(_activeDirInputId);
         dirInput.value = data.path;
-        dirInput.dispatchEvent(new Event('change'));
+        dirInput.dispatchEvent(new Event('change', { bubbles: true })); // bubbling: the Open folder box's error line is taken away by a delegated listener (#10572)
 
         if (!data.entries.length) {
             list.innerHTML = '<li class="empty-state">No subdirectories</li>';
