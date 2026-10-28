@@ -136,7 +136,7 @@ export async function _fillThemeSelect(s) {
         try {
             const resp = await fetch("/api/themes");
             const data = await resp.json();
-            customThemes = data.themes || [];
+            customThemes = (data.themes || []).filter(t => !['dark', 'light', 'system'].includes(String(t && t.name).toLowerCase())); // a saved theme named like a built-in one is not a second copy of it (#10735)
         } catch (_) {}
 
         // Build options: built-in first, then custom

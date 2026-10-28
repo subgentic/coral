@@ -91,8 +91,8 @@ const helpLine = (text, more) => ({ text, more }); // a visible one-line descrip
 const moreOnly = (text, more) => ({ text: '', more: more ? `${text} ${more}` : text }); // the line is one click away, not on the screen: the Agents pane stays under its word budget (#10074 had put one under every row)
 
 // One CLI path row: the path (mono, spell check off) with the verify result cli_dialogs.js writes under it.
-const CLI_PLACEHOLDERS = { agy: 'agy (Antigravity)', pi: 'pi (the Pi coding agent)' }; // the program Coral looks for on PATH, and what it is where the command's name does not say (#10481, Beta)
-const cliPath = (type, label) => ({ key: `cli_path_${type}`, type: 'path', id: `settings-cli-path-${type}`, label: `${label} CLI path`, placeholder: CLI_PLACEHOLDERS[type] || type, live: [`cli-result-${type}`], setup: el => el.classList.add('settings-mono-input') });
+const CLI_NAMES = { agy: ' (Antigravity)', pi: ' (the Pi coding agent)' }; // what the program is where the command's name does not say (#10481, Beta); the field asks for its full path (#10735)
+const cliPath = (type, label) => ({ key: `cli_path_${type}`, type: 'path', id: `settings-cli-path-${type}`, label: `${label} CLI path`, placeholder: `Full path, e.g. /usr/local/bin/${type}${CLI_NAMES[type] || ''}`, live: [`cli-result-${type}`], setup: el => el.classList.add('settings-mono-input') });
 
 const AGENTS_FIELDS = host => [
     { key: 'default_models', type: 'heading', id: 'settings-agents-models', label: 'Default models', help: 'Pick one, or type any model id.' },
