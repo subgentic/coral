@@ -72,7 +72,7 @@ function _renderTeamCard(boardName, boardSessions) {
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 9l4 4 4-4"/></svg>
                     Move Down
                 </button>
-                <hr class="overflow-menu-divider">
+                <hr class="overflow-menu-divider overflow-menu-divider-danger">
                 <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-reset" data-board="${escapeAttr(boardName)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg>
                     Reset Team
@@ -307,7 +307,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13V5h3v8H2zM7 13V3h3v10H7zM12 13V7h3v6h-3z"/></svg>
                             Token Usage
                         </button>
-                        <hr class="overflow-menu-divider">
+                        <hr class="overflow-menu-divider overflow-menu-divider-danger">
                         ${killAllItem(boardName)}
                 ${deleteTeamItem(boardName)}
                     </div>
