@@ -9,16 +9,17 @@ const BASE = require('./test_base').BASE;
 
 const SENTENCE = "That team isn't on that computer (it may have been deleted). Revoke this link, and link the team again if it was re-created.";
 const OWN = '@s-own/b-aaaaaaaaaa';
-const SERVERS = [{ id: 's-own', label: 'This Mac', online: true, effective_mode: 'launch', version: '2.0.3' }, { id: 's-two', label: 'Studio Mac', online: true, effective_mode: 'interact', version: '2.0.3' }, { id: 's-view', label: 'Viewer', online: true, effective_mode: 'view', version: '2.0.3' }, { id: 's-off', label: 'Sleeping', online: false, effective_mode: 'launch', version: '2.0.3' }, { id: 's-old', label: 'Old Mac', online: true, effective_mode: 'interact', version: '2.0.2' }];
+const SERVERS = [{ id: 's-own', label: 'This Mac', online: true, effective_mode: 'launch' }, { id: 's-two', label: 'Studio Mac', online: true, effective_mode: 'interact' }, { id: 's-view', label: 'Viewer', online: true, effective_mode: 'view' }, { id: 's-off', label: 'Sleeping', online: false, effective_mode: 'launch' }, { id: 's-old', label: 'Old Mac', online: true, effective_mode: 'interact' }, { id: 's-low', label: 'Low Mac', online: true, effective_mode: 'interact' }];
 const LINKS = [
-    { id: 11, src_server_id: 's-two', src_team: 'b-bbbbbbbbbb', dst_server_id: 's-own', dst_team: 'b-aaaaaaaaaa', src_team_label: 'nightly', notice: 'delivered' },
-    { id: 12, src_server_id: 's-own', src_team: 'b-aaaaaaaaaa', dst_server_id: 's-two', dst_team: 'b-bbbbbbbbbb', dst_team_label: 'nightly', notice: 'delivered' },
-    { id: 13, src_server_id: 's-two', src_team: 'b-cccccccccc', dst_server_id: 's-own', dst_team: 'b-aaaaaaaaaa', src_team_label: 'build-bots', notice: 'not_delivered' },
-    { id: 14, src_server_id: 's-two', src_team: 'b-eeeeeeeeee', dst_server_id: 's-own', dst_team: 'b-aaaaaaaaaa', src_team_label: 'old-team', notice: 'delivered', legacy: true },
-    { id: 15, src_server_id: 's-x', src_team: 'b-xxxxxxxxxx', dst_server_id: 's-y', dst_team: 'b-yyyyyyyyyy', notice: 'delivered' },
+    { id: 11, src_server_id: 's-two', src_team: 'b-bbbbbbbbbb', dst_server_id: 's-own', dst_team: 'b-aaaaaaaaaa', src_team_label: 'nightly', notice: { source: 'delivered', target: 'delivered' } },
+    { id: 12, src_server_id: 's-own', src_team: 'b-aaaaaaaaaa', dst_server_id: 's-two', dst_team: 'b-bbbbbbbbbb', dst_team_label: 'nightly', notice: { source: 'unavailable', target: 'delivered' } },
+    { id: 13, src_server_id: 's-two', src_team: 'b-cccccccccc', dst_server_id: 's-own', dst_team: 'b-aaaaaaaaaa', src_team_label: 'build-bots', notice: { source: 'delivered', target: 'not_delivered' } },
+    { id: 14, src_server_id: 's-two', src_team: 'b-eeeeeeeeee', dst_server_id: 's-own', dst_team: 'b-aaaaaaaaaa', src_team_label: 'old-team', notice: { source: 'delivered', target: 'delivered' }, legacy: true },
+    { id: 15, src_server_id: 's-x', src_team: 'b-xxxxxxxxxx', dst_server_id: 's-y', dst_team: 'b-yyyyyyyyyy', notice: { source: 'delivered', target: 'delivered' } },
 ];
+const LIVE = { servers: [{ id: 's-own', label: 'This Mac', version: '2.0.3', coral_version: '2.0.3' }, { id: 's-two', label: 'Studio Mac', version: '2.0.3', coral_version: '2.0.3' }, { id: 's-view', label: 'Viewer', version: '2.0.3' }, { id: 's-off', label: 'Sleeping', version: '2.0.3' }, { id: 's-old', label: 'Old Mac', version: '2.0.2', coral_version: '2.0.2' }, { id: 's-low', label: 'Low Mac', version: '2.0.9', coral_version: '2.0.9', below_minimum: true, min_coral: '2.0.5' }], sessions: [{ session_id: 'h1', name: 'HOSTILE-SESSION-<b>x</b>', display_name: 'HOSTILE-SESSION' }] };
 const PROJECTS = [{ project: 'b-dddddddddd', board_label: 'research-crew' }, { project: 'legacy_board', board_label: 'legacy' }];
-const ALLOWED = [/^GET \/api\/relay\/links$/, /^POST \/api\/relay\/links$/, /^DELETE \/api\/relay\/links\/\d+$/, /^GET \/api\/servers$/, /^GET \/api\/remote\/[\w-]+\/api\/board\/projects$/, /^GET \/api\/account$/];
+const ALLOWED = [/^GET \/api\/sessions\/live$/, /^GET \/api\/relay\/links$/, /^POST \/api\/relay\/links$/, /^DELETE \/api\/relay\/links\/\d+$/, /^GET \/api\/servers$/, /^GET \/api\/remote\/[\w-]+\/api\/board\/projects$/, /^GET \/api\/account$/];
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -36,11 +37,13 @@ const ALLOWED = [/^GET \/api\/relay\/links$/, /^POST \/api\/relay\/links$/, /^DE
                 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
                 window.fetch = async (url, opt = {}) => {
                     const u = String(url), m = (opt.method || 'GET').toUpperCase(), path = u.split('?')[0];
-                    const hubby = /^\\/api\\/(relay\\/|servers$|remote\\/|account$)/.test(path);
+                    const hubby = /^\\/api\\/(relay\\/|servers$|sessions\\/live$|remote\\/|account$)/.test(path);
+                    window.__paths = window.__paths || []; window.__paths.push(m + ' ' + path);
                     if (!hubby) return real(url, opt);
                     window.__calls.push(m + ' ' + path + (opt.body ? ' ' + opt.body : ''));
-                    if (path === '/api/account') return json(200, { team_link_dialog: window.__flag === true });
-                    if (path === '/api/relay/links' && m === 'GET') return json(200, window.__links);
+                    if (path === '/api/account') return json(200, { team_link_dialog: window.__flag === true, ...(window.__owner === false ? { owner: false } : {}) });
+                    if (path === '/api/sessions/live') return window.__live === 'fail' ? json(500, {}) : json(200, ${JSON.stringify(LIVE)});
+                    if (path === '/api/relay/links' && m === 'GET') return json(200, { links: window.__links, relay_artifacts_available: true, relay_artifacts_enabled: true });
                     if (path === '/api/relay/links' && m === 'POST') return json(window.__post.status, window.__post.status === 200 ? { ok: true } : { error: window.__post.code || 'not_found' });
                     if (/^\\/api\\/relay\\/links\\/\\d+$/.test(path) && m === 'DELETE') { window.__links = window.__links.filter(l => String(l.id) !== path.split('/').pop()); return json(200, { ok: true }); }
                     if (path === '/api/servers') return json(200, { servers: ${JSON.stringify(SERVERS)} });
@@ -54,7 +57,9 @@ const ALLOWED = [/^GET \/api\/relay\/links$/, /^POST \/api\/relay\/links$/, /^DE
             await waitFor(`document.querySelectorAll('.session-board-card').length >= 1`, 'the team card', 10000);
             const menu = () => ev(`[...document.querySelectorAll('.session-board-card .sidebar-kebab-menu button[data-on-click]')].map(b => b.dataset.onClick)`);
             assert.ok(!(await menu()).includes('team-link'), `${label}: no Link team item while the account says nothing`);
-            await ev(`(async () => { window.__flag = true; const m = await import((window.__coralStatic || '/static/') + 'team_link_flag.js'); await m.initTeamLinkFlag(); return true; })()`);
+            await ev(`(async () => { window.__flag = true; window.__owner = false; const m = await import((window.__coralStatic || '/static/') + 'team_link_flag.js'); await m.initTeamLinkFlag(); return true; })()`);
+            assert.ok(!(await menu()).includes('team-link'), `${label}: a viewer the account says is not the owner gets no Link team item, whatever the switch says`);
+            await ev(`(async () => { window.__owner = undefined; const m = await import((window.__coralStatic || '/static/') + 'team_link_flag.js'); await m.initTeamLinkFlag(); return true; })()`);
             await waitFor(`[...document.querySelectorAll('.session-board-card .sidebar-kebab-menu button[data-on-click]')].some(b => b.dataset.onClick === 'team-link')`, 'the Link team item', 6000);
             const order = await menu();
             assert.ok(order.indexOf('team-link') === order.indexOf('team-working-mode') + 1, `${label}: Link team... is right after Team settings: ${order}`);
@@ -76,8 +81,11 @@ const ALLOWED = [/^GET \/api\/relay\/links$/, /^POST \/api\/relay\/links$/, /^DE
             assert.deepEqual(rows.map(r => r.state), ['Active', 'Active', 'Not delivered', 'Old-style, create again']);
             assert.ok(rows.every(r => r.revoke), 'Revoke on every row, Not delivered and Old-style included');
             assert.deepEqual(rows.map(r => r.sentence), ['', '', SENTENCE, ''], 'only the Not delivered row carries the Security sentence, word for word');
+            assert.deepEqual(await dlg(`[...d.querySelectorAll('.team-link-row .team-link-files')].map(c => c.textContent)`), ['Files allowed', 'Files allowed', 'Files allowed', 'Files allowed'], 'the account-wide Files setting, read-only, on every row');
+            assert.ok((await dlg(`d.textContent`)).includes('Files follow the account setting in Coral Hub.'));
+            assert.ok(!(await ev(`document.body.innerHTML`)).includes('HOSTILE-SESSION'), `${label}: sessions[] of the live answer appears nowhere`);
             assert.deepEqual(await dlg(`[...d.querySelectorAll('#team-link-computer option')].map(o => o.textContent)`), ['Studio Mac'], `${label}: no View-only, offline, older or own computer`);
-            assert.equal(await dlg(`[...d.querySelectorAll('.team-link-update')].map(p => p.textContent).join('|')`), 'Old Mac needs Coral 2.0.3 or later to be linked. Update Coral there.', `${label}: an older computer is said to need an update, not offered`);
+            assert.equal(await dlg(`[...d.querySelectorAll('.team-link-update')].map(p => p.textContent).join('|')`), 'Old Mac needs Coral 2.0.3 or later to be linked. Update Coral there.|Low Mac is below the Coral version Coral Hub allows (2.0.5 or later). Update Coral there.', `${label}: an older or below-minimum computer is said to need an update, not offered`);
             await waitFor(`document.querySelectorAll('#team-link-team option').length >= 1`, 'the teams', 5000);
             assert.deepEqual(await dlg(`[...d.querySelectorAll('#team-link-team option')].map(o => o.textContent)`), ['research-crew'], 'a name that is not a generated team id is not offered');
             assert.equal(await dlg(`d.querySelector('#team-link-direction').value`), 'both', 'Both ways is the default');
@@ -125,8 +133,21 @@ const ALLOWED = [/^GET \/api\/relay\/links$/, /^POST \/api\/relay\/links$/, /^DE
             // 5. only the listed routes were called
             const calls = (await ev(`window.__calls`)).map(c => c.split(' ').slice(0, 2).join(' '));
             assert.deepEqual(calls.filter(c => !ALLOWED.some(rx => rx.test(c))), [], 'a route the dialog may not call');
+            assert.equal((await ev(`window.__paths`)).filter(p => p === 'GET /api/sessions/live').length, 1, `${label}: sessions/live is read once when the dialog opens, never polled`);
+            assert.deepEqual((await ev(`window.__paths`)).filter(p => /cross-team-state/.test(p)), [], `${label}: cloud mode never reads cross-team-state`);
             await click('#team-link-dialog .team-link-close');
             assert.equal(await ev(`document.getElementById('team-link-dialog').open`), false, 'Close closes it');
+            // a failed live read is "version unknown" and does not block the form (the Hub's own minimum still applies)
+            await ev(`window.__live = 'fail'; window.showTeamLinkDialog(${JSON.stringify(OWN)}, { cloud: true }); true`);
+            await waitFor(`document.querySelectorAll('#team-link-computer option').length >= 1`, 'the form after a failed live read', 6000);
+            assert.deepEqual(await dlg(`[...d.querySelectorAll('#team-link-computer option')].map(o => o.textContent)`), ['Studio Mac', 'Old Mac', 'Low Mac'], `${label}: a failed read leaves every online, non-View computer offered`);
+            await ev(`window.__live = ''; true`); await click('#team-link-dialog .team-link-close');
+            // local mode reads this computer's own state, and only there
+            await ev(`window.__paths = []; window.showTeamLinkDialog(${JSON.stringify(OWN)}, { cloud: false }); true`);
+            await waitFor(`!!document.querySelector('#team-link-dialog .team-link-manage')`, 'the local view', 6000);
+            assert.ok((await ev(`window.__paths`)).some(p => /^GET \/api\/board\/[^/]+\/cross-team-state$/.test(p)), `${label}: local mode reads its own cross-team-state`);
+            assert.deepEqual((await ev(`window.__paths`)).filter(p => /\/api\/relay\//.test(p)), [], 'and calls no relay route');
+            await click('#team-link-dialog .team-link-close');
             console.log(`PASS ${label}: Link team... after Team settings, the dialog, Both ways, Revoke per row, the Security sentence`);
         }
     } finally { await client.close(); }
