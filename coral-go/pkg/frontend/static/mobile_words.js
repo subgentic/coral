@@ -3,7 +3,7 @@
 export const ENABLE_LABEL = 'Enable';
 export const USE_HUB_LABEL = 'Use Coral Hub instead';
 /** What the dialog says while mobile access is off: what Enable does (it opens Coral to the network), and the Hub way that needs no network access. */
-export const DISABLED_WORDS = 'Mobile access is off. Turning it on lets devices on your network reach Coral; they need your password or a setup code. Or use Coral Hub, which needs no network access.';
+export const DISABLED_WORDS = 'Scan a QR code to open Coral on your phone. Mobile access is off: turning it on lets devices on your network reach Coral; they need your password or a setup code. Or use Coral Hub, which needs no network access.';
 
 /** The one panel's lines: the address, where a phone types the setup code, and the network it must be on. */
 export const OPEN_ON_PHONE = "Open this address on your phone's browser, then tap Add to Home Screen for an app-like experience.";

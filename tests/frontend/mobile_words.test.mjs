@@ -6,7 +6,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const W = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/mobile_words.js')).href);
 
 // what Enable does, before it is pressed, and the Hub way as a named choice
-assert.match(W.DISABLED_WORDS, /Turning it on lets devices on your network reach Coral/);
+assert.match(W.DISABLED_WORDS, /^Scan a QR code to open Coral on your phone\./); // what the QR is for comes first (#10572)
+assert.match(W.DISABLED_WORDS, /turning it on lets devices on your network reach Coral/);
 assert.match(W.DISABLED_WORDS, /they need your password or a setup code/);
 assert.match(W.DISABLED_WORDS, /Coral Hub, which needs no network access/);
 assert.equal(W.USE_HUB_LABEL, 'Use Coral Hub instead');

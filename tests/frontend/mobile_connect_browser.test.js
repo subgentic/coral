@@ -68,7 +68,8 @@ const BASE = require('./test_base').BASE;
             const opener=document.createElement('button');opener.id='qr-test-opener';opener.textContent='Mobile QR';document.body.append(opener);opener.focus();
         })()`);
         await ev('window._showMobileConnectModal()');
-        assert.match(await status(), /Turning it on lets devices on your network reach Coral; they need your password or a setup code\. Or use Coral Hub, which needs no network access\./); // what Enable does, before it is pressed (#10149)
+        assert.match(await status(), /^Scan a QR code to open Coral on your phone\. Mobile access is off/, 'one line says what the QR is for, before Enable (#10572)');
+        assert.match(await status(), /turning it on lets devices on your network reach Coral; they need your password or a setup code\. Or use Coral Hub, which needs no network access\./); // what Enable does, before it is pressed (#10149)
         assert.deepEqual(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b => b.textContent)`), ['Enable', 'Use Coral Hub instead', 'Cancel'], 'the Hub way is a named button');
         assert.deepEqual(await ev('window.__calls.map(c=>c.url)'),['/api/system/privacy']);
         await noQR(); await shot('mobile-qr-disabled');
