@@ -266,7 +266,7 @@ export function dataTable(cfg) {
         if (c.min) set('min', `${c.min}ch`);
         if (c.max) set('max', `${c.max}ch`);
         if (c.fixed && c.width && /rem$/.test(c.width)) { set('min', c.width); set('max', 'none'); set('w', c.width); }
-        if (c.share) { set('w', `${Math.round(90 * c.share / shareTotal)}%`); if (!c.max) set('max', 'none'); }
+        if (c.share) { set('w', `${Math.round(90 * c.share / shareTotal)}%`); if (!c.max) set('max', '0'); } // a share column is bounded (max-width 0 with its min-width above it): in an auto layout its no-wrap text otherwise sets the column to the width of the text and the table scrolls sideways (UI Accessibility, #9856)
     }
 
     const attrEsc = v => String(v).replace(/["\\]/g, '\\$&'); // a column key inside a quoted attribute selector
