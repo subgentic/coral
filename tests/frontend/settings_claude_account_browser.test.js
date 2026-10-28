@@ -21,12 +21,18 @@ const BASE = require('./test_base').BASE;
         assert.ok(labels.some(t => t === 'Coral API key'), 'the key is labelled Coral API key: ' + JSON.stringify(labels));
         assert.ok(labels.some(t => t === 'Claude account'), 'a Claude account row: ' + JSON.stringify(labels));
         assert.equal(await ev(`document.getElementById('settings-api-key').getAttribute('aria-label')`), 'Coral API key');
-        assert.match(await ev(`document.getElementById('settings-claude-account-check').title`), /Claude CLI's own login/, 'the explanation is on the Check button, not a line of the pane');
+        assert.equal(await ev(`document.getElementById('settings-claude-account-check').getAttribute('aria-label')`), 'Check Claude sign-in');
+        // the explanation is behind the row's own More (a tooltip never shows on a phone), not a line of the pane
+        const more = await ev(`(() => { const row = document.getElementById('settings-claude-account').closest('.sv-row'); const t = row.querySelector('.sv-help-toggle, button[aria-expanded], summary'); return t ? { label: t.textContent.trim(), expanded: t.getAttribute('aria-expanded') } : null; })()`);
+        assert.ok(more, 'the row has a Learn more control');
+        await ev(`(() => { const row = document.getElementById('settings-claude-account').closest('.sv-row'); const t = row.querySelector('.sv-help-toggle, button[aria-expanded], summary'); t.click(); return true; })()`);
+        assert.match(await ev(`document.getElementById('settings-claude-account').closest('.sv-row').textContent`), /Claude CLI's own login/, 'the explanation is in the row once More is open');
         const check = async answer => { await ev(`window.__answer = ${JSON.stringify(answer)}; document.getElementById('settings-claude-account-check').click(); true`); await waitFor(`document.getElementById('settings-claude-account-status').textContent !== 'Checking...' && document.getElementById('settings-claude-account-status').textContent !== 'Not checked yet'`, 'the answer'); return ev(`document.getElementById('settings-claude-account-status').textContent`); };
         assert.equal(await check({ found: true, signed_in: true }), 'Signed in');
         assert.match(await check({ found: true, signed_in: false }), /^Not signed in: run claude auth login/);
         assert.match(await check({ found: true, signal: 1 }), /^Could not tell/);
         assert.equal(await ev(`window.__asks.length`), 3, 'each Check asks the CLI');
+        assert.ok((await ev(`window.__asks`)).every(q => /source=settings_check/.test(q)), 'the Settings Check has its own analytics source');
         console.log('PASS Coral API key and the Claude account row');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
