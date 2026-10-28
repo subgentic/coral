@@ -2,9 +2,9 @@
 // name (online, not this team's computer, not View-only; generated board ids only), the create body for each direction, and our words for a refusal. coral-hub Security's exact sentence is pinned.
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const M = await import(path.resolve(here, '../../coral-go/pkg/frontend/static/team_link_dialog.js'));
+const M = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/team_link_dialog.js')).href); // a file:// URL: a Windows absolute path (d:\...) is not an import specifier
 
 const own = { server: 's-own', team: 'b-aaaaaaaaaa' };
 assert.equal(M.NOT_DELIVERED_SENTENCE, "That team isn't on that computer (it may have been deleted). Revoke this link, and link the team again if it was re-created.");
