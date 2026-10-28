@@ -40,8 +40,8 @@ import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflo
 import { MENU_KEYS, menuMove } from './menu_keys.js';
 
 // The New job form (job_form.js, about 28 KB) loads when a person first opens it, not at start (#10218): these are the same calls, answered once the file is in.
-const jobForm = () => importOnce('./job_form.js');
-const showJobModal = (...args) => jobForm().then(m => m.showJobModal(...args));
+const jobForm = () => importOnce('./job_form.js', 'the job form');
+const showJobModal = (...args) => jobForm().then(m => m.showJobModal(...args)).catch(() => {}); // a failed load already said so (importOnce's toast): the click is not silent and nothing is left unhandled
 // hiding or showing again a form that was never opened has nothing to do, so these do not load it (#10218 review)
 const hideJobModal = (...args) => loadedModule('./job_form.js')?.hideJobModal(...args);
 const reshowJobModal = (...args) => loadedModule('./job_form.js')?.reshowJobModal(...args);
