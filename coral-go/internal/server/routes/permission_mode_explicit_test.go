@@ -100,3 +100,26 @@ func TestAClaudeLaunchThatMeansAutoSaysSo(t *testing.T) {
 	assert.Contains(t, cmds[len(cmds)-1], "--permission-mode auto")
 	assert.NotContains(t, cmds[len(cmds)-1], "--permission-mode default")
 }
+
+// #10380: a restart of an agent that is in Default keeps Default when the saved default is Auto: the stored mode is what a restart restores, never the saved default.
+func TestARestartOfADefaultAgentStaysDefaultWhenAutoIsSaved(t *testing.T) {
+	_, h, term, ss := setupSessionsTestServer(t)
+	stubCLIPaths(t, ss)
+	ctx := context.Background()
+	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", "auto"))
+	const restarted = "33333333-4444-4555-8666-777777777777"
+	mode := "default"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: restarted, AgentType: "claude", AgentName: "coral-go", WorkingDir: t.TempDir(), PermissionMode: &mode}))
+	name := "claude-" + restarted
+	term.addSession(name, t.TempDir())
+	rb, _ := json.Marshal(map[string]any{"session_id": restarted, "agent_type": "claude"})
+	rec := httptest.NewRecorder()
+	h.Restart(rec, dropAt2(httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+name+"/restart", bytes.NewReader(rb)), map[string]string{"name": name}))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	cmds := term.sentCommands()
+	require.NotEmpty(t, cmds)
+	cmd := cmds[len(cmds)-1]
+	assert.Contains(t, cmd, "--permission-mode default")
+	assert.NotContains(t, cmd, "--permission-mode auto")
+	assert.NotContains(t, cmd, "dangerously-skip-permissions")
+}
