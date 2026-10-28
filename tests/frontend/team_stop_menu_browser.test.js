@@ -12,7 +12,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
     const problems = [];
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const mk = (id, name, sleeping) => ({ session_id: id, name, display_name: name, agent_type: 'claude', summary: 'x', model: 'claude-opus-5-5', branch: 'main', repo_name: 'coral', working_directory: '/work/' + name, status: 'idle', server: 'local', board_project: BOARD, sleeping });
-    const items = host => ev(`[...document.querySelectorAll('${host} [data-stop]:not([data-stop="sep"])')].map(b => ({ key: b.dataset.stop, text: b.textContent.trim(), danger: b.classList.contains('menu-item-danger'), shown: b.getClientRects().length > 0, h: Math.round(b.getBoundingClientRect().height) }))`);
+    const items = host => ev(`[...document.querySelectorAll('${host} [data-stop]:not([data-stop="sep"])')].map(b => ({ key: b.dataset.stop, text: ((b.querySelector('.menu-item-text') || b).firstChild || b).textContent.trim(), hint: ((b.querySelector('.menu-item-hint') || {}).textContent || '').trim(), danger: b.classList.contains('menu-item-danger'), shown: b.getClientRects().length > 0, h: Math.round(b.getBoundingClientRect().height) }))`);
     const dialogText = () => ev(`(() => { const d = [...document.querySelectorAll('dialog[open], .dlg-confirm')].find(e => e.getClientRects().length); return d ? d.textContent.replace(/\\s+/g, ' ').trim() : ''; })()`);
     const closeDialog = () => ev(`(() => { for (const d of document.querySelectorAll('dialog[open]')) { const c = [...d.querySelectorAll('button')].find(b => /^cancel$/i.test(b.textContent.trim())); if (c) c.click(); } return true; })()`);
     try {
@@ -40,6 +40,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             let it = await items(host);
             check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep Team', 'Reset Team', 'Kill All']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
+            check(/^Stops every agent for now; Wake Team starts them again$/.test(it[0].hint) && /^Each agent starts again from its first instructions, in a new chat$/.test(it[1].hint) && /^Ends every agent now; their chats stay in History$/.test(it[2].hint), `each item says in one line what it does (#10357): ${JSON.stringify(it.map(i => i.hint))}`);
             check(it.every(i => i.shown) && (!mobile || it.every(i => i.h >= 44)), `shown (44 px on a phone): ${JSON.stringify(it)}`);
             check(it[0] && !it[0].danger && it[1].danger && it[2].danger, 'Reset Team and Kill All are the danger items, Sleep Team is not');
             check(await ev(`document.querySelectorAll('${host} hr.overflow-menu-divider').length >= 1`), 'the danger items are set apart by a rule');
@@ -58,7 +59,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             // a sleeping team says Wake Team
             await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', true), mk('s2', 'Worker', true)])}; T.render.renderLiveSessions(T.state.liveSessions); document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu follows the team
             it = await items(host);
-            check(it[0] && it[0].text === 'Wake Team', `a sleeping team offers Wake Team: ${JSON.stringify(it)}`);
+            check(it[0] && it[0].text === 'Wake Team' && /^Starts the sleeping agents again$/.test(it[0].hint), `a sleeping team offers Wake Team, and says what it does: ${JSON.stringify(it)}`);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             // Pause Board says what it does (the board's actions are in More)
             await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
