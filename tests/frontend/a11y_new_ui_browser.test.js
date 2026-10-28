@@ -205,13 +205,9 @@ const LABELS = ['Feels like a slideshow', "Doesn't show the game", 'Tone/story i
             f = await focused();
             check(`${tag}: and focus is on the message box, not lost with the card (${desc(f)})`, f.id === 'command-input');
 
-            // ── the Display panel's hint
+            // ── the Display panel (its branch hint went with the Show branches switch)
             const hintView = view.phone ? '#mobile-agent-list' : '.sidebar';
             await ev(`(() => { const b = document.querySelector(${JSON.stringify(hintView + ' [data-display-button]')}); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`); await settle(300);
-            await ev(`import(${S} + 'state.js').then(st => { for (const s of st.state.liveSessions) { s.branch = ''; s.model = ''; } return true; })`);
-            await ev(`document.querySelector(${JSON.stringify(hintView + ' [data-display-input="branches"]')}).click(); true`); await settle(400);
-            const hint = await ev(`(() => { const h = document.querySelector(${JSON.stringify(hintView + ' [data-display-hint]')}); return h ? { text: h.textContent.trim(), role: h.getAttribute('role'), live: h.getAttribute('aria-live'), hidden: h.hidden } : null; })()`);
-            check(`${tag}: the Display hint says how many agents have no branch, and is a polite live region (${JSON.stringify(hint)})`, hint && !hint.hidden && /no branch/i.test(hint.text) && (hint.role === 'status' || hint.live === 'polite'));
             const aud = await auditRegion(ev, [hintView + ' [data-display-panel]', '#live-history-messages']);
             check(`${tag}: the Display panel and the chat have 4.5:1 text contrast (${JSON.stringify((aud.fails || []).slice(0, 3))})`, (aud.fails || []).length === 0);
 
