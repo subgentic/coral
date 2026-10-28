@@ -919,6 +919,32 @@ body:has(.model-chip-menu:not([hidden])) .chat-jump-latest-btn { visibility: hid
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.chat-system-toggle {
+    flex: none;
+    display: inline-flex;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.chat-system-toggle .material-icons {
+    color: inherit;
+    transition: transform 0.12s;
+}
+.chat-system.open .chat-system-toggle .material-icons {
+    transform: rotate(180deg);
+}
+/* Open: the whole reminder, wrapped, in a rounded box instead of a one-line pill. */
+.chat-system.open {
+    align-items: flex-start;
+    border-radius: var(--radius-xl);
+}
+.chat-system.open .chat-system-text {
+    overflow: visible;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
 .chat-system-count {
     flex: none;
     padding: 0 6px;
