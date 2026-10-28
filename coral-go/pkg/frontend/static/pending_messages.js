@@ -23,6 +23,8 @@ import { flushReply } from './chat_announce.js';
 // Before either, "Sending…" while the server has not yet said the agent's
 // input box took it and it was submitted (#4587): Sent means submitted.
 const PENDING_TTL_MS = 15 * 60 * 1000;
+const UNANSWERED_TTL_MS = 24 * 60 * 60 * 1000; // a message the agent never answered because its CLI ended stays, marked, for a day (#10439)
+const pendingAlive = (p, now) => now - (p.at || 0) < (p.unanswered ? UNANSWERED_TTL_MS : PENDING_TTL_MS);
 const STORAGE_KEY_PENDING = "coral-pending-messages";
 const pendingBySession = new Map(); // session_id -> [{ id, text, at, queued, sending }]
 let pendingSeq = 0;
@@ -39,7 +41,7 @@ export function loadPendingFromStorage() {
         for (const [sid, list] of Object.entries(obj)) {
             if (Array.isArray(list)) {
                 // A send still unconfirmed when the page went is not known to have been submitted: its draft is kept instead.
-                const valid = list.filter(p => p && p.text && !p.sending && (now - (p.at || 0) < PENDING_TTL_MS));
+                const valid = list.filter(p => p && p.text && !p.sending && pendingAlive(p, now));
                 if (valid.length > 0) {
                     pendingBySession.set(sid, valid);
                     for (const p of valid) {
@@ -58,7 +60,7 @@ function savePendingToStorage() {
         const obj = {};
         const now = Date.now();
         for (const [sid, list] of pendingBySession.entries()) {
-            const valid = (list || []).filter(p => now - (p.at || 0) < PENDING_TTL_MS);
+            const valid = (list || []).filter(p => pendingAlive(p, now));
             if (valid.length > 0) {
                 obj[sid] = valid;
             }
@@ -403,16 +405,28 @@ function syncPendingGroup(container, cls, items, label) {
     return wrap;
 }
 
+/** The agent's CLI ended with these messages unanswered (#10439): each stays in the chat, marked "Not answered", instead of vanishing with the Working row; what waited behind a turn (queued) and what was still being sent are not claimed as sent. The "Working" clock stops: it is not working. */
+export function markUnanswered(sessionId) {
+    const list = pendingBySession.get(sessionId) || [];
+    let changed = false;
+    for (const p of list) if (!p.queued && !p.sending && !p.unanswered) { p.unanswered = true; changed = true; }
+    lastSendAt.delete(sessionId);
+    if (changed) savePendingToStorage();
+    const container = document.getElementById("live-history-messages");
+    if (container) { syncPendingBubbles(container, sessionId); syncWorkingIndicator(container, { session_id: sessionId }); }
+}
+
 export function syncPendingBubbles(container, sessionId) {
     const now = Date.now();
-    const list = (pendingBySession.get(sessionId) || []).filter(p => now - p.at < PENDING_TTL_MS);
+    const list = (pendingBySession.get(sessionId) || []).filter(p => pendingAlive(p, now));
     pendingBySession.set(sessionId, list);
     savePendingToStorage();
-    const sent = syncPendingGroup(container, "pending-sent", list.filter(p => !p.queued && !p.sending), "Sent");
-    const queued = syncPendingGroup(container, "pending-queued", list.filter(p => p.queued && !p.sending), "Queued");
-    const sending = syncPendingGroup(container, "pending-sending", list.filter(p => p.sending), "Sending…");
-    // Always last, below any newly rendered messages: sent, then queued, then the ones still sending
-    for (const wrap of [sent, queued, sending]) {
+    const sent = syncPendingGroup(container, "pending-sent", list.filter(p => !p.queued && !p.sending && !p.unanswered), "Sent");
+    const queued = syncPendingGroup(container, "pending-queued", list.filter(p => p.queued && !p.sending && !p.unanswered), "Queued");
+    const sending = syncPendingGroup(container, "pending-sending", list.filter(p => p.sending && !p.unanswered), "Sending…");
+    const unanswered = syncPendingGroup(container, "pending-unanswered", list.filter(p => p.unanswered), "Not answered");
+    // Always last, below any newly rendered messages: not answered (the agent ended), sent, then queued, then the ones still sending
+    for (const wrap of [unanswered, sent, queued, sending]) {
         if (wrap && container.lastElementChild !== wrap) container.appendChild(wrap);
     }
 }
