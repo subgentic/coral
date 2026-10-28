@@ -49,7 +49,7 @@ That is the one-time first-launch screen. Click **Skip for now** (or press Escap
 Coral local; it does not come back, and nothing is sent to the hub. The server marks a new
 install `welcome_pending` in its settings and the dashboard clears it with your answer
 (`welcome_choice`: `connected`, `skipped` or `own-hub`), so another browser does not ask
-again. **Settings › About › Connect to Coral Hub…** reopens it. It only opens when a hub is
+again. **Settings › Network and Hub › Connect to Coral Hub…** reopens it. It only opens when a hub is
 configured and Coral was started to offer it (a hub URL passed with `--cloud-url` or
 `CORAL_CLOUD_URL`, or `--cloud-connect prompt` or `auto`; not for the release build's default
 URL alone), and test servers set `CORAL_NO_WELCOME=1` and never show it.
@@ -70,7 +70,7 @@ sent until this server is connected: Settings > Coral Hub)`.
 ### "This server is enrolled with a different hub" (Coral Hub moved to app.coralhub.dev)
 
 Coral Hub moved from app.coralai.ai to **app.coralhub.dev**. A server enrolled with the old
-host stops connecting after the upgrade and says so in Settings > Coral Hub (Coral never
+host stops connecting after the upgrade and says so in Settings > Network and Hub (Coral never
 sends its token to a host it wasn't enrolled with, and never follows a redirect to a hub).
 Connect it again, then remove the old entry:
 
@@ -505,7 +505,7 @@ started and recorded (`kill <pid>`, or a tree walked down from that PID).
 ### Seeing exactly what Coral types into an agent's terminal
 
 If an agent did something you didn't expect (it exited, or ran a command nobody typed), turn on
-**Settings > Log terminal input (debug)**, or start Coral with `CORAL_DEBUG_INPUT=1` or
+**Settings > Security and privacy > Log terminal input (debug)**, or start Coral with `CORAL_DEBUG_INPUT=1` or
 `--debug-input`. It is off by default. While it is on, every write Coral makes to an agent's
 terminal goes to `<data dir>/input-debug.log`, one line each: time, terminal, the code path that
 sent it (`source=`, for example the board notifier or the dashboard's composer), how it was sent
@@ -559,7 +559,7 @@ session's process) and everything started in it run at nice +10 on macOS and Lin
 normal priority on Windows, as do workflow steps and hooks. The Coral server and the tmux server
 keep normal priority.
 
-It's **Settings > Agent priority**: **Low** (the default) or **Normal**. `--agent-priority low|normal`
+It's **Settings > Agents > Behaviour > Run agents at lower priority**: on (**Low**, the default) or off (**Normal**). `--agent-priority low|normal`
 or `CORAL_AGENT_PRIORITY` override the setting. A change applies to agents started afterwards:
 an agent already running keeps its priority until it is restarted, because a process can lower
 its priority but not raise it back. At startup Coral lowers the panes of its own tmux server that
