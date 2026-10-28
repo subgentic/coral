@@ -412,10 +412,10 @@ registerActions({
     'folder-pin': menu(el => { const d = dirOf(el); if (d && (el.dataset.mode === 'pin' || el.dataset.mode === 'unpin')) W(el.dataset.mode === 'pin' ? 'pinFolder' : 'unpinFolder')(d); }),
     'wf-run-open': menu(el => { const id = idOf(el.dataset.runId); if (id) window.selectWorkflowRun(id); }),
     // A row (or a rail tile) opens its agent.
-    'session-open': el => {
+    'session-open': (el, event) => {
         const sid = textOf(el.dataset.sessionId) || '';
         const name = textOf(el.dataset.name), type = tokenOf(el.dataset.agentType);
-        if (name && type) window.selectLiveSession(name, type, sid, textOf(el.dataset.server) || '');
+        if (name && type) window.selectLiveSession(name, type, sid, textOf(el.dataset.server) || '', { pointer: !!event && event.detail > 0 }); // a click puts the cursor in the composer (a mouse); Enter on the row leaves focus on it (#9794)
     },
     'history-open': el => { const sid = textOf(el.dataset.sessionId); if (sid) window.selectHistorySession(sid); },
     'history-page': el => { const n = idOf(el.dataset.page); if (n) window.loadHistoryPage(n); },

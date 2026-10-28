@@ -296,7 +296,7 @@ function showAgentsTab() {
     if (active && active.id !== 'nav-tab-agents') window.switchNavTab?.('agents', { fromHistory: true });
 }
 
-/** Shows an agent's page. `opts.focusChat` (Open chat) takes the keyboard to the chat; any other way in (the sidebar's row, a link) leaves focus where it was. */
+/** Shows an agent's page. `opts.focusChat` (Open chat) takes the keyboard to the chat; `opts.pointer` (a click on the sidebar's row) puts the cursor in the composer at a mouse; any other way in (Enter on a row, a link) leaves focus where it was. */
 export async function selectLiveSession(name, agentType, sessionId, server, opts = {}) {
     // Identity is (server, name). Callers that only know the session id (hash
     // restore, toasts) omit `server` and it is resolved from the live list.
@@ -327,6 +327,7 @@ export async function selectLiveSession(name, agentType, sessionId, server, opts
     const newKey = sessionKey(state.currentSession);
     input.value = state.sessionInputText[newKey] || "";
     renderAttachments();
+    if (opts.pointer && !isPhoneLayout()) input.focus(); // a click on the sidebar's row at a mouse puts the cursor in the composer, as it always did: early, so the list's redraw that follows does not hand focus back to the row
 
     // Show live view, hide others
     showView("live-session-view");
