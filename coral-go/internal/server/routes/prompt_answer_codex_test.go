@@ -133,7 +133,7 @@ func TestAnswerPrompt_CodexHookTrust(t *testing.T) {
 			term.onRaw = func(string) { setScreen(codexHookTrust(t, f[1])) } // and Enter changes nothing
 			code, body := answer(2, trust)
 			assert.Equal(t, http.StatusConflict, code)
-			assert.Equal(t, "prompt_still_open", body["code"])
+			assert.Equal(t, "answer_sent_prompt_open", body["code"])
 			assert.Equal(t, 1, term.enters["codex-hooks"], "never a second Enter")
 		})
 	}
@@ -142,7 +142,7 @@ func TestAnswerPrompt_CodexHookTrust(t *testing.T) {
 		setScreen(codexHookTrust(t, "tmux_open.txt")) // the digit is lost: option 1 stays selected
 		code, body := answer(2, trust)
 		assert.Equal(t, http.StatusConflict, code)
-		assert.Equal(t, "prompt_still_open", body["code"])
+		assert.Equal(t, "answer_sent_prompt_open", body["code"])
 		assert.Zero(t, term.enters["codex-hooks"], "Enter is only for the option that was chosen")
 	})
 	t.Run("a menu a digit answers gets no Enter", func(t *testing.T) {
@@ -176,7 +176,7 @@ func TestAnswerPrompt_CodexHookTrust(t *testing.T) {
 		}
 		code, body := answer(2, trust)
 		assert.Equal(t, http.StatusConflict, code)
-		assert.Equal(t, "prompt_still_open", body["code"])
+		assert.Equal(t, "answer_sent_prompt_open", body["code"])
 		assert.Zero(t, term.enters["codex-hooks"])
 	})
 }
@@ -197,7 +197,7 @@ func TestAnswerPrompt_ClaudeStillOpen(t *testing.T) {
 	var body map[string]any
 	json.NewDecoder(resp.Body).Decode(&body)
 	assert.Equal(t, http.StatusConflict, resp.StatusCode)
-	assert.Equal(t, "prompt_still_open", body["code"])
+	assert.Equal(t, "answer_sent_prompt_open", body["code"])
 	assert.Equal(t, []string{"1"}, terminal.raw["claude-open"])
 	assert.Zero(t, terminal.enters["claude-open"])
 }

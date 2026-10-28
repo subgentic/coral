@@ -26,7 +26,7 @@ const SHOWN = { claude: ['Yes', 'No'], claudeLasting: ['Yes', 'No'], claudeTrust
         await ev(`window.__coralReady.then(() => true)`);
         await ev(`window.__posts = []; window.__ask = 'ask-1'; window.__status = 200; window.__opts = ${JSON.stringify(SETS.claude)};
             const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
-                if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__posts.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify(window.__status === 200 ? { ok: true } : window.__status === 409 ? { error: 'That question changed; look at it again.' } : { error: "The answer was sent, but the agent's prompt is still open. Check the terminal.", code: 'prompt_still_open' }), { status: window.__status === 'late' ? 409 : window.__status, headers: { 'content-type': 'application/json' } })); }
+                if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__posts.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify(window.__status === 200 ? { ok: true } : window.__status === 409 ? { error: 'That question changed; look at it again.', code: 'ask_changed' } : window.__status === 'late' ? { error: "The answer was sent, but the agent's prompt is still open. Check the terminal.", code: 'answer_sent_prompt_open' } : { error: "The prompt's selection didn't move to that option. Answer it in the terminal.", code: 'prompt_still_open' }), { status: window.__status === 'late' || window.__status === 'unmoved' ? 409 : window.__status, headers: { 'content-type': 'application/json' } })); }
                 if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: { question: 'Do you want to proceed?', ask_id: window.__ask, options: window.__opts.map((label, i) => ({ n: i + 1, label, action: 'select' })) } }), { headers: { 'content-type': 'application/json' } }));
                 return real(u, o); };
             true`);
@@ -53,13 +53,23 @@ const SHOWN = { claude: ['Yes', 'No'], claudeLasting: ['Yes', 'No'], claudeTrust
         await waitFor(`window.__cell.querySelectorAll('button').length === 2`, 'again', 5000);
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button').click(); true`);
         await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(e => /That question changed; look at it again/.test(e.textContent))`, 'a 409 says the same', 5000);
-        // the answer went but the agent's prompt had not gone yet (a 409 of another kind): it says so, never "That question changed", and the row says Answered (#10525)
-        await ev(`window.__posts = []; window.__status = 'late'; window.__ask = 'ask-2'; true`); await draw();
+        // the answer went but the agent's prompt had not cleared (answer_sent_prompt_open): the row says Sent and Still waiting and stays in Needs you; it is not Answered and the Inbox is not told (#10516)
+        await ev(`window.__posts = []; window.__status = 'late'; window.__ask = 'ask-2'; window.__told = 0; document.addEventListener('coral:inbox-answered', () => { window.__told++; }); true`); await draw();
         await waitFor(`window.__cell.querySelectorAll('button').length === 2`, 'again for the late prompt', 5000);
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button').click(); true`);
-        await waitFor(`/^Answered: /.test(window.__cell.textContent)`, 'the row says Answered', 5000);
-        await new Promise(r => setTimeout(r, 300)); // sleep-ok: a wrong toast would have been drawn by now
+        await waitFor(`/^Sent: .*Still waiting: check the agent\\.$/.test(window.__cell.textContent)`, 'the row says Sent and Still waiting', 5000);
+        await new Promise(r => setTimeout(r, 300)); // sleep-ok: a wrong event or toast would have come by now
+        assert.equal(await ev(`window.__told`), 0, 'the Inbox is not told the agent was answered: the row stays');
+        assert.ok(!/^Answered/.test(await ev(`window.__cell.textContent`)), 'and the row does not say Answered');
         assert.ok(!(await ev(`[...document.querySelectorAll('.toast .toast-message')].some(e => /That question changed/.test(e.textContent))`)), 'a sent answer does not say the question changed');
+        // nothing was sent (the selection did not move to the option): the buttons stay and the person is told to use the terminal
+        await ev(`window.__posts = []; window.__status = 'unmoved'; window.__ask = 'ask-2'; true`); await draw();
+        await waitFor(`window.__cell.querySelectorAll('button').length === 2`, 'again for the unmoved selection', 5000);
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button').click(); true`);
+        await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(e => /Could not send the answer/.test(e.textContent))`, 'the person is told it was not sent', 5000);
+        assert.equal(await ev(`window.__cell.querySelectorAll('button').length`), 2, 'the buttons stay');
+        assert.ok(!/^(Answered|Sent)/.test(await ev(`window.__cell.textContent`)), 'and the row does not claim an answer');
+        assert.equal(await ev(`window.__told`), 0, 'the row stays in Needs you');
         console.log('PASS Inbox answers: no lasting choice on a row (Claude, Codex, Antigravity), a changed ask sends nothing, a 409 says so');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

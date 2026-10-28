@@ -298,14 +298,19 @@ func TestAnswerPrompt(t *testing.T) {
 	assert.NotEqual(t, drawn.AskID, next.AskID, "two asks with the same options are two ids")
 	setScreen(other)
 	before := len(sentKeys())
+	var lastCode string
 	askAnswer := func(id string) int {
 		b, _ := json.Marshal(map[string]any{"n": 1, "label": "Yes", "ask_id": id, "session_id": sid, "agent_type": "claude"})
 		resp, err := http.Post(base+"/answer-prompt", "application/json", bytes.NewReader(b))
 		require.NoError(t, err)
 		defer resp.Body.Close()
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		lastCode, _ = body["code"].(string)
 		return resp.StatusCode
 	}
 	assert.Equal(t, http.StatusConflict, askAnswer(drawn.AskID), "the ask changed between draw and click")
+	assert.Equal(t, "ask_changed", lastCode, "the client matches on the code, not the words (#10516)")
 	assert.Len(t, sentKeys(), before, "a refused answer sends no key")
 	assert.Equal(t, http.StatusOK, askAnswer(next.AskID), "the ask that is open is answered")
 }
