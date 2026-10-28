@@ -25,12 +25,12 @@ const BASE = require('./test_base').BASE;
     assert.match((await note({remote_access_enabled:true,remote_access_effective:false})).text, /Restart to apply.*Not encrypted: the API key/);
     assert.deepEqual(await note({remote_access_enabled:false,remote_access_effective:false}), {text:'',unencrypted:''});
     assert.equal((await note({remote_access_enabled:true,remote_access_effective:true})).unencrypted, 'true');
-    await ev(`(async()=>{document.getElementById('settings-telemetry-enabled').checked=true;document.getElementById('settings-remote-access-enabled').checked=true;await import((window.__coralStatic||'/static/')+'modals.js').then(m=>m.applySettings())})()`);
+    await ev(`(async()=>{document.getElementById('settings-telemetry-enabled').checked=true;document.getElementById('settings-remote-access-enabled').checked=true;await Promise.resolve(window.applySettings())})()`);
     const payload = await ev(`window.__settingsPut[0]`);
     assert.equal(payload.telemetry_enabled, true); assert.equal(payload.remote_access_enabled, true);
     await ev(`window.__settingsStatus=403`);
     await ev(`document.getElementById('settings-modal').style.display='flex'`);
-    await ev(`import((window.__coralStatic||'/static/')+'modals.js').then(m=>m.applySettings())`);
+    await ev(`Promise.resolve(window.applySettings())`);
     assert.equal(await ev(`document.getElementById('settings-modal').style.display`), 'flex');
     console.log('PASS privacy settings load, save, effective-state notice');
   } finally { await client.close(); }

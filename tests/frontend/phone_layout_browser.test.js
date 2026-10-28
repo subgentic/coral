@@ -76,7 +76,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile: true }); await settle(500);
             await ev(`window.switchNavTab('agents'); true`);
             // Settings and every dialog
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js'); await m.showSettingsModal(); return true; })()`); await settle(1500); await scan('settings', '#settings-modal'); await ev(`window.hideSettingsModal(); true`);
+            await ev(`(async () => { await window.showSettingsModal(); return true; })()`); await settle(1500); await scan('settings', '#settings-modal'); await ev(`window.hideSettingsModal(); true`);
             const ids = await ev(`[...document.querySelectorAll('.modal[role=dialog]')].map(m => m.id).filter(id => id !== 'settings-modal')`);
             for (const id of ids) {
                 await ev(`document.getElementById(${JSON.stringify(id)}).style.display = 'flex'; true`); await settle(120);
@@ -131,7 +131,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const lk = await ev(`(() => { const r = s => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, h: b.height }; }; return { input: r('#command-input'), msgs: r('#live-history-messages'), vh: innerHeight }; })()`);
             if (!(lk.input && lk.input.bottom <= lk.vh + 0.5 && lk.input.top >= 0)) problems.push(`640x320|landscape: the composer box is not in view ${JSON.stringify(lk.input)}`);
             if (!(lk.msgs && lk.msgs.h >= 60)) problems.push(`640x320|landscape: the conversation is squeezed to ${lk.msgs && lk.msgs.h} px`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js'); await m.showSettingsModal(); return true; })()`); await settle(1200);
+            await ev(`(async () => { await window.showSettingsModal(); return true; })()`); await settle(1200);
             await scan('landscape: settings', '#settings-modal'); await ev(`window.hideSettingsModal(); true`);
             // 200 percent text on the home and agent views (the root font size doubled: everything sized in rem or em follows)
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });

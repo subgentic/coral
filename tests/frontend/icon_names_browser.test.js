@@ -59,7 +59,7 @@ const AUDIT = `(() => { const root = window.__scanRoot ? document.querySelector(
         await scan('agent chat and its header');
         await ev(`(document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); true`); await settle(ev, 700); // sleep-ok: views and dialogs fill from several answers; there is no completion event
         for (const tab of ['files', 'browse', 'artifacts', 'tasks', 'notes', 'activity']) { await ev(`window.switchAgenticTab('${tab}', 'top'); true`); await settle(ev, 700); await scan('side panel ' + tab, '#agentic-state'); } // sleep-ok: views and dialogs fill from several answers; there is no completion event
-        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js'); await m.showSettingsModal(); return true; })()`); await settle(ev, 1500); // sleep-ok: views and dialogs fill from several answers; there is no completion event
+        await ev(`(async () => { await window.showSettingsModal(); return true; })()`); await settle(ev, 1500); // sleep-ok: views and dialogs fill from several answers; there is no completion event
         await scan('settings', '#settings-modal'); await ev(`window.hideSettingsModal(); true`);
         await ev(`document.querySelector('[data-on-click="launch-show"]').click(); true`); await settle(ev, 900); // sleep-ok: views and dialogs fill from several answers; there is no completion event
         await scan('launch dialog', '#launch-modal');

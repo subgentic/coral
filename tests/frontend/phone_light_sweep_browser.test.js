@@ -77,7 +77,7 @@ const TASKS = ['Fix the lock taken twice in the update path of the store', 'Writ
         for (const tab of ['tasks', 'board', 'files', 'notes']) { await ev(`window.switchAgenticTab('${tab}', 'top'); true`); await settle(900); await scan('side panel ' + tab, '#agentic-state'); }
         await ev(`(document.getElementById('agentic-mobile-close-btn') || document.createElement('i')).click(); true`); await settle(500);
         // Settings, every tab
-        await ev(`(async () => { const m = await import(${S} + 'modals.js'); await m.showSettingsModal(); return true; })()`); await settle(1500);
+        await ev(`(async () => { await window.showSettingsModal(); return true; })()`); await settle(1500);
         const groups = await ev(`[...document.querySelectorAll('#settings-group-select option')].map(o => o.value)`);
         for (const g of groups) { await ev(`(() => { const s = document.getElementById('settings-group-select'); s.value = ${JSON.stringify(g)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500); await scan('settings ' + g, '#settings-modal'); }
         await ev(`window.hideSettingsModal(); true`);

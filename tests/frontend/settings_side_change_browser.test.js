@@ -31,7 +31,7 @@ const BASE = require('./test_base').BASE;
     // The dialog fills its CLI path fields a moment after it opens; a Save before that drops them, which is not what this test is about.
     await until(`document.getElementById('settings-cli-path-claude').dataset.filled === '1'`, 'the dialog to finish filling');
   };
-  const save = () => ev(`import(${MOD}+'modals.js').then(m=>m.applySettings()).then(()=>true)`);
+  const save = () => ev(`Promise.resolve(window.applySettings()).then(()=>true)`);
   let original = null;
   const guard = await require('./helpers/settings_guard').guardSettings(); // the settings this suite changes are put back in its finally (#4849)
   try {
