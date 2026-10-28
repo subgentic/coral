@@ -186,7 +186,11 @@ async function freshServer() {
         assert.ok(orch, `${tag}: the Orchestrator never got the first task as an unread board message (screen: ${JSON.stringify(await screen())})`);
         const posted = await ev(`fetch('/api/board/' + encodeURIComponent(${JSON.stringify(orch.board)}) + '/messages/all').then(r => r.json()).then(l => (Array.isArray(l) ? l : l.messages || []).map(m => String(m.content || '')))`);
         assert.ok(posted.some(c => c.includes(GOAL)), `${tag}: the team's board holds the first task (${JSON.stringify(posted).slice(0, 300)})`);
-        assert.ok((await gotContains(s, 'unread message on the message board', 45000)).includes('unread message on the message board'), `${tag}: the Orchestrator's CLI was never told it has a message (it got ${JSON.stringify(await gotText(s))})`);
+        // The first task is also a real task assigned to the Orchestrator (#10007), so its CLI is told to claim it; the unread-message nudge for the board line waits for the end of that turn. Either tells it.
+        const told = await gotContains(s, "coral-board task claim", 45000);
+        assert.ok(told.includes('coral-board task claim') || told.includes('unread message on the message board'), `${tag}: the Orchestrator's CLI was never told about the first task (it got ${JSON.stringify(await gotText(s))})`);
+        const tasks = await ev(`fetch('/api/board/' + encodeURIComponent(${JSON.stringify(orch.board)}) + '/tasks').then(r => r.json()).then(l => (Array.isArray(l) ? l : l.tasks || []).map(t => ({ title: String(t.title || ''), assigned_to: t.assigned_to })))`);
+        assert.ok(tasks.some(t => t.title.includes(GOAL) && /orchestrator/i.test(String(t.assigned_to || ''))), `${tag}: the Tasks tab has the first task, assigned to the Orchestrator (${JSON.stringify(tasks).slice(0, 300)})`);
         assert.match(await ev(`location.pathname`), /^\/team\//, `${tag}: after Launch Team the person is on the team's page`);
         console.log(`   ✓ ${tag}: Launch Team starts all ${members} agents, opens the team, and the first task is on its board with the Orchestrator told`);
         return s;
