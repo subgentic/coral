@@ -39,6 +39,7 @@ const { JSDOM } = require('jsdom');
     assert.strictEqual(n.title, 'Coral');
     assert.strictEqual(n.opts.body, 'Worker 1 needs input on laptop');
     assert.strictEqual(n.opts.tag, 'needs-input:srv:abc');
+    assert.strictEqual(n.opts.silent, true, 'no sound unless this browser turned it on (#10068)');
     assert.deepStrictEqual(Object.keys(n.opts).sort(), ['body', 'silent', 'tag']); // no icon, data or image
     hidden = false;
     assert.strictEqual(m.notifyNeedsInput({ agent: 'a', tag: 't' }), null, 'visible page: toast only');
@@ -95,7 +96,8 @@ const { JSDOM } = require('jsdom');
 
     // the wiring: the alert is raised from the rising edge in websocket.js only, summaries are not passed
     const ws = fs.readFileSync(path.join(dir, 'websocket.js'), 'utf8');
-    const call = ws.match(/notifyNeedsInput\(\{[^}]*\}\)/)[0];
-    assert.ok(!/summary|detail/.test(call), call);
+    const calls = ws.match(/noteAttention\(KIND_[A-Z_]+, \{[^}]*\}\)/g) || [];
+    assert.strictEqual(calls.length, 2, 'the needs-input alert and the reply alert are raised from websocket.js');
+    for (const call of calls) assert.ok(!/summary|detail/.test(call), call);
     console.log('desktop_notify: ok');
 })().catch(e => { console.error(e); process.exit(1); });
