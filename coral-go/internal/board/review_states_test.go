@@ -40,6 +40,11 @@ func reviewStatesBoard(t *testing.T) (*Store, string) {
 	require.NoError(t, err)
 	_, err = s.RejectReview(ctx, "team", rejected, "QA", "not yet", 0)
 	require.NoError(t, err)
+	split := submit("Dev", "two reviewers, one rejects")
+	_, _, err = s.DelegateReview(ctx, "team", split, "lead", []string{"QA", "Sec"})
+	require.NoError(t, err)
+	_, err = s.RejectReview(ctx, "team", split, "QA", "not yet", 0) // Sec's review task stays open, for a task no longer in review
+	require.NoError(t, err)
 	for i := 0; i < 5; i++ { // plain open tasks
 		_, err := s.CreateTask(ctx, "team", fmt.Sprintf("open %d", i), "body", "low", "lead", "")
 		require.NoError(t, err)
@@ -59,6 +64,18 @@ func TestListReviewStatesAgreesWithTheHydratedRead(t *testing.T) {
 			want[tk.ID] = tk
 		}
 	}
+	// The one expected difference (#9779, Security Reviewer's probe): after one reviewer rejects, the parent is back with its author, no longer in review, and the other reviewer's review task
+	// is still open. The hydrated read lists that stale review; ListReviewStates does not, as it finds review tasks through the tasks in review.
+	stale := 0
+	for id, tk := range want {
+		if tk.Workflow.ReviewOf > 0 {
+			if parent, err := s.GetTask(ctx, team, tk.Workflow.ReviewOf); err == nil && parent.Status == "pending" {
+				delete(want, id)
+				stale++
+			}
+		}
+	}
+	require.Equal(t, 1, stale, "the split-verdict review task is the stale one")
 	require.GreaterOrEqual(t, len(want), 3, "a review_pending task and two review tasks")
 	got, err := s.ListReviewStates(ctx, team)
 	require.NoError(t, err)
