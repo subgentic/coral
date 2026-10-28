@@ -52,6 +52,16 @@ export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so
 const WORKERS_REFUSED = { plan: 'Claude agents cannot start workers in this mode.' };
 const WORKERS_REFUSED_ANY = 'Agents cannot start workers in this mode.';
 
+// A CLI offers only the modes it has (#10381): Codex has no Accept edits, and its Default, Auto and Don't ask are one launch (a workspace sandbox that never asks, #7527) under one name, Default (what its row records), so its list is Default, Plan and Bypass permissions.
+const MODES_A_CLI_LACKS = { codex: ['acceptEdits', 'auto', 'dontAsk'] };
+export function modeOffered(type, value) { return !(MODES_A_CLI_LACKS[String(type || '').toLowerCase()] || []).includes(value); }
+/** Hides the modes the CLI lacks; a pick that is one of them (the type was changed to this CLI) falls to Default. */
+export function offerModesFor(selectEl, type) {
+    if (!type) return; // Settings' own select is for every CLI
+    for (const o of selectEl.options) { const on = modeOffered(type, o.value); o.hidden = !on; o.disabled = !on; }
+    if (!modeOffered(type, selectEl.value)) selectEl.value = 'default';
+}
+
 // `unset`: nothing is saved, so nothing is refused, though the select reads Auto (Security's #7587 point: only a saved mode, or a pick that will be saved, refuses)
 export function _updatePermModeDescription(selectEl, unset = false) {
     const warn = selectEl.closest('.settings-row, .sv-row')?.querySelector('.perm-mode-warn'); // only the Settings row has it
@@ -60,6 +70,7 @@ export function _updatePermModeDescription(selectEl, unset = false) {
         warn.hidden = unset || selectEl.value === 'default' || selectEl.value === ''; // nothing saved refuses nothing
     }
     const type = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value;
+    offerModesFor(selectEl, type);
     for (const o of selectEl.options) o.title = permissionDescription(type, o.value); // each option's tip is the CLI's own words, refreshed with the agent type (#10074)
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc') || selectEl.closest('.settings-row, .sv-row')?.querySelector('.perm-mode-desc'); // Settings' line is in the label, not beside the select
     if (!hint) return;
