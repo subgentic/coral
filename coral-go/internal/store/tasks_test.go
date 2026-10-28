@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -135,6 +136,13 @@ func TestAgentEventsCRUD(t *testing.T) {
 	goals, err := s.GetLatestGoals(ctx, []string{"sess-1"})
 	require.NoError(t, err)
 	assert.Equal(t, "Build auth system", goals["sess-1"])
+	// the goal's age is said beside it (#10123): the row carries when it was written, the newest one's time
+	rows, err := s.GetLatestGoalRows(ctx, []string{"sess-1", "sess-none"})
+	require.NoError(t, err)
+	assert.Equal(t, "Build auth system", rows["sess-1"].Summary)
+	_, parseErr := time.Parse(ISOFormat, rows["sess-1"].At)
+	assert.NoError(t, parseErr, "the goal's time is the stored ISO stamp: %q", rows["sess-1"].At)
+	assert.NotContains(t, rows, "sess-none", "a session with no goal has no row")
 
 	// Latest event types (excludes status/goal/confidence)
 	latest, err := s.GetLatestEventTypes(ctx, []string{"sess-1"})
