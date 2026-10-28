@@ -1,9 +1,12 @@
 package main
 
-import "errors"
+import "github.com/subgentic/coral/internal/machinelaunch"
 
-// machineUserData makes the cloud-init user-data for one machine credential: the Coral release to install, the cap the machine announces, and the agent CLIs (name or name@version). It is the one
-// seam between this command and the user-data builder of #9973 (slice 1, part 3: machinelaunch.BuildUserData); until that is in this build it says so instead of making something up.
-var machineUserData = func(credential, maxMode, coralVersion string, agents []string) (string, error) {
-	return "", errors.New("this build cannot make the machine's user-data yet (the builder of #9973 slice 1 part 3 is not in it)")
+// machineUserData makes the cloud-init user-data for one machine credential: the Coral release to install, the cap the machine announces, the Hub it joins and the agent CLIs (claude@V, codex@V, pi@V,
+// agy@sha256:...). It is the one seam between this command and the user-data builder (machinelaunch.BuildUserData); a test replaces it.
+var machineUserData = func(credential, maxMode, coralVersion, hubURL string, agents []string) (string, error) {
+	return machinelaunch.BuildUserData(machinelaunch.UserDataSpec{Credential: credential, MaxMode: maxMode, CoralVersion: coralVersion, HubURL: hubURL, Agents: agents})
 }
+
+// checkCredential stands in for the credential while the flags are only being checked, before any secret is read.
+const checkCredential = "chb_0000000000000000000000000000000000"

@@ -39,7 +39,7 @@ var (
 	}
 )
 
-var agentEntry = regexp.MustCompile(`^(claude|codex|pi|agy)(@[A-Za-z0-9._-]{1,40})?$`)
+var agentEntry = regexp.MustCompile(`^((claude|codex|pi)@[A-Za-z0-9._-]{1,40}|agy@sha256:[0-9a-f]{64})$`)
 
 type listFlag []string
 
@@ -48,7 +48,7 @@ func (l *listFlag) Set(v string) error { *l = append(*l, v); return nil }
 
 func machineUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: coral machine launch --provider digitalocean --token-file <path|-> --hub-key-file <path|-> [--hub-url https://app.coralhub.dev]")
-	fmt.Fprintln(w, "         [--name NAME] [--region nyc3] [--size s-2vcpu-4gb] [--image SLUG] [--ssh-key ID]... [--agents claude@VERSION,codex@VERSION,pi@VERSION,agy@unpinned]")
+	fmt.Fprintln(w, "         [--name NAME] [--region nyc3] [--size s-2vcpu-4gb] [--image SLUG] [--ssh-key ID]... [--agents claude@VERSION,codex@VERSION,pi@VERSION,agy@sha256:HEX]")
 	fmt.Fprintln(w, "         [--max-mode view|interact|launch] [--coral-version VERSION] [--yes]")
 }
 
@@ -67,7 +67,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	region := fs.String("region", "nyc3", "the provider's region slug")
 	size := fs.String("size", "s-2vcpu-4gb", "the provider's size slug")
 	image := fs.String("image", "", "the provider's image slug (default: the provider's Ubuntu LTS)")
-	agents := fs.String("agents", "", "agent CLIs to install: claude, codex, pi (each needs @VERSION) and agy (agy@unpinned runs its installer without a version)")
+	agents := fs.String("agents", "", "agent CLIs to install: claude, codex and pi, each pinned as NAME@VERSION; agy (Antigravity) only as agy@sha256:HEX, the SHA-256 of the installer script you checked")
 	maxMode := fs.String("max-mode", "launch", "the most Coral Hub may do on the machine: view, interact or launch")
 	coralVersion := fs.String("coral-version", "", "the Coral release to install (default: this binary's version)")
 	yes := fs.Bool("yes", false, "go on without asking (the price is still printed)")
@@ -112,10 +112,13 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		for _, a := range strings.Split(*agents, ",") {
 			a = strings.TrimSpace(a)
 			if !agentEntry.MatchString(a) {
-				return fail("--agents entry %q is not claude, codex, pi or agy, optionally with @VERSION", a)
+				return fail("--agents entry %q is not claude@VERSION, codex@VERSION, pi@VERSION or agy@sha256:HEX (nothing is installed unpinned)", a)
 			}
 			agentList = append(agentList, a)
 		}
+	}
+	if _, err := machineUserData(checkCredential, *maxMode, version, *hubURL, agentList); err != nil { // the flags are checked by the builder before any secret is read or any call is made
+		return fail("%v", err)
 	}
 	machine := *name
 	if machine == "" {
@@ -144,7 +147,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	deps := machinelaunch.Deps{
 		Provider: p, Hub: hub, Out: stdout,
 		UserData: func(credential string) (string, error) {
-			return machineUserData(credential, *maxMode, version, agentList)
+			return machineUserData(credential, *maxMode, version, *hubURL, agentList)
 		},
 	}
 	if f, ok := stdin.(*os.File); ok && isTerminal(f) && *tokenFile != "-" && *keyFile != "-" {
