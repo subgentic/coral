@@ -6,13 +6,14 @@
 //   - Open board from the page lands at the message, the jump bar's Back to Saved returns to the Inbox; on a phone the Inbox is in the view dropdown.
 // The hub path (the frame) is inbox_tab_browser's. Seven bookmarks on two teams, three mock agents (one waiting). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
+const { OPEN_INBOX_SAVED } = require('./helpers/open_inbox_saved');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
 const tabBtn = name => `import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('${name}')).then(() => true)`; // the Inbox's groups (the sidebar's): the one on screen is a table in the centre
-const openSavedFolder = async ev => { await ev(`window.switchNavTab('hub-inbox'); true`); await ev(tabBtn('saved')); }; // the Inbox tab, then its Saved folder (the top bar's bookmark is gone, #9929)
+const openSavedFolder = async ev => { await ev(OPEN_INBOX_SAVED); }; // the Inbox tab, then its Saved folder (the top bar's bookmark is gone, #9929)
 
 const hex = i => i.toString(16).padStart(20, '0');
 
