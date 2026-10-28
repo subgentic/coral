@@ -10,6 +10,12 @@ const { pathToFileURL } = require('url');
     const m = await import(pathToFileURL(path.join(dir, 'server_base.js')).href);
     const { state, sessionKey } = await import(pathToFileURL(path.join(dir, 'state.js')).href);
 
+    // the folder a team works in is found by the team's key, so a team on another computer has one (#9970: over the Hub Add agent asked for a folder the team already had)
+    const sessions = [{ name: 'a', server: 'ws1', board_project: 'alpha', working_directory: '/work/a' }, { name: 'b', server: 'local', board_project: 'alpha', working_directory: '/work/local' }, { name: 'c', server: 'ws1', board_project: 'alpha' }, { name: 'd', server: 'ws1', board_project: 'beta', working_directory: '/work/d' }];
+    assert.strictEqual(m.teamWorkDir(sessions, '@ws1/alpha'), '/work/a', 'a team on another computer: its own session\'s folder');
+    assert.strictEqual(m.teamWorkDir(sessions, 'alpha'), '/work/local', 'the team here: the folder of the session here, not the other computer\'s');
+    assert.strictEqual(m.teamWorkDir(sessions, '@ws1/gamma'), '', 'no session on it: empty');
+    assert.strictEqual(m.teamWorkDir(undefined, 'alpha'), '');
     assert.strictEqual(m.serverBase(), '');
     assert.strictEqual(m.serverBase('local'), '');
     assert.strictEqual(m.serverBase('ws1'), '/api/remote/ws1');
