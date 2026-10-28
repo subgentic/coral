@@ -25,8 +25,11 @@ export function dismissAsked(s) {
 /** Does Needs you list this agent: it waits for its person, or it asked something before Coral restarted. */
 export const needsYou = s => needsInputAttention(s) || !!askedBefore(s);
 
+/** The words that open what it asked: "before Coral restarted" when Coral's stop put it to sleep, else "before it went to sleep" (an operator's Sleep, an ended CLI). */
+export const askedWords = a => `Asked ${a && a.after_restart ? 'before Coral restarted' : 'before it went to sleep'}: ${a ? a.text : ''}`;
+
 /** The row as Needs you shows it: an agent that asked before the restart carries its words, kind and time as a waiting agent's do. */
 export function askedRow(s) {
     const a = askedBefore(s);
-    return a ? { ...s, waiting_summary: `Asked before Coral restarted: ${a.text}`, waiting_kind: a.kind, waiting_since: a.at } : s;
+    return a ? { ...s, waiting_summary: askedWords(a), waiting_kind: a.kind, waiting_since: a.at } : s;
 }
