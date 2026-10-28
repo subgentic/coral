@@ -495,11 +495,12 @@ export async function launchSession() {
             const addedTo = launch.addTo && launch.addTo.board ? ` on board ${keyLabel(launch.addTo.board)}` : '';
             const added = !!(launch.addTo && launch.addTo.board); // Add agent to a team opens nothing: the person is on the team's page (#7778); one into a folder opens the new agent (#10077)
             showToast(server === LOCAL_SERVER ? `Launched: ${shown}${addedTo}` : `Launched on ${serverLabel(server, state.servers)}: ${shown}${addedTo}`);
+            const opener = document.getElementById('launch-modal')._focusOpener || null; // where the keyboard was when the dialog opened: closing the dialog puts it back there (#10247)
             hideLaunchModal();
             importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first agent is when alerts make sense: once per browser (#10068)
             setTimeout(loadLiveSessions, 2000);
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
-            if (normServer(server) === LOCAL_SERVER && !added) _openLaunched(result, type);
+            if (normServer(server) === LOCAL_SERVER && !added) _openLaunched(result, type, opener);
         }
     } catch (e) {
         showToast("Could not start the agent. Check that the folder exists and that the agent is installed, then try again.", true);
@@ -511,11 +512,15 @@ export async function launchSession() {
 
 /** Open what was just launched (#5835): a person who pressed Launch expects to land in the new agent, not on the home screen with a row to find (the first run's biggest drop:
  *  launched, never prompted). The list is read first so the row exists; the composer is focused by selecting it. A failure leaves the toast and the row, as before. */
-export async function _openLaunched(result, type) {
+export async function _openLaunched(result, type, opener = null) {
     try {
         await loadLiveSessions();
         const { selectLiveSession } = await importOnce('./sessions.js');
         await selectLiveSession(result.session_name, type, result.session_id, LOCAL_SERVER);
+        // The keyboard goes into the new agent's message box, where the person types next: closing the dialog had put it back on the button that opened it (or, on a phone, where that button is gone, on the page).
+        // Somewhere else, because the person moved it while the agent opened, it stays (#10247).
+        const now = document.activeElement, box = document.getElementById('command-input');
+        if ((!now || now === document.body || now === opener) && box && box.getClientRects().length > 0) box.focus();
     } catch { /* the toast and the list row are still there */ }
 }
 
