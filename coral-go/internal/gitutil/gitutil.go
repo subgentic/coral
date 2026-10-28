@@ -113,18 +113,18 @@ func IncludesWorkingTree(mode string) bool { return mode != DiffLastCommit }
 func CompareLabel(ctx context.Context, workdir, mode string) string {
 	switch mode {
 	case DiffUncommitted:
-		return "Uncommitted changes"
+		return "Since my last commit"
 	case DiffLastCommit:
-		return "Last commit"
+		return "In my last commit"
 	case DiffPreviousCommit:
-		return "Last commit and uncommitted changes"
+		return "Last commit + uncommitted"
 	case DiffMainHead:
-		return "Changes compared with main"
+		return "Compared with main"
 	}
 	if GetDiffBase(ctx, workdir, mode) == "HEAD" {
-		return "Uncommitted changes (on main the branch point is HEAD)"
+		return "Since my last commit (on main you have not branched, so it is the same list)"
 	}
-	return "Changes since the branch point"
+	return "Since I branched"
 }
 
 // GetDiffBase returns the base ref for diffing.
