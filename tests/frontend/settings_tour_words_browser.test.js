@@ -54,7 +54,7 @@ const BASE = require('./test_base').BASE;
         // END Agents
 
         // PANE Network
-        assert.match(await row('settings-remote-access-enabled'), /Lets other devices use Coral as you do \(control agents, read files, change settings\)\./, 'Network and Hub: Remote access says its risk before the switch');
+        assert.match(await row('settings-remote-access-enabled'), /Lets other devices use Coral as you do \(control agents, read files, change settings\); unencrypted unless TLS is set up\./, 'Network and Hub: Remote access says its risk before the switch');
         assert.match(await row('settings-hub-mode-enabled'), /Adds a Servers tab; whoever signs in here controls every computer you add\./, 'Network and Hub: Manage other computers says its risk before the switch');
         // END Network
         console.log('PASS Settings tour words');
