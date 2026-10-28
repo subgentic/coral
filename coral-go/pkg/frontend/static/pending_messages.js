@@ -118,6 +118,28 @@ const CORAL_HEALTH_NUDGE_RE = /^\[Coral health check\]/i;
 function coralNoticeSummary(text) {
     return /^\[Coral UI panel request\b/i.test(text) ? text.split(/\r?\n/, 1)[0] : text;
 }
+// A reminder longer than this has a toggle that shows the whole of it (the pill keeps to one line otherwise).
+const NOTICE_FOLD_CHARS = 60;
+function syncNoticeToggle(pill, text) {
+    let btn = pill.querySelector(".chat-system-toggle");
+    const long = text.length > NOTICE_FOLD_CHARS || /\n/.test(text);
+    if (!long) { if (btn) btn.remove(); pill.classList.remove("open"); return; }
+    if (!btn) {
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chat-system-toggle";
+        btn.innerHTML = '<span class="material-icons" aria-hidden="true">expand_more</span>';
+        btn.addEventListener("click", () => {
+            const open = pill.classList.toggle("open");
+            btn.setAttribute("aria-expanded", String(open));
+            btn.setAttribute("aria-label", open ? "Show less of this reminder" : "Show all of this reminder");
+        });
+        btn.setAttribute("aria-expanded", String(pill.classList.contains("open")));
+        btn.setAttribute("aria-label", pill.classList.contains("open") ? "Show less of this reminder" : "Show all of this reminder");
+        const badge = pill.querySelector(".chat-system-count");
+        pill.insertBefore(btn, badge);
+    }
+}
 export function appendCoralNotice(container, text, health = false) {
     text = coralNoticeSummary(text);
 	// A notice is a step of the work it prompts, not a pill of its own (#4171): it goes into the steps group, which it starts when
@@ -131,6 +153,7 @@ export function appendCoralNotice(container, text, health = false) {
         const textEl = prev.querySelector(".chat-system-text");
         textEl.textContent = text;
         textEl.title = text;
+        syncNoticeToggle(prev, text);
         let badge = prev.querySelector(".chat-system-count");
         if (!badge) {
             badge = document.createElement("span");
@@ -141,8 +164,10 @@ export function appendCoralNotice(container, text, health = false) {
         badge.title = `${count} notices from Coral in a row`;
         return;
     }
-	appendWork(container, makeBubble(`chat-system ${noticeClass}`,
-		`<span class="material-icons" aria-hidden="true">${health ? "health_and_safety" : "notifications"}</span><span class="chat-system-label">${health ? "Coral · Health check" : "Coral"}</span><span class="chat-system-text" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`));
+	const pill = makeBubble(`chat-system ${noticeClass}`,
+		`<span class="material-icons" aria-hidden="true">${health ? "health_and_safety" : "notifications"}</span><span class="chat-system-label">${health ? "Coral · Health check" : "Coral reminder"}</span><span class="chat-system-text" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`);
+	syncNoticeToggle(pill, text);
+	appendWork(container, pill);
 }
 
 export function normalizeNudgeText(content) {

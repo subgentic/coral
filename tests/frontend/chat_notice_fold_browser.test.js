@@ -85,7 +85,7 @@ const fixture = [
         if (process.env.FOLD_SHOT_DIR) require('node:fs').writeFileSync(`${process.env.FOLD_SHOT_DIR}/expanded.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
         assert.equal(pills.length, 5, 'five notices in groups: ' + JSON.stringify(pills));
         assert.ok(pills.every(p => p.radius && p.border && p.visible), 'each is a visible bordered pill: ' + JSON.stringify(pills));
-        assert.deepEqual(pills.map(p => [p.icon, p.label]), [['notifications', 'Coral'], ['health_and_safety', 'Coral · Health check'], ['notifications', 'Coral'], ['notifications', 'Coral'], ['notifications', 'Coral']], 'the bell pill and the shield health-check pill');
+        assert.deepEqual(pills.map(p => [p.icon, p.label]), [['notifications', 'Coral reminder'], ['health_and_safety', 'Coral · Health check'], ['notifications', 'Coral reminder'], ['notifications', 'Coral reminder'], ['notifications', 'Coral reminder']], 'the bell pill and the shield health-check pill');
         // #7419: a Codex agent's chat (the operator's screenshot): the replies the agent gives to board notices are on the page; its commentary (progress) and its tool steps are what fold.
         const codex = [
             { type: 'user', content: 'Introduce yourself to the team' },
