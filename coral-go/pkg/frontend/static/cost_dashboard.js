@@ -308,6 +308,19 @@ function _setCompare(text) {
     el.replaceChildren(dot, document.createTextNode(text));
 }
 
+/** Today's and this month's cost under the Total cost figure: two reads of the same summary the page uses, from the start of the day and of the month (the person's zone), whatever the range chosen above. */
+async function _refreshCalendarCost() {
+    const el = document.getElementById('cost-calendar-cost');
+    if (!el) return;
+    const { calendarSince } = await importOnce('./cost_data.js');
+    const since = calendarSince(Date.now());
+    try {
+        const [day, month] = await Promise.all([since.today, since.month].map(s => fetch(`/api/token-usage/summary?since=${encodeURIComponent(s)}`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))));
+        const cost = d => formatCost((d && d.totals && d.totals.cost_usd) || 0, { zeroAsTwo: true });
+        el.textContent = day && month ? `Today ${cost(day)} \u00b7 This month ${cost(month)}` : '';
+    } catch { el.textContent = ''; }
+}
+
 export async function _refreshCostDashboard({ force = false } = {}) {
     _watchCostTables();
     const { costRange, providerRows, modelRows, thinkingRows, agentRows } = await importOnce('./cost_data.js'); // the range and the rows, pure (#8359); loaded when the page first refreshes, as the page's other lazy parts are
@@ -318,6 +331,7 @@ export async function _refreshCostDashboard({ force = false } = {}) {
     _flashLiveIndicator();
     _refreshSeries(); // the chart above the open breakdown view (#7857)
     _refreshOverview(); // the change against the period before, and cost by team (#7930)
+    _refreshCalendarCost(); // Today and This month beside Total cost (#10521)
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
     syncEfficiency(period);
     showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time'), force); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors

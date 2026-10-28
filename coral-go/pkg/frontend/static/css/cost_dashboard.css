@@ -383,6 +383,8 @@
 }
 .cost-card-change { margin-top: 2px; font-size: var(--fs-base); line-height: var(--lh-label); color: var(--text-muted); }
 .cost-card-change:empty { display: none; }
+.cost-card-calendar { margin-top: 2px; font-size: var(--fs-base); line-height: var(--lh-label); color: var(--text-secondary); }
+.cost-card-calendar:empty { display: none; }
 .viz-fill { stroke: var(--bg-primary); stroke-width: 2; stroke-linejoin: round; }
 .viz-legend { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 12px; }
 .viz-legend-btn { width: 100%; justify-content: flex-start; gap: 8px; text-align: left; } /* the look is the button family's (.btn .btn-quiet, the highlighted line aria-pressed): one row of the legend (#9505) */

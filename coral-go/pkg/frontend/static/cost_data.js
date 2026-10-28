@@ -22,6 +22,12 @@ export function costRange(period, nowMs) {
     return { hoursAgo, since, sinceParam, interval, tsParams };
 }
 
+/** The start of today and of this month in the person's own zone, as the `since` stamps of the summary read: the Total cost card's Today and This month, whatever range the page is on (#10521). */
+export function calendarSince(nowMs) {
+    const d = new Date(nowMs);
+    return { today: new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString(), month: new Date(d.getFullYear(), d.getMonth(), 1).toISOString() };
+}
+
 /** By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them). */
 export const providerRows = (rows) => (rows || []).map(a => ({
     agent_type: a.agent_type || 'unknown',
