@@ -13,7 +13,7 @@ const context = vm.createContext({
   _getBoardProject: () => 'p', boardKeyName: String, keyLabel: String, identityKey: String, splitKey: () => ({ server: '' }),
   formatCost: String, _formatTokenCount: String, _priorityLabel: String, _claimedFor: () => '', serverUrl: String, artifactPath: String, contextServer: () => '', reviewPoolInfo: () => null,
 });
-vm.runInContext(source.slice(source.indexOf('function _messageWithFiles(')).replaceAll('export function', 'function'), context);
+vm.runInContext(source.slice(source.indexOf('function nameAt(')).replaceAll('export function', 'function'), context);
 const HEX = 'a'.repeat(64);
 
 let html = context._taskWorkflowHtml({ id: 1, workflow: { instructions: 'Write the hours report.' } });
@@ -21,12 +21,18 @@ assert.ok(/<summary>Instructions for the agent<\/summary>/.test(html), 'the agen
 html = context._taskWorkflowHtml({ id: 1, workflow: { name: 'release', stage: 'build', instructions: 'x' } });
 assert.ok(/<summary>Workflow: release · build<\/summary>/.test(html), 'a workflow with a name keeps it');
 
-const art = [{ name: 'hours.md', uri: 'coral://artifacts/' + HEX }, { name: 'notes.txt', uri: 'https://example.com/n.txt' }];
+const art = [{ name: 'hours.md', uri: 'coral://artifacts/' + HEX }, { name: 'notes.txt', uri: 'https://elsewhere.example/n.txt' }];
 let m = context._messageWithFiles('Done. Wrote hours.md and notes.txt for the team.', art);
 assert.ok(m.includes('data-artifact-uri="coral://artifacts/' + HEX + '"') && m.includes('>hours.md</a>'), 'a coral file is a link that opens it: ' + m);
-assert.ok(m.includes('<a href="https://example.com/n.txt"') && m.includes('>notes.txt</a>'), 'a web file is a link: ' + m);
-assert.ok(m.startsWith('Done. Wrote ') && m.endsWith(' for the team.'), 'the other words are as written: ' + m);
+assert.ok(!m.includes('elsewhere.example') && !m.includes('href="https'), 'a web address is not linked inside the words (it stays in the artifacts list): ' + m);
+assert.ok(m.startsWith('Done. Wrote ') && m.endsWith(' and notes.txt for the team.'), 'the other words are as written: ' + m);
 assert.equal(context._messageWithFiles('Wrote hours.md, then hours.md again', art).match(/<a /g).length, 1, 'the first mention is the link');
 assert.equal(context._messageWithFiles('<b>hours.md</b>', [{ name: 'x', uri: 'coral://artifacts/' + HEX }]), '&lt;b&gt;hours.md&lt;/b&gt;', 'text is escaped, and a one-letter name is not a link');
-assert.equal(context._messageWithFiles('Wrote hours.md', [{ name: 'hours.md', uri: 'javascript:alert(1)' }]), 'Wrote hours.md', 'only a coral or web address is linked');
+assert.equal(context._messageWithFiles('Wrote hours.md', [{ name: 'hours.md', uri: 'javascript:alert(1)' }]), 'Wrote hours.md', 'only a Coral store address is linked');
+// a name is linked only when it looks like a file (a dot and an extension), and on a word boundary (#10629)
+const words = [{ name: 'the', uri: 'coral://artifacts/' + HEX }, { name: 'run', uri: 'coral://artifacts/' + HEX }];
+assert.equal(context._messageWithFiles('Ran the tests; the run was green, running fine', words), 'Ran the tests; the run was green, running fine', 'a name with no extension ("the", "run") is never linked');
+assert.equal(context._messageWithFiles('see xhours.md and hours.mdx and my-hours.md', art).match(/<a /g), null, 'a name inside a longer word or file name is not linked');
+assert.equal(context._messageWithFiles('Wrote (hours.md), then "hours.md".', art).match(/<a /g).length, 1, 'punctuation around a name is a boundary');
+assert.equal(context._messageWithFiles('Open elsewhere.example now', [{ name: 'elsewhere.example', uri: 'https://elsewhere.example/' }]), 'Open elsewhere.example now', 'a web address named in the words stays text');
 console.log('task_detail_words: ok');
