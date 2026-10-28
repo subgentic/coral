@@ -13,6 +13,8 @@ const { connect } = require('./agent_view_harness');
         base({ session_id: 'o3', display_name: 'Held', board_project: 'team-a', board_unread: 2, skipped_send: { why: 'a prompt is open', what: 'nudge' } }),
         base({ session_id: 'o4', display_name: 'Asker and held', waiting_for_input: true, waiting_kind: 'question', board_project: 'team-a', board_unread: 1, skipped_send: { why: 'a prompt is open', what: 'nudge' } }),
         base({ session_id: 'o5', display_name: 'Idler' }),
+        base({ session_id: 'o6', display_name: 'Jammed', stuck: true }),
+        base({ session_id: 'o7', display_name: 'Silent', not_started: true }),
     ];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -20,7 +22,7 @@ const { connect } = require('./agent_view_harness');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(ROWS)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
-            await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 5`, `${label}: the rows`, 6000);
+            await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 7`, `${label}: the rows`, 6000);
             const rows = await ev(`[...document.querySelectorAll('${root} .session-group-item')].map(li => { const r = li.getBoundingClientRect(), name = li.querySelector('.session-label'); return { id: li.dataset.sessionId, h: Math.round(r.height), weight: name ? getComputedStyle(name).fontWeight : null, nameLines: name ? Math.round(name.getBoundingClientRect().height / parseFloat(getComputedStyle(name).lineHeight || '16')) : 0, chips: [...li.querySelectorAll('.chip')].filter(c => c.getClientRects().length).map(c => c.textContent.trim()), chipPx: (c => c ? parseFloat(getComputedStyle(c).fontSize) : 0)(li.querySelector('.session-state-pill')), extra: ['.session-goal', '.session-model', '.session-worktree-line', '.session-line2', '.session-held-line', '.session-mobile-meta', '.session-mobile-banner-row', '.session-ctx-pill'].filter(s => li.querySelector(s)), dot: !!li.querySelector('.session-dot') }; })`);
             const by = id => rows.find(r => r.id === id);
             for (const r of rows) {
@@ -35,6 +37,8 @@ const { connect } = require('./agent_view_harness');
             assert.deepEqual(by('o3').chips, ['Message held'], `${label}: an agent whose message was held has "Message held"`);
             assert.match(by('o4').chips[0] || '', /Needs input/, `${label}: Needs you wins over the hold`);
             assert.equal(by('o4').chips.length, 1, `${label}: one chip`);
+            assert.match(by('o6').chips.join(), /^Stuck$/, `${label}: a stuck agent has the Stuck chip: a state that asks something of a person is a word on the row (UI/UX, #9700) ${JSON.stringify(by('o6'))}`);
+            assert.match(by('o7').chips.join(), /^Check terminal$/, `${label}: an agent with nothing yet has the Check terminal chip ${JSON.stringify(by('o7'))}`);
             console.log(`PASS ${label}: one line, a dot, a name, at most one chip`);
             if (mobile) { // a phone's header has no room: one tap on Details shows the folder, branch and model
                 await ev(`window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
