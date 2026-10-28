@@ -80,6 +80,20 @@ function _renderTeamTemplateSelector(query = '') {
         sel.append(new Option(`${t.name} (${members}${t.builtin ? '' : ', saved'})`, t.name));
     }
     sel.value = [...sel.options].some(o => o.value === _chosenTemplate) ? _chosenTemplate : '';
+    syncMemberCount();
+    const list = document.getElementById('team-agents-list');
+    if (list && !list.dataset.countWatched) { list.dataset.countWatched = '1'; new MutationObserver(syncMemberCount).observe(list, { childList: true }); }
+}
+
+/** The choice that filled Members says how many members there are now: a fourth added to the default team is "Default team (4 members)", not 3 (#10052). Only the choice that is picked is relabelled. */
+function syncMemberCount() {
+    const sel = document.getElementById('team-template-select'), list = document.getElementById('team-agents-list');
+    if (!sel || !list) return;
+    const n = list.querySelectorAll('.team-agent-row').length, words = `${n} ${n === 1 ? 'member' : 'members'}`;
+    const def = [...sel.options].find(o => o.value === DEFAULT_TEAM_KEY);
+    if (def) def.textContent = _chosenTemplate === DEFAULT_TEAM_KEY ? `Default team (${words})` : 'Default team (3 members)';
+    const gen = [...sel.options].find(o => o.value === GENERATED_TEAM_KEY);
+    if (gen && _chosenTemplate === GENERATED_TEAM_KEY) gen.textContent = `Generated team (${words})`;
 }
 
 /** An AI-generated team is in Members: the template choice says so. */
@@ -93,6 +107,7 @@ function markTeamTemplate(name) {
     _chosenTemplate = name || '';
     const sel = document.getElementById('team-template-select');
     if (sel) sel.value = [...sel.options].some(o => o.value === _chosenTemplate) ? _chosenTemplate : '';
+    syncMemberCount();
 }
 
 function resetTeamTemplatePicker() {

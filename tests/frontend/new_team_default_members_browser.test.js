@@ -34,12 +34,14 @@ const BASE = require('./test_base').BASE;
         assert.ok((await menuItems(1)).includes('Remove'), 'the Lead Developer can be removed');
         await ev(`[...window.__nt.dlg(${require('./helpers/new_team').N.team}).querySelectorAll('[role=menuitem]')].find(x => window.__na.name(x) === 'Remove').click(); true`); await settle(300);
         assert.deepEqual(await roles(), ['Orchestrator', 'QA Engineer'], 'Remove takes the member out');
+        assert.match(await chosen(), /^Default team \(2 members\)$/, 'the choice says how many members there are now (#10052)');
         // Blank team clears them and says so; the Default team choice brings the three back
         await t.pick(require('./helpers/new_team').N.template, /^Blank/); await settle(300);
         assert.deepEqual(await roles(), [], 'Blank team clears the members');
         assert.match(await chosen(), /^Blank team/, 'and the choice says Blank team');
         await t.pick(require('./helpers/new_team').N.template, /^Default team/); await settle(300);
         assert.deepEqual(await roles(), ['Orchestrator', 'Lead Developer', 'QA Engineer'], 'the Default team choice puts the three back');
+        assert.match(await chosen(), /^Default team \(3 members\)$/, 'and three again');
         // a template still replaces them
         await t.pick(require('./helpers/new_team').N.template, /Consumer Research/);
         await settle(300);
