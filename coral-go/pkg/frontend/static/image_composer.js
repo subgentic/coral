@@ -8,6 +8,7 @@ import { prepareImage, artifactErrorText, PICKER_ACCEPT, parseUploadReply, uploa
 import { responseErrorText } from './server_status.js';
 import { sleepingBlocked } from './control_runtime.js';
 import { registerUnsavedWork } from './update_banner.js';
+import { registerActions } from './actions.js';
 
 // Active upload promises scoped by session_id
 export const activeUploadPromisesBySession = new Map(); // session_id -> Promise[]
@@ -137,18 +138,15 @@ export function openImagePicker() {
     if (why) { showToast(why, true); return; }
     const input = document.getElementById("attach-image-input");
     if (!input) return;
-    if (!input.dataset.bound) { // bound on the first press, not at startup: the startup sequence stays as it was
-        input.dataset.bound = "1";
-        // The files are taken before the input is cleared, so the same photo can be chosen again.
-        input.addEventListener("change", () => {
-            const files = [...input.files];
-            input.value = "";
-            if (files.length) uploadPickedImages(files);
-        });
-    }
     input.accept = PICKER_ACCEPT;
     input.click();
 }
+
+// The input's change is an action on the input itself (data-on-change in the template), not a listener the button's first press adds: a file given to the input any other way (a file chooser that is not
+// the button's, a drag from the OS, a test) is taken the same (#10512). The files are taken before the input is cleared, so the same photo can be chosen again.
+registerActions({
+    'attach-image-picked': el => { const files = [...(el.files || [])]; el.value = ''; if (files.length) uploadPickedImages(files); },
+});
 
 /** Pictures chosen in the picker go up one after another, not at once (a phone on a slow connection, and the hub's limit on parallel requests); each is made smaller first when it is a big photo. */
 async function uploadPickedImages(files, session = state.currentSession) {
