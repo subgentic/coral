@@ -5,7 +5,7 @@ const { connect } = require('./agent_view_harness');
 
 const WF = { id: 7, name: 'nightly-build', description: '', enabled: true, steps: [{ name: 'Build', type: 'shell', command: 'make' }], max_duration_s: 300, created_at: '2026-10-27T10:00:00Z' };
 const JOB = { id: 5, name: 'Every night', description: '', enabled: true, workflow_id: 7, cron_expr: '0 2 * * *', timezone: 'UTC', next_fire_at: '2026-10-29T02:00:00Z', created_at: '2026-10-27T10:00:00Z', last_run: null };
-const RUN = { id: 31, workflow_id: 7, workflow_name: 'nightly-build', trigger_type: 'job', trigger_context: JSON.stringify({ scheduled_job_id: 5, scheduled_run_id: 9 }), status: 'completed', started_at: '2026-10-28T02:00:00Z', finished_at: '2026-10-28T02:00:03Z', steps: [{ name: 'Build', type: 'shell', status: 'completed', exit_code: 0, output_tail: 'ok' }] };
+const RUN = { id: 31, workflow_id: 7, workflow_name: 'nightly-build', trigger_type: 'job', trigger_context: JSON.stringify({ scheduled_job_id: 5, scheduled_run_id: 9 }), status: 'completed', started_at: '2026-10-28T02:00:00Z', finished_at: '2026-10-28T02:00:03Z', steps: [{ name: 'Build', type: 'shell', status: 'completed', exit_code: 0, output_tail: 'ok' }, { name: 'Say hello', type: 'agent', status: 'completed', output_tail: JSON.stringify({ is_error: false, result: 'Hello from the agent. The build is green.', duration_ms: 4200 }) }] };
 const STUB = `(() => {
     const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     const inner = window.fetch;
@@ -40,6 +40,11 @@ const STUB = `(() => {
             if (!/Every night/.test(run.back)) problems.push(`${tag}: the run's way back is its job, not the workflow (it says "${run.back.trim()}")`);
             if (!/Run by job Every night/.test(run.meta.replace(/\s+/g, ' '))) problems.push(`${tag}: the run says Run by job <name> (it says "${run.meta.replace(/\s+/g, ' ').trim().slice(0, 80)}")`);
             if (!/Jobs/.test(run.phoneBack.join(' '))) problems.push(`${tag}: the phone's way back says Jobs (${JSON.stringify(run.phoneBack)})`);
+            // (3) a step's result is the agent's reply text, not the JSON the CLI wrote
+            const steps = await ev(`[...document.querySelectorAll('#wf-run-detail .wf-run-step-output')].map(e => e.textContent)`);
+            const peeks = await ev(`[...document.querySelectorAll('#wf-run-detail .wf-run-step-peek')].map(e => e.textContent)`);
+            if (steps[1] !== 'Hello from the agent. The build is green.' || !/^Hello from the agent/.test(peeks[1] || '')) problems.push(`${tag}: a step's result shows the reply text, not raw JSON (${JSON.stringify([steps[1], peeks[1]])})`);
+            if (steps[0] !== 'ok') problems.push(`${tag}: a shell step's output is as it is (${JSON.stringify(steps[0])})`);
             await ev(`document.getElementById('wf-run-back').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-view .sched-title, #scheduler-detail h2')`, `${tag}: the job's page opens from the run's way back`, 10000);
             // (2) a run's page is on screen, the person goes to another tab and comes back: the folder's list, not the last run's page
