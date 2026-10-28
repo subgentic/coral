@@ -139,7 +139,8 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 		Tools:           spec.Tools,
 		Hooks:           spec.Hooks,
 		CLIPath:         cliPath,
-		PermissionMode: func() string {
+		// a mode the CLI does not have is recorded as Default (agent.PermissionModeForCLI, #10466)
+		PermissionMode: agent.PermissionModeForCLI(agentType, func() string {
 			if spec.PermissionMode != "" {
 				return spec.PermissionMode
 			}
@@ -159,7 +160,7 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 				return agent.DefaultLaunchPermissionMode(agentType) // Claude: Auto (#5836)
 			}
 			return "default"
-		}(),
+		}()),
 		CoralDir:  h.cfg.CoralDir(),
 		CoralHost: h.cfg.AgentHost(),
 		CoralPort: h.cfg.Port,
