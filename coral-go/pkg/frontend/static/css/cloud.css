@@ -41,7 +41,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cs-launch select { width: 100%; min-width: 9rem; max-width: 100%; }
 .cs-access-effective { font-weight: var(--fw-strong); }
 .cs-meta.cs-access-help { opacity: 1; color: var(--text-secondary); }
-.cs-access-info { display: inline-flex; align-items: center; gap: var(--space-xs); margin-top: var(--space-xs); color: var(--text-secondary); }
+.cs-access-info { display: inline-flex; align-items: center; gap: var(--space-xs); margin-top: var(--space-xs); color: var(--text-primary); } /* the quiet text button (no border, no fill): in the secondary colour it read as disabled (#9798) */
 .cs-access-info .material-icons { font-size: var(--fs-xl); }
 .cs-access-matrix { color: var(--text-secondary); font-size: var(--fs-base); line-height: var(--lh-body); }
 .cs-access-matrix p { margin: var(--space-sm) 0; }
@@ -151,3 +151,5 @@ body.native-inbox [data-native-inbox-hides] { display: none !important; }
 .cs-page-name .machine-health-dot { flex: none; }
 .cs-page:focus { outline: none; } /* the page takes the keyboard when it opens: the heading says where it is, no ring round the whole page */
 .cs-facts .cs-launch select { width: auto; min-width: 10rem; max-width: 100%; }
+.cs-access-details > .cs-access-info { padding-inline-start: 0; margin-inline-start: 0; } /* its icon starts where the text above does (the .btn-small padding comes later in the cascade) */
+.cs-facts { align-items: baseline; } /* a label sits on its value's text line: the Hub access select is taller than a word and its label was 6 px above its text (#9798) */

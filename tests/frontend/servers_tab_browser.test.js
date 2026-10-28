@@ -220,11 +220,11 @@ const contrast = (a, b) => {
             const cell = c => r.querySelector('.cs-col-' + c).textContent.replace(/\\s+/g, ' ').trim();
             return [r.id.replace('server-row-', ''), { status: cell('status'), version: r.querySelector('.cs-col-version span').textContent, agents: cell('agents'), meta: '', badges }];
         }))`);
-        for (const id of ['m1', 'm3']) { await openPage(id); rowInfo[id].meta = await ev(`(document.querySelector('#server-row-${id} .cs-detail-cell .cs-lastseen') || {}).textContent || ''`); await backToList(); } // the last contact is in the machine's page
+        for (const id of ['m1', 'm3']) { await openPage(id); rowInfo[id].meta = await ev(`(() => { const dt = [...document.querySelectorAll('#server-row-${id} .cs-facts dt')].find(x => x.textContent === 'Last contact'); return dt ? 'Last contact ' + dt.nextElementSibling.textContent : ''; })()`); rowInfo[id].said = await ev(`(document.getElementById('server-row-${id}').textContent.match(/Last contact/g) || []).length`); await backToList(); } // the last contact is the fact row's, said once (#9798)
         assert.deepEqual([rowInfo.m1.status, rowInfo.m1.version, rowInfo.m1.agents, rowInfo.m1.meta], ['Online', '1.4.2', '7', ''], 'm1: nothing repeated in the details, and no last contact while online (#3152)');
         assert.deepEqual([rowInfo.m2.status, rowInfo.m2.version, rowInfo.m2.agents], ['Online', '1.4.6', '1'], "m2: version from 'version'");
         assert.equal(rowInfo.m3.status, 'Offline'); assert.equal(rowInfo.m3.agents, '0');
-        assert.match(rowInfo.m3.meta, /^Last contact /, `m3: offline shows last contact in the details (${rowInfo.m3.meta})`);
+        assert.match(rowInfo.m3.meta, /^Last contact /, `m3: offline shows last contact in its facts (${rowInfo.m3.meta})`); assert.equal(rowInfo.m3.said, 1, 'and says it once, not again under the facts (#9798)'); assert.equal(rowInfo.m1.said, 0, 'an online machine never says it');
         assert.deepEqual([rowInfo.m4.version, rowInfo.m4.agents], ['—', '2'], 'm4: a dash when the version is unknown');
         const notice = { m1: 'Update required: this Coral (1.4.2) is too old for some Coral Hub features. Update to 1.5.0.', m2: 'Update available: 1.5.0' };
         for (const [id, level] of [['m1', 'required'], ['m2', 'available']]) {
