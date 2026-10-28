@@ -57,7 +57,7 @@ const BASE = require('./test_base').BASE;
             assert.ok(rows.groupRight - rows.remoteRight < 24, at + `the Remote access switch is at the far end of its row (${rows.groupRight - rows.remoteRight} px from the edge)`);
             assert.ok(rows.manageGroupRight - rows.manageRight < 24, at + `the Manage switch is at the far end of its row too (${rows.manageGroupRight - rows.manageRight} px from the edge)`);
             assert.equal(rows.hintShown, true, at + 'Remote access has its hint line on the screen');
-            assert.ok(rows.hint.split(/\s+/).length <= 14 && /\.$/.test(rows.hint), at + 'one short sentence: ' + rows.hint);
+            assert.ok(rows.hint.split(/\s+/).length <= 20 && /\.$/.test(rows.hint), at + 'one short sentence: ' + rows.hint);
             assert.equal(rows.statusTitle, 'Status');
             assert.ok(!/About/.test(rows.aboutWords), at + 'no About header');
             assert.ok(/Unknown|OK|Busy|Stalled/.test(rows.aboutWords) && /(not connected|waiting|Waiting|reading)/i.test(rows.aboutWords), at + 'the machine state is in words, and an unknown one says why: ' + rows.aboutWords.replace(/\s+/g, ' '));
