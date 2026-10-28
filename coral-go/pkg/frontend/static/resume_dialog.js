@@ -31,11 +31,13 @@ export async function showResumeModal() {
     let boardName = "";
     let displayName = "";
     let resumeSessionId = sessionId;
+    let ranIn = "", ranInExists = true; // the folder the session ran in, from its transcript or live row (#10291)
     try {
         const resp = await fetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/resume-info`);
         if (resp.ok) {
             const info = await resp.json();
             if (info.working_dir) resumeDir = info.working_dir;
+            if (info.working_dir && info.working_dir_from === "session") { ranIn = info.working_dir; ranInExists = info.working_dir_exists !== false; }
             if (info.board_name) boardName = info.board_name;
             if (info.agent_type) agentType = info.agent_type;
             if (info.resume_session_id) resumeSessionId = info.resume_session_id;
@@ -50,6 +52,11 @@ export async function showResumeModal() {
     // Pre-fill working directory: saved working dir > settings default > coral root
     const defaultDir = resumeDir || state.settings?.default_working_dir || dirInput.dataset.coralRoot || "";
     dirInput.value = defaultDir;
+    const modalEl = document.getElementById("resume-modal");
+    modalEl.dataset.ranIn = ranIn;
+    modalEl.dataset.ranInExists = ranInExists ? "1" : "0";
+    if (!dirInput.dataset.noteWired) { dirInput.dataset.noteWired = "1"; dirInput.addEventListener("input", syncResumeDirNote); }
+    syncResumeDirNote();
 
     // Show board reconnect option if the session was on a board
     if (boardName) {
@@ -68,6 +75,23 @@ export async function showResumeModal() {
     modal.dataset.displayName = displayName || historyEntry?.display_name || "";
     modal.dataset.resumeSessionId = resumeSessionId;
     modal.style.display = "flex";
+}
+
+/** Under the folder: where the session ran, and a warning when the folder is changed (its files may not be found) or gone. Written only when the words change. */
+function syncResumeDirNote() {
+    const modal = document.getElementById("resume-modal"), note = document.getElementById("resume-dir-note"), input = document.getElementById("resume-dir");
+    if (!modal || !note || !input) return;
+    const ranIn = modal.dataset.ranIn || "";
+    let words = "";
+    if (ranIn) {
+        const changed = input.value.trim() !== ranIn;
+        if (modal.dataset.ranInExists === "0") words = `This session ran in ${ranIn}, which is not there any more. Choose a folder to resume in.`;
+        else if (changed) words = `This session ran in ${ranIn}. Resuming somewhere else may not find the files it worked on.`;
+        else words = "This is where the session ran.";
+    }
+    if (note.textContent !== words) note.textContent = words;
+    note.hidden = !words;
+    note.classList.toggle("is-warning", !!ranIn && (modal.dataset.ranInExists === "0" || input.value.trim() !== ranIn));
 }
 
 export function hideResumeModal() {
@@ -126,6 +150,7 @@ export async function resumeLaunchNew() {
             recordRecentDir(dir);
             showToast(`Resumed session as new agent`);
             hideResumeModal();
+            openResumedAgent(result, agentType); // the person asked for this agent: it opens when it is ready (#10291)
             setTimeout(loadLiveSessions, 2000);
         }
     } catch (e) {
@@ -133,5 +158,24 @@ export async function resumeLaunchNew() {
         console.error("resumeLaunchNew error:", e);
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = "Resume"; }
+    }
+}
+
+/** Opens the agent a Resume just started, in its chat, once the live list has it: the list is read now and again until the agent is in it (about 12 s at most), and a person who has opened something else meanwhile is not taken away from it. */
+async function openResumedAgent(result, agentType) {
+    const sid = result && (result.session_id || result.id);
+    if (!sid) return;
+    const was = state.currentSession && state.currentSession.session_id;
+    for (let i = 0; i < 24; i++) {
+        try { await loadLiveSessions(); } catch { /* the next look */ }
+        const row = (state.liveSessions || []).find(s => s.session_id === sid);
+        if (row) {
+            const cur = state.currentSession && state.currentSession.session_id;
+            if (cur && cur !== was && cur !== sid) return; // the person went elsewhere
+            await window.selectLiveSession(row.name, row.agent_type || agentType, sid, row.server || "local");
+            window.showChatView?.();
+            return;
+        }
+        await new Promise(r => setTimeout(r, 500)); // interval-ok: a bounded wait for the new agent to be listed
     }
 }
