@@ -187,6 +187,7 @@ export function dataTable(cfg) {
     function saveWidths() {
         if (Object.keys(st.widths).length) browserLocal.set(wkey, JSON.stringify(st.widths)); else browserLocal.remove(wkey); // a convenience: the store is guarded, and the widths last until the page closes without it
     }
+    let emptyKeys = new Set(); // the columns no row has anything in (syncEmptyColumns, below)
     st.widths ||= cfg.oneLine ? {} : readWidths();
     function applyWidths() {
         colgroup.replaceChildren();
@@ -195,11 +196,11 @@ export function dataTable(cfg) {
         if (cfg.layout !== 'fixed' && !cfg.oneLine) table.style.tableLayout = any ? 'fixed' : '';
         if (!any) { table.style.width = ''; return; }
         if (sel) { const k = el('col'); k.style.width = 'var(--table-check-w)'; colgroup.append(k); }
-        for (const c of columns) { const k = el('col'); if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; colgroup.append(k); }
+        for (const c of columns) { const k = el('col'); if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; if (emptyKeys.has(c.key)) k.classList.add('dt-col-unused'); colgroup.append(k); }
         // Every column has a width (the flexible name column's own separator was used): the table is as wide as its columns, not 100%. A fixed table at 100% spreads what is left over
         // across ALL its columns, so shrinking one column grew the others (#9228); this way a column's separator changes that column alone, and the table scrolls or ends short of the box.
-        const all = columns.every(c => st.widths[c.key]);
-        table.style.width = all ? `calc(${sel ? 'var(--table-check-w) + ' : ''}${columns.reduce((n, c) => n + st.widths[c.key], 0)}px)` : '';
+        const shown = columns.filter(c => !emptyKeys.has(c.key)), all = shown.every(c => st.widths[c.key]);
+        table.style.width = all ? `calc(${sel ? 'var(--table-check-w) + ' : ''}${shown.reduce((n, c) => n + st.widths[c.key], 0)}px)` : '';
     }
     /** The first resize freezes the other columns at the widths they have (the title column, 'grow', takes whatever is left) so nothing jumps. */
     function freezeWidths() {
@@ -256,6 +257,44 @@ export function dataTable(cfg) {
         return rows.slice().sort((a, b) => dir * cmp(a, b));
     };
 
+    // Column sizing (#9846, design note rules 3 to 5), all optional: min and max in characters (ch follows the text size), share (the part of the leftover width a flexible column takes: Item 2, Goal 1), fixed (a column
+    // that is never shrunk: Actions, its width is its minimum). The first resize still freezes the widths as before; these are the defaults a list starts from.
+    const shareTotal = columns.reduce((n, c) => n + (c.share || 0), 0);
+    function sizeColumn(c, node) {
+        const ATTR = { min: 'data-dt-min', max: 'data-dt-max', w: 'data-dt-w' };
+        const set = (name, v) => { node.style.setProperty(`--dt-${name}`, v); node.setAttribute(ATTR[name], ''); }; // custom properties, read by data_table.css only while the table is not folded: a folded (phone) row lays its cells out its own way
+        if (c.min) set('min', `${c.min}ch`);
+        if (c.max) set('max', `${c.max}ch`);
+        if (c.fixed && c.width && /rem$/.test(c.width)) { set('min', c.width); set('max', 'none'); set('w', c.width); }
+        if (c.share) { set('w', `${Math.round(90 * c.share / shareTotal)}%`); if (!c.max) set('max', 'none'); }
+    }
+
+    const attrEsc = v => String(v).replace(/["\\]/g, '\\$&'); // a column key inside a quoted attribute selector
+    // A column no row has anything in is not drawn (#9846, the design note's rule 2): its head and its cells are hidden, and it is back the moment a row has a value. Never the name, an action or the selection column.
+    const isEmptyCell = td => !/[^\s\u2014\u2013-]/.test(td.textContent || '') && !td.querySelector('button, a, input, select, img, svg, .material-icons');
+    function syncEmptyColumns() {
+        if (mailOn()) return;
+        const trs = [...tbody.querySelectorAll(':scope > .dt-row')], next = new Set();
+        if (trs.length) for (const c of columns) {
+            if (c.primary || c.hideWhenEmpty === false || c.hideLabel || c.key === 'review' || c.key === 'actions') continue;
+            if (trs.every(tr => { const td = tr.querySelector(`:scope > td[data-key="${attrEsc(c.key)}"]`); return !td || isEmptyCell(td); })) next.add(c.key);
+        }
+        if (next.size === emptyKeys.size && [...next].every(k => emptyKeys.has(k))) return;
+        emptyKeys = next;
+        for (const th of thead.querySelectorAll('th.dt-th')) th.classList.toggle('dt-col-unused', emptyKeys.has(th.dataset.key));
+        for (const td of tbody.querySelectorAll(':scope > .dt-row > td.dt-td')) td.classList.toggle('dt-col-unused', emptyKeys.has(td.dataset.key));
+        applyWidths();
+    }
+
+    // When the columns do not fit the box, the optional ones go by priority (#9846, rule 5): a column with `drop: n` is hidden, the lowest n first (1 goes first), until the table fits; Actions and the name never carry a drop. They return as the box grows.
+    function syncTight() {
+        if (mailOn() || box.classList.contains('dt-folded') || !box.clientWidth) return;
+        const hide = (key, on) => { for (const n of box.querySelectorAll(`th.dt-th[data-key="${attrEsc(key)}"], td.dt-td[data-key="${attrEsc(key)}"]`)) n.classList.toggle('dt-col-tight', on); };
+        const cand = columns.filter(c => c.drop && !emptyKeys.has(c.key)).sort((a, b) => a.drop - b.drop);
+        for (const c of cand) hide(c.key, false);
+        for (const c of cand) { if (box.scrollWidth <= box.clientWidth + 1) break; hide(c.key, true); }
+    }
+
     function drawHead() {
         thead.replaceChildren();
         const tr = el('tr'); tr.setAttribute('role', 'row');
@@ -265,6 +304,7 @@ export function dataTable(cfg) {
             if (cfg.oneLine && c.dropAt) th.setAttribute('data-drop-at', String(c.dropAt));
             if (c.tiny) th.setAttribute('data-tiny', 'hide');
             if (c.width && /rem$/.test(c.width)) th.style.width = c.width;
+            sizeColumn(c, th);
             if (c.width === 'grow') th.classList.add('dt-grow');
             if (c.width === 'content') th.classList.add('dt-content');
             if (c.narrowHide) th.classList.add('dt-narrow-hide');
@@ -283,6 +323,7 @@ export function dataTable(cfg) {
             }
             if (cfg.resize !== false && c.resize !== false) th.append(resizeHandle(c, th));
             if (cfg.decorateHead) cfg.decorateHead(th, c);
+            if (emptyKeys.has(c.key)) th.classList.add('dt-col-unused');
             tr.append(th);
         }
         thead.append(tr);
@@ -317,11 +358,13 @@ export function dataTable(cfg) {
         const td = el('td', `dt-td dt-tone-${c.tone || (c.primary ? 'primary' : 'secondary')}${c.numeric || c.align === 'end' ? ' dt-end' : ''}${c.nowrap === false ? ' dt-wrap' : ''}`);
         if (c.width === 'grow') td.classList.add('dt-grow');
         if (c.width === 'content') td.classList.add('dt-content');
+        sizeColumn(c, td);
         td.setAttribute('role', 'cell'); td.dataset.label = c.label; td.dataset.key = c.key;
         if (cfg.oneLine && c.dropAt) td.setAttribute('data-drop-at', String(c.dropAt));
         if (c.tiny) td.setAttribute('data-tiny', 'hide');
         td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
+        if (emptyKeys.has(c.key)) td.classList.add('dt-col-unused');
         if (c.foldFirst) td.classList.add('dt-fold-first');
         if (st.sort && st.sort.key === c.key) td.classList.add('dt-fold-key'); // folded 'labeled': the figure the rows are sorted by is the one stronger line (#7738)
         if (c.narrowHide) td.classList.add('dt-narrow-hide'); // folded 'labeled': this figure follows the name, ahead of the other "label value" lines
@@ -391,6 +434,8 @@ export function dataTable(cfg) {
             if (dr) tbody.append(dr);
             if (cfg.decorate) cfg.decorate(r, tr, dr); // the surface's own hooks on a row it owns (an id, a class a deep link reads, a key handler): called again whenever the rows are drawn again, a sort included
         });
+        syncEmptyColumns();
+        syncTight();
         syncSelection(true);
     }
 
@@ -482,7 +527,7 @@ export function dataTable(cfg) {
             box.classList.toggle('dt-folded', on);
             box.classList.toggle('dt-tiny', w < 20 * root()); // a phone at large text: the columns that say tiny: true go, so the name keeps its room (20 rem is a 390 px screen at 200% text)
         };
-        new ResizeObserver(syncFold).observe(box);
+        new ResizeObserver(() => { syncFold(); syncTight(); }).observe(box);
         if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(syncFold); // fonts already in: the observer's first call settles it before the paint; calling it now read the width of a box not yet laid out, a forced layout (#9450)
     }
     mailQuery?.addEventListener?.('change', () => { box.classList.toggle('dt-mail-on', mailOn()); drawBody(); cfg.onModeChange?.(); }); // the window crosses the phone's width: the rows are drawn again in the other form; a list whose selection exists on a phone only (selectable is decided when the spec is drawn) asks its owner to draw the table again
