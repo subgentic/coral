@@ -4,7 +4,7 @@ import { openTask } from './task_navigation.js';
  * This module is the shell: each tab's own panel is built the first time the tab is opened by its own module (goals_view.js, team_tasks_page.js, team_artifacts_page.js); Messages is the board's own column moved in (message_board.js),
  * and Agents, Knowledge and Settings are today's panels of the right dock moved in, until their own builds (stage 3 of #7453). Lazy: loaded by openTeamPage (lazy_panels.js). */
 import { state } from './state.js';
-import { keyLabel, splitKey, boardFetch, teamFetch, isCloud } from './server_base.js';
+import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir } from './server_base.js';
 import { showView } from './utils.js';
 import { note, go } from './nav.js';
 import { keyRoute, TEAM_TABS } from './routes.js';
@@ -116,10 +116,7 @@ function syncTabsMore() {
 }
 
 /** The folder the team works in: where an agent added to it starts. */
-function teamDir() {
-    const s = (state.liveSessions || []).find(x => x && x.board_project === S.team && x.working_directory);
-    return s ? s.working_directory : '';
-}
+function teamDir() { return teamWorkDir(state.liveSessions, S.team); } // by the team's key: a team on another computer is "@server/name" and its sessions say the bare name (#9970)
 
 // More: the board's own actions (Select, Export, Pause, Delete), moved here from the board view's hidden holder (message_board.html) while this page is on screen (they keep their ids and their handlers).
 let moreOpen = false;
