@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab, post } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
-const TEAM = `qa-queued-${Date.now() % 100000}`;
+const TEAM = `qa-queued-${Date.now() % 100000}`, OTHER = `qa-hub-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -22,11 +22,19 @@ const TEAM = `qa-queued-${Date.now() % 100000}`;
         const dep = await post(ev, `/api/board/${TEAM}/tasks`, { title: 'Needs the first one', body: 'second', created_by: 'Operator', assigned_to: 'Backend Dev', blocked_by: [id] });
         const depId = dep && (dep.id || (dep.task && dep.task.id));
         assert.ok(depId, 'the task that waits on the first exists: ' + JSON.stringify(dep));
+        // a task that waits on a task of another board (#10287): the number alone would read as a task of this team
+        const far = await post(ev, `/api/board/${OTHER}/tasks`, { title: 'Hub work', body: 'elsewhere', created_by: 'Operator', assigned_to: 'Someone' });
+        const farId = far && (far.id || (far.task && far.task.id));
+        assert.ok(farId, 'the task on the other board exists: ' + JSON.stringify(far));
+        const across = await post(ev, `/api/board/${TEAM}/tasks`, { title: 'Needs the hub', body: 'across', created_by: 'Operator', assigned_to: 'Hub Dev', blocked_by: [{ task_id: farId, board_id: OTHER }] });
+        const acrossId = across && (across.id || (across.task && across.task.id));
+        assert.ok(acrossId, 'the task that waits across boards exists: ' + JSON.stringify(across));
         // the board's status: the Orchestrator has the queued task, nobody has a signal yet
         await ev(`(() => { window.__taskStatus = 'pending'; const R = window.fetch.bind(window); window.fetch = async (u, o = {}) => { const url = new URL(String(u), location.origin);
             if (/^\\/api\\/board\\/[^/]+\\/status$/.test(url.pathname)) return new Response(JSON.stringify({ summary: {}, observed_at: new Date().toISOString(), agents: [
                 { name: 'Orchestrator', subscriber_id: 'Orchestrator', session_id: 'sid-1', availability: window.__taskStatus === 'pending' ? 'queued' : 'busy', reason: '', tasks: [{ id: ${Number(id)}, status: window.__taskStatus, title: 'Say hello to the team' }] },
-                { name: 'Backend Dev', subscriber_id: 'Backend Dev', session_id: 'sid-2', availability: 'queued', reason: '', tasks: [{ id: ${Number(depId)}, status: 'blocked', title: 'Needs the first one', waiting_on: [${Number(id)}] }] }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+                { name: 'Backend Dev', subscriber_id: 'Backend Dev', session_id: 'sid-2', availability: 'queued', reason: '', tasks: [{ id: ${Number(depId)}, status: 'blocked', title: 'Needs the first one', waiting_on: [${Number(id)}] }] },
+                { name: 'Hub Dev', subscriber_id: 'Hub Dev', session_id: 'sid-3', availability: 'queued', reason: '', tasks: [{ id: ${Number(acrossId)}, status: 'blocked', title: 'Needs the hub', waiting_on_elsewhere: [{ board_id: ${JSON.stringify(OTHER)}, id: ${Number(farId)} }] }] }] }), { status: 200, headers: { 'content-type': 'application/json' } });
             return R(u, o); }; return true; })()`);
         await openTeam(ev, waitFor, TEAM);
         await goTab(ev, settle, 'Agents');
@@ -52,6 +60,17 @@ const TEAM = `qa-queued-${Date.now() % 100000}`;
         const line2 = await ev(`document.querySelector('.goals-detail-line').parentElement.textContent.replace(/\\s+/g, ' ')`);
         assert.match(line2, new RegExp('Waiting on #' + id + '\\.'), 'the task page says which task it waits on: ' + line2);
         assert.doesNotMatch(line2, /to pick it up/, 'and not that it waits for the agent: ' + line2);
+        // a blocker on another board is named with its board, on the Agents tab and the task's page (#10287)
+        await ev(`window.__tp.find('button, a', /Back|Tasks/i)?.click(); true`).catch(() => {});
+        await goTab(ev, settle, 'Agents'); await settle(400);
+        const third = await ev(`(() => { const r = [...document.querySelectorAll('tr, [role=row]')].find(x => /Hub Dev/.test(x.textContent) && /Needs the hub/.test(x.textContent)); return r ? r.textContent.replace(/\\s+/g, ' ') : ''; })()`);
+        assert.match(third, new RegExp('waiting on ' + OTHER + ' #' + farId + '\\b'), 'the Agents tab names the board of a blocker on another one: ' + third);
+        await goTab(ev, settle, 'Tasks');
+        await waitFor(`/Needs the hub/.test(document.body.textContent)`, 'the cross-board task on the Tasks tab', { timeout: 8000 });
+        await ev(`(() => { const b = [...document.querySelectorAll('button.dt-primary, a, button')].find(x => /Needs the hub/.test(x.textContent)); b.click(); return true; })()`);
+        await waitFor(`document.querySelector('.goals-detail-line')`, 'the cross-board task page', { timeout: 8000 });
+        const line3 = await ev(`document.querySelector('.goals-detail-line').parentElement.textContent.replace(/\\s+/g, ' ')`);
+        assert.match(line3, new RegExp('Waiting on ' + OTHER + ' #' + farId + '\\.'), 'the task page names the board too: ' + line3);
         // picked up: the words go
         await ev(`window.__taskStatus = 'in_progress'; true`);
         await ev(`window.__tp.find('button, a', /Back|Tasks/i)?.click(); true`).catch(() => {});
@@ -59,5 +78,5 @@ const TEAM = `qa-queued-${Date.now() % 100000}`;
         const after = await ev(`(() => { const r = [...document.querySelectorAll('tr, [role=row]')].find(x => /Orchestrator/.test(x.textContent) && /Say hello/.test(x.textContent)); return r ? r.textContent.replace(/\\s+/g, ' ') : ''; })()`);
         assert.doesNotMatch(after, /waiting for Orchestrator to pick it up/i, 'once picked up the Agents tab no longer says it waits: ' + after);
         console.log('PASS a queued first task says what it waits on, on the Agents tab and its own page, and stops once picked up');
-    } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
+    } finally { await removeBoards(ev, [TEAM, OTHER]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });
