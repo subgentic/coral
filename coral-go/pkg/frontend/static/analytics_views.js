@@ -10,10 +10,10 @@ import { note } from './nav.js';
 // One sidebar entry per metric (the Operator's design, #9236): Overview, Tokens per commit, Task time, Tool and API calls. The groupings (provider, model, thinking level, team, agent, branch, task) are a
 // Group by selector inside Overview, not entries of their own: each is still a page of its own under /analytics/<key> (a link keeps working), drawn as Overview with that grouping chosen.
 export const VIEWS = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'per-commit', label: 'Tokens per commit' },
-    { key: 'task-time', label: 'Task time' },
-    { key: 'calls', label: 'Tool and API calls' },
+    { key: 'overview', label: 'Overview', question: 'What am I spending?' }, // each page is subtitled by the question it answers (#10482)
+    { key: 'per-commit', label: 'Tokens per commit', question: 'What did each commit cost?' },
+    { key: 'task-time', label: 'Task time', question: 'How long do tasks take?' },
+    { key: 'calls', label: 'Tool and API calls', question: 'Which calls does the work make?' },
     { key: 'provider', label: 'By provider', under: 'overview', hidden: true },
     { key: 'model', label: 'By model', under: 'overview', hidden: true },
     { key: 'thinking', label: 'By thinking level', under: 'overview', hidden: true },
@@ -94,6 +94,8 @@ export function selectView(key, { focus = false, fromHistory = false } = {}) {
     }
     for (const sec of document.querySelectorAll('#cost-dashboard-view [data-cview]')) sec.hidden = sec.dataset.cview !== v.key;
     setText(document.getElementById('cost-view-title'), v.under && v.key !== 'agent-detail' ? 'Overview' : v.label); // a grouping is Overview with a grouping chosen
+    const asked = document.getElementById('cost-view-question'), qv = v.under && v.key !== 'agent-detail' ? VIEWS.find(x => x.key === v.under) : v; // a grouping keeps Overview's question; one agent's page names its own
+    if (asked) { setText(asked, v.key === 'agent-detail' ? '' : (qv.question || '')); asked.hidden = !asked.textContent; }
     syncRangeLine();
     drawViews();
     drawGroupBar(v.key);
