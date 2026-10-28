@@ -16,7 +16,7 @@ const SOURCE = `(() => {
 })()`;
 const install = async ev => { await na.install(ev); return ev(SOURCE); };
 const N = {
-    team: /^New team$/i, member: /^(Edit|Add) member/i,
+    team: /^New project$/i, member: /^(Edit|Add) member/i,
     teamName: /^Team name/i, folder: /^Folder/i, recents: /^Recent folders$/i, machine: /^Machine$/i, address: /^Another computer's address$/i,
     template: /template/i, bulk: /^Set all workers to/i, section: /section$/i,
     cancel: /^Cancel$/i, back: /^Back$/i, next: /^Next$/i, launch: /^Launch team$/i, save: /^Save member$/i, addMember: /^\+?\s*Add member$/i, addOrch: /^Add Orchestrator$/i,
@@ -26,7 +26,7 @@ const stepLine = ev => ev(`(() => { const d = window.__nt.dlg(${N.team}); if (!d
 // Open New team as a person does: the Launch dialog, then the Team choice.
 async function openNewTeam(ev, waitFor) {
     await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="team"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
-    await waitFor(`!!window.__nt.dlg(${N.team})`, 'the New team dialog (role=dialog named New team)', 6000);
+    await waitFor(`!!window.__nt.dlg(${N.team})`, 'the New project dialog (role=dialog named New project)', 6000);
 }
 // The steps of the flow, the same in every suite: T(ev, waitFor) gives click(sel, rx), type(sel, rx, value), pick(select, text) and to(step, opts) that fills what each step needs and presses Next.
 const T = (ev, waitFor) => {

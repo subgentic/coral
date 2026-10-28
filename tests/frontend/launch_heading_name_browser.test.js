@@ -14,7 +14,7 @@ const { axName } = require('./helpers/ax_tree');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'settings')`);
-        for (const [type, heading, title, back] of [['team', '#launch-team-title', 'New team', '#launch-step-team .launch-back-btn'], ['agent', '#launch-agent-title', 'New agent', '#launch-step-agent .launch-back-btn'], ['terminal', '#launch-step-terminal h3', 'Launch Terminal', '#launch-step-terminal .launch-back-btn']]) {
+        for (const [type, heading, title, back] of [['team', '#launch-team-title', 'New project', '#launch-step-team .launch-back-btn'], ['agent', '#launch-agent-title', 'New agent', '#launch-step-agent .launch-back-btn'], ['terminal', '#launch-step-terminal h3', 'Launch Terminal', '#launch-step-terminal .launch-back-btn']]) {
             await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType(${JSON.stringify(type)}); return true; })()`);
             await waitFor(`(() => { const e = document.querySelector(${JSON.stringify(heading)}); return !!e && e.getClientRects().length > 0; })()`, `${type}: the heading`, 8000);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the step draws

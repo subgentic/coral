@@ -33,9 +33,9 @@ const BASE = require('./test_base').BASE;
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app', '/work/website', '/work/docs'])); true`);
         await openNewTeam(ev, waitFor);
 
-        await S.run('the dialog is a role=dialog named exactly "New team" and opens on "Step 1 of 3: Name and where it launches"', async () => {
+        await S.run('the dialog is a role=dialog named exactly "New project" and opens on "Step 1 of 3: Your team"', async () => {
             assert.ok(await ev(`!!window.__nt.dlg(${N.team})`), 'no role=dialog named "New team"');
-            assert.match(await stepLine(ev), /^Step 1 of 3: Name and where it launches/);
+            assert.match(await stepLine(ev), /^Step 1 of 3: Your team/);
         });
         await S.run('step 1: Team name and Folder say Required in words and aria-required, Browse, Cancel and Next, no Back, no tabs, no Machine with one machine, no Launch', async () => {
             for (const [sel, rx, what] of [['input', N.teamName, 'Team name'], ['input', N.folder, 'Folder']]) {

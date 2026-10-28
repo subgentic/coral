@@ -2,6 +2,6 @@
  * (templates/includes/modals.html) carry the same icons, words and order as markup: tests/frontend/launch_cards_census.test.mjs reads all three against this table. The dialog adds Terminal after them, the one extra (written in the census test, which is its only reader). */
 export const LAUNCH_CARDS = [
     { key: 'agent', icon: 'smart_toy', label: 'New agent', desc: 'One agent in a folder you choose.' },
-    { key: 'team', icon: 'groups', label: 'New team', desc: 'Agents that split the work and talk to each other.' },
+    { key: 'team', icon: 'groups', label: 'New project', desc: 'Launch a team of agents collaborating on a shared board.' },
     { key: 'folder', icon: 'create_new_folder', label: 'Open folder', desc: 'Add a project folder to start agents in later.' },
 ];

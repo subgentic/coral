@@ -12,7 +12,7 @@
             </div>
             <!-- Step 1: Session type chooser -->
             <div id="launch-step-chooser" class="launch-modal-step">
-                <h3 id="launch-title">New agent or team</h3>
+                <h3 id="launch-title">New agent or project</h3>
                 <div class="launch-type-cards">
                     <button class="launch-type-card" data-on-click="m-select-launch-type" data-arg="agent">
                         <div class="launch-type-icon">
@@ -25,8 +25,8 @@
                         <div class="launch-type-icon">
                             <span class="material-icons launch-type-glyph" aria-hidden="true">groups</span>
                         </div>
-                        <div class="launch-type-label">New team</div>
-                        <div class="launch-type-desc">Agents that split the work and talk to each other.</div>
+                        <div class="launch-type-label">New project</div>
+                        <div class="launch-type-desc">Launch a team of agents collaborating on a shared board.</div>
                     </button>
                     <!-- #3630: pin a folder to the Agents list, ready to launch into -->
                     <button class="launch-type-card" id="launch-type-open-folder" data-on-click="m-show-open-folder-modal">
@@ -216,9 +216,9 @@
                 <div class="sd-step-header">
                     <div class="sd-step-title-row">
                         <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
-                        <h3 id="launch-team-title"><span id="launch-team-title-text">New team</span></h3>
+                        <h3 id="launch-team-title"><span id="launch-team-title-text">New project</span></h3>
                     </div>
-                    <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Name and where it launches</p>
+                    <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Your team</p>
                 </div>
                 <p class="sr-only" id="team-step-live" role="status">Step 1 of 3</p>
                 <div class="settings-modal-body team-steps-body">

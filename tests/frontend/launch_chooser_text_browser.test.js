@@ -6,7 +6,7 @@ const BASE = require('./test_base').BASE;
 
 const WORDS = {
     'New agent': 'One agent in a folder you choose.',
-    'New team': 'Agents that split the work and talk to each other.',
+    'New project': 'Launch a team of agents collaborating on a shared board.',
     'Open folder': 'Add a project folder to start agents in later.',
     'Terminal': 'Open a shell next to your agents.',
 };

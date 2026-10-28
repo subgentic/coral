@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
-const BUDGET = { chooser: 52, /* the title "New agent or team" (#7064) and the four description lines the type cards say again (#9253, the Operator): 10 + 9 + 10 + 11 words */ folder: 30, persona: 81, agent: 59 }; // the three New Agent steps as the design words them (#7391): measured at 1280 px (the phone shows fewer). Step 1's 30 includes the 10-word "Next: the persona, then model and permissions. All have defaults." line (UI/UX cut it from 20), the step header, the screen-reader reason for Next and the Recent: label
+const BUDGET = { chooser: 52, /* the title "New agent or project" (#7064) and the four description lines the type cards say again (#9253, the Operator): 10 + 9 + 10 + 11 words */ folder: 30, persona: 81, agent: 59 }; // the three New Agent steps as the design words them (#7391): measured at 1280 px (the phone shows fewer). Step 1's 30 includes the 10-word "Next: the persona, then model and permissions. All have defaults." line (UI/UX cut it from 20), the step header, the screen-reader reason for Next and the Recent: label
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
