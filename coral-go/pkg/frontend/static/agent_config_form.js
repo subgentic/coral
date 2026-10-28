@@ -291,12 +291,12 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
         autoPermissionsHTML = `
             <label>Permission mode
                 <select class="acf-permission-mode" data-on-change="perm-mode-describe">
-                    <option value="default"${permModeVal === 'default' ? ' selected' : ''} title="${escapeAttr(PERMISSION_MODE_DESCRIPTIONS.default)}">Default</option>
-                    <option value="plan"${permModeVal === 'plan' ? ' selected' : ''} title="${escapeAttr(PERMISSION_MODE_DESCRIPTIONS.plan)}">Plan</option>
-                    <option value="acceptEdits"${permModeVal === 'acceptEdits' ? ' selected' : ''} title="${escapeAttr(PERMISSION_MODE_DESCRIPTIONS.acceptEdits)}">Accept edits</option>
-                    <option value="auto"${permModeVal === 'auto' ? ' selected' : ''} title="${escapeAttr(PERMISSION_MODE_DESCRIPTIONS.auto)}">Auto</option>
-                    <option value="bypassPermissions"${permModeVal === 'bypassPermissions' ? ' selected' : ''} title="${escapeAttr(PERMISSION_MODE_DESCRIPTIONS.bypassPermissions)}">Bypass permissions</option>
-                    <option value="dontAsk"${permModeVal === 'dontAsk' ? ' selected' : ''} title="${escapeAttr(PERMISSION_MODE_DESCRIPTIONS.dontAsk)}">Don't ask</option>
+                    <option value="default"${permModeVal === 'default' ? ' selected' : ''} title="${escapeAttr(permissionDescription(v.agentType, 'default'))}">Default</option>
+                    <option value="plan"${permModeVal === 'plan' ? ' selected' : ''} title="${escapeAttr(permissionDescription(v.agentType, 'plan'))}">Plan</option>
+                    <option value="acceptEdits"${permModeVal === 'acceptEdits' ? ' selected' : ''} title="${escapeAttr(permissionDescription(v.agentType, 'acceptEdits'))}">Accept edits</option>
+                    <option value="auto"${permModeVal === 'auto' ? ' selected' : ''} title="${escapeAttr(permissionDescription(v.agentType, 'auto'))}">Auto</option>
+                    <option value="bypassPermissions"${permModeVal === 'bypassPermissions' ? ' selected' : ''} title="${escapeAttr(permissionDescription(v.agentType, 'bypassPermissions'))}">Bypass permissions</option>
+                    <option value="dontAsk"${permModeVal === 'dontAsk' ? ' selected' : ''} title="${escapeAttr(permissionDescription(v.agentType, 'dontAsk'))}">Don't ask</option>
                 </select>
                 <span class="settings-hint perm-mode-desc">${escapeHtml(permModeDesc)}</span>
                 <span class="settings-hint acf-mode-override" role="status" hidden></span>

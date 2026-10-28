@@ -55,7 +55,7 @@ const BASE = require('./test_base').BASE;
         await startLaunch();
         await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="cancel"]')`, 'the permission question');
         let m = await modals();
-        assert.equal(m[0].title, 'Default mode waits for you'); assert.match(m[0].text, /Default mode stops and waits for you each time\. Use \w[\w ']* so it keeps going\?/); assert.doesNotMatch(m[0].text, /--|flag/i, 'no CLI flag name (#10074)');
+        assert.equal(m[0].title, 'Default mode waits for you'); assert.match(m[0].text, /Default mode stops and waits for you each time\. Use \w[\w ']* so it keeps going\?/); assert.doesNotMatch(m[0].text, /--|flag/i, 'no CLI flag name (#10074)'); assert.match(m[0].text, /Auto: Everything, with safety checks\./, 'and says what the mode means for this CLI (Claude here)');
         assert.deepEqual(await ev(`[...document.querySelectorAll('body > .modal:not([id]) .modal-actions button')].map(b => b.textContent.trim())`), ['Cancel', 'Keep Default', /^Use /.test(await ev(`document.querySelector('body > .modal:not([id]) [data-action="enable"]').textContent.trim()`)) ? await ev(`document.querySelector('body > .modal:not([id]) [data-action="enable"]').textContent.trim()`) : 'Use Auto'], 'the buttons say what they do');
         assert.deepEqual(m[0].buttons, ['cancel', 'skip', 'enable']);
         await click('cancel'); await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: a launch, if one were sent, would be sent within this
