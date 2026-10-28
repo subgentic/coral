@@ -157,7 +157,10 @@ async function openTab({ contextId, width, height, mobile, fakeHubView = false, 
     await load();
     // The browser applies the emulation a moment after it is asked: a terminal shown before it sees a mouse and a desktop window, sizes the shared pane to itself (a landscape phone's 68x20) and draws the desktop
     // font (#7505, 5 of 20 runs on the base). The page asks the media queries each time it decides, so wait until they report the device it was asked to be, before any session is shown.
-    await waitFor(`(() => { const d = { coarse: matchMedia('(pointer: coarse)').matches, w: innerWidth, h: innerHeight }; return d.coarse === ${!!mobile} && d.w === ${width} && d.h === ${height} ? d : false; })()`, 'the emulated device (pointer and window size)', 5000);
+    // The query the terminal itself asks (phone_layout.js PHONE_QUERY: narrow, or a touch screen at most 500 px high and 950 wide) must say so too, not only its parts: a landscape phone (800x360) whose pointer and size
+    // are right but whose query still said "desktop" sized the shared pane to itself (68x8) and followed it a moment later (step 12, the tmux leg on a Linux runner, #10621).
+    const phoneExpected = !!mobile && (width <= 767 || (height <= 500 && width <= 950));
+    await waitFor(`(() => { const d = { coarse: matchMedia('(pointer: coarse)').matches, w: innerWidth, h: innerHeight, phone: matchMedia('(max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px)').matches }; return d.coarse === ${!!mobile} && d.w === ${width} && d.h === ${height} && d.phone === ${phoneExpected} ? d : false; })()`, 'the emulated device (pointer, window size and the phone query)', 5000);
     const metrics = (w, h) => Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: dpr, mobile });
     return { ev, waitFor, load, close, metrics };
 }
