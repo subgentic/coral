@@ -47,7 +47,8 @@
 /* The drawer (a phone's Inbox, #9545; UI/UX's spec): a 44 px button that names the current view and its count, in place of the select; the column opens from the left over a scrim: 86 percent of the width, at most 320 px, 44 px rows. */
 .view-list-trigger, .view-list-scrim { display: none; }
 @media (max-width: 767px) {
-    .view-list-drawer .view-list-trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--control-touch-height); margin-bottom: 8px; padding: 0 12px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-weight: var(--fw-strong); text-align: left; cursor: pointer; }
+    .view-list-drawer .view-list-trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--control-touch-height); margin-bottom: 8px; padding: 0 12px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); font: inherit; font-size: var(--fs-lg); font-weight: var(--fw-medium); text-align: left; cursor: pointer; } /* a control: 14/500 on a fill of its own, the open folder's icon in front and a chevron after (#9999; it read as the page's title at 16/600) */
+    .view-list-trigger-lead { flex: none; color: var(--text-secondary); }
     .view-list-trigger-icon { flex: none; color: var(--text-secondary); }
     .view-list-trigger-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .view-list.view-list-drawer.view-list-open > .view-list-nav { display: flex; position: fixed; top: 0; bottom: 0; left: 0; z-index: 101; box-sizing: border-box; width: min(86vw, 320px); overflow-y: auto; padding: 12px 8px; border-right: 1px solid var(--border); background: var(--bg-secondary); box-shadow: var(--shadow-lg); }
