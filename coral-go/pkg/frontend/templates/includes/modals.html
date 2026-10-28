@@ -67,10 +67,10 @@
             <!-- Step 2a: Agent form (#7391): three steps in one dialog that keeps its size: 1 Where it launches (the folder), 2 Persona, 3 The agent (tabs Agent, Permissions, Advanced) -->
             <div id="launch-step-agent" class="launch-modal-step launch-wizard" style="display:none" data-stage="folder">
                 <div class="sd-step-header">
-                    <h3 id="launch-agent-title">
+                    <div class="sd-step-title-row">
                         <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
-                        <span id="launch-agent-title-text">New agent</span>
-                    </h3>
+                        <h3 id="launch-agent-title"><span id="launch-agent-title-text">New agent</span></h3>
+                    </div>
                     <p id="launch-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Where it launches</p>
                 </div>
                 <div class="settings-modal-body">
@@ -170,10 +170,10 @@
 
             <!-- Step 2b: Terminal form -->
             <div id="launch-step-terminal" class="launch-modal-step" style="display:none">
-                <h3>
-                    <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back">&larr;</button>
-                    Launch Terminal
-                </h3>
+                <div class="sd-step-title-row">
+                    <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
+                    <h3>Launch Terminal</h3>
+                </div>
                 <div class="form-row">
                     <label class="form-label" for="launch-terminal-name">Session Name <span class="launch-optional">optional</span></label>
                     <input type="text" id="launch-terminal-name" placeholder="e.g. build server, test runner">
@@ -212,10 +212,10 @@
             <!-- Step 2c: Agent Team form (#7407): three steps in the one fixed-size dialog: 1 Name and where it launches, 2 Members, 3 Start and team settings (tabs Start, Workflow, Health check, Messaging) -->
             <div id="launch-step-team" class="launch-modal-step launch-wizard team-wizard" style="display:none" data-stage="team">
                 <div class="sd-step-header">
-                    <h3 id="launch-team-title">
+                    <div class="sd-step-title-row">
                         <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
-                        <span id="launch-team-title-text">New team</span>
-                    </h3>
+                        <h3 id="launch-team-title"><span id="launch-team-title-text">New team</span></h3>
+                    </div>
                     <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Name and where it launches</p>
                 </div>
                 <p class="sr-only" id="team-step-live" role="status">Step 1 of 3</p>
