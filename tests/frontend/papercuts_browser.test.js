@@ -166,14 +166,14 @@ const BASE = require('./test_base').BASE;
             window.switchNavTab('servers');
             for (let i = 0; i < 100 && !document.querySelector('#server-row-r1'); i++) await new Promise(r => setTimeout(r, 50));
             const text = sel => (document.querySelector(sel)?.textContent || '').replace(/\\s+/g, ' ').trim();
-            const localText = text('#server-row-local td:nth-child(3)') + ' · ' + text('#server-row-local td:last-child'); // the Version column and the Agents column (one line a row, Goal #79)
+            const localText = text('#server-row-local td[data-key="version"]') + ' · ' + text('#server-row-local td[data-key="agents"]'); // the Version column and the Agents column, by their keys (the columns' order moved: Server, Tags, Status, Agents, Needs you, Last seen, Version; #9679)
             document.querySelector('#server-row-r1 [data-action=open]').click(); // the unreachable server's facts and hint are on its page (#7638)
             for (let i = 0; i < 100 && !document.querySelector('.servers-page'); i++) await new Promise(r => setTimeout(r, 50));
             const out = { local: localText, r1meta: [...document.querySelectorAll('.servers-fact')].map(f => f.textContent.replace(/\\s+/g, ' ').trim()).join(' · '), r1hint: text('.servers-page .servers-row-hint') };
             window.fetch = real;
             return out;
         })()`);
-        assert.match(rows.local, /^Coral 9\.9\.9 · \d+ agents?$/, 'the This computer row shows its version and agent count: ' + rows.local);
+        assert.match(rows.local, /^Coral 9\.9\.9 · (\d+( agents?)?)?$/, 'the This computer row shows its version and its agent count (the number alone, blank at zero): ' + rows.local);
         assert.match(rows.r1meta, /Last contact\s*\d/, 'an unreachable server\'s page says last contact: ' + rows.r1meta);
         assert.equal(rows.r1hint, 'Is Coral running on that machine? Check the URL.');
         console.log('PASS (14) Servers: This computer row version + agents; unreachable row explains and says last contact');
