@@ -8,6 +8,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const NOTE = "Its terminal log is kept, in the logs folder of Coral's data folder.";
 const NOTE_MANY = "Their terminal logs are kept, in the logs folder of Coral's data folder.";
+const NOTE_RESET = 'Their terminal logs are kept.'; // Reset says it in plain words: where the folder is is for Settings (#10549)
 
 (async () => {
     const { client, Page, ev, waitFor, PRELOAD, install, reqs, clearReqs } = await connect();
@@ -45,7 +46,14 @@ const NOTE_MANY = "Their terminal logs are kept, in the logs folder of Coral's d
         await asked('Kill Session (agent header)', `T.state.currentSession = { type: 'live', name: 'repo', session_id: 's1', agent_type: 'claude' }; (await import((window.__coralStatic || '/static/') + 'controls.js')).killSession()`, 'Kill session');
         await asked('Kill All Agents (folder)', `T.render.killGroup('repo')`, 'Kill all agents', NOTE_MANY, 'Kill all 2 agents in');
         await asked('Kill Team (one agent)', `T.render.killBoard('team-k')`, 'Kill team', NOTE, 'Kill the 1 agent in "team-k"');
-        await asked('Reset Team', `window.resetTeam('team-k')`, 'Reset team', NOTE_MANY);
+        await asked('Reset Team', `window.resetTeam('team-k')`, 'Reset team', NOTE_RESET);
+        assert.ok(!(await ev(`document.getElementById('confirm-modal-message').textContent`)).includes('logs folder'), 'Reset does not name the logs folder of the data folder');
+        // Sleep Team says what Reset says: the chats stay (#10549, the Desktop tester)
+        await ev(`window.toggleTeamSleep('team-k', 'sleep'); true`);
+        await waitFor(open, 'the Sleep Team confirmation', 8000);
+        const sleepWords = await ev(`document.getElementById('confirm-modal-message').textContent`);
+        assert.ok(/chats stay/i.test(sleepWords) && /Wake Team/.test(sleepWords), 'Sleep Team says the chats stay and that Wake Team starts them again: ' + sleepWords);
+        await ev(`document.querySelector('#confirm-modal .btn:not(#confirm-modal-yes)').click(); true`);
         console.log('PASS');
     } catch (e) {
         console.error(e && e.stack || e);

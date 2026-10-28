@@ -20,6 +20,9 @@ export const KILL_LOG_NOTE = "Its terminal log is kept, in the logs folder of Co
 // starts it again under a new session id, so the old logs stay as they are).
 export const KILL_LOG_NOTE_MANY = "Their terminal logs are kept, in the logs folder of Coral's data folder.";
 
+// Reset's own, in plain words: it is the one confirmation that is not about ending anything, and where the folder is is Settings' to say (#10549).
+export const RESET_LOG_NOTE = "Their terminal logs are kept.";
+
 // killCount is "the 1 agent" or "all 3 agents", and its log note to match.
 export function killCount(n) {
     return n === 1 ? { agents: 'the 1 agent', note: KILL_LOG_NOTE } : { agents: `all ${n} agents`, note: KILL_LOG_NOTE_MANY };

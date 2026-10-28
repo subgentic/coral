@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { loadLiveSessions } from './api.js';
 import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal } from './controls.js';
 import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, editInstructions, setAgentIcon, toggleChatFlag } from './sessions.js';
-import { KILL_LOG_NOTE_MANY, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
+import { RESET_LOG_NOTE, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
 import { WHAT_STAYS_RESET } from './agent_words.js';
 import { toggleBrowser, browserNavigateTo, browserNavigateUp, browserSelectRecent, browserUse } from './browser.js';
 import { toggleAgenticPanel, toggleSidebarRail, focusSidebarSearch } from './sidebar.js';
@@ -311,7 +311,7 @@ Object.assign(window, {
 });
 
 function resetTeam(boardName) {
-    showConfirmModal('Reset team', `Reset all agents in "${keyLabel(boardName)}"? Each one stops and starts again from its first instructions, in a new chat. ${WHAT_STAYS_RESET} ${KILL_LOG_NOTE_MANY}`, async () => {
+    showConfirmModal('Reset team', `Reset all agents in "${keyLabel(boardName)}"? Each one stops and starts again from its first instructions, in a new chat. ${WHAT_STAYS_RESET} ${RESET_LOG_NOTE}`, async () => {
         try {
             const resp = await teamFetch(boardName, n => `/api/sessions/live/team/${encodeURIComponent(n)}/reset`, { method: 'POST' });
             if (resp.ok) {

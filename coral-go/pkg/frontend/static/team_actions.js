@@ -259,7 +259,7 @@ export function toggleTeamSleep(boardName, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep team', `Put all agents on "${keyLabel(boardName)}" to sleep?`, doIt, undefined, { danger: false, label: 'Sleep team' });
+        showConfirmModal('Sleep team', `Put all agents on "${keyLabel(boardName)}" to sleep? Their chats stay, and Wake Team starts them again.`, doIt, undefined, { danger: false, label: 'Sleep team' });
     } else {
         doIt();
     }
