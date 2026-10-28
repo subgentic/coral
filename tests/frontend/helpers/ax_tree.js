@@ -14,4 +14,21 @@ async function axNodes(Accessibility, { from } = {}) {
     return out;
 }
 
-module.exports = { axNodes };
+// The name Chrome computes for one element, from the same accessibility tree a screen reader reads (#9727).
+//   axName(client, selector) -> { name, role } of the first element the selector matches (null when none, or when the tree skips it)
+// Use it for what a person hears: a control's name built from its content (a role=img dot's label, an aria-labelledby, a child's text), and whether a word is said once or twice. window.__na.name (helpers/new_agent.js)
+// is a text approximation made in the page: it follows aria-label, aria-labelledby and text, but not role=img labels or the browser's own rules, so use it to find a control and axName to assert what it is called.
+async function axName(client, selector) {
+    const { DOM, Accessibility } = client;
+    await DOM.enable(); await Accessibility.enable();
+    const { root } = await DOM.getDocument({ depth: 0 });
+    const { nodeId } = await DOM.querySelector({ nodeId: root.nodeId, selector });
+    if (!nodeId) return null;
+    const { node } = await DOM.describeNode({ nodeId });
+    const { nodes } = await Accessibility.getPartialAXTree({ backendNodeId: node.backendNodeId, fetchRelatives: false });
+    const self = nodes.find(n => n.backendDOMNodeId === node.backendNodeId);
+    if (!self || self.ignored) return null;
+    return { name: (self.name && self.name.value) || '', role: (self.role && self.role.value) || '' };
+}
+
+module.exports = { axNodes, axName };

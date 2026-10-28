@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, agentsUp, openTeam, goTab, scenarios } = require('./helpers/team_page');
+const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
@@ -36,6 +37,9 @@ const TEAM = `qa-agents200-${Date.now() % 100000}`;
             assert.equal(t.sideways, false, 'the table does not scroll sideways: ' + JSON.stringify(t)); assert.equal(t.statusColumn, false, 'the Status column is gone: ' + JSON.stringify(t));
             assert.ok(t.foldedStatus.length && t.foldedStatus.every(v => !v), 'Status has given way on each one-line row (#8960): ' + JSON.stringify(t));
             assert.ok(t.dots.length && t.dots.every(d => d && d.shown && d.role === 'img' && d.label && d.title === d.label && d.before), 'the state stays as a dot before each name, its word the label and the title (#9588): ' + JSON.stringify(t.dots)); assert.ok(t.remind.length && t.remind.every(Boolean), 'Open chat is on the screen: ' + JSON.stringify(t)); assert.deepEqual((await asks()).filter(Boolean), [], 'at 200% text the word has no room: the dot and the row\'s accessible name carry it (#9713)');
+            await ev(`(() => { const r = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-box tbody tr')].find(x => x.querySelector('.team-agent-ask')); r.querySelector('button').setAttribute('data-ax-probe', ''); return true; })()`);
+            const ax = await axName(client, '[data-ax-probe]'); assert.ok(ax && ax.role === 'button', 'the Needs input row has one button in the accessibility tree: ' + JSON.stringify(ax));
+            assert.equal((ax.name.match(/needs input/gi) || []).length, 1, 'the row button says Needs input once (the dot names it, the chip beside it is hidden from a screen reader), as Chrome computes it: ' + ax.name); // not window.__na.name: it misses a role=img label (#9727)
         });
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
     S.finish();
