@@ -862,21 +862,7 @@
     <!-- Theme Configurator Modal (content rendered dynamically) -->
     <div id="theme-configurator-modal" class="modal" role="dialog" aria-label="Customize theme" aria-modal="true" style="display:none"></div>
 
-    <!-- Jump to (Cmd/Ctrl+K): any agent or chat by name (#10579) -->
-    <template data-lazy="jump-modal">
-    <div id="jump-modal" class="modal" role="dialog" aria-labelledby="jump-title" aria-modal="true" style="display:none">
-        <div class="modal-content dlg-form">
-            <div class="modal-header">
-                <h3 id="jump-title">Jump to</h3>
-            </div>
-            <div class="modal-body">
-                <input type="text" id="jump-input" class="field" role="combobox" aria-expanded="true" aria-controls="jump-list" aria-autocomplete="list" aria-label="Agent or chat name" placeholder="Agent or chat name" autocomplete="off" spellcheck="false">
-                <ul id="jump-list" class="menu jump-list" role="listbox" aria-label="Matches"></ul>
-                <div id="jump-status" class="sr-only" role="status" aria-live="polite"></div>
-            </div>
-        </div>
-    </div>
-    </template>
+    <template data-lazy="jump-modal"><div id="jump-modal" class="modal" role="dialog" aria-labelledby="jump-title" aria-modal="true" style="display:none"><div class="modal-content dlg-form"><div class="modal-header"><h3 id="jump-title">Jump to</h3></div><div class="modal-body"><input type="text" id="jump-input" class="field" role="combobox" aria-expanded="true" aria-controls="jump-list" aria-autocomplete="list" aria-label="Agent or chat name" placeholder="Agent or chat name" autocomplete="off"><ul id="jump-list" class="menu jump-list" role="listbox" aria-label="Matches"></ul><div id="jump-status" class="sr-only" role="status" aria-live="polite"></div></div></div></div></template>
 
     <!-- Scheduled Job Modal -->
     <template data-lazy="job-modal">

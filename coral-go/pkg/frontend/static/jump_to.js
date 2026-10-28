@@ -8,7 +8,7 @@ import { historyLabel } from './history_label.js';
 import { menuMove } from './menu_keys.js';
 import { sessionServer, serverFetch } from './server_base.js';
 
-const MAX_AGENTS = 8, MAX_CHATS = 6;
+const MAX_AGENTS = 8, MAX_CHATS = 6, NONE = 'No matches';
 let matches = [], current = -1, timer = 0, seq = 0;
 
 const agentLabel = s => s.display_name || s.name || 'Agent';
@@ -16,54 +16,47 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 
 function agentMatches(words) {
     return (state.liveSessions || []).filter(s => !s.archived && words.every(w => `${agentLabel(s)} ${s.name || ''} ${s.board_project || ''}`.toLowerCase().includes(w)))
-        .slice(0, MAX_AGENTS).map(s => ({ kind: 'agent', label: agentLabel(s), detail: s.board_project ? `Agent in ${s.board_project}` : 'Agent', open: () => window.selectLiveSession(s.name, s.agent_type, s.session_id || '', sessionServer(s), { focusChat: true }) }));
+        .slice(0, MAX_AGENTS).map(s => ({ label: agentLabel(s), detail: s.board_project ? `Agent in ${s.board_project}` : 'Agent', open: () => window.selectLiveSession(s.name, s.agent_type, s.session_id || '', sessionServer(s), { focusChat: true }) }));
 }
 
 function draw(modal, said) {
     const list = modal.querySelector('#jump-list'), input = modal.querySelector('#jump-input');
     list.replaceChildren();
     matches.forEach((m, i) => {
-        const li = el('li', 'menu-item jump-option', ''); li.id = `jump-opt-${i}`; li.setAttribute('role', 'option'); li.setAttribute('aria-selected', String(i === current));
+        const li = el('li', 'menu-item jump-option'); li.id = `jump-opt-${i}`; li.setAttribute('role', 'option'); li.setAttribute('aria-selected', String(i === current));
         li.append(el('span', 'jump-label', m.label), el('span', 'jump-detail', m.detail));
         li.addEventListener('mousedown', e => e.preventDefault()); // the box keeps the focus
         li.addEventListener('click', () => choose(modal, i));
         list.append(li);
     });
     if (current >= 0) input.setAttribute('aria-activedescendant', `jump-opt-${current}`); else input.removeAttribute('aria-activedescendant');
-    modal.querySelector('#jump-status').textContent = said !== undefined ? said : '';
-    list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+    modal.querySelector('#jump-status').textContent = said;
+    list.children[current]?.scrollIntoView({ block: 'nearest' });
 }
 
 function choose(modal, i) {
-    const m = matches[i];
-    if (!m) return;
-    close();
-    m.open();
-}
-
-function close() {
-    const modal = document.getElementById('jump-modal');
-    if (modal) modal.style.display = 'none'; // display-ok: the same inline state the dialog was opened with
+    modal.style.display = 'none'; // display-ok: the same inline state the dialog was opened with
+    matches[i]?.open();
 }
 
 async function search(modal) {
     const text = modal.querySelector('#jump-input').value.trim().toLowerCase(), mine = ++seq;
     const words = text.split(/\s+/).filter(Boolean);
-    matches = words.length ? agentMatches(words) : (state.liveSessions || []).filter(s => !s.archived).slice(0, MAX_AGENTS).map(s => agentMatches([agentLabel(s).toLowerCase()])[0]).filter(Boolean);
+    matches = agentMatches(words); // no words: every agent of the list
     current = matches.length ? 0 : -1;
-    draw(modal, matches.length ? '' : words.length ? 'Looking for chats' : '');
+    draw(modal, '');
     if (!words.length) return;
     try { // chats: the History list's own search, by words in the title or summary
         const resp = await serverFetch('', `/api/sessions/history?${new URLSearchParams({ q: text, page: '1', page_size: String(MAX_CHATS) })}`);
-        if (mine !== seq || !resp.ok) { if (mine === seq) draw(modal, matches.length ? '' : 'No agent or chat matches'); return; }
-        const data = await resp.json().catch(() => ({}));
-        const chats = (data.sessions || []).filter(c => c.session_id).slice(0, MAX_CHATS).map(c => ({ kind: 'chat', label: historyLabel(c), detail: c.agent_name || c.display_name ? `Chat with ${c.agent_name || c.display_name}` : 'Chat', open: () => window.selectHistorySession(c.session_id) }));
         if (mine !== seq) return;
-        const keep = matches[current];
+        if (!resp.ok) throw new Error('history');
+        const data = await resp.json().catch(() => ({}));
+        const chats = (data.sessions || []).filter(c => c.session_id).map(c => ({ label: historyLabel(c), detail: 'Chat', open: () => window.selectHistorySession(c.session_id) }));
+        if (mine !== seq) return;
         matches = [...matches, ...chats];
-        current = keep ? matches.indexOf(keep) : (matches.length ? 0 : -1);
-        draw(modal, `${matches.length} ${matches.length === 1 ? 'match' : 'matches'}`.replace(/^0 matches$/, 'No agent or chat matches'));
-    } catch { if (mine === seq) draw(modal, matches.length ? '' : 'No agent or chat matches'); }
+        if (current < 0 && matches.length) current = 0;
+        draw(modal, matches.length ? `${matches.length} ${matches.length === 1 ? 'match' : 'matches'}` : NONE);
+    } catch { if (mine === seq) draw(modal, matches.length ? '' : NONE); }
 }
 
 /** Open the box (Cmd/Ctrl+K): empty, with the agents of the list under it. */
