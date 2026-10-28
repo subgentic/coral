@@ -101,7 +101,7 @@ wireMessageActions(document.getElementById("live-history-messages")); // the cha
 
 document.addEventListener("click", (e) => {
     const btn = e.target.closest && e.target.closest(".chat-msg-menu-btn");
-    if (btn) importOnce('./message_menu.js').then(m => m.openMessageMenu(btn)).catch(() => {}); // Copy, Save for later and Send to another agent on a message the person sent (#10159)
+    if (btn) importOnce('./message_menu.js').then(m => m.openMessageMenu(btn)).catch(() => {}); // Copy and Save for later on a message (#10159)
 });
 
 document.addEventListener("click", async (e) => {

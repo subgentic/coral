@@ -27,7 +27,7 @@ New agents use it unless you choose a model when you launch them.
 ## Copy a chat, or keep part of it
 
 - **Copy one reply:** point at an agent's reply and press **Copy message**. It copies the reply as the agent wrote it.
-- **Copy a message you sent:** open the **⋯** beside it and choose **Copy**. The same menu has **Save for later** and **Send to another agent**.
+- **Copy a message you sent:** open the **⋯** beside it and choose **Copy**. The same menu has **Save for later**.
 - **A whole team's messages:** on the team's message board, press the select button in its header, choose the messages and press **Export Markdown**.
 - **A single chat has no export button yet.** Its **Summary** tab (open the chat from **Inbox**, then **All chats**) says what was done.
 
