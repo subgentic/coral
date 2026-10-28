@@ -42,7 +42,7 @@ const BASE = require('./test_base').BASE;
     assert.equal(v.noteHidden, true, 'no note while off');
 
     // Turning it on saves debug_input_log: true and shows the note at once.
-    await ev(`(async()=>{document.getElementById('settings-debug-input-log').checked=true;await import(${MOD}+'modals.js').then(m=>m.applySettings())})()`);
+    await ev(`(async()=>{document.getElementById('settings-debug-input-log').checked=true;await Promise.resolve(window.applySettings())})()`);
     assert.equal(await ev(`window.__settingsPut[0].debug_input_log`), true);
     v = await view();
     assert.equal(v.noteHidden, false, 'the note shows once it is on');
@@ -52,7 +52,7 @@ const BASE = require('./test_base').BASE;
     assert.equal(v.deleteHidden, true, 'no Delete while it is on');
 
     // Turning it off saves false; the file is kept, and the note says so with a Delete button.
-    await ev(`(async()=>{document.getElementById('settings-debug-input-log').checked=false;await import(${MOD}+'modals.js').then(m=>m.applySettings())})()`);
+    await ev(`(async()=>{document.getElementById('settings-debug-input-log').checked=false;await Promise.resolve(window.applySettings())})()`);
     assert.equal(await ev(`window.__settingsPut[1].debug_input_log`), false);
     v = await view();
     assert.equal(v.noteHidden, false);
@@ -89,7 +89,7 @@ const BASE = require('./test_base').BASE;
     assert.match(v.note, /CORAL_DEBUG_INPUT or --debug-input/);
     // Applying Settings while forced keeps the SAVED value (off here): the forced state
     // must not be saved, or the log would stay on after the env/flag is removed.
-    await ev(`import(${MOD}+'modals.js').then(m=>m.applySettings())`);
+    await ev(`Promise.resolve(window.applySettings())`);
     assert.equal(await ev(`window.__settingsPut[0].debug_input_log`), false, 'forced on is not saved as the setting');
 
     console.log('PASS debug input log toggle: off by default, saved live, visible note, forced state');

@@ -26,7 +26,7 @@ const { connect } = require('./agent_view_harness');
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
             // 1 and 2: Settings
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js'); await m.showSettingsModal(); return true; })()`);
+            await ev(`(async () => { await window.showSettingsModal(); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'settings');
             await sleep(500); // sleep-ok: the dialog's rows fill from several answers; there is no single completion event
             const boxes = await acrossGroups(ev, `[...document.querySelectorAll('#settings-modal .info-grid dd input[type="checkbox"], #settings-modal input.switch')].filter(i => i.getClientRects().length).map(i => { const dd = i.closest('dd, .sv-control').getBoundingClientRect(), r = i.getBoundingClientRect(); return { id: i.id, w: Math.round(r.width), offset: Math.round(r.left - dd.left) }; })`);

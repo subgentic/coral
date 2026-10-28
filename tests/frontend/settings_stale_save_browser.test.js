@@ -22,8 +22,8 @@ const BASE = require('./test_base').BASE;
   const server = () => ev(`fetch('/api/settings').then(r=>r.json()).then(d=>d.settings)`);
   const field = (id, value) => ev(`(()=>{const e=document.getElementById(${JSON.stringify(id)});e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('input',{bubbles:true}));return e.value;})()`);
   const value = id => ev(`document.getElementById(${JSON.stringify(id)}).value`);
-  const openDialog = () => ev(`import(${MOD}+'modals.js').then(m=>m.showSettingsModal()).then(()=>true)`);
-  const save = () => ev(`import(${MOD}+'modals.js').then(m=>m.applySettings()).then(()=>true)`);
+  const openDialog = () => ev(`Promise.resolve(window.showSettingsModal()).then(()=>true)`);
+  const save = () => ev(`Promise.resolve(window.applySettings()).then(()=>true)`);
   const CLAUDE = 'settings-cli-path-claude', CODEX = 'settings-cli-path-codex', WDIR = 'settings-working-dir';
   let original = {};
   const guard = await require('./helpers/settings_guard').guardSettings(); // the settings this suite changes are put back in its finally (#4849)

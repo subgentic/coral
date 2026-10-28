@@ -57,7 +57,7 @@ const { settle } = require('./helpers/wait');
             await load(w, 800, w === 320);
             for (const scene of ['home', 'chat', 'settings']) {
                 if (scene === 'chat') { await ev(`window.selectLiveSession('docs-bot', 'claude', 'docs-bot-id', 'local'); true`); await settle(ev, 1200); } // sleep-ok: the Chat view settles over several answers
-                if (scene === 'settings') { await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js'); await m.showSettingsModal(); return true; })()`); await settle(ev, 1500); } // sleep-ok: Settings fills from several answers
+                if (scene === 'settings') { await ev(`(async () => { await window.showSettingsModal(); return true; })()`); await settle(ev, 1500); } // sleep-ok: Settings fills from several answers
                 const r = await ev(`(() => { const de = document.documentElement; const wide = []; for (const e of document.querySelectorAll('body *')) { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); if (b.width > 0 && b.right > innerWidth + 2 && cs.position !== 'fixed' && cs.visibility !== 'hidden' && !e.closest('[hidden]')) wide.push((e.id ? '#' + e.id : e.tagName.toLowerCase() + '.' + String(e.className).split(' ')[0]) + ' ' + Math.round(b.right)); if (wide.length > 5) break; } return { over: de.scrollWidth - de.clientWidth, wide }; })()`);
                 assert.equal(r.over, 0, `${scene} at ${w} px: no horizontal page scroll`);
                 assert.deepEqual(r.wide, [], `${scene} at ${w} px: nothing wider than the screen`);

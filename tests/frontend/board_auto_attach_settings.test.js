@@ -52,11 +52,11 @@ const BASE = require('./test_base').BASE;
     // Saving Settings on a Coral that never set it sends false, not the old default true.
     await setup({});
     await ev(`import(${MOD}+'modals.js').then(m=>m.loadSettings())`);
-    await ev(`import(${MOD}+'modals.js').then(m=>m.applySettings())`);
+    await ev(`Promise.resolve(window.applySettings())`);
     assert.equal(await ev(`window.__settingsPut[0].board_auto_attach`), false, 'saved as off');
 
     // Turning it on from the dashboard saves true.
-    await ev(`(async()=>{document.getElementById('settings-board-auto-attach').checked=true;await import(${MOD}+'modals.js').then(m=>m.applySettings())})()`);
+    await ev(`(async()=>{document.getElementById('settings-board-auto-attach').checked=true;await Promise.resolve(window.applySettings())})()`);
     assert.equal(await ev(`window.__settingsPut[1].board_auto_attach`), true, 'turned on');
 
     // Saving with no switch on the page (Settings not rendered) keeps the stored state: off
@@ -65,7 +65,7 @@ const BASE = require('./test_base').BASE;
       await setup(settings);
       await ev(`import(${MOD}+'modals.js').then(m=>m.loadSettings())`);
       await ev(`document.getElementById('settings-board-auto-attach').remove()`);
-      await ev(`import(${MOD}+'modals.js').then(m=>m.applySettings())`);
+      await ev(`Promise.resolve(window.applySettings())`);
       assert.equal(await ev(`window.__settingsPut[0].board_auto_attach`), want, `saved without the switch: ${JSON.stringify(settings)}`);
     }
 
@@ -85,7 +85,7 @@ const BASE = require('./test_base').BASE;
         const got = await ev(`(async () => {
           const m = await import(${MOD}+'modals.js');
           await m.loadSettings();
-          await m.showSettingsModal();
+          await window.showSettingsModal();
           const box = document.getElementById('settings-board-auto-attach');
           return box ? box.checked : 'missing';
         })()`);

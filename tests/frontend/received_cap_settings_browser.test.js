@@ -32,7 +32,7 @@ const GIB = 1024 ** 3;
                 return R(u, o); };
             return true; })()`);
         const MOD = `(window.__coralStatic || '/static/')`;
-        const save = () => ev(`import(${MOD} + 'modals.js').then(m => m.applySettings()).then(() => true)`);
+        const save = () => ev(`Promise.resolve(window.applySettings()).then(() => true)`);
         // Scroll the dialog's own scroller (the page itself does not scroll) so the row is in view, a little below the top.
         const showRow = () => ev(`(() => { const i = document.getElementById('settings-received-max'); let p = i.parentElement; while (p && !(p.scrollHeight > p.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(p).overflowY))) p = p.parentElement; if (p) p.scrollTop += i.getBoundingClientRect().top - p.getBoundingClientRect().top - 80; return true; })()`);
         const lastPut = () => ev(`window.__puts[window.__puts.length - 1] || null`);

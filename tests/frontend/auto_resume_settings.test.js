@@ -55,9 +55,9 @@ const BASE = require('./test_base').BASE;
     // Apply on a Coral that never set it sends false; turning it on sends true.
     await setup({});
     await ev(`import(${MOD}+'modals.js').then(m=>m.loadSettings())`);
-    await ev(`import(${MOD}+'modals.js').then(m=>m.applySettings())`);
+    await ev(`Promise.resolve(window.applySettings())`);
     assert.equal(await ev(`window.__settingsPut[0].auto_resume_after_api_error`), false, 'saved as off');
-    await ev(`(async()=>{document.getElementById('settings-auto-resume').checked=true;await import(${MOD}+'modals.js').then(m=>m.applySettings())})()`);
+    await ev(`(async()=>{document.getElementById('settings-auto-resume').checked=true;await Promise.resolve(window.applySettings())})()`);
     assert.equal(await ev(`window.__settingsPut[1].auto_resume_after_api_error`), true, 'turned on');
 
     // The real dialog has the switch, off, with its label.
@@ -65,7 +65,7 @@ const BASE = require('./test_base').BASE;
     const row = await ev(`(async () => {
       const m = await import(${MOD}+'modals.js');
       await m.loadSettings();
-      await m.showSettingsModal();
+      await window.showSettingsModal();
       const box = document.getElementById('settings-auto-resume');
       const label = box && document.getElementById(box.getAttribute('aria-labelledby'));
       return box ? { checked: box.checked, label: label && label.textContent.trim() } : 'missing';

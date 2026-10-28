@@ -36,7 +36,7 @@ const GIB = 1024 ** 3;
             return true; })()`);
         const GONE = `(window.hideSettingsModal(), (!document.getElementById('settings-modal') || getComputedStyle(document.getElementById('settings-modal')).display === 'none'))`;
         const close = () => waitFor(GONE, 'Settings to close', 6000);
-        const apply = () => ev(`import((window.__coralStatic || '/static/') + 'modals.js').then(m => m.applySettings()).then(() => true)`);
+        const apply = () => ev(`Promise.resolve(window.applySettings()).then(() => true)`);
         const line = () => ev(`(document.getElementById('settings-artifact-store-size')?.textContent ?? '')`);
 
         console.log('1. A failed or slow load leaves the fields empty and off, and Save writes neither limit');

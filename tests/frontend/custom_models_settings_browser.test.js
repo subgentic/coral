@@ -85,12 +85,12 @@ const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 
         await ev(`import(${S} + 'custom_models.js').then(m => m.initCustomModels()).then(() => true)`);
         check('a refill of the dialog (the same open) keeps what the person has edited', (await ev(`import(${S} + 'custom_models.js').then(m => m.customModelsPayload().models.length)`)) === 4);
         console.log('2. Apply: one PUT with the whole list, and every picker forgets its list');
-        await ev(`window.__cm.fail = true; import(${S} + 'settings_dialog.js').then(m => m.applySettings()).then(() => true)`);
+        await ev(`window.__cm.fail = true; Promise.resolve(window.applySettings()).then(() => true)`);
         await waitFor(`[...document.querySelectorAll('.toast-message')].some(e => /custom model 1 \\(codex/.test(e.textContent))`, 'the toast naming the refused row', 8000);
         check('a refusal is shown with the server\'s words (the row and the field), the draft stays, nothing is marked saved', (await ev(`import(${S} + 'custom_models.js').then(m => m.customModelsDirty())`)) === true && /Unsaved changes/.test(await ev(`document.querySelector('#settings-custom-models .cm-status').textContent`)));
         await ev(`window.__cm.fail = false; window.__cm.puts.length = 0; true`);
         await ev(`localStorage.setItem('coral-models:v1:local:claude', JSON.stringify({ models: [{ value: 'old' }] })); true`);
-        await ev(`import(${S} + 'settings_dialog.js').then(m => m.applySettings()).then(() => true)`);
+        await ev(`Promise.resolve(window.applySettings()).then(() => true)`);
         await waitFor(`window.__cm.puts.length >= 1`, 'the PUT', 8000);
         const puts = await ev(`window.__cm.puts`);
         check(`Apply sends exactly one PUT with the whole list, each row with its family (${puts.length})`, puts.length === 1 && Array.isArray(puts[0].models) && puts[0].models.length === 4 && puts[0].models.map(m => m.family).join() === 'claude,claude,codex,agy' && puts[0].models[1].value === 'claude-opus-5-5');

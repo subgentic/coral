@@ -93,7 +93,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(document.getElementById('agentic-mobile-close-btn') || document.createElement('i')).click(); true`);
         }
         if (group === 'dialogs') {
-            await probe('settings', () => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js'); await m.showSettingsModal(); return true; })()`), '#settings-modal');
+            await probe('settings', () => ev(`(async () => { await window.showSettingsModal(); return true; })()`), '#settings-modal');
             await ev(`window.hideSettingsModal(); true`);
             const ids = await ev(`[...document.querySelectorAll('.modal[role=dialog]')].map(m => m.id).filter(id => id !== 'settings-modal')`);
             for (const id of ids) { await probe('dialog ' + id, () => ev(`document.getElementById(${JSON.stringify(id)}).style.display = 'flex'; true`), '#' + id); await ev(`document.getElementById(${JSON.stringify(id)}).style.display = 'none'; true`); }
@@ -116,7 +116,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         }
         const subset = async (tag) => {
             for (const tab of ['agents', 'history', 'workflows', 'tokens', 'docs']) await probe(tag + ' tab ' + tab, () => ev(`window.switchNavTab('${tab}'); true`));
-            await probe(tag + ' settings', () => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js'); await m.showSettingsModal(); return true; })()`), '#settings-modal');
+            await probe(tag + ' settings', () => ev(`(async () => { await window.showSettingsModal(); return true; })()`), '#settings-modal');
             await ev(`window.hideSettingsModal(); true`);
             await probe(tag + ' launch step 2', async () => { await ev(`document.querySelector('[data-on-click="launch-show"]').click(); true`); await settle(800);
                 await ev(`{ const c = [...document.querySelectorAll('.launch-type-card, .launch-type-label')].find(e => /New agent/.test(e.textContent)); (c.closest('[data-on-click]') || c).click(); } true`); await settle(1000); }, '#launch-modal');

@@ -45,7 +45,7 @@ const COUNTERS = `(() => {
         let n = 0;
         const round = async () => {
             await select(n++); await ev(`${framesJs(4)}`); // the selection's redraws are painted before the next round (the rounds' async tails overlap a little, which is only harder on the page; the samples wait for them)
-            if (n % 4 === 0) { await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js'); await m.showSettingsModal(); return true; })()`); await ev(`${framesJs(4)}`); await ev(`window.hideSettingsModal(); true`); }
+            if (n % 4 === 0) { await ev(`(async () => { await window.showSettingsModal(); return true; })()`); await ev(`${framesJs(4)}`); await ev(`window.hideSettingsModal(); true`); }
             if (n % 5 === 0) { await ev(`window.switchAgenticTab('tasks', 'top'); true`); await ev(`${framesJs(3)}`); await ev(`window.switchAgenticTab('files', 'top'); true`); }
         };
         const sample = async () => {
