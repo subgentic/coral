@@ -100,17 +100,44 @@ export function exportTeamTemplates() {
     showToast(`Exported ${templates.length} template(s)`);
 }
 
+/** What is wrong with a team template file, in words, or the templates it holds (#10366). A template file is the .json that Export this template (or Share team) makes: {"type": "coral-team-templates", "templates": [{name, agents: [...]}]}. */
+export function readTeamTemplateFile(data) {
+    const FORMAT = 'a Coral team template: a .json file made by Export this template ({"type": "coral-team-templates", "templates": [...]})';
+    if (data === null || typeof data !== 'object') return { entries: [], problems: [`That file is not ${FORMAT}.`] };
+    if (!Array.isArray(data) && data.type !== undefined && data.type !== 'coral-team-templates') {
+        return { entries: [], problems: [`That file is ${data.type === 'coral-personas' ? 'a personas file' : `a "${String(data.type).slice(0, 40)}" file`}, not ${FORMAT}.`] };
+    }
+    const templates = Array.isArray(data) ? data : data.templates;
+    if (!Array.isArray(templates)) return { entries: [], problems: [`That file has no "templates" list: it is not ${FORMAT}.`] };
+    if (!templates.length) return { entries: [], problems: ['That file holds no templates.'] };
+    const entries = [], problems = [];
+    templates.forEach((t, i) => {
+        const named = t && typeof t.name === 'string' && t.name.trim() ? `"${t.name.trim().slice(0, 60)}"` : '';
+        if (!t || typeof t !== 'object') problems.push(`Template ${i + 1} is not a template.`);
+        else if (!named) problems.push(`Template ${i + 1} has no name.`);
+        else if (!Array.isArray(t.agents) || !t.agents.length) problems.push(`${named} has no members.`);
+        else if (t.agents.some(a => !a || typeof a.name !== 'string' || !a.name.trim())) problems.push(`A member of ${named} has no name.`);
+        else entries.push(t);
+    });
+    return { entries, problems };
+}
+
 export async function importTeamTemplates() {
     const data = await _openFilePicker();
     if (!data) return;
-    const templates = data.templates || (Array.isArray(data) ? data : null);
-    if (!templates || !Array.isArray(templates)) { showToast("Invalid template file format", "error"); return; }
-
-    const entries = templates.filter(t => t.name && Array.isArray(t.agents));
-    const added = entries.length;
+    const { entries, problems } = readTeamTemplateFile(data);
+    if (!entries.length) { showToast(problems[0], "error"); return; }
     try { await _upsertSavedTeamTemplates(entries); } catch { showToast("Could not save the imported templates", "error"); return; }
-    showToast(`Imported ${added} template(s)`);
+    showToast(problems.length ? `Imported ${entries.length} template(s); skipped ${problems.length}: ${problems[0]}` : `Imported ${entries.length} template(s)`);
     _renderTeamTemplateSelector();
+}
+
+/** Export the saved template `name` as a .json file: its members (roles, instructions, models, flags) and the team's flags, the file Import a template takes (#10366). */
+export function exportTeamTemplate(name) {
+    const t = _getSavedTeamTemplates().find(x => x.name === name);
+    if (!t) { showToast("Pick one of your saved templates to export it", "error"); return; }
+    _downloadJson({ version: 1, type: "coral-team-templates", templates: [t] }, `coral-team-template-${String(t.name).replace(/[^a-zA-Z0-9-_]/g, "_")}.json`);
+    showToast(`Exported the template "${t.name}"`);
 }
 
 // ── Agent Preset Selector (single-agent modal) ───────────────────────────

@@ -125,6 +125,7 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
     'm-import-personas': 'launch dialog: imports persona files into the form',
     'm-import-team-from-folder': 'launch dialog: reads a team definition into the form',
     'm-import-team-templates': 'launch dialog: imports team templates (the operator\'s settings)',
+    'm-export-team-template': 'launch dialog: exports the picked saved team template as a .json file (#10366)',
     'm-handle-team-folder-import': 'launch dialog: the folder picker of the import above',
     'm-apply-settings': 'Settings dialog (top bar only): saves settings',
     'm-confirm-save-template': 'saves a team template (settings)',

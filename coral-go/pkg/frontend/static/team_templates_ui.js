@@ -58,6 +58,15 @@ const BUILTIN_TEAM_TEMPLATES = [
 // The template picker (#7407): a select of "Blank team" and each template with its member count. (It was a searchable list, #6397; the design's select scales to the templates people save by being a native list.)
 let _chosenTemplate = '';
 
+/** The template More menu opens: Export this template is for one of the person's own saved templates (a built-in one is nothing of theirs to export), and says so when it is not offered (#10366). */
+function _syncTemplateMenu() {
+    const item = document.getElementById('team-template-export'), sel = document.getElementById('team-template-select');
+    if (!item || !sel) return;
+    const saved = _getSavedTeamTemplates().some(t => t.name === sel.value);
+    item.disabled = !saved;
+    item.title = saved ? 'Download this template as a .json file: its members (roles, instructions, models, flags)' : 'Pick one of your saved templates to export it';
+}
+
 function _allTemplates() { return [...BUILTIN_TEAM_TEMPLATES, ..._getSavedTeamTemplates()]; }
 
 /** The choice the dialog opens on (#9906): the default members it fills in (the Orchestrator, the Lead Developer, the QA Engineer). Not a template of its own: team_dialogs.js loads it. */
@@ -180,4 +189,4 @@ async function _confirmSaveTemplate() {
 }
 window._confirmSaveTemplate = _confirmSaveTemplate;
 
-export { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, markTeamTemplate, markGeneratedTeam, resetTeamTemplatePicker };
+export { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, markGeneratedTeam, resetTeamTemplatePicker };
