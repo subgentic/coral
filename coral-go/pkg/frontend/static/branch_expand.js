@@ -31,11 +31,13 @@ document.addEventListener('focusout', (e) => {
 // A live header narrower than 22.25 rem of content (the phone's container query drops the branch there; a desktop header beside two panes squeezes it to a few pixels): data-narrow on the header,
 // kept by one observer, and the capped text leaves the Tab order, since there is nothing of it to see or focus.
 const NARROW_REM = 22.25;
+const TIGHT_REM = 44;
 const narrowObserver = new ResizeObserver((entries) => {
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     for (const e of entries) {
         const narrow = e.contentRect.width < NARROW_REM * rem;
         e.target.toggleAttribute('data-narrow', narrow);
+        e.target.toggleAttribute('data-tight', e.contentRect.width < TIGHT_REM * rem); // too tight for the model line beside the name: the Details disclosure has it (#9784)
         const t = e.target.querySelector('.terminal-branch-text');
         if (t) t.tabIndex = narrow ? -1 : 0;
     }
