@@ -14,7 +14,7 @@ const ROWS = {
     file_search_mode: ['File search mode'], file_search_limit: ['File search limit'], git_diff_mode: ['Git diff mode'], git_poll_interval_s: ['Git scan interval'],
     agent_priority: ['Run agents at lower priority', 'low'], telemetry_enabled: ['Usage analytics', 'switch'], board_auto_attach: ['Attach files linked in posts', 'switch'],
     nudge_claude_artifacts: ['Coral artifact reminders', 'switch'], board_health_monitor: ['Team health checks', 'switch'], auto_resume_after_api_error: ['Resume after API errors', 'switch'],
-    auto_goals: ["Name each agent's goal", 'switch'], debug_input_log: ['Log terminal input', 'switch'], remote_access_enabled: ['Remote access', 'switch'],
+    auto_goals: ["Name each agent's goal", 'switch'], debug_input_log: ['Record what Coral types', 'switch'], remote_access_enabled: ['Remote access', 'switch'],
     artifact_store_max_bytes: ['Artifact store limit'], received_artifacts_max_bytes: ['Received files limit'],
     artifact_retention_days: ['Automatic cleanup'], artifact_retention_kinds: ['Automatic cleanup'],
 };
