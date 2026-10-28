@@ -41,16 +41,22 @@ let _lastSidebarRenderAt = 0;
 
 // The page says when the feed has been gone a few seconds, and when it is back (connection_bar.js, #10296): a blip says nothing.
 const FEED_DOWN_BAR_MS = 3000;
-let _downTimer = 0, _barShown = false;
+let _downTimer = 0, _barShown = false, _upCount = 0;
+const feedIsUp = () => navigator.onLine !== false && !!state.coralWs && state.coralWs.readyState === 1;
 function feedDown() {
     if (_downTimer) return;
     _downTimer = setTimeout(() => {
         _downTimer = 0;
-        if (navigator.onLine !== false && state.coralWs && state.coralWs.readyState === 1) return; // the feed is up and the browser is online: nothing to say
-        importOnce('./connection_bar.js').then(m => { _barShown = true; m.showNoConnection(); }).catch(() => {});
+        if (feedIsUp()) return; // the feed is up and the browser is online: nothing to say
+        const ups = _upCount;
+        importOnce('./connection_bar.js').then(m => {
+            if (ups !== _upCount || feedIsUp()) return; // the feed came back while the module was loading: there is nothing for the bar to say, and nothing would take it away (#10500)
+            _barShown = true; m.showNoConnection();
+        }).catch(() => {});
     }, FEED_DOWN_BAR_MS);
 }
 function feedUp() {
+    _upCount++;
     if (_downTimer) { clearTimeout(_downTimer); _downTimer = 0; }
     if (_barShown) { _barShown = false; importOnce('./connection_bar.js').then(m => m.showBackOnline()).catch(() => {}); }
 }
