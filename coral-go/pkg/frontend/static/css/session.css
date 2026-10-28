@@ -1677,7 +1677,9 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 /* What waits for an agent (#7727): the last automated message Coral did not type, one small line in the warning colour on the agent's row; the agent view has the unread count, a list and Send now. */
 
 .composer-hint.composer-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); } /* the sentence, then What waits (a link), Send now (a small button) and Show terminal (a link), spaced apart */
-#composer-waiting-send { margin: 0; } /* .btn-small carries a 20px margin for the sidebars: it left a blank line before the links on a phone */
+#composer-waiting-send { margin: 0; }
+.composer-waiting-detail .composer-waiting-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 4px; } /* Send these now and Show terminal, behind Details (#10036) */
+.composer-waiting-detail .composer-waiting-note { margin: 0 0 6px; color: var(--text-secondary); } /* what Send these now does and does not send */ /* .btn-small carries a 20px margin for the sidebars: it left a blank line before the links on a phone */
 .composer-waiting-detail .composer-waiting-why { margin: 0 0 6px; }
 .composer-waiting-detail summary { cursor: pointer; }
 .composer-waiting.composer-waiting-empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say (a class set by waiting.js, not :has(): that costs every DOM change): out of the layout, still a live region (#6679) */

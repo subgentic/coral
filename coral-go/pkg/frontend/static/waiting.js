@@ -21,13 +21,11 @@ export function skippedOf(row) {
     return { why: k.why, what: typeof k.what === 'string' ? k.what : '' };
 }
 
-/** The line for the agent view and the row: '' when nothing waits and nothing was skipped. */
+/** The agent view's line: '' when no board message waits (a skipped send alone says nothing here). */
 export function waitingText(row) {
     if (!row || row.sleeping) return '';
-    const n = waitingCount(row), k = n > 0 ? skippedOf(row) : null; // a skip is shown only while an unread message waits
-    const unread = n > 0 ? `${n} unread board message${n === 1 ? '' : 's'} for this agent` : '';
-    if (unread && k) return `${unread}. Not typed: ${k.why}.`;
-    return unread;
+    const n = waitingCount(row);
+    return n > 0 ? `${n} board message${n === 1 ? ' waits' : 's wait'} for this agent` : ''; // short on purpose (#10036): why it waits, the list and the actions are behind Options
 }
 
 /** What is said after a Send now, from the server's answer. */
@@ -39,7 +37,7 @@ export function sendNowToast(r) {
     return 'Not sent' + (r && typeof r.why === 'string' && r.why ? ': ' + r.why : '.');
 }
 
-/** The agent view's line, its What waits and Send now buttons, and the list when open. Written only on a change (#5010's budget). */
+/** The agent view's one line and its Options link; Send these now, Show terminal and the list are in the panel Options opens. Written only on a change (#5010's budget). */
 export function syncWaitingNotice(row) {
     const el = document.getElementById('composer-waiting-notice');
     if (!el) return;
@@ -63,7 +61,7 @@ function closeList() {
 const url = (s, tail) => `/api/sessions/live/${encodeURIComponent(s.name)}/waiting${tail}`;
 
 function listNode(r) {
-    const root = document.createElement('div');
+    const root = document.createDocumentFragment();
     const k = r && r.skipped;
     if (k && k.why) { // why they wait comes first
         const p = document.createElement('p');
@@ -92,13 +90,13 @@ function listNode(r) {
 }
 
 async function toggleList() {
-    const s = state.currentSession, d = document.getElementById('composer-waiting-detail'), b = document.getElementById('composer-waiting-list');
-    if (!s || !d || !b) return;
+    const s = state.currentSession, d = document.getElementById('composer-waiting-detail'), b = document.getElementById('composer-waiting-list'), items = document.getElementById('composer-waiting-items');
+    if (!s || !d || !b || !items) return;
     if (!d.hidden) { closeList(); return; }
     try {
         const resp = await serverFetch(currentServer(), url(s, `?agent_type=${encodeURIComponent(s.agent_type)}&session_id=${encodeURIComponent(s.session_id)}`));
         if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `The list could not be read (HTTP ${resp.status}).`)); return; }
-        d.replaceChildren(listNode(await resp.json()));
+        items.replaceChildren(listNode(await resp.json()));
         d.hidden = false;
         b.setAttribute('aria-expanded', 'true');
     } catch (e) {
