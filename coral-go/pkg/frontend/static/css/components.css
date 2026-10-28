@@ -4069,4 +4069,6 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .team-link-form select { min-height: var(--control-touch-height); }
 .team-link-revoke, .team-link-link, .team-link-back, .team-link-go, .team-link-manage { min-height: var(--control-touch-height); align-self: flex-start; }
 .team-link-confirm-actions { display: flex; gap: var(--space-sm); }
-@media (max-width: 480px) { .team-link-row { flex-wrap: wrap; } .team-link-text { flex-basis: calc(100% - 3rem); } .team-link-state { margin-left: auto; } }
+.team-link-end { display: flex; align-items: center; gap: var(--space-sm); flex: none; }
+.team-link-files { font-weight: var(--fw-regular); color: var(--text-secondary); }
+@media (max-width: 480px) { .team-link-row { display: grid; grid-template-columns: auto 1fr; align-items: start; column-gap: var(--space-md); } .team-link-end { grid-column: 2; justify-content: flex-end; } .team-link-files { display: none; } } /* a phone draws no Files chip on a row (the approved pictures): the note under the group says files follow the account */

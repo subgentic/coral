@@ -92,6 +92,11 @@ const ALLOWED = [/^GET \/api\/sessions\/live$/, /^GET \/api\/relay\/links$/, /^P
             const fits = await dlg(`({ over: d.scrollWidth - d.clientWidth, targets: [...d.querySelectorAll('button, select')].filter(e => e.getClientRects().length).map(e => Math.round(e.getBoundingClientRect().height)) })`);
             assert.ok(fits.over <= 0, `${label}: no sideways scroll ${JSON.stringify(fits)}`);
             if (mobile) assert.ok(fits.targets.every(x => x >= 44), `390: every control is 44 px ${JSON.stringify(fits.targets)}`);
+            // each row is laid out the same: its Files chip, state word and Revoke are one line under (or beside) the name, Revoke at the row's right edge, and the chip is quiet (F4, #9905)
+            const lay = await dlg(`[...d.querySelectorAll('.team-link-row')].map(r => { const q = s => r.querySelector(s), rr = r.getBoundingClientRect(), rv = q('.team-link-revoke').getBoundingClientRect(), st = q('.team-link-state').getBoundingClientRect(), fc = q('.team-link-files'), tx = q('.team-link-text').getBoundingClientRect();
+                return { revokeRight: Math.round(rr.right - rv.right), sameLine: Math.abs(rv.top - st.top) <= rv.height, revokeBelowName: rv.top >= q('.team-link-name').getBoundingClientRect().bottom - 2 || (rv.left > tx.right - 1), chipWeight: Number(getComputedStyle(fc).fontWeight), endOneLine: q('.team-link-end').getBoundingClientRect().height < q('.team-link-revoke').getBoundingClientRect().height * 1.6, belowText: rv.top >= tx.bottom - 2 || rv.left > tx.right - 1 }; })`);
+            assert.ok(lay.every(x => x.revokeRight === lay[0].revokeRight && x.sameLine && x.endOneLine && x.chipWeight === 400), `${label}: Revoke is in one place on every row, with the chip and the state on its line, and the chip is quiet (400) ${JSON.stringify(lay)}`);
+            if (mobile) assert.ok(lay.every(x => x.belowText), `390: the chip, state and Revoke are one line under the text, on every row ${JSON.stringify(lay)}`);
             await shot(`team-link-dialog-${label}`);
 
             // 3. link: the confirm names both directions, the POST says both_directions explicitly
