@@ -231,11 +231,9 @@
 .dt-resize:hover::after, .dt-resize.dt-resizing::after { background: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .dt-resize::after { transition: none; } }
 .dt-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.dt-widthbar { display: flex; justify-content: flex-end; padding: 4px var(--table-pad-x); border-bottom: 1px solid var(--table-border); }
-.dt-widthbar[hidden] { display: none; }
 .dt-box.dt-sized { overflow-x: auto; }
 .dt-box.dt-sized .dt-table td { max-width: none; }
-.dt-box.dt-folded .dt-widthbar, .dt-box.dt-folded .dt-resize { display: none; }
+.dt-box.dt-folded .dt-resize { display: none; }
 @media (max-width: 767px) { .dt-resize { display: none; } } /* a column's drag handle is a pointer's: on a phone an unfolded table (the dock's one-line rows) has none, not a 10 px target (#8837) */
 
 /* A row's detail (data_table.js detail, #7903): one full-width row under it, shown only while the surface says it is open */

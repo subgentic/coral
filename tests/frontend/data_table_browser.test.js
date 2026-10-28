@@ -164,7 +164,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.activeElement.blur(); true`);
         const hb = await handle('who'); await mouse('mouseMoved', hb.x, hb.y); await mouse('mousePressed', hb.x, hb.y); await mouse('mouseReleased', hb.x, hb.y);
         assert.equal(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`), null, 'a press with no move keeps nothing');
-        assert.equal(await ev(`document.querySelector('#dt-host .dt-widthbar').hidden && !document.querySelector('#dt-host .dt-box').classList.contains('dt-sized')`), true, 'and offers no Reset column widths: nothing changed');
+        assert.equal(await ev(`!document.querySelector('#dt-host .dt-box').classList.contains('dt-sized')`), true, 'and nothing is sized: nothing changed');
         assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"]').getAttribute('aria-sort')`), 'none', 'and does not sort');
         await drag('who', 70);
         const w1 = { name: await W('name'), who: await W('who'), n: await W('n') };
@@ -179,7 +179,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(Object.keys(JSON.parse(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`))).includes('who'), true, 'the width is kept in this browser');
         await mount();
         assert.ok(Math.abs((await W('who')) - kept) <= 2, 'a redraw (a new table for the same list) has the kept width: ' + (await W('who')) + ' vs ' + kept);
-        assert.equal(await ev(`!!document.querySelector('#dt-host .dt-reset-widths') && !document.querySelector('#dt-host .dt-widthbar').hidden`), true, 'Reset column widths is there while any width is set');
+        assert.equal(await ev(`!document.querySelector('#dt-host .dt-reset-widths, #dt-host .dt-widthbar') && !/Reset column widths/.test(document.getElementById('dt-host').textContent)`), true, 'there is no Reset column widths button, however many widths are set (#9845)');
         // the keyboard
         await ev(`document.querySelector('#dt-host th[data-key="n"] .dt-resize').focus(); true`);
         const before = await W('n');
@@ -194,11 +194,11 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#dt-host th[data-key="who"] .dt-resize').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); true`);
         const fit = await W('who');
         assert.ok(fit < wide - 40 && fit >= 64, 'a double click fits the column to what is in it: ' + wide + ' to ' + fit);
-        // reset
-        await ev(`document.querySelector('#dt-host .dt-reset-widths').click(); true`);
-        assert.equal(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`), null, 'Reset forgets the widths');
-        assert.ok(Math.abs((await W('who')) - w0.who) <= 3 && !(await ev(`document.querySelector('#dt-host .dt-box').classList.contains('dt-sized')`)), 'and the columns are as they were');
-        assert.equal(await ev(`document.querySelector('#dt-host .dt-widthbar').hidden`), true, 'the reset bar goes');
+        // the way back is the double click on an edge (the old Reset column widths button is gone, #9845): each column fits to what is in it, and a table of fitted columns keeps nothing that differs
+        await ev(`document.querySelector('#dt-host th[data-key="who"] .dt-resize').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); true`);
+        assert.ok(Math.abs((await W('who')) - fit) <= 2, 'a second double click on a fitted column changes nothing: ' + fit + ' vs ' + await W('who'));
+        await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`); await mount();
+        assert.ok(Math.abs((await W('who')) - w0.who) <= 3 && !(await ev(`document.querySelector('#dt-host .dt-box').classList.contains('dt-sized')`)), 'with nothing kept the columns are as they were');
         // folded: no handles
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await mount(); await waitFor(`document.querySelector('#dt-host .dt-box').classList.contains('dt-folded')`, 'folded');
