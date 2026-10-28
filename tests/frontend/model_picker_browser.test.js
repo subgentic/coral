@@ -4,7 +4,7 @@
 //   - the last list is cached and shown at once, then the server's replaces it; the agent type switches the list; no list: free text;
 //   - what is chosen or typed is what the form returns; values set from code show in the list (or under Other…);
 //   - the small refresh button posts, polls while the server says refreshing, and says why when refused (429, 403);
-//   - the real model is shown by its display name from the list, else from the id: in the agent's hover tip and in the agent page's header (#terminal-header-model), never in the row (a row is one line, #9686).
+//   - the real model is shown by its display name from the list, else from the id: in the agent's hover tip and in the agent page's Details disclosure (#apd-model, #9837: the header does not carry it), never in the row (a row is one line, #9686).
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -126,7 +126,7 @@ const { connect } = require('./agent_view_harness');
         await ev(`window.selectLiveSession('opus-bot', 'claude', 'opus-bot-id', 'local'); true`);
         await waitFor(`document.getElementById('terminal-header-label') && document.getElementById('terminal-header-label').textContent.length > 0`, 'the header', 5000);
         // The row no longer says the model, so the agent page's header does (#9686): the same fields, "Opus 4.1" first; the composer's chip still changes it.
-        await waitFor(`!!document.getElementById('terminal-header-model') && /Opus 4\\.1/.test(document.getElementById('terminal-header-model').textContent)`, 'the header model', 5000);
+        await waitFor(`!!document.getElementById('apd-model') && /Opus 4\\.1/.test(document.getElementById('apd-model').textContent)`, 'the Details model', 5000);
         console.log('7. a custom model (#5480) is marked, and its own levels drive the thinking picker');
         await ev(`window.__serve.claude = { thinking: ['low', 'medium', 'high', 'xhigh', 'max'], models: [${JSON.stringify(OPUS)}, { value: 'global-opus-5-5', display_name: 'Global Opus 5.5', custom: true, efforts: ['low', 'high'] }, { value: 'global-plain', display_name: '<img src=x onerror="window.__pwn=1">', custom: true, efforts: [] }], refreshing: false }; localStorage.removeItem('coral-models:v1:local:claude');
             (() => { const old = document.getElementById('acf-t'); if (old) old.remove(); const host = document.createElement('div'); host.id = 'acf-t'; document.body.appendChild(host); window.__acf.renderAgentConfigForm('acf-t', {}); })(); true`);

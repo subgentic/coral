@@ -72,28 +72,31 @@ const { connect } = require('./agent_view_harness');
                 assert.ok(dd.some(x => /^Context: ctx 10%/.test(x)) && dd.some(x => /^Folder: .*coral-project/.test(x)) && dd.some(x => /^Branch: .*long-branch-name/.test(x)) && dd.some(x => /^Model: .*Opus/.test(x)) && dd.some(x => /^Thinking[a-z ]*: High$/.test(x)), `Details has the folder, the branch and the model ${JSON.stringify(dd)}`);
                 console.log('PASS 390: Details shows the folder, branch and model');
             }
-            if (!mobile) { // nothing is lost: the agent's own page header has the branch, the folder and the model with its level (the row says none of them)
+            if (!mobile) { // the header is the state, the name (whole), the branch, the buttons and, last, the Chat/Terminal toggle at the right; the folder is the name's tip, the model is in Details (#9836, #9837, the operator)
                 await ev(`window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
-                await waitFor(`!document.getElementById('terminal-header-model')?.hidden && !document.getElementById('terminal-header-folder')?.hidden && !document.getElementById('terminal-header-branch')?.hidden`, 'the header: model, folder and branch', 8000);
-                const hd = await ev(`({ model: document.querySelector('#terminal-header-model .terminal-folder-text').textContent, folder: document.querySelector('#terminal-header-folder .terminal-folder-text').textContent, folderTip: document.getElementById('terminal-header-folder').title, branch: document.querySelector('#terminal-header-branch .terminal-branch-text').textContent })`);
+                await waitFor(`!document.getElementById('terminal-header-branch')?.hidden && !document.getElementById('agent-phone-details')?.hidden`, 'the header: branch and Details', 8000);
+                const hd = await ev(`(() => { const h = document.querySelector('#live-session-view .terminal-header'), id = document.getElementById('terminal-header-identity'), lab = document.getElementById('terminal-header-label'), tg = h.querySelector('.live-view-toggle'), acts = h.querySelector('.terminal-header-actions'), r = e => e.getBoundingClientRect();
+                    return { noFolder: !document.getElementById('terminal-header-folder'), noModel: !document.getElementById('terminal-header-model'), text: h.textContent.replace(/\\s+/g, ' '), nameWhole: lab.scrollWidth <= lab.clientWidth, name: lab.textContent, branch: document.querySelector('#terminal-header-branch .terminal-branch-text').textContent, folderOnHeader: h.dataset.folder,
+                        toggleInActions: tg.parentElement === acts, toggleAfterName: r(tg).left >= r(id).right, toggleFirstAction: acts.querySelector(':scope > .live-view-toggle') === acts.firstElementChild || [...acts.children].filter(c => c.getClientRects().length)[0] === tg || [...acts.children].filter(c => c.getClientRects().length && c.classList.contains('terminal-branch')).length === 1, toggleRight: Math.round(r(h).right - r(tg).right), tabOrder: [...h.querySelectorAll('button, a[href], [tabindex="0"]')].filter(e => e.getClientRects().length).map(e => e.id || e.className.toString().slice(0, 24)).slice(0, 4) }; })()`);
                 await shot('agent-header-model-1280');
-                assert.match(hd.model, /Opus/, `the header names the model ${JSON.stringify(hd)}`); assert.equal(hd.model, 'Opus 5.5 \u00b7 High \u00b7 ctx 10%', `the model line reads model, thinking level and context in that order (#9826) ${JSON.stringify(hd)}`); assert.match(hd.model, /ctx 10%/, `and the context use (the row's pill moved here) ${JSON.stringify(hd)}`);
-                assert.ok(hd.folder.includes('coral-project') && hd.folderTip === '/work/coral-project', `and the folder, with its full path on hover ${JSON.stringify(hd)}`);
-                assert.ok(hd.branch.includes('long-branch-name'), `and the branch beside it ${JSON.stringify(hd)}`);
-                // the header is what the pane leaves it: with the side panel open it is under 44 rem and the model line gives way to Details (it was squeezed to nothing); with the panel closed the model line is drawn (#9784, UI/UX look check)
-                const geo = () => ev(`(() => { const h = document.querySelector('#live-session-view .terminal-header'), m = document.getElementById('terminal-header-model'), d = document.getElementById('agent-phone-details'); return { tight: h.hasAttribute('data-tight'), headerW: Math.round(h.clientWidth), modelW: m && m.getClientRects().length ? Math.round(m.getBoundingClientRect().width) : 0, modelText: m ? m.textContent : '', detailsShown: !!d && !d.hidden && d.getClientRects().length > 0 }; })()`);
-                const open = await geo();
-                assert.ok(open.tight && open.modelW === 0 && open.detailsShown, `a tight header (side panel open): no squeezed model line, Details has it ${JSON.stringify(open)}`);
-                await ev(`document.getElementById('panel-toggle-btn').click(); true`);
-                await waitFor(`!document.querySelector('#live-session-view .terminal-header').hasAttribute('data-tight')`, 'a roomy header with the side panel closed', 6000);
-                const roomy = await geo();
-                assert.ok(roomy.modelW >= 90 && /Opus/.test(roomy.modelText) && !roomy.detailsShown, `a roomy header draws the model line (Opus, at least 90 px) and no Details ${JSON.stringify(roomy)}`);
-                await shot('agent-header-model-roomy-1280');
-                console.log('PASS 1280: the header has the branch, the folder and the model');
-                await Emulation.setDeviceMetricsOverride({ width: 1024, height: 800, deviceScaleFactor: 1, mobile: false }); // a header this narrow (the side panel takes half) has no room for the model line: Details has it
-                await waitFor(`getComputedStyle(document.getElementById('terminal-header-model')).display === 'none' && !document.getElementById('agent-phone-details').hidden && document.getElementById('agent-phone-details').getClientRects().length > 0`, '1024: the header model line gives way to Details', 6000);
+                assert.ok(hd.noFolder && hd.noModel && !/Opus|\/work\//.test(hd.text), `the header has no folder and no model line ${JSON.stringify(hd)}`);
+                assert.ok(hd.nameWhole && hd.name === 'Worker', `the name is whole ${JSON.stringify(hd)}`);
+                assert.ok(hd.branch.includes('long-branch-name') && hd.folderOnHeader === '/work/coral-project', `the branch stays; the folder is the header's tip text ${JSON.stringify(hd)}`);
+                assert.ok(hd.toggleInActions && hd.toggleAfterName && hd.toggleRight >= 0 && hd.toggleRight <= 200, `the Chat/Terminal toggle is at the right, with the actions, after the name ${JSON.stringify(hd)}`);
+                assert.equal(hd.tabOrder[0], 'terminal-header-identity', `the Tab order starts at the name, then the toggle's buttons (the name's tip opens on focus) ${JSON.stringify(hd.tabOrder)}`);
+                // the folder's full path is a tip on the name: on keyboard focus, and on hover at a mouse (not a native title)
+                await ev(`document.getElementById('terminal-header-identity').focus(); true`);
+                const tip = await ev(`(() => { const h = document.querySelector('#live-session-view .terminal-header'); return { content: getComputedStyle(h, '::after').content, native: [...h.querySelectorAll('[title]')].filter(e => /work/.test(e.title)).length }; })()`);
+                assert.equal(tip.content, '"/work/coral-project"', `focus on the name shows the folder as a tip ${JSON.stringify(tip)}`); assert.equal(tip.native, 0, 'and it is not a native title');
+                await shot('agent-header-folder-tip-1280');
+                await ev(`document.getElementById('terminal-header-identity').blur(); document.querySelector('#agent-phone-details > summary').click(); true`);
+                const dd = await ev(`[...document.querySelectorAll('#agent-phone-details .facts-row')].filter(r => !r.hidden).map(r => r.querySelector('dt').textContent + ': ' + r.querySelector('dd').textContent)`);
+                await shot('agent-details-1280');
+                assert.ok(dd.some(x => /^Folder: .*coral-project/.test(x)) && dd.some(x => /^Branch: .*long-branch-name/.test(x)) && dd.some(x => /^Model: .*Opus 5\.5/.test(x)) && dd.some(x => /^Thinking[a-z ]*: High$/.test(x)) && dd.some(x => /^Context: ctx 10%/.test(x)), `Details has the folder, the branch, the model, the thinking level and the context at 1280 ${JSON.stringify(dd)}`);
+                console.log('PASS 1280: the header is the state, the name, the branch and the buttons; Details has the rest');
+                await Emulation.setDeviceMetricsOverride({ width: 1024, height: 800, deviceScaleFactor: 1, mobile: false });
                 assert.equal(await ev(`(() => { const h = document.querySelector('#live-session-view .terminal-header'); return h.scrollWidth - h.clientWidth <= 1; })()`), true, '1024: the header does not overflow');
-                console.log('PASS 1024: the header gives the model line to Details and does not overflow');
+                console.log('PASS 1024: the header does not overflow');
             }
         }
     } finally { await client.close(); }
