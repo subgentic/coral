@@ -110,6 +110,8 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev('location.pathname'),url,'Add task stays in Inbox');
         await ev(`document.querySelector('#inbox-page .goals-close').click(); true`);
         await waitFor(`!!document.querySelector('.goals-close-dialog[open]')`, 'close goal dialog');
+        assert.equal(await ev(`document.querySelectorAll('.goals-close-dialog input[name="goal-close-state"]:checked').length`), 0, 'with a task open nothing is chosen (#10717)');
+        await ev(`document.querySelector('.goals-close-dialog input[value="dropped"]').click(); true`);
         await ev(`document.getElementById('goal-close-reason').value='Acceptance checked'; document.querySelector('.goals-close-dialog button[type="submit"]').click(); true`);
         await waitFor(`!!document.querySelector('#inbox-page .goals-reopen')`, 'goal closes in place');
         await ev(`document.querySelector('#inbox-page .goals-reopen').click(); true`);
