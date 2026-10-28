@@ -21,6 +21,13 @@ function _setTeamWizardError(message = '') {
     errorEl.style.display = 'none';
 }
 
+/** What went wrong in words that end with what to do next (#10314): a draft with no members says what to ask for; any other failure says to try again or use a template. */
+function _plainGenerateError(message) {
+    const m = String(message || '');
+    if (/no agents|any agents|empty response/i.test(m)) return 'The draft had no members. Try again and name the roles you want, for example "an orchestrator, a developer and a tester".';
+    return /try again|pick a template/i.test(m) ? m : `${m.replace(/\s*\.?$/, '.')} Try again, or pick a template instead.`;
+}
+
 let _wizardBodyOriginalHTML = null;
 
 function showTeamWizardModal() {
@@ -36,7 +43,6 @@ function showTeamWizardModal() {
     }
 
     const directiveEl = document.getElementById('team-wizard-directive');
-    const compositionEl = document.getElementById('team-wizard-composition');
     const generateBtn = document.getElementById('team-wizard-generate-btn');
 
     // If a job is actively running, show generating state
@@ -49,7 +55,6 @@ function showTeamWizardModal() {
     } else {
         _setTeamWizardError('');
         if (directiveEl) directiveEl.value = '';
-        if (compositionEl) compositionEl.value = '';
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.textContent = 'Generate Team';
@@ -144,27 +149,19 @@ let _generatePollTimer = null;
 
 async function generateTeamFromWizard() {
     const directiveEl = document.getElementById('team-wizard-directive');
-    const compositionEl = document.getElementById('team-wizard-composition');
     const generateBtn = document.getElementById('team-wizard-generate-btn');
     const directive = directiveEl?.value.trim() || '';
-    const composition = compositionEl?.value.trim() || '';
+    const composition = ''; // one box: who should be on the team is part of what the person describes; the server infers a team from it
 
     // Disable immediately to prevent double submissions
     if (generateBtn) generateBtn.disabled = true;
 
     if (!directive) {
-        _setTeamWizardError('Add a directive so Coral knows what the team should accomplish.');
+        _setTeamWizardError('Describe your team first: what it should do, and who should be on it, for example "an orchestrator, a developer and a tester to build a login page".');
         directiveEl?.focus();
         if (generateBtn) generateBtn.disabled = false;
         return;
     }
-    if (!composition) {
-        _setTeamWizardError('Describe the team composition so Coral can assign the right roles.');
-        compositionEl?.focus();
-        if (generateBtn) generateBtn.disabled = false;
-        return;
-    }
-
     _setTeamWizardError('');
     if (generateBtn) {
         generateBtn.textContent = 'Generating...';
@@ -195,7 +192,7 @@ async function generateTeamFromWizard() {
         // Synchronous response (no job_id) — handle inline
         _handleGenerateResult(payload);
     } catch (error) {
-        _setTeamWizardError(error.message || 'Team generation failed.');
+        _setTeamWizardError(_plainGenerateError(error.message || 'Team generation failed.'));
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.textContent = 'Generate Team';
@@ -268,6 +265,7 @@ function _handleGenerateResult(payload) {
 }
 
 function _handleGenerateError(message) {
+    message = _plainGenerateError(message);
     if (_isWizardOpen()) {
         _setTeamWizardError(message);
         const generateBtn = document.getElementById('team-wizard-generate-btn');
