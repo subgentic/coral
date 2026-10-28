@@ -218,9 +218,9 @@ function syncMobileDocsList() {
     const orig = window.selectLiveSession;
     if (!orig) return;
 
-    window.selectLiveSession = function(name, agentType, sessionId, server, opts) {
-        // Call original (its options too: Open chat's focusChat, a click's pointer, #9794)
-        const selection = orig(name, agentType, sessionId, server, opts);
+    window.selectLiveSession = function(name, agentType, sessionId, server) {
+        // Call original with every argument it was given (its options too: Open chat's focusChat, a click's pointer, #9794)
+        const selection = orig(...arguments);
 
         // On mobile, hide agent list to show full session view and reset panel overlay
         if (isMobile()) {
