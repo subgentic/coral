@@ -20,6 +20,8 @@ let historyMessageCount = 0;
 let historyStart = 0;       // absolute index of the oldest rendered message (keyset cursor)
 let historyHasMore = false;  // whether older messages exist
 let initialLoadDone = false; // whether the initial full load has completed
+let frozenFor = '';          // the session id whose chat already took over from an earlier session's (a restart the feed told us of first)
+let shownFor = '';           // the session id whose messages the chat shows: a different id for the same agent is a restart (#10297)
 let loadingMore = false;     // an older page is being fetched
 
 
@@ -60,13 +62,14 @@ async function _showKeptPage(session, container, kept) {
     }
     if (generation !== historyGeneration) return true; // the agent was switched while it built
     if (rebuilt) {
-        container.innerHTML = "";
+        clearMessages(container);
         while (built.firstChild) container.appendChild(built.firstChild);
         historyHasMore = kept.start > 0;
         historyStart = kept.start;
         historyMessageCount = kept.total;
         _updateLoadMoreButton(container);
         initialLoadDone = true;
+        shownFor = session.session_id;
         if (state.autoScroll) container.scrollTop = container.scrollHeight;
     }
     return false;
@@ -93,7 +96,7 @@ function _historyParams(session) {
 function _renderHistoryReply(container, session, data) {
     if (data.messages && data.messages.length > 0) {
         if (!initialLoadDone) {
-            container.innerHTML = "";
+            clearMessages(container);
             noteIndexes(data.messages, data.start);
             // Initial load — render all and add "Load More" button if needed
             for (const msg of data.messages) {
@@ -103,6 +106,7 @@ function _renderHistoryReply(container, session, data) {
             historyStart = data.start;
             _updateLoadMoreButton(container);
             initialLoadDone = true;
+            shownFor = session.session_id;
             keepFirstPage(session.session_id, data.messages, data.total, historyStart);
         } else {
             // Poll — append new messages at the bottom.
@@ -120,9 +124,10 @@ function _renderHistoryReply(container, session, data) {
         }
         historyMessageCount = data.total;
     } else if (!initialLoadDone) {
-        container.innerHTML = "";
+        clearMessages(container);
         historyHasMore = false;
         initialLoadDone = true;
+        shownFor = session.session_id;
         _updateLoadMoreButton(container);
     }
 }
@@ -136,7 +141,7 @@ function _showHistoryError(container) {
     const retryBtn = container.querySelector('.chat-retry-btn');
     if (retryBtn) {
         retryBtn.onclick = () => {
-            container.innerHTML = '<div class="loading-indicator" role="status">Loading conversation…</div>';
+            setMessagesHtml(container, '<div class="loading-indicator" role="status">Loading conversation…</div>');
             refreshInFlight = -1;
             refreshLiveHistory();
         };
@@ -161,8 +166,8 @@ export async function refreshLiveHistory() {
     }
 
     // Show loading indicator on first load
-    if (!initialLoadDone && !container.querySelector('.loading-indicator') && !container.querySelector('.chat-load-error') && container.children.length === 0) {
-        container.innerHTML = '<div class="loading-indicator" role="status">Loading conversation…</div>';
+    if (!initialLoadDone && !container.querySelector('.loading-indicator') && !container.querySelector('.chat-load-error') && !container.querySelector(':scope > :not(.chat-earlier)')) {
+        setMessagesHtml(container, '<div class="loading-indicator" role="status">Loading conversation…</div>');
     }
 
     const params = _historyParams(session);
@@ -215,9 +220,11 @@ export async function refreshLiveHistory() {
 
         // The transcript is shorter than what this client holds (it was cut or replaced while the agent was away, or a kept
         // page outlived it): forget what is shown and load it again from its start.
-        if (initialLoadDone && data.total < historyMessageCount) {
+        const replaced = initialLoadDone && shownFor && shownFor !== session.session_id; // the agent was restarted: this is another session's transcript
+        if (initialLoadDone && (data.total < historyMessageCount || replaced)) {
             keptPages.delete(session.session_id);
-            container.innerHTML = "";
+            if (replaced) { freezeEarlier(container); frozenFor = session.session_id; } else clearMessages(container);
+            shownFor = '';
             historyMessageCount = 0;
             historyStart = 0;
             historyHasMore = false;
@@ -253,7 +260,7 @@ let _historyBusyRetry = null;
 function _showHistoryBusy(container, resp, server, generation) {
     let el = container.querySelector(':scope > .loading-indicator');
     if (!el) {
-        container.innerHTML = '<div class="loading-indicator"></div>';
+        setMessagesHtml(container, '<div class="loading-indicator"></div>');
         el = container.querySelector(':scope > .loading-indicator');
     }
     el.classList.add('chat-history-busy');
@@ -386,7 +393,7 @@ async function _loadMoreHistory(generation) {
 
             // Find the insertion point (after the Load More button)
             const loadMoreBtn = container.querySelector(".load-more-btn");
-            const refNode = loadMoreBtn ? loadMoreBtn.nextSibling : container.firstChild;
+            const refNode = loadMoreBtn ? loadMoreBtn.nextSibling : messagesStart(container);
 
             const lastOlder = temp.lastElementChild;
             while (temp.firstChild) {
@@ -447,7 +454,7 @@ function _updateLoadMoreButton(container) {
             btn.className = "btn load-more-btn chat-history-sentinel";
             btn.textContent = "Load older messages";
             btn.onclick = loadMoreHistory;
-            container.insertBefore(btn, container.firstChild);
+            container.insertBefore(btn, messagesStart(container));
             observeSentinel(container, btn);
         }
     } else if (btn) {
@@ -483,10 +490,45 @@ export function stopLiveHistoryPoll() {
     }
 }
 
+/** The first node of the current session's messages: the earlier conversation of a restarted agent (#10297) stays above it. */
+function messagesStart(container) {
+    const earlier = container.querySelector(':scope > .chat-earlier');
+    return earlier ? earlier.nextSibling : container.firstChild;
+}
+
+/** Replaces the current session's messages with a note (a spinner), leaving an earlier session's conversation above it. */
+function setMessagesHtml(container, html) {
+    clearMessages(container);
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+/** Empties the current session's messages and leaves what an earlier session of this agent said. */
+function clearMessages(container) {
+    for (const n of [...container.childNodes]) if (!(n.classList && n.classList.contains('chat-earlier'))) n.remove();
+}
+
+/** A restart gives the agent a new transcript: what the chat showed stays above, as a quiet block with a line saying so, and is never reloaded or matched against the new messages. */
+function freezeEarlier(container) {
+    let earlier = container.querySelector(':scope > .chat-earlier');
+    const old = [...container.childNodes].filter(n => n !== earlier && !(n.classList && (n.classList.contains('load-more-btn') || n.classList.contains('loading-indicator') || n.classList.contains('chat-load-error'))));
+    if (!old.length && !earlier) return;
+    if (!earlier) { earlier = document.createElement('div'); earlier.className = 'chat-earlier'; earlier.setAttribute('role', 'group'); earlier.setAttribute('aria-label', 'Earlier conversation'); }
+    for (const n of old) {
+        if (n.nodeType === 1) { n.removeAttribute('data-msg-key'); n.querySelectorAll('[data-msg-key]').forEach(e => e.removeAttribute('data-msg-key')); }
+        earlier.appendChild(n);
+    }
+    const line = document.createElement('div'); line.className = 'chat-earlier-line'; line.textContent = 'Restarted: a new conversation starts here';
+    earlier.appendChild(line);
+    clearMessages(container);
+    container.prepend(earlier);
+}
+
 // Reset transcript state when the selected live session changes. A restart
 // keeps the same pane but allocates a new Coral session ID; callers can ask us
 // to resume an already-running poll so the new transcript is loaded from zero.
-export function resetLiveHistory({ resume = false } = {}) {
+export function resetLiveHistory({ resume = false, keepEarlier = false, forSession = '' } = {}) {
+    if (keepEarlier && forSession && (shownFor === forSession || frozenFor === forSession)) return; // the chat already shows or loads the replacement: nothing of it is the earlier conversation
+    shownFor = ''; frozenFor = '';
     if (!resume) forgetReplies(); // another agent: what was waiting to be said belongs to the one before
     const wasPolling = !!historyPollInterval;
     stopLiveHistoryPoll();
@@ -505,7 +547,7 @@ export function resetLiveHistory({ resume = false } = {}) {
         sentinelObserver = null;
     }
     const container = document.getElementById("live-history-messages");
-    if (container) container.innerHTML = "";
+    if (container) { if (keepEarlier) freezeEarlier(container); else container.innerHTML = ""; }
     historyGeneration++;
     refreshInFlight = -1;
     // A new chat opens at the bottom. Only scroll events set autoScroll, and
