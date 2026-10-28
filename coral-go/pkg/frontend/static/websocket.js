@@ -16,7 +16,6 @@ import { updateChangedFileCount } from './changed_files.js';
 import { showNotificationToast, showWorkflowNotification, showAlertNotification, escapeHtml, dbg } from './utils.js';
 import { serverWsBase, identityKey, sessionServer, isCloud } from './server_base.js';
 import { updateHeaderContext } from './header_context.js';
-import { noteAttention, KIND_NEEDS_INPUT, KIND_REPLY } from './attention.js';
 import { deriveSessionState } from './session_state.js';
 import { isPopout, popoutAllowsToastFor, popoutUpdateFromSession, popoutHandleSessionsTick, formatTerminalLabel } from './popout.js';
 import { applySleepingView } from './sleeping_view.js';
@@ -225,7 +224,8 @@ function _raiseNeedsInputAlert(s, id) {
     showNotificationToast(label, detail, openSession);
     // Opt-in desktop alert while this tab is in the background; names only.
     const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
-    noteAttention(KIND_NEEDS_INPUT, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession });
+    // attention.js is read when the first alert is due, not at start (the start weight is guarded): the count it keeps is only ever needed from then on
+    importOnce('./attention.js').then(m => m.noteAttention(m.KIND_NEEDS_INPUT, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
 }
 
 /** An agent's turn just ended and it awaits its person: a count in the tab title and, when this browser wants them, a desktop alert; only while this tab is in the background (#10068). Names only. */
@@ -236,7 +236,7 @@ function _raiseReplyAlert(s, id) {
     const sessionSrv = sessionServer(s);
     const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv));
     const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
-    noteAttention(KIND_REPLY, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession });
+    importOnce('./attention.js').then(m => m.noteAttention(m.KIND_REPLY, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession })).catch(() => {});
 }
 
 /** A Codex row whose request is the agent's own approval request (its PermissionRequest hook), which Codex's reviewer may settle by itself. */
