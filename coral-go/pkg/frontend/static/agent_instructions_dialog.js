@@ -32,7 +32,7 @@ export function openInstructionsDialog(label, opts) {
     form.addEventListener('submit', async e => {
         e.preventDefault();
         err.hidden = true;
-        if (bytes(box.value) > MAX_BYTES) { err.textContent = `That is too long: at most ${MAX_BYTES.toLocaleString('en-US')} characters.`; err.hidden = false; box.setAttribute('aria-invalid', 'true'); box.focus(); return; }
+        if (bytes(box.value) > MAX_BYTES) { err.textContent = `That is too long: at most ${MAX_BYTES.toLocaleString('en-US')} bytes (a plain letter is one byte; an accented letter or an emoji is more).`; err.hidden = false; box.setAttribute('aria-invalid', 'true'); box.focus(); return; }
         box.removeAttribute('aria-invalid');
         save.disabled = true; cancel.disabled = true; dialog.dataset.busy = '1';
         let res;

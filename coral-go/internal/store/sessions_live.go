@@ -469,12 +469,16 @@ func (s *SessionStore) SetIcon(ctx context.Context, sessionID string, icon *stri
 	return err
 }
 
-// SetPrompt stores what a live session is told when it starts again (its Behavior prompt, which a restart reads); nil clears it.
-func (s *SessionStore) SetPrompt(ctx context.Context, sessionID string, prompt *string) error {
-	_, err := s.db.ExecContext(ctx,
+// SetPrompt stores what a live session is told when it starts again (its Behavior prompt, which a restart reads); nil clears it. found is false when no live session has that id.
+func (s *SessionStore) SetPrompt(ctx context.Context, sessionID string, prompt *string) (found bool, err error) {
+	res, err := s.db.ExecContext(ctx,
 		"UPDATE live_sessions SET prompt = ? WHERE session_id = ?",
 		prompt, sessionID)
-	return err
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // UpdateContextWindow updates the context window and optionally the model for a live session.
