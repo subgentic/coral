@@ -83,8 +83,8 @@ const SLEEPING_PLACEHOLDER = '';
         assert.match(sb.summary || '', /^Archived \(5\)$/, `one 'Archived (5)' row (got ${sb.summary})`);
         assert.equal(sb.expanded, 'false', 'collapsed by default');
         assert.equal(sb.archived.length, 0, 'no archived rows while collapsed');
-        assert.ok(sb.sleepingSummaries.every(t => !/\b[2-9] sleeping/.test(t)), `team-one's sleeping count excludes archived (${JSON.stringify(sb.sleepingSummaries)})`);
-        assert.ok(sb.sleepingSummaries.some(t => /^1 sleeping agent$/.test(t)), `team-one shows '1 sleeping agent' (${JSON.stringify(sb.sleepingSummaries)})`);
+        assert.equal(sb.sleepingSummaries.length, 0, `team-one's one sleeper is a row, not a folded line (#10062): ${JSON.stringify(sb.sleepingSummaries)}`);
+        assert.ok(sb.main.includes('t1-sleeper-id'), `team-one's sleeping agent is a main row, archived ones are not (${JSON.stringify(sb.main)})`);
         console.log(`   ✓ main list clean, 'Archived (5)' collapsed, team-one: 1 sleeping`);
 
         await ev(`document.querySelector('#live-sessions-list .archived-summary-row').click()`);
@@ -189,7 +189,7 @@ const SLEEPING_PLACEHOLDER = '';
         assert.equal(await ev('window.__selCalls'), 0, 'Unarchive switches the view in place (no re-select)');
         sb = await sidebar();
         assert.ok(!sb.archived.some(x => x.sid === 't1-arch-a-id'), 'row left the Archived section');
-        assert.ok(sb.sleepingSummaries.some(t => /^2 sleeping agents$/.test(t)), `team-one now has 2 sleeping (${JSON.stringify(sb.sleepingSummaries)})`);
+        assert.ok(sb.main.includes('t1-sleeper-id') && sb.main.includes('t1-arch-a-id'), `team-one now has 2 sleeping, both rows (${JSON.stringify(sb.main)})`);
         console.log('   ✓ unarchived in place: sleeping composer, row back in team-one (2 sleeping)');
 
         console.log('6. Wake on an archived agent wakes and unarchives it');
