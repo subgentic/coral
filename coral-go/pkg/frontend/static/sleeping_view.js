@@ -7,7 +7,7 @@
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { resolveSessionIdentity } from './session_state.js';
-import { askedBefore, dismissAsked } from './asked_before_restart.js';
+import { askedBefore, dismissAsked, askedWords } from './asked_before_restart.js';
 
 const lastState = new Map(); // session_id -> the words its state last had, to say a change once (#6213)
 let stateFlip = false;
@@ -65,7 +65,7 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
     const asked = sleeping && row ? askedBefore(row) : null;
     const askedBox = document.getElementById('sleeping-composer-asked'), askedText = document.getElementById('sleeping-composer-asked-text');
     if (askedBox && askedText) {
-        const words = asked ? `Asked before Coral restarted: ${asked.text}` : '';
+        const words = asked ? askedWords(asked) : '';
         if (askedText.textContent !== words) askedText.textContent = words;
         askedBox.hidden = !asked;
     }

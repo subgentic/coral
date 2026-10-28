@@ -245,6 +245,7 @@ type liveExtra struct {
 // agents not yet subscribed: board name and display name) and the extra fields.
 type liveIndex struct {
 	sleeping, archived map[string]bool
+	afterRestart       map[string]bool // asleep because Coral stopped (sleep reason coral_stopped, #10368)
 	createdAt          map[string]string
 	boardNames         map[string][2]string
 	extras             map[string]liveExtra
@@ -254,11 +255,12 @@ type liveIndex struct {
 // newLiveIndex indexes the authoritative snapshot of the live sessions (a second, ignored query failure used to
 // erase team names and other identity metadata).
 func newLiveIndex(allLive []store.LiveSession) liveIndex {
-	lv := liveIndex{sleeping: map[string]bool{}, archived: map[string]bool{}, createdAt: map[string]string{},
+	lv := liveIndex{sleeping: map[string]bool{}, archived: map[string]bool{}, afterRestart: map[string]bool{}, createdAt: map[string]string{},
 		boardNames: map[string][2]string{}, extras: map[string]liveExtra{}, launchPath: map[string]string{}}
 	for _, session := range allLive {
 		lv.sleeping[session.SessionID] = session.IsSleeping == 1
 		lv.archived[session.SessionID] = session.IsArchived == 1
+		lv.afterRestart[session.SessionID] = sleepReason(session) == store.SleepReasonCoralStopped
 		lv.launchPath[session.SessionID] = ptr.Value(session.Backend)
 		// Launch times, used to bound how long after launch a stalled start is
 		// reported. See agentNeverStarted.
@@ -461,7 +463,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		displayHint, displayHintAt = h.displayActivityHint(agent.AgentType, agent.TmuxSession, sid, state, d.stateEvents[sid], time.Now())
 	}
 	// what a sleeping agent had open when it went away: {text, kind, at}, nil for any other (#10368)
-	askedBefore := askedBeforeRestart(d.stateEvents[sid], lv.sleeping[sid], lv.archived[sid])
+	askedBefore := askedBeforeRestart(d.stateEvents[sid], lv.sleeping[sid], lv.archived[sid], lv.afterRestart[sid])
 	entry := map[string]any{
 		"name":                  agent.AgentName,
 		"agent_type":            agent.AgentType,
@@ -604,7 +606,7 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"waiting_summary":       nil,
 			"waiting_since":         nil,
 			"waiting_kind":          nil,
-			"asked_before_restart":  askedBeforeRestart(asleepEvents[ls.SessionID], true, ls.IsArchived == 1),
+			"asked_before_restart":  askedBeforeRestart(asleepEvents[ls.SessionID], true, ls.IsArchived == 1, sleepReason(ls) == store.SleepReasonCoralStopped),
 			"working":               false,
 			"stuck":                 false,
 			"changed_file_count":    0,
