@@ -12,7 +12,7 @@ Each answer names the button as it reads on screen. The topics after this one go
 
 ## Change the default model
 
-1. Click the gear at the top right to open **Settings**, then **Agents**.
+1. Click the gear at the top right (on a phone, the menu) to open **Settings**, then **Agents**.
 2. Under **Default models**, pick a model for each agent type, or **Other…** to type any model id.
 3. Press **Save settings**.
 
