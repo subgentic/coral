@@ -1,12 +1,20 @@
 package startup
 
 import (
+	"context"
+	"net"
+	"os"
+	"path/filepath"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #9936: a headless first start (a cloud machine with a Coral Hub credential and nobody at a terminal) takes its Terms from the Hub: the start goes on only when the bootstrap ended with
@@ -39,27 +47,78 @@ func TestHubTermsGate(t *testing.T) {
 	}
 }
 
-func TestEnforceHubTermsExitsOnlyWhenTheHubDidNotConfirm(t *testing.T) {
-	oldExit, oldAccepted := exitProcess, eulaAcceptedHere
-	t.Cleanup(func() { exitProcess, eulaAcceptedHere = oldExit, oldAccepted })
+// A start that took its Terms locally is not touched: no database is needed, nothing is read.
+func TestHubTermsFirstLeavesALocalAcceptanceAlone(t *testing.T) {
+	code, ok := hubTermsFirst(context.Background(), nil, &config.Config{})
+	assert.True(t, ok)
+	assert.Zero(t, code)
+}
+
+// #9936: a start that left its Terms to the Hub enrolls BEFORE anything listens or starts, so a prod build serves nothing while the terms are unconfirmed. With no Hub to confirm them it ends,
+// non-zero, with no listener bound.
+func TestStartLeavingTheTermsToTheHubServesNothingWhenTheyAreNotConfirmed(t *testing.T) {
+	oldExit, oldAccepted, oldPrompt := exitProcess, eulaAcceptedHere, promptTerms
+	t.Cleanup(func() { exitProcess, eulaAcceptedHere, promptTerms = oldExit, oldAccepted, oldPrompt })
 	var exits []int
 	exitProcess = func(code int) { exits = append(exits, code) }
-
-	// A start that took its Terms locally never exits here, whatever the bootstrap did.
 	eulaAcceptedHere = func() bool { return false }
-	enforceHubTerms(&config.Config{}, cloud.BootstrapResult{Status: cloud.BootstrapRetryLater})
-	assert.Empty(t, exits)
+	promptTerms = func() bool { return false } // nobody at a terminal
 
-	// A start that left its Terms to the Hub: confirmed (the marker is written), it goes on.
-	cfg := &config.Config{TermsViaHub: true}
-	eulaAcceptedHere = func() bool { return true }
-	enforceHubTerms(cfg, cloud.BootstrapResult{Status: cloud.BootstrapEnrolled})
-	assert.Empty(t, exits)
+	iso := t.TempDir()
+	for _, k := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(k, iso)
+	}
+	t.Setenv("HOME", filepath.Join(iso, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(iso, "home"))
+	home := filepath.Join(iso, "data")
+	t.Setenv("CORAL_DATA_DIR", home)
+	t.Setenv("CORAL_NO_DEMO_SEED", "1")
+	t.Setenv("CORAL_NO_WELCOME", "1")
+	t.Setenv("CORAL_TELEMETRY_DISABLED", "1")
+	t.Setenv("CORAL_CLOUD_URL", "")
+	require.NoError(t, os.MkdirAll(filepath.Join(iso, "home"), 0o700))
+	require.NoError(t, os.MkdirAll(home, 0o700))
 
-	// Not confirmed: it ends, with the code of what happened.
+	cfg := config.Load(home)
+	cfg.Host = "127.0.0.1"
+	cfg.Port = freePort(t)
+	cfg.CloudURL = "" // no Hub to confirm anything
+	cfg.TermsViaHub = true
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rs, err := Start(ctx, cfg, Options{BackendType: "pty"})
+	require.Error(t, err)
+	assert.Nil(t, rs)
+	assert.ErrorIs(t, err, errTermsNotConfirmed)
+	assert.Equal(t, []int{2}, exits, "the process ends with the bootstrap's code for no Hub")
+
+	conn, derr := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Port)), time.Second)
+	if derr == nil {
+		conn.Close()
+	}
+	assert.Error(t, derr, "nothing was listening: the terms came first")
+}
+
+// A person at a terminal can still accept the terms there when the Hub did not confirm them (a credential that cannot be used, a Hub that is down): the start asks as it always did, and goes on if they say yes.
+func TestAPersonAtATerminalCanAcceptWhenTheHubDoesNot(t *testing.T) {
+	oldAccepted, oldPrompt := eulaAcceptedHere, promptTerms
+	t.Cleanup(func() { eulaAcceptedHere, promptTerms = oldAccepted, oldPrompt })
 	eulaAcceptedHere = func() bool { return false }
-	enforceHubTerms(cfg, cloud.BootstrapResult{Status: cloud.BootstrapRetryLater})
-	enforceHubTerms(cfg, cloud.BootstrapResult{Status: cloud.BootstrapRefused})
-	enforceHubTerms(cfg, cloud.BootstrapResult{Status: cloud.BootstrapNoHub})
-	assert.Equal(t, []int{4, 1, 2}, exits)
+	asked := 0
+	promptTerms = func() bool { asked++; return true }
+
+	home := t.TempDir()
+	db, err := store.OpenWithKey(context.Background(), filepath.Join(home, "sessions.db"), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	cfg := &config.Config{TermsViaHub: true} // no Hub configured: the Hub cannot confirm anything
+	code, ok := hubTermsFirst(context.Background(), db, cfg)
+	assert.True(t, ok, "they accepted in the terminal")
+	assert.Zero(t, code)
+	assert.Equal(t, 1, asked)
+
+	promptTerms = func() bool { asked++; return false }
+	code, ok = hubTermsFirst(context.Background(), db, cfg)
+	assert.False(t, ok, "they declined, or there is no terminal")
+	assert.Equal(t, 2, code)
 }

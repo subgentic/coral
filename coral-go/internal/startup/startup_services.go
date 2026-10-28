@@ -2,6 +2,7 @@ package startup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/backendchoice"
 	"github.com/subgentic/coral/internal/coralnames"
@@ -390,16 +391,21 @@ type cloudAttacher interface {
 	EndHubSessions(ctx context.Context, why string)
 }
 
-func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, srv cloudAttacher, ss *store.SessionStore) {
-	hubURL := ""
-	if strings.TrimSpace(cfg.CloudURL) != "" {
-		u, err := cloud.NormalizeHubURL(cfg.CloudURL)
-		if err != nil {
-			log.Printf("[CLOUD] ignoring --cloud-url: %v", err)
-		} else {
-			hubURL = u
-		}
+// configuredHubURL is the normalized origin of the Coral Hub this start names (--cloud-url, the release tier's default), or "" for none (a bad one is logged and ignored).
+func configuredHubURL(cfg *config.Config) string {
+	if strings.TrimSpace(cfg.CloudURL) == "" {
+		return ""
 	}
+	u, err := cloud.NormalizeHubURL(cfg.CloudURL)
+	if err != nil {
+		log.Printf("[CLOUD] ignoring --cloud-url: %v", err)
+		return ""
+	}
+	return u
+}
+
+func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, srv cloudAttacher, ss *store.SessionStore) {
+	hubURL := configuredHubURL(cfg)
 	keywordSwitch := routes.RedactKeywordsFromSettings(ss)
 	routes.SetKeywordSwitch(keywordSwitch) // the hub-bound paths of the routes read the same switch (#5172)
 	mgr := cloud.New(cloud.Options{
@@ -435,25 +441,26 @@ func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, 
 		if cfg.BootstrapFile != "" {
 			mgr.Bootstrap(ctx, ss, hostname, src) // records no_hub_configured; reads nothing
 		}
-		if cfg.TermsViaHub {
-			enforceHubTerms(cfg, cloud.BootstrapResult{Status: cloud.BootstrapNoHub, Detail: "no Coral Hub is configured (--cloud-url), so nothing can confirm the terms"})
-		}
 		return
 	}
 	log.Printf("[CLOUD] Coral Hub: %s (nothing is sent until this server is connected: Settings > Coral Hub)", hubURL)
 	safeGo(ctx, "cloud_connector", func() {
-		res := mgr.Bootstrap(ctx, ss, hostname, src)
-		if ctx.Err() == nil {
-			enforceHubTerms(cfg, res)
+		if !cfg.TermsViaHub { // a start that left its Terms to the Hub enrolled before anything started (hubTermsFirst), with this same credential
+			mgr.Bootstrap(ctx, ss, hostname, src)
 		}
 		mgr.Run(ctx)
 	})
 }
 
 // exitProcess ends the process with a status (a variable for the tests).
+// errTermsNotConfirmed is Start's error when a start that left its Terms to the Hub could not get them confirmed (the process exits with the bootstrap's code; the error is for a caller that stays).
+var errTermsNotConfirmed = errors.New("the Coral Hub did not confirm the Terms of Service")
+
 var (
 	exitProcess      = logexit.Exit
 	eulaAcceptedHere = license.IsEULAAccepted // read after the bootstrap: the Hub's confirmation writes the marker
+	// promptTerms is the terminal prompt the start falls back to when the Hub did not confirm the terms: a person at a terminal can still accept them there; with no terminal it says so and answers no.
+	promptTerms = func() bool { return license.CheckAndPromptEULA(license.TerminalEULADialog) }
 )
 
 // hubTermsGate decides, once a bootstrap has run, whether a start whose Terms were left to the Hub (config TermsViaHub) may go on: only when the terms are now recorded as accepted
@@ -469,20 +476,37 @@ func hubTermsGate(res cloud.BootstrapResult, accepted bool) (code int, stop bool
 	return 3, true
 }
 
-// enforceHubTerms applies hubTermsGate to a start that took the Terms from the Hub: fail closed, with a line saying why on stderr and in the log (#9936).
-func enforceHubTerms(cfg *config.Config, res cloud.BootstrapResult) {
+// hubTermsFirst runs, before the database is served from, the enrollment that a start leaving its Terms to the Hub depends on (config TermsViaHub, #9936): the credential is redeemed
+// now, with this binary's terms version, so a prod build serves nothing and starts nothing (no listener, no background service, no agent) until the Hub has confirmed it and the
+// acceptance is recorded. Not confirmed: ok is false, the reason is on stderr and in coral.log, and code is the bootstrap's own exit code. A start that took its Terms locally is not touched.
+func hubTermsFirst(ctx context.Context, db *store.DB, cfg *config.Config) (code int, ok bool) {
 	if !cfg.TermsViaHub {
-		return
+		return 0, true
+	}
+	res := cloud.BootstrapResult{Status: cloud.BootstrapNoHub, Detail: "no Coral Hub is configured (--cloud-url), so nothing can confirm the terms"}
+	if hubURL := configuredHubURL(cfg); hubURL != "" {
+		hostname, _ := os.Hostname()
+		res = cloud.Bootstrap(ctx, cloud.BootstrapOptions{
+			HubURL:   hubURL,
+			Store:    store.NewCloudStore(db, store.NewRemoteServerStore(db, cfg.CoralDir())),
+			Settings: store.NewSessionStore(db),
+			Hostname: hostname,
+			Logger:   slog.Default(),
+		}, cloud.CredentialSource{WellKnown: cfg.BootstrapFile == "", File: cfg.BootstrapFile, ProofFile: cfg.ProofFile})
 	}
 	code, stop := hubTermsGate(res, eulaAcceptedHere())
 	if !stop {
 		log.Println("[EULA] the Coral Hub confirmed this terms version")
-		return
+		return 0, true
+	}
+	log.Printf("[EULA] the Coral Hub did not confirm the terms (status %s)", res.Status)
+	if promptTerms() { // somebody is at a terminal after all: the terms are theirs to accept there, as on any first start
+		return 0, true
 	}
 	msg := "Terms of Service were not confirmed by Coral Hub (status " + res.Status + "); Coral is not started. Accept them by running coral once in a terminal."
 	log.Println("[EULA] " + msg)
 	fmt.Fprintln(os.Stderr, "coral: "+msg)
-	exitProcess(code)
+	return code, false
 }
 
 // resolveBackend picks this run's terminal backend without asking what is running (the pure rules are in backendchoice, #6064).
