@@ -442,3 +442,22 @@ func TestRunWhoseTerminalSitsAtAnIdleShellWithNoEventIsFailedAsNeverStarted(t *t
 		})
 	}
 }
+
+// #10276: a job saved to run without a worktree works in its folder itself, which need not be a git repository; every other job still gets a worktree of its own.
+func TestJobWithoutAWorktreeRunsInItsFolder(t *testing.T) {
+	assert.True(t, jobRunConfig(store.ScheduledJob{RepoPath: "/r"}).createWorktree, "a job says nothing: a worktree")
+	assert.False(t, jobRunConfig(store.ScheduledJob{RepoPath: "/r", NoWorktree: 1}).createWorktree)
+
+	e := newExitEnv(t, "exit-no-worktree")
+	plain := t.TempDir() // not a git repository
+	launched := false
+	e.launch(t, func(context.Context) error { launched = true; return nil })
+	job := store.ScheduledJob{AgentType: "claude", RepoPath: plain, NoWorktree: 1, CleanupWorktree: 1}
+	e.s.launchAndWatch(e.runID, job, jobRunConfig(job))
+	r := e.run(t)
+	assert.Equal(t, "completed", r.Status, "no worktree is made, so a plain folder is no failure: %v", r.ErrorMsg)
+	assert.True(t, launched)
+	assert.Equal(t, plain, e.dir, "the agent works in the folder itself")
+	_, err := os.Stat(plain)
+	assert.NoError(t, err, "and the folder is not removed with a worktree")
+}
