@@ -51,9 +51,9 @@ export function renderInspection(data, workingMode) {
             const defaultInst = role.default_instructions || '';
             const teamInst = workingMode?.instructions?.trim();
             const composed = defaultInst + (teamInst ? `\n\nTeam working instructions:\n${teamInst}` : '') + '\n\n[+ per-task extra when supplied at creation]';
-            body = `${folded(role, null, 'Effective composed task preview (on first claim)', composed)}${folded(role, 'default_instructions', 'Default task instructions')}`;
+            body = `${folded(role, null, 'What an agent reads when it claims a task', composed)}${folded(role, 'default_instructions', 'Built-in task instructions')}`;
         } else {
-            body = folded(role, 'effective_system', 'Effective system') + folded(role, 'effective_action', 'Effective action') + folded(role, 'system_default', 'System default') + folded(role, 'action_default', 'Action default') + folded(role, 'override', 'Override');
+            body = folded(role, 'effective_system', 'What the agent is told first (in use)') + folded(role, 'effective_action', 'What it is asked to do each time (in use)') + folded(role, 'system_default', 'Built-in first message') + folded(role, 'action_default', 'Built-in request each time') + folded(role, 'override', 'Your replacement for both, if you set one');
         }
         return `<article class="prompt-inspection-card" data-role="${escapeAttr(key)}"${index ? ' hidden' : ''}>${head}${body}</article>`;
     }).join('');

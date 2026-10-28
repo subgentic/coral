@@ -37,7 +37,7 @@ const BASE = require('./test_base').BASE;
                 boxes: [...document.querySelectorAll('.prompt-inspection-content pre')].filter(p => getComputedStyle(p).overflowY !== 'visible').length,
                 hiddenPre: [...c.querySelectorAll('details.prompt-inspection-folded pre')].filter(p => vis(p)).length }; })()`);
         assert.deepEqual(pi.shown, []);
-        assert.deepEqual(pi.folded, [['Effective system', false], ['Effective action', false], ['System default', false], ['Action default', false], ['Override', false]]);
+        assert.deepEqual(pi.folded, [['What the agent is told first (in use)', false], ['What it is asked to do each time (in use)', false], ['Built-in first message', false], ['Built-in request each time', false], ['Your replacement for both, if you set one', false]]);
         assert.equal(pi.boxes, 0); assert.equal(pi.hiddenPre, 0, 'the folded blocks are closed');
         assert.equal(await ev(`document.querySelector('.sv-save').disabled`), true, 'the read-only group changes nothing: the bar\'s Save is off');
         const metadata = await ev(`(() => { const b = document.querySelector('.prompt-inspection-card:not([hidden]) .settings-info-btn'); const box = document.getElementById(b.getAttribute('aria-controls')); const before = box.hidden; b.click(); const result = {before, expanded:b.getAttribute('aria-expanded'), hidden:box.hidden, text:box.textContent}; b.click(); return result; })()`);
@@ -46,7 +46,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.__copied = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { window.__copied.push(t); return Promise.resolve(); } } }); document.querySelector('.prompt-inspection-copy').click(); true`);
         await waitFor(`window.__copied.length === 1`, 'one copy', 5000);
         const copied = await ev(`window.__copied[0]`);
-        for (const t of ['Effective system', 'Effective action', 'System default', 'Action default', 'Override']) assert.ok(copied.includes(t), `Copy takes the folded text too: ${t}`);
+        for (const t of ['What the agent is told first (in use)', 'What it is asked to do each time (in use)', 'Built-in first message', 'Built-in request each time', 'Your replacement for both, if you set one']) assert.ok(copied.includes(t), `Copy takes the folded text too: ${t}`);
         await ev(`document.querySelector('.prompt-inspection-folded > summary').click(); true`);
         assert.equal(await ev(`document.querySelector('.prompt-inspection-folded').open`), true, 'a folded block opens');
         assert.equal(await ev(`[...document.querySelectorAll('.prompt-inspection-content pre')].filter(p => getComputedStyle(p).overflowY !== 'visible').length`), 0, 'still no scroll box');

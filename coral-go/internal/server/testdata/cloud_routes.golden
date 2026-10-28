@@ -426,6 +426,7 @@ PUT /api/sessions/history/{sessionID}/notes never
 PUT /api/sessions/live/{name}/display-name interact
 PUT /api/sessions/live/{name}/file-content launch
 PUT /api/sessions/live/{name}/icon interact
+PUT /api/sessions/live/{name}/instructions never
 PUT /api/sessions/live/{name}/name-color interact
 PUT /api/settings never
 PUT /api/settings/git-diff-mode interact

@@ -70,7 +70,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     assert.ok(inspectionText.includes('Agent / worker'), 'Prompt inspection includes Agent / worker');
     assert.ok(inspectionText.includes('Task defaults'), 'Prompt inspection includes Task defaults');
     assert.ok(inspectionText.includes('Scope: Global role configuration; read-only here'), 'Prompt inspection includes scope');
-    assert.ok(inspectionText.includes('Effective composed task preview (on first claim)'), 'Prompt inspection includes composed preview');
+    assert.ok(inspectionText.includes('What an agent reads when it claims a task'), 'Prompt inspection includes composed preview');
 
     // Check effective system prompt contains team-alpha
     const effectiveSystem = await ev(`document.querySelectorAll('.prompt-inspection-card')[0].innerText`);

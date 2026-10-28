@@ -5,7 +5,7 @@ import { showTeamAvailabilityWorkspace } from './team_availability.js';
 import { state } from './state.js';
 import { loadLiveSessions } from './api.js';
 import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal } from './controls.js';
-import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, setAgentIcon, toggleChatFlag } from './sessions.js';
+import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, editInstructions, setAgentIcon, toggleChatFlag } from './sessions.js';
 import { KILL_LOG_NOTE_MANY, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
 import { toggleBrowser, browserNavigateTo, browserNavigateUp, browserSelectRecent, browserUse } from './browser.js';
 import { toggleAgenticPanel, toggleSidebarRail, focusSidebarSearch } from './sidebar.js';
@@ -243,7 +243,7 @@ Object.assign(window, {
     launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal,
     exportPersonas, importPersonas, importTeamTemplates,
     // sessions
-    selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, setAgentIcon,
+    selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, editInstructions, setAgentIcon,
     // xterm
     connectTerminalWs, disconnectTerminalWs,
     // notes

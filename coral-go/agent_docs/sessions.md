@@ -686,6 +686,22 @@ Operator only: an agent's session token is refused (403 `forbidden_for_agent`). 
 {"ok": true, "display_name": "My Custom Name"}
 ```
 
+### PUT `/api/sessions/live/{name}/instructions`
+
+Save the instructions an agent is given the next time it starts (its Behavior prompt, which a restart reads). The running agent is not touched. An empty `instructions` clears them; at most 20,000 bytes.
+
+Operator only: an agent's session token is refused (403 `forbidden_for_agent`), and Coral Hub never reaches it.
+
+**Request Body:**
+```json
+{"session_id": "abc123", "instructions": "Review only; never push."}
+```
+
+**Response:**
+```json
+{"ok": true, "applies": "at the next restart"}
+```
+
 ### PUT `/api/sessions/live/{name}/icon`
 
 Set or clear the emoji icon for a session.

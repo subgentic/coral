@@ -310,6 +310,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/resume", sessHandler.Resume)
 	r.Post("/api/sessions/live/{name}/attach", sessHandler.Attach)
 	r.Put("/api/sessions/live/{name}/display-name", sessHandler.SetDisplayName)
+	r.Put("/api/sessions/live/{name}/instructions", sessHandler.SetInstructions) // what the agent is told at its next restart (#10133)
 	r.Get("/api/sessions/live/{name}/file-content", sessHandler.GetFileContent)
 	r.Get("/api/sessions/live/{name}/resolve-path", sessHandler.ResolvePath)
 	r.Post("/api/sessions/live/{name}/open-in-editor", sessHandler.OpenInEditor)
