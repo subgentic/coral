@@ -462,6 +462,11 @@ func TestAvailabilityTaskNamesWhatItWaitsOn(t *testing.T) {
 	require.NoError(t, err)
 	waiting, err := h.bs.CreateTaskWithOpts(ctx, team, "Needs the first", "", "medium", "lead", &board.CreateTaskOpts{BlockedBy: []board.TaskDep{{TaskID: first.ID, BoardID: team}}}, "dev")
 	require.NoError(t, err)
+	// a blocker on another board is named with its board (#10287): its number alone would read as a task of this team
+	other, err := h.bs.CreateTask(ctx, "coral-hub", "Hub work", "", "high", "lead", "someone")
+	require.NoError(t, err)
+	across, err := h.bs.CreateTaskWithOpts(ctx, team, "Needs the hub", "", "medium", "lead", &board.CreateTaskOpts{BlockedBy: []board.TaskDep{{TaskID: other.ID, BoardID: "coral-hub"}}}, "dev")
+	require.NoError(t, err)
 	r := chi.NewRouter()
 	r.Get("/api/board/{project}/status", h.TeamAvailability)
 	w := httptest.NewRecorder()
@@ -479,4 +484,7 @@ func TestAvailabilityTaskNamesWhatItWaitsOn(t *testing.T) {
 	}
 	require.Equal(t, []int64{first.ID}, byID[waiting.ID].WaitingOn, "the blocked task names its open blocker")
 	require.Empty(t, byID[free.ID].WaitingOn, "a task nothing blocks waits on no task")
+	require.Empty(t, byID[across.ID].WaitingOn, "a blocker on another board is not a task of this one")
+	require.Equal(t, []availabilityBlocker{{BoardID: "coral-hub", ID: other.ID}}, byID[across.ID].WaitingOnElsewhere, "it is named with its board")
+	require.Empty(t, byID[waiting.ID].WaitingOnElsewhere, "a blocker on this board is not elsewhere")
 }
