@@ -121,7 +121,7 @@ export function serverVersion(e) {
     return typeof v === 'string' ? v.trim() : '';
 }
 
-/** Multi-line hover text for a server: status, address, agent count, last contact. */
+/** Multi-line hover text for a server: status, address, agent count, last seen. */
 export function serverHoverText(id) {
     const e = serverEntry(id);
     const m = statusMeta(e.status);
@@ -135,7 +135,7 @@ export function serverHoverText(id) {
     lines.push(local ? 'This server (the hub)' : (e.url || e.id));
     lines.push(`${count} agent${count === 1 ? '' : 's'}`);
     if (!local && serverVersion(e)) lines.push(`Version ${serverVersion(e)}`);
-    if (!local) lines.push(`Last contact: ${formatLastSeen(e.last_seen)}`);
+    if (!local) lines.push(`Last seen: ${formatLastSeen(e.last_seen)}`);
     if (!local && e.status !== 'online' && e.last_error) lines.push(`Error: ${e.last_error}`);
     if (!local && e.status !== 'online') lines.push(m.hint);
     const notice = local ? null : updateNotice(e);
@@ -223,7 +223,7 @@ export function serverDetailsHtml(e) {
         local ? ['Server', 'This server (the hub)'] : (e.url ? ['Address', e.url] : null),
         ['Agents', String(count)],
         full ? ['Version', shortVersion(full), full] : null,
-        !local ? ['Last contact', formatLastSeen(e.last_seen)] : null,
+        !local ? ['Last seen', formatLastSeen(e.last_seen)] : null,
         !local && e.status !== 'online' && e.last_error ? ['Error', e.last_error] : null,
     ].filter(Boolean);
     const dd = ([k, v, fullText]) => (fullText && fullText !== v

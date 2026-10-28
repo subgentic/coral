@@ -337,7 +337,7 @@ const contrast = (a, b) => {
         await ev(`document.querySelector('#server-row-r1 [data-action=open]').click(); true`); // the facts are on the server's page (#7638)
         await waitFor(`!!document.querySelector('.servers-page .servers-fact')`, 'the self-hosted r1 page', 3000);
         const sh = await ev(`(() => { const f = Object.fromEntries([...document.querySelectorAll('.servers-fact')].map(x => [x.querySelector('dt').textContent, x.querySelector('dd').textContent.replace(/\\s+/g, ' ').trim()])); return { meta: [f.URL, f.Coral, f.Agents, f['Last contact']].filter(Boolean).join(' · '), badges: document.querySelectorAll('#servers-view a.server-update-badge').length }; })()`);
-        assert.match(sh.meta, /^https:\/\/r1\.example:8420 · Coral 1\.4\.5 · 3 agents$/, `self-hosted facts: online per the feed, no 'last contact' (#3152) (${sh.meta})`);
+        assert.match(sh.meta, /^https:\/\/r1\.example:8420 · Coral 1\.4\.5 · 3 agents$/, `self-hosted facts: online per the feed, no 'last seen' (#3152) (${sh.meta})`);
         assert.equal(sh.badges, 0, 'self-hosted rows have no update badge');
         await ev(`(async () => { T.state.servers = []; (await import((window.__coralStatic||'/static/')+'servers_tab.js')).updateServersTabVisibility(); return true; })()`);
         t = await tabState();

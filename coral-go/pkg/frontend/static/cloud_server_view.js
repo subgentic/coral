@@ -1,6 +1,6 @@
 const { liveServer: liveOf, buildServersTable } = await importOnce('./server_table.js');
 /* Servers dialog for the Cloud Hub: the servers enrolled to this account.
- * List (name, online/offline, last contact), rename, "allow launching from the
+ * List (name, online/offline, last seen), rename, "allow launching from the
  * web" switch, revoke (confirmed in the dialog, never window.confirm), and the
  * enrollment instructions. All text from the server goes through textContent.
  *

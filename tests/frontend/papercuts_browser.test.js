@@ -174,9 +174,9 @@ const BASE = require('./test_base').BASE;
             return out;
         })()`);
         assert.match(rows.local, /^Coral 9\.9\.9 · (\d+( agents?)?)?$/, 'the This computer row shows its version and its agent count (the number alone, blank at zero): ' + rows.local);
-        assert.match(rows.r1meta, /Last contact\s*\d/, 'an unreachable server\'s page says last contact: ' + rows.r1meta);
+        assert.match(rows.r1meta, /Last seen\s*\d/, 'an unreachable server\'s page says last seen (#9798): ' + rows.r1meta);
         assert.equal(rows.r1hint, 'Is Coral running on that machine? Check the URL.');
-        console.log('PASS (14) Servers: This computer row version + agents; unreachable row explains and says last contact');
+        console.log('PASS (14) Servers: This computer row version + agents; unreachable row explains and says last seen');
 
         // ── (15) A view the user opens while the first list loads is not opened
         // again by the deep-link restore (it only restores the hash the page was
