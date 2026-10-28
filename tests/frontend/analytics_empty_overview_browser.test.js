@@ -13,8 +13,10 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`window.switchNavTab('tokens'); true`);
-            await waitFor(`document.querySelector('#cost-nav-list .row-btn[data-view="overview"]')?.getClientRects().length > 0`, 'the Analytics view list', 10000);
-            await ev(`document.querySelector('#cost-nav-list .row-btn[data-view="overview"]').click(); true`);
+            if (!mobile) { // a phone opens on Overview itself (#10064); a wide screen picks it from the list
+                await waitFor(`document.querySelector('#cost-nav-list .row-btn[data-view="overview"]')?.getClientRects().length > 0`, 'the Analytics view list', 10000);
+                await ev(`document.querySelector('#cost-nav-list .row-btn[data-view="overview"]').click(); true`);
+            }
             await waitFor(`!!document.querySelector('#cost-spend-chart .empty-state') && !/Loading/.test(document.getElementById('cost-spend-chart').textContent) && !!document.querySelector('#cost-series-overview .empty-state')`, `${w}: both empty states`, 15000);
             const t = await ev(`({ team: document.getElementById('cost-series-overview').textContent.trim(), cumulative: document.getElementById('cost-spend-chart').textContent.trim() })`);
             assert.equal(t.team, 'No data in this range yet. It appears once an agent has used tokens; try a longer range.', `${w}: Cost by team does not stay a bare heading`);
