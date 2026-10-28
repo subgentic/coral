@@ -36,7 +36,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(rows.length, NAMES.length);
         for (const r of rows) {
             assert.ok(NAMES.includes(r.name), 'the text is the whole name: ' + r.name);
-            assert.equal(r.title, r.name, 'the hover shows the full name'); assert.ok(r.aria.startsWith(r.name + ','), 'the accessible name carries the full name: ' + r.aria);
+            assert.equal(r.title, '', 'no native title (it covered the next row, #9822): the whole name is in the row\'s hover tip and name'); assert.ok(r.aria.startsWith(r.name + ','), 'the accessible name carries the full name: ' + r.aria);
             const cut = r.name.length - (r.tail || '').length;
             if (r.name.length > 16 && !PLAIN.includes(r.name)) {
                 assert.ok(r.split && r.name.endsWith(r.tail) && r.tailVisible && r.tail.length <= 10, 'its end is in view: ' + JSON.stringify(r));

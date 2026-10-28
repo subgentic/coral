@@ -89,7 +89,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             // A chip as the dropdown renders one for a tag on the folder.
             for (const [action, id] of [['folder-tag-remove', '7'], ['folder-tag-add', '8'], ['folder-tag-add', '0']]) {
                 const s = document.createElement('span'); s.setAttribute('data-on-click', action); s.dataset.folder = input.dataset.folder; s.dataset.tagId = id; dd.appendChild(s); s.click(); }
-            ft.hideFolderTagDropdown();`);
+            (window.__coral && 'hideFolderTagDropdown' in window.__coral ? window.__coral : window).hideFolderTagDropdown();`); // through the hook like the others: the stray ft module handle was left behind when the suite moved to window hooks
         check('a folder named with quotes, markup and an entity reaches the folder tag functions unchanged (a bad tag id does nothing)',
             JSON.stringify(folder) === JSON.stringify([['createAndAddFolderTag', HOSTILE], ['createAndAddFolderTag', HOSTILE], ['removeFolderTag', HOSTILE, 7], ['addFolderTag', HOSTILE, 8]]), JSON.stringify(folder));
 
