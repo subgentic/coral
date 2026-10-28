@@ -298,6 +298,15 @@ function _watchCostTables() {
     _nameCostTables();
 }
 
+/** The range line's comparison, "Last 24 hours · Change against the prior 24 hours": the dot is its own element, so a phone, where the line wraps, can leave it out and the comparison does not start a line with it (#10649). */
+function _setCompare(text) {
+    const el = document.getElementById('cost-compare-text');
+    if (!el) return;
+    if (!text) { el.replaceChildren(); return; }
+    const dot = document.createElement('span'); dot.className = 'cost-compare-sep'; dot.setAttribute('aria-hidden', 'true'); dot.textContent = ' \u00b7 ';
+    el.replaceChildren(dot, document.createTextNode(text));
+}
+
 export async function _refreshCostDashboard({ force = false } = {}) {
     _watchCostTables();
     const { costRange, providerRows, modelRows, thinkingRows, agentRows } = await importOnce('./cost_data.js'); // the range and the rows, pure (#8359); loaded when the page first refreshes, as the page's other lazy parts are
@@ -498,18 +507,18 @@ async function _refreshOverview() {
         const word = series.priorWord(document.getElementById('cost-time-range')?.value || 'day'), cur = series.bucketTotals(now), before = series.bucketTotals(prior);
         let compared = false;
         for (const [field, id] of Object.entries(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`), t = series.changeText(cur[field], before[field]); if (e) e.textContent = t; if (t) compared = true; }
-        _setText('cost-compare-text', compared ? ` \u00b7 Change against ${word}` : ''); // said once here, not on each tile
+        _setCompare(compared ? `Change against ${word}` : ''); // said once here, not on each tile
         series.setData('overview', { buckets: byTeam, interval, sinceMs, untilMs });
     } catch {
         for (const id of Object.values(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`); if (e) e.textContent = ''; }
-        _setText('cost-compare-text', '');
+        _setCompare('');
         series.setData('overview', null, 'The chart is unavailable. The figures above are complete.');
     }
     series.drawOverviewPanel(host, { phone: isPhoneLayout() });
 }
 
 document.addEventListener('cost-view-change', e => {
-    if (e.detail !== 'overview') _setText('cost-compare-text', ''); // the comparison is the Overview's: no other view says it
+    if (e.detail !== 'overview') _setCompare(''); // the comparison is the Overview's: no other view says it
     if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); else if (e.detail === 'overview') _refreshOverview();
 });
 let _resizeTimer = null;

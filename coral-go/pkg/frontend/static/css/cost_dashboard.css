@@ -331,6 +331,7 @@
 /* Analytics on a phone (#7473): the pane is the page's list; a view is the screen after it, with a way back to the list */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     #mobile-analytics-list { display: block; }
+    .cost-compare-sep { display: none; } /* the comparison wraps under the range on a phone: no dot to start its line (#10649) */
     #cost-dashboard-view:not([data-phone-item]) .cost-page { display: none; }
     #cost-dashboard-view[data-phone-item] #mobile-analytics-list { display: none; }
     #cost-dashboard-view .cost-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
