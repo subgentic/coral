@@ -242,3 +242,27 @@ func TestHowDoIStepsNameTheRealControls(t *testing.T) {
 		assert.Contains(t, string(rows), "\n                "+item+"\n", "the row menu really has "+item)
 	}
 }
+
+// #10484 (Desktop pass 16:26): How do I...? answers three more questions a newcomer asks, and each step names a control the dashboard really has.
+func TestHowDoIAnswersThreeMoreQuestions(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", "how-do-i.md"))
+	require.NoError(t, err)
+	text := strings.ReplaceAll(string(b), "\r\n", "\n")
+	for _, heading := range []string{"## Switch to the light theme", "## Copy a chat, or keep part of it", "## Find an old chat"} {
+		assert.Contains(t, text, heading)
+	}
+	static := filepath.Join("..", "..", "..", "pkg", "frontend", "static")
+	read := func(name string) string {
+		b, err := os.ReadFile(filepath.Join(static, name))
+		require.NoError(t, err, name)
+		return string(b)
+	}
+	fields, chat, menu, board, lists, saved := read("settings_fields.js"), read("chat_messages.js"), read("message_menu.js"), read("board_chat.js"), read("history_list.js"), read("saved_marks.js")
+	for want, src := range map[string]string{
+		"label: 'Theme'": fields, "label: 'Light'": fields, "Customize Theme": fields, // the Theme select with Light and System, and its Customize Theme button
+		"aria-label=\"Copy message\"": chat, "item(menu, 'Copy'": menu, "Send to another agent": menu, "Save for later": saved,
+		"Export Markdown": board, "label: 'Search chats'": lists,
+	} {
+		assert.Contains(t, src, want, "the dashboard has the control the answer names: "+want)
+	}
+}
