@@ -8,7 +8,7 @@ let _leave = 0;
 function bar() {
     let b = document.getElementById(ID);
     if (b) return b;
-    b = document.createElement('div'); b.id = ID; b.setAttribute('role', 'status');
+    b = document.createElement('div'); b.id = ID; // no role: the words are said once, by announceNotice's region (a role=status bar as well said them twice, #10620)
     const after = document.getElementById('alerts-offer-banner') || document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
     if (after) after.after(b); else document.body.prepend(b);
     return b;
