@@ -95,8 +95,8 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         // the boards' chats live in Board history: the name once, "1 message"
         await ev(`document.querySelector('.view-list-item[data-key="chats-group"]').click(); true`);
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 1 && !!document.querySelector('#group-table-view .dt-tag')`, 'the Board history folder: the one board');
-        assert.deepEqual(await ev(`(() => { const r = document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group)'); return [r.querySelector('.dt-primary').textContent, !!r.querySelector('.dt-chat-snippet'), r.querySelector('.dt-tag').textContent]; })()`), ['release-crew', false, 'Board'], 'a group chat says its name once, tagged Board, with no summary line (#8961)');
-        assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-tag')].map(t => t.textContent).join()`), 'Board,Archived', 'an archived board stays in Board history, marked');
+        assert.deepEqual(await ev(`(() => { const r = document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group)'); return [r.querySelector('.dt-primary').textContent, !!r.querySelector('.dt-chat-snippet'), r.querySelector('.dt-tag').textContent]; })()`), ['release-crew', false, 'Archived'], 'a group chat says its name once with no summary line (#8961), and one chip at most: Board history already says Board, so the board is marked only for being archived (#9730)');
+        assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-tag')].map(t => t.textContent).join()`), 'Archived', 'an archived board stays in Board history, marked with its one chip');
         console.log('   ✓');
 
         console.log('5. Phone: mail rows (the agent, the title, the time), the folders in a drawer, select by the avatar');
