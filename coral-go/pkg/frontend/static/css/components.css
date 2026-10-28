@@ -4108,3 +4108,14 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .team-link-end { display: flex; align-items: center; gap: var(--space-sm); flex: none; }
 .team-link-files { font-weight: var(--fw-regular); color: var(--text-secondary); }
 @media (max-width: 480px) { .team-link-row { display: grid; grid-template-columns: auto 1fr; align-items: start; column-gap: var(--space-md); } .team-link-end { grid-column: 2; justify-content: flex-end; } .team-link-files { display: none; } } /* a phone draws no Files chip on a row (the approved pictures): the note under the group says files follow the account */
+
+/* The Jump to box's matches: a list under the input, one line each, the label and what it is (#10579). */
+.jump-list { margin: 8px 0 0; padding: 0; list-style: none; max-height: 50vh; overflow-y: auto; position: static; box-shadow: none; border: 0; }
+.jump-option { display: flex; justify-content: space-between; gap: 12px; cursor: pointer; }
+.jump-option[aria-selected="true"] { background: var(--bg-hover); }
+.jump-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jump-detail { color: var(--text-secondary); font-size: var(--fs-sm); flex: none; }
+
+/* A skip link: out of sight until the keyboard is on it, then a plain link at the top of the pane (#10579). */
+.skip-link { position: absolute; left: -9999px; top: 0; }
+.skip-link:focus-visible { position: static; display: block; padding: 6px 12px; color: var(--accent); }
