@@ -411,7 +411,7 @@ function savedListSpec(where = '') {
         signature: JSON.stringify([multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
         node: () => DT.dataTable({ label: `Saved, ${rows.length}`, compact: true, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
             open: (f, row) => dock ? openDockSavedSheet(f.id, row.querySelector('.dt-primary')) : openSavedPage(f.id),
-            ...(dock ? {} : { mail: f => ({ lead: { text: f.title || f.which, name: f.title || f.which }, title: f.title || f.which, medium: true, snippet: f.snip, time: f.saved, data: { id: String(f.id) } }) }), // the snippet as the name cuts it, so the words on the row are the words in its name // a phone's Inbox row (#9583): who it is from, the message, when it was saved; the agent dock's Saved tab keeps its table
+            mail: f => ({ lead: { text: f.title || f.which, name: f.title || f.which }, title: f.title || f.which, medium: true, snippet: f.snip, time: f.saved, data: { id: String(f.id) }, tip: multi && f.serverName ? `${f.which} \u00b7 ${f.serverName}` : '' }), // the snippet as the name cuts it, so the words on the row are the words in its name // a phone's row (#9583): who it is from, the message, when it was saved, one line, in the Inbox and in the agent dock alike (Done is inside the item, not on every row, #9786)
             columns: [
                 { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { // the sender (14/600), then the message in the secondary colour: a list of who said what reads at a glance; the button's name is still the whole words
                     const b = DT.primaryButton('', f.which); b.dataset.id = f.id; b.title = multi && f.serverName ? `${f.which} · ${f.serverName}` : f.which;
@@ -443,6 +443,7 @@ async function openDockSavedSheet(id, opener) {
     const cannotOpen = f.gone || f.noopen;
     const actions = [];
     if (!cannotOpen) actions.push({ label: f.open.text, primary: true, ariaLabel: f.open.name, run: () => saved.savedOpen(it) });
+    if (!f.gone) actions.push({ label: f.done ? 'Reopen' : 'Done', ariaLabel: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`, run: async () => { const now = saved.findSavedItem(id); if (!now) return; const done = !now.done_at; if (await saved.savedSetDone(now, done)) { sayLive(done ? 'Marked done' : 'Moved back to Open'); back(); } } }); // a phone's rows have no Done button: it is in the item (#9786)
     actions.push({ label: 'Remove from saved', ariaLabel: `Remove from saved: ${f.which}`, run: async () => { if (await saved.savedRemove(it)) { sayLive('Removed from saved'); back(); } } });
     dockSheetId = id;
     openDetailPane({

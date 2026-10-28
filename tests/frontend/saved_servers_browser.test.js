@@ -213,7 +213,7 @@ const REMOTE = `(() => {
         await shot('saved-servers-narrow');
         await ev(`document.getElementById('agentic-state').style.width = ''; true`);
 
-        console.log('6c. A phone at 200% text: the stacked rows keep each computer name whole and inside the panel');
+        console.log('6c. A phone at 200% text: the mail rows stay inside the panel and the computer name is on each row hover');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true });
         await ev(`document.documentElement.style.fontSize = '32px'; document.getElementById('agentic-state').style.width = ''; true`);
@@ -221,8 +221,8 @@ const REMOTE = `(() => {
         await ev(`window.toggleAgenticPanel(true); window.switchAgenticTab('saved', 'top'); true`);
         await refresh();
         await waitFor(`document.querySelectorAll('#saved-table tbody tr').length >= 2`, 'the rows', 6000);
-        const gap = await ev(`(() => { const t = document.getElementById('saved-table'), r = t.getBoundingClientRect(); return { over: t.scrollWidth > t.clientWidth + 1, cells: [...t.querySelectorAll('tbody tr')].map(tr => { const c = tr.cells[1], cr = c.getBoundingClientRect(); return cr.right <= r.right + 1 && cr.left >= r.left - 1 && c.scrollWidth <= c.clientWidth + 1; }) }; })()`);
-        assert.ok(!gap.over && gap.cells.length >= 2 && gap.cells.every(Boolean), 'at 200% text the computer names are whole and inside: ' + JSON.stringify(gap));
+        const gap = await ev(`(() => { const t = document.getElementById('saved-table'), r = t.getBoundingClientRect(); return { over: t.scrollWidth > t.clientWidth + 1, cells: [...t.querySelectorAll('tbody tr')].map(tr => { const c = tr.cells[0], cr = c.getBoundingClientRect(); return cr.right <= r.right + 1 && cr.left >= r.left - 1 && c.scrollWidth <= c.clientWidth + 1 && /Box B|This computer/.test((tr.querySelector('.dt-primary') || {}).title || ''); }) }; })()`);
+        assert.ok(!gap.over && gap.cells.length >= 2 && gap.cells.every(Boolean), 'at 200% text the rows are the one-cell mail rows (#9786), inside the panel, and each row\'s hover names its computer: ' + JSON.stringify(gap));
         await shot('saved-servers-phone-200');
         await ev(`document.documentElement.style.fontSize = ''; window.toggleAgenticPanel(false); true`);
         await Emulation.setTouchEmulationEnabled({ enabled: false });
