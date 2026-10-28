@@ -34,7 +34,7 @@ const BASE = require('./test_base').BASE;
         // the agent header's icons
         await ev(`window.switchNavTab('agents'); window.__m.add('tip-agent', 'T', 2, { sleeping: false }); window.T.render.renderLiveSessions(window.T.state.liveSessions); true`);
         const head = await ev(`Object.fromEntries(['live-view-btn-chat', 'live-view-btn-terminal', 'terminal-open-window-link', 'popout-panel-toggle-btn', 'chat-find-btn'].map(id => { const e = document.getElementById(id); return [id, e ? { title: e.title, name: e.getAttribute('aria-label') } : null]; }))`);
-        check('the header icons have a tip that says what they do and a name that agrees', /read and send/i.test(head['live-view-btn-chat'].title) && /what the agent sees|terminal/i.test(head['live-view-btn-terminal'].title) && /own window/i.test(head['terminal-open-window-link'].title) && /side panel/i.test(head["popout-panel-toggle-btn"].title) && /find/i.test(head['chat-find-btn'].title) && Object.values(head).every(h => h.name && h.name.length > 2), JSON.stringify(head));
+        check('the header icons have a tip that says what they do and a name that agrees', /read and send/i.test(head['live-view-btn-chat'].title) && /what the agent sees|terminal/i.test(head['live-view-btn-terminal'].title) && /own window/i.test(head['terminal-open-window-link'].title) && /files, tasks and notes/i.test(head["popout-panel-toggle-btn"].title) && /find/i.test(head['chat-find-btn'].title) && Object.values(head).every(h => h.name && h.name.length > 2), JSON.stringify(head));
 
         // the New agent dialog
         await openNewAgent(ev, waitFor);
