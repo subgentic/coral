@@ -289,13 +289,15 @@ async function previewAndRun(body, verb) {
     requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
 }
 
-/** What the two buttons do, in a line beside them (#10481, Beta): Shrink keeps every code change; Prune deletes what the two fields above say, and asks first. */
+/** What the two buttons do, in each one's tooltip (#10481, Beta): Shrink keeps every code change; Prune deletes what the two fields above say, and each asks first. */
 const PRUNE_SAYS = { diffs: 'saved diffs', objects: 'unlinked artifacts', all: 'saved diffs and unlinked artifacts' };
 function syncStorageSays() {
-    const says = document.getElementById('settings-storage-says'); if (!says) return;
+    const shrink = document.getElementById('settings-storage-shrink'), prune = document.getElementById('settings-storage-prune'); if (!shrink || !prune) return;
     const days = Math.max(1, Math.floor(Number(document.getElementById('settings-prune-days')?.value) || 14));
     const kind = document.getElementById('settings-prune-kind')?.value || 'diffs';
-    says.textContent = `Shrink keeps every code change. Prune deletes ${PRUNE_SAYS[kind] || PRUNE_SAYS.diffs} older than ${days} day${days === 1 ? '' : 's'}. Each asks first.`;
+    // in each button's tooltip, not in more words on the page (the group is at its word budget): hover or long-press says it; each still asks first
+    shrink.title = 'Keeps every code change; drops secrets, dot-files and binaries. Asks first.';
+    prune.title = `Deletes ${PRUNE_SAYS[kind] || PRUNE_SAYS.diffs} older than ${days} day${days === 1 ? '' : 's'}. Asks first.`;
 }
 
 export function wireStorageActions() {
