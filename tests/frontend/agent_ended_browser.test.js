@@ -33,7 +33,21 @@ const BASE = require('./test_base').BASE;
         assert.match(c.text, /has ended$/, 'no message waiting: just that it ended: ' + c.text);
         await ev(`(window.T.state.lastSendAt ||= new Map()).set('ended-a-id', Date.now()); window.T.render.renderLiveSessions(window.T.state.liveSessions); true`);
         c = await composer('ended-a-id');
-        assert.match(c.text, /stopped before answering$/, 'a message was sent and nothing came back: ' + c.text);
+        assert.match(c.text, /has ended$/, 'a message was sent and nothing came back: it still says who has ended, by the name the row shows, not the folder (#10439): ' + c.text);
+        assert.doesNotMatch(c.text, /stopped before answering/, 'the bar says it has ended');
+        assert.match(await ev(`document.getElementById('sleeping-composer-hint').textContent`), /^Wake continues this conversation; Restart starts a fresh session/, 'one line on what Wake and Restart each do');
+        // the message it never answered stays, marked; the Working clock stops, and does not come back with Wake
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'pending_messages.js'); m.addPendingMessage('ended-a-id', 'please answer me', Date.now() - 5000); return true; })()`);
+        c = await composer('ended-a-id');
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: the ended bar hands its message over to the chat
+        const kept = await ev(`(() => { const g = document.querySelector('#live-history-messages > .pending-messages.pending-unanswered'); return { text: g ? g.textContent : null, label: g ? (g.querySelector('.pending-label') || {}).textContent : null, working: !!document.querySelector('#live-history-messages > .chat-working'), clock: window.T.state.lastSendAt.has('ended-a-id'), sent: !!document.querySelector('#live-history-messages > .pending-messages.pending-sent') }; })()`);
+        assert.ok(kept.text && /please answer me/.test(kept.text), 'the unanswered message stays in the chat: ' + JSON.stringify(kept));
+        assert.equal(kept.label, 'Not answered', 'marked Not answered');
+        assert.deepEqual([kept.working, kept.clock, kept.sent], [false, false, false], 'no Working line, no clock, not claimed as Sent');
+        await ev(`(() => { const r = window.T.state.liveSessions.find(s => s.session_id === 'ended-a-id'); r.sleeping = false; delete r.sleep_reason; window.T.render.renderLiveSessions(window.T.state.liveSessions); return true; })()`);
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the woken agent's chat is drawn
+        assert.equal(await ev(`!!document.querySelector('#live-history-messages > .chat-working')`), false, 'after Wake there is no stale Working line');
+        assert.equal(await ev(`!!document.querySelector('#live-history-messages > .pending-messages.pending-unanswered')`), true, 'the unanswered message is still marked after Wake');
         assert.equal(await ev(`(() => { const t = document.getElementById('sleeping-composer-text'); let n = 0; new MutationObserver(m => { n += m.length; }).observe(t, { childList: true, characterData: true, subtree: true }); window.__endedMuts = () => n; return true; })()`), true);
         await ev(`window.T.render.renderLiveSessions(window.T.state.liveSessions); true`); await new Promise(r => setTimeout(r, 1500)); // sleep-ok: two refreshes with nothing to change
         assert.equal(await ev(`window.__endedMuts()`), 0, 'the line is written once: a refresh with the same words rewrites nothing');
