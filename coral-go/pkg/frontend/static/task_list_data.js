@@ -1,6 +1,11 @@
 /* The pure parts of the dock's task list (moved out of task_list.js, #8386): what a task says about its state, which review it is in, and the order the rows are shown in. Node-tested. */
 import { _priorityOrder } from './task_format.js';
 
+/** Whether the completion form offers "Not yet: send back" (#10337): the task has an agent to tell, and the Coral Hub's access for the board's machine allows Interact (hubReason is blockedReason's words, '' when it does). */
+export function canSendBack(task, hubReason) {
+    return !!(task && task.assigned_to) && !hubReason;
+}
+
 /** A list item says review_requested; a full task has workflow.completion_review. */
 export function reviewRequested(t) {
     return !!(t && (t.review_requested || t.workflow?.completion_review));
