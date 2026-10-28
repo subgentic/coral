@@ -34,6 +34,8 @@ const { DATA_WORLD } = require('./helpers/census_world');
             assert.ok(Math.abs(p.svgW - p.vbW) <= 1 && Math.abs(p.svgW - p.inner) <= 1, `${tag}: the chart is drawn at the card's width, one scale (svg ${p.svgW}, viewBox ${p.vbW}, card ${p.inner})`);
             assert.ok(Math.abs(p.plotRight - p.dotX) <= 1, `${tag}: the line ends where the plot does ${JSON.stringify(p)}`);
         };
+        // the page settles as its tables arrive (the card can change by a few px): the chart is drawn again at the card's width, which is what is asserted, not the frame before it
+        await waitFor(`(() => { const s = document.querySelector('#cost-spend-chart svg'), b = document.getElementById('cost-spend-chart'); const c = getComputedStyle(b); return !!s && Math.abs(Math.round(s.viewBox.baseVal.width) - Math.round(b.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight))) <= 1; })()`, 'the chart at the card\'s width', 6000);
         fits(await probe(), 'desktop');
         const ends = await ev(`({ tile: document.getElementById('cost-total-cost').textContent.trim(), top: document.querySelector('#cost-spend-chart text.spend-label').textContent.trim() })`);
         assert.equal(ends.top, ends.tile, 'the axis top and the line\'s end are the Total cost tile\'s figure (#7719) ' + JSON.stringify(ends));
@@ -49,14 +51,17 @@ const { DATA_WORLD } = require('./helpers/census_world');
             fits(await probe(), `${w} px`);
             if (w === 390) await shot('cumulative-spend-phone');
         }
-        // drawn while its view is hidden (a phone opens on the list: the card has no width, the chart takes its 600 px fallback), then shown: it is drawn again at the card's width, not left at 600 (#7719 item 2)
+        // drawn while its view is hidden (the page is not Overview: the card has no width, the chart takes its 600 px fallback), then shown: it is drawn again at the card's width, not left at 600 (#7719 item 2)
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         const loaded = Page.loadEventFired(); await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await loaded; await install();
         await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
         await ev(`window.switchNavTab('tokens'); true`);
-        await waitFor(`!!document.querySelector('#cost-spend-chart svg polygon')`, 'the spend chart, drawn while hidden');
+        await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => { m.selectView('model'); return true; })`); // a phone opens on Overview now (#10064): another page hides the card while its chart is drawn
+        await waitFor(`!!document.querySelector('#cost-spend-chart svg polygon')`, 'the spend chart');
+        await ev(`document.querySelector('[data-on-click="cost-refresh"]').click(); true`); // the read answers with the card hidden: the chart is drawn again without a width
+        await waitFor(`Math.round(document.querySelector('#cost-spend-chart svg').viewBox.baseVal.width) === 600`, 'the spend chart, drawn while hidden', 6000);
         const hidden = await ev(`({ shown: document.getElementById('cost-spend-chart').getClientRects().length > 0, vb: Math.round(document.querySelector('#cost-spend-chart svg').viewBox.baseVal.width) })`);
-        assert.equal(hidden.shown, false, 'the phone opens Analytics on its list: the chart is hidden ' + JSON.stringify(hidden));
+        assert.equal(hidden.shown, false, 'another Analytics page is open: the chart is hidden ' + JSON.stringify(hidden));
         assert.equal(hidden.vb, 600, 'drawn hidden, it has the 600 px fallback ' + JSON.stringify(hidden));
         await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => { m.selectView('overview'); return true; })`);
         await waitFor(`(() => { const s = document.querySelector('#cost-spend-chart svg'), b = document.getElementById('cost-spend-chart'); const c = getComputedStyle(b); return b.getClientRects().length > 0 && Math.abs(Math.round(s.viewBox.baseVal.width) - Math.round(b.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight))) <= 1; })()`, 'the chart drawn again at the card\'s width once shown');
