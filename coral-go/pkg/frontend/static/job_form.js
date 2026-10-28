@@ -310,7 +310,7 @@ function jobFormValues() {
 function makeRepo() {
     const dir = String(view.values().repo_path || '').trim();
     if (!dir) return;
-    window.showConfirmModal('Make this folder a git repo', `Coral will run git init in ${dir} if it is not a repository yet, and make one empty first commit, so each run of the job has a branch to start from. Nothing in the folder is changed.`, async () => {
+    window.showConfirmModal('Make this folder a git repo', `Coral will run git init in ${dir} if it is not a repository yet, and make one empty first commit, so each run of the job has a branch to start from. Nothing in the folder is changed. Then the job is created.`, async () => {
         try {
             const resp = await fetch('/api/scheduled/jobs/init-repo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo_path: dir }) });
             const data = await resp.json().catch(() => ({}));
