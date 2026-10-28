@@ -1,7 +1,7 @@
 // The Inbox tab (#4718): a hub-only main tab that shows the hub's /inbox page in a frame, with the number of agents waiting for input as its badge.
 //   - A local Coral shows its own Inbox in the same tab (#4811: Needs you and Saved for later, no frame, inbox_local_browser); where the hub serves the dashboard it is this page's frame, right
 //     after Servers and before Docs.
-//   - The badge is the number of agents the feed says wait for input (99+ past 99), nothing when none do, and it follows the next feed message; the
+//   - The badge is the number of agents the feed says wait for input (9+ past 9: two characters fit the tabs' gap, #9821), nothing when none do, and it follows the next feed message; the
 //     tab's name says the number.
 //   - Opening the tab shows its view and loads the frame from the constant address /inbox (once, kept after), with referrerpolicy no-referrer; the
 //     tab writes no address of its own; nothing is posted to or read from the frame (no postMessage and no message listener in its source).
@@ -84,7 +84,7 @@ const { settle } = require('./helpers/wait');
         await feed({ total: 5, waiting: 1 });
         b = await badge(); check('it follows the next message', b.text === '1' && !b.hidden, JSON.stringify(b));
         await feed({ total: 120, waiting: 105 });
-        b = await badge(); check('past 99 it says 99+', b.text === '99+', JSON.stringify(b));
+        b = await badge(); check('past 9 it says 9+', b.text === '9+', JSON.stringify(b));
         await feed({ total: 5, waiting: 0 });
         b = await badge(); check('none waiting: no badge and the plain name', b.hidden && b.text === '' && b.label === null, JSON.stringify(b));
         await ev(framesJs(4)); // the row's own redraw after the badge changed has finished

@@ -42,15 +42,16 @@
 .nav-tab-badge {
     position: absolute;
     top: 2px;
-    left: calc(100% - 2px); /* just past the word's top-right corner: it covers the last letter by 2 px at most, and a pill of three or four characters stays in the tabs' 24 px gap */
+    left: calc(100% - 14px); /* the tab's box has 12 px of its own after the word: this is 2 px inside the word's top-right corner (#9821: the pill of two characters then ends before the next word with the tabs' own 24 px gap). Before: just past the word's top-right corner: it covers the last letter by 2 px at most, and a pill of three or four characters stays in the tabs' 24 px gap */
     /* 11px text: the unread red alone is 3.9:1 with white in the dark theme, so it is darkened here (5.5:1 dark, higher in light). Its size is the count chip's (#9329). */
     background: color-mix(in srgb, var(--rail-badge-unread) 82%, #000);
     box-shadow: 0 0 0 1px var(--topbar-bg); /* a ring in the bar's colour, so it reads on the active tab's underline */
     color: var(--rail-badge-text);
 }
+.top-nav-tab > .nav-tab-badge { padding-inline: 4px; }
 .nav-tab-badge[hidden] { display: none; }
 /* Room for the badge (#9629): the tab that carries it keeps 1.25rem after its box, so a count of up to three characters (99+) ends before the next tab's word, at 200% text too (rem scales with it). The room is there with or without a count: a badge showing or going moves no tab (#8497). */
-.top-nav-tab:has(> .nav-tab-badge) { margin-inline-end: 1.25rem; }
+.top-nav-tab:has(> .nav-tab-badge) { margin-inline-end: max(0px, calc(1.5rem - 24px)); } /* the room is the part of 1.25rem a text size above 100% adds: at 100% it is 0, so the gap after Inbox is the tabs' own 24 px (#9821); the 99+ pill fits that gap at 100% (below), and bigger text grows the room with it */
 .nav-more-item .nav-more-badge { margin-left: auto; }
 .top-nav-tab.nav-overflowed { display: none; }
 .nav-more-wrap { display: flex; flex: 0 0 auto; }
