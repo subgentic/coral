@@ -88,9 +88,11 @@ async function loadWorkflowsById() {
 /** The job page's runs and its detail, read again and drawn (a run that was pending or running is read again every 3 s until it has ended, so the page does not keep saying "Waiting to start" for a run the sidebar already lists as Failed, #9958). */
 async function reloadJobDetail(job, { refresh = false } = {}) {
     const jobId = job.id;
-    const [jobRuns, , workflowPage] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null,
+    // A watch read takes the jobs again too: the job's own last result (its page's "waiting to start", the sidebar's Failed count) comes from the list, and read once it would stay as it was when the run began (#10104).
+    const [jobRuns, , , workflowPage] = await Promise.all([fetchJobRuns(jobId), refresh ? fetchJobs() : null, job.workflow_id ? loadWorkflowsById() : null,
         job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw new Error('Unable to load workflow runs'); return r.json(); }).then(data => ({ runs: data.runs || [], total: data.total })).catch(() => null) : null]);
     if (selectedJobId !== jobId) return;
+    if (refresh) job = scheduledJobs.find(j => j.id === jobId) || job;
     if (refresh && jobRuns.failed) { watchJobRuns(job, [{ status: 'pending' }]); return; } // a read that failed while watching: keep what is drawn and read again (an empty answer would have been drawn as no runs and ended the watch)
     renderJobDetail(job, jobRuns.runs, workflowPage && workflowPage.runs, jobRuns.total, workflowPage && workflowPage.total);
     watchJobRuns(job, jobRuns.runs);
