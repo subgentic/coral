@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/ptr"
@@ -512,7 +513,7 @@ func (s *WorkflowStore) SetRunSignInRefused(ctx context.Context, runID int64, er
 func (s *WorkflowStore) UpdateStepResults(ctx context.Context, runID int64, currentStep int, stepResults string) error {
 	return s.UpdateWorkflowRun(ctx, runID, map[string]interface{}{
 		"current_step": currentStep,
-		"step_results": stepResults,
+		"step_results": quietStepResults(stepResults),
 	})
 }
 
@@ -537,4 +538,27 @@ func StepsJSONFromRaw(steps []json.RawMessage) (string, error) {
 		return "", fmt.Errorf("marshal steps: %w", err)
 	}
 	return string(b), nil
+}
+
+// quietStepResults writes the home folder as "~" in the texts a step result carries (the end of its stderr and stdout, its note), which are read with the run by whoever may see it, Hub viewers
+// included: "bash: /home/name/x: No such file" names the account (#10021). Anything that is not the results' JSON is stored as it came.
+func quietStepResults(raw string) string {
+	var results []map[string]any
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(&results); err != nil {
+		return raw
+	}
+	for _, r := range results {
+		for _, k := range []string{"error_tail", "output_tail", "note"} {
+			if v, ok := r[k].(string); ok {
+				r[k] = logsafe.HomeInText(v)
+			}
+		}
+	}
+	out, err := json.Marshal(results)
+	if err != nil {
+		return raw
+	}
+	return string(out)
 }

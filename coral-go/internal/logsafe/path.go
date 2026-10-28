@@ -209,7 +209,7 @@ func homeInText(text string, homes []string) string {
 			inName := func(c byte) bool { // a character that can continue a folder's name
 				return c == '_' || c == '-' || c == '.' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80
 			}
-			before := k == 0 || !inName(text[k-1]) && text[k-1] != '/' && text[k-1] != '\\'
+			before := k == 0 || !inName(text[k-1]) && text[k-1] != '/' && text[k-1] != '\\' || strings.HasSuffix(text[:k], "file://") // a file:// link names the folder from its third slash
 			after := end == len(text) || !inName(text[end])
 			if before && after {
 				b.WriteString(text[i:k])
