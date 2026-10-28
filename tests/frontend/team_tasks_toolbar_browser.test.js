@@ -27,6 +27,8 @@ const board = 'task-tb-' + Date.now().toString(36);
             assert.ok(bar.btnRight <= bar.paneRight, width + ': New task is whole, not cut at the pane\'s right edge ' + JSON.stringify(bar));
             assert.ok(bar.rowOver <= 1, width + ': the toolbar row does not overflow sideways ' + JSON.stringify(bar));
             assert.ok(bar.pills !== bar.select, width + ': the state choice is the pills or the select, not both nor neither ' + JSON.stringify(bar));
+            const names = await ev(`(() => { const g = document.querySelector('#team-panel-tasks .team-tb-pills'), s = document.querySelector('#team-panel-tasks .team-tb-select'); return { role: g.getAttribute('role'), label: g.getAttribute('aria-label'), selectLabel: s.getAttribute('aria-label') }; })()`);
+            assert.ok(names.role === 'group' && names.label && names.label === names.selectLabel, width + ': the pills are a named group (role group, the same name as the select) for a screen reader ' + JSON.stringify(names));
             console.log(`PASS ${width}px: New task whole (right ${bar.btnRight} of ${bar.paneRight}), ${bar.pills ? 'the pills fit' : 'the select stands in'}`);
         }
     } finally { await removeBoards(ev, [board]); await client.close(); }
