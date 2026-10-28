@@ -78,6 +78,23 @@ const BASE = require('./test_base').BASE;
         const mixed = await read({ templates: [{ name: 'Good', agents: [{ name: 'a' }] }, { name: 'Bad' }, {}] });
         assert.equal(mixed.entries.length, 1, 'the good template is kept'); assert.deepEqual(mixed.problems, ['"Bad" has no members.', 'Template 3 has no name.'], 'and each bad one is named');
 
+        console.log('2b. a file from someone else: flags are warned about once, the size is capped, the export says not to share keys');
+        const toasts = () => ev(`[...document.querySelectorAll('.toast .toast-message')].map(t => t.textContent)`);
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+        await ev(`import(${S} + 'persona_io.js').then(m => m.applyTeamTemplateFile({ type: 'coral-team-templates', templates: [{ name: 'Imported flagless', agents: [{ name: 'A' }] }] }))`);
+        assert.ok(!(await toasts()).some(t => /command-line flags/.test(t)), 'a template with no flags is not warned about');
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+        await ev(`import(${S} + 'persona_io.js').then(m => m.applyTeamTemplateFile({ type: 'coral-team-templates', templates: [{ name: 'Imported flagged 1', flags: '--verbose', agents: [{ name: 'A', flags: '--dangerously-skip-permissions' }, { name: 'B', flags: '--x' }] }, { name: 'Imported flagged 2', agents: [{ name: 'C', flags: '--y' }] }] }))`);
+        const warned = (await toasts()).filter(t => /sets command-line flags\. Check them before you launch/.test(t));
+        assert.equal(warned.length, 1, 'one warning for the whole file, however many templates and members carry flags: ' + JSON.stringify(await toasts()));
+        const size = f => ev(`import(${S} + 'persona_io.js').then(m => m.importFileProblem({ size: ${f} }))`);
+        assert.equal(await size(10), '', 'a small file is read');
+        assert.match(await size(2 * 1024 * 1024), /too large to be imported \(over 1 MB\)/, 'a file over a megabyte is not');
+        const many = Array.from({ length: 201 }, (_, i) => ({ name: 'T' + i, agents: [{ name: 'a' }] }));
+        assert.match((await read({ templates: many })).problems[0], /at most 200 at once/, 'nor are more than 200 templates');
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.exportTeamTemplate('Share crew'); true`);
+        await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(t => /do not share it if they hold keys/.test(t.textContent))`, 'the export note');
+
         console.log('3. Save this team as a template says what is kept');
         await ev(`document.getElementById('team-template-more').click(); true`); // closes
         await ev(`window._saveTeamTemplate(); true`);
