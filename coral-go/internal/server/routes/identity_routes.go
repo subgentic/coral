@@ -138,6 +138,7 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/board/{project}/artifacts/{id}/tags":                        "change an artifact's tags",
 	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings": "set an agent's Reviews only switch and review areas",
 	"PUT /api/artifacts/{id}/keep":                                        "keep an artifact",
+	"GET /api/artifacts/resolve":                                          "resolve a shortened artifact link",
 	"POST /api/artifacts/{id}/comments":                                   "comment on an artifact",
 	"PATCH /api/artifacts/{id}/comments/{cid}":                            "edit a comment on an artifact",
 	"DELETE /api/artifacts/{id}/comments/{cid}":                           "delete a comment on an artifact",

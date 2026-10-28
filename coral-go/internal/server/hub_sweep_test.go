@@ -137,7 +137,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 	routes.SetHubOwnerLabel(func(context.Context) (string, error) { return sweepOwner, nil })
 	t.Cleanup(func() { routes.SetHubOwnerLabel(nil) })
 	owner := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: sweepOwner}
-	ownerOnly := map[string]bool{"/api/artifacts": true, "/api/artifacts/{id}": true, "/api/artifacts/{id}/meta": true, "/api/artifacts/{id}/comments": true, "/api/artifacts/{id}/readers": true,
+	ownerOnly := map[string]bool{"/api/artifacts": true, "/api/artifacts/resolve": true, "/api/artifacts/{id}": true, "/api/artifacts/{id}/meta": true, "/api/artifacts/{id}/comments": true, "/api/artifacts/{id}/readers": true,
 		"/api/board/{project}/artifacts": true, "/api/board/{project}/cross-team/settings": true, "/api/session-artifacts": true, "/api/team-artifacts": true, "/api/board/{project}/tasks/{taskID}/artifact-content": true,
 		"/api/saved": true, "/api/saved/{id}/message": true, // saved for later is the owner's alone since #5753
 		"/api/custom-models": true} // the custom models are the owner's alone through the hub (#5996)
@@ -158,6 +158,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		path := repl.Replace(f[1])
 		if f[1] == "/api/artifacts/{id}" {
 			path = "/api/artifacts/" + artifactHex
+		}
+		if f[1] == "/api/artifacts/resolve" { // which artifact a shortened link means (#9841): it needs a link to answer 200 (none matches in the rig)
+			path = "/api/artifacts/resolve?link=" + artifactHex[:8]
 		}
 		if f[1] == "/api/artifacts/{id}/meta" { // the facts of that artifact (#5465)
 			path = "/api/artifacts/" + artifactHex + "/meta"

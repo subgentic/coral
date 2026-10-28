@@ -415,6 +415,7 @@ b POST /api/worktrees/remove
 a PUT /api/agent/ui/{id}
 b PUT /api/artifacts/{id}/comments/lock
 b PUT /api/artifacts/{id}/keep
+b GET /api/artifacts/resolve
 b PUT /api/auth/hub-origins
 b PUT /api/auth/hub-signin
 b PUT /api/board/{project}/artifacts/{id}/tags

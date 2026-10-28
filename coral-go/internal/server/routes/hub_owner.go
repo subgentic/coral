@@ -97,6 +97,7 @@ func ownerLabelRecordedWith(r *http.Request, label func(context.Context) (string
 var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}"):                           textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts"):                                   textArtifactsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/artifacts/resolve"):                           textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/meta"):                      textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/comments"):                  textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/readers"):                   textArtifactsOwnerOnly,

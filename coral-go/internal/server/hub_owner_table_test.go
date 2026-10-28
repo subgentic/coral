@@ -96,7 +96,7 @@ func TestTheOwnerDecisionHasOneImplementation(t *testing.T) {
 // The set of owner routes is pinned here, so that a route cannot leave the table (and stop being stamped and refused) without this test saying so: a change to it is a reviewed act.
 func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 	want := map[string]string{
-		"GET /api/artifacts": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
+		"GET /api/artifacts": "owner-only", "GET /api/artifacts/resolve": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
 		"DELETE /api/artifacts/{hex64}": "owner-only", "GET /api/board/{project}/artifacts": "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
 		"GET /api/session-artifacts": "owner-only", "GET /api/team-artifacts": "owner-only", "GET /api/settings/prompt-inspection": "owner-only", "PUT /api/board/{project}/settings": "owner-only",
 		"POST /api/board/{project}/cross-team/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/disable": "owner-only-hub",

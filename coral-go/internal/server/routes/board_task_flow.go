@@ -103,6 +103,9 @@ func (h *BoardHandler) CompleteTaskByID(w http.ResponseWriter, r *http.Request) 
 		errBadRequest(w, "subscriber_id required")
 		return
 	}
+	if body.Message != nil && h.refuseShortArtifactRefs(w, r, body.Message) { // #9841
+		return
+	}
 	unverified := h.vetTaskArtifacts(r, project, body.Artifacts)
 	task, err := h.bs.CompleteTaskWithArtifactsAtRevisionAndCandidate(r.Context(), project, taskID, body.SubscriberID, body.Message, body.Outcome, body.Artifacts, body.ExpectedRevision, body.CandidateRevision)
 	if err != nil {
@@ -215,6 +218,9 @@ func (h *BoardHandler) CancelTaskByID(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "Task not found")
 		return
 	} else if !h.requirePlannerOrAssignee(w, r.Context(), project, current, body.SubscriberID, "cancel it") {
+		return
+	}
+	if body.Message != nil && h.refuseShortArtifactRefs(w, r, body.Message) { // #9841
 		return
 	}
 	task, err := h.bs.CancelTask(r.Context(), project, taskID, body.SubscriberID, body.Message)

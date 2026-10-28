@@ -78,6 +78,7 @@ func (h *SessionsHandler) RegisterAgentArtifacts(r chi.Router) {
 	st.mu.Unlock()
 	r.Post("/api/agent/artifacts", h.uploadAgentArtifact)
 	r.Get("/api/artifacts", h.listAllArtifacts)                           // the machine-wide list, the owner's (#5575)
+	r.Get("/api/artifacts/resolve", h.resolveArtifactRefs)                // #9841: which artifact a shortened link in an old message means
 	r.Get("/api/artifacts/series/{series_id}", h.seriesRedirect)          // #6357: the newest version the caller can read (a redirect to its digest)
 	r.Get("/api/artifacts/series/{series_id}/versions", h.seriesVersions) // #6357
 	r.Delete("/api/artifacts/series/{series_id}", h.deleteSeries)         // #6357: the Operator's, every version

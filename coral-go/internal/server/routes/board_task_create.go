@@ -111,6 +111,9 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		}
 		remindAt = at
 	}
+	if h.refuseShortArtifactRefs(w, r, &body.Title) || h.refuseShortArtifactRefs(w, r, &body.Body) { // shortened artifact links are made whole, or the task is refused (#9841)
+		return
+	}
 	if refuseNewBoardName(w, r, h.bs, project) {
 		return
 	}

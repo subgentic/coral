@@ -243,6 +243,8 @@ var routeTable = cat(
 	// too (#5284); /api/upload and /api/shared-images stay local only. Upload (POST /api/agent/artifacts) and the artifact list under /api/agent/ stay unlisted (never).
 	owner(OwnerRefuse, rules(http.MethodGet, TierView,
 		"/api/artifacts/{hex64}",
+		// Which artifact a shortened link in an old message means (#9841): link, repeatable, the owner's alone like the reads around it.
+		"/api/artifacts/resolve",
 		// The machine-wide list (#5575): every artifact on this computer with its uploader, board and source, paged by a cursor.
 		"/api/artifacts",
 		// The same artifact without its bytes (#5465, coral-hub): id, size, the media type a download is served as and the stored name, 404 exactly as the content read is, never cached.

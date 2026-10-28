@@ -209,6 +209,9 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		errBadRequest(w, "content required")
 		return nil, false
 	}
+	if h.refuseShortArtifactRefs(w, r, &body.Content) { // a shortened coral://artifacts link is made whole, or the post is refused (#9841)
+		return nil, false
+	}
 	if refuseNewBoardName(w, r, h.bs, project) {
 		return nil, false
 	}

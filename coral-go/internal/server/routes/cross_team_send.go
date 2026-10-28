@@ -186,6 +186,9 @@ func (h *BoardHandler) PostRelayMessage(w http.ResponseWriter, r *http.Request) 
 		refused(w)
 		return
 	}
+	if h.refuseShortArtifactRefs(w, r, &body.Content) { // a shortened artifact link is made whole before it leaves, or the send is refused (#9841)
+		return
+	}
 	ctx := r.Context()
 	role, ok := h.relaySenderRole(w, r, project, body.SubscriberID, body.SessionName)
 	if !ok {
