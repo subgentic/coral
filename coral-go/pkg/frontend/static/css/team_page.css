@@ -393,3 +393,8 @@
     .inbox-artifacts-main > .group-table-head { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 }
 @media (max-width: 767px) { .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; } } /* a full line (200% text) wraps its Select button to the next, whole, not cut at the screen's edge (#9658) */
+
+/* The keyboard is up on a phone (a short window, the board's composer has the focus): the team's tabs, its status line and the board's search and filter chips fold away, one slim row stays (the team's name and More), so the messages have the room (#10088). */
+@media (max-width: 767px) and (max-height: 560px) {
+    #team-page-view:has(#mb-post-input:focus) :is(#team-tabs-row, #team-page-status, #mb-tools) { display: none; }
+}

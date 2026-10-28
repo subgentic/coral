@@ -2734,7 +2734,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 @media (pointer: coarse), (max-width: 767px) {
     .mb-post-card { padding: 3px 3px 3px 16px; align-items: center; }
-    .mb-post-input { min-height: var(--control-touch-height, 44px); box-sizing: border-box; padding: 10px 0; }
+    .mb-post-input { min-height: var(--control-touch-height, 44px); box-sizing: border-box; padding: 10px 0; max-height: min(40vh, calc(5lh + 20px)); } /* about five lines, then it scrolls: the messages keep the room above the keyboard (#10088) */
 }
 
 /* ── Modal Width Variants ──────────────────────────────────── */
