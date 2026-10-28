@@ -9,10 +9,10 @@ const BUDGET = { chooser: 52, /* the title "New agent or team" (#7064) and the f
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    // (the "not installed" marks and the "Updating the list..." line under Model are the machine's and a moment's words, not the dialog's: left out)
+    // (the "not installed" marks, the "Updating the list..." line under Model and the CLI check's "Checking claude CLI..." or missing-CLI note are the machine's and a moment's words, not the dialog's: left out)
     const words = () => ev(`(() => { let n = 0; const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden || (p.parentElement && p.parentElement.matches('details:not([open])') && p.tagName !== 'SUMMARY')) return false; } return true; };
         const w = document.createTreeWalker(document.getElementById('launch-modal'), NodeFilter.SHOW_TEXT);
-        for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('script, style, .material-icons, select, option, .launch-agent-missing, .acf-model-note') || !shown(e)) continue; n += t.nodeValue.trim().split(/\\s+/).filter(Boolean).length; }
+        for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('script, style, .material-icons, select, option, .launch-agent-missing, .acf-model-note, .launch-cli-slot') || !shown(e)) continue; n += t.nodeValue.trim().split(/\\s+/).filter(Boolean).length; }
         return n; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
