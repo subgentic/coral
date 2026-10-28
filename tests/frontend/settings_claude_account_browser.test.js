@@ -21,6 +21,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(labels.some(t => t === 'Coral API key'), 'the key is labelled Coral API key: ' + JSON.stringify(labels));
         assert.ok(labels.some(t => t === 'Claude account'), 'a Claude account row: ' + JSON.stringify(labels));
         assert.equal(await ev(`document.getElementById('settings-api-key').getAttribute('aria-label')`), 'Coral API key');
+        assert.match(await ev(`document.getElementById('settings-claude-account-check').title`), /Claude CLI's own login/, 'the explanation is on the Check button, not a line of the pane');
         const check = async answer => { await ev(`window.__answer = ${JSON.stringify(answer)}; document.getElementById('settings-claude-account-check').click(); true`); await waitFor(`document.getElementById('settings-claude-account-status').textContent !== 'Checking...' && document.getElementById('settings-claude-account-status').textContent !== 'Not checked yet'`, 'the answer'); return ev(`document.getElementById('settings-claude-account-status').textContent`); };
         assert.equal(await check({ found: true, signed_in: true }), 'Signed in');
         assert.match(await check({ found: true, signed_in: false }), /^Not signed in: run claude auth login/);

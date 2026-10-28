@@ -165,7 +165,7 @@ const apiKeyLine = slot => {
 const claudeAccountLine = slot => {
     const line = document.createElement('div'); line.className = 'sv-ctl-line';
     const status = document.createElement('span'); status.id = 'settings-claude-account-status'; status.className = 'settings-hint'; status.setAttribute('role', 'status');
-    const check = document.createElement('button'); check.type = 'button'; check.id = 'settings-claude-account-check'; check.className = 'btn btn-small'; check.textContent = 'Check';
+    const check = document.createElement('button'); check.type = 'button'; check.id = 'settings-claude-account-check'; check.className = 'btn btn-small'; check.textContent = 'Check'; check.title = "Agents sign in through the Claude CLI's own login, not a key stored in Coral. Check asks the CLI now.";
     check.addEventListener('click', async () => {
         check.disabled = true; status.textContent = 'Checking...';
         let signedIn;
@@ -179,13 +179,13 @@ const claudeAccountLine = slot => {
 export const SECURITY_FIELDS = [
     { key: 'security_access_title', type: 'heading', id: 'settings-security-access-title', label: 'Access' },
     { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'Coral API key', render: slot => apiKeyLine(slot) },
-    { key: 'claude_account', type: 'custom', id: 'settings-claude-account', label: 'Claude account', help: "Agents use the Claude CLI's own login.", render: slot => claudeAccountLine(slot) },
+    { key: 'claude_account', type: 'custom', id: 'settings-claude-account', label: 'Claude account', render: slot => claudeAccountLine(slot) },
     live('settings-security'),
     { key: 'security_data_title', type: 'heading', id: 'settings-security-data-title', label: 'Data and privacy' },
     { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },
         help: { text: 'Applies after restart.', more: 'Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.' },
         options: [{ value: 'disabled', label: 'Off (plaintext database)' }, { value: 'key_file', label: 'Local key file (~/.coral/.db_key)' }, { value: 'password', label: 'Password at startup' }] },
-    { key: 'telemetry_enabled', type: 'toggle', id: 'settings-telemetry-enabled', label: 'Usage analytics', help: 'Anonymous product events only. No prompts, transcripts, or secrets are sent. Applies immediately.' },
+    { key: 'telemetry_enabled', type: 'toggle', id: 'settings-telemetry-enabled', label: 'Usage analytics', help: 'Anonymous product events only, no prompts, transcripts or secrets. Applies immediately.' },
     { key: 'install_id', type: 'custom', id: 'settings-install-id-group', label: 'Install ID', live: ['settings-telemetry-install-hint', 'settings-telemetry-install-status'], render: slot => { const el = document.getElementById('settings-telemetry-install-box'); if (el) slot.append(el); } },
     { key: 'debug_input_log', type: 'toggle', id: 'settings-debug-input-log', label: 'Record what Coral types (debug)', disabledWhen: () => { const e = document.getElementById('settings-debug-input-log'); return !!e && e.dataset.locked === '1'; }, live: ['settings-debug-input-log-status', { id: 'settings-debug-input-log-delete', describes: false }], help: { text: '', more: 'Saves everything Coral sends to agent terminals, including anything typed or pasted, such as passwords. For troubleshooting only: turn it off afterwards. Applies immediately.' } },
 ];
