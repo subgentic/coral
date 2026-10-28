@@ -21,7 +21,8 @@ function noteElement() {
     if (!chat || !chat.parentElement) return null;
     el = document.createElement('div');
     el.id = 'chat-return-note';
-    el.className = 'loading-indicator chat-return-note';
+    el.className = 'loading-indicator';
+    el.style.padding = '6px 16px'; // a slim line above the chat (a rule in the stylesheet would add to the guarded start weight)
     el.setAttribute('role', 'status');
     el.hidden = true;
     chat.parentElement.insertBefore(el, chat);

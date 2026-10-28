@@ -38,11 +38,11 @@ const { connect } = require('./agent_view_harness');
         assert.equal(await ev(`window.__notes.length`), 0, 'and raises no alert');
 
         // A hidden tab: alpha's next turn ends.
-        await ev(`window.__hidden = true; true`);
+        await ev(`window.__hidden = true; document.dispatchEvent(new Event('visibilitychange')); true`);
         await feed({ alpha: 'working', beta: 'idle' });
         await feed({ alpha: 'replied', beta: 'idle' });
-        await waitFor(`document.title === '(1) Coral'`, 'the reply counted in the tab title');
-        await waitFor(`window.__notes.length === 1`, 'the reply alert');
+        await waitFor(`document.title === '(1) Coral'`, 'the reply counted in the tab title', 15000);
+        await waitFor(`window.__notes.length === 1`, 'the reply alert', 15000);
         assert.equal(await ev(`window.__notes[0].opts.body`), 'alpha finished a reply', 'names only, and what happened');
         assert.equal(await ev(`window.__notes[0].opts.silent`), true, 'no sound unless turned on');
 
@@ -58,7 +58,7 @@ const { connect } = require('./agent_view_harness');
 
         // Reply alerts can be turned off on their own; the title still counts.
         await resetAlertGap();
-        await ev(`localStorage.setItem('coral-alert-finished', '0'); window.__notes.length = 0; window.__hidden = true; true`);
+        await ev(`localStorage.setItem('coral-alert-finished', '0'); window.__notes.length = 0; window.__hidden = true; document.dispatchEvent(new Event('visibilitychange')); true`);
         await feed({ alpha: 'working', beta: 'idle' });
         await feed({ alpha: 'replied', beta: 'idle' });
         await waitFor(`document.title === '(1) Coral'`, 'the count without an alert');

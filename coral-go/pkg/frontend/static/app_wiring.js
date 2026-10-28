@@ -174,7 +174,10 @@ export function wireWindowEvents() {
     // coming back reconnects and reads the open agent again at once, saying "Reconnecting…" or "Loading chat…" meanwhile (return_to_tab.js, #10068).
     if (!platform.isNative) {
         const back = () => importOnce('./return_to_tab.js').then(m => m.refreshOnReturn()).catch(() => {}); // read when a return happens, not at start (the start weight is guarded)
-        document.addEventListener("visibilitychange", () => { if (!document.hidden) back(); });
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) back();
+            else importOnce('./attention.js').catch(() => {}); // the person has left: what counts an alert in the tab title is read now, so the first alert does not wait for it (#10068)
+        });
         window.addEventListener("pageshow", e => { if (e.persisted) back(); });
         window.addEventListener("online", back);
     }
