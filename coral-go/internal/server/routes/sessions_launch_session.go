@@ -19,6 +19,7 @@ import (
 	"github.com/subgentic/coral/internal/agentmodels"
 	"github.com/subgentic/coral/internal/agentsignin"
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/naming"
@@ -71,6 +72,7 @@ type launchSpec struct {
 
 // launchSession creates a new agent session using the specified backend (tmux or pty).
 func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_ map[string]any, retErr error) {
+	h.ensureScratchDir(spec.WorkDir)
 	if msg := launchDirError(spec.WorkDir); msg != "" {
 		return nil, errors.New(msg)
 	}
@@ -541,6 +543,15 @@ func isExtendedDrivePath(p string) bool {
 	}
 	c := p[4] | 0x20
 	return c >= 'a' && c <= 'z'
+}
+
+// ensureScratchDir makes the scratch folder when a launch names exactly it (the folder New agent offers a person who has used none, #10034): no other missing folder is made.
+func (h *SessionsHandler) ensureScratchDir(dir string) {
+	scratch := config.ScratchDir(h.cfg.CoralRoot)
+	if scratch == "" || dir == "" || filepath.Clean(dir) != scratch {
+		return
+	}
+	_ = os.MkdirAll(scratch, 0o755)
 }
 
 func launchDirError(dir string) string {

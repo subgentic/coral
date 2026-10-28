@@ -101,6 +101,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 	// A directory that does not exist is the caller's mistake: 400 naming the
 	// field, so the dialog can mark it (it used to surface as a 500) (#3152).
+	h.ensureScratchDir(body.WorkingDir)
 	if msg := launchDirError(body.WorkingDir); msg != "" {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailWorkdirUnavailable, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg, "field": "working_dir"})

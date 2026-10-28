@@ -7,6 +7,8 @@ import (
 	"embed"
 	"html/template"
 	"path"
+
+	"github.com/subgentic/coral/internal/config"
 )
 
 // Static holds the files served under /static/ (JavaScript modules, CSS, vendor
@@ -20,6 +22,9 @@ var Static embed.FS
 //
 //go:embed all:templates
 var Templates embed.FS
+
+// ScratchDir is the folder New agent offers when no folder was used before ("" with no root: the Cloud Hub has none).
+func (p PageData) ScratchDir() string { return config.ScratchDir(p.CoralRoot) }
 
 // PageData is what the app shell template needs. The Coral server and the Cloud
 // Hub both render it.

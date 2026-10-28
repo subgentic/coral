@@ -34,6 +34,11 @@ export function getRecentDirs(server = LOCAL_SERVER) {
     }
 }
 
+/** The folder New agent and New team start with (#10034): the Settings default, else the last folder an agent was launched in (on that server), else, on this computer, its scratch folder (made when a launch names it); a remote with none stays empty. */
+export function defaultLaunchDir(server = LOCAL_SERVER, settings = {}) {
+    return settings.default_working_dir || getRecentDirs(server)[0] || (server === LOCAL_SERVER ? document.body?.dataset?.scratchDir || '' : '');
+}
+
 /* Remember a working directory an agent was launched into (most recent first) */
 export function recordRecentDir(path, server = LOCAL_SERVER) {
     path = (path || "").trim();

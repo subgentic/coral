@@ -4,7 +4,7 @@ import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
 import { loadBoardProjects } from './message_board.js';
-import { recordRecentDir, getRecentDirs } from './browser.js';
+import { recordRecentDir, getRecentDirs, defaultLaunchDir } from './browser.js';
 import { teamForm, showTeamWorktree, showTeamWorkers } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER } from './server_base.js';
@@ -386,12 +386,12 @@ async function _initTeamForm() {
     // Pre-fill working dir from the target server's settings
     const s = _settingsFor(_effectiveServer(launch.server));
     const dirInput = document.getElementById("launch-team-dir");
-    // No folder is chosen for the person (#5989): the Settings default if they set one, else empty and required, never the home folder.
+    // The folder is the Settings default, else the last one used, else the scratch folder (#10034); never the home folder (#5989).
     if (dirInput) dirInput.value = '';
     const goalEl = document.getElementById("team-goal");
     if (goalEl) goalEl.value = "";
     if (launch.server !== LOCAL_SERVER) _resetDirInputs(['launch-team-dir'], launch.server, s, { switching: true });
-    else if (s.default_working_dir && dirInput) dirInput.value = s.default_working_dir;
+    if (dirInput && !dirInput.value) dirInput.value = defaultLaunchDir(_effectiveServer(launch.server), s); // the Settings default, the last folder used or this computer's scratch folder (#10034)
 
     // Show worktree option when directory is a git repo (checked on the target server)
     if (dirInput && !dirInput.dataset.gitWired) {

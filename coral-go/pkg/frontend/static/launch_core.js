@@ -43,8 +43,8 @@ export function setLaunchStage(stage) {
     if (subEl) { subEl.textContent = ''; if (stage !== 'folder' && dir) { subEl.append(`Step ${n} of ${total}: ${STAGE_NAMES[stage]}. In `); const b = document.createElement('b'); b.textContent = dir; subEl.append(b); } else subEl.textContent = sub; }
     const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go"), save = document.getElementById("launch-agent-save");
     if (back) back.hidden = stage === stages[0];
-    if (next) next.hidden = stage === 'agent';
-    if (go) go.hidden = !!launch.member || !(stage === 'agent' || launchFlags.launchFromAnyStep); // a member is saved into the team form, not launched (#7861)
+    if (next) { next.hidden = stage === 'agent'; next.textContent = stage === 'folder' ? 'Advanced' : 'Next'; next.classList.toggle('btn-primary', stage !== 'folder' || !!launch.member || !!launch.addTo); } // on step 1 Launch is the primary and Advanced the quiet one // persona, prompt and permissions are one click away (#10034)
+    if (go) go.hidden = !!launch.member || !(stage === 'agent' || launchFlags.launchFromAnyStep || launch.mode === 'agent'); // New Agent launches from its first step (#10034); the rest is behind Advanced // a member is saved into the team form, not launched (#7861)
     if (save) save.hidden = !launch.member || stage !== 'agent';
     const recap = document.getElementById("launch-recap");
     if (recap) recap.hidden = stage === 'folder' || !!launch.member;

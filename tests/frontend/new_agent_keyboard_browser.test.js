@@ -31,6 +31,7 @@ const BASE = require('./test_base').BASE;
             assert.ok(d, 'role=dialog named New agent'); assert.equal(d.modal, 'true', 'aria-modal'); assert.match(d.name, /^New agent$/, `the dialog is named "New agent" on its steps (it is "${d.name}")`); assert.ok((await active()).inside, 'focus starts inside the dialog');
         });
         await S.run('Enter in the folder is Next; with no folder it does not advance', async () => {
+            await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); // New agent now opens with a folder (#10034): this is the person who cleared it
             await focusEl('input', N.folder); await key('Enter');
             assert.match(await ev(`window.__na.dialog().textContent`), /Step 1 of 3/, 'no folder: still step 1');
             await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = '/work/payments-app'; i.dispatchEvent(new Event('input', { bubbles: true })); i.focus(); return true; })()`);

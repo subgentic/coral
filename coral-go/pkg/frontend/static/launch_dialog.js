@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem } from './utils.js';
 import { blockedReason } from './hub_access.js';
 import { loadLiveSessions } from './api.js';
-import { recordRecentDir, setDirServerResolver, getRecentDirs } from './browser.js';
+import { recordRecentDir, setDirServerResolver, getRecentDirs, defaultLaunchDir } from './browser.js';
 import { defaultAgentName } from './session_state.js';
 import { serverFetch, identityKey, isHub, normServer, LOCAL_SERVER, keyLabel, noteBoardLabels } from './server_base.js';
 import { pickerVisible, pickerOptions, serverLabel, coerceSelection, bareBoardName } from './launch_server.js';
@@ -81,7 +81,7 @@ function _selectLaunchType(type) {
         // The agent is chosen in this step, not only under More options (#6199): a radio group that follows the form's own select, the installed agents first.
         importOnce('./launch_agent_pick.js').then(m => m.buildAgentPick({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
         _folderPressed = false; folderForm()?.clearErrors();
-        _wireDirNote(); _syncDirNote(); _syncLaunchBlock(); _renderDirRecents();
+        _applyDefaultDir(); _wireDirNote(); _syncDirNote(); _syncLaunchBlock(); _renderDirRecents();
         wireRecap(); syncRecap(); _syncLaunchBlock();
         _checkTmuxHere(); // tmux missing: said once, Launch off (#6046)
         if (launch.member) _applyMember(); else if (launch.addTo) _applyAddTo(); else document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
@@ -189,11 +189,21 @@ const _LAUNCH_DIR_IDS = ['launch-dir', 'launch-terminal-dir', 'launch-team-dir']
 const _LAUNCH_BROWSER_IDS = ['dir-browser', 'dir-browser-terminal', 'dir-browser-team'];
 
 
+/** New Agent opens with a folder (#10034): the Settings default, the last one used or this computer's scratch folder, so Launch works from step 1. A team member has none; a folder already there stays. */
+function _applyDefaultDir() {
+    const input = document.getElementById('launch-dir');
+    if (!input || launch.member || input.value.trim()) return;
+    const server = _effectiveServer(launch.server);
+    input.value = defaultLaunchDir(server, _settingsFor(server));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 function _resetLaunchDirs(server, opts) {
     // The team dir is also filled by _initTeamForm; only touch it on a switch
     // or for a remote so local behaviour with hub off is unchanged.
     const ids = (opts && opts.switching) || server !== LOCAL_SERVER ? _LAUNCH_DIR_IDS : _LAUNCH_DIR_IDS.slice(0, 2);
     _resetDirInputs(ids, server, _settingsFor(server), opts);
+    if (launch.mode === 'agent') _applyDefaultDir();
     for (const id of _LAUNCH_BROWSER_IDS) {
         const b = document.getElementById(id);
         if (b) b.style.display = 'none';
@@ -274,7 +284,9 @@ function _syncLaunchBlock() {
     // The reason Launch is off is its description (#7391): the missing CLI's line. A missing folder never turns a button off: pressing Next says it where the folder is (one red line above the buttons, the error under the field).
     const noDir = !launch.member && !(document.getElementById('launch-dir')?.value || '').trim();
     const status = document.getElementById('launch-agent-status');
-    if (status && (_folderPressed || status.textContent === 'Choose a folder')) status.textContent = _folderPressed && noDir ? 'Choose a folder' : ''; // the folder's line only: a member's role line is said by the member's own save
+    if (status && why) { status.textContent = (why.textContent || '').trim().replace(/\s+/g, ' ') || 'Launch is off'; status.dataset.why = '1'; } // Launch is off: its reason is said on this step, beside the buttons (#10034)
+    else if (status && status.dataset.why) { delete status.dataset.why; status.textContent = ''; }
+    if (status && !why && (_folderPressed || status.textContent === 'Choose a folder')) status.textContent = _folderPressed && noDir ? 'Choose a folder' : ''; // the folder's line only: a member's role line is said by the member's own save
     for (const b of [go, next]) {
         if (!b) continue;
         b.removeAttribute('aria-disabled');
@@ -300,6 +312,7 @@ function _syncTeamBlock() {
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest && e.target.closest('#launch-step-team')) _syncTeamBlock(); });
 
 // The first step helps with the folder (#6370 item 3): the last three folders as buttons (a repeat launch is one click), and for a person who has used none, one line that says what to pick.
+const DATALIST_ATTRIBUTE = 'l\x69st'; // the input's datalist attribute
 function _renderDirRecents() {
     const box = document.getElementById('launch-dir-recents'), hint = document.getElementById('launch-dir-hint');
     if (!box || !hint) return;
@@ -310,6 +323,12 @@ function _renderDirRecents() {
         b.textContent = d.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || d;
         return b;
     }));
+    const input = document.getElementById('launch-dir');
+    if (input) { // every recent folder as the field's own list, as well as the buttons (#10034)
+        let list = document.getElementById('launch-dir-list');
+        if (!list) { list = document.createElement('datalist'); list.id = 'launch-dir-list'; input.after(list); input.setAttribute(DATALIST_ATTRIBUTE, list.id); }
+        list.replaceChildren(...getRecentDirs(_effectiveServer(launch.server)).map(d => Object.assign(document.createElement('option'), { value: d })));
+    }
     hint.textContent = ''; // the Browse button and the field's own placeholder say it: no line under the label (#7064)
     hint.hidden = true;
 }
@@ -331,6 +350,7 @@ function _wireDirNote() {
     const input = document.getElementById('launch-dir');
     if (!input || input.dataset.noteWired) return;
     input.dataset.noteWired = '1';
+    input.addEventListener('focus', () => input.select()); // a folder already there is selected, so typing replaces it and does not add to it (#10034)
     input.addEventListener('input', _syncDirNote); input.addEventListener('change', _syncDirNote);
     input.addEventListener('input', _syncLaunchBlock); input.addEventListener('change', _syncLaunchBlock); // Next and Launch say why they are off until there is a folder
     input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); _launchStage('next'); } }); // Enter is Next

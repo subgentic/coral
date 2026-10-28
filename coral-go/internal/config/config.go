@@ -342,3 +342,11 @@ func Truthy(v string) bool {
 	}
 	return false
 }
+
+// ScratchDir is the folder a first agent starts in when the person has used none: coral-scratch in Coral's root (the home folder by default). It is made when a launch names it, never before (#10034).
+func ScratchDir(root string) string {
+	if root == "" {
+		return ""
+	}
+	return filepath.Join(root, "coral-scratch")
+}
