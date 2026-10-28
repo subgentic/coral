@@ -110,6 +110,6 @@ export function initDockTabs() {
         watchScrollCue(row);
     } // the phone's overlay strip scrolls: a fade says which edge hides tabs
     WIDE.addEventListener('change', fitWords);
-    document.addEventListener('click', e => { if (menuOpen && !e.target.closest?.('#agentic-more')) closeMore(false); });
-    document.addEventListener('focusout', e => { if (menuOpen && e.relatedTarget && !e.relatedTarget.closest?.('#agentic-more')) closeMore(false); });
+    document.addEventListener('click', e => { if (menuOpen && !e.target.closest?.('#agentic-more, #agentic-more-menu')) closeMore(false); }); // the menu is beside the More wrapper (#10214): both are the control
+    document.addEventListener('focusout', e => { if (menuOpen && e.relatedTarget && !e.relatedTarget.closest?.('#agentic-more, #agentic-more-menu')) closeMore(false); });
 }
