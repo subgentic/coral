@@ -62,6 +62,9 @@ function _allTemplates() { return [...BUILTIN_TEAM_TEMPLATES, ..._getSavedTeamTe
 
 /** The choice the dialog opens on (#9906): the default members it fills in (the Orchestrator, the Lead Developer, the QA Engineer). Not a template of its own: team_dialogs.js loads it. */
 const DEFAULT_TEAM_KEY = '__default';
+/** The choice after an AI-generated team filled Members (#9911): shown only while it is what is chosen, with the member count; Blank team clears the members and takes it away. */
+const GENERATED_TEAM_KEY = '__generated';
+let _generatedCount = 0;
 
 const SEARCH_FROM = 9; // the search is there once there are more templates than a list is quick to read
 
@@ -71,11 +74,19 @@ function _renderTeamTemplateSelector(query = '') {
     const all = _allTemplates(), q = String(query || '').trim().toLowerCase();
     const search = document.getElementById('team-template-search'); if (search) search.hidden = all.length < SEARCH_FROM;
     sel.replaceChildren(new Option('Blank team', ''), new Option('Default team (3 members)', DEFAULT_TEAM_KEY));
+    if (_chosenTemplate === GENERATED_TEAM_KEY) sel.append(new Option(`Generated team (${_generatedCount} ${_generatedCount === 1 ? 'member' : 'members'})`, GENERATED_TEAM_KEY));
     for (const t of all.filter(x => !q || x.name.toLowerCase().includes(q) || x.name === _chosenTemplate)) {
         const members = t.agents.length === 1 ? '1 member' : `${t.agents.length} members`;
         sel.append(new Option(`${t.name} (${members}${t.builtin ? '' : ', saved'})`, t.name));
     }
     sel.value = [...sel.options].some(o => o.value === _chosenTemplate) ? _chosenTemplate : '';
+}
+
+/** An AI-generated team is in Members: the template choice says so. */
+function markGeneratedTeam(count) {
+    _generatedCount = count;
+    _chosenTemplate = GENERATED_TEAM_KEY;
+    _renderTeamTemplateSelector(document.getElementById('team-template-search')?.value || '');
 }
 
 function markTeamTemplate(name) {
@@ -154,4 +165,4 @@ async function _confirmSaveTemplate() {
 }
 window._confirmSaveTemplate = _confirmSaveTemplate;
 
-export { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, _renderTeamTemplateSelector, markTeamTemplate, resetTeamTemplatePicker };
+export { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, markTeamTemplate, markGeneratedTeam, resetTeamTemplatePicker };

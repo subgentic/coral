@@ -18,7 +18,7 @@ const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { showSettingsModal } = await importOnce('./settings_dialog.js');
 const { modelName, levelName } = await importOnce('./model_labels.js');
 const { launchedMode } = await importOnce('./preset_enforcement.js');
-const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, _renderTeamTemplateSelector, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
+const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
 const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings, setTeamLaunchMode } = await importOnce('./team_launch_settings.js');
 
@@ -422,8 +422,8 @@ async function _initTeamForm() {
     await _loadExistingTeamBoards();
 
     // The template picker says what is in Members: the default team when it was filled in, nothing chosen otherwise (#9906)
-    resetTeamTemplatePicker();
-    if (defaultsOnOpen) markTeamTemplate(DEFAULT_TEAM_KEY);
+    // An AI-generated team fills Members and marks the picker itself, before this async step resumes: the reset must not take its mark away (#9911).
+    if (defaultsOnOpen) { resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); }
     _syncTeamMembers();
 
     launch.skipDefaultTeamAgents = false;
@@ -592,6 +592,7 @@ function _pickTeamTemplate(name) {
         _syncTeamMembers();
         return;
     }
+    if (name === GENERATED_TEAM_KEY) return; // the members are already the generated team: choosing what is chosen changes nothing
     if (name === DEFAULT_TEAM_KEY) { // the default team again: it replaces the members, as any template does
         launch.teamAgentCounter = 0;
         document.getElementById('team-agents-list').innerHTML = '';

@@ -188,6 +188,11 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`getComputedStyle(document.getElementById('team-wizard-modal')).display`), 'none');
         assert.deepEqual(await teamRows(), ['Lead', 'Dev']); assert.equal(await ev(`document.getElementById('team-board-name').value`), 'Gen Team');
         assert.equal(await ev(`getComputedStyle(document.getElementById('generated-team-banner')).display`), 'flex');
+        const chosenTemplate = () => ev(`(() => { const s = document.getElementById('team-template-select'); return s.options[s.selectedIndex].textContent.trim(); })()`);
+        assert.equal(await chosenTemplate(), 'Generated team (2 members)', 'the template choice says where the members came from, not "Blank team" (#9911)');
+        await ev(`(() => { const s = document.getElementById('team-template-select'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await waitFor(`document.querySelectorAll('#team-agents-list > *').length === 0`, 'Blank team still clears the generated members', 4000);
+        assert.equal(await chosenTemplate(), 'Blank team', 'and says Blank team; the Generated team choice is gone');
 
         console.log('A job that is polled: its result is shown when it finishes');
         await ev(`window.hideLaunchModal(); window.showTeamWizardModal(); document.getElementById('team-wizard-directive').value = 'd'; document.getElementById('team-wizard-composition').value = 'c';

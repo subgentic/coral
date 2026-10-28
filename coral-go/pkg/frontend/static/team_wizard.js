@@ -7,6 +7,7 @@ const { launch } = await importOnce('./launch_state.js');
 const { _showLaunchStep } = await importOnce('./launch_core.js');
 const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { _initTeamForm, _addTeamAgent } = await importOnce('./team_dialogs.js');
+const { markGeneratedTeam } = await importOnce('./team_templates_ui.js');
 
 function _setTeamWizardError(message = '') {
     const errorEl = document.getElementById('team-wizard-error');
@@ -135,6 +136,7 @@ function _populateGeneratedTeamDraft(team) {
             agent.model,
         );
     }
+    markGeneratedTeam(team.agents.length); // the template choice says where the members came from, not Blank team (#9911)
 }
 
 let _activeGenerateJobId = null;
