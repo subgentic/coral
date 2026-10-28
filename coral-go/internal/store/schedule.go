@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/logsafe"
 )
 
 // ScheduledJob represents a cron job definition.
@@ -203,6 +204,7 @@ func (s *ScheduleStore) CreateScheduledRunTrigger(ctx context.Context, jobID int
 
 // UpdateScheduledRun updates allowed fields on a run.
 func (s *ScheduleStore) UpdateScheduledRun(ctx context.Context, runID int64, fields map[string]interface{}) error {
+	quietRunText(fields)
 	return dynamicUpdate(ctx, s.db, "scheduled_runs", runID, fields, map[string]bool{
 		"session_id": true, "worktree_path": true, "status": true,
 		"started_at": true, "finished_at": true, "exit_reason": true, "error_msg": true,
@@ -214,6 +216,7 @@ func (s *ScheduleStore) UpdateScheduledRun(ctx context.Context, runID int64, fie
 // deadline, a user's kill, the agent exiting) makes, so that exactly one of them settles it and none overwrites another's outcome (#7090). errorMsg and errorCode are kept when not empty.
 func (s *ScheduleStore) FinishScheduledRunIfActive(ctx context.Context, runID int64, status, exitReason, errorMsg, errorCode, finishedAt string) (bool, error) {
 	var msg, code any
+	exitReason, errorMsg = logsafe.HomeInText(exitReason), logsafe.HomeInText(errorMsg)
 	if errorMsg != "" {
 		msg = errorMsg
 	}
@@ -439,4 +442,20 @@ func (s *ScheduleStore) SessionsOfFinishedRuns(ctx context.Context, sessionIDs [
 		out[id] = true
 	}
 	return out, nil
+}
+
+// quietRunText writes the home folder as "~" in the texts of a run that a person reads (error_msg, exit_reason), in place: a run's error can carry a full path (the executable that is not installed, a
+// folder git refused), and the run is read by whoever may see it, Hub viewers included (#10021).
+func quietRunText(fields map[string]interface{}) {
+	for _, k := range []string{"error_msg", "exit_reason"} {
+		switch v := fields[k].(type) {
+		case string:
+			fields[k] = logsafe.HomeInText(v)
+		case *string:
+			if v != nil {
+				t := logsafe.HomeInText(*v)
+				fields[k] = &t
+			}
+		}
+	}
 }

@@ -178,3 +178,49 @@ func itoa(n int) string {
 	}
 	return string(b[i:])
 }
+
+// HomeInText writes every place text names the user's home folder as "~": an error sentence that carries a full executable path ("/home/name/.local/bin/claude is not installed") is stored in a run and
+// read by whoever may see the run, Coral Hub's viewers included (#10021). A folder under the home keeps its path after the "~"; a longer name that only starts like it ("/home/someoneelse" next to "/home/someone") is left.
+func HomeInText(text string) string { return homeInText(text, homeFolders()) }
+
+func homeInText(text string, homes []string) string {
+	if text == "" {
+		return text
+	}
+	fold := filepath.Separator == '\\' // Windows compares paths without case
+	for _, h := range homes {
+		h = strings.TrimRight(h, `/\`)
+		if len(h) < 2 {
+			continue
+		}
+		hay, needle := text, h
+		if fold {
+			hay, needle = strings.ToLower(hay), strings.ToLower(needle)
+		}
+		var b strings.Builder
+		i := 0
+		for {
+			k := strings.Index(hay[i:], needle)
+			if k < 0 {
+				break
+			}
+			k += i
+			end := k + len(needle)
+			inName := func(c byte) bool { // a character that can continue a folder's name
+				return c == '_' || c == '-' || c == '.' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80
+			}
+			before := k == 0 || !inName(text[k-1]) && text[k-1] != '/' && text[k-1] != '\\' || strings.HasSuffix(text[:k], "file://") // a file:// link names the folder from its third slash
+			after := end == len(text) || !inName(text[end])
+			if before && after {
+				b.WriteString(text[i:k])
+				b.WriteString("~")
+			} else {
+				b.WriteString(text[i:end])
+			}
+			i = end
+		}
+		b.WriteString(text[i:])
+		text = b.String()
+	}
+	return text
+}

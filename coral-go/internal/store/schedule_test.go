@@ -141,3 +141,72 @@ func TestOneshotRuns(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, jobs) // sentinel excluded
 }
+
+// #10021: a run's error text is read by whoever may see the run (Hub viewers included), so the home folder is written as "~" in it, whichever way the text is stored.
+func TestRunErrorTextsHideTheHomeFolder(t *testing.T) {
+	t.Setenv("HOME", "/home/someone")
+	t.Setenv("USERPROFILE", "")
+	db := openTestDB(t)
+	s := NewScheduleStore(db)
+	ws := NewWorkflowStore(db)
+	ctx := context.Background()
+	const raw, want = "/home/someone/.local/bin/claude is not installed", "~/.local/bin/claude is not installed"
+
+	job, err := s.CreateScheduledJob(ctx, &ScheduledJob{Name: "j", CronExpr: "* * * * *", RepoPath: "/tmp", Prompt: "p", Enabled: 1})
+	require.NoError(t, err)
+	runID, err := s.CreateScheduledRun(ctx, job.ID, "2026-01-01T00:00:00Z", "pending")
+	require.NoError(t, err)
+	require.NoError(t, s.UpdateScheduledRun(ctx, runID, map[string]interface{}{"status": "failed", "error_msg": raw, "exit_reason": raw}))
+	run, err := s.GetScheduledRun(ctx, runID)
+	require.NoError(t, err)
+	require.NotNil(t, run.ErrorMsg)
+	assert.Equal(t, want, *run.ErrorMsg)
+	assert.Equal(t, want, *run.ExitReason)
+
+	second, err := s.CreateScheduledRun(ctx, job.ID, "2026-01-02T00:00:00Z", "running")
+	require.NoError(t, err)
+	ok, err := s.FinishScheduledRunIfActive(ctx, second, "failed", raw, raw, "code", "2026-01-02T00:01:00Z")
+	require.NoError(t, err)
+	require.True(t, ok)
+	run, err = s.GetScheduledRun(ctx, second)
+	require.NoError(t, err)
+	assert.Equal(t, want, *run.ErrorMsg)
+	assert.Equal(t, want, *run.ExitReason)
+
+	wf, err := ws.CreateWorkflow(ctx, &Workflow{Name: "w", StepsJSON: `[{"name":"s","type":"shell","command":"true"}]`, RepoPath: "/tmp", Enabled: 1})
+	require.NoError(t, err)
+	wr, err := ws.CreateWorkflowRun(ctx, wf.ID, "api", nil)
+	require.NoError(t, err)
+	msg := raw
+	require.NoError(t, ws.SetRunStatus(ctx, wr.ID, "failed", &msg))
+	got, err := ws.GetWorkflowRunDirect(ctx, wr.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got.ErrorMsg)
+	assert.Equal(t, want, *got.ErrorMsg)
+
+	// every other write of a workflow run's text: a field update, the sign-in refusal, and the step results' tails and note
+	wr2, err := ws.CreateWorkflowRun(ctx, wf.ID, "api", nil)
+	require.NoError(t, err)
+	require.NoError(t, ws.UpdateWorkflowRun(ctx, wr2.ID, map[string]interface{}{"error_msg": raw}))
+	got, err = ws.GetWorkflowRunDirect(ctx, wr2.ID)
+	require.NoError(t, err)
+	assert.Equal(t, want, *got.ErrorMsg, "UpdateWorkflowRun")
+	require.NoError(t, ws.SetRunSignInRefused(ctx, wr2.ID, raw, ErrorCodeNotSignedIn, "claude"))
+	got, err = ws.GetWorkflowRunDirect(ctx, wr2.ID)
+	require.NoError(t, err)
+	assert.Equal(t, want, *got.ErrorMsg, "SetRunSignInRefused")
+	results := `[{"index":0,"name":"build","type":"shell","status":"failed","exit_code":127,"output_tail":"ran /home/someone/bin/build\n","error_tail":"bash: /home/someone/x: No such file or directory","note":"refused /home/someone/out.txt","files":[]},{"index":1,"name":"next","type":"shell","status":"pending","files":null}]`
+	require.NoError(t, ws.UpdateStepResults(ctx, wr2.ID, 1, results))
+	got, err = ws.GetWorkflowRunDirect(ctx, wr2.ID)
+	require.NoError(t, err)
+	assert.NotContains(t, got.StepResults, "/home/someone", "no step text names the home folder")
+	assert.Contains(t, got.StepResults, "bash: ~/x: No such file or directory")
+	assert.Contains(t, got.StepResults, "ran ~/bin/build")
+	assert.Contains(t, got.StepResults, "refused ~/out.txt")
+	assert.Contains(t, got.StepResults, `"exit_code":127`, "the rest of a result is kept")
+	assert.Contains(t, got.StepResults, `"files":null`)
+	require.NoError(t, ws.UpdateStepResults(ctx, wr2.ID, 1, "not json"))
+	got, err = ws.GetWorkflowRunDirect(ctx, wr2.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "not json", got.StepResults, "a value that is not the results' JSON is stored as it came")
+}
