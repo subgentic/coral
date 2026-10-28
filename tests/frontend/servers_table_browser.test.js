@@ -314,8 +314,8 @@ const contrast = (a, b) => {
         console.log('   ok');
 
         console.log('6. Both themes at 4.5:1 and the shots (desktop, then a phone)');
-        for (const [w, h, mobile, tag] of [[1280, 900, false, 'desktop'], [390, 844, true, 'phone']]) {
-            await client.Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await client.Emulation.setTouchEmulationEnabled({ enabled: mobile }); // a phone is a touch screen: its targets are 44 px
+        for (const [w, h, mobile, tag, touch] of [[1280, 900, false, 'desktop', false], [390, 844, true, 'phone', true], [820, 1100, false, 'tablet', true]]) { // a touch tablet: a coarse pointer above a phone's width (QA Engineer's note on #9814)
+            await client.Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await client.Emulation.setTouchEmulationEnabled({ enabled: touch }); // a phone is a touch screen: its targets are 44 px
             await open();
             await waitFor(`document.querySelectorAll('#servers-view tr.cs-row').length === ${SERVERS.length}`, 'rows', 6000);
             await installAudit(ev);
@@ -324,7 +324,7 @@ const contrast = (a, b) => {
                 const au = await auditRegion(ev, ['#cs-add-machine', '#servers-view .cs-table']);
                 assert.ok(au.checked > 0 && !au.fails.filter(f => !/Revoke/.test(f.text || '')).length, `${tag} ${theme}: 4.5:1 ${JSON.stringify(au.fails).slice(0, 400)}`);
                 const tg = await ev(`(() => { const hs = [...document.querySelectorAll('#servers-view .cs-sort, #servers-view .cs-toggle, #servers-view .dt-sortbar-select')].filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height)); return Math.min(...hs); })()`);
-                assert.ok(tg >= (mobile ? 44 : 24), `${tag} ${theme}: the sort headers and row toggles are big enough targets (${tg} px: 24 with a mouse, 44 on a touch phone)`);
+                assert.ok(tg >= (touch ? 44 : 24), `${tag} ${theme}: the sort headers and row toggles are big enough targets (${tg} px: 24 with a mouse, 44 under touch, a phone or a tablet)`);
                 const over = await ev(`document.documentElement.scrollWidth - innerWidth`);
                 assert.ok(over <= 0, `${tag}: no sideways scroll (${over})`);
                 await ev(`document.querySelector('#servers-view .cs-table').scrollIntoView(); true`);

@@ -22,9 +22,10 @@ const NAME = 'Production build server for the release candidate integration and 
                 if(p==='/api/servers')return J(servers);
                 return real(u,o);};
         })()`});
-        for (const width of [1280,390]) {
+        for (const width of [1280,390,820]) { // 820 is a touch tablet: a coarse pointer at a width above a phone's, so its target is the touch 44 px, not the mouse's row (QA Engineer's note on #9814)
+            const touch=width!==1280;
             await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
-            await Emulation.setTouchEmulationEnabled({enabled:width===390});
+            await Emulation.setTouchEmulationEnabled({enabled:touch});
             await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`(async()=>{ const real=window.fetch; const J=o=>Promise.resolve(new Response(JSON.stringify(o),{headers:{'Content-Type':'application/json'}}));
@@ -48,7 +49,7 @@ const NAME = 'Production build server for the release candidate integration and 
                 await waitFor(`!!document.querySelector('#server-row-build-west .dt-name-text')`, 'long server name', 10000, `({tab:document.querySelector('.nav-tab.active')?.id,body:document.querySelector('#servers-tab-body')?.textContent,servers:window.__qaState?.servers})`);
                 const name=await ev(`(()=>{const n=document.querySelector('#server-row-build-west .dt-name-text'),b=n.closest('button'),s=getComputedStyle(n),td=n.closest('td');return {text:n.textContent,title:td.title,buttonTitle:b.title,accessible:b.getAttribute('aria-label'),space:s.whiteSpace,clamp:s.webkitLineClamp,folded:!!n.closest('.dt-folded'),nameHeight:n.getBoundingClientRect().height,height:b.getBoundingClientRect().height,rowHeight:n.closest('tr').getBoundingClientRect().height,width:b.getBoundingClientRect().width,clipped:n.scrollWidth>n.clientWidth,over:document.documentElement.scrollWidth-innerWidth};})()`);
                 assert.equal(name.text,NAME); assert.equal(name.title,NAME); assert.equal(name.buttonTitle,NAME); assert.equal(name.accessible,'Open '+NAME+', Online'); /* the whole long name, then its state (#9683: Open <name>, <state>) */ assert.ok(name.over<=1,JSON.stringify(name));
-                assert.equal(name.folded,false,'a server row is one line at every width (Goal #79): the table does not fold'); assert.equal(name.space,'nowrap'); assert.equal(name.clipped,true,'a long name is ellipsized, its title is whole'); assert.ok(Math.max(name.height,name.rowHeight)>=(width===390?44:36) && name.width>=44,'the name opens from a target of 44 px on a touch phone and the 36 px row at a mouse (#9758, #9734): a row that shrank to 24 to 35 px is the density regression this guards '+JSON.stringify(name));
+                assert.equal(name.folded,false,'a server row is one line at every width (Goal #79): the table does not fold'); assert.equal(name.space,'nowrap'); assert.equal(name.clipped,true,'a long name is ellipsized, its title is whole'); assert.ok(Math.max(name.height,name.rowHeight)>=(touch?44:36) && name.width>=44,'the name opens from a target of 44 px under touch (a phone, a tablet) and the 36 px row at a mouse (#9758, #9734): a row that shrank to 24 to 35 px is the density regression this guards '+JSON.stringify(name));
                 await shot(`servers-long-name-${width}-${theme}`);
                 console.log(`PASS ${width} ${theme}: short failed chip, two-line reason, complete title, one-line server name`);
             }
