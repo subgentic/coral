@@ -305,7 +305,7 @@ export function showNotificationToast(agentLabel, detail, onClick) {
         : "";
     toast.innerHTML = `<div class="notification-toast-body">
             <div class="notification-toast-header">
-                <span class="notification-toast-title">⏳ <strong>${agentLabel}</strong> needs input</span>
+                <span class="notification-toast-title">⏳ <strong>${agentLabel}</strong> needs your answer</span>
                 <button class="notification-toast-close">✕</button>
             </div>
             ${detailHtml}

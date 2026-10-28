@@ -222,6 +222,7 @@ function needsInputHtml(info, session) {
         const target = inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || "";
         if (inp.description && inp.command) context += `<div class="cni-context-text">${escapeHtml(inp.description)}</div>`;
         if (target) context += `<pre class="cni-target"><code>${escapeHtml(target)}</code></pre>`;
+        else if (info.summary && info.summary !== question) context += `<div class="cni-context-text cni-ask">${escapeHtml(info.summary)}</div>`; // what is asked, from the event, as the Inbox row says it (#10141)
     } else if (info.kind === "prompt") {
         question = screenQuestion || "The agent is waiting for you";
     } else {

@@ -220,7 +220,7 @@ function _raiseNeedsInputAlert(s, id) {
     const agentType = s.agent_type;
     const sessionId = s.session_id;
     const sessionSrv = sessionServer(s);
-    const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv));
+    const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv)).then(() => window.showChatView?.()); // the chat card is where the answer is (#10141)
     showNotificationToast(label, detail, openSession);
     // Opt-in desktop alert while this tab is in the background; names only.
     const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);

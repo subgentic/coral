@@ -35,9 +35,11 @@ function hasTranscript(session) {
 // attaches only for a view that wants it (sessions.js asks effectiveLiveViewMode), so the view that is showing has to be what is asked:
 // until the next agent is selected, or a view is chosen with the toggle, the terminal is the view.
 let _terminalOverride = false;
-export function clearViewOverride() { _terminalOverride = false; }
+// An agent opened from something that says it needs an answer (a Needs you row, the toast's Open) shows the chat, where the card is, whatever view was saved last: for this agent only, the same way (#10141).
+let _chatOverride = false;
+export function clearViewOverride() { _terminalOverride = false; _chatOverride = false; }
 export function effectiveLiveViewMode(override) {
-    return hasTranscript(state.currentSession) ? (override || (_terminalOverride ? "terminal" : getLiveViewMode())) : "terminal";
+    return hasTranscript(state.currentSession) ? (override || (_terminalOverride ? "terminal" : _chatOverride ? "chat" : getLiveViewMode())) : "terminal";
 }
 
 /** Apply the persisted mode (or a one-off override) to the DOM and start/stop the transcript poll. */
@@ -102,7 +104,7 @@ function scheduleTerminalPrefetch() {
     }, terminalPrefetch.idleMs);
 }
 export function setLiveViewMode(mode) {
-    _terminalOverride = false;
+    _terminalOverride = false; _chatOverride = false;
     try {
         browserLocal.set(VIEW_MODE_KEY, mode === "chat" ? "chat" : "terminal");
     } catch { /* storage unavailable — mode lasts for this page only */ }
@@ -115,8 +117,14 @@ export function setLiveViewMode(mode) {
     }
 }
 
+/** Show the chat for this agent without changing the saved Chat/Terminal choice (a row that says it needs an answer opened it). */
+export function showChatView() {
+    _chatOverride = true; _terminalOverride = false;
+    applyLiveViewMode("chat");
+}
+
 /** Show the terminal for this agent without changing the saved Chat/Terminal choice. */
 export function showTerminalView() {
-    _terminalOverride = true;
+    _terminalOverride = true; _chatOverride = false;
     applyLiveViewMode("terminal");
 }
