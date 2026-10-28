@@ -448,7 +448,8 @@
 
     .command-pane textarea {
         min-height: 2.25rem !important;   /* 36px; rem, so the box grows with the text size (#4086) */
-        max-height: 5rem;                 /* 80px */
+        flex: 0 1 auto;                   /* its own height (command_autosize.js grows it with the text): flex: 1 from command-pane.css took the row's content height instead (#10281) */
+        max-height: min(40vh, calc(5lh + 20px)); /* about five lines, then it scrolls, and never more than 40% of the screen: the messages keep the room above the keyboard (the team board's rule, #10088; the chat's was 80 px, #10281) */
         font-size: var(--fs-xl) !important; /* 16px at the default size: prevents iOS zoom on focus, and follows the text size */
         padding: 7px 12px;
         border-radius: 18px;
