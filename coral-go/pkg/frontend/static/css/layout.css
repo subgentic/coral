@@ -669,7 +669,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .editions-home-hide { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: none; border-radius: var(--radius-md); background: none; color: var(--text-muted); cursor: pointer; }
 .editions-home-hide:hover, .editions-home-hide:focus-visible { color: var(--text-primary); background: var(--bg-hover); }
 .editions-home-hide .material-icons { font-size: var(--icon-size); }
-@media (pointer: coarse), (max-width: 1024px) { .editions-home-hide { width: 44px; height: 44px; margin: -8px -8px -8px 0; } }
+@media (pointer: coarse), (max-width: 1024px) { .editions-home-hide { flex: none; width: 44px; min-width: 44px; height: 44px; margin: -8px -8px -8px 0; } } /* flex: none: a flex row squeezed it to 36 px wide at 820 px and 200% text (#10328) */
 .editions-home-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .editions-home-item { position: relative; display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 14px 40px 14px 14px; border: 1px solid var(--border); border-radius: var(--radius-xl); color: var(--text-secondary); font-family: inherit; text-align: left; text-decoration: none; cursor: pointer; transition: border-color .15s ease, background .15s ease; border-color: transparent; background: transparent; }
 /* "Use Coral from anywhere" is a quiet row under the launch cards, not two more cards of their weight (#6042); its border returns on hover and focus. */
