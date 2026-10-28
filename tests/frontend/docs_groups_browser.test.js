@@ -18,6 +18,7 @@ const BASE = require('./test_base').BASE;
         const gs = groups.find(g => /^Getting started/.test(g.label)), dev = groups.find(g => /^For developers/.test(g.label));
         check('the groups are Getting started and For developers', !!gs && !!dev && !groups.some(g => /^API\b/.test(g.label)), JSON.stringify(groups.map(g => g.label)));
         check('How do I... is the first topic of Getting started, then Quickstart', gs && gs.docs[0] === 'how-do-i' && gs.docs[1] === 'quickstart', JSON.stringify(gs && gs.docs));
+        check('its title keeps the pronoun a capital: "How do I...?"', (await ev(`(document.querySelector('#docs-nav-list [data-doc="how-do-i"]') || {}).textContent`)) === 'How do I...?', String(await ev(`(document.querySelector('#docs-nav-list [data-doc="how-do-i"]') || {}).textContent`)));
         check('Getting started has the newcomer pages only: no API reference, no Sessions API', gs && !gs.docs.includes('README') && !gs.docs.includes('sessions') && gs.docs.every(d => ['how-do-i', 'quickstart', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting'].includes(d)), JSON.stringify(gs && gs.docs));
         check('the API reference and the API pages are under For developers', dev && dev.docs.includes('README') && dev.docs.includes('sessions'), JSON.stringify(dev && dev.docs.slice(0, 6)));
         await shot('docs-groups-1280');
