@@ -32,7 +32,7 @@ const STUB = `(() => {
             await ev(`window.__coralReady.then(() => true)`); await ev(STUB);
             await ev(`window.showJobModal().then(() => true)`); // the form loads on first use (#10218): showJobModal answers once it is open
             await waitFor(`document.querySelectorAll('#job-modal-workflow option').length === 2`, 'the workflow list', 8000);
-            await waitFor(`/Runs every hour/.test(document.getElementById('cron-preview').textContent)`, 'the preview', 8000);
+            await waitFor(`/Runs every day at 09:00/.test(document.getElementById('cron-preview').textContent)`, 'the preview', 8000);
             await installAudit(ev);
 
             // 1. what is on the form first
@@ -43,7 +43,7 @@ const STUB = `(() => {
             assert.deepEqual(labels, ['Type|', 'Name|req', 'When|req', 'Workflow|req'], at + 'labels, in order (When right after Name, #9965), with Required in words: ' + JSON.stringify(labels));
             assert.deepEqual(await ev(`[...document.querySelectorAll('.sched-preset')].map(b => b.textContent.trim())`), ['Every N minutes', 'Every N hours', 'Daily at', 'Weekly on', 'Advanced'], at + 'the schedule is picked: minutes, hours, daily, weekly; the cron box is Advanced');
             const prev = await ev(`document.getElementById('cron-preview').textContent`);
-            assert.match(prev, /^Runs every hour\. Next: (today|tomorrow) \d\d:\d\d\.$/, at + 'the preview is one sentence, in the person\'s own zone (no zone named): ' + prev);
+            assert.match(prev, /^Runs every day at 09:00\. Next: (today|tomorrow) 09:00\.$/, at + 'the preview is one sentence, in the person\'s own zone (no zone named): ' + prev);
             assert.equal(await ev(`document.getElementById('cron-preview').getAttribute('role')`), 'status');
             assert.equal(await ev(`document.getElementById('job-modal-more').open`), false, at + 'More options starts closed');
             await ev(`document.querySelector('.sched-preset:nth-child(3)').click(); true`);
