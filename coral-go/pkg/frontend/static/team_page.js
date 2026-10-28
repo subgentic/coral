@@ -221,7 +221,7 @@ async function readCounts() {
     if (g) S.counts.goals = (Array.isArray(g) ? g : g.goals || []).length;
     const t = tasks.value;
     if (t && Number.isFinite(t.total_open)) S.counts.tasks = t.total_open;
-    if (avail.value && Array.isArray(avail.value.agents)) S.counts.agents = avail.value.agents.length;
+    if (avail.value && Array.isArray(avail.value.agents)) S.counts.agents = avail.value.agents.filter(a => a.availability !== 'archived').length; // as the sidebar group counts them (#10164)
     const k = kn.value;
     if (k && k.exists) S.counts.knowledge = ((k.index ? 1 : 0) + (Array.isArray(k.agents) ? k.agents.length : 0)) || null;
     drawStatus(avail.value);

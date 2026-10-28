@@ -57,7 +57,7 @@ async function load() {
         if (team !== model.team) return;
         if (!data || !Array.isArray(data.agents)) throw new Error('no answer');
         model.data = data; model.failed = '';
-        hooks.onCount?.(data.agents.length);
+        hooks.onCount?.(data.agents.filter(a => a.availability !== 'archived').length); // the sidebar group lists a team's live agents and keeps an archived one in its own section: the tab says the same number (#10164); the Archived chip still finds it
     } catch (e) {
         if (team !== model.team) return;
         model.failed = 'The agents could not be read.';
