@@ -14,6 +14,9 @@ import (
 // file that is not embedded would show a broken image, and an embedded screenshot no page names is weight in every binary.
 var docImageRef = regexp.MustCompile(`!\[[^\]]*\]\(docs-img/([^)\s]*)\)`)
 
+// One picture is at most this many bytes (the largest today is about 22 KB).
+const maxDocImageBytes = 24 * 1024
+
 var docImageName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*\.png$`)
 
 func TestDocsImagesAreEmbeddedAndNamed(t *testing.T) {
@@ -46,6 +49,9 @@ func TestDocsImagesAreEmbeddedAndNamed(t *testing.T) {
 	for _, e := range entries {
 		if strings.HasPrefix(e.Name(), ".") {
 			continue
+		}
+		if info, err := e.Info(); err == nil && info.Size() > maxDocImageBytes {
+			t.Errorf("static/docs-img/%s is %d bytes, over %d: crop it and save it as a palette PNG (every picture is in every binary, and the static tree has a budget)", e.Name(), info.Size(), maxDocImageBytes)
 		}
 		if !named[e.Name()] {
 			t.Errorf("static/docs-img/%s is named by no page in agent_docs: delete it or use it", path.Base(e.Name()))
