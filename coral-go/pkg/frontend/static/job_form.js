@@ -7,6 +7,7 @@ import { escapeHtml, showToast } from './utils.js';
 import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
 import { cronWords, atWords, localZone, zoneNote } from './job_words.js';
 import { importOnce } from './import_once.js';
+import { joinBrowse } from './dir_row.js';
 const { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } = await importOnce('./cron_picker.js'); // this form loads on first use (#10218), and so do the pieces only it uses
 const { limitSeconds, limitParts } = await importOnce('./time_limit.js');
 
@@ -16,7 +17,7 @@ let openedJob = null;     // what the editor showed for the job it opened (#4423
 let noOwnWorkflows = false; // none of the workflows is the person's own: the list is empty or holds only the seeded example (its description starts with Example, #9965)
 let noWorkflows = false;  // the workflow list came back empty: the form says so and offers to make one
 
-const DEFAULT_CRON = '0 * * * *';
+const DEFAULT_CRON = '0 9 * * *'; // a new job runs every day at 09:00 until the person says otherwise (#10276): the time a first job is most often wanted, not every hour
 const LOCAL_ZONE = localZone(); // a schedule is read in the person's own zone unless they pick another (Automations #4)
 // The ways to say when: the first four are pickers, Advanced is the cron box. `compose` turns a picker's state into the cron expression the server takes; `parse` reads one back (null: only the cron box can say it).
 const MODES = [['minutes', 'Every N minutes'], ['hours', 'Every N hours'], ['daily', 'Daily at'], ['weekly', 'Weekly on'], ['cron', 'Advanced']];
@@ -44,7 +45,7 @@ function markInvalid(e, bad) { if (bad) e.setAttribute('aria-invalid', 'true'); 
 
 // -- the schedule picker: four pickers and an Advanced cron box, one sentence for what it means ------------
 
-const pickerState = { mode: 'hours', n: 1, at: '09:00', days: new Set([1]) };
+const pickerState = { mode: 'daily', n: 1, at: '09:00', days: new Set([1]) };
 
 /** Shows the picker the mode names (its panel, its pressed button) and writes the cron expression the picker says into the box the form reads. */
 function setMode(mode, { focus = false, keepCron = false } = {}) {
@@ -236,7 +237,8 @@ function jobFields(host) {
                 slot.append(el('span', '', 'No workflows yet.'), ' ', b);
             },
         },
-        { key: 'repo_path', type: 'path', id: 'job-modal-repo', label: 'Repository path', required: true, requiredMessage: 'Enter the repository path.', placeholder: '/path/to/repo', default: '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' }, visibleWhen: prompt },
+        { key: 'repo_path', type: 'path', id: 'job-modal-repo', label: 'Folder', required: true, requiredMessage: 'Choose a folder: type a path, or use Browse.', messageAsIs: true, placeholder: 'Choose a folder', help: 'The folder the agent works in: a git folder with at least one commit.', default: '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' }, visibleWhen: prompt,
+            live: [{ id: 'btn-browse-job', wide: true, describes: false }, { id: 'dir-browser-job', wide: true, describes: false }] }, // Browse and its folder list, as New agent has them (#10276)
         {
             key: 'agent_type', type: 'select', id: 'job-modal-agent', label: 'Agent', default: 'claude', visibleWhen: prompt,
             options: [{ value: 'claude', label: 'Claude' }, { value: 'agy', label: 'Antigravity (agy)' }, { value: 'codex', label: 'Codex' }, { value: 'pi', label: 'Pi' }],
@@ -340,6 +342,7 @@ function jobView() {
         fields: jobFields(host),
         form: { submit: 'Create job', submitId: 'job-modal-submit', cancel: 'Cancel', barHost: footer, onSubmit: submitJob, onCancel: hideJobModal },
     });
+    joinBrowse('job-modal-repo', 'btn-browse-job'); // Browse at the input's right, as New agent has it (#10276)
     return view;
 }
 
