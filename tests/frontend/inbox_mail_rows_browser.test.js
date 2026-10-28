@@ -59,7 +59,7 @@ const AGENTS = [
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 3`, at + 'the three tasks as mail rows', 10000);
             r = await rows();
             for (const x of r) {
-                assert.ok(x.h >= 56 && x.h <= 60 && !x.ask && !x.dot && x.sameLine && x.leadW >= 44 && x.open, at + 'a task is one 56 px line, no dot ' + JSON.stringify(x));
+                assert.ok(x.h === 56 && !x.ask && !x.dot && x.sameLine && x.leadW >= 44 && x.open, at + 'a task is one 56 px line exactly, no dot ' + JSON.stringify(x));
                 assert.ok(x.bold <= 500, at + 'no unread bold where nothing is unread ' + JSON.stringify(x));
             }
             assert.deepEqual(r.map(x => x.snippet), ['Queued', 'In progress', 'In review'], at + 'the state is the first words');
@@ -68,7 +68,7 @@ const AGENTS = [
             await readAs('0');
             await showTasks('the three tasks again, unread');
             r = await rows();
-            for (const x of r) assert.ok(x.h >= 56 && x.h <= 60 && x.dot && x.bold >= 600 && x.sameLine, at + 'an unread task is still one 56 px line, with the dot and the title at 600 ' + JSON.stringify(x));
+            for (const x of r) assert.ok(x.h === 56 && x.dot && x.bold >= 600 && x.sameLine, at + 'an unread task is still one 56 px line, with the dot and the title at 600 ' + JSON.stringify(x));
             assert.deepEqual(r.map(x => x.h), readHeights, at + 'an unread row is exactly as tall as a read one');
             await readAs('Date.now() + 1e10');
             await showTasks('the three tasks read again');
