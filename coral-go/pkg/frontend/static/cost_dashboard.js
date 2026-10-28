@@ -358,6 +358,7 @@ export async function _refreshCostDashboard({ force = false } = {}) {
             const nothing = !(t.num_requests > 0 || t.cost_usd > 0 || t.input_tokens > 0 || t.output_tokens > 0); // nothing at all: a total of money or tokens beside the note would contradict it
             if (none) { none.textContent = nothing ? COUNTS_NOTE : ''; none.hidden = !nothing; }
             _flashLiveIndicator(); // the figures were read: say when
+            _costTotal = t.cost_usd || 0;
 
             // By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them).
             _renderProviderTable(providerRows(data.by_agent_type));
@@ -710,6 +711,7 @@ function _spendInnerWidth(container) {
     return Math.max(0, Math.round(container.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0))); // 0 while the view is hidden (the padding alone is not a width)
 }
 
+let _costTotal = 0; // the page's Total cost, as the summary read it
 function _renderSpendChart(buckets) {
     const container = document.getElementById('cost-spend-chart');
     if (!container) return;
@@ -717,7 +719,8 @@ function _renderSpendChart(buckets) {
     _watchSpendChart(container);
 
     if (buckets.length < 2) {
-        emptyState(container, noDataWords(_period(), 'Not enough data yet.'), 'empty-state'); // says what makes it appear (Beta Tester, #9955)
+        const spent = _costTotal > 0 || (buckets[0]?.cumulative_cost || 0) > 0; // money was spent: it is all in one interval, so there is no line to draw, which is not "not enough data" (#10740)
+        emptyState(container, spent ? 'All the spend so far is in one interval, so there is no line to draw yet. The total above is complete.' : noDataWords(_period(), 'Not enough data yet.'), 'empty-state'); // says what makes it appear (Beta Tester, #9955)
         return;
     }
 
