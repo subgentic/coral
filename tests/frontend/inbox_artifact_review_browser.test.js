@@ -33,6 +33,7 @@ const BASE = require('./test_base').BASE;
                             const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag'))),offset=Number(u.searchParams.get('offset')||0),limit=Number(u.searchParams.get('limit')||100);
                             return json({project:'${team}',artifacts:items.slice(offset,offset+limit),has_more:offset+limit<items.length});
                         }
+                        if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/star')&&u.pathname.split('/').length===5&&(opts.method==='PUT'||opts.method==='DELETE')){ const id=u.pathname.split('/')[3], it=window.__reviewItems.find(x=>x.id===id); if(!it)return json({error:'not found'},404); it.starred=opts.method==='PUT'; window.__starCalls=(window.__starCalls||[]).concat(opts.method+' '+id); return json({starred:it.starred}); } // what the server does: the next list says it
                         if(u.pathname.startsWith('/api/board/${team}/artifacts/')&&u.pathname.endsWith('/tags')){
                             if(window.__reviewFail)return json({error:'Review save failed'},500);
                             const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body);window.__reviewWrites.push(body);
@@ -42,6 +43,7 @@ const BASE = require('./test_base').BASE;
                         return original(url,opts);
                     };return true;
                 })()`);
+                await ev(`window.__reviewItems[1].starred = true; true`); // the server's list says it (ListTeamArtifacts sets starred from the artifact_stars table, the same field the Artifacts tab reads): a starred review artifact comes with starred: true, not set by hand on a row (#9834, QA Reviewer 2)
                 await ev(`window.switchNavTab('hub-inbox');true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
@@ -79,6 +81,18 @@ const BASE = require('./test_base').BASE;
                 { const st = await ev(`(() => { const r = ${row('Review file 01.txt')}, b = r.querySelector('.inbox-review-actions .dt-star'); return b ? { label: b.getAttribute('aria-label'), pressed: b.getAttribute('aria-pressed'), op: getComputedStyle(b).opacity, shown: getComputedStyle(b).display !== 'none' } : null; })()`);
                   assert.ok(st && st.label === 'Star Review file 01.txt' && st.pressed === 'false', `${width}: a review row has the star, named for the file: ` + JSON.stringify(st)); // Needs you's artifact rows take the star too (#9834): a button at a hover, nothing on touch
                   if (width === 1280) assert.equal(st.op, '0', '1280: it is hidden at rest and shows on a hover'); else assert.equal(st.shown, false, '390: no star control on touch'); }
+                { const starState = () => ev(`(() => { const r = ${row('Review file 02.txt')}, b = r.querySelector('.inbox-review-actions .dt-star'), open = r.querySelector('.dt-mail-open'); return { label: b ? b.getAttribute('aria-label') : null, pressed: b ? b.getAttribute('aria-pressed') : null, op: b ? getComputedStyle(b).opacity : null, shown: b ? getComputedStyle(b).display !== 'none' : false, pe: b ? getComputedStyle(b).pointerEvents : null, other: (${row('Review file 01.txt')}).querySelector('.inbox-review-actions .dt-star')?.getAttribute('aria-pressed') ?? null }; })()`);
+                  const check2 = (s, when) => { if (width === 1280) { assert.ok(s.pressed === 'true' && s.label === 'Remove the star from Review file 02.txt' && s.op === '1', `${width}: ${when}a starred review artifact (the server's starred: true) draws the filled star and says so: ` + JSON.stringify(s)); } else { assert.ok(s.pressed === 'true' && s.shown && s.pe === 'none' && s.label === 'Remove the star from Review file 02.txt', `${width}: ${when}a starred review artifact keeps its glyph on touch, which takes no tap, and it names the star: ` + JSON.stringify(s)); } assert.ok(s.other === null || s.other === 'false', `${width}: ${when}and an unstarred one stays unstarred: ` + JSON.stringify(s)); };
+                  check2(await starState(), '');
+                  await ev(`import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m=>m.refreshReviews(true)).then(()=>true)`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the rows are drawn again
+                  check2(await starState(), 'after the reviews are read again, '); }
+                if (width === 1280) { // starring from the Needs you row: the next time the reviews are read it is still starred (the server's list says so, as the Artifacts tab reads it)
+                    await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-actions .dt-star').click(); true`);
+                    await waitFor(`(${row('Review file 01.txt')}).querySelector('.inbox-review-actions .dt-star').getAttribute('aria-pressed') === 'true'`, 'the star on the row', 4000);
+                    await ev(`import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m=>m.refreshReviews(true)).then(()=>true)`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the rows are drawn again
+                    const kept = await ev(`({ pressed: (${row('Review file 01.txt')}).querySelector('.inbox-review-actions .dt-star').getAttribute('aria-pressed'), calls: window.__starCalls })`);
+                    assert.ok(kept.pressed === 'true' && kept.calls.length === 1 && /^PUT 0+1$/.test(kept.calls[0]), `1280: a star made on the Needs you row is one PUT of that artifact and is still there after the reviews are read again: ` + JSON.stringify(kept));
+                }
                 const layout = await ev(`(() => {const r=${row('Review file 01.txt')}, buttons=[...r.querySelectorAll('.inbox-review-actions button:not(.dt-star)')], rects=buttons.map(b=>b.getBoundingClientRect());const team=r.querySelector('.inbox-review-team');return {actionsBesideName:rects[0].left>r.querySelector('.inbox-review-name').getBoundingClientRect().right-1&&Math.abs(rects[0].top+rects[0].height/2-(r.querySelector('.inbox-review-name').getBoundingClientRect().top+r.querySelector('.inbox-review-name').getBoundingClientRect().height/2))<2,team:team.textContent,teamHeight:team.getBoundingClientRect().height,teamFits:team.scrollWidth<=team.clientWidth+1,height:r.getBoundingClientRect().height,sameLine:Math.abs(rects[0].top-rects[1].top)<2,standard:buttons.every(b=>!b.classList.contains('dt-quiet')&&!b.disabled)};})()`);
                 assert.ok(layout.sameLine,'both actions stay on one line');
                 if(width===390){assert.equal(layout.team,team,'phone keeps the full team name');assert.ok(layout.teamHeight>0&&layout.teamFits,'team metadata is visible and wraps within the row');}
