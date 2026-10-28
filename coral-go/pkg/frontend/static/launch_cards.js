@@ -3,5 +3,5 @@
 export const LAUNCH_CARDS = [
     { key: 'agent', icon: 'smart_toy', label: 'New agent', desc: 'One agent in a folder you choose.' },
     { key: 'team', icon: 'groups', label: 'New team', desc: 'Agents that split the work and talk to each other.' },
-    { key: 'folder', icon: 'create_new_folder', label: 'Open folder', desc: 'Add a folder now and start an agent in it later.' },
+    { key: 'folder', icon: 'create_new_folder', label: 'Open folder', desc: 'Add a project folder to start agents in later.' },
 ];
