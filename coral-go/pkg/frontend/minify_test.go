@@ -106,8 +106,18 @@ func TestMinifyAssetCollapsesGapsBetweenTags(t *testing.T) {
 	if keep := string(MinifyAsset("t.js", []byte("export const t = `line one\n   line two`;\n"))); !strings.Contains(keep, "\n") {
 		t.Errorf("a template that is not markup lost its newline: %q", keep)
 	}
-	pre := "export const p = () => `<pre>\n    <b>a</b>\n    <b>b</b></pre>`;\n"
-	if got := string(MinifyAsset("p.js", []byte(pre))); !strings.Contains(got, ">\n    <") {
-		t.Errorf("whitespace in a file with a <pre> was changed: %q", got)
+	pre := "export const p = () => `<div>\n    <b>a</b>\n  <pre>\n    <b>a</b>\n    <b>b</b></pre>\n    <i>c</i></div>`;\n"
+	got = string(MinifyAsset("p.js", []byte(pre)))
+	if !strings.Contains(got, "<pre>\n    <b>a</b>\n    <b>b</b></pre>") {
+		t.Errorf("whitespace inside a <pre> was changed: %q", got)
+	}
+	if !strings.Contains(got, "<div> <b>a</b> <pre>") || !strings.Contains(got, "</pre> <i>c</i></div>") {
+		t.Errorf("the gaps outside the <pre> were not collapsed: %q", got)
+	}
+	// a gap after the end of a tag, and an attribute on its own line, are one space too
+	attrs := "export const a = n => `<label>\n        <input\n            type=\"text\"\n            id=\"x\">\n        ${n}\n    </label>`;\n"
+	got = string(MinifyAsset("a.js", []byte(attrs)))
+	if !strings.Contains(got, "<label> <input type=\"text\" id=\"x\"> ${") || !strings.Contains(got, "} </label>") && !strings.Contains(got, "}\n    </label>") {
+		t.Errorf("the gaps in a tag and after it are not one space: %q", got)
 	}
 }
