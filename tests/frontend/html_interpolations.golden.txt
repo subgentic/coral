@@ -112,6 +112,7 @@
 1	chat_messages.js	chips.join("")
 2	chat_messages.js	getToolIcon(view.icon)
 1	chat_messages.js	messageMenuButton(lead.rest)
+1	chat_messages.js	messageMenuButton(msg.text)
 2	chat_messages.js	messageTimeHtml(msg.timestamp)
 2	chat_messages.js	msg.key ? SAVE_BUTTON : ""
 3	chat_messages.js	outputHtml
