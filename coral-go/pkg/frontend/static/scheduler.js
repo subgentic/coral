@@ -70,7 +70,9 @@ async function fetchJobRuns(jobId) {
 // ── Words a job's row and page share ─────────────────────────────────────
 
 export const scheduleOf = job => cronWords(job.cron_expr) + zoneNote(job.timezone);
-export const nextOf = job => !job.enabled ? 'Paused' : job.next_fire_at ? awayWords(job.next_fire_at) : 'Not scheduled';
+/** The word for a job that does not run (#10475): the job's page says Turned off, and the lists say the same; Paused is for a job Coral stopped after failures, with its reason. */
+export const offWord = job => (job.paused_reason ? 'Paused' : 'Turned off');
+export const nextOf = job => !job.enabled ? offWord(job) : job.next_fire_at ? awayWords(job.next_fire_at) : 'Not scheduled';
 
 // ── Job detail view ──────────────────────────────────────────────────────
 
