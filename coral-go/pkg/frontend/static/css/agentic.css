@@ -1955,3 +1955,4 @@ body.panel-dragging .agentic-state {
 
 /* An open file's note when the file changed on disk under unsaved edits (#10334). */
 .preview-disk-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px; font-size: var(--fs-sm); color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.files-legend { padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-muted); }

@@ -134,7 +134,7 @@ const PATHS = ["src/a&b <x>.go", "docs/it's here.md"];
         const modeReqs = (await ev(`window.__req`)).filter(r => r.includes('git_diff_mode') || r.includes('git-diff-mode'));
         const modeWords = await ev(`[...document.querySelector('select[data-on-change="diff-mode"]').options].map(o => o.textContent)`);
         check('the comparisons say what they list (#10054): no "vs HEAD~1" over an uncommitted-only list', JSON.stringify(modeWords) === JSON.stringify(['Uncommitted changes', 'Last commit', 'Since this branch began', 'Last commit + uncommitted', 'Compared with main']), JSON.stringify(modeWords));
-        check('the Files header has a legend for new, deleted and changed (#10386)', await ev(`(() => { const l = document.querySelector('#changed-files-title .files-legend'); return !!l && /New files are green.*deleted.*red.*changed/.test(l.textContent); })()`), 'no legend');
+        check('the Files list starts with a legend for new, deleted and changed, not in the header (#10386)', await ev(`(() => { const l = document.querySelector('#changed-files-list > .files-legend'); return !!l && !document.querySelector('#changed-files-title .files-legend') && /New files are green.*deleted.*red.*changed/.test(l.textContent); })()`), 'no legend');
         check('the diff mode select saves a mode it offers, and never one it doesn\'t', sel && modeReqs.length === 1 && !modeReqs[0].includes('evil') && modeReqs[0].includes(sel.picked), JSON.stringify({ sel, modeReqs }));
 
         const inline = await ev(`[...document.querySelectorAll('#history-session-view *, #changed-files-list *, #changed-files-title *, .starred-files *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.tagName + '.' + el.className + ' ' + a.name))`);
