@@ -33,6 +33,7 @@ const STUB = `(() => {
             await ev(`window.showJobModal().then(() => true)`); // the form loads on first use (#10218): showJobModal answers once it is open
             await waitFor(`document.querySelectorAll('#job-modal-workflow option').length === 2`, 'the workflow list', 8000);
             await waitFor(`/Runs every day at 09:00/.test(document.getElementById('cron-preview').textContent)`, 'the preview', 8000);
+            await ev(`document.querySelector('.job-type-btn[data-type="workflow"]').click(); true`); // the dialog opens on Run a prompt, the first choice (#10515): this pass is the workflow form's
             await installAudit(ev);
 
             // 1. what is on the form first

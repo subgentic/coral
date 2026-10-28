@@ -99,3 +99,13 @@ func TestLookbackStart(t *testing.T) {
 	bad := store.ScheduledJob{UpdatedAt: "garbage"}
 	assert.Equal(t, now.Add(-24*time.Hour), lookbackStart(bad, nil, now), "an unreadable stamp does not move the floor")
 }
+
+// What the New job form and a job's page say (frontend job_words.js RUNS_WHILE_OPEN, #10515): a run missed while Coral was off happens once when it starts again, unless the job was edited or turned on
+// after it was due. The look-back is from the job's last run (TestLookbackStart: only a job that never ran looks back a day), so a job whose last run is older than a day is caught up for the slot it missed.
+func TestMissedRunWordsMatchTheScheduler(t *testing.T) {
+	edited := utcAt(1, 0, 0)
+	ran := utcAt(2, 9, 0)
+	start := utcAt(13, 11, 0) // Coral starts again 11 days later: the 09:00 slot of this morning was missed
+	assert.True(t, evaluateAt(t, edited, &ran, start), "a job whose last run is older than a day is caught up once for the slot it missed")
+	assert.False(t, evaluateAt(t, utcAt(13, 10, 0), &ran, start), "unless it was edited or turned on after the slot was due")
+}
