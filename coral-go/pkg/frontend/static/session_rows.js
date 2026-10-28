@@ -318,11 +318,17 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
 function _renderSleepingSummary(sleepingAgents, groupName, isCompact, teamDefaultDir) {
     const count = sleepingAgents.length;
     const expanded = _isSleepingExpanded(groupName);
-    const summaryName = `${count} sleeping agent${count !== 1 ? 's' : ''} in ${keyLabel(groupName)}`; // each folder's summary has its own name
+    // Agents Coral put to sleep when it stopped (sleep_reason coral_stopped) are said so, with a Wake button for exactly those (#10057): a returning person sees what happened, not a bare "2 sleeping agents".
+    const restarted = sleepingAgents.filter(s => s.sleep_reason === 'coral_stopped'), k = restarted.length;
+    const plural = n => `${n} agent${n !== 1 ? 's' : ''}`;
+    const label = k === 0 ? `${count} sleeping agent${count !== 1 ? 's' : ''}` : k === count ? `${plural(count)} asleep after Coral restarted` : `${count} sleeping agents, ${k} after Coral restarted`;
+    const wakeName = `Wake ${plural(k)} that went to sleep when Coral restarted`, wakeIds = restarted.map(s => s.session_id).join(',');
+    const wake = k ? `<button type="button" class="btn btn-small sleeping-wake" data-on-click="wake-restarted" data-ids="${escapeAttr(wakeIds)}" aria-label="${escapeAttr(wakeName)}">Wake</button>` : '';
+    const summaryName = `${label} in ${keyLabel(groupName)}`; // each folder's summary has its own name
     let html = `<li class="sleeping-summary-row" data-on-click="group-sleeping-expand" data-group="${escapeAttr(groupName)}"><button type="button" class="row-btn" aria-expanded="${escapeAttr(String(expanded))}" aria-label="${escapeAttr(summaryName)}">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
-        <span class="sleeping-summary-label">${count} sleeping agent${count !== 1 ? 's' : ''}</span>
-    </button></li>`;
+        <span class="sleeping-summary-label">${label}</span>
+    </button>${wake}</li>`;
     if (expanded) {
         for (const s of sleepingAgents) {
             html += _renderSessionItem(s, groupName, isCompact, false, teamDefaultDir);
