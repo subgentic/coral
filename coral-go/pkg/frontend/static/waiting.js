@@ -25,12 +25,12 @@ export function skippedOf(row) {
 export function waitingText(row) {
     if (!row || row.sleeping) return '';
     const n = waitingCount(row);
-    return n > 0 ? `${n} board message${n === 1 ? ' waits' : 's wait'} for this agent` : ''; // short on purpose (#10036): why it waits, the list and the actions are behind Options
+    return n > 0 ? `${n} team message${n === 1 ? ' waits' : 's wait'} for this agent` : ''; // short on purpose (#10036): why it waits, the list and the actions are behind Options
 }
 
 /** What is said after a Send now, from the server's answer. */
 export function sendNowToast(r) {
-    if (r && r.nothing_waiting) return 'No unread board messages wait for this agent.';
+    if (r && r.nothing_waiting) return 'No unread team messages wait for this agent.';
     if (r && r.draft_in_box) return 'There is a draft in the agent\'s input box: nothing was sent. Send or clear it first.';
     if (r && r.prompt_open) return 'A prompt is open in the agent\'s terminal: nothing was sent into it. Answer it first.';
     if (r && r.sent) return 'Sent now.';
