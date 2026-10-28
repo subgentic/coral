@@ -76,7 +76,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`window.__srv.restarts === 1`, 'the restart to be asked', 5000);
         const body = await ev(`window.__srv.bodies[0]`);
         assert.equal(body.session_id, id0);
-        for (const k of ['prompt', 'model', 'thinking', 'extra_flags', 'capabilities']) assert.equal(body[k], undefined, `a same-settings restart sends no ${k}`);
+        assert.deepEqual(body, { agent_type: 'claude', session_id: id0 }, 'a same-settings restart asks for nothing but the agent: no prompt, model, thinking, flags, capabilities or mode');
         assert.notEqual(await ev(`getComputedStyle(document.getElementById('restart-modal')).display`), 'flex', 'no dialog');
 
         // The conversation so far stays, then the new one.
