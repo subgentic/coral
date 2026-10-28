@@ -47,6 +47,19 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.ok(m.list < 560, 'a narrow list: ' + m.list); assert.equal(m.folded, false, '420 px: the dock rows are one line at every width, not folded (#8792)');
         assert.deepEqual(m.gone, [], 'the folded row has none of them either: ' + JSON.stringify(m)); assert.ok(m.cells.every(k => ['state', 'task', 'who'].includes(k)), 'only Status, Task and Agent cells: ' + JSON.stringify(m));
         assert.ok(m.scrolls <= 1, 'and it does not scroll sideways');
+        // 200% text in the desktop dock (#9942, Security Reviewer's LOW on #9917): the name column's minimum is a share of the table's box, so at twice the text the three columns still fit the dock and the table does not scroll sideways
+        await ev(`(() => { const t = document.getElementById('tk-status'); if (t) { t.value = 'all'; t.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`); // every state, done tasks and their doers too
+        await ev(`document.getElementById('agentic-state').style.width = '680px'; document.documentElement.style.fontSize = '32px'; true`);
+        await waitFor(`document.getElementById('board-task-list').getBoundingClientRect().width > 560`, 'the dock at 680 px again');
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows the text size
+        m = await measure(); await shot('tasks-dock-680-columns-200');
+        const edge = await ev(`(() => { const b = document.querySelector('#board-task-list .dt-primary'), r = b.getBoundingClientRect(), l = document.getElementById('board-task-list').getBoundingClientRect(); return { right: Math.round(r.right), dock: Math.round(l.right), vw: innerWidth }; })()`);
+        const sum = Object.values(m.widths).reduce((n, w) => n + w, 0);
+        assert.ok(sum <= m.list + 1, '200% text: State, Task and Who add up to the dock, the name does not keep its 24 characters past the box (' + sum + ' of ' + m.list + '): ' + JSON.stringify(m.widths));
+        assert.ok(m.scrolls <= 1, '200% text, 680 px dock: the table does not scroll sideways: ' + JSON.stringify(m));
+        assert.ok(edge.right <= edge.dock + 1 && edge.right <= edge.vw, '200% text: the Task button ends inside the dock and the screen: ' + JSON.stringify(edge));
+        assert.deepEqual(m.heads, ['state', 'task', 'who'], '200% text keeps the three heads: ' + JSON.stringify(m));
+        await ev(`document.documentElement.style.fontSize = ''; true`);
         console.log('PASS dock Tasks columns');
     } finally { await removeBoards(ev, [ctx && ctx.TBOARD, ctx && ctx.BBOARD]); try { await client.close(); } catch (_) {} } // the panel helper's boards (themes-t-, themes-b-)
 })().catch(e => { console.error(e); process.exit(1); });
