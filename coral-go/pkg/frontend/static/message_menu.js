@@ -5,7 +5,7 @@ import { state, sessionKey, saveSessionDraft } from './state.js';
 import { importOnce } from './import_once.js';
 import { showToast, copyText } from './utils.js';
 import { resolveSessionIdentity } from './session_state.js';
-import { sessionServer } from './server_base.js';
+import { sessionServer, keyLabel } from './server_base.js';
 
 
 function item(menu, label, run, { disabled = false } = {}) {
@@ -49,7 +49,17 @@ export async function openMessageMenu(btn) {
     const cur = state.currentSession || {};
     const others = (state.liveSessions || []).filter(s => s.session_id && (s.session_id !== cur.session_id || sessionServer(s) !== sessionServer(cur)) && !s.archived && s.agent_type !== 'terminal');
     if (!others.length) item(menu, 'No other agents', () => {}, { disabled: true });
-    for (const s of others) item(menu, resolveSessionIdentity(s), () => prefill(s, text));
+    // grouped by team (#10676): this agent's own team first, the other teams by name, the agents with no team last under "No team"; each team a heading over its agents
+    const teams = new Map();
+    for (const s of others) { const k = s.board_project || ''; if (!teams.has(k)) teams.set(k, []); teams.get(k).push(s); }
+    const ownKey = cur.board_project || '', labelOf = k => (k ? keyLabel(k) : 'No team');
+    const order = [...teams.keys()].sort((a, b) => (a === ownKey ? -1 : b === ownKey ? 1 : a === '' ? 1 : b === '' ? -1 : labelOf(a).localeCompare(labelOf(b), undefined, { sensitivity: 'base' })));
+    order.forEach((k, i) => {
+        const hid = `chat-msg-menu-team-${i}`, g = document.createElement('div'), h = document.createElement('div');
+        h.id = hid; h.className = 'chat-msg-menu-team'; h.textContent = labelOf(k); g.setAttribute('role', 'group'); g.setAttribute('aria-labelledby', hid);
+        menu.append(h, g);
+        for (const s of teams.get(k)) item(g, resolveSessionIdentity(s), () => prefill(s, text));
+    });
     const r = btn.getBoundingClientRect();
     openMenu(btn);
     menu.style.position = 'fixed'; menu.style.zIndex = '3000';

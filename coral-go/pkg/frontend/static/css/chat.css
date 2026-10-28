@@ -1584,7 +1584,8 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 .chat-bubble.assistant > .message-time { right: calc(3 * var(--chat-ib) + 18px); }
 .chat-prose.chat-messages .chat-bubble.assistant .chat-msg-menu-btn { top: 100%; margin-top: -2px; right: calc(2 * var(--chat-ib) + 2px); }
 .chat-prose.chat-messages .chat-bubble.assistant > .message-time { right: calc(3 * var(--chat-ib) + 6px); }
-#chat-msg-menu { background: var(--bg-elevated); opacity: 1; } /* solid: the reply's words never show through it (#10540) */
+#chat-msg-menu { background: var(--bg-elevated); opacity: 1; max-height: min(60vh, 420px); overflow-y: auto; } /* a long list of agents scrolls inside the menu (#10676) */
+.chat-msg-menu-team { padding: 8px 12px 2px; color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-strong); } /* solid: the reply's words never show through it (#10540) */
 .chat-msg-menu-head { padding: 6px 12px 2px; color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
 
 /* A restarted agent's earlier conversation stays above the new one, quieter, with a line where the new one starts (#10297). */
