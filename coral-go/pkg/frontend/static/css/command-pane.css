@@ -445,6 +445,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 .composer-error[hidden] { display: none; }
 .composer-hint { margin: 0 0 6px; font-size: var(--fs-sm); color: var(--text-secondary); }
 .composer-hint[hidden] { display: none; }
+.composer-starting-count { font-weight: var(--fw-medium); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .composer-error-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .composer-error-restart { flex-shrink: 0; }
 .composer-error-dismiss {
