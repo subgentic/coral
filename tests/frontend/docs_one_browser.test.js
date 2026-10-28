@@ -1,5 +1,5 @@
 // Docs on the shared sidebar (#7470, part 2 of one sidebar, UI/UX's audit c2596330): the Docs pane has the header's parts in the same pixels as the other tabs (search named "Search docs", no Display options,
-// Expand or collapse all, Hide), two groups (Getting started, API) whose name opens a one-column table of topics at 20/700 with its count and whose chevron only folds; a topic opens as a page with its own
+// Expand or collapse all, Hide), two groups (Getting started, For developers) whose name opens a one-column table of topics at 20/700 with its count and whose chevron only folds; a topic opens as a page with its own
 // "← group" link, the document at its reading scale (headings 20/700 and 17/700, table headers 12/500, bold labels 14/600, body 14/400) and "Copy docs line for agents" as a normal button in the page header;
 // the search narrows the topics; one empty line; both themes and 200% text; on a phone the list is the page and a topic is the screen after it, with a way back to the list. The real docs of the isolated
 // dev server are read, so the grouping is checked on the real topics. Drives Chrome over CDP through agent_view_harness.js.
@@ -37,7 +37,7 @@ const BASE = require('./test_base').BASE;
 
             await openTab('docs');
             await waitFor(`document.querySelectorAll('${pane('docs')} .sgroup-header').length === 2 && document.querySelectorAll('${pane('docs')} li .row-btn').length > 10`, at + 'the groups and the topics', 15000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Getting started', 'API'], at + 'two groups');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Getting started', 'For developers'], at + 'two groups (#10093: the second was called API)');
             // the button is the row: the li around it has no padding and the button is 36 px high (44 on a phone), UI/UX's rule for every sidebar list (#7473)
             assert.deepEqual(await ev(`(() => { const b = document.querySelector('${pane('docs')} li:not(.session-group-header) > .row-btn'), li = b.parentElement, cs = getComputedStyle(li); return { pad: [cs.paddingTop, cs.paddingBottom], h: Math.round(b.getBoundingClientRect().height) >= ${mobile ? 44 : 36}, same: Math.abs(li.getBoundingClientRect().height - b.getBoundingClientRect().height) <= 1 }; })()`), { pad: ['0px', '0px'], h: true, same: true }, at + 'a row is its button, no padding on the li, at least ${mobile ? 44 : 36} px high');
 
@@ -114,7 +114,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.querySelector('${pane('docs')} .sgroup-header[data-group-name="docs:api"] .group-chevron').getAttribute('aria-expanded')`), 'false', at + 'the chevron folds API');
             assert.equal(await ev(`document.querySelectorAll('${pane('docs')} li .row-btn').length`), counts[0], at + "API's topics are hidden");
             await ev(`document.querySelector('${pane('docs')} .sgroup-header[data-group-name="docs:api"]').click(); true`);
-            await waitFor(`document.querySelector('#group-table-title').textContent === 'API'`, at + "the name opens API's table", 8000);
+            await waitFor(`document.querySelector('#group-table-title').textContent === 'For developers'`, at + "the name opens For developers' table", 8000);
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`), counts[1], at + "all of API's topics are in its table, folded or not");
             await ev(`document.querySelector('${pane('docs')} .sgroup-header[data-group-name="docs:api"] .group-chevron').click(); true`); // open it again
 
