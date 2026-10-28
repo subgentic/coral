@@ -2,6 +2,7 @@
 // team's page. Real boards on the isolated dev server (two teams, removed again). Desktop and a phone.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
 const { ROW_WORDS } = require('./helpers/folder_rows');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -52,6 +53,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-one-line')`, 'a one-line table on a phone', 5000);
         const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { h: rows.map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, head: getComputedStyle(document.querySelector('#group-table-view thead')).display }; })()`);
         assert.equal(p.head, 'none', 'a phone\'s rows are mail rows (#9545): no column heads, and no Sort row (a mail list has none)'); assert.ok(p.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(p.h)); assert.ok(p.over <= 1, 'no sideways scroll');
+        await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary').forEach((b, i) => b.setAttribute('data-axp', String(i))); true`);
+        const axn = await axName(client, '[data-axp="0"]'); assert.match(axn && axn.name, /^.+, Active, .+$/, `a goal's phone button is "<goal>, <state>, <time>" as Chrome computes it (its state is on the row's second line: #9747): ${axn && axn.name}`);
         console.log('   ✓');
         console.log('PASS Inbox Goals folder: every team\'s open goals as the goal row with a Team column');
     } finally { await removeBoards(ev, [A, B]).catch(() => {}); await client.close(); }

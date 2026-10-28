@@ -37,6 +37,7 @@ const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar takes the page's toolbar line (mountSelection)
 const GC = await importOnce('./goal_columns.js');
+const GW = await importOnce('./goal_words.js'); // a goal's state word, said in a phone row's button name (#9747)
 const { mountGoal } = await importOnce('./goal_view.js');
 const { mountInboxItem } = await importOnce('./inbox_item_page.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
@@ -591,7 +592,7 @@ registerGroupSource('hub-inbox', {
                         go({ ...folderRoute, id: g.board_id, item: g.id });
                     },
                     oneLine: true, sortBar: false,
-                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: g.title, team: goalTeam(g), snippet: g.outcome || g.state, time: DT.timeCell(g.updated_at).textContent }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved
+                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: g.title, team: goalTeam(g), snippet: g.outcome || g.state, state: GW.stateWord(g), time: DT.timeCell(g.updated_at).textContent }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }).el };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
