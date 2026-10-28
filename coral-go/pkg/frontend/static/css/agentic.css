@@ -1863,6 +1863,7 @@ body.panel-dragging .agentic-state {
 
 /* #4344: the Files tab's title row (count, +/- stats, the diff select) wraps beside the refresh button at large text instead of pushing it off the screen. */
 .changed-files-header > .changed-files-title { flex: 1 1 0; min-width: 0; flex-wrap: wrap; row-gap: 2px; min-height: calc(0.8125rem * 1.4 + 10px); }
+.changed-files-header > .changed-files-title > .diff-mode-select { flex: 1 1 8rem; min-width: 0; max-width: 16rem; text-overflow: ellipsis; } /* the comparison select shares the row with the count and the +N -N that arrive with the first list: wide as its longest option it was pushed to a second row and the header grew by a line (files_header_stable) */
 /* The header is as high as its comparison select from the first draw: the page's "0 files changed" has no select until the first list comes, and the header grew by the select's height when it did (a layout shift on a slow runner, #7671). */
 @media (pointer: coarse), (max-width: 767px) { .changed-files-header > .changed-files-title { min-height: var(--control-touch-height, 2.75rem); } } /* the select is a touch target there */
 .diff-mode-select { max-width: 100%; }
