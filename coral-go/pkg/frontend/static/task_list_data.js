@@ -6,6 +6,11 @@ export function canSendBack(task, hubReason) {
     return !!(task && task.assigned_to) && !hubReason;
 }
 
+/** Whether the task's bar offers Complete (#10337): the task is not blocked or a draft, and the Coral Hub's access for the board's machine allows Interact (the call POST /api/board/{project}/tasks/{id}/complete is an Interact rule in pkg/tunnel/routes.go). hubReason is blockedReason's words, '' when it does. */
+export function canComplete(task, hubReason) {
+    return !!task && task.status !== 'blocked' && task.status !== 'draft' && !hubReason;
+}
+
 /** A list item says review_requested; a full task has workflow.completion_review. */
 export function reviewRequested(t) {
     return !!(t && (t.review_requested || t.workflow?.completion_review));
