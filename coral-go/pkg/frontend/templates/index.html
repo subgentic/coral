@@ -157,11 +157,12 @@
         </div>
     </header>
 
-    <!-- #4291: local sign-in is off (local_auth_banner.js). A strip across the top, like the tmux banner below, and not a child of .main-content: the
-         views in it are counted and sized, and its height is settled before the terminal is sized. No close button; it goes when sign-in is back on. -->
+    <!-- #4291: local sign-in is off, or no password is set (local_auth_banner.js, #10061). A strip across the top, like the tmux banner below, and not a child of .main-content: the
+         views in it are counted and sized, and its height is settled before the terminal is sized. No close button; it goes when sign-in is back on and a password is set. -->
     <div id="local-auth-banner" class="notice notice-error notice-bar local-auth-banner" role="alert" hidden>
         <span class="material-icons" aria-hidden="true">warning</span>
-        <div class="local-auth-banner-text"><b>Sign-in is off:</b> any program on this computer can use Coral without a password.</div>
+        <div class="local-auth-banner-text"><span data-auth-state="off"><b>Sign-in is off:</b> any program on this computer can use Coral without a password.</span><span data-auth-state="nopw" hidden><b>No password is set.</b> The Coral app and the tray open without one; a browser needs a password to sign in.<span id="local-auth-remote" hidden> Other devices sign in with the setup code (Settings, Network and Hub).</span></span></div>
+        <button type="button" class="btn btn-small" id="local-auth-set-password" data-on-click="local-auth-set-password" hidden>Set a password</button>
     </div>
 
     <div id="tmux-missing-banner" class="notice notice-warn notice-bar tmux-missing-banner" role="alert" style="display:none">

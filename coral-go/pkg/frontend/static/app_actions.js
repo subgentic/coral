@@ -144,6 +144,7 @@ registerActions({
     'm-tmux-banner-close': () => { const b = document.getElementById('tmux-missing-banner'); if (b) b.style.display = 'none'; },
     'm-toggle-agentic-panel': () => { window.toggleAgenticPanel(); },
     'm-toggle-tablet-sidebar': () => { window.toggleTabletSidebar(); },
+    'local-auth-set-password': el => { importOnce('./password_ui.js').then(m => m.showSetPasswordModal({ local: el.dataset.local === 'true' })).catch(() => {}); },
     'm-toggle-top-bar-settings': (el, event) => { window.__coral.toggleTopBarSettings(event); },
     'm-wake-pending-agents': () => { window.wakePendingAgents(); },
 });

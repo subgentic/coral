@@ -44,6 +44,9 @@ export async function loadSecurityRow() {
     if (st.method === 'session') appendHub(root, sessions);   // only for a browser session, and only where this computer is linked to Coral Hub (#3966)
 }
 
+// A password set or changed from anywhere (the bar's button, the first-run form, this row): an open Settings row says so at once (#10061: it still read No password after the save)
+document.addEventListener('coral:password-changed', () => { loadSecurityRow(); });
+
 function render(root, st, sessions) {
     root.replaceChildren();
     const head = el('div', 'tb-head');
