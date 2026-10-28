@@ -757,6 +757,14 @@ body:has(.model-chip-menu:not([hidden])) .chat-jump-latest-btn { visibility: hid
     white-space: nowrap;
 }
 
+/* On a phone the button is not beside the bubble (it was partly off the screen and crowded the bubble, #10738): it opens inside the bubble's foot when the bubble is tapped or has the keyboard, and the time keeps a gap below the bubble. */
+@media (max-width: 767px) {
+    .chat-prose.chat-messages .chat-bubble.human .edit-btn { top: 0; right: 0; transform: none; }
+    .chat-prose.chat-messages .chat-bubble.human:hover .edit-btn,
+    .chat-prose.chat-messages .chat-bubble.human:focus-within .edit-btn { position: static; display: block; margin: 8px 0 0 auto; }
+    .chat-prose.chat-messages .chat-bubble:is(.human, .assistant) > .message-time { margin-top: 4px; }
+}
+
 /* File references in the live Chat view open in the Files preview */
 .live-history-center .chat-file-ref {
     cursor: pointer;
