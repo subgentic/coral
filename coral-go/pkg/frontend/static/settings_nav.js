@@ -21,6 +21,9 @@ const shown = () => panes().filter(p => !p.dataset.empty);
 
 function tabFor(id) { return document.getElementById(`settings-tab-${id}`); }
 
+/** On a phone (a narrow dialog) Settings is two screens (Beta Tester's phone pass, #10000): the sections, listed, and one section with a way back. The dialog says which one it is on; a wide dialog ignores it. */
+const setScreen = screen => modalEl()?.setAttribute('data-screen', screen);
+
 /** Opens the pane for a group; an unknown or empty group opens the first one. Returns the group shown. */
 function showSettingsGroup(id, { focus = false, remember = true } = {}) {
     const list = shown();
@@ -43,6 +46,7 @@ function showSettingsGroup(id, { focus = false, remember = true } = {}) {
 
 /** The group Settings opens on: the one last used in this browser. */
 export function openSettingsGroup(id) {
+    setScreen(id ? 'pane' : 'sections'); // asked for a section: that section; otherwise a phone starts at the list of sections
     return showSettingsGroup(id || browserLocal.get(storeKey(GROUP_KEY)) || FIRST, { remember: false });
 }
 
@@ -154,9 +158,17 @@ function buildTabs(modal) {
         b.setAttribute('aria-controls', p.id); b.setAttribute('aria-selected', String(!p.hidden)); b.tabIndex = p.hidden ? -1 : 0;
         b.innerHTML = `<span class="material-icons" aria-hidden="true">${p.dataset.icon}</span><span class="settings-tab-name"></span>`;
         b.querySelector('.settings-tab-name').textContent = p.dataset.title;
-        b.addEventListener('click', () => showSettingsGroup(id));
+        b.addEventListener('click', () => { showSettingsGroup(id); setScreen('pane'); });
         tabs.append(b);
         const o = document.createElement('option'); o.value = id; o.textContent = p.dataset.title; pick?.append(o);
+    }
+    const panesEl = modal.querySelector('.settings-panes');
+    if (panesEl && !panesEl.querySelector('.settings-back')) { // a phone's way from a section back to the list of sections
+        const back = document.createElement('button');
+        back.type = 'button'; back.className = 'settings-back btn btn-quiet';
+        back.innerHTML = '<span class="material-icons" aria-hidden="true">arrow_back</span><span>Settings</span>';
+        back.addEventListener('click', () => { setScreen('sections'); const cur = panes().find(p => !p.hidden); tabFor(cur?.dataset.group)?.focus(); });
+        panesEl.prepend(back);
     }
     tabs.addEventListener('keydown', e => {
         const list = [...tabs.querySelectorAll('[role="tab"]:not([hidden])')];
@@ -167,7 +179,7 @@ function buildTabs(modal) {
         e.preventDefault();
         showSettingsGroup(list[(to + list.length) % list.length].id.replace('settings-tab-', ''), { focus: true });
     });
-    pick?.addEventListener('change', () => showSettingsGroup(pick.value));
+    pick?.addEventListener('change', () => { showSettingsGroup(pick.value); setScreen('pane'); }); // not drawn on a phone any more (the list of sections replaced it); still a way to switch for anything that drives it
 }
 
 onBuilt('settings-modal', modal => {
