@@ -105,6 +105,11 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
             for (let i = 1; i <= 'needle'.length; i++) { m.chatsSpec('chats', ctx({}, 'needle'.slice(0, i))); await new Promise(r => setTimeout(r, 30)); }
             await window.__quiet();
             window.__census.push({ m: 'MARK', p: 'typed-module', keys: [] });
+            // three chats opened from the Inbox: the unread numbers go down in memory and nothing is asked of any computer (coral-hub's rate rule, #9703); the start read was the one history read
+            window.__census.push({ m: 'MARK', p: 'opens-start', keys: [] });
+            for (const id of ['open-a', 'open-b', 'open-c']) m.chatOpened({ session_id: id, server: 'm1', source_type: 'claude', last_timestamp: new Date().toISOString() });
+            await window.__quiet();
+            window.__census.push({ m: 'MARK', p: 'opens-end', keys: [] });
             // a chat from a folder opens in the Chats viewer
             window.selectHistorySession?.('same-chat', null, { session_id: 'same-chat', server: 'm1', source_type: 'claude', title: 'Laptop conversation' }); await window.__quiet();
             return { cloud: sv.isCloud(), nativeInbox: typeof sv.nativeInbox === 'function' ? !!sv.nativeInbox() : null, frame: !!document.getElementById('inbox-frame') };
@@ -148,6 +153,9 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         const between = (a, b) => { const from = inboxAll.findIndex(r => r.m === 'MARK' && r.p === a), to = inboxAll.findIndex(r => r.m === 'MARK' && r.p === b); return from >= 0 && to > from ? inboxAll.slice(from + 1, to) : null; };
         const fieldRuns = fieldsTyped.map(f => ({ ...f, typed: between(`typing-${f.i}`, `typed-${f.i}`), entered: between(`typed-${f.i}`, `entered-${f.i}`), held: between(`holding-${f.i}`, `held-${f.i}`) })), typing = between('typing-module', 'typed-module'), inbox = inboxAll.filter(r => r.m !== 'MARK');
         assert.ok(typing, 'the typing was bounded by its marks');
+        const opens = between('opens-start', 'opens-end');
+        assert.ok(opens, 'the opens were bounded by their marks');
+        assert.deepEqual(opens.map(r => `${r.m} ${r.p} ?${r.keys}`), [], 'three chats opened send no request: no history read, no counts read (the unread numbers are updated in memory)');
         const online = await ev(`window.__computers.filter(c => c.online).length`);
         // then the Inbox is left alone for 30 seconds: no timer of the Inbox asks the computers again (the idle census below)
         await new Promise(r => setTimeout(r, 30000)); // sleep-ok: the observation is that nothing happens in 30 s (coral-hub Security's condition), there is no event to wait for
