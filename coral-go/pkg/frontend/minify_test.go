@@ -88,3 +88,26 @@ func TestMinifyAssetWholeTree(t *testing.T) {
 	}
 	t.Logf("static JS and CSS: %d -> %d bytes (%.0f%%)", before, after, float64(after)*100/float64(before))
 }
+
+// The indentation between two tags of a template literal is one space in what is shipped (#10594): the page is laid out as before, and the bytes are fewer.
+func TestMinifyAssetCollapsesGapsBetweenTags(t *testing.T) {
+	src := "export const row = n => `<div class=\"row\">\n            <span>${n}</span>\n            <b>x</b>\n        </div>`;\n"
+	got := string(MinifyAsset("row.js", []byte(src)))
+	if !strings.Contains(got, "<div class=\"row\"> <span>${") || !strings.Contains(got, "</span> <b>x</b> </div>") {
+		t.Errorf("the gap before a tag is not one space: %q", got)
+	}
+	if strings.Contains(strings.TrimSuffix(got, "\n"), "\n") {
+		t.Errorf("a newline is left in %q", got)
+	}
+	if again := string(MinifyAsset("row.js", []byte(got))); again != got {
+		t.Errorf("a second pass changes the result (MinifyAsset must be a fixed point): %q", again)
+	}
+	// text that is not between two tags keeps its newlines, and a file that writes a <pre> keeps all of its template text
+	if keep := string(MinifyAsset("t.js", []byte("export const t = `line one\n   line two`;\n"))); !strings.Contains(keep, "\n") {
+		t.Errorf("a template that is not markup lost its newline: %q", keep)
+	}
+	pre := "export const p = () => `<pre>\n    <b>a</b>\n    <b>b</b></pre>`;\n"
+	if got := string(MinifyAsset("p.js", []byte(pre))); !strings.Contains(got, ">\n    <") {
+		t.Errorf("whitespace in a file with a <pre> was changed: %q", got)
+	}
+}

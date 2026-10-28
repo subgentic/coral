@@ -1,9 +1,11 @@
 package frontend
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"sync/atomic"
 
@@ -46,7 +48,23 @@ func MinifyAsset(name string, data []byte) []byte {
 		}
 		out = res.Code
 	}
+	if ext == ".js" {
+		out = collapseTagGaps(out)
+	}
 	return out
+}
+
+// tagGap is the indentation a multi-line template literal keeps before a tag that starts an indented line: ">\n            <". esbuild leaves a template's text as written, and the source's markup
+// is indented, so these gaps were about 10 KB of the shipped tree (#10594). HTML reads any run of whitespace as one space, so the gap becomes that one space: the page is laid out as it was.
+var tagGap = regexp.MustCompile(`\n[ \t]+<`)
+
+// collapseTagGaps shortens those gaps in the template literals of minified JS. esbuild's minified output has a newline only inside a literal (or a legal comment), so every match is template text.
+// A file that writes a <pre> or <textarea> keeps its text as it is: there whitespace shows. The result is a fixed point (a second call changes nothing), as MinifyAsset needs.
+func collapseTagGaps(js []byte) []byte {
+	if bytes.Contains(js, []byte("<pre")) || bytes.Contains(js, []byte("<textarea")) {
+		return js
+	}
+	return tagGap.ReplaceAll(js, []byte(" <"))
 }
 
 // minifyPasses is the most times MinifyAsset runs esbuild over one file (it stops at the first pass that does not shrink it).
@@ -86,7 +104,7 @@ func MinifyIdentity() string {
 	if disabled.Load() || os.Getenv("CORAL_NO_MINIFY") == "1" {
 		return "minify:off"
 	}
-	return fmt.Sprintf("minify:esbuild %s %s passes:%d %s", esbuildVersion, optionsIdentity(minifyOptions(".js"), minifyOptions(".css")), minifyPasses, bundleFormat)
+	return fmt.Sprintf("minify:esbuild %s %s passes:%d tag-gaps:1 %s", esbuildVersion, optionsIdentity(minifyOptions(".js"), minifyOptions(".css")), minifyPasses, bundleFormat)
 }
 
 // esbuildVersion is the esbuild module version this binary is built with: a constant, not read

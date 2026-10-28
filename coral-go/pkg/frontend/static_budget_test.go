@@ -16,9 +16,9 @@ import (
 
 const (
 	// staticBudget is the most the static tree a release ships may hold: its JS and CSS as the server serves them (minified, comments gone; a release embeds exactly those bytes, tools/strip-static, #6208)
-	// and every other file as it is, with the agent docs `make` syncs into static/agent_docs. It is 5.04 MB today (the source tree is 6.44 MB: comments and indentation are not shipped), so a comment
+	// and every other file as it is, with the agent docs `make` syncs into static/agent_docs. It is 5.49 MB today (the source tree is 8.21 MB: comments and indentation are not shipped), so a comment
 	// never moves it and a real asset does. Raise it deliberately, with the reason in the commit, when a real asset needs the room.
-	// 5.25 MiB since Goal #61's artifact roll-up (the file count, the goal section, Group by, tags: ~35 KB of JS, CSS and one new JS module each); about 200 KB of room over what ships
+	// 5.25 MiB (5,505,024 bytes) since Goal #61's artifact roll-up; the tree has grown into it, so a feature trims as much as it adds (#10594 collapsed the indentation inside templates: 10 KB). About 11 KB of room over what ships
 	staticBudget = 5<<20 + 256<<10
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
