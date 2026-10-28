@@ -59,7 +59,7 @@ function drawGroupBar(key) {
         bar = document.createElement('div'); bar.id = 'cost-group-bar'; bar.className = 'eff-switch';
         const label = document.createElement('div'); label.className = 'eff-switch-label'; label.textContent = 'Group by';
         const seg = document.createElement('div'); seg.className = 'eff-seg btn-seg'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Group by');
-        const pick = document.createElement('select'); pick.className = 'cost-time-select eff-pick'; pick.setAttribute('aria-label', 'Group by');
+        const pick = document.createElement('select'); pick.className = 'field field-dense cost-time-select eff-pick'; pick.setAttribute('aria-label', 'Group by');
         for (const [value, text] of GROUPS) {
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn eff-seg-btn'; b.textContent = text; b.dataset.group = value;
             b.addEventListener('click', () => selectView(value === 'all' ? 'overview' : value, { focus: true }));
