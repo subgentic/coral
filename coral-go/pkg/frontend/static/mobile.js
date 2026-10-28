@@ -26,6 +26,7 @@ window.toggleTabletSidebar = toggleTabletSidebar;
 // Escape closes the drawer (#10306), and the focus goes back to the button that opened it; a click outside is the backdrop's.
 if (typeof document.addEventListener === 'function') document.addEventListener('keydown', e => {
     if (e.key !== 'Escape' || e.defaultPrevented || !document.querySelector('.sidebar.tablet-open')) return;
+    if (e.target instanceof Element && e.target.closest('.xterm, input, textarea, select, [contenteditable="true"]')) return; // in a terminal Escape belongs to the CLI, and in a field to the field
     e.preventDefault(); toggleTabletSidebar(); document.querySelector('.tablet-sidebar-toggle')?.focus();
 });
 
