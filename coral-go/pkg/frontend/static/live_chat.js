@@ -42,7 +42,7 @@ export { initCommandInputAutosize } from './command_autosize.js';
 export { addPendingMessage, confirmPendingMessage, loadPendingFromStorage, removePendingMessage } from './pending_messages.js';
 export { linkifyRefs } from './chat_bubbles.js';
 export { refreshLiveHistory, chatHasOlder, loadMoreHistory, jumpToLiveMessage, stopLiveHistoryPoll, resetLiveHistory } from './live_history.js';
-export { getLiveViewMode, clearViewOverride, effectiveLiveViewMode, applyLiveViewMode, terminalPrefetch, setLiveViewMode, showTerminalView } from './live_view_mode.js';
+export { getLiveViewMode, clearViewOverride, effectiveLiveViewMode, applyLiveViewMode, terminalPrefetch, setLiveViewMode, showTerminalView, showChatView } from './live_view_mode.js';
 export { stitchPages } from './live_history_render.js';
 
 // Opening a card whose tool or output was shortened loads its message in full and shows that in

@@ -17,7 +17,7 @@ import { openFilePreview, openFileEdit, refreshChangedFiles, copyFilePath } from
 import { activateCustomView } from './custom_views.js';
 
 import { popoutRetry } from './popout.js';
-import { setLiveViewMode, showTerminalView } from './live_chat.js';
+import { setLiveViewMode, showTerminalView, showChatView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { copyBranchName, showToast } from './utils.js';
 import { showJobModal, hideJobModal, reshowJobModal } from './job_form.js';
@@ -260,7 +260,7 @@ Object.assign(window, {
     // agentic_state
     switchAgenticTab,
     // live_chat
-    setLiveViewMode, showTerminalView,
+    setLiveViewMode, showTerminalView, showChatView,
     // scheduler
     showJobModal, hideJobModal,
     // preview_pane
