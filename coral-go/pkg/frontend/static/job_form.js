@@ -6,8 +6,9 @@ import { ensureBuilt } from './lazy_dom.js';
 import { escapeHtml, showToast } from './utils.js';
 import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
 import { cronWords, atWords, localZone, zoneNote } from './job_words.js';
-import { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } from './cron_picker.js';
-import { limitSeconds, limitParts } from './time_limit.js';
+import { importOnce } from './import_once.js';
+const { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } = await importOnce('./cron_picker.js'); // this form loads on first use (#10218), and so do the pieces only it uses
+const { limitSeconds, limitParts } = await importOnce('./time_limit.js');
 
 let view = null;
 let editingJobId = null;  // non-null when editing an existing job

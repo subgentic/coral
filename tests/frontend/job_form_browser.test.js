@@ -30,7 +30,7 @@ const STUB = `(() => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile }); await Emulation.setTimezoneOverride({ timezoneId: 'Europe/Berlin' }); // the person's own zone is what a schedule is read in
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`); await ev(STUB);
-            await ev(`window.showJobModal(); true`);
+            await ev(`window.showJobModal().then(() => true)`); // the form loads on first use (#10218): showJobModal answers once it is open
             await waitFor(`document.querySelectorAll('#job-modal-workflow option').length === 2`, 'the workflow list', 8000);
             await waitFor(`/Runs every hour/.test(document.getElementById('cron-preview').textContent)`, 'the preview', 8000);
             await installAudit(ev);
@@ -142,7 +142,7 @@ const STUB = `(() => {
             assert.equal(body.timezone, 'Europe/Berlin'); assert.equal(body.cron_expr, '0 5 * * 1,3');
 
             // 7. an agent job: Repository, Agent and Prompt first; Base branch, Flags and Cleanup behind More options
-            await ev(`window.showJobModal(); document.querySelector('.job-type-btn[data-type="prompt"]').click(); true`);
+            await ev(`window.showJobModal().then(() => { document.querySelector('.job-type-btn[data-type="prompt"]').click(); return true; })`);
             assert.equal(await ev(vis('#job-modal-repo')) && await ev(vis('#job-modal-agent')) && await ev(vis('#job-modal-prompt')), true, at + 'an agent job shows Repository, Agent and Prompt');
             for (const id of ['#job-modal-branch', '#job-modal-flags', '#job-modal-cleanup']) assert.equal(await ev(vis(id)), false, at + id + ' is behind More options');
             await ev(`document.querySelector('#job-modal-more > summary').click(); true`);
@@ -150,7 +150,7 @@ const STUB = `(() => {
             await shot(`job-form-agent-${w}`);
 
             // 8. no workflows yet (#9297): the form opens on the Agent prompt; the Workflow tab says so and offers "Create one", which opens New workflow and comes back
-            await ev(`window.__wf = []; window.showJobModal(); true`);
+            await ev(`window.__wf = []; window.showJobModal().then(() => true)`);
             await waitFor(`document.querySelector('.job-type-btn[data-type="prompt"]').getAttribute('aria-pressed') === 'true'`, 'the Agent prompt is the type', 8000);
             assert.equal(await ev(vis('#job-modal-prompt')), true, at + 'an agent job shows its Prompt first');
             await ev(`document.querySelector('.job-type-btn[data-type="workflow"]').click(); true`);
