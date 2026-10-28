@@ -196,3 +196,6 @@ export function deleteJobWords(job, runCount) {
     const name = job && job.name ? job.name : 'this job';
     return runCount > 0 ? `Delete ${name} and its ${runCount} run${runCount === 1 ? '' : 's'}? This cannot be undone.` : `Delete ${name}? It has no runs yet.`;
 }
+
+/** A job or workflow Coral added as an example (its description starts with "Example"): the folders and the page mark it, and Settings can remove them (#10001). */
+export const isExample = description => /^Example\b/.test(String(description || ''));

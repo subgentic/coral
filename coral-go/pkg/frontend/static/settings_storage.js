@@ -4,6 +4,7 @@ import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { requestJson } from './api.js';
+const { isExample } = await importOnce('./job_words.js'); // lazy like this file
 
 // ── Artifact store (#3553) ─────────────────────────────────────────────
 const GIB = 1024 ** 3;
@@ -86,6 +87,35 @@ export async function loadMessageSearchIndex() {
     } catch {
         out.textContent = "Couldn't read the search index.";
     }
+}
+
+/** Settings: the example job and workflow Coral added (their description starts with "Example"), with a Remove that deletes only those (#10001). Shown only while there are some. */
+export async function loadExamples() {
+    const out = document.getElementById('settings-examples-status'), button = document.getElementById('settings-examples-remove');
+    if (!out || !button) return;
+    const find = async () => {
+        const [jobs, workflows] = await Promise.all([requestJson('GET', '/api/scheduled/jobs'), requestJson('GET', '/api/workflows')]);
+        return { jobs: (jobs.jobs || []).filter(j => isExample(j.description)), workflows: (workflows.workflows || []).filter(w => isExample(w.description)) };
+    };
+    try {
+        const found = await find();
+        const names = [...found.jobs.map(j => j.name), ...found.workflows.map(w => w.name)];
+        out.hidden = button.hidden = names.length === 0;
+        out.textContent = names.length ? `Coral added ${names.length === 1 ? 'an example' : `${names.length} examples`} to Automations: ${names.join(', ')}.` : '';
+        if (!button.dataset.wired) {
+            button.dataset.wired = '1';
+            button.addEventListener('click', () => window.showConfirmModal?.('Remove examples', 'Remove the example job and workflow Coral added to Automations? Your own jobs and workflows are not touched.', async () => {
+                try {
+                    const now = await find();
+                    for (const j of now.jobs) await requestJson('DELETE', `/api/scheduled/jobs/${Number(j.id)}`);
+                    for (const w of now.workflows) await requestJson('DELETE', `/api/workflows/${Number(w.id)}`);
+                    showToast('The examples are removed.');
+                } catch (e) { showToast(`Couldn't remove the examples: ${e.message}`, true); }
+                loadExamples();
+                importOnce('./scheduler.js').then(m => m.refreshJobs && m.refreshJobs()).catch(() => {});
+            }, undefined, { label: 'Remove', danger: true }));
+        }
+    } catch { out.hidden = button.hidden = true; }
 }
 
 /** Settings: how many terminal logs there are and how many belong to ended agents. This computer's dashboard only. */
