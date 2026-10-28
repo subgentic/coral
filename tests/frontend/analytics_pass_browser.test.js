@@ -37,6 +37,14 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.getElementById('cost-calendar-cost').textContent !== ''`, 'today and this month', 8000);
         assert.equal(await ev(`document.getElementById('cost-calendar-cost').textContent`), 'Today $1.50 \u00b7 This month $7.00');
         assert.equal(await ev(`document.getElementById('cost-total-cost').textContent`), '$4.00', 'and the card still shows the range\'s cost');
+        // 3. an empty range says to try a longer one, except the longest
+        await open({ input_tokens: 0, output_tokens: 0, cost_usd: 0, num_requests: 0 });
+        const empty = () => ev(`document.getElementById('cost-dashboard-view').textContent`);
+        await waitFor(`/It appears once an agent has used tokens/.test(document.getElementById('cost-dashboard-view').textContent)`, 'an empty-state line', 10000);
+        assert.match(await empty(), /try a longer range/, 'a day with nothing says to try a longer range');
+        await ev(`(() => { const sel = document.getElementById('cost-time-range'); sel.value = 'month'; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await waitFor(`!/try a longer range/.test(document.getElementById('cost-dashboard-view').textContent)`, 'the longest range without the hint', 10000);
+        assert.match(await empty(), /It appears once an agent has used tokens\./, 'but still says what makes data appear');
         console.log('PASS analytics_pass');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
