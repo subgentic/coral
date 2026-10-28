@@ -8,6 +8,8 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // the browser bar is the light colour from the first paint when the saved theme is light (#10469): the first theme-color meta, read when the document is parsed, before any later script has run
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { try { if (location.pathname === '/' && sessionStorage.getItem('pwa-early') === '1') localStorage.setItem('coral-theme', 'light'); } catch (e) {} document.addEventListener('DOMContentLoaded', () => { const m = document.querySelector('meta[name="theme-color"]'); window.__barAtParse = m ? m.content : null; }); })();` });
         for (const [w, h, mobile] of [[390, 844, true], [1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
@@ -23,6 +25,11 @@ const BASE = require('./test_base').BASE;
             assert.ok(man.icons.every(i => i.ok && /image\/png/.test(i.type)), `${w}: every icon loads: ${JSON.stringify(man.icons)}`);
             assert.deepEqual(man.icons.map(i => i.purpose).filter(Boolean).sort(), ['any', 'any', 'maskable', 'maskable'], `${w}: any and maskable are separate icons`);
         }
+        // light saved: the first paint's bar is not the dark one
+        await ev(`sessionStorage.setItem('pwa-early', '1'); true`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+        assert.equal(await ev(`window.__barAtParse`), '#f4f5f7', 'with a light theme saved, the browser bar is the light colour when the page is parsed, not the dark one first');
+        await ev(`sessionStorage.removeItem('pwa-early'); localStorage.removeItem('coral-theme'); true`);
         console.log('PASS The installed app: manifest id, scope and separate icons, edge to edge, the browser bar follows the theme');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
