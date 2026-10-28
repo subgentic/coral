@@ -1,5 +1,122 @@
 # Release Notes
 
+## v2.0.3 — a first run that explains itself: a new agent that tells you what is missing, question and permission cards that say what is asked, alerts when you are away, a phone panel and a sign-in page that say how to get in, a New agent that keeps the Default mode you picked, plainer words everywhere, artifact stars and short links, and links between your own teams
+
+### Changes
+
+#### Getting started
+
+- **A missing CLI says where to fix it** (#10013, #10161): when Launch is blocked because a CLI is not installed, a **Set path** button opens Settings > Agents on that CLI's path field, and the check runs again when Settings closes; after Set path and Save the agent tile and the blocker are drawn again from the fresh check, not left at "not installed" until a refresh.
+- **CLI paths say what is true** (#10083, #9955): a CLI you do not use reads "Not installed" in a neutral colour, a refused path says why and what to do, the CLI paths sit under Defaults, and the closed row says whether the default CLI was found.
+- **New team starts with the default team** (#9877, #9906, #9911): the New team dialog opens with the Orchestrator, Lead Developer and QA Engineer; the template choice says Default team, Blank team or Generated team (N members) to match what is in Members; step 3 says everything on it is optional and each menu item says what it holds (#9971); and a team's **First task** is a real task assigned to the Orchestrator as well as the board line (#10007).
+- **Launch team says why it is off** (#9945, #10129): a member's missing or unrunnable CLI is named in the line above the buttons with its fix, and the description names tmux when tmux is what is missing.
+- **A new team says what it is waiting for** (#10006, #10200, #9971): the team header says "Waiting for first signal" (or "N of M waiting for first signal") with a neutral dot instead of "All well" in green; a queued first task says what it waits on ("Waiting for Orchestrator to pick it up") until it is claimed; an empty team Board says agents post there and where to give the first task.
+- **One set of cards and words for the empty pages** (#9998, #10077): the empty Agents page, the welcome page and the New dialog's chooser share cards and words; the phone's empty page gets Open folder; Open folder says what you get; a persona is explained first in step 2 with Save as persona, Export and Import in one More menu.
+- **The first message and the first reply** (#9948, #10085, #10036): the starting hint says what happens to a message (it waits a few seconds; if the agent is not ready nothing is sent and the text stays); an agent the row calls Check terminal is no longer "starting"; a message that was sent is not kept as a draft; the composer says one plain line about waiting board messages with the actions behind Options; a working agent's **Stop** in a desktop chat is red and Escape in the empty box presses it.
+- **The chat says where the agent works and how it acts** (#10035): an empty chat reads "Working in <folder>." then its permission mode and what that allows for its CLI; going Home deselects the agent's row; a fresh chat has no empty Details bar above its first message (#10041).
+- **Docs match the screens** (#10011, #10025, #10020, #9965): Getting started, Troubleshooting and the worked demos use today's Settings and New team names, every Settings path names the pane it is in, and Docs search reads the topics' text, not only their titles.
+
+#### Questions, permissions and Needs you
+
+- **A question card is a Question** (#10195): headed Question with full-width 44 px choices; the card, the toast and the Inbox row say what is asked, not the tool's name.
+- **A permission card says what is asked** (#10141): the event's own words (the command or the file); opening a Needs you row, or the toast's **Open**, lands on the chat card, not the terminal; the toast says the agent needs your answer.
+- **Needs you is one line on a phone** (#9986): the agent, then what it asks, 56 px like Tasks and Saved. An empty Needs you or Goals says what puts something there, and that a task assigned to you is under Tasks (#9955, #10065).
+- **The Inbox reopens on Needs you** (#10205): when something waits for you; with nothing waiting it reopens on the folder last on screen. The Inbox's Tasks folder says "No tasks assigned to you" (#10127) and the Archived counts agree between the sidebar and the Inbox (#10086).
+- **Reopen where you left** (#10057, #10151): the dashboard reopens the team, agent or chat you left, not Home, and never pulls you back from where you have since gone; the sidebar says what happened to agents Coral put to sleep at a restart, with a Wake button.
+
+#### Alerts, banners and coming back
+
+- **A hidden tab tells you** (#10068): a count in the tab title ("(2) Coral"), cleared when you return, and a desktop alert per kind (a reply, needs you) with an optional sound; alerts are offered once, when the first agent starts, as a strip under the top bar (it covers no page control and a screen reader hears it) with one button and an x for "not now"; Settings > Notifications has a switch for each alert kind and the sound, and a blocked or dismissed permission is explained, never a silent snap back.
+- **Coming back refreshes the open chat at once** (#10068): it says "Reconnecting…" or "Loading chat…" instead of a blank view or a Working time nobody updated.
+- **Banners never cover what you are using** (#10194, #9985): the needs-input toast and the notices share one column that sits above the composer on a desktop and under the headers on a phone, steps aside while a menu is open and comes back when it closes; a short toast on a phone starts below the open agent's header.
+
+#### Chat and composer
+
+- **Attachments teach themselves** (#10147): the composer's placeholder says "Message <agent>, @ to mention a file, or paste an image"; an image thumbnail shows the whole picture and opens full size on click; dropping a file that is not an image says to mention it with @.
+- **Small things in the chat** (#10050, #10012): **Copy** is on every agent reply without hovering; the top button says "Loading earlier messages..." while an older page is fetched and keeps your place; a Coral reminder is labelled "Coral reminder" and a long one folds; **Alt+N** starts a new agent and **?** lists the shortcuts.
+- **Search all chats from the sidebar** (#10050): the agent search says "Search agents" and, once you type, offers "Search all chats" for the same words.
+- **Chat titles and goals skip Coral's own nudges** (#10046, #10163): what Coral typed into the agent (the unread-messages nudge, a task notice, the health check, a stop-hook note) is never an agent's first prompt, its chat title or the goal made from its requests, for every CLI; the history index reads once more at its next start to apply this.
+- **All chats agrees with its header** (#10197): after a restart the list is read again when its folder's count moves, so the header and the list say the same number.
+- **The agent page on a phone and a tablet** (#9999, #9927, #10079): a 44 px back arrow named Agents and a named panel button; the open panel tab shows its word when the words fit; the agent row's hover card waits 800 ms and shows only what the row does not; the header keeps the status dot, with the Chat/Terminal toggle last; even provider tiles, a taller New agent page on a short screen, and the side column starts closed on a tablet's first chat.
+
+#### Settings and the permission mode
+
+- **Default models are dropdowns** (#10000): each default model is a dropdown of the composer's models, with Other… for any id; one line says what Default, Auto and Not set are; New agent's footer says what the chosen permission mode allows; Settings on a phone is a list of its sections, then one section with a way back.
+- **Auto does not promise safety checks it does not have** (#10191, #10000): Claude checks each action for safety; Codex runs in a workspace sandbox; Antigravity, Gemini and Pi have no safety checks (Pi has no permission prompts at all). The always-visible line says "safety checks on Claude only"; each CLI's own words are behind Learn more and in New agent.
+- **Settings says more with fewer words** (#9955, #9926): the footer's way out reads Close while nothing is changed and Cancel once something is; the two Coral Hub commands say they are only needed for Coral Hub; "No install ID yet" reads "Not created yet" without a Copy button; an idle Coral on a busy computer says "Busy (other programs)"; one row style for every sidebar list.
+- **The Files compare setting says what it compares** (#10054): Uncommitted changes, Last commit, Since branch point, Last commit + uncommitted and Compared with main; the files list names the comparison.
+
+#### Safety
+
+- **A New agent you start in Default stays in Default** (#10362, critical): the launch said nothing for Default, so the server could not tell "Default" from "nothing chosen" and started the agent in the saved default or Auto. A launch that picked Default now says so (the optional field `permission_mode`, only the value `default`), for New agent and for each member a team launch starts; no other mode can be named this way, and a launch that does not say behaves as before.
+- **A resurrected team member keeps Default** (#10380): a team member who picked Default now comes back in Default when the team is resurrected; it used to come back in the saved default permission mode.
+- **What Auto, Bypass and the Codex hook switch really do** (#10191, #10324): the Auto line says safety checks are Claude's only; Bypass permissions says it turns off safety checks; the Codex switch is named "Skip Codex's review of Coral's hooks" and says it turns off a safety check; Remote access says other devices can use Coral as you do (control agents, read files, change settings) and that it is unencrypted unless TLS is set up; Manage other computers says whoever signs in here controls every computer you add; the input log is "Record what Coral types" and says it can record passwords; Name each agent's goal says your requests go to Haiku through your Claude Code account.
+
+#### Signing in, phones and privacy
+
+- **The sign-in page says how to get in** (#10094, #10167, #9961): with no password yet it says in one sentence each how to get in; for another device it says how to carry a `coral open --print` link (put the computer's network address in place of 127.0.0.1; it works once, for 10 minutes; do not post it where others can read it); a used or expired link is a page with the Coral mark and the command in a code box, not a line of monospace.
+- **Use on your phone is one panel** (#10149): the address, the QR, the same-network line, and the setup code behind a **Show setup code** button (hidden again after 60 seconds and never in the page until asked for); Enable says what it does, with Coral Hub as a button. With a password set it says your phone signs in with your password.
+- **The set-password prompt says what Not now leaves you with** (#9971): the Coral app, the tray and `coral open` still open Coral; nothing else reaches it; a password adds any browser and other devices.
+- **First start without a screen** (#9936): a headless Coral with a Coral Hub credential takes its Terms from the Hub's confirmation before anything listens, and exits non-zero if the confirmation does not come; a person at a terminal can still accept.
+- **Telemetry: the new-user steps** (#10004, #10106): schema 5 adds `eula_accepted`, `dashboard_signed_in`, `first_message_sent` and `first_agent_reply`; `eula_accepted` follows the saved analytics choice and, for a server the Coral app started, is sent once on a first run and only with analytics on. Nothing new is sent when analytics is off.
+
+#### Cleanup and the rest of the dashboard
+
+- **Cleanup dialogs name what they touch** (#10139, #10178): kill and archive name the agent by role and team and say what stays; **Delete team** is a real dialog that lists everything it removes (messages, tasks, goals, members, reminders, waits, presets, artifact tags and health data); **Unpin** says its files were not changed and has an Undo.
+- **Artifacts** (#9819, #9925, #9941, #9894, #9971): star an artifact to find it again, with a Starred view; a manifest artifact's Download saves its own file by its own name, not the .json list, and has no address until its kind is known; in the Coral app a download is saved to Downloads and carries the download mark a browser's does (quarantine on macOS, Zone.Identifier on Windows); an empty Artifacts list says how a file gets there.
+- **Shortened artifact links** (#9841): a shortened link is made whole by the server or the text is refused; old ones become links in the dashboard; a worded link says what it opens. Through the Hub this is the owner's alone.
+- **Links between your own teams** (#9893, #9888, #9892): `coral-board link`, `unlink` and `links` connect two teams on this computer and carry a files grant (on unless turned off); a Link team dialog (behind the Hub's team_link_dialog account field) does the same for teams on other computers, with a keyboard and screen-reader pass.
+- **Which MCP servers an agent has** (#9769): read-only, on the agent's Info dialog.
+- **Tables size their columns** (#9845, #9846, #9856, #9904, #9861): no Reset column widths button and a fixed Actions column that is never clipped; a column no row uses is not drawn; Tasks, Automations' runs and the Server view follow the same rules; the stars on Needs you rows stay one line at 360 px.
+- **Automations** (#9958, #10104, #9965): a job page follows its run (read again every 3 s while one is pending or running, and while another tab hides the page), the jobs too, so the last result and the sidebar's Failed count follow a run Run now started; a new job's Repository path is the Settings default or empty, its When row sits right after the name, a refused path is said under its field, and a failed run says why beside the chip.
+- **Small ones** (#9929, #9915, #9955, #9998): the top bar has no "Saved for later" bookmark (Saved is the Inbox's folder); the Analytics Overview says what makes data appear; a workflow's notice that carries an agent's JSON result says it in words with the raw JSON behind Details (#10119); Analytics opens on Overview's content on a phone (#10064); the Complete-task form is stacked on a phone (#10064).
+
+#### Also in this release
+
+- **Edit instructions** (#10133): an agent's menu has Edit instructions (what it is told each time it starts, saved for its next restart); Operator only (never through the Hub), at most 20,000 bytes (said in bytes), an unknown agent is a 404, and a Hub-served dashboard does not offer it. The Prompts folds have plain names.
+- **All chats search finds codes** (#10137, #10262, #10230): `PLUM-4471`, `v2.0.3` and `a@b` are searched as words, each hit shows the line of the chat that matched under its title, a failed search says "Search failed" instead of loading for ever, and a kept list older than 20 seconds is read again at the next draw with its rows staying until the new ones land.
+- **Docs** (#10093, #10266, #10011): a "How do I...?" topic first, Quickstart second, the API pages under "For developers"; search takes words in any order with title hits first and a snippet under each text hit; newcomer docs lose source paths and CLI flags; a phone's Docs list says so when the build has no documentation.
+- **Plainer words on first contact** (#10074, #10266, #10164): the reset-password line, Open folder, the Hub card, Persona, Archive, "Still working" and the empty states; one-line tips for permission modes, Thinking, Flags, the top tabs, Needs you, Artifacts and the header icons; the permission-mode tips are per CLI; the model list names Fable as "Fable 5.1"; Add Terminal says "Opens a shell in this folder"; sleeping agents have one count and the same words in the sidebar and the team's Agents chip.
+- **Teams** (#10008, #10187, #10249, #10052, #10277): the team page has a Stop menu with Sleep Team (Wake Team), Reset Team and Kill All, each with one line on what it does and each asking first; two agents with the same default name are told apart ("Claude 2"); after Wake team the page says how many agents have reported; New workflow starts from a template and a workflow can be duplicated.
+- **Files** (#10256, #10268, #10054): in a folder that is not a git repository the Files list shows the folder's recently changed files (newest first, a week, at most 100, never a dot folder, a credential file or a symlink); the Files list follows the agent when its reply ends, only while the Files panel shows; and the Compare setting says what it compares.
+- **The phone and the keyboard** (#10281, #10247, #10253, #10067): the message box grows to about five lines, is named "Message", Send options and Send are two 44 px buttons; after Launch team, closing Set a password and opening a card's terminal the keyboard goes where the person works and not where it raises the on-screen keyboard; Alt+N (Ctrl+Option+N on a Mac) opens New agent from the message box; a page that is not here has a 404 page with Back to Agents.
+- **The sent-message menu** (#10159): Copy, Save for later and Send to another agent, which adds the text after that agent's unsent draft and sends nothing.
+- **A CLI that quit is Ended** (#10295): an agent whose CLI quit and left its shell is Ended within seconds, and the chat stops saying Working.
+- **Usage by agent** (#10272): an unnamed agent is called by its folder, a running agent with no requests is a $0.00 row, and a running agent's context used is a column; the composer's model chip says where its model comes from (#10080).
+- **Small ones** (#10222, #10120, #10279, #10263, #10212): a task that waits on another says "waiting on #N"; the job page's run watch backs off to 30 s after two minutes and says "Still running" or "Still waiting to start" with a Refresh; the sidebar's "Search all chats" carries its words; Needs you opened for you is not remembered as your folder.
+
+### Fixes
+
+- Add agent to a team on another computer starts with the team's folder (#9970).
+- The agent header writes its folder tip only when it changes (a message that changes nothing writes nothing) (#9919).
+- A Windows import in the Link team test, and the cdp suites' census and column reds after the stack (#9884, #9917, #9942).
+- `dbcrypt`'s migration fault injection trusts only registered test flags, and no testing package links into a shipped binary (#10014, #9980).
+- The cross-team files switch is on by default, as its comment said; pinned through the route (#9873).
+
+### Hub notice
+
+Diffed `v2.0.2..06378c2b0` (`pkg/tunnel`, `pkg/redact`, `pkg/secretbox`, the goldens).
+
+- **`pkg/tunnel/routes.go`**: three rows added. `GET /api/artifacts/resolve` (query `link`, repeatable; owner-only, class view, `redact` in `view_redaction.golden`) (#9841); `PUT` and `DELETE /api/artifacts/{hex64}/star` (tier Interact, `OwnerRefuse`) (#9819).
+- **`routes_query.go`**: `GET /api/artifacts` gains `starred`; `GET /api/board/{}/artifacts` and `GET /api/team-artifacts` gain `starred`; `GET /api/token-usage/summary` gains `by_agent_limit` and `include=totals` (the one value `totals`) (#9820); `GET /api/artifacts/resolve` takes `link`.
+- **`cloud_routes.golden`**: `+GET /api/artifacts/resolve view`, `+PUT /api/artifacts/{id}/star interact`, `+DELETE /api/artifacts/{id}/star interact`, and four routes at `never` (no Hub row): `GET`, `POST` and `DELETE /api/board/{project}/cross-team-links` (#9893) and `GET /api/sessions/live/{name}/mcp-servers` (#9769). `agent_routes.txt` lists all seven new routes as `b` (the Operator's and the board's, an agent token is refused where the identity bindings say operator-only).
+- **Cross-team `files`**: a link entry in `cross_team_allowed` can carry `files` (a boolean; absent means the board's files switch decides; `coral-board link` writes it, on unless turned off) (#9893). Only a sender on this Coral is told apart by it.
+- **`PUT /api/settings/git-diff-mode`** (class interact, unchanged) accepts two more values: `uncommitted` and `last_commit` (besides `branch_point`, `previous_commit`, `main_head`); the setting `git_diff_mode` takes the same five (#10054).
+- **`pkg/redact`, `pkg/secretbox`**: no change.
+- **Telemetry** (not the Tunnel): schema 5 adds the four new-user events above (#10004).
+- **More `never` and Operator-only routes**: `PUT /api/sessions/live/{name}/instructions` (#10133, class `never`, 20,000-byte cap, 404 for an unknown id), added to the lines above (`cloud_routes.golden` gains `PUT /api/sessions/live/{name}/instructions never`; `agent_routes.txt` `b`).
+- **`GET /api/sessions/history`** (#10137, no new key): each hit carries `snippet` (one line, at most 200 characters, control characters dropped) when `q` is set, and a failed search answers `400` with code `search_failed`; the route stays class `redact`.
+- **Launch bodies** (#10362): `POST /api/sessions/launch` and each agent of `POST /api/sessions/launch-team` take the optional `permission_mode`, only `"default"` (no other mode can be named this way); no Tunnel row changes.
+- **Files answer for a non-git folder** (#10256): `GET /api/sessions/live/{name}/files` with `is_git` false now carries up to 100 entries (`status` `??`, `recorded_at`) instead of an empty list; same route, tier and keys; `hubVisibleFiles` still drops dot and sensitive paths for a tunneled request.
+- **A 404 page** (#10281): a GET that accepts HTML, outside `/api`, the sockets, `/auth` and `/static`, to a path no route has, answers a small 404 page (it names nothing of the request) instead of the router's bare text; no route is shadowed.
+- **Internal bindings** (not the Tunnel): `identity_route_bindings.txt` adds `+token-session` to the board task routes (create, amend, approve, cancel, complete, reject, submit-review) and the three new link routes; `pkg/secretbox` only changes the text of one error message (the Settings pane's name).
+
+### Internal
+
+- The mock agent has a ready mode (`MOCK_AGENT_READY=1`) that never writes into a real `~/.claude/projects`, and controls a tester types (`MOCK_ASK_QUESTION`, `MOCK_ASK_PERMISSION`, `MOCK_STUCK_ENTER`, `MOCK_GO_DEAF`, `MOCK_EXIT`) (#10010, #10033, #10168).
+- A CI path for a new user from a fresh page to a first reply and the Orchestrator's first task, each step with a time budget (#10032); `no testing package in shipped binaries` census (#9980); telemetry census entries for suites that start no Coral.
+- The start weight: the alert and return-to-tab modules load when first needed (#10068).
+
 ## v2.0.2 — the Inbox on Coral Hub (behind a switch), a phone Inbox that reads like mail, one line a row for agents, board messages and chats, one look for text, buttons, menus and dialogs, and faster lists, charts and searches
 
 ### Changes
