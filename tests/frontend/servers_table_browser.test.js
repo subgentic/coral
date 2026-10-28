@@ -179,6 +179,11 @@ const contrast = (a, b) => {
         await sortBy('agents');
         t = await table(); assert.equal(t.heads[2].sort, 'descending', 'agents start with the most');
         assert.deepEqual(t.names, ['Box Four', 'Box One', 'box two', 'Box Three']);
+        await sortBy('seen');
+        t = await table(); assert.equal(t.heads[4].sort, 'descending', 'Last seen starts with the most recent');
+        assert.deepEqual(t.names, ['Box Four', 'Box One', 'box two', 'Box Three'], 'online machines first (now), then the offline one by when it was last heard from');
+        await sortBy('seen');
+        t = await table(); assert.equal(t.heads[4].sort, 'ascending'); assert.equal(t.names[0], 'Box Three', 'the second press reverses: the longest-silent first');
         await sortBy('status');
         t = await table(); assert.equal(t.heads[1].sort, 'ascending');
         assert.equal(t.rows[0].status, 'Offline', 'ascending: offline first');
