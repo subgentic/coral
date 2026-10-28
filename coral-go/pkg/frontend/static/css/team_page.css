@@ -355,6 +355,8 @@
 @media (max-width: 760px) {
     .inbox-review-actions button { min-height: 44px; }
     .inbox-review-actions-star { column-gap: 4px; } /* the starred glyph is a fourth cell: 8 px gaps put the actions 3 px over the line, under the name (#9904) */
+    .inbox-review-actions-star > .dt-star { width: 16px; margin-inline-end: -4px; } /* on a phone the starred glyph is not a button: 16 px, and it leans 4 px into the gap (#9922) */
+    .dt-box.dt-fold-column.dt-folded tr:has(.inbox-review-actions-star > .dt-star-on) td.dt-line-1.dt-grow { flex-basis: 3.5rem; } /* a starred row name has 3.5 rem of its own, not 5, so the actions stay on its line at 360 px (#9922) */
     .inbox-review-team { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); line-height: var(--lh-label); color: var(--table-tertiary-color); }
 }
 /* A team no board has (#8848): its name and the way back, none of a team's tabs, panels or actions */

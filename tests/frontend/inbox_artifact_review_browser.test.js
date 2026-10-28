@@ -13,10 +13,10 @@ const BASE = require('./test_base').BASE;
     const rows = `document.querySelectorAll('#group-table-view [data-review-artifact]')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
-        for (const width of [1280,1024,390]) {
+        for (const width of [1280,1024,390,360]) { // 360 is the narrow phone (#9922)
             try {
-                await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
-                await Emulation.setTouchEmulationEnabled({enabled:width===390});
+                await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width<=390});
+                await Emulation.setTouchEmulationEnabled({enabled:width<=390});
                 await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await install();
                 await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
                 assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`),200);
@@ -52,7 +52,7 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+','all pending artifacts count: the pill reads 9+ past nine (#9821)');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 13 /,'and the tab\'s accessible name keeps the exact count');
                 assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
-                if (width !== 390) { // column sizing (#9846): an empty column is not drawn, Item has room, Actions is whole, the table fits its box
+                if (width > 390) { // column sizing (#9846): an empty column is not drawn, Item has room, Actions is whole, the table fits its box
                     const cols = await ev(`(() => { const box = document.querySelector('#group-table-view .dt-box'), br = box.getBoundingClientRect(), shown = e => !!e && getComputedStyle(e).display !== 'none'; const ch = (() => { const td = box.querySelector('tbody tr.dt-row td.dt-td'), s = document.createElement('span'); s.style.cssText = 'position:absolute;visibility:hidden;width:1ch;font:inherit'; td.append(s); const w = s.getBoundingClientRect().width; s.remove(); return w; })(); const heads = [...box.querySelectorAll('thead th.dt-th')].filter(shown).map(th => th.dataset.key + ':' + Math.round(th.getBoundingClientRect().width)); const row = box.querySelector('tbody tr.dt-row'), cell = k => row.querySelector('td[data-key="' + k + '"]'), r = e => e.getBoundingClientRect(); return { heads, itemCh: Math.round(r(cell('agent')).width / ch), goalCh: cell('goal') && shown(cell('goal')) ? Math.round(r(cell('goal')).width / ch) : 0, actionsRight: Math.round(r(cell('review')).right), boxRight: Math.round(br.right), actionsLeft: Math.round(r(cell('review')).left), fits: box.scrollWidth <= box.clientWidth + 1, scroll: box.scrollWidth, client: box.clientWidth, ch }; })()`);
                     assert.ok(!cols.heads.some(h => /^(cli|folder):/.test(h)), `${width}: CLI and Folder are empty on every review row and are not drawn: ` + JSON.stringify(cols.heads));
                     assert.ok(cols.itemCh >= 24, `${width}: Item has at least 24 characters of room: ` + JSON.stringify(cols));
@@ -99,11 +99,11 @@ const BASE = require('./test_base').BASE;
                 }
                 const layout = await ev(`(() => {const r=${row('Review file 01.txt')}, buttons=[...r.querySelectorAll('.inbox-review-actions button:not(.dt-star)')], rects=buttons.map(b=>b.getBoundingClientRect());const team=r.querySelector('.inbox-review-team');return {actionsBesideName:rects[0].left>r.querySelector('.inbox-review-name').getBoundingClientRect().right-1&&Math.abs(rects[0].top+rects[0].height/2-(r.querySelector('.inbox-review-name').getBoundingClientRect().top+r.querySelector('.inbox-review-name').getBoundingClientRect().height/2))<2,team:team.textContent,teamHeight:team.getBoundingClientRect().height,teamFits:team.scrollWidth<=team.clientWidth+1,height:r.getBoundingClientRect().height,sameLine:Math.abs(rects[0].top-rects[1].top)<2,standard:buttons.every(b=>!b.classList.contains('dt-quiet')&&!b.disabled)};})()`);
                 assert.ok(layout.sameLine,'both actions stay on one line');
-                if(width===390){assert.equal(layout.team,team,'phone keeps the full team name');assert.ok(layout.teamHeight>0&&layout.teamFits,'team metadata is visible and wraps within the row');}
-                if(width===390)assert.ok(layout.actionsBesideName,'actions sit to the right of the filename on the same line');
-                assert.ok(layout.height<(width===390?96:41),'compact review row (a phone row has the goal on its second line, #8917, so its waiting time may be a third): '+JSON.stringify(layout));
+                if(width<=390){assert.equal(layout.team,team,'phone keeps the full team name');assert.ok(layout.teamHeight>0&&layout.teamFits,'team metadata is visible and wraps within the row');}
+                if(width<=390)assert.ok(layout.actionsBesideName,'actions sit to the right of the filename on the same line');
+                assert.ok(layout.height<(width<=390?96:41),'compact review row (a phone row has the goal on its second line, #8917, so its waiting time may be a third): '+JSON.stringify(layout));
                 assert.ok(layout.standard,'standard enabled button treatment');
-                if(width===390)assert.ok(await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('.inbox-review-actions button:not(.dt-star)')].every(b=>b.getBoundingClientRect().height>=44)`),'review actions keep 44px touch targets');
+                if(width<=390)assert.ok(await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('.inbox-review-actions button:not(.dt-star)')].every(b=>b.getBoundingClientRect().height>=44)`),'review actions keep 44px touch targets');
 
                 const dir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
                 if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);fs.writeFileSync(path.join(dir,`inbox-review-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
