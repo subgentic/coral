@@ -111,15 +111,14 @@ export function phoneBack() {
     (document.querySelector('#cost-nav-list .row-btn[aria-current="true"]') || document.querySelector('#cost-nav-list .row-btn'))?.focus({ preventScroll: true }); // the view just left, else the first
 }
 
-/** The tab was opened: the list is drawn, the view that was open stays (a phone starts at the list). */
+/** The tab was opened: the list is drawn, the view that was open stays (a phone opens on it too, Overview the first time). */
 export function showViews() {
     const el = page();
     const ask = state.analyticsAsk; // a route asked for a page (/analytics/<page>): read once
     state.analyticsAsk = null;
     if (el && isPhoneLayout()) el.removeAttribute('data-phone-item');
     selectView(ask ? ask.view : current, { fromHistory: true });
-    if (el && isPhoneLayout() && !(ask && ask.open)) el.removeAttribute('data-phone-item');
-}
+} // a phone opens on the page (Overview, or the one a link names), not the bare list of pages: the way back (phoneBack) shows the list (#10064)
 
 /** An Analytics table on a phone is one line a row (#8982): its name column (the primary one, else the first) and the figure the table is read for (`keep`: column keys) stay, a row's own link stays (a column
  *  `details`), the others drop as the table narrows, the later columns first (the shared one-line table's dropAt, #8931). Returns the table's config to spread: { columns } as it was on a wider screen, or with
