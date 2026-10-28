@@ -175,7 +175,7 @@ const BASE = require('./test_base').BASE;
         assert.match(await ev(`document.getElementById('team-wizard-error').textContent`), /^Describe your team first/);
         await ev(`document.getElementById('team-wizard-directive').value = 'Ship it, with two devs'; window.generateTeamFromWizard(); true`);
         await waitFor(`/the model is down/.test(document.getElementById('team-wizard-error').textContent)`, 'the failure');
-        assert.deepEqual(await ev(`[document.getElementById('team-wizard-generate-btn').disabled, document.getElementById('team-wizard-generate-btn').textContent]`), [false, 'Generate Team']);
+        assert.deepEqual(await ev(`[document.getElementById('team-wizard-generate-btn').disabled, document.getElementById('team-wizard-generate-btn').textContent]`), [false, 'Generate team']);
         assert.deepEqual(await ev(`window.__generates`), [{ directive: 'Ship it, with two devs', composition: '' }]);
         await ev(`window.__generateAnswer = { status: 200, body: { team: { name: 'Gen Team', flags: ['--x'], agents: [{ name: 'Lead', prompt: 'lead it' }, { name: 'Dev', prompt: 'build it' }] } } }; window.generateTeamFromWizard(); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step, straight from the draft (no Review Team press, #10517)');
