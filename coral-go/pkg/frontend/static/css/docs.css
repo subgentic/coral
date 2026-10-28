@@ -151,3 +151,5 @@
 
 /* The sentence a search found, when its topic is opened from the results (#10484): a quiet band and an edge, not a flash. */
 .docs-content .doc-hit { background: var(--bg-hover); box-shadow: -4px 0 0 var(--accent); border-radius: 2px; }
+
+.docs-page:has(#docs-content .empty-state) .docs-toolbar-hint { display: none; } /* no hint about agents over the line that says to pick a topic (#10736) */

@@ -219,6 +219,8 @@ function renderDocNav() {
         || (docsList.length || docsLoaded ? `<li class="empty-state empty-state-tight">${docsList.length ? (docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches. Try other words, or clear the search.') : 'No documentation found.'}</li>` : ''); // a build with none says so in the list too: a phone shows the list, not the content pane (#10266)
     syncPaneGroupToggle('docs');
     refreshGroupTable('docs');
+    const pane = document.getElementById('docs-content'); // the page with no topic open says what to do, where it was an empty space under a line about agents (#10736)
+    if (pane && !selectedDoc && !pane.firstChild) pane.innerHTML = emptyHtml(docsQuery ? 'Pick a result' : 'Pick a topic');
 }
 
 /** Say which topic is showing, politely (the text changes under a reader without a word otherwise, #6586). */
