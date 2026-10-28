@@ -10,6 +10,7 @@
  *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
  *   cell types: chip(word, cls), avatar(name), avatars(people, label), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   oneLine: true: keep one row, hide columns with dropAt 62/52/36/28/16 (rem) as the container narrows; never fold.
+ *   wrapNames: true (with oneLine): in a narrow table the name wraps at its words, to two or three lines, rather than ending in an ellipsis mid-word (the Automations lists).
  *   compact: true: a folded column row is two compact lines (60 px; the name on one line): the Tasks lists and the dock's Artifacts ask for it (#8496); other folded tables keep two-line names and descriptions.
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; 'fit' measures the unfolded columns; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
@@ -148,6 +149,7 @@ export function dataTable(cfg) {
     const hasContent = cfg.columns.some(c => c.width === 'content');
     const box = el('div', `dt-box${cfg.compact ? ' dt-compact' : ''}${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     if (cfg.oneLine) box.classList.add('dt-one-line');
+    if (cfg.oneLine && cfg.wrapNames) box.classList.add('dt-wrap-names'); // a narrow list wraps a long name at its words (hyphens too) instead of cutting it mid-word with an ellipsis (#10275)
     const mailQuery = cfg.mail && typeof window.matchMedia === 'function' ? window.matchMedia(MAIL_QUERY) : null, mailOn = () => !!mailQuery && mailQuery.matches; // a phone's rows are mail rows
     box.classList.toggle('dt-mail-on', mailOn());
     const bar = el('div', 'dt-bar'); bar.hidden = true;
