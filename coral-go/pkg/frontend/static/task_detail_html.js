@@ -62,6 +62,24 @@ function _taskRevisionHtml(task) {
     return html;
 }
 
+/** A result names the files the task attached (hours.md): each name in the message is a link to its file, the way the Completion artifacts list opens it (#10603, the Beta tester). Plain text stays escaped; the first mention of each name is the link. */
+function _messageWithFiles(message, artifacts) {
+    const text = String(message ?? '');
+    const files = (artifacts || []).filter(a => a && String(a.name || '').length >= 3 && /^(coral:\/\/artifacts\/[a-f0-9]{64}|https?:\/\/)/i.test(String(a.uri || '')));
+    let out = '', rest = text;
+    const used = new Set();
+    for (;;) {
+        let at = -1, hit = null;
+        for (const f of files) { if (used.has(f.name)) continue; const i = rest.indexOf(f.name); if (i >= 0 && (at < 0 || i < at)) { at = i; hit = f; } }
+        if (!hit) break;
+        used.add(hit.name);
+        const uri = String(hit.uri), isCoral = uri.startsWith('coral://');
+        out += escapeHtml(rest.slice(0, at)) + (isCoral ? `<a href="#" data-artifact-uri="${escapeAttr(uri)}" title="${escapeAttr(uri)}" data-on-click="task-artifact-open">${escapeHtml(hit.name)}</a>` : `<a href="${escapeAttr(uri)}" title="${escapeAttr(uri)}" target="_blank" rel="noopener noreferrer">${escapeHtml(hit.name)}</a>`);
+        rest = rest.slice(at + hit.name.length);
+    }
+    return out + escapeHtml(rest);
+}
+
 /** The task's workflow: its gates, inputs, completion candidate and artifacts. */
 function _taskWorkflowHtml(task) {
     let html = '';
@@ -79,7 +97,7 @@ function _taskWorkflowHtml(task) {
             const uriDisplay = linked ? '' : escapeHtml(uri);
             return `<div class="task-detail-body">${nameHtml}${a.revision ? ` · ${escapeHtml(a.revision)}` : ''}${a.digest ? ` · ${escapeHtml(a.digest)}` : ''}${uriDisplay ? `<div>${uriDisplay}</div>` : ''}${a.content ? `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(a.content)}</pre>` : ''}</div>`;
         };
-        html += `<details class="task-detail-section"><summary>Workflow${workflow.name ? `: ${escapeHtml(workflow.name)}` : ''}${workflow.stage ? ` · ${escapeHtml(workflow.stage)}` : ''}</summary>
+        html += `<details class="task-detail-section"><summary>${workflow.name || workflow.stage ? `Workflow${workflow.name ? `: ${escapeHtml(workflow.name)}` : ''}${workflow.stage ? ` · ${escapeHtml(workflow.stage)}` : ''}` : 'Instructions for the agent'}</summary>
             <div class="task-detail-body">${escapeHtml(workflow.instructions || '')}</div>
             <div>Required outputs: ${escapeHtml((workflow.required_outputs || []).join(', ') || 'None')}</div>
             <div>Completion gates: ${(workflow.completion_gates || []).length ? `<em>experimental, disabled by default (inactive unless the server enables them)</em> — ` : ''}${escapeHtml((workflow.completion_gates || []).map(g => `${g.name || g.type}${g.check_id ? ` [${g.check_id}]` : ''} (${g.artifact || 'server check'})`).join(', ') || 'None')}</div>
@@ -152,7 +170,7 @@ function _taskFieldsHtml(task) {
     if (task.completion_message) {
         html += `<div class="task-detail-field task-detail-field-wide">
             <span class="task-detail-label">Message</span>
-            <span class="task-detail-value">${escapeHtml(task.completion_message)}</span>
+            <span class="task-detail-value">${_messageWithFiles(task.completion_message, task.workflow?.artifacts)}</span>
         </div>`;
     }
     if (task.workflow?.outcome === 'failed' && !task.completion_message) {

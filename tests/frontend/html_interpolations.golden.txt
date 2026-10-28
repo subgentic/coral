@@ -420,6 +420,7 @@
 1	task_detail_html.js	_formatTokenCount(task.cache_write_tokens)
 1	task_detail_html.js	_formatTokenCount(task.input_tokens)
 1	task_detail_html.js	_formatTokenCount(task.output_tokens)
+1	task_detail_html.js	_messageWithFiles(task.completion_message, task.workflow?.artifacts)
 1	task_detail_html.js	_verifyLine(task)
 1	task_detail_html.js	amendments.length ? `<details class="task-amendment-history"><summary>Changed since task creation</summary>${a
 1	task_detail_html.js	amendments.map(amendment => { const previous = amendment.previous_snapshot || {}; const effective = amendment.
