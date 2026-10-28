@@ -329,8 +329,6 @@ export async function _refreshCostDashboard({ force = false } = {}) {
     const period = document.getElementById('cost-time-range')?.value || 'day';
     const { hoursAgo, since, sinceParam, interval, tsParams } = costRange(period, Date.now());
 
-    // Flash live indicator
-    _flashLiveIndicator();
     _refreshSeries(); // the chart above the open breakdown view (#7857)
     _refreshOverview(); // the change against the period before, and cost by team (#7930)
     _refreshCalendarCost(); // Today and This month beside Total cost (#10521)
@@ -359,6 +357,7 @@ export async function _refreshCostDashboard({ force = false } = {}) {
             const none = document.getElementById('cost-counts-note'); // nothing in this range: say what is counted, never a bare 0 (#10521)
             const nothing = !(t.num_requests > 0 || t.cost_usd > 0 || t.input_tokens > 0 || t.output_tokens > 0); // nothing at all: a total of money or tokens beside the note would contradict it
             if (none) { none.textContent = nothing ? COUNTS_NOTE : ''; if (nothing) delete none.dataset.empty; else none.dataset.empty = '1'; none.hidden = !nothing; } // data-empty: the view switcher (analytics_views.js) leaves a note with nothing to say hidden, as it un-hid it with the Overview (#10979)
+            _flashLiveIndicator(); // the figures were read: say when
 
             // By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them).
             _renderProviderTable(providerRows(data.by_agent_type));
@@ -691,6 +690,8 @@ function _flashLiveIndicator() {
     const el = document.getElementById('cost-live-indicator');
     if (!el) return;
     el.classList.add('cost-live-flash');
+    const at = document.getElementById('cost-live-text'); // the word says what happened, not that something is "live": when the figures were last read (#10740)
+    if (at) at.textContent = `Updated ${new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
     setTimeout(() => el.classList.remove('cost-live-flash'), 1000);
 }
 

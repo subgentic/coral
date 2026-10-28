@@ -120,7 +120,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
 
             // Overview: the title, the range and the live mark, seven tiles of one size, the chart; nothing of the other views
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.getElementById('cost-view-title')); return [document.getElementById('cost-view-title').textContent, t.fontSize, t.fontWeight]; })()`), ['Overview', '20px', '700'], at + 'the title is the view, 20/700');
-            assert.equal(await ev(`document.getElementById('cost-range-line').textContent.replace(/\\s+/g, ' ').trim()`), 'Last 24 hours · Change against the prior 24 hours Live', at + 'the range, prior-period comparison and live mark under it');
+            assert.match(await ev(`document.getElementById('cost-range-line').textContent.replace(/\\s+/g, ' ').trim()`), /^Last 24 hours · Change against the prior 24 hours (Updating…|Updated \d\d?:\d\d:\d\d.*)$/, at + 'the range, prior-period comparison and when the figures were read under it');
             assert.deepEqual(await ev(`[...new Set([...document.querySelectorAll('#cost-summary-cards .cost-card-value')].map(e => getComputedStyle(e).fontSize + '/' + getComputedStyle(e).fontWeight))]`), ['20px/700'], at + 'every tile number is 20/700');
             assert.deepEqual(await ev(`[...new Set([...document.querySelectorAll('#cost-summary-cards .cost-card-label')].map(e => getComputedStyle(e).fontSize + '/' + getComputedStyle(e).fontWeight))]`), ['12px/500'], at + 'every tile label is 12/500');
             assert.equal(await ev(`document.querySelectorAll('#cost-summary-cards .cost-card').length`), 7, at + 'seven tiles');
