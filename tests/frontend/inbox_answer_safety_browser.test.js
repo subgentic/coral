@@ -9,11 +9,12 @@ const SETS = {
     claude: ['Yes', "Yes, and don't ask again for: npm test:*", 'Yes, allow all edits during this session (shift+tab)', 'Yes, allow reading from src/ from this project', 'No'],
     claudeLasting: ['Yes', 'Yes, never ask again', 'Yes, and do not ask again', 'Yes, forever', 'No'], // phrasings no word list had: a full-match allowlist leaves them to Open
     claudeTrust: ['Yes, and trust this workspace', 'Yes, for the rest of this task', 'Yes', 'No'],
+    bracketed: ['Yes (always)', 'Yes (do not ask again)', 'Allow (for this session)', 'Yes (forever)', 'Yes (all projects)', 'Yes (y)', 'No (esc)'], // a lasting phrase in brackets is not a key hint
     gemini: ['Allow once', 'Allow for this session', 'Allow for all future sessions', 'No'],
     codex: ['Yes, proceed (y)', "Yes, and don't ask again for commands that start with `touch` (p)", 'No, and tell Codex what to do differently (esc)'],
     antigravity: ['Yes, run command', "Yes, and always allow in this conversation for commands that start with 'printf'", 'Yes, and always allow access to the folder', 'No, cancel'],
 };
-const SHOWN = { claude: ['Yes', 'No'], claudeLasting: ['Yes', 'No'], claudeTrust: ['Yes', 'No'], gemini: ['Allow once', 'No'], codex: ['Yes, proceed (y)', 'No, and tell Codex what to do differently (esc)'], antigravity: ['Yes, run command', 'No, cancel'] };
+const SHOWN = { claude: ['Yes', 'No'], claudeLasting: ['Yes', 'No'], claudeTrust: ['Yes', 'No'], gemini: ['Allow once', 'No'], bracketed: ['Yes (y)', 'No (esc)'], codex: ['Yes, proceed (y)', 'No, and tell Codex what to do differently (esc)'], antigravity: ['Yes, run command', 'No, cancel'] };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
