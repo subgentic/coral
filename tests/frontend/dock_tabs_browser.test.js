@@ -108,6 +108,13 @@ const { settle } = require('./helpers/wait');
         const target = await ev(`Math.round(document.querySelector('#agentic-more-menu [role=menuitem]').getBoundingClientRect().height)`);
         assert.ok(target >= 44, 'a 44 px target on the phone: ' + target);
         await shot('dock-tabs-more-390'); ok('below 1280 and on the phone');
+        // a tab chosen from More shows its word on the More button: the strip still holds every tab, none cut at its edge (#10052, Mobile tester)
+        const before = await ev(`(() => { const r = document.querySelector('${ROW}'); return r.scrollWidth - r.clientWidth; })()`);
+        await ev(`document.querySelector('#agentic-more-menu [role=menuitem]').click(); true`); await settle(ev, 400); // sleep-ok: the tab switch redraws the strip
+        const fit = await ev(`(() => { const r = document.querySelector('${ROW}'), rb = r.getBoundingClientRect(); const tabs = [...r.querySelectorAll('.agentic-tab')].filter(b => getComputedStyle(b).display !== 'none' && b.getClientRects().length); const out = tabs.filter(b => { const b2 = b.getBoundingClientRect(); return b2.right > rb.right + 1 || b2.left < rb.left - 1; }).map(b => (b.getAttribute('aria-label') || b.title || b.id)); return { n: tabs.length, out, scroll: r.scrollWidth - r.clientWidth, before: window.__before, more: (document.getElementById('agentic-tab-more') || {}).textContent }; })()`);
+        assert.ok(fit.scroll <= before, 'the open tab\'s word does not widen the row past what it was (' + before + ' px over before, ' + fit.scroll + ' after)');
+        assert.deepEqual(fit.out.filter(() => fit.scroll > before), [], 'no tab is cut at the strip\'s edge when the open tab shows its word at 390: ' + JSON.stringify(fit));
+        await shot('dock-tabs-open-word-390');
         // a tab's new count widens the tabs and leaves the strip's size alone (it does not wrap while its words show, #9420): the tabs are watched, so the words come off and nothing is wrapped or clipped (#9435)
         await load(1280, false);
         await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show again at 1280', 4000);
