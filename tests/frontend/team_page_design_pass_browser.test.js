@@ -1,5 +1,5 @@
 // UI/UX's 169 design pass on the team page (items 4 to 7 of the pass, task 7590): the Messages tab has the other tabs' top and left edge, "Search messages" and the page's button style; Tasks on a phone has New task on the
-// search row and a chip strip that never clips a word; Remind sits in its cell under its header, on the name's line; no tab has a badge at zero. By role and accessible name where there is one (helpers/team_page.js). Isolated dev server.
+// search row and a chip strip that never clips a word; Open chat sits in its cell under its header, on the name's line; no tab has a badge at zero. By role and accessible name where there is one (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, agentsUp, openTeam, goTab, scenarios } = require('./helpers/team_page');
@@ -64,12 +64,12 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
                 else { assert.equal(t.sameLine, true, 'the field, the pills, the Filters icon and New task share one line'); assert.ok(t.newH <= t.searchH + 4, `New task is not taller than the field (${t.newH} against ${t.searchH})`); }
             });
 
-            if (!mobile) await S.run(`${label}: item 6, Remind is left-aligned under its header and on the name's line`, async () => {
+            if (!mobile) await S.run(`${label}: item 6, Open chat is left-aligned under its header and on the name's line`, async () => {
                 await goTab(ev, settle, 'Agents'); await settle(600);
-                const r = await ev(`(() => { const p = ${panel()}; const th = [...p.querySelectorAll('th')].find(x => x.textContent.trim() === 'Remind'); const b = [...p.querySelectorAll('button')].find(x => /^Remind /.test(window.__na.name(x)) && window.__na.vis(x)); const td = b.closest('tr').querySelector('td'); const range = document.createRange(); range.selectNodeContents(td.querySelector('button, a, span') || td); const nr = range.getBoundingClientRect(), br = b.getBoundingClientRect(), hr = th.getBoundingClientRect();
+                const r = await ev(`(() => { const p = ${panel()}; const th = [...p.querySelectorAll('th')].find(x => x.textContent.trim() === 'Chat'); const b = [...p.querySelectorAll('button')].find(x => /^Open chat with /.test(window.__na.name(x)) && window.__na.vis(x)); const td = b.closest('tr').querySelector('td'); const range = document.createRange(); range.selectNodeContents(td.querySelector('button, a, span') || td); const nr = range.getBoundingClientRect(), br = b.getBoundingClientRect(), hr = th.getBoundingClientRect();
                     return { header: Math.round(hr.left + parseFloat(getComputedStyle(th).paddingLeft)), button: Math.round(br.left), dy: Math.round(Math.abs((br.top + br.bottom) / 2 - (nr.top + nr.bottom) / 2)) }; })()`);
-                assert.ok(Math.abs(r.button - r.header) <= 2, `Remind starts at its header's text (${r.button} vs ${r.header})`);
-                assert.ok(r.dy <= 6, `Remind is on the name's line (centres ${r.dy} px apart)`);
+                assert.ok(Math.abs(r.button - r.header) <= 2, `Open chat starts at its header's text (${r.button} vs ${r.header})`);
+                assert.ok(r.dy <= 6, `Open chat is on the name's line (centres ${r.dy} px apart)`);
             });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
