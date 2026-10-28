@@ -279,6 +279,27 @@ func TestAnswerPrompt(t *testing.T) {
 	assert.Equal(t, "session_id_required", body["code"])
 	assert.Equal(t, []string{"4", "4", "5"}, sentKeys(), "a bare-name answer sends no keys")
 	assert.Zero(t, terminal.enters["claude-ask"], "Claude Code's digits answer: no Enter")
+
+	// An answer carries the ask it was drawn for (#10400): another ask now open, with the same option at that number, is refused and sends no key
+	drawn, ok := parsePromptScreen(screenPermission)
+	require.True(t, ok)
+	other := strings.Replace(screenPermission, "Do you want to proceed?", "Do you want to delete everything?", 1)
+	require.NotEqual(t, screenPermission, other)
+	next, ok := parsePromptScreen(other)
+	require.True(t, ok)
+	assert.NotEqual(t, drawn.AskID, next.AskID, "two asks with the same options are two ids")
+	setScreen(other)
+	before := len(sentKeys())
+	askAnswer := func(id string) int {
+		b, _ := json.Marshal(map[string]any{"n": 1, "label": "Yes", "ask_id": id, "session_id": sid, "agent_type": "claude"})
+		resp, err := http.Post(base+"/answer-prompt", "application/json", bytes.NewReader(b))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+	assert.Equal(t, http.StatusConflict, askAnswer(drawn.AskID), "the ask changed between draw and click")
+	assert.Len(t, sentKeys(), before, "a refused answer sends no key")
+	assert.Equal(t, http.StatusOK, askAnswer(next.AskID), "the ask that is open is answered")
 }
 
 // fastPromptChecks shortens the waits after an answer for a test.

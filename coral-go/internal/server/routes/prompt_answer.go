@@ -2,6 +2,8 @@ package routes
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -77,6 +79,9 @@ type promptScreen struct {
 	// The few lines above the question (a permission prompt's command): with the question and the labels,
 	// what tells this prompt from the next one the agent opens (samePrompt).
 	context string
+	// AskID names this ask: a short digest of its title, question, the lines above it and its option labels (not the selection). An answer that carries the id it was drawn for is refused
+	// when the screen now shows another ask (#10400): a row or card drawn for one command cannot answer the next one.
+	AskID string `json:"ask_id,omitempty"`
 	// boxes: how many options carry a box (the first ones; a "Chat about this" row has none)
 	boxes int
 }
@@ -137,7 +142,23 @@ func parsePromptScreen(capture string) (promptScreen, bool) {
 	if !ok {
 		return s, false
 	}
-	return cleanPromptScreen(s), true
+	s = cleanPromptScreen(s)
+	s.AskID = askID(s)
+	return s, true
+}
+
+// askID is the digest AskID carries.
+func askID(s promptScreen) string {
+	h := sha256.New()
+	for _, part := range []string{s.Title, s.Question, s.context} {
+		h.Write([]byte(part))
+		h.Write([]byte{0})
+	}
+	for _, o := range s.Options {
+		h.Write([]byte(normalizeLabel(o.Label)))
+		h.Write([]byte{0})
+	}
+	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
 // cleanPromptScreen drops from a parsed prompt's text what can hide or reorder it (Security on #132): controls and escape
@@ -581,6 +602,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		Label     string `json:"label"`
 		Text      string `json:"text"`   // the typed answer, for a "text" option
 		Submit    bool   `json:"submit"` // take the Submit row of a multi-select question (#5232); no n or label
+		AskID     string `json:"ask_id"` // the ask the caller drew (a screen's ask_id): another ask now open is refused (#10400); empty: not checked
 	}
 	if err := decodeJSON(r, &body); err != nil || !body.Submit && (body.N < 1 || body.N > 9 || strings.TrimSpace(body.Label) == "") {
 		errBadRequest(w, "n (1-9) and label are required")
@@ -614,6 +636,10 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	}
 	if !ok || body.N > len(screen.Options) {
 		errConflict(w, "The prompt is no longer open. Check the terminal.")
+		return
+	}
+	if body.AskID != "" && screen.AskID != body.AskID {
+		errConflict(w, "That question changed; look at it again.")
 		return
 	}
 	opt := screen.Options[body.N-1]
