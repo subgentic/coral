@@ -1,6 +1,7 @@
 import { historyLabel } from './history_label.js';
 import { showTerminalStatusbar } from './terminal_statusbar.js';
 import { setCommandPlaceholder } from './composer_placeholder.js';
+import { isPhoneLayout } from './phone_layout.js';
 import { agentIsStarting, syncSendStarting } from './agent_starting.js';
 import { updateModelChip } from './model_chip.js';
 import { importOnce } from './import_once.js';
@@ -325,7 +326,6 @@ export async function selectLiveSession(name, agentType, sessionId, server) {
     const newKey = sessionKey(state.currentSession);
     input.value = state.sessionInputText[newKey] || "";
     renderAttachments();
-    input.focus();
 
     // Show live view, hide others
     showView("live-session-view");
@@ -395,6 +395,8 @@ export async function selectLiveSession(name, agentType, sessionId, server) {
     });
 
     _loadAgentSecondary(name, sessionId, agentData, srv, generation, transcriptReady);
+    // The keyboard goes with the person to the chat (#9794): at a mouse into the composer, on a phone to the page's heading (no keyboard pops up). Last, after the view shows and the pane is built: nothing before it keeps focus.
+    if (isPhoneLayout()) { const h = document.getElementById('session-name'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } else input.focus();
 }
 
 import { historyServer, historyRoute } from './history_source.js';
