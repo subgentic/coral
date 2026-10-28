@@ -262,7 +262,7 @@ function chatFolderSpec(key, ctx) {
                     const hit = !group && s.snippet ? DT.el('span', 'dt-title-snippet') : null; if (hit) { hit.textContent = s.snippet; hit.title = s.snippet; } /* a search's hit: one line of the chat around the matched words (#10137) */
                     if (!marks.length && !hit) return b; const w = DT.el('span', 'dt-title-cell'); w.append(b, ...marks, ...(hit ? [hit] : [])); return w; } },
                 ...(key === 'chats-group' ? [] : [{ key: 'agent', label: 'Agent', width: '9rem', dropAt: 36, cell: s => name(s) }]),
-                { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '7.5rem', cell: s => DT.timeCell(stampOf(s)) },
+                { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '10rem', cell: s => DT.timeCell(stampOf(s)) },
                 ...serverColumns().map(c => ({ ...c, line: undefined, sort: false, width: '7rem', dropAt: 52 })),
                 { key: 'flags', label: 'Star and archive', hideLabel: true, width: '6.5rem', dropAt: 36, /* the two icon buttons are about 100 px: at 5 rem the second was cut by the table's edge, a stray mark (#9458) */ cell: s => {
                     if (isCloud() || (s.server && s.server !== 'local')) return '';

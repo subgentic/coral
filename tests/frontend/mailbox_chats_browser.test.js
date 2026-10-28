@@ -32,6 +32,9 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('chats')).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 50`, 'the first page of chats', 15000);
+        // the When column gives its words room: "yesterday 12:50" is not cut to "yesterday 12:..." (#10391)
+        const cut = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody .dt-time')].filter(t => t.getClientRects().length).map(t => { const c = t.closest('td') || t; return { text: t.textContent, cut: t.scrollWidth > t.clientWidth + 1 || c.scrollWidth > c.clientWidth + 1 }; }).filter(x => x.cut).slice(0, 3)`);
+        assert.deepEqual(cut, [], 'no date is cut: ' + JSON.stringify(cut));
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
