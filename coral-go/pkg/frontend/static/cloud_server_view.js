@@ -25,7 +25,7 @@ import { accessChanged } from './hub_access.js';
 import { state } from './state.js';
 import { note } from './nav.js';
 import { sessionServer } from './server_base.js';
-import { needsInputAttention } from './display_activity_hint.js';
+import { needsYou } from './asked_before_restart.js';
 const { MODES, MODE_INFO, accessChoice, effectiveMode, launchNote, effectiveNote, invalidateServerAccess, serverAccess } = await importOnce('./server_access.js');
 const rank = m => MODES.indexOf(m);
 import { announceNotice } from './notifications.js';
@@ -123,7 +123,7 @@ function cmpVersion(a, b) {
 }
 
 /** Agents of a machine waiting for their person: the Inbox's own test (needsInputAttention) over the live list, per server (UI/UX's Needs you column, #9680): no new route. */
-const needsCount = s => (state.liveSessions || []).filter(x => x && needsInputAttention(x) && sessionServer(x) === s.id).length;
+const needsCount = s => (state.liveSessions || []).filter(x => x && needsYou(x) && sessionServer(x) === s.id).length;
 /** Last seen: "now" while the machine is online, else when the hub last heard from it. */
 const seenWords = s => (s.online === true ? 'now' : formatLastSeen(s.last_seen));
 const seenValue = s => (s.online === true ? Number.MAX_SAFE_INTEGER : (Date.parse(s.last_seen) || 0));
