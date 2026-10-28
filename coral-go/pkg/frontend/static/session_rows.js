@@ -38,8 +38,9 @@ export function _renderArchivedSection(archived) {
         if (!byTeam.has(label)) byTeam.set(label, []);
         byTeam.get(label).push(s);
     }
-    const labels = [...byTeam.keys()].sort((a, b) => (a === 'No team') - (b === 'No team') || a.localeCompare(b));
-    for (const label of labels) {
+    // Agents with no team come first with no heading of their own (a heading "No team" was noise, #10086); each team's agents follow under its name.
+    for (const s of byTeam.get('No team') || []) html += _renderSessionItem(s, '__archived__', true, false, '');
+    for (const label of [...byTeam.keys()].filter(l => l !== 'No team').sort((a, b) => a.localeCompare(b))) {
         html += `<li class="archived-team-caption">${escapeHtml(label)}</li>`;
         for (const s of byTeam.get(label)) html += _renderSessionItem(s, '__archived__', true, false, '');
     }

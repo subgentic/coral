@@ -64,6 +64,12 @@ func (h *HistoryHandler) SetChatFlags(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not save chat flags")
 		return
 	}
+	if body.Archived != nil && !*body.Archived { // Unarchive on a chat whose agent is archived puts the agent back in the sidebar too: the two lists are one answer (#10086); no live session is a no-op
+		if err := h.ss.SetSessionArchived(r.Context(), id, false); err != nil {
+			errInternalServer(w, "could not unarchive the agent")
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
