@@ -29,7 +29,7 @@ const { connect } = require('./agent_view_harness');
             await ev(`{ const h = document.getElementById('team-page-head'); if (window.__headStyle === null) h.removeAttribute('style'); else h.setAttribute('style', window.__headStyle); window.__headHome[0].insertBefore(h, window.__headHome[1]); } document.querySelectorAll('#toast-host > .toast').forEach(t => t.remove()); true`);
             await toast('Copied to the clipboard', false);
             m = await rects();
-            // and below the list's own title (Live Sessions), which it covered (#10052)
+            // and below the list's own title (Agents), which it covered (#10052)
             const title = await ev(`(() => { const e = document.querySelector('.mobile-list-title'); if (!e || !e.getClientRects().length) return null; const b = e.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom) }; })()`);
             if (!title) problems.push(`${w}: the phone list's title is on screen with no agent open`);
             else if (m.toast.top < title.bottom) problems.push(`${w}: the toast starts below the list title: ${JSON.stringify([m.toast, title])}`);
