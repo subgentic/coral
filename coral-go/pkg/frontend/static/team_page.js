@@ -177,7 +177,8 @@ function drawStatus(data) {
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
     if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
     const n = data.agents.filter(a => ATTENTION.includes(a.availability)).length;
-    const text = n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : 'All well';
+    const unknown = data.agents.filter(a => a.availability === 'unknown').length; // no signal from them yet: nothing says they are well (#10006, Beta Tester: "All well" in green over three agents with No signal yet)
+    const text = n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`) : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
@@ -185,7 +186,7 @@ function drawStatus(data) {
         if (n) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
     if (s.textContent === text) return; // the same words are not said again
-    s.className = `team-page-status ${n ? 'needs sr-only' : 'well'}`;
+    s.className = `team-page-status ${n ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`;
     const dot = el('span', 'team-status-dot'); dot.setAttribute('aria-hidden', 'true');
     s.replaceChildren(dot, document.createTextNode(text));
 }

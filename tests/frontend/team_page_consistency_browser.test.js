@@ -48,6 +48,17 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             assert.equal(await ev(`document.getElementById('team-page-health').hidden`), true, 'All well is plain text, not a button');
             assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-status')).position !== 'absolute'`), true, 'and it is drawn');
         });
+        await S.run('agents with no signal yet are not "All well": the status waits for the first signal, with a neutral dot (#10006)', async () => {
+            await ev(`window.__avail = 'unknown'; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`); await settle(700);
+            const st = await status();
+            assert.match(st, /waiting for first signal/i, `got ${JSON.stringify(st)}`);
+            assert.doesNotMatch(st, /All well/);
+            const dot = await ev(`(() => { const s = document.getElementById('team-page-status'); return { cls: s.className, dot: getComputedStyle(s.querySelector('.team-status-dot')).backgroundColor, success: (() => { const p = document.createElement('i'); p.style.color = 'var(--success)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })() }; })()`);
+            assert.ok(!/well/.test(dot.cls) && dot.dot !== dot.success, `not the green of All well: ${JSON.stringify(dot)}`);
+            if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/team-status-no-signal.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+            await ev(`window.__avail = 'available'; true`);
+        });
         await S.run('the rollup and the rows are never drawn as two moments: Updating… and aria-busy until the rows arrive', async () => {
             await ev(`window.__tp.find('button, a, [role=row], tr', /Ship it/).click(); true`); await settle(600);
             assert.ok(await ev(`/In progress/.test(document.querySelector('#team-panel-goals').textContent)`), 'the first draw: In progress, with a rollup that agrees');

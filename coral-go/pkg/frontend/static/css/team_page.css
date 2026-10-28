@@ -14,6 +14,7 @@
 .team-page-health .team-status-dot { background: var(--warning); }
 .team-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex: none; }
 .team-page-status.needs .team-status-dot { background: var(--warning); }
+.team-page-status.unknown .team-status-dot { background: var(--text-secondary); } /* no signal yet: neither green nor amber (#10006) */
 .team-page-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
 .team-page-actions .btn { min-height: 36px; }
 .team-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
