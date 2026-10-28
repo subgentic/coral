@@ -50,7 +50,7 @@ export async function leaveServersTab() {
 
 async function focusRow(focusId) {
     const heading = document.getElementById('servers-tab-title');
-    if (!focusId) { if (heading) heading.focus(); return; }
+    if (!focusId) { if (isCloud()) (await importOnce('./servers.js')).collapseServer(); if (heading) heading.focus(); return; } // the list's address closes an open machine page
     const id = 'server-row-' + String(focusId).replace(/[^A-Za-z0-9_-]/g, '_');
     if (isCloud()) (await importOnce('./servers.js')).expandServer(focusId); // a deep link opens the machine's details
     const row = document.getElementById(id) || document.getElementById('server-row-' + focusId);

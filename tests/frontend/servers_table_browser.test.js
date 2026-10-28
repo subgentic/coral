@@ -135,8 +135,8 @@ const contrast = (a, b) => {
                     select: r.querySelector('.cs-col-access select').value, selectLabel: r.querySelector('.cs-col-access .sr-only').textContent.trim(),
                     open: !!r.querySelector('.cs-toggle.cs-open'), noChevron: !r.querySelector('.cs-chevron') && !r.querySelector('[aria-expanded]') })) }; })()`);
         const pageOpen = id => `!!document.querySelector('#servers-view section.cs-page#server-row-${id}')`;
-        const openPage = async id => { await ev(`document.querySelector('#server-row-${id} .cs-toggle').focus(); document.querySelector('#server-row-${id} .cs-toggle').click(); true`); await waitFor(pageOpen(id), `${id}'s page`, 3000); };
-        const backToList = async id => { await ev(`document.getElementById('servers-back').click(); true`); await waitFor(`document.querySelectorAll('#servers-view tr.cs-row').length === ${SERVERS.length}`, 'the list is back', 3000); if (id) assert.equal(await ev(`document.activeElement === document.querySelector('#server-row-${id} .cs-toggle')`), true, `Back puts the keyboard on ${id}'s row`); };
+        const openPage = async id => { await ev(`document.querySelector('#server-row-${id} .cs-toggle').focus(); document.querySelector('#server-row-${id} .cs-toggle').click(); true`); await waitFor(pageOpen(id), `${id}'s page`, 3000); assert.equal(await ev('location.pathname'), '/servers/' + id, `${id}'s page is in the address`); };
+        const backToList = async id => { await ev(`document.getElementById('servers-back').click(); true`); await waitFor(`document.querySelectorAll('#servers-view tr.cs-row').length === ${SERVERS.length}`, 'the list is back', 3000); assert.equal(await ev('location.pathname'), '/servers', 'the list is at /servers'); if (id) assert.equal(await ev(`document.activeElement === document.querySelector('#server-row-${id} .cs-toggle')`), true, `Back puts the keyboard on ${id}'s row`); };
         const sortBy = key => ev(`document.querySelector('#servers-view .cs-sort[data-key="${key}"]').click(); true`);
         const open = async (where = '') => {
             const blank = Page.loadEventFired(); await Page.navigate({ url: 'about:blank' }); await blank;
@@ -229,7 +229,11 @@ const contrast = (a, b) => {
         assert.ok(hc.filter(x => x.status === 'Online').every(x => x.note === 'No health reading yet.'), 'online machines wait for a reading: ' + JSON.stringify(hc));
         assert.ok(!hc.some(x => x.status === 'Online' && /not connected/.test(x.note || '')), 'no online machine says not connected');
         await backToList('m4');
-        await openPage('m1'); await shot('table-desktop-open'); // a machine's page (Box One)
+        const rowName = id => ev(`document.querySelector('#server-row-${id} .cs-toggle').getAttribute('aria-label')`);
+        assert.equal(await rowName('m3'), 'Open Box Three, offline', 'the row button says the state once');
+        assert.match(await rowName('m1'), /^Open Box One, online(, warning: .+)?$/, 'online, and a warning only when there is one'); // the #9683 rule
+        await openPage('m1'); await ev('history.back(); true'); await waitFor(`document.querySelectorAll('#servers-view tr.cs-row').length === ${SERVERS.length}`, 'browser Back closes the page', 3000); await ev('history.forward(); true'); await waitFor(pageOpen('m1'), 'browser Forward reopens it', 3000); // the page is an address (#9722)
+        await shot('table-desktop-open'); // a machine's page (Box One)
         await backToList('m1');
         await openPage('m3');
         // Revoke asks in the row (Confirm revoke / Cancel) and opens the details for the warning; Cancel puts the row back.
