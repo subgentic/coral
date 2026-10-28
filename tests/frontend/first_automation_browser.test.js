@@ -39,7 +39,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`window.selectHistorySession = async () => true; document.querySelector('#scheduler-detail [data-on-click="job-run-session"]').click(); true`);
         await waitFor(`document.getElementById('history-back') && /weekday-summary/.test(document.getElementById('history-back').textContent) && !document.getElementById('history-back').hidden`, 'the back link to the job', 6000);
         assert.equal(await ev(`document.getElementById('history-back').textContent.trim()`), '← weekday-summary');
-        assert.equal(await ev(`document.getElementById('btn-resume-session').textContent.trim()`), 'Resume this chat', 'Resume says what it resumes');
+        assert.match(await ev(`document.getElementById('btn-resume-session').textContent.trim()`), /^(Resume|Continue) this chat$/, 'the button says which chat it goes on with'); // the word was Resume before #10400
         // and it goes back to the job
         await ev(`document.getElementById('history-back').click(); true`);
         await waitFor(`!!document.querySelector('#scheduler-detail h2') && /weekday-summary/.test(document.querySelector('#scheduler-detail h2').textContent)`, 'the job page again', 8000);
