@@ -260,6 +260,7 @@ let _notGit = false; // the folder is not a git repository (#6072): there is not
 
 export async function loadChangedFiles(agentName, sessionId) {
     if (!agentName) return;
+    _filesStale = false;
     try {
         const params = new URLSearchParams();
         const sid = sessionId || (state.currentSession && state.currentSession.session_id);
@@ -285,6 +286,8 @@ export async function loadChangedFiles(agentName, sessionId) {
 // carries each agent's changed-file count and its state: the list is read again when the open agent's count moves or its turn ends (working to anything else), once for a burst of rows.
 let _followed = { id: '', count: null, working: false };
 let _followTimer = null;
+let _filesStale = false; // the agent changed files while the Files panel was not showing: the next look reads the list
+const filesPanelShowing = () => { const p = document.getElementById('agentic-panel-files'); return !!p && p.classList.contains('active') && p.getClientRects().length > 0; };
 const FOLLOW_DELAY_MS = 300;
 export function followChangedFiles(s) {
     if (!s || !state.currentSession || state.currentSession.type !== 'live') return;
@@ -296,7 +299,9 @@ export function followChangedFiles(s) {
     clearTimeout(_followTimer);
     _followTimer = setTimeout(() => {
         const cur = state.currentSession;
-        if (cur && cur.type === 'live' && (cur.session_id || cur.name) === id) loadChangedFiles(cur.name, cur.session_id);
+        if (!cur || cur.type !== 'live' || (cur.session_id || cur.name) !== id) return;
+        if (!filesPanelShowing()) { _filesStale = true; return; } // nobody is looking: it is read when the panel opens (switchAgenticTab), not at every reply
+        loadChangedFiles(cur.name, cur.session_id);
     }, FOLLOW_DELAY_MS);
 }
 
