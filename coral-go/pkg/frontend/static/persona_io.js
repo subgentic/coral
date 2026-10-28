@@ -4,7 +4,7 @@ import { showToast } from './utils.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
 const { AGENT_PRESETS } = await importOnce('./agent_presets.js');
-const { _findPersona, _getSavedPersonas, _getSavedTeamTemplates, _renderPresetButtons, _upsertSavedPersonas, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
+const { _findPersona, _getSavedPersonas, _getSavedTeamTemplates, _renderPresetButtons, _upsertSavedPersonas, _upsertSavedTeamTemplates, _renameSavedPersona, _deleteSavedPersona } = await importOnce('./persona_store.js');
 const { getAgentConfig, setAgentConfig } = await importOnce('./agent_config_form.js');
 const { _renderTeamTemplateSelector } = await importOnce('./team_dialogs.js');
 
@@ -34,8 +34,55 @@ async function _saveCurrentPersona(nameInputId, promptInputId, flagsInputId) {
 
     // Re-render all preset containers
     _renderPresetButtons("agent-preset-selector", "agent", { blankFirst: true, selectId: 'launch-persona-select' });
+    _syncPersonaButtons();
 }
 window._saveCurrentPersona = _saveCurrentPersona;
+
+// ── Rename and delete a saved persona (#10285): the one picked in New agent's step 2; a built-in or Blank has neither ──
+const selectedSavedPersona = () => {
+    const name = document.getElementById('launch-persona-select')?.value || '';
+    return name && name !== '__blank__' && _getSavedPersonas().some(p => p && p.name === name) ? name : '';
+};
+/** Rename and Delete are on for a saved persona and off, with the reason as their title, otherwise. */
+function _syncPersonaButtons() {
+    const picked = selectedSavedPersona();
+    for (const id of ['agent-rename-persona-btn', 'agent-delete-persona-btn']) {
+        const b = document.getElementById(id);
+        if (!b) continue;
+        b.disabled = !picked;
+        b.title = picked ? (id === 'agent-rename-persona-btn' ? `Rename "${picked}"` : `Delete "${picked}"`) : 'Pick one of your saved personas first (a built-in persona has neither)';
+    }
+}
+function _afterPersonaChange(pick) {
+    _renderPresetButtons("agent-preset-selector", "agent", { blankFirst: true, selectId: 'launch-persona-select' });
+    const sel = document.getElementById('launch-persona-select');
+    if (sel) sel.value = pick && [...sel.options].some(o => o.value === pick) ? pick : '__blank__';
+    _syncPersonaButtons();
+}
+async function _renamePersona() {
+    const old = selectedSavedPersona();
+    if (!old) { showToast('Pick one of your saved personas first', 'error'); return; }
+    window.showPromptModal('Rename persona', 'Persona name', old, async name => {
+        const next = String(name || '').trim();
+        if (next === old) return;
+        if (AGENT_PRESETS.some(p => p.name === next) || _getSavedPersonas().some(p => p && p.name === next)) { showToast(`There is already a persona called "${next}"`, 'error'); return; }
+        try { await _renameSavedPersona(old, next); } catch { showToast('Could not rename the persona', 'error'); return; }
+        showToast(`Renamed to "${next}"`);
+        _afterPersonaChange(next);
+    });
+}
+function _deletePersona() {
+    const name = selectedSavedPersona();
+    if (!name) { showToast('Pick one of your saved personas first', 'error'); return; }
+    window.showConfirmModal('Delete persona', `Delete the saved persona "${name}"? Agents already started from it are not changed.`, async () => {
+        try { await _deleteSavedPersona(name); } catch { showToast('Could not delete the persona', 'error'); return; }
+        showToast(`Deleted persona "${name}"`);
+        _afterPersonaChange('');
+    }, undefined, { label: 'Delete persona', danger: true });
+}
+window._renamePersona = _renamePersona;
+window._deletePersona = _deletePersona;
+document.addEventListener('change', e => { if (e.target && e.target.id === 'launch-persona-select') _syncPersonaButtons(); });
 
 // ── Export / Import (Personas & Team Templates) ──────────────────────────
 
@@ -117,6 +164,7 @@ export async function importTeamTemplates() {
 
 function _initAgentPresets() {
     _renderPresetButtons("agent-preset-selector", "agent", { blankFirst: true, selectId: 'launch-persona-select' });
+    _syncPersonaButtons();
 }
 
 function _selectAgentPreset(name) {

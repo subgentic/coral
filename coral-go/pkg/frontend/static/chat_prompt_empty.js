@@ -8,6 +8,8 @@ import { responseError } from './server_status.js';
 import { reportSendError, noteHooksAnswered } from './terminal_gone.js';
 import { announcePrompt, promptOptionsBySession, syncNeedsInputCard } from './needs_input_card.js';
 import { importOnce } from './import_once.js';
+import { isCloud } from './server_base.js';
+import { instructionsOffered } from './agent_instructions_offer.js';
 
 // The first seconds of a new agent (#6058): its CLI has written nothing yet (the list has no output age for it), and it was started less than STARTING_MS ago by the list's created_at AND this page first saw it less than STARTING_MS ago (the second bounds a server clock that runs ahead of this one). "No messages yet" there reads as ready; it says the CLI is coming up.
 // After that the row's own states take over (the "Waiting in the terminal" card from 25 s with no event at all).
@@ -45,6 +47,21 @@ function emptyStateWords(session) {
     }
 }
 
+// The agent's standing instructions are shown where the agent is, one line cut with an ellipsis and an Edit (#10285, the desktop tester: they were only behind the row's menu). Only for an agent that has some, and where Edit is offered.
+function syncInstructionsLine(el, session) {
+    const row = (state.liveSessions || []).find(s => s.session_id === session?.session_id) || session;
+    const text = row && instructionsOffered(row, isCloud()) ? String(row.prompt || '').trim().replace(/\s+/g, ' ') : '';
+    const line = el.querySelector('.chat-standing');
+    if (!line) return;
+    const shown = text.length > 140 ? text.slice(0, 139).trimEnd() + '\u2026' : text;
+    const t = line.querySelector('.chat-standing-text');
+    if (t.textContent !== (shown ? `Instructions: ${shown}` : '')) t.textContent = shown ? `Instructions: ${shown}` : '';
+    if (shown) t.title = text.slice(0, 500);
+    const btn = line.querySelector('button');
+    if (row) { btn.dataset.name = row.name || ''; btn.dataset.agentType = row.agent_type || ''; btn.dataset.sessionId = row.session_id || ''; }
+    line.hidden = !shown;
+}
+
 // A brand-new agent has no transcript yet; say so, and what to do, instead of a blank pane.
 export function syncEmptyState(container) {
     const hasContent = Array.from(container.children).some(c => !c.matches(TRAILING_CHROME + ", .load-more-btn, .loading-indicator"));
@@ -59,9 +76,10 @@ export function syncEmptyState(container) {
         el = document.createElement("div");
         el.className = "chat-empty";
         el.setAttribute("role", "status");
-        el.innerHTML = '<div class="chat-empty-title"></div><div class="chat-empty-hint"></div>';
+        el.innerHTML = '<div class="chat-empty-title"></div><div class="chat-empty-hint"></div><div class="chat-standing" hidden><span class="chat-standing-text"></span> <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-instructions">Edit</button></div>';
         container.appendChild(el);
     }
+    syncInstructionsLine(el, state.currentSession);
     // Only write a word that changed, so a screen reader is not told the same thing at every poll
     const t = el.querySelector(".chat-empty-title"), h = el.querySelector(".chat-empty-hint");
     if (t.textContent !== title) t.textContent = title;

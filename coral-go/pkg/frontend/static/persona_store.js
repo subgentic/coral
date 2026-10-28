@@ -17,6 +17,18 @@ export async function _upsertSavedPersonas(entries) {
     state.settings.saved_personas = raw;
 }
 
+/** Rename a saved persona in the list the server has now (#10285). The name must be free (not another saved persona's, not a built-in's). */
+export async function _renameSavedPersona(oldName, newName) {
+    const { raw } = await updateSettingList("saved_personas", list => list.map(p => (p && p.name === oldName ? { ...p, name: newName } : p)), { local: _getSavedPersonas() });
+    state.settings.saved_personas = raw;
+}
+
+/** Delete a saved persona (#10285). */
+export async function _deleteSavedPersona(name) {
+    const { raw } = await updateSettingList("saved_personas", list => list.filter(p => !(p && p.name === name)), { local: _getSavedPersonas() });
+    state.settings.saved_personas = raw;
+}
+
 export function _getSavedTeamTemplates() {
     try { return JSON.parse(state.settings.saved_team_templates || "[]"); }
     catch { return []; }

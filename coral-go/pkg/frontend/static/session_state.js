@@ -208,6 +208,7 @@ export function buildSessionTooltip(s, opts = {}) {
     const stateLabel = getStateLabel(s);
     const lastAction = formatStaleness(s.staleness_seconds);
     const goal = s.summary || "";
+    const instructions = s.agent_type !== 'terminal' && String(s.prompt || '').trim() ? oneLine(s.prompt, 120) : '';
     const status = s.status || "";
     const branchName = s.branch ? _repoBranch(s.repo_name, s.branch) || "" : ""; // no branch on record: no row, not the repository name alone
     const branch = branchName ? branchName + (s.git_state?.is_worktree ? " (worktree)" : "") : "";
@@ -219,6 +220,7 @@ export function buildSessionTooltip(s, opts = {}) {
         { label: 'Last action', text: lastAction },
         ...(goal ? [{ label: 'Goal', text: goal }] : []),
         ...(status ? [{ label: 'Status', text: status }] : []),
+        ...(instructions ? [{ label: 'Instructions', text: instructions, title: String(s.prompt).trim().slice(0, 500) }] : []), // its standing instructions, one line (#10285)
         ...(branch ? [{ label: 'Branch', text: branch }] : []),
         { label: 'Agent', text: agent },
     ];
