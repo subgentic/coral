@@ -37,7 +37,7 @@ import { _handleTeamFolderImport, _importTeamFromFolder } from './team_folder_im
 import { closeSidebarKebabs, closeTopBarSettings, toggleSidebarKebab, toggleTopBarSettings } from './sidebar_menus.js';
 import { loadHistoryPage } from './history_filters.js';
 import { switchNavTab } from './app_navigation.js';
-import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showTeamLinkDialog, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, showResumeModal, hideResumeModal, resumeLaunchNew, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
+import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showTeamLinkDialog, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate, showResumeModal, hideResumeModal, resumeLaunchNew, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
 
 // The New job form (job_form.js, about 28 KB) loads when a person first opens it, not at start (#10218): these are the same calls, answered once the file is in.
@@ -100,6 +100,7 @@ registerActions({
     'm-import-personas': el => { window.importPersonas(); },
     'm-import-team-from-folder': el => { _importTeamFromFolder(); },
     'm-import-team-templates': el => { window.importTeamTemplates(); },
+    'm-export-team-template': el => { window.exportTeamTemplate(document.getElementById('team-template-select')?.value || ''); }, // the saved template that is picked (#10366)
     'm-launch-session': el => { window.launchSession(); },
     'm-launch-team': el => { window.launchTeam(); },
     'm-mobile-connect-backdrop': (el, event) => { if (event.target === el) window._hideMobileConnectModal(); },
@@ -250,7 +251,7 @@ Object.assign(window, {
     hideResumeModal, resumeLaunchNew,
     showAddAgentToBoard, launchTerminalToBoard,
     launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal,
-    exportPersonas, importPersonas, importTeamTemplates,
+    exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate,
     // sessions
     selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, editInstructions, setAgentIcon,
     // xterm
