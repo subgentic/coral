@@ -17,6 +17,8 @@ export const WHAT_STAYS_KILL = "Its chat stays in History.";
 /** The same for a team or a folder of agents killed together, and what a reset leaves alone (#10371: the confirms said terminate and context, and not what stays). */
 export const WHAT_STAYS_KILL_MANY = "Their chats stay in History.";
 export const WHAT_STAYS_RESET = "The old chats stay in History and your files are not touched.";
+/** What a sleep stops, and what it leaves alone (#10785: the dialog named the folder and said nothing of either). */
+export const WHAT_STAYS_SLEEP = 'It stops running; its chat and files stay, and Wake brings it back.';
 /** What an archive leaves alone, and the way back. */
 export const WHAT_STAYS_ARCHIVE = 'Its chat history and files stay; Unarchive brings it back.';
 
