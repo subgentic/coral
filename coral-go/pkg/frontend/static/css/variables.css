@@ -161,6 +161,9 @@
     --glyph-lg: 3rem;      /* 48px */
     --fs-display: 2rem;    /* 32px: the welcome title only */
     /* Weights: three. 700 only on the 20 px and 32 px titles (Goal #84) */
+    --ls-caps: 0.05em;    /* tracking of an uppercase label, a badge, a group head (was 0.3px to 0.12em in nine places) */
+    --ls-code: 0.12em;    /* a spelled-out code (a user code, a pairing code) */
+    --ls-display: -0.035em; /* the 32 px welcome title */
     --fw-regular: 400;
     --fw-medium: 500;     /* UI text, buttons, labels */
     --fw-strong: 600;     /* titles, selected, badges, uppercase labels */

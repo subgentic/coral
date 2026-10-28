@@ -13,7 +13,7 @@
     --table-selected: color-mix(in srgb, var(--accent) 14%, transparent);
     --table-head-size: 0.6875rem;
     --table-head-weight: 600;
-    --table-head-track: 0.06em;
+    --table-head-track: var(--ls-caps);
     --table-head-color: var(--text-muted);
     --table-head-active: var(--text-primary);
     --table-code-font: var(--font-mono, monospace);

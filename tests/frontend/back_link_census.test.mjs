@@ -23,7 +23,7 @@ for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
     if (!hit) continue;
     for (const d of body.split(/;(?![^()]*\))/)) { const prop = d.split(':')[0].trim(); if (prop && LOOK.test(prop)) problems.push(`css: "${sel.trim().replace(/\s+/g, ' ')}" sets ${prop}: the Back link's look is .back-link's alone`); }
 }
-if (!/(^|[}\s])\.back-link\s*\{[^}]*color:\s*var\(--link-text, var\(--accent\)\)[^}]*font:\s*500 var\(--fs-md\)/.test(css)) problems.push('css: .back-link must declare the look (accent colour, 500 var(--fs-md))');
+if (!/(^|[}\s])\.back-link\s*\{[^}]*color:\s*var\(--link-text, var\(--accent\)\)[^}]*font:\s*var\(--fw-medium\) var\(--fs-md\)/.test(css)) problems.push('css: .back-link must declare the look (accent colour, 500 var(--fs-md))');
 if (/\.group-back(?![A-Za-z0-9_-])/.test(css)) problems.push('css: .group-back is gone: use .back-link');
 
 const sources = [...walk(path.join(root, 'static'), ['.js']), ...walk(path.join(root, 'templates'), ['.html'])];

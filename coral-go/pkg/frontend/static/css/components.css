@@ -907,7 +907,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-base);
     font-weight: var(--fw-strong);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: var(--ls-caps);
     line-height: var(--lh-label);
 }
 
@@ -1459,7 +1459,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-weight: var(--fw-strong);
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: var(--ls-caps);
     padding: 6px 4px 2px;
 }
 
@@ -1754,7 +1754,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     padding: 4px 12px 2px;
     font-size: var(--fs-sm);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--ls-caps);
     color: var(--text-muted);
 }
 
@@ -1951,7 +1951,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-weight: var(--fw-strong);
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: var(--ls-caps);
 }
 
 .overflow-menu-tier .tier-label {
@@ -1960,7 +1960,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border-radius: var(--radius-sm);
     font-size: var(--fs-sm);
     font-weight: var(--fw-strong);
-    letter-spacing: 0.5px;
+    letter-spacing: var(--ls-caps);
 }
 
 .overflow-menu-tier .tier-pro {
@@ -2470,7 +2470,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-weight: var(--fw-strong);
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--ls-caps);
     margin-bottom: 4px;
     display: block;
 }
@@ -2940,7 +2940,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 
 /* Settings > Coral Hub (cloud connector) */
 .settings-cloud-code { margin: 6px 0; font-size: var(--fs-base); }
-.settings-cloud-usercode { font-size: 1.6em; letter-spacing: 0.12em; margin-top: 4px; user-select: all; }
+.settings-cloud-usercode { font-size: 1.6em; letter-spacing: var(--ls-code); margin-top: 4px; user-select: all; }
 .settings-cloud-actions { display: flex; gap: 8px; margin: 6px 0; }
 
 /* A field the server rejected (e.g. a launch directory that does not exist, #3152). */
@@ -2987,7 +2987,7 @@ input.switch:disabled { opacity: .5; cursor: not-allowed; }
 .auto-accept-chip {
     flex-shrink: 0;
     margin-left: 4px;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--ls-caps);
     color: var(--warning);
     background: rgba(var(--warning-rgb), 0.14);
     border: 1px solid rgba(var(--warning-rgb), 0.45);
@@ -3126,7 +3126,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 }
 /* The one Details disclosure of a document or an artifact (#7775, details_disclosure.js): a quiet text button in the header row, closed to begin with, and the panel of facts under the header while it is open;
    the document or the artifact comes straight under the header otherwise. The documents pane and the artifact viewer share it. */
-.details-toggle { flex: none; display: inline-flex; align-items: center; gap: 2px; min-height: 32px; padding: 0 6px; border: 0; border-radius: var(--radius-md); background: none; color: var(--link-text, var(--accent)); font: 500 var(--fs-sm, 0.8125rem)/1.4 var(--font-sans); cursor: pointer; }
+.details-toggle { flex: none; display: inline-flex; align-items: center; gap: 2px; min-height: 32px; padding: 0 6px; border: 0; border-radius: var(--radius-md); background: none; color: var(--link-text, var(--accent)); font: var(--fw-medium) var(--fs-sm)/var(--lh-ui) var(--font-sans); cursor: pointer; }
 .details-toggle[hidden] { display: none; }
 .details-toggle:hover { text-decoration: underline; }
 .detail-sub-row { display: flex; align-items: center; flex-wrap: wrap; column-gap: 12px; }

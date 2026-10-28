@@ -24,6 +24,12 @@ const FAMILY = /(?<![\w-])font-family\s*:\s*([^;}"`{]+?)\s*(?:!important)?\s*(?=
 const STYLE_SIZE = /\.style\.fontSize\s*=\s*['"`]([^'"`]+)['"`]/g;
 const WEIGHT = /(?<![\w-])font-weight\s*:\s*([^;}"'`{]+?)\s*(?:!important)?\s*(?=[;}"'`]|$)/g;
 const LINE = /(?<![\w-])line-height\s*:\s*([^;}"'`{]+?)\s*(?:!important)?\s*(?=[;}"'`]|$)/g;
+// a `font:` shorthand is a size, weight and family in one: each part is a token (var(--fw-*) var(--fs-*)/var(--lh-*) var(--font-*)) or the whole is a var(--dlg-*) / inherit (#9741)
+const SHORTHAND = /(?<![\w-])font\s*:\s*([^;}"'`{]+?)\s*(?:!important)?\s*(?=[;}"'`]|$)/g;
+const LETTER = /(?<![\w-])letter-spacing\s*:\s*([^;}"'`{]+?)\s*(?:!important)?\s*(?=[;}"'`]|$)/g;
+// a tracking of 0, normal or inherited is not a step; any other length is a --ls-* token
+const okLetter = (v) => ok(v) || /^(0|normal)$/.test(v.trim());
+const okShorthand = (v) => ok(v) || /^(caption|icon|menu|message-box|small-caption|status-bar)$/.test(v.trim());
 const STYLE_FAMILY = /\.style\.fontFamily\s*=\s*['"`]([^'"`]+)['"`]/g;
 // a line height that is a length (a control's fixed height), 1 or 0 (an icon's), or inherited is not one of the three ratios
 const okLine = (v) => ok(v) || /^(1|0)$/.test(v.trim()) || /^[0-9.]+(px|rem|em)$/.test(v.trim()) || /^normal$/i.test(v.trim());
@@ -56,6 +62,8 @@ export function scan() {
             for (const m of line.matchAll(FAMILY)) if (!ok(m[1]) && !iconFont(m[1])) add(rel, 'font-family', m[1]);
             for (const m of line.matchAll(WEIGHT)) if (!okWeight(m[1])) add(rel, 'font-weight', m[1]);
             for (const m of line.matchAll(LINE)) if (!okLine(m[1])) add(rel, 'line-height', m[1]);
+            for (const m of line.matchAll(SHORTHAND)) if (!okShorthand(m[1]) && /(^|\s)([0-9.]+(rem|px|em)|[1-9]00)(\/|\s|$)/.test(m[1])) add(rel, 'font', m[1]);
+            for (const m of line.matchAll(LETTER)) if (!okLetter(m[1])) add(rel, 'letter-spacing', m[1]);
             for (const m of line.matchAll(STYLE_SIZE)) if (!ok(m[1])) add(rel, 'style.fontSize', m[1]);
             for (const m of line.matchAll(STYLE_FAMILY)) if (!ok(m[1])) add(rel, 'style.fontFamily', m[1]);
         });

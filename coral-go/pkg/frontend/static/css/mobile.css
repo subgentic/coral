@@ -555,8 +555,8 @@
         min-height: 0;
     }
 
-    /* Board message bubbles: compact on mobile */
-    .mb-message {
+    /* Board message bubbles: compact on mobile (a table row is not a bubble: board_table.css owns its 44 px line) */
+    :not(.mb-table) > .mb-message {
         margin-bottom: 8px !important;
         padding: 8px 10px 8px 0 !important;
     }

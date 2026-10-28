@@ -17,7 +17,7 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cloud-card label { display: block; font-size: var(--fs-md); margin: 12px 0 4px; }
 .cloud-card input[type=email], .cloud-card input[type=text] { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: var(--radius-lg);
     border: 1px solid var(--control-border, var(--border, var(--fx-navy-line))); background: var(--bg-primary, var(--fx-navy-ink)); color: inherit; font-size: var(--fs-lg); min-height: var(--control-touch-height, 44px); } /* a 44px target on every pointer: the sign-in page is used from a phone (#5637) */
-.cloud-card input.cloud-code { font-family: var(--font-mono); letter-spacing: .15em; text-transform: uppercase; font-size: var(--icon-size); text-align: center; }
+.cloud-card input.cloud-code { font-family: var(--font-mono); letter-spacing: var(--ls-code); text-transform: uppercase; font-size: var(--icon-size); text-align: center; }
 .cloud-btn { display: inline-flex; align-items: center; justify-content: center; min-height: var(--control-touch-height, 44px); width: 100%; box-sizing: border-box; margin-top: 14px; padding: 10px 14px; border-radius: var(--radius-lg); border: 1px solid var(--control-border, var(--border, var(--fx-navy-line)));
     background: var(--bg-tertiary, #1c2330); color: inherit; font-size: var(--fs-lg); cursor: pointer; text-align: center; text-decoration: none; }
 .cloud-btn.primary { background: #1f6feb; border-color: #1f6feb; color: var(--text-on-accent); }
