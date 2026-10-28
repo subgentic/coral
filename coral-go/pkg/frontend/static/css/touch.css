@@ -5,6 +5,7 @@
 @media (pointer: coarse) {
     .board-chat-header .board-chat-title { min-width: var(--control-touch-height, 44px); }
     .list-row { min-height: var(--control-touch-height, 44px); }
+    .board-card-agents .session-group-item, .session-list .session-group-item.list-row { min-height: var(--control-touch-height, 44px); } /* a team's agent rows were held at 36 px by their own rule (#10341): the tablet's sidebar is the phone's rows */
     .working-mode-docs-link { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); } /* the docs link under Team working mode is a control: its own line, a 44 px target (it was 15 px) */
     /* Square icon buttons: top bar, side-panel and sidebar toggles, Send,
        Open Agent Tab, refresh, Agent UI panel actions, Copy path, row kebabs. */
