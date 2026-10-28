@@ -68,6 +68,11 @@ const STUB = `(() => {
       const hov = await style();
       assert.equal(hov.color, hov.accent, `${width}: the row's hover brings the full colour: ` + JSON.stringify(hov));
       await shot(`details-row-hover-${width}`);
+      const bp = await ev(`(() => { const r = document.querySelector('#agentic-panel-artifacts .artifact-details').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+      await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: bp.x, y: bp.y }); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the hover transition
+      const own = await ev(`getComputedStyle(document.querySelector('#agentic-panel-artifacts .artifact-details')).textDecorationLine`);
+      assert.equal(own, 'none', `${width}: the hovered button has no underline bar under the glyph: ` + own);
+      await shot(`details-button-hover-${width}`);
    }
    console.log('PASS quiet Details button ' + width);
   } catch (error) { failures.push(width + ': ' + error.message); console.error(failures.at(-1)); } }
