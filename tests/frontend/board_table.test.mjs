@@ -12,6 +12,12 @@ assert.equal(snippetOf('## Heading\n\nSome **bold** and `code` with [a link](htt
 assert.equal(snippetOf('Run #7740 is green'), 'Run #7740 is green', 'a task number keeps its #');
 assert.equal(Array.from(snippetOf('é'.repeat(500))).length, 300, 'cut by characters');
 assert.equal(snippetOf(null), '');
+// #10597: a row shows the person's words as typed: an underscore inside a word (snake_case, a file name, an id) stays; only emphasis marks at the edge of a word go, and a ">" or "~" that is not Markdown stays
+assert.equal(snippetOf('Fix retry_count in task_runner.py and MAX_RETRIES'), 'Fix retry_count in task_runner.py and MAX_RETRIES', 'underscores inside words stay');
+assert.equal(snippetOf('Some _emphasis_ and __strong__ words'), 'Some emphasis and strong words', 'emphasis marks at a word edge still go');
+assert.equal(snippetOf('The _private_flag setting and _x_'), 'The private_flag setting and x', 'an edge underscore of a snake_case word goes only when it opens the word');
+assert.equal(snippetOf('> quoted line\nif a > b then'), 'quoted line if a > b then', 'a quote mark at the start of a line goes; a comparison stays');
+assert.equal(snippetOf('about ~5 items and ~~gone~~'), 'about ~5 items and gone', 'a lone tilde stays; a struck-through pair loses its marks');
 assert.equal(snippetOf('## Report 7\n\nA table:\n\n| name | value |\n|------|-------|\n| a | 1 |\n\n---\n\nAnd the end.'), 'Report 7 A table: And the end.', 'a Markdown table and a rule are no words');
 
 assert.deepEqual(taskRefs('See #7740, #7757 and #7740 again; not C#, not a#b, not http://x/#12, not #123456789'), ['7740', '7757']);
