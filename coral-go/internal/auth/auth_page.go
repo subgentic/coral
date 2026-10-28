@@ -184,7 +184,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
       <p><b>Sign in without a password.</b> In a terminal on this computer, run <b>coral open</b>: it opens Coral signed in.</p>
       <p><b>Or create a password below</b> to open Coral in this browser.</p>
 {{else}}
-      <p><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in.</p>
+      <p><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in. To sign in on this device instead, run <b>coral open --print</b>, put the computer's network address in place of <b>127.0.0.1</b> in the link (Coral Mobile shows it) and open the link here: it works once, for 10 minutes.</p>
       <p><b>Or create a password here.</b> Enter the setup code (run <b>coral setup-code</b> on that computer), then choose a password.</p>
 {{end}}
     </div>
