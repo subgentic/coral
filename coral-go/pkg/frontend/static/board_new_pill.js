@@ -43,4 +43,5 @@ export function jumpToLatest() {
     container.scrollTop = container.scrollHeight;
     clearNewPill();
     container.focus({ preventScroll: true });
+    requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; }); // the focus can leave the composer, and a phone's page unfolds around it (#10088): once more, on the settled layout
 }

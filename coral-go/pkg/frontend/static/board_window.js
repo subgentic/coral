@@ -119,7 +119,11 @@ function wireBoardScroll(container) {
     container.addEventListener('focusin', (e) => {
         if (e.target.closest?.('.mb-load-earlier')) focusScrollUntil = performance.now() + 300;
     });
+    // The newest message stays in view when the box changes height (the keyboard comes up or goes, the composer grows): a box that was at the end is at the end again (#10088); one scrolled up stays where it was.
+    let pinned = isAtBottom(container);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (pinned && container.clientHeight > 0) container.scrollTop = container.scrollHeight; }).observe(container);
     container.addEventListener('scroll', () => {
+        pinned = isAtBottom(container);
         if (performance.now() < focusScrollUntil && document.activeElement?.closest?.('.mb-load-earlier')) return;
         if (container.scrollTop < 80 && bs._loadedOffset > 0) loadEarlierMessages();
         if (bs._unseen && isAtBottom(container)) clearNewPill();

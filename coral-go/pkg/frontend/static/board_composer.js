@@ -47,6 +47,7 @@ export async function postBoardMessage() {
         bs._replyTo = null;
         // Fetch new messages since our last known total
         await _pollNewMessages();
+        const list = document.getElementById('mb-messages'); if (list) list.scrollTop = list.scrollHeight; // the person's own message is the newest, and in view (#10088)
     } catch (e) {
         console.error('Failed to post message:', e);
     }
