@@ -38,6 +38,9 @@ const BASE = require('./test_base').BASE;
         assert.match(await row('settings-file-search-mode'), /How @ mentions and the file browser find files/, 'Files and Git: and what they are for');
         // END Files
 
+        // PANE Storage
+        assert.equal(await text('settings-storage-shrink'), 'Shrink saved diffs…', 'Storage: Shrink says what it shrinks');
+        // END Storage
 
 
 
