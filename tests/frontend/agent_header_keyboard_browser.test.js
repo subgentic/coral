@@ -27,7 +27,7 @@ const { axName } = require('./helpers/ax_tree');
             await waitFor(`!!document.querySelector('#live-session-view .terminal-header[data-folder]') && document.querySelector('#live-session-view .terminal-header').getClientRects().length > 0`, `${tag}: the header with its folder`, 8000);
             await settle();
             // Tab order through the header: the name, the branch, the view toggle first of the actions at the right
-            await ev(`document.querySelector('#live-session-view .terminal-header').scrollIntoView(); const first = document.querySelector('#live-session-view .terminal-header [tabindex="0"], #live-session-view .terminal-header button'); first.focus(); true`);
+            await ev(`document.querySelector('#live-session-view .terminal-header').scrollIntoView(); const first = [...document.querySelectorAll('#live-session-view .terminal-header [tabindex="0"], #live-session-view .terminal-header button')].find(e => e.getClientRects().length > 0); first.focus(); true`);
             const seq = [await act()]; for (let i = 0; i < 9; i++) { await key('Tab'); const a = await act(); seq.push(a); if (!a.inHeader) break; }
             const names = seq.filter(a => a.inHeader).map(a => a.id || a.label);
             const idxId = names.indexOf('terminal-header-identity'), idxChat = names.indexOf('live-view-btn-chat'), idxTerm = names.indexOf('live-view-btn-terminal');
