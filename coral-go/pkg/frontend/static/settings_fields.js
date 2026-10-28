@@ -151,7 +151,7 @@ export const CLEANUP_FIELDS = [
 const apiKeyLine = slot => {
     const mk = (tag, cls, attrs = {}, text = '') => { const e = document.createElement(tag); if (cls) e.className = cls; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text) e.textContent = text; return e; };
     const line = mk('div', 'sv-ctl-line', { id: 'settings-api-key-live' });
-    const input = mk('input', 'field field-dense sv-input settings-mono-input', { type: 'password', id: 'settings-api-key', readonly: '', autocomplete: 'off', placeholder: 'Loading...', 'aria-label': 'API key' });
+    const input = mk('input', 'field field-dense sv-input settings-mono-input', { type: 'password', id: 'settings-api-key', readonly: '', autocomplete: 'off', placeholder: 'Loading...', 'aria-label': 'Coral API key' });
     const show = mk('button', 'btn btn-small settings-copy-btn', { type: 'button', id: 'settings-api-key-show', 'aria-pressed': 'false' }, 'Show'); show.hidden = true;
     const copy = mk('button', 'btn btn-small settings-copy-btn', { type: 'button', id: 'settings-api-key-copy' }, 'Copy'); copy.disabled = true;
     const qr = mk('button', 'btn btn-small', { type: 'button', title: 'Show QR code for mobile connection' });
@@ -160,9 +160,25 @@ const apiKeyLine = slot => {
     line.append(input, show, copy, qr); slot.append(line);
 };
 
+// The Claude account's line (#10526): who the agents sign in as is the CLI's own login, so Check asks the CLI (GET /api/system/cli-check?type=claude&signin=1) and says signed in, not signed in, or that it could not tell.
+const claudeAccountLine = slot => {
+    const line = document.createElement('div'); line.className = 'sv-ctl-line';
+    const status = document.createElement('span'); status.id = 'settings-claude-account-status'; status.className = 'settings-hint'; status.setAttribute('role', 'status');
+    const check = document.createElement('button'); check.type = 'button'; check.id = 'settings-claude-account-check'; check.className = 'btn btn-small'; check.textContent = 'Check';
+    check.addEventListener('click', async () => {
+        check.disabled = true; status.textContent = 'Checking...';
+        let signedIn;
+        try { const r = await fetch('/api/system/cli-check?type=claude&signin=1&source=cli_recheck', { cache: 'no-store' }); signedIn = r.ok ? (await r.json()).signed_in : undefined; } catch { /* no answer: said below */ }
+        status.textContent = signedIn === true ? 'Signed in' : signedIn === false ? 'Not signed in: run claude auth login in a terminal' : 'Could not tell if Claude is signed in';
+        check.disabled = false;
+    });
+    line.append(status, check); slot.append(line);
+};
+
 export const SECURITY_FIELDS = [
     { key: 'security_access_title', type: 'heading', id: 'settings-security-access-title', label: 'Access' },
-    { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'API key', render: slot => apiKeyLine(slot) },
+    { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'Coral API key', render: slot => apiKeyLine(slot) },
+    { key: 'claude_account', type: 'custom', id: 'settings-claude-account', label: 'Claude account', help: "Agents use the Claude CLI's own login.", render: slot => claudeAccountLine(slot) },
     live('settings-security'),
     { key: 'security_data_title', type: 'heading', id: 'settings-security-data-title', label: 'Data and privacy' },
     { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },
