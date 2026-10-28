@@ -133,8 +133,10 @@ const contrast = (a, b) => {
                 names: rows.map(r => r.querySelector('.cs-name').textContent),
                 rows: rows.map(r => ({ id: r.id, status: r.querySelector('.cs-col-status').textContent, version: r.querySelector('.cs-col-version').textContent, agents: r.querySelector('.cs-col-agents').textContent, needs: r.querySelector('.cs-col-needs').textContent.trim(), seen: r.querySelector('.cs-col-seen').textContent.trim(),
                     select: r.querySelector('.cs-col-access select').value, selectLabel: r.querySelector('.cs-col-access .sr-only').textContent.trim(),
-                    expanded: r.querySelector('.cs-toggle').getAttribute('aria-expanded'), controls: r.querySelector('.cs-toggle').getAttribute('aria-controls'),
-                    detailHidden: document.getElementById(r.querySelector('.cs-toggle').getAttribute('aria-controls')).hidden })) }; })()`);
+                    open: !!r.querySelector('.cs-toggle.cs-open'), noChevron: !r.querySelector('.cs-chevron') && !r.querySelector('[aria-expanded]') })) }; })()`);
+        const pageOpen = id => `!!document.querySelector('#servers-view section.cs-page#server-row-${id}')`;
+        const openPage = async id => { await ev(`document.querySelector('#server-row-${id} .cs-toggle').focus(); document.querySelector('#server-row-${id} .cs-toggle').click(); true`); await waitFor(pageOpen(id), `${id}'s page`, 3000); };
+        const backToList = async id => { await ev(`document.getElementById('servers-back').click(); true`); await waitFor(`document.querySelectorAll('#servers-view tr.cs-row').length === ${SERVERS.length}`, 'the list is back', 3000); if (id) assert.equal(await ev(`document.activeElement === document.querySelector('#server-row-${id} .cs-toggle')`), true, `Back puts the keyboard on ${id}'s row`); };
         const sortBy = key => ev(`document.querySelector('#servers-view .cs-sort[data-key="${key}"]').click(); true`);
         const open = async (where = '') => {
             const blank = Page.loadEventFired(); await Page.navigate({ url: 'about:blank' }); await blank;
@@ -144,7 +146,7 @@ const contrast = (a, b) => {
             if (!where) { await ev(`document.getElementById('nav-tab-servers').click(); true`); await waitFor(`!!document.querySelector('#servers-view table.cs-table')`, 'the Servers page', 8000); }
         };
 
-        console.log('1. The Servers page is a table: columns, rows, one details row each, Add a machine at the top');
+        console.log('1. The Servers page is a table: columns, rows (each opens its machine\'s page), Add a machine at the top');
         await open();
         await waitFor(`document.querySelectorAll('#servers-view tr.cs-row').length === ${SERVERS.length}`, 'the rows', 6000);
         await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(SESSIONS)}; (await import((window.__coralStatic || '/static/') + 'cloud_server_view.js')).serverView.render(); return true; })()`); // the live list reaches the page after its first draw: draw again with it (Needs you reads it)
@@ -152,7 +154,7 @@ const contrast = (a, b) => {
         assert.equal(t.role, 'table'); assert.equal(t.label, 'Your computers');
         assert.deepEqual(t.heads.map(h => h.text), ['Name', 'Status', 'Agents', 'Needs you', 'Last seen', 'Coral', 'Hub access']);
         assert.ok(t.heads.every(h => h.scope === 'col' && h.button), 'every sortable header is a button in a column header');
-        assert.equal(t.actionsHead, 'Actions', 'the last column is the row actions, named for a screen reader, not sortable');
+        assert.equal(t.actionsHead, null, 'no Actions column: Rename and Revoke are on the machine\'s page');
         assert.deepEqual(t.heads.map(h => h.sort), ['ascending', 'none', 'none', 'none', 'none', 'none', 'none'], 'sorted by name, ascending, to start with');
         assert.deepEqual(t.names, ['Box Four', 'Box One', 'Box Three', 'box two'].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())), 'by name, case ignored');
         const m1 = t.rows.find(r => r.id === 'server-row-m1');
@@ -160,7 +162,7 @@ const contrast = (a, b) => {
         assert.equal(m1.needs, '1', 'Needs you: the agent that waits: ' + JSON.stringify(t.rows.map(r => [r.id, r.needs, r.seen]))); assert.ok(t.rows.filter(r => r.id !== 'server-row-m1').every(r => r.needs === ''), 'and nothing at zero');
         assert.ok(t.rows.filter(r => r.id !== 'server-row-m3').every(r => r.seen === 'now') && t.rows.find(r => r.id === 'server-row-m3').seen !== 'now' && t.rows.find(r => r.id === 'server-row-m3').seen !== '', 'Last seen: now while online, the contact time for an offline machine: ' + JSON.stringify(t.rows.map(r => r.seen)));
         assert.equal(m1.select, 'view'); assert.equal(m1.selectLabel, 'Hub access for Box One');
-        assert.ok(t.rows.every(r => r.expanded === 'false' && r.detailHidden), 'every row starts closed');
+        assert.ok(t.rows.every(r => r.open && r.noChevron), 'every row is one button that opens its machine\'s page: no chevron, nothing expands in place');
         const order = await ev(`[...document.getElementById('cs-add-machine').parentElement.children].map(e => e.id || e.className.split(' ')[0])`);
         assert.ok(order.indexOf('cs-add-machine') >= 0 && order.indexOf('cs-add-machine') < order.findIndex(x => /dt-box/.test(x)), 'Add a machine comes before the table: ' + order);
         console.log('   ok');
@@ -200,35 +202,36 @@ const contrast = (a, b) => {
         await sortBy('name');
         console.log('   ok');
 
-        console.log('3. Rename and Revoke are row actions; a row opens for its details');
-        const acts = await ev(`[...document.querySelectorAll('#servers-view tr.cs-row')].map(r => ({ id: r.id, buttons: [...r.querySelectorAll('.cs-col-actions button')].map(b => b.textContent + '|' + b.getAttribute('aria-label')) }))`);
-        assert.ok(acts.every(x => x.buttons.length === 3 && /^Rename\|Rename /.test(x.buttons[0]) && /^More\|More for /.test(x.buttons[1]) && /^Revoke\|Revoke /.test(x.buttons[2])), 'Rename, More and Revoke (in More), named with the machine, in every row: ' + JSON.stringify(acts));
-        await ev(`document.querySelector('#server-row-m1 .cs-toggle').focus(); document.querySelector('#server-row-m1 .cs-toggle').click(); true`);
-        await waitFor(`document.querySelector('#server-row-m1 .cs-toggle').getAttribute('aria-expanded') === 'true' && !document.getElementById('server-row-m1-detail').hidden`, 'm1 open', 3000);
-        const d = await ev(`(() => { const x = document.getElementById('server-row-m1-detail'); return { text: x.textContent.replace(/\\s+/g, ' '), buttons: [...x.querySelectorAll('button:not(.cs-access-info)')].map(b => b.textContent.trim()), update: (x.querySelector('.cs-update a') || {}).href || null, focus: document.activeElement && document.activeElement.classList.contains('cs-toggle') }; })()`);
+        console.log('3. A row opens the machine\'s page: its details, Rename and Revoke are there, Back returns to the row');
+        assert.equal(await ev(`[...document.querySelectorAll('#servers-view tr.cs-row button')].filter(b => !b.classList.contains('cs-toggle')).length`), 0, 'no Rename, More or Revoke in any row: the row\'s one button opens the page');
+        await openPage('m1');
+        assert.equal(await ev(`document.querySelectorAll('#servers-view tr.cs-row').length`), 0, 'the list is not on screen while a machine\'s page is open');
+        assert.equal(await ev(`document.activeElement.id`), 'server-row-m1', 'the keyboard is on the page');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#server-row-m1 .cs-actions button')].map(b => b.textContent + '|' + b.getAttribute('aria-label'))`), ['Rename|Rename Box One', 'More|More for Box One', 'Revoke|Revoke Box One'], 'Rename, More and Revoke (in More), named with the machine, in the page\'s foot bar');
+        const d = await ev(`(() => { const x = document.querySelector('#server-row-m1 .cs-detail-cell'); return { text: x.textContent.replace(/\\s+/g, ' '), buttons: [...x.querySelectorAll('button:not(.cs-access-info)')].map(b => b.textContent.trim()), update: (x.querySelector('.cs-update a') || {}).href || null, focus: document.activeElement && document.activeElement.id === 'server-row-m1' }; })()`);
         assert.deepEqual(d.buttons, [], 'the details hold no machine-action buttons');
-        const infoState = () => ev(`(() => { const b = document.querySelector('#server-row-m1-detail .cs-access-info'), p = document.getElementById(b.getAttribute('aria-controls')); return { open:b.getAttribute('aria-expanded'), hidden:p.hidden, words:p.textContent, focus:document.activeElement===b }; })()`);
+        const infoState = () => ev(`(() => { const b = document.querySelector('#server-row-m1 .cs-access-info'), p = document.getElementById(b.getAttribute('aria-controls')); return { open:b.getAttribute('aria-expanded'), hidden:p.hidden, words:p.textContent, focus:document.activeElement===b }; })()`);
         assert.equal((await infoState()).open, 'false');
         assert.equal((await infoState()).hidden, true, 'the complete access matrix starts folded');
-        await ev(`document.querySelector('#server-row-m1-detail .cs-access-info').focus(); document.querySelector('#server-row-m1-detail .cs-access-info').click(); true`);
+        await ev(`document.querySelector('#server-row-m1 .cs-access-info').focus(); document.querySelector('#server-row-m1 .cs-access-info').click(); true`);
         const info = await infoState();
         assert.equal(info.open, 'true'); assert.equal(info.hidden, false); assert.equal(info.focus, true, 'focus survives the redraw');
         assert.match(info.words, /View:.*Interact:.*Launch:/, 'every access level remains available on demand');
         assert.match(info.words, /What Coral Hub may do on a machine is what you allowed when you connected it; you can limit it further here\./, 'the enrollment access limit remains reachable');
         assert.match(info.words, /turn on auto-accept/, 'the complete capability text is preserved');
-        await ev(`document.querySelector('#server-row-m1-detail .cs-access-info').click(); true`);
+        await ev(`document.querySelector('#server-row-m1 .cs-access-info').click(); true`);
         assert.equal(d.update, DOWNLOAD, 'the update notice points to the download page, not GitHub');
         assert.doesNotMatch(d.text, /Follow this computer|Limit to|Hub: |Machine: /, 'none of the old wording');
-        assert.ok(d.focus, 'focus stays on the toggle');
-        assert.equal(await ev(`document.querySelectorAll('#servers-view .cs-detail:not([hidden])').length`), 1, 'only the open row shows details');
+        assert.ok(d.focus, 'focus is on the page');
         // Status and Health agree: an online machine with no reading yet is waiting for one, never "not connected".
-        const hc = await ev(`[...document.querySelectorAll('#servers-view tr.cs-row')].map(r => ({ status: r.querySelector('.cs-col-status').textContent, note: ((document.getElementById(r.id + '-detail').querySelector('.machine-health-note')) || {}).textContent || null }))`);
-        assert.ok(hc.filter(x => x.status === 'Online').every(x => x.note === 'No health reading yet.'), 'online rows wait for a reading: ' + JSON.stringify(hc));
-        assert.ok(!hc.some(x => x.status === 'Online' && /not connected/.test(x.note || '')), 'no online row says not connected');
-        await ev(`document.querySelector('#servers-view .cs-table').scrollIntoView(); true`);
-        await shot('table-desktop-open'); // a row open (Box One)
-        await ev(`document.querySelector('#server-row-m1 .cs-toggle').click(); true`);
-        await waitFor(`document.getElementById('server-row-m1-detail').hidden`, 'm1 closed again', 3000);
+        const hc = [];
+        for (const id of ['m1', 'm2', 'm4']) { if (id !== 'm1') await openPage(id); hc.push({ status: await ev(`document.querySelector('#server-row-${id} .cs-facts dd').textContent`), note: await ev(`((document.querySelector('#server-row-${id} .cs-detail-cell .machine-health-note')) || {}).textContent || null`) }); if (id !== 'm4') await backToList(id); }
+        assert.ok(hc.filter(x => x.status === 'Online').every(x => x.note === 'No health reading yet.'), 'online machines wait for a reading: ' + JSON.stringify(hc));
+        assert.ok(!hc.some(x => x.status === 'Online' && /not connected/.test(x.note || '')), 'no online machine says not connected');
+        await backToList('m4');
+        await openPage('m1'); await shot('table-desktop-open'); // a machine's page (Box One)
+        await backToList('m1');
+        await openPage('m3');
         // Revoke asks in the row (Confirm revoke / Cancel) and opens the details for the warning; Cancel puts the row back.
         // Revoke is one step further than Rename: it sits in a More menu, closed until asked (#6370 follow-up, the row keeps Rename and the one thing most visits do).
         const seen = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.checkVisibility({ checkVisibilityCSS: true }); })()`;
@@ -250,10 +253,10 @@ const contrast = (a, b) => {
         assert.equal(await ev(seen('#server-row-m3 .cs-revoke')), false, 'the More button toggles: a second click closes it');
         assert.equal(await ev(`document.activeElement === document.querySelector('#server-row-m3 .cs-more-btn')`), true, 'and keeps the keyboard on More');
         await ev(`document.querySelector('#server-row-m3 .cs-more-btn').click(); document.querySelector('#server-row-m3 .cs-revoke').click(); true`);
-        await waitFor(`!!document.querySelector('#server-row-m3 .cs-col-actions .btn-danger')`, 'the revoke confirmation', 3000);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#server-row-m3 .cs-col-actions button')].map(b => b.textContent)`), ['Confirm revoke', 'Cancel']);
-        assert.match(await ev(`document.getElementById('server-row-m3-detail').textContent`), /Revoke Box Three\? It disconnects this computer from Coral Hub\./);
-        assert.ok(await ev(`document.getElementById('server-row-m3').querySelector('.cs-toggle').getAttribute('aria-expanded') === 'true'`), 'the row opens to show the warning');
+        await waitFor(`!!document.querySelector('#server-row-m3 .cs-actions .btn-danger')`, 'the revoke confirmation', 3000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#server-row-m3 .cs-actions button')].map(b => b.textContent)`), ['Confirm revoke', 'Cancel']);
+        assert.match(await ev(`document.querySelector('#server-row-m3 .cs-detail-cell').textContent`), /Revoke Box Three\? It disconnects this computer from Coral Hub\./);
+        assert.ok(await ev(`!!document.querySelector('#server-row-m3 .cs-detail-cell .cs-note')`), 'the page shows the warning');
         // Revoke is never one click and never loses the keyboard: the ask puts focus on Cancel (the safe answer), the question is the buttons' description, Cancel and Escape leave the machine
         // connected (no DELETE) and put focus back on that row's Revoke.
         assert.equal(await ev(`document.activeElement.classList.contains('cs-revoke-cancel')`), true, 'the ask moves focus to Cancel');
@@ -263,16 +266,18 @@ const contrast = (a, b) => {
         assert.equal(await ev(`document.activeElement === document.querySelector('#server-row-m3 .cs-more-btn')`), true, 'Escape returns focus to More');
         assert.equal(await ev(`(window.__deletes || []).length`), 0, 'nothing was revoked');
         await ev(`document.querySelector('#server-row-m3 .cs-more-btn').click(); document.querySelector('#server-row-m3 .cs-revoke').click(); true`);
-        await waitFor(`!!document.querySelector('#server-row-m3 .cs-col-actions .btn-danger')`, 'the revoke confirmation again', 3000);
-        await ev(`[...document.querySelectorAll('#server-row-m3 .cs-col-actions button')].find(b => b.textContent === 'Cancel').click(); true`);
+        await waitFor(`!!document.querySelector('#server-row-m3 .cs-actions .btn-danger')`, 'the revoke confirmation again', 3000);
+        await ev(`[...document.querySelectorAll('#server-row-m3 .cs-actions button')].find(b => b.textContent === 'Cancel').click(); true`);
         await waitFor(`!!document.querySelector('#server-row-m3 .cs-revoke')`, 'the row actions back', 3000);
         assert.equal(await ev(`document.activeElement === document.querySelector('#server-row-m3 .cs-more-btn')`), true, 'Cancel returns focus to More');
         assert.equal(await ev(`(window.__deletes || []).length`), 0, 'still nothing revoked');
-        // Rename in the row: the name cell becomes a form.
+        // Rename on the page: the heading becomes a form.
+        await backToList('m3'); await openPage('m4');
         await ev(`document.querySelector('#server-row-m4 .cs-rename-btn').click(); true`);
         await waitFor(`!!document.querySelector('#server-row-m4 .cs-rename input[name=label]')`, 'the rename form', 3000);
         await ev(`[...document.querySelectorAll('#server-row-m4 .cs-rename button')].find(b => b.textContent === 'Cancel').click(); true`);
         await waitFor(`!document.querySelector('#server-row-m4 .cs-rename')`, 'rename cancelled', 3000);
+        await backToList('m4');
         console.log('   ok');
 
         console.log('4. Add a machine: closed for an existing account, with the original steps on demand');
@@ -292,9 +297,9 @@ const contrast = (a, b) => {
         assert.doesNotMatch(await ev(`document.documentElement.outerHTML`), /github\.com\/subgentic\/coral\/releases/, 'the page has no GitHub releases link');
         console.log('   ok');
 
-        console.log('5. Deep link: /servers/<id> opens that machine\'s details');
+        console.log('5. Deep link: /servers/<id> opens that machine\'s page');
         await open('servers/m2');
-        await waitFor(`document.getElementById('server-row-m2') && document.getElementById('server-row-m2').querySelector('.cs-toggle').getAttribute('aria-expanded') === 'true'`, 'm2 open from the link', 6000);
+        await waitFor(pageOpen('m2'), 'm2\'s page from the link', 6000);
         console.log('   ok');
 
         console.log('6. Both themes at 4.5:1 and the shots (desktop, then a phone)');
@@ -302,7 +307,6 @@ const contrast = (a, b) => {
             await client.Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await client.Emulation.setTouchEmulationEnabled({ enabled: mobile }); // a phone is a touch screen: its targets are 44 px
             await open();
             await waitFor(`document.querySelectorAll('#servers-view tr.cs-row').length === ${SERVERS.length}`, 'rows', 6000);
-            await ev(`document.querySelector('#server-row-m1 .cs-toggle').click(); true`);
             await installAudit(ev);
             for (const theme of ['dark', 'light']) {
                 await setTheme(ev, theme);
@@ -314,6 +318,15 @@ const contrast = (a, b) => {
                 assert.ok(over <= 0, `${tag}: no sideways scroll (${over})`);
                 await ev(`document.querySelector('#servers-view .cs-table').scrollIntoView(); true`);
                 await shot(`table-${tag}-${theme}`);
+            }
+            await openPage('m1'); // the machine's page too: 4.5:1 in both themes, and no sideways scroll
+            for (const theme of ['dark', 'light']) {
+                await setTheme(ev, theme);
+                const au = await auditRegion(ev, ['#servers-view section.cs-page']);
+                assert.ok(au.checked > 0 && !au.fails.filter(f => !/Revoke/.test(f.text || '')).length, `${tag} ${theme} (the machine's page): 4.5:1 ${JSON.stringify(au.fails).slice(0, 400)}`);
+                const over = await ev(`document.documentElement.scrollWidth - innerWidth`);
+                assert.ok(over <= 0, `${tag}: the page has no sideways scroll (${over})`);
+                await shot(`page-${tag}-${theme}`);
             }
             await setTheme(ev, 'dark');
         }
