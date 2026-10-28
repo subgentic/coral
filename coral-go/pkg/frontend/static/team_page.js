@@ -213,11 +213,15 @@ function drawStatus(data) {
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
     if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
     const n = data.agents.filter(a => ATTENTION.includes(a.availability)).length;
-    const unknown = data.agents.filter(a => a.availability === 'unknown').length; // no signal from them yet: nothing says they are well (#10006, Beta Tester: "All well" in green over three agents with No signal yet)
+    const waking = wakingSince(S.team) > 0;
+    // no signal yet, or (right after Wake, while the read still says so) still asleep: nothing says they are well (#10006), and a just-woken team is counted as it reports (#10052, #10359)
+    const notYet = a => a.availability === 'unknown' || (waking && a.availability === 'sleeping');
+    const unknown = data.agents.filter(notYet).length;
+    const asleep = !waking && teamAsleep(); // every agent of the team asleep: "Asleep", not "All well" in green (Mobile tester, #10359)
     // Just woken from here: how many have reported so far, until all have (or two minutes pass), not only "waiting" (#10052).
-    const wakingNow = unknown > 0 && !n && wakingSince(S.team) > 0;
+    const wakingNow = unknown > 0 && !n && waking;
     if (!unknown) stopWaking(S.team);
-    const text = wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
+    const text = asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
@@ -225,7 +229,7 @@ function drawStatus(data) {
         if (n) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
     if (s.textContent === text) return; // the same words are not said again
-    s.className = `team-page-status ${n ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`;
+    s.className = `team-page-status ${asleep ? 'unknown' : n ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
     const dot = el('span', 'team-status-dot'); dot.setAttribute('aria-hidden', 'true');
     s.replaceChildren(dot, document.createTextNode(text));
 }
@@ -269,6 +273,8 @@ async function readCounts() {
     drawStatus(avail.value);
     drawCounts();
 }
+// A Wake or a Sleep from here: the status is read and drawn at once, not at the next poll (#10359).
+document.addEventListener('coral:team-sleep-changed', e => { if (S.team && e.detail && e.detail.team === S.team) readCounts(); });
 function startCounts() {
     readCounts();
     if (S.timer) return;

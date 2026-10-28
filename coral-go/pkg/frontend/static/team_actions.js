@@ -250,7 +250,7 @@ export function toggleTeamSleep(boardName, action) {
                 // Team wake leaves archived agents asleep (#3030).
                 if (inTeam(s, boardName) && !s.archived) s.sleeping = sleeping;
             }
-            if (!sleeping) importOnce('./team_waking.js').then(m => m.startWaking(boardName)).catch(() => {}); // the team page's status counts the agents that have reported since (#10052); loaded here, not at start (page weight)
+            importOnce('./team_waking.js').then(m => m.noteTeamSleep(boardName, sleeping)).catch(() => {}); // the team page's status counts the agents that have reported since a Wake and says Asleep after a Sleep (#10052, #10359); loaded here, not at start (page weight)
             redrawLiveList();
             showToast(sleeping ? `Team "${keyLabel(boardName)}" is now sleeping` : `Team "${keyLabel(boardName)}" is awake`);
         } catch (e) {

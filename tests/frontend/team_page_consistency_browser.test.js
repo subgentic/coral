@@ -60,7 +60,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             await ev(`window.__avail = 'available'; true`);
         });
         await S.run('a team just woken says how many agents have reported, until all have (#10052)', async () => {
-            await ev(`window.__avail = 'unknown'; import((window.__coralStatic || '/static/') + 'team_waking.js').then(m => m.startWaking(${JSON.stringify(TEAM)})).then(() => true)`);
+            await ev(`window.__avail = 'unknown'; import((window.__coralStatic || '/static/') + 'team_waking.js').then(m => m.noteTeamSleep(${JSON.stringify(TEAM)}, false)).then(() => true)`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`);
             await waitFor(`/^Waking the team/.test(document.getElementById('team-page-status').textContent.trim())`, 'the waking progress', 6000);
             const st = await status();
@@ -68,6 +68,19 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             await ev(`window.__avail = 'available'; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`);
             await waitFor(`document.getElementById('team-page-status').textContent.trim() === 'All well'`, 'the usual status once all have reported', 6000);
+        });
+        await S.run('right after Sleep the status says Asleep, not All well in green; right after Wake it counts the agents that have reported even while the read still says sleeping (#10359)', async () => {
+            const setSleeping = v => ev(`window.T.state.liveSessions = ['a1', 'a2'].map(n => ({ session_id: n + '-sid', name: n, agent_type: 'claude', board_project: ${JSON.stringify(TEAM)}, sleeping: ${v} })); true`);
+            await setSleeping(true);
+            await ev(`window.__avail = 'sleeping'; import((window.__coralStatic || '/static/') + 'team_waking.js').then(m => m.noteTeamSleep(${JSON.stringify(TEAM)}, true)).then(() => true)`);
+            await waitFor(`document.getElementById('team-page-status').textContent.trim() === 'Asleep'`, 'Asleep after Sleep', 8000);
+            assert.ok(!/well/.test(await ev(`document.getElementById('team-page-status').className`)), 'with the neutral dot, not the green of All well');
+            await setSleeping(false);
+            await ev(`import((window.__coralStatic || '/static/') + 'team_waking.js').then(m => m.noteTeamSleep(${JSON.stringify(TEAM)}, false)).then(() => true)`);
+            await waitFor(`/^Waking the team: \\d+ of \\d+ agents have sent their first message\\./.test(document.getElementById('team-page-status').textContent.trim())`, 'the waking line while the read still says sleeping', 8000);
+            await ev(`window.__avail = 'available'; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`);
+            await waitFor(`document.getElementById('team-page-status').textContent.trim() === 'All well'`, 'All well once they have reported', 8000);
         });
         await S.run('the rollup and the rows are never drawn as two moments: Updating… and aria-busy until the rows arrive', async () => {
             await ev(`window.__tp.find('button, a, [role=row], tr', /Ship it/).click(); true`); await settle(600);

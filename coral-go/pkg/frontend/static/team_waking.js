@@ -3,8 +3,11 @@
 const WAKING_MAX_MS = 120000;
 const since = new Map();
 
-/** The team's Wake just went through. */
-export function startWaking(team) { since.set(team, Date.now()); }
+/** The team's Wake just went through (or its Sleep: the progress is over). The team page reads its availability again at once and says so, not at the next poll (#10359). */
+export function noteTeamSleep(team, sleeping) {
+    if (sleeping) since.delete(team); else since.set(team, Date.now());
+    document.dispatchEvent(new CustomEvent('coral:team-sleep-changed', { detail: { team } }));
+}
 
 /** When the team was woken from here and is still within the progress window, else 0. */
 export function wakingSince(team) {
