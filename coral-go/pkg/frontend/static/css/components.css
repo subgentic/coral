@@ -3264,8 +3264,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .pw-meter > i { display: block; height: 100%; width: 0; border-radius: var(--radius-xs); background: #d4a72c; transition: width .15s; }
 .pw-strength[data-level="strong"] .pw-meter > i { background: var(--fx-green); }
 .pw-strength[data-level="weak"] .pw-meter > i { background: var(--fx-red); }
-.pw-hint { font-size: var(--fs-base); color: var(--text-secondary); margin: 0 0 12px; min-height: 2.6em; line-height: var(--lh-ui); } /* two lines kept: the advice wraps, and the field under it must not move as it changes (#10281) */
-@media (max-width: 767px) { .pw-hint { min-height: 4.4em; } } /* three lines and a little over on a phone, where the advice is the longest */
+.pw-hint { font-size: var(--fs-base); color: var(--text-secondary); margin: 0 0 12px; min-height: 2.9em; line-height: var(--lh-ui); } /* two lines kept: the advice wraps, and the field under it must not move as it changes (#10281) */
 .pw-strength-idle { visibility: hidden; }
 .pw-hint b { color: var(--text-primary); font-weight: var(--fw-strong); }
 .pw-error { color: var(--fx-red); font-size: var(--fs-md); margin: 0 0 10px; }
