@@ -3940,6 +3940,9 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agent-dot-ok { background: var(--success); }
 .team-agent-dot-ask { background: var(--warning); }
 @container (max-width: 28rem) { .team-agent-dot { display: inline-block; } } /* with the Status column: it drops under 28 rem (a phone), so the name keeps the room and the state stays as this dot (#9713) */
+.team-agent-ask { display: none; flex: none; margin-inline-start: 8px; }
+@container (max-width: 28rem) { .team-agent-ask { display: inline-flex; } }
+@container (max-width: 16rem) { .team-agent-ask { display: none; } } /* a phone at 200% text: the dot and the row's name carry it, there is no room for the word */
 .team-agents-count { margin: 0 0 6px; color: var(--text-secondary); font-size: var(--fs-sm); }
 .team-agents-count:empty { display: none; }
 .team-agents-list { display: flex; flex-direction: column; }
