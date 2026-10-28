@@ -12,7 +12,7 @@ import { importOnce } from './import_once.js';
 import { refreshTeamAvailability } from './team_availability.js';
 import { pollEvery } from './overload.js';
 import { onViewShown } from './view_switch.js';
-import { setPreviewSession } from './preview_pane.js';
+import { setPreviewSession } from './preview_loader.js';
 import { renderLiveSessions } from './render.js';
 import { watchScrollCue } from './scroll_cue.js';
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried

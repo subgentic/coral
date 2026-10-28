@@ -28,7 +28,7 @@ const { state } = await importUi('state');
 state.currentSession = { type: 'live', session_id: 's1', name: 'dev' }; // standalone: no team
 const previews = [];
 const { registerBundled } = await importUi('import_once');
-registerBundled({'preview_pane.js': {openArtifactTab: (uri, options) => previews.push({uri, options})}});
+registerBundled({'preview_pane.js': {openArtifactTab: (uri, options) => previews.push({uri, options}), setPreviewSession: () => {}}});
 const { initFilesSourcePicker, selectFilesSource } = await importUi('team_artifacts');
 initFilesSourcePicker(() => {});
 selectFilesSource('artifacts');

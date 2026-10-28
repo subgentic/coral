@@ -7,6 +7,7 @@ import { boardFetch, serverUrl, isCloud, splitKey, keyLabel, isBoardAnswer, isBo
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
+import { previewPane } from './preview_loader.js';
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { showToast } from './utils.js';
@@ -390,7 +391,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     function openArtifact(item, opener) {
         const key = itemKey(item), link = linkOf(item), name = readableName(item);
         if (model.scope && link) {
-            importOnce('./preview_pane.js').then(m => m.openArtifactTab(link.hex ? `coral://artifacts/${link.hex}` : item.uri || '', {
+            previewPane().then(m => m.openArtifactTab(link.hex ? `coral://artifacts/${link.hex}` : item.uri || '', {
                 server: link.server, filename: name, mediaType: item.media_type,
                 contentURL: link.contentURL, externalURL: link.preview ? undefined : link.url,
                 tagging: link.hex ? { project: model.project, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(link.hex, tags) } : undefined, // the tags in the preview's head (#8594)
@@ -429,7 +430,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         ];
         const actions = [];
         if (link) {
-            if (link.inline) actions.push({ label: 'Open', primary: true, run: () => importOnce('./preview_pane.js').then(m => m.openArtifactTab(item.uri || '', { contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true })) });
+            if (link.inline) actions.push({ label: 'Open', primary: true, run: () => previewPane().then(m => m.openArtifactTab(item.uri || '', { contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true })) });
             else if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: link.server, filename: name, mediaType: item.media_type }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
             if (link.preview) actions.push(isCloud() ? { label: 'Download', run: () => importOnce('./artifact_download.js').then(m => m.downloadArtifact(link.url, m.sanitizeDownloadName(name))).catch(() => showToast('The artifact could not be downloaded', true)) } : { label: 'Download', href: link.url, download: true });
             else actions.push({ label: 'Open link', primary: true, href: link.url });

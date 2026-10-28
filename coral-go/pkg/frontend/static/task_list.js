@@ -1,5 +1,5 @@
 /* The task list: polling, loading, filtering, sorting and drawing it (moved out of tasks.js, #5082; no behaviour change). */
-import { importOnce } from './import_once.js';
+import { previewPane } from './preview_loader.js';
 import { state } from './state.js';
 import { pollEvery, afterPause, isBusyStatus, busyRetryingText, machineOf } from './overload.js';
 import { platform } from './platform/detect.js';
@@ -26,7 +26,7 @@ let previewTask = null;
 export async function openDockTaskPreview(id, opener) {
     const project = _currentBoardKey(), session = state.currentSession;
     if (!project) return;
-    const pane = await importOnce('./preview_pane.js');
+    const pane = await previewPane();
     if (state.currentSession !== session || _currentBoardKey() !== project) return;
     const key = `board:${id}`;
     const selection = { project, key };

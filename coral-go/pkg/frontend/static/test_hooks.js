@@ -18,7 +18,7 @@ import { loadAgentEvents } from './agentic_state.js';
 import { selectScheduledJob } from './scheduler.js';
 import { go } from './nav.js';
 import { editScheduledJob } from './job_form.js';
-import { closeAllTabs as closeAllPreviewTabs, openPreviewTab } from './preview_pane.js';
+import { closeAllTabs as closeAllPreviewTabs, openPreviewTab } from './preview_loader.js';
 import { hideServersModal } from './servers.js';
 import { cancelSelectMode, deleteMessageBoardProject, showExportBoardModal, showMessageBoardProjects, postBoardMessage, toggleSelectMode } from './message_board.js';
 import { hideFolderTagDropdown } from './folder_tags.js';

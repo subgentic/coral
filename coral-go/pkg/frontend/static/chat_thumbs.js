@@ -9,7 +9,7 @@ import { escapeAttr, escapeHtml } from './utils.js';
 import { registerActions } from './actions.js';
 import { serverUrl, sessionServer, isCloud } from './server_base.js';
 import { fetchImageSrc } from './image_source.js';
-import { openChatImageTab } from './preview_pane.js';
+import { openChatImageTab } from './preview_loader.js';
 import { removeSharedCopy, removedCopyText } from './shared_images.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { showToast } from './utils.js';

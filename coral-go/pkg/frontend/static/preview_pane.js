@@ -19,9 +19,10 @@ import './dialog_focus.js';
 import './overlay_history.js';
 import './safe_storage.js';
 import { importOnce } from './import_once.js';
-import { createPreviewLayout } from './preview_layout.js';
-import { createPreviewEditor } from './preview_editor.js';
 import { _fileName, _renderContentView } from './preview_content.js';
+
+// The pane's own parts load with it (the pane is loaded on first use, #9753).
+const [{ createPreviewLayout }, { createPreviewEditor }] = await Promise.all([importOnce('./preview_layout.js'), importOnce('./preview_editor.js')]);
 
 const ICON_MAP = {
     javascript: '{ }', typescript: '{ }', jsx: '{ }', tsx: '{ }',
@@ -67,7 +68,7 @@ const layout = createPreviewLayout({ getTabs: () => _tabs, isTaskPreview: () => 
 const { _setMaximised, _setPhoneFull, _placePane, _showPane, _isMobile } = layout;
 const { _destroyEditor, _captureEditor, _mountEditor, _mountDiff } = createPreviewEditor({ _activeTab, _isDirty, _renderTabs, _fileUrl, _setBody });
 
-export function initPreviewPane() { layout.initPreviewPane(); }
+layout.initPreviewPane(); // the pane loads on first use (#9753), after the page is built: its resize handles and saved size are wired as it loads
 
 function _hidePane() {
     _comments?.close(); // no tab, no comments (#5311)

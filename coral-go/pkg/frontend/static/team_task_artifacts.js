@@ -3,6 +3,7 @@
  * when the task has no artifact or the list cannot be read (a Coral Hub viewer's: the team's artifacts are the owner's alone). Lazy: team_tasks_page.js imports it. */
 import { boardFetch, pathId } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { previewPane } from './preview_loader.js';
 const { artifactTable, serverArtifactSort } = await importOnce('./artifact_table.js');
 const { el, tableState } = await importOnce('./data_table.js'); // lazy: its failure is retried
 
@@ -13,7 +14,7 @@ const HEX = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i;
 function openIt(item) {
     const name = String(item.name || 'Artifact');
     const m = HEX.exec(String(item.uri || ''));
-    if (item.inline && item.content_url) return importOnce('./preview_pane.js').then(p => p.openArtifactTab(item.uri || '', { contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true }));
+    if (item.inline && item.content_url) return previewPane().then(p => p.openArtifactTab(item.uri || '', { contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true }));
     if (m) return importOnce('./artifact_viewer.js').then(v => v.openArtifactViewer(m[1].toLowerCase(), { filename: name, mediaType: item.media_type }));
     return null;
 }

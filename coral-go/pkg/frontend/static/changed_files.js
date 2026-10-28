@@ -6,7 +6,7 @@ import { registerActions, textOf } from './actions.js';
 import { fetchFileList, fuzzyFilter } from './file_mention.js';
 import { initFilesSourcePicker, syncFilesSourceTeam } from './team_artifacts.js';
 import { fileIconHtml } from './file_explorer.js';
-import { openPreviewTab, openArtifactTab, setPreviewSession } from './preview_pane.js';
+import { openPreviewTab, openArtifactTab, setPreviewSession } from './preview_loader.js';
 import { storeKey, readStars, writeStars } from './local_store.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
 
