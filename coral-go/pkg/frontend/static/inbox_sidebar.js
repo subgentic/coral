@@ -484,8 +484,7 @@ export function drawDockSaved(host) {
 async function openChat(c) {
     if (nativeInbox() && !c.server) return; // a Hub's row names its computer: with none there is no "local" to fall back to, so nothing opens (fail closed)
     state.inboxFolder = { key: group, label: (groupMeta(group) || {}).label || 'All chats' };
-    IR.markRead(c.type === 'group' || String(c.session_id || '').startsWith('board:') ? 'board' : 'chat', `${c.server}:${c.session_id}`, c.last_timestamp || c.updated_at); // opened: read at the stamp it has now (#9687)
-    CH.loadChatCounts(() => renderInboxNav(true)); // the folders' unread numbers follow (#9687)
+    CH.chatOpened(c); renderInboxNav(true); // opened: read at its stamp, and the folders' unread numbers go down in memory, no request (#9687, #9703)
     const isGroup = c.type === 'group' || String(c.session_id || '').startsWith('board:');
     if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); openItemRoute('boards', identityKey(c.server || historyServer(), c.title || String(c.session_id).replace(/^board:/, '')), null, c.session_id); return; }
     const { setHistorySource } = await importOnce('./history_source.js');

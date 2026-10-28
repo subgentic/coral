@@ -123,8 +123,16 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         let nm = await nums();
         assert.deepEqual([nm['chats'], nm['chats-group'], nm['chats-active'], nm['chats-archived'], nm['chats-starred'], nm['chats-cli-codex'], nm['chats-notes']],
             [['119', 'All chats, 119 unread', '119 in all'], ['1', 'Board history, 1 unread', '1 in all'], ['1', 'Active now, 1 unread', '1 in all'], ['1', 'Archived, 1 unread', '3 in all'], ['', 'Starred', '0 in all'], ['30', 'Codex, 30 unread', '30 in all'], ['', 'With notes', '9 in all']], 'each folder\'s number is its unread chats, named so, the total in its tooltip; none at zero, and With notes (which this cannot tell) has none ' + JSON.stringify(nm));
+        await ev(`window.__asked.length = 0; true`);
         await ev(`document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group) button.dt-primary').click(); true`);
         await waitFor(`(document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="chats"] .view-list-count') || {}).textContent === '118'`, 'a chat opened lowers All chats\' number', 8000);
+        assert.equal(await ev(`window.__asked.length`), 0, 'opening a chat sends no history read: the number went down in memory (#9703)');
+        // the recount rate rule (coral-hub, #9703): an open sent no history read (the number went down in memory); asking for the counts again within a minute sends none; after a minute, while the Inbox shows, exactly one
+        await ev(`window.__asked.length = 0; true`);
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); for (let i = 0; i < 3; i++) await m.loadChatCounts(() => {}); return true; })()`);
+        assert.equal(await ev(`window.__asked.length`), 0, 'three more counts reads within a minute send no history read (no recount)');
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); const real = Date.now; Date.now = () => real() + 61000; try { await m.loadChatCounts(() => {}); } finally { Date.now = real; } return true; })()`);
+        assert.equal(await ev(`window.__asked.filter(a => a.page_size === '200').length`), 1, 'after a minute, with the Inbox showing, exactly one recount (one history read of up to 200)');
         await ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: Date.now() - 90 * 86400000, items: {} })); true`);
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             await open(w, 844, mobile);
