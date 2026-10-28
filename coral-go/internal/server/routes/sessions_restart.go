@@ -62,6 +62,7 @@ type restartPlan struct {
 	capsJSON, toolsJSON                                       *string
 	tools                                                     []string
 	permMode                                                  string
+	modeNotRecorded                                           bool // the stored agent had no mode: it restarts in Default and the answer says so
 }
 
 // Restart restarts the agent session: worked out first (restartResolve, restartSettings, restartCommand), so
@@ -114,9 +115,11 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.restartRecord(ctx, plan)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true, "session_id": plan.newSessionID, "session_name": plan.newSessionName,
-	})
+	out := map[string]any{"ok": true, "session_id": plan.newSessionID, "session_name": plan.newSessionName}
+	if plan.modeNotRecorded {
+		out["mode_note"] = "Its mode was not recorded: restarted in Default"
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // restartResolve works out the restart: the stored session (refused when it is no longer live or is archived),
@@ -326,6 +329,13 @@ func (p *restartPlan) restartSettings() {
 	} else {
 		if perm := agent.PermissionModeFromFlags(storedFlags); perm != "" {
 			p.permMode = perm
+		}
+	}
+	if p.permMode == "" {
+		// An agent from before modes were recorded, with no permission flags either: it restarts in Default, never the saved default (which may be Auto), and says so (#10297).
+		if carried, _ := agent.SplitPermissionFlags(append(append([]string{}, storedFlags...), strings.Fields(p.req.ExtraFlags)...)); len(carried) == 0 {
+			p.permMode = "default"
+			p.modeNotRecorded = p.stored != nil
 		}
 	}
 	cleanFlags := restartFlags(storedFlags, p.model, p.req.ExtraFlags)
@@ -581,10 +591,10 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 		Tools:         p.toolsJSON,
 		PID:           restartPID,
 		PermissionMode: func() *string {
-			if p.stored != nil {
+			if p.stored != nil && p.stored.PermissionMode != nil && *p.stored.PermissionMode != "" {
 				return p.stored.PermissionMode
 			}
-			return nil
+			return ptr.NonEmpty(p.permMode) // the mode it restarted in is recorded, so the next restart knows it (#10297)
 		}(),
 	})
 	h.noteLaunchedHooks(ctx, p.newSessionID, p.agentType) // #3665
