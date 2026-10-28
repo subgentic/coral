@@ -263,6 +263,7 @@ export function dataTable(cfg) {
             if (cfg.oneLine && c.dropAt) th.setAttribute('data-drop-at', String(c.dropAt));
             if (c.tiny) th.setAttribute('data-tiny', 'hide');
             if (c.width && /rem$/.test(c.width)) th.style.width = c.width;
+            if (fixedW(c)) th.style.minWidth = c.width; // a fixed column is its width at least: in an auto layout a declared width is only a preference and the table squeezed it (#9845)
             if (c.width === 'grow') th.classList.add('dt-grow');
             if (c.width === 'content') th.classList.add('dt-content');
             if (c.narrowHide) th.classList.add('dt-narrow-hide');
