@@ -416,14 +416,13 @@ async function _initTeamForm() {
     // The default team is in Members when the dialog opens (#9877, the Operator): the Orchestrator, the Lead Developer and the QA Engineer, the first three of the Coding Team, each removable; a template still replaces them.
     // A team the AI generated fills the list itself (launch.skipDefaultTeamAgents). #5989 opened it empty after four agents nobody picked were launched; three a person can see and remove are not that.
     const defaultsOnOpen = !launch.skipDefaultTeamAgents;
-    if (defaultsOnOpen) _addDefaultMembers();
+    if (defaultsOnOpen) { _addDefaultMembers(); resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
 
     // Fetch existing boards for uniqueness validation
     await _loadExistingTeamBoards();
 
     // The template picker says what is in Members: the default team when it was filled in, nothing chosen otherwise (#9906)
     // An AI-generated team fills Members and marks the picker itself, before this async step resumes: the reset must not take its mark away (#9911).
-    if (defaultsOnOpen) { resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); }
     _syncTeamMembers();
 
     launch.skipDefaultTeamAgents = false;
