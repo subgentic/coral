@@ -60,7 +60,7 @@ func (r *rig) nothingStaged() {
 // The updater's own check, with real signatures from a Sigstore we control: a promoted release is downloaded through a redirect, verified, staged byte for
 // byte, found again as already staged, and not offered once it is the installed version.
 func TestCheckStagesAReleaseSignedUnderTheFakeSigstore(t *testing.T) {
-	r := newRig(t)
+	r := newAPIRig(t)
 	rel := r.publish(Spec{Version: "1.4.131", Sequence: 7})
 	res := r.check()
 	require.Equal(t, stage.ResultStaged, res.Result, "%+v", res)
