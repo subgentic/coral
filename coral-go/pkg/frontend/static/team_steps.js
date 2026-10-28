@@ -40,6 +40,6 @@ export function showTeamStep(step, { focus = false } = {}) {
     document.dispatchEvent(new CustomEvent('team-step-shown', { detail: { step } }));
     if (focus) {
         const first = { team: '#team-board-name', members: '#team-template-select', start: '#team-goal' }[step];
-        (step === 'start' ? document.querySelector('#launch-step-team .settings-tab[aria-selected="true"]') || document.getElementById('team-goal') : document.querySelector(first))?.focus();
+        (step === 'start' ? document.getElementById('team-goal') || document.querySelector('#launch-step-team .settings-tab[aria-selected="true"]') : document.querySelector(first))?.focus(); // step 3 opens in its first field, the task: the keyboard that typed it was on the menu's "Start" tab and the text went nowhere (#10410)
     }
 }
