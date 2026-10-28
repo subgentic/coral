@@ -113,13 +113,13 @@ function _syncEnforcement(container) {
     if (!container) return;
     const uid = container.dataset.acfUid;
     const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
-    const permMode = container.querySelector('.acf-permission-mode')?.value
+    const modeSelect = container.querySelector('.acf-permission-mode');
+    if (modeSelect) _updatePermModeDescription(modeSelect); // the CLI's own modes and words first (#10381): a mode it lacks falls to Default before anything reads the value
+    const permMode = modeSelect?.value
         || defaultPermissionMode(_settingsFor(_acfServer(container)), agentType);
     const caps = _getPermissions(`${uid}-perms`) || {};
     const e = presetEnforcement(agentType, caps, permMode);
     // Codex and Antigravity keep only a sandbox and an approval mode: an explicit Mode is applied and the capabilities may only narrow it; with no Mode the capabilities decide (#6425). Say so beside the Mode.
-    const modeSelect = container.querySelector('.acf-permission-mode');
-    if (modeSelect) _updatePermModeDescription(modeSelect); // Codex's Auto has its own words
     const override = container.querySelector('.acf-mode-override');
     if (override) {
         const lm = launchedMode(agentType, permMode, caps);
