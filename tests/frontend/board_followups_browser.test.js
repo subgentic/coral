@@ -153,6 +153,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`${C}.scrollHeight - ${C}.scrollTop - ${C}.clientHeight < 50`, 'the board at the bottom');
         p = await pill();
         assert.equal(p.shown, false, 'gone at the bottom');
+        // the jump scrolls to the bottom once more a frame later, on the settled layout (jumpToLatest, #10088): let it run before reading higher up again, or it undoes the scroll below and the next message is read at the bottom (#10615)
+        await ev(framesJs(3));
         // the singular, and gone by scrolling to the bottom by hand
         await ev(`${C}.scrollTop = Math.round(${C}.scrollHeight / 2); ${framesJs(2)}`);
         add(1);
