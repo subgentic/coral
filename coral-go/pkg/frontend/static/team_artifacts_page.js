@@ -374,7 +374,10 @@ export function createArtifactsList({ inbox = false } = {}) {
     /** The sheet's own link on an agent's row (the row itself opens the preview): the item's facts and actions, as the team page's rows open them. */
     function detailsLink(item) {
         const b = DT.link('', () => openArtifactSheet(item, b));
-        const icon = el('span', 'material-icons', 'info'); icon.setAttribute('aria-hidden', 'true'); b.append(icon);
+        const NS = 'http://www.w3.org/2000/svg', icon = document.createElementNS(NS, 'svg'); // an outline "i" in a circle: the font's info is a filled disc, which is loud on every row (#10433)
+        icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('class', 'artifact-details-icon'); icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('focusable', 'false');
+        for (const [tag, attrs] of [['circle', { cx: 12, cy: 12, r: 9 }], ['path', { d: 'M12 11v5.5' }], ['path', { d: 'M12 7.6v.1' }]]) { const part = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) part.setAttribute(k, String(v)); icon.append(part); }
+        b.append(icon);
         b.title = `Details for ${readableName(item)}`;
         b.classList.add('artifact-details');
         b.setAttribute('aria-label', `Details for ${readableName(item)}`);
