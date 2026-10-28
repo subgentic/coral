@@ -151,10 +151,10 @@ async function readMore(key, folder, q, extra, redraw) {
     L.busy = true; // no redraw here: the spec is being built inside a draw, and a nested draw would close the table it is drawing (the empty line already says Loading)
     try {
         if (L.refresh) { // read again because the folder's count moved (#10230): the rows on screen stay until the new ones are in, the same pages come back at once
-            const pages = Math.min(L.page, REFRESH_PAGES);
+            const keep = Math.min(L.page, REFRESH_PAGES); // not named for the Material icon of that word: a name before a semicolon makes the icon scan want the icon in the font subset (#10261)
             let rows = [], total = 0;
-            for (let page = 1; page <= pages; page++) { const got = await readPage(page, folder, q, extra); rows = rows.concat(got.rows); total = got.total; if (!got.rows.length) break; }
-            L.rows = byNewest(rows); L.page = pages; L.total = Number.isFinite(total) ? total : rows.length; L.error = ''; L.refresh = false;
+            for (let page = 1; page <= keep; page++) { const got = await readPage(page, folder, q, extra); rows = rows.concat(got.rows); total = got.total; if (!got.rows.length) break; }
+            L.rows = byNewest(rows); L.page = keep; L.total = Number.isFinite(total) ? total : rows.length; L.error = ''; L.refresh = false;
             L.done = !rows.length || L.rows.length >= L.total;
         } else {
             const got = await readPage(L.page + 1, folder, q, extra), rows = got.rows;
