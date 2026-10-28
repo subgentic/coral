@@ -39,6 +39,9 @@ const say = text => {
     requestAnimationFrame(() => setText(r, text)); // cleared first: the same words said twice are heard twice
 };
 
+/** Whether the open agent's chat shows its question card (a role=alert that announces the question). */
+const questionCardShown = () => [...document.querySelectorAll('#live-history-messages > .chat-needs-input')].some(e => e.getClientRects().length > 0);
+
 /** The question the agent is asking now, as a key (a different question is a different key), or '' when it is not asking one a person answers with keys (a sign-in is answered in its terminal). */
 function questionKey(row) {
     if (!row || deriveSessionState(row) !== 'needs_input' || row.waiting_kind === 'login') return '';
@@ -118,7 +121,7 @@ export function syncAgentKeys(row) {
     const key = deriveSessionState(r);
     const q = questionKey(r);
     if (!viewOnly) {
-        if (q && !open && closedFor !== q && readPref() !== 'off') openStrip('byQuestion', 'Keys for the question are shown');
+        if (q && !open && closedFor !== q && readPref() !== 'off') openStrip('byQuestion', questionCardShown() ? '' : 'Keys for the question are shown'); // the card in the chat has said the question: not a third time (#10374)
         else if (!q && open && openedBy === 'byQuestion') closeStrip();
         if (!q) closedFor = null;
     }

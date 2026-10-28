@@ -333,7 +333,7 @@ export function showAlertNotification(title, message, level = 'info', link = nul
     announceNotice([title || 'Notification', plain ? plain.words : message].filter(Boolean).join(': '), level === 'error' || level === 'warning');
 }
 
-export function showNotificationToast(agentLabel, detail, onClick) {
+export function showNotificationToast(agentLabel, detail, onClick, { silent = false } = {}) { // silent: the question's own card is on screen and is the announcement (#10374)
     const toast = document.createElement("div");
     toast.className = "notice notice-warn notice-float notice-flush notification-toast";
     const detailHtml = detail
@@ -354,6 +354,6 @@ export function showNotificationToast(agentLabel, detail, onClick) {
     });
     toast.querySelector(".notification-toast-close").addEventListener("click", () => toast.remove());
     joinColumn(toast);
-    announceNotice(`${toast.querySelector(".notification-toast-title").textContent.replace(/^\S+\s/, "")}${detail ? ": " + toast.querySelector(".notification-toast-detail").textContent : ""}`);
+    if (!silent) announceNotice(`${toast.querySelector(".notification-toast-title").textContent.replace(/^\S+\s/, "")}${detail ? ": " + toast.querySelector(".notification-toast-detail").textContent : ""}`);
     setTimeout(() => toast.remove(), 10000);
 }
