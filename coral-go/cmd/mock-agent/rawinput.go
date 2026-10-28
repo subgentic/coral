@@ -47,6 +47,9 @@ type inputBox struct {
 	// is open answers it (option 1, as Claude Code takes it) and is logged; Esc dismisses it.
 	trigger    string
 	promptOpen bool
+	question   bool // the open prompt is a question (AskUserQuestion), not a permission menu (#10168)
+	noSubmit   bool // MOCK_STUCK_ENTER: an Enter does not submit, so typed text stays in the box (#10168)
+	deaf       bool // MOCK_GO_DEAF: the box takes no more input and draws nothing (a CLI that has stopped reading), so a send is typed and never shows
 	// notify, when set, hears the menu open ("permission_request") and close ("permission_answered", "permission_dismissed"): the run loop turns them into the hook events Claude Code runs for a tool's
 	// permission prompt, so Coral sees an agent waiting for a person (#8245), not only a menu on its screen.
 	notify func(kind string)
@@ -94,6 +97,9 @@ func drawBox(b *inputBox) { fmt.Printf("\r\x1b[K> %s", b.display()) }
 
 // feed takes bytes read from the terminal; submit is called with each submitted text.
 func (b *inputBox) feed(data []byte, submit func(string)) {
+	if b.deaf {
+		return
+	}
 	data = append(b.pending, data...)
 	b.pending = nil
 	for i := 0; i < len(data); {
@@ -119,15 +125,22 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 			case '\r':
 				fmt.Print("\r\n[mock-agent] PROMPT ANSWERED by an Enter (option 1)\r\n")
 				b.promptOpen = false
-				b.tell("permission_answered")
+				if b.question {
+					b.question = false
+					b.tell("question_answered")
+				} else {
+					b.tell("permission_answered")
+				}
 			case 0x1b:
 				fmt.Print("\r\n[mock-agent] prompt dismissed\r\n")
 				b.promptOpen = false
+				b.question = false
 				b.tell("permission_dismissed")
 			}
 			continue
 		}
 		switch {
+		case c == '\r' && !b.inPaste && b.noSubmit: // the Enter is swallowed: the text stays in the box
 		case c == '\r' && !b.inPaste:
 			s := b.text.String()
 			b.text.Reset()
@@ -179,6 +192,7 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 			ev()
 		}
 	}()
+	var box *inputBox // made below, before the first byte is read
 	submit := func(s string) {
 		// Test controls: a submitted line that is exactly one of these switches the program's cursor-key
 		// mode (DECCKM), as a TUI does, so a test can check arrows are encoded for it (audit F13).
@@ -192,10 +206,13 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		case "MOCK_BRACKETED_ON":
 			fmt.Print("\x1b[?2004h")
 		}
-		turn(s)
-		events <- func() {
-			hooks.fire("UserPromptSubmit", map[string]any{"prompt": s})
-			hooks.fire("Stop", map[string]any{"stop_hook_active": false})
+		events <- func() { hooks.fire("UserPromptSubmit", map[string]any{"prompt": s}) } // first: a menu's request must come after the submit it answers, or the submit clears the wait
+		control, waiting := applyControl(box, s)                                         // MOCK_ASK_QUESTION, MOCK_ASK_PERMISSION, MOCK_GO_DEAF: no turn of its own (ready.go)
+		if !control {
+			turn(s)
+		}
+		if !waiting { // a menu that is open is the agent waiting: no Stop until it is answered
+			events <- func() { hooks.fire("Stop", map[string]any{"stop_hook_active": false}) }
 		}
 	}
 
@@ -225,13 +242,18 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		hooks.fire("SessionStart", map[string]any{"source": "startup"})
 		hooks.fire("Stop", map[string]any{"stop_hook_active": false})
 	}
-	box := &inputBox{trigger: os.Getenv("MOCK_AGENT_PROMPT_TRIGGER")}
+	box = &inputBox{trigger: os.Getenv("MOCK_AGENT_PROMPT_TRIGGER")}
 	box.notify = func(kind string) {
 		events <- func() {
 			switch kind {
 			case "permission_request": // the tool call's request, then the notification that follows it, as Claude Code sends them
 				hooks.fire("PermissionRequest", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_input": map[string]any{"command": "rm -rf build", "description": "Remove the build folder"}})
 				hooks.fire("Notification", map[string]any{"notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash"})
+			case "question_request": // Claude's AskUserQuestion: a permission request of the tool, as Coral reads a question (#10168)
+				hooks.fire("PermissionRequest", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_input": map[string]any{"questions": []any{map[string]any{"header": "Color", "multiSelect": false, "question": "Pick a color:", "options": []any{map[string]any{"label": "Red", "description": "Choose red"}, map[string]any{"label": "Blue", "description": "Choose blue"}}}}}})
+			case "question_answered":
+				hooks.fire("PostToolUse", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_response": map[string]any{"answers": map[string]any{"Pick a color:": "Red"}}})
+				hooks.fire("Stop", map[string]any{"stop_hook_active": false})
 			case "permission_answered":
 				hooks.fire("PostToolUse", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_response": map[string]any{"stdout": ""}})
 				hooks.fire("Stop", map[string]any{"stop_hook_active": false})
@@ -247,7 +269,7 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		if n > 0 {
 			_, _ = f.Write(buf[:n])
 			box.feed(buf[:n], submit)
-			if !box.promptOpen {
+			if !box.promptOpen && !box.deaf {
 				drawBox(box) // a redraw would hide the open menu under the box line
 			}
 		}

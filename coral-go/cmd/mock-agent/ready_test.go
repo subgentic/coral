@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -131,5 +132,92 @@ func TestReadyModeRawFolderIsOwnPerAgent(t *testing.T) {
 	}
 	if dirs[0] == "" || dirs[0] == dirs[1] || strings.HasSuffix(dirs[0], "mock-agent-ready") {
 		t.Errorf("the raw folders are not each their own: %v", dirs)
+	}
+}
+
+// A tester makes the mock ask a question, ask permission or stop reading by typing a line (#10168): the menu opens and the hooks that make a Needs you row are told, an Enter ends it with the hooks that end the wait, and a deaf mock
+// takes nothing (so the next send is typed and never shows).
+func TestMockControlsMakeAQuestionAPermissionAndADeafBox(t *testing.T) {
+	newBox := func() (*inputBox, *[]string) {
+		var kinds []string
+		b := &inputBox{}
+		b.notify = func(kind string) { kinds = append(kinds, kind) }
+		return b, &kinds
+	}
+	t.Run("a permission request", func(t *testing.T) {
+		b, kinds := newBox()
+		if h, w := applyControl(b, "MOCK_ASK_PERMISSION"); !h || !w || !b.promptOpen || b.question {
+			t.Fatalf("the permission menu is not open: %+v", b)
+		}
+		b.feed([]byte("\r"), func(string) {})
+		if want := []string{"permission_request", "permission_answered"}; !reflect.DeepEqual(*kinds, want) {
+			t.Errorf("hooks %v, want %v", *kinds, want)
+		}
+		if b.promptOpen {
+			t.Error("an Enter did not answer it")
+		}
+	})
+	t.Run("a question", func(t *testing.T) {
+		b, kinds := newBox()
+		if h, w := applyControl(b, "MOCK_ASK_QUESTION"); !h || !w || !b.promptOpen || !b.question {
+			t.Fatalf("the question is not open: %+v", b)
+		}
+		b.feed([]byte("\r"), func(string) {})
+		if want := []string{"question_request", "question_answered"}; !reflect.DeepEqual(*kinds, want) {
+			t.Errorf("hooks %v, want %v", *kinds, want)
+		}
+		if b.promptOpen || b.question {
+			t.Error("an Enter did not answer it")
+		}
+	})
+	t.Run("a dismissed question", func(t *testing.T) {
+		b, kinds := newBox()
+		applyControl(b, "MOCK_ASK_QUESTION")
+		b.feed([]byte("\x1bx"), func(string) {}) // a lone Escape is held as the start of a paste marker until more arrives (as it always was): a following key completes it
+		if want := []string{"question_request", "permission_dismissed"}; !reflect.DeepEqual(*kinds, want) || b.question {
+			t.Errorf("hooks %v question=%v", *kinds, b.question)
+		}
+	})
+	t.Run("a deaf box takes nothing", func(t *testing.T) {
+		b, _ := newBox()
+		if h, w := applyControl(b, "MOCK_GO_DEAF"); !h || w || !b.deaf {
+			t.Fatal("not deaf")
+		}
+		var got []string
+		b.feed([]byte("hello\r"), func(s string) { got = append(got, s) })
+		if len(got) != 0 || b.display() != "" {
+			t.Errorf("a deaf box took input: submitted %v, shows %q", got, b.display())
+		}
+	})
+	t.Run("any other line is not a control", func(t *testing.T) {
+		b, _ := newBox()
+		if h, _ := applyControl(b, "hello"); h {
+			t.Error("an ordinary message was taken as a control")
+		}
+	})
+}
+
+// MOCK_EXIT ends the mock like a CLI that quit; the test only checks it asks to exit (and is a control).
+func TestMockExitControlEndsTheProcess(t *testing.T) {
+	var code = -1
+	old := exitNow
+	exitNow = func(c int) { code = c }
+	t.Cleanup(func() { exitNow = old })
+	b := &inputBox{}
+	if h, _ := applyControl(b, "MOCK_EXIT"); !h || code != 0 {
+		t.Errorf("handled=%v exit code %d", h, code)
+	}
+}
+
+// MOCK_STUCK_ENTER leaves typed text in the box: an Enter submits nothing.
+func TestStuckEnterLeavesTheTextInTheBox(t *testing.T) {
+	b := &inputBox{}
+	if h, _ := applyControl(b, "MOCK_STUCK_ENTER"); !h || !b.noSubmit {
+		t.Fatal("not stuck")
+	}
+	var got []string
+	b.feed([]byte("hello\r"), func(s string) { got = append(got, s) })
+	if len(got) != 0 || b.display() != "hello" {
+		t.Errorf("an Enter submitted %v, box shows %q", got, b.display())
 	}
 }

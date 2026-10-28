@@ -10,7 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+// exitNow ends the process; a test replaces it.
+var exitNow = os.Exit
 
 // readyMode is whether MOCK_AGENT_READY=1.
 func readyMode() bool { return os.Getenv("MOCK_AGENT_READY") == "1" }
@@ -67,4 +71,47 @@ func applyReadyMode(writeTranscript bool) bool {
 // readyReply is the canned answer to a message in ready mode.
 func readyReply(prompt string) string {
 	return "Hi! I'm mock-agent, a stand-in for a real agent, so this reply is canned. You said: " + firstLine(prompt)
+}
+
+// questionMenu is drawn like Claude Code's AskUserQuestion, as Coral's PromptOnScreen reads a menu.
+const questionMenu = "\r\n Pick a color:\r\n \u276f 1. Red\r\n   2. Blue\r\n\r\n Enter to select \u00b7 Esc to cancel\r\n"
+
+// applyControl handles the lines a tester types to make the mock do something on demand (#10168), whatever mode it is in; it reports whether the line was one:
+//
+//	MOCK_ASK_PERMISSION  a permission menu opens and the PermissionRequest and Notification hooks fire: a Needs you row ("permission")
+//	MOCK_ASK_QUESTION    a question opens ("Pick a color:", Red or Blue) with the AskUserQuestion permission request: a Needs you row ("question")
+//	MOCK_GO_DEAF         the mock stops reading: its box stays on screen but takes nothing and it answers nothing: a send is accepted and no reply ever comes (the chat stays blank)
+//	MOCK_STUCK_ENTER     the box takes text but an Enter does not submit it: the next send is refused (a message not submitted, then "an earlier message is still in the box"): the send-error box
+//	MOCK_EXIT            the mock ends at once, as a CLI that quit: the agent is over, and the next send is refused (the send-error box)
+//
+// An Enter answers an open menu (option 1) and an Escape dismisses it; both fire the hooks that end the wait. waiting says a menu is open: the line's UserPromptSubmit is sent (so Coral confirms the send) but not its Stop.
+func applyControl(box *inputBox, line string) (handled, waiting bool) {
+	switch line {
+	case "MOCK_ASK_PERMISSION":
+		box.promptOpen, box.question = true, false
+		drawBox(box)
+		fmt.Print(promptMenu)
+		box.tell("permission_request")
+		return true, true
+	case "MOCK_ASK_QUESTION":
+		box.promptOpen, box.question = true, true
+		drawBox(box)
+		fmt.Print(questionMenu)
+		box.tell("question_request")
+		return true, true
+	case "MOCK_STUCK_ENTER":
+		box.noSubmit = true
+		fmt.Print("\r\n[mock-agent] Enter no longer submits\r\n")
+		return true, false
+	case "MOCK_EXIT":
+		fmt.Print("\r\n[mock-agent] exiting on request\r\n")
+		time.Sleep(300 * time.Millisecond) // the line's UserPromptSubmit hook is on its way: let it go first
+		exitNow(0)
+		return true, false
+	case "MOCK_GO_DEAF":
+		fmt.Print("\r\n[mock-agent] not reading input any more\r\n")
+		box.deaf = true
+		return true, false
+	}
+	return false, false
 }
