@@ -7,6 +7,7 @@ import { serverFetch, sessionServer } from './server_base.js';
 import { responseError } from './server_status.js';
 import { reportSendError, noteHooksAnswered } from './terminal_gone.js';
 import { announcePrompt, promptOptionsBySession, syncNeedsInputCard } from './needs_input_card.js';
+import { importOnce } from './import_once.js';
 
 // The first seconds of a new agent (#6058): its CLI has written nothing yet (the list has no output age for it), and it was started less than STARTING_MS ago by the list's created_at AND this page first saw it less than STARTING_MS ago (the second bounds a server clock that runs ahead of this one). "No messages yet" there reads as ready; it says the CLI is coming up.
 // After that the row's own states take over (the "Waiting in the terminal" card from 25 s with no event at all).
@@ -21,13 +22,26 @@ function isStarting(row) {
 }
 const CLI_NAMES = { claude: "Claude", codex: "Codex", pi: "Pi", agy: "Antigravity", antigravity: "Antigravity", gemini: "Antigravity" };
 
+const MODE_NAMES = { '': 'Auto mode', auto: 'Auto mode', default: 'Default mode', acceptEdits: 'Accept edits mode', plan: 'Plan mode', dontAsk: "Don't ask mode", bypassPermissions: 'Bypass permissions mode' };
+// Where the agent works and how it acts, in the words Settings and the New agent footer use for its CLI (#10035, the desktop tester: no hint what this agent can touch): the folder's name, then its permission mode and what that allows for this CLI (Auto is not the same for Claude, Codex, Antigravity, Gemini and Pi, #10000).
+let permissionDescription = null; // permission_flags.js is loaded lazily (it carries the settings modules): the first empty chat asks for it, and draws the words again when it is here
+function wantWords() { if (!permissionDescription) importOnce('./permission_flags.js').then(m => { permissionDescription = m.permissionDescription; const c = document.getElementById('live-history-messages'); if (c) syncEmptyState(c); }).catch(() => {}); }
+function worksIn(row) {
+    wantWords();
+    const folder = String(row?.working_directory || '').split(/[\\/]/).filter(Boolean).pop();
+    const type = String(row?.agent_type || '').toLowerCase(), mode = row?.permission_mode || 'auto'; // no mode on record: new agents use Auto
+    const said = permissionDescription ? permissionDescription(type, mode).replace(/\.$/, '') : '';
+    const how = !said ? '' : type === 'pi' || !MODE_NAMES[mode] ? `${said}.` : `${MODE_NAMES[mode]}: ${said.charAt(0).toLowerCase()}${said.slice(1)}.`;
+    return [folder ? `Working in ${folder}.` : '', how].filter(Boolean).join(' ');
+}
+
 // What a brand-new agent's empty chat says, by what the agent is doing: a title, and a hint on what to do next.
 function emptyStateWords(session) {
     const row = (state.liveSessions || []).find(s => s.session_id === session?.session_id) || session;
     if (isStarting(row) && deriveSessionState(row) === "idle") return [`Waiting for ${CLI_NAMES[row.agent_type] || "the agent"} to start`, "Its first screen is not up yet. You can type below once it is."];
     switch (deriveSessionState(row)) {
         case 'sleeping': return row.sleep_reason === 'agent_exited' ? ["This agent has ended", "Its CLI exited. Use Restart below to start it again."] : ["This agent is asleep", "Use Wake below to chat with it."];
-        default: return ["Say hello to your agent", "Type below to start."];
+        default: return ["Say hello to your agent", [worksIn(row), "Type below to start."].filter(Boolean).join(' ')];
     }
 }
 
