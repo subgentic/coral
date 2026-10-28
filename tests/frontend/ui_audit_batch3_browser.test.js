@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
                 await waitFor(`!document.getElementById('tb-choice').closest('.sv-row').hidden`, 'the backend row', 10000);
                 const RADIO_ROW = `document.getElementById('tb-choice').closest('.sv-row')`;
                 const tb = await ev(`[...document.querySelectorAll('#tb-choice option')].map(o => o.textContent.trim())`);
-                assert.deepEqual(tb, ['tmux (agents keep running)', 'pty (default)'], 'the backend is a select with two short options (#9490: no radio buttons in the product)');
+                assert.deepEqual(tb, ['Keep agents running when Coral restarts (tmux)', 'Put agents to sleep when Coral restarts (pty, default)'], 'the backend is a select with two short options (#9490: no radio buttons in the product)');
                 assert.equal(await ev(`document.querySelectorAll('input[type=radio]').length`), 0, 'no radio button in Settings');
                 const more = await ev(`(() => { const m = ${RADIO_ROW}.querySelector('.sv-more'); return { text: m.textContent, shown: m.checkVisibility({ checkVisibilityCSS: true }) }; })()`);
                 assert.match(more.text, /any other program running as you, can find that socket/, 'the access warning is in Learn more, whole');

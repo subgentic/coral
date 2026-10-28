@@ -25,6 +25,13 @@ const BASE = require('./test_base').BASE;
         assert.match(await row('settings-group-by-team'), /Agents on the same team sit together in the list/, 'General: and what it does');
         // END General
 
+        // PANE Terminal
+        assert.deepEqual(await options('tb-choice'), ['Keep agents running when Coral restarts (tmux)', 'Put agents to sleep when Coral restarts (pty, default)'], 'Terminal: the choices say what happens to agents, with the technical name after');
+        
+        assert.equal(await ev(`document.querySelector('#settings-engine-more > summary').textContent.trim()`), 'Terminal drawing', 'Terminal: the disclosure says what it is for, in the same two words as before');
+        assert.equal(await text('settings-renderer-select-label'), 'Drawing engine', 'Terminal: Default render engine is the drawing engine');
+        assert.equal(await ev(`document.getElementById('settings-renderer-select').title`), 'Leave this unless the terminal text looks wrong.', 'Terminal: and when to touch it, on the select (no new visible words)');
+        // END Terminal
 
 
 
