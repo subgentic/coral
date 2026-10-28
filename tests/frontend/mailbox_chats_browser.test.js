@@ -17,13 +17,14 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
         window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin);
             if (url.pathname === '/api/sessions/history/counts') return json({ all: 119, group: 1, notes: 9, active: 1, starred: 0, archived: 3, by_agent_type: { claude: 90, codex: 30, agy: 27, antigravity: 27, gemini: 27 }, tags: [{ id: 7, name: 'release', color: '#e5534b', count: 4 }] });
+            if (url.pathname === '/api/sessions/history' && window.__failBig && url.searchParams.get('page_size') === '200') { window.__asked.push(Object.fromEntries(url.searchParams)); return json({ error: 'down' }, 500); } // the unread recount's read, failing (#9703)
             if (url.pathname === '/api/sessions/history') { window.__asked.push(Object.fromEntries(url.searchParams)); const p = Number(url.searchParams.get('page') || 1), n = Number(url.searchParams.get('page_size') || 50); const ty = url.searchParams.get('type'), list = ty === 'group' ? sessions.filter(x => x.type === 'group') : ty === 'agent' ? sessions.filter(x => x.type !== 'group') : sessions; return json({ sessions: list.slice((p - 1) * n, p * n), total: list.length, page: p, page_size: n }); }
             if (/^\\/api\\/sessions\\/history\\/[^/]+\\/flags$/.test(url.pathname) && String(o.method).toUpperCase() === 'PATCH') { window.__flags.push([decodeURIComponent(url.pathname.split('/')[4]), JSON.parse(o.body)]); return json({ ok: true }); }
             return R(u, o); }; return true; })()`);
-    const open = async (w, h, mobile) => {
+    const open = async (w, h, mobile, failBig = false) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub();
+        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(`window.__failBig = ${failBig}; true`); await stub();
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('chats')).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 50`, 'the first page of chats', 15000);
@@ -117,6 +118,14 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         console.log('   ✓');
         console.log('6. The read marker (#9687): a chat not opened since it changed is unread, opening one marks it read');
         await ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: Date.now() - 90 * 86400000, items: {} })); true`); // the marker was first used long ago: every chat here changed since
+        // a start read that fails is tried again at most once a minute: the numbers stay unknown, and every counts read does not retry the 200-row read (#9703, QA Engineer's hole)
+        await open(1280, 800, false, true);
+        const bigReads = () => ev(`window.__asked.filter(a => a.page_size === '200').length`);
+        assert.equal(await bigReads(), 1, 'the start read was tried once and failed');
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); for (let i = 0; i < 3; i++) await m.loadChatCounts(() => {}); return true; })()`);
+        assert.equal(await bigReads(), 1, 'three more counts reads within a minute do not retry it');
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); const real = Date.now; Date.now = () => real() + 61000; try { await m.loadChatCounts(() => {}); } finally { Date.now = real; } return true; })()`);
+        assert.equal(await bigReads(), 2, 'after a minute it is tried once more');
         // the folder's number is its unread chats, its name says so, its tooltip has the total (UI/UX #9687); a chat opened lowers it
         await open(1280, 800, false);
         const nums = () => ev(`Object.fromEntries([...document.querySelectorAll('.sidebar-pane[data-pane="hub-inbox"] .view-list-item')].map(b => [b.dataset.key, [(b.querySelector('.view-list-count') || {}).textContent || '', b.getAttribute('aria-label'), b.title]]))`);
