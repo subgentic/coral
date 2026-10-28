@@ -106,9 +106,18 @@ function _syncTeamMembers() {
 let _teamStepPressed = false; // Next was pressed with step 1 wrong: only then does the line under the buttons name the first thing wrong (nothing is said before the first press)
 let _membersPressed = false; // the same for step 2: Next was pressed with no Orchestrator
 
+/** Why Launch team is off on the last step, in words and with the fix: a member's CLI that is missing or cannot run holds it (launch_dialog.js _syncTeamBlock), and that member's own warning is on the Members page, which this step does not show (#9945). tmux's line is above the buttons already. */
+function _launchBlockReason() {
+    const blocker = document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)');
+    if (!blocker) return '';
+    const what = (blocker.querySelector('span')?.textContent || '').trim().replace(/\.$/, '') || 'An agent CLI is missing';
+    return /not found$/.test(what) ? `${what}: install it or set its path in Settings` : `${what}: set the right path in Settings`;
+}
+
 /** What is wrong on this step, in words, and Next (or Launch team) cannot go on; '' when it can. Steps 1 and 2 say it only after Next was pressed, and Next is never off there. */
 function _teamGateReason() {
     const step = currentTeamStep();
+    if (step === 'start') return _launchBlockReason();
     if (step === 'team') {
         if (!_teamStepPressed) return '';
         const name = (document.getElementById('team-board-name')?.value || '').trim(), dir = (document.getElementById('launch-team-dir')?.value || '').trim();
@@ -144,6 +153,7 @@ function _syncTeamGate() {
     if (dir) { recap.append(', '); const d = document.createElement('b'); d.textContent = dir; recap.append(d); }
 }
 document.addEventListener('team-step-shown', _syncTeamGate);
+document.addEventListener('cli-blocks-launch', e => { if (e.target.closest?.('#launch-step-team')) _syncTeamGate(); }); // a CLI check that answers while step 3 shows
 document.addEventListener('team-page-open', e => { const page = e.target.closest && e.target.closest('.team-page'); if (page && page.dataset.page) showTeamStep(page.dataset.page); });
 document.addEventListener('input', e => { if (e.target && (e.target.id === 'team-board-name' || e.target.id === 'launch-team-dir')) _syncTeamGate(); });
 

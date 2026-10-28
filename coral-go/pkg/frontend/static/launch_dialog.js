@@ -295,7 +295,7 @@ function _syncTeamBlock() {
     if (!go) return;
     const why = document.querySelector('#launch-step-team [data-blocks-launch]');
     go.disabled = !!why;
-    if (why) go.setAttribute('aria-describedby', why.id); else go.removeAttribute('aria-describedby');
+    if (why) go.setAttribute('aria-describedby', 'team-recap'); else go.removeAttribute('aria-describedby'); // the line above the buttons says why (a member's own warning is on a page this step does not show, #9945)
 }
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest && e.target.closest('#launch-step-team')) _syncTeamBlock(); });
 
