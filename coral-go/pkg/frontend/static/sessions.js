@@ -425,7 +425,14 @@ export async function toggleChatFlag(flag) {
     if (!entry) return;
     const m = await importOnce('./mailbox_chats.js');
     const next = !entry[flag]; // setChatFlag sets the cached entry itself (one star state everywhere, #10391): the value is read before it
-    if (await m.setChatFlag(cur.name, flag, next, sessionServer(cur))) { entry[flag] = next; drawChatFlags(entry); }
+    if (await m.setChatFlag(cur.name, flag, next, sessionServer(cur))) { entry[flag] = next; drawChatFlags(entry); sayChatFlag(flag, next, cur, entry, m); }
+}
+/** What a Star or Archive did, in words (#10738, Mobile pass 39: the icon changed and nothing was said; an archived chat's way back was not said): a toast, said once by the notices' own region; an archive has an Undo. */
+async function sayChatFlag(flag, value, cur, entry, m) {
+    const n = await importOnce('./notifications.js');
+    if (flag === 'starred') { n.showToast(value ? 'Starred' : 'Star removed', false, undefined, { silent: false }); return; }
+    if (!value) { n.showToast('Unarchived', false, undefined, { silent: false }); return; }
+    n.showToast('Archived. Find it under Archived.', false, undefined, { silent: false, action: { label: 'Undo', onClick: async () => { if (await m.setChatFlag(cur.name, 'archived', false, sessionServer(cur))) { entry.archived = false; if (state.currentSession === cur) drawChatFlags(entry); } } } });
 }
 
 export async function selectHistorySession(sessionId, locator = null, entry = null) {
