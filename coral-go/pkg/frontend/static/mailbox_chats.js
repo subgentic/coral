@@ -266,7 +266,7 @@ function chatFolderSpec(key, ctx) {
                 ...(key === 'chats-group' ? [] : [{ key: 'agent', label: 'Agent', width: '9rem', dropAt: 36, cell: s => name(s) }]),
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '10rem', cell: s => DT.timeCell(stampOf(s)) },
                 ...serverColumns().map(c => ({ ...c, line: undefined, sort: false, width: '7rem', dropAt: 52 })),
-                { key: 'flags', label: 'Star and archive', hideLabel: true, width: '6.5rem', dropAt: 36, /* the two icon buttons are about 100 px: at 5 rem the second was cut by the table's edge, a stray mark (#9458) */ cell: s => {
+                { key: 'flags', label: 'Star, archive and continue', hideLabel: true, width: '8.5rem', dropAt: 36, /* the three icon buttons (star, archive, continue) are about 100 px and the cell has its padding: at 6.5 rem the third was cut by the cell's edge (#10523; at 5 rem the second was, #9458) */ cell: s => {
                     if (isCloud() || (s.server && s.server !== 'local')) return '';
                     const w = DT.el('span', 'dt-chat-flags');
                     // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat
