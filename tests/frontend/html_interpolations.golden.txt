@@ -317,7 +317,6 @@
 1	session_rows.js	stale ? '' : kebabMenu
 1	session_rows.js	stale ? '' : waitingBadge + heldChip
 1	session_rows.js	staleClass
-1	session_rows.js	stateInfo.pill
 1	session_rows.js	stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''
 1	session_rows.js	stuckClass
 1	session_rows.js	terminalGoneChip(s)

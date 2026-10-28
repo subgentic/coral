@@ -243,7 +243,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const stateInfo = sessionStateInfo(s);
     const pillKind = stateInfo.attention ? 'waiting-badge session-state-pill session-attention-pill' : 'session-state-pill';
     const waitingBadge = stateInfo.pill && stateInfo.attention // one row, one line: the one chip is for an agent that needs you (the dot says every other state, #9686)
-        ? ` <span class="chip chip-caps ${pillKind}${stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''}">${stateInfo.pill}</span>`
+        ? ` <span class="chip chip-caps ${pillKind}${stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''}"${stateInfo.label !== stateInfo.pill.split(' · ')[0] ? ` title="${escapeAttr(stateInfo.label)}"` : ''}>${escapeHtml(stateInfo.pill.split(' · ')[0])}</span>` // one chip, one word: the reason (Question, Permission) is the chip's hover and the row's name, not in the pill (UI/UX, #9784)
         : '';
     // Context is secondary: any state pill owns line 1 and the ctx pill
     // collapses to the dot's ring, which survives on every glyph.
