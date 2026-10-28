@@ -42,7 +42,7 @@ const BASE = require('./test_base').BASE;
             for (const [k, v] of Object.entries(m.servers)) assert.ok(v >= 13, `${w}: ${k} is ${v}px`);
             assert.ok(m.list.n >= 3, 'the agent rows are drawn: ' + JSON.stringify(m.list));
             for (const k of ['count', 'name', 'chip']) for (const v of m.list[k]) assert.ok(v >= 13, `${w}: the agent list's ${k} is ${v}px`);
-            assert.ok(m.list.name.length >= 1, 'the agent names were measured (the row is a dot, the name and at most one chip; a phone draws no chip today: mobile.css hides .session-state-pill in #mobile-session-list, #9699 finding): ' + JSON.stringify(m.list));
+            assert.ok(m.list.name.length >= 1 && m.list.chip.length >= 1, 'a name and the Needs input chip were measured, drawn (the row is the dot, the name and at most one chip: a chip nobody sees has no size to hold to 13 px; the seed has an agent that waits for input): ' + JSON.stringify(m.list));
             assert.ok(m.over <= 1, `${w}: nothing scrolls sideways (${m.over})`);
             assert.deepEqual(m.offscreen, [], `${w}: no part of a row is off the screen`);
         }
