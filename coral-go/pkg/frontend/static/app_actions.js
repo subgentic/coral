@@ -90,6 +90,7 @@ registerActions({
     'm-dialog-step': el => { if (['persona', 'agent', 'next', 'back'].includes(el.dataset.arg)) restartStage(el.dataset.arg); }, // Restart's Next and Back: the name carries no "restart" so the popout's destructive-control scan (agent_popout) does not count them
     'm-hide-restart-modal': el => { window.hideRestartModal(); },
     'm-hide-resume-modal': el => { window.hideResumeModal(); },
+    'm-settings-go-group': el => { importOnce('./settings_nav.js').then(m => m.openSettingsGroup(el.dataset.arg)); }, // the link between Settings sections (#10570)
     'm-hide-save-template-modal': el => { window._hideSaveTemplateModal(); },
     'm-hide-settings-modal': el => { window.hideSettingsModal(); },
     'm-hide-settings-modal-then-show-default-prompts-modal': el => { window.hideSettingsModal(); window.showDefaultPromptsModal(); },

@@ -160,10 +160,17 @@ const apiKeyLine = slot => {
     line.append(input, show, copy, qr); slot.append(line);
 };
 
+/** A row that says where the other half of "use Coral from another device" is, with a button that goes there (#10570): the API key and the Mobile QR are under Security and privacy, Remote access and the setup code under Network and Hub. */
+const deviceLink = (key, buttonLabel, group) => ({ key, type: 'custom', id: `settings-${key.replace(/_/g, '-')}`, label: 'Other devices', render: slot => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small btn-quiet'; b.textContent = buttonLabel; b.setAttribute('data-on-click', 'm-settings-go-group'); b.dataset.arg = group;
+    slot.append(b); // the button says what is there and goes there; no sentence (the section's word budget, #10570)
+} });
+
 export const SECURITY_FIELDS = [
     { key: 'security_access_title', type: 'heading', id: 'settings-security-access-title', label: 'Access' },
     { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'API key', render: slot => apiKeyLine(slot) },
     live('settings-security'),
+    deviceLink('device_access_security', 'Remote access: Network and Hub', 'network'),
     { key: 'security_data_title', type: 'heading', id: 'settings-security-data-title', label: 'Data and privacy' },
     { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },
         help: { text: 'Applies after restart.', more: 'Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.' },
@@ -177,6 +184,7 @@ export const SECURITY_FIELDS = [
 export const NETWORK_FIELDS = [
     { key: 'remote_access', type: 'toggle', id: 'settings-remote-access-enabled', labelId: 'net-access-title', label: 'Remote access', live: ['settings-remote-access-status', 'net-remote-note'],
         help: { text: 'Lets other devices use Coral as you do (control agents, read files, change settings); unencrypted unless TLS is set up.', more: 'TLS is on when Coral was started with --tls-cert and --tls-key, or when you reach it through Coral Hub. A device needs your password or API key.' } },
+    deviceLink('device_access_network', 'API key and Mobile QR: Security and privacy', 'security'),
     // the groups of this pane (#8491): a title drawn by settings_view (the sections are labelled by it) and the group's body, a part of the page its own module fills and shows or hides (the row and its title leave with it, settings_view.css)
     { key: 'net_setup_title', type: 'heading', id: 'net-setup-title', label: 'Setup code' }, live('net-group-setup'),
     { key: 'net_hub_title', type: 'heading', id: 'net-hub-title', label: 'Coral Hub' }, live('net-group-hub'),
