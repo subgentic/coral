@@ -72,8 +72,8 @@ func (h *SessionsHandler) Diff(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	base := gitutil.GetDiffBase(ctx, workdir, h.getDiffMode(r.Context()))
-	gitArgs := []string{"diff", base, "--", fp}
+	diffMode := h.getDiffMode(r.Context())
+	gitArgs := append(append([]string{"diff"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--", fp)
 	if strict {
 		// The filepath is a name, never a pathspec: '*' or ':(glob)**' would diff the whole
 		// tree (QA's #3558 review).
@@ -87,8 +87,8 @@ func (h *SessionsHandler) Diff(w http.ResponseWriter, r *http.Request) {
 		diffText = string(out)
 	}
 
-	// For untracked files, show the file content as a "new file" diff
-	if diffText == "" {
+	// For untracked files, show the file content as a "new file" diff (not for the last commit alone: an untracked file is not in it)
+	if diffText == "" && gitutil.IncludesWorkingTree(diffMode) {
 		fullPath := filepath.Join(workdir, fp)
 		realFull, err := safefs.Resolve(fullPath)
 		realWork, _ := safefs.Resolve(workdir)
@@ -164,16 +164,18 @@ func (h *SessionsHandler) ChangesDiff(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SessionsHandler) generateChangesDiff(ctx context.Context, workdir string) ([]byte, error) {
-	base := gitutil.GetDiffBase(ctx, workdir, h.getDiffMode(ctx))
-	diff, err := gitutil.Command(ctx, workdir, "diff", "--binary", base, "--").Output()
+	diffMode := h.getDiffMode(ctx)
+	diff, err := gitutil.Command(ctx, workdir, append(append([]string{"diff", "--binary"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--")...).Output()
 	if err != nil {
 		return nil, err
 	}
 
-	// A normal git diff omits untracked files. Render each as a new-file patch.
-	untracked, err := gitutil.Command(ctx, workdir, "ls-files", "--others", "--exclude-standard", "-z").Output()
-	if err != nil {
-		return nil, err
+	// A normal git diff omits untracked files. Render each as a new-file patch (not for the last commit alone).
+	var untracked []byte
+	if gitutil.IncludesWorkingTree(diffMode) {
+		if untracked, err = gitutil.Command(ctx, workdir, "ls-files", "--others", "--exclude-standard", "-z").Output(); err != nil {
+			return nil, err
+		}
 	}
 	for _, rawPath := range bytes.Split(untracked, []byte{0}) {
 		if len(rawPath) == 0 {

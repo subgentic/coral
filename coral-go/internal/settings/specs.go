@@ -119,7 +119,7 @@ func init() {
 	s = whole(FileSearchLimit, "500", 1, 100_000, ReadDefault, ApplyLive, "Most results a file search returns.")
 	s.ReadBounded, s.ReadMin, s.ReadMax = true, 1, math.MaxInt64
 	register(s)
-	register(Spec{Key: GitDiffMode, Kind: KindEnum, Values: []string{"branch_point", "previous_commit", "main_head"}, Default: "branch_point", Apply: ApplyLive, Doc: "What a session's diff is taken against."})
+	register(Spec{Key: GitDiffMode, Kind: KindEnum, Values: []string{"branch_point", "uncommitted", "last_commit", "previous_commit", "main_head"}, Default: "branch_point", Apply: ApplyLive, Doc: "What a session's diff is taken against."})
 	s = whole(GitPollIntervalS, "", 0, 86_400, ReadAny, ApplyLive, "Seconds between git polls; 0 is off. Unset takes the --git-poll-interval flag.")
 	register(s)
 	register(Spec{Key: AgentPriority, Kind: KindOpaque, Apply: ApplyLive, Doc: "Process priority of agents (validated by agentprio)."})

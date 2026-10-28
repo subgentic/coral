@@ -34,7 +34,7 @@ const FILES_FIELDS = [
     { key: 'file_search_limit', type: 'select', id: 'settings-file-search-limit', label: 'File search limit', help: 'Max number of files returned in search results', default: '500',
         options: [{ value: '50', label: '50' }, { value: '100', label: '100' }, { value: '200', label: '200' }, { value: '500', label: '500' }, { value: '1000', label: '1,000' }] },
     { key: 'git_diff_mode', type: 'select', id: 'settings-git-diff-mode', label: 'Git diff mode', help: 'What to compare changed files against',
-        options: [{ value: 'branch_point', label: 'Branch Point (merge-base)' }, { value: 'previous_commit', label: 'Previous Commit (HEAD~1)' }, { value: 'main_head', label: 'Main Branch (vs main)' }] },
+        options: [{ value: 'uncommitted', label: 'Uncommitted changes' }, { value: 'last_commit', label: 'Last commit' }, { value: 'branch_point', label: 'Since branch point (merge-base)' }, { value: 'previous_commit', label: 'Last commit + uncommitted (vs HEAD~1)' }, { value: 'main_head', label: 'Compared with main' }] },
     { key: 'git_poll_interval', type: 'select', id: 'settings-git-poll-interval', label: 'Git scan interval', help: { text: '', more: 'How often Coral rescans git for changed files. Scanning a large repository is slow \u2014 stretch this out, or turn it off and use the refresh button.' },
         options: [{ value: '30', label: 'Every 30 seconds' }, { value: '60', label: 'Every minute' }, { value: '120', label: 'Every 2 minutes' }, { value: '300', label: 'Every 5 minutes' }, { value: '600', label: 'Every 10 minutes' }, { value: '1800', label: 'Every 30 minutes' }, { value: '0', label: 'Off \u2014 refresh manually' }] },
 ];

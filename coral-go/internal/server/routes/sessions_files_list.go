@@ -85,7 +85,11 @@ func (h *SessionsHandler) Files(w http.ResponseWriter, r *http.Request) {
 
 	files, found, err := h.gs.GetChangedFiles(r.Context(), name, sidPtr, diffMode)
 	if err == nil && found && filesCacheFresh(files, h.filesCacheMaxAge(r.Context(), diffMode), time.Now()) {
-		writeJSON(w, http.StatusOK, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode})
+		out := map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode}
+		if workdir := h.resolveGitRoot(agentCtx(r), name, "", ptr.Value(sidPtr)); workdir != "" {
+			out["compare"] = map[string]any{"mode": diffMode, "label": gitutil.CompareLabel(r.Context(), workdir, diffMode)}
+		}
+		writeJSON(w, http.StatusOK, out)
 		return
 	}
 
@@ -179,8 +183,9 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	defer cancel()
 
 	diffMode := h.getDiffMode(r.Context())
-	base := gitutil.GetDiffBase(ctx, workdir, diffMode)
-	out, err := gitCmd(ctx, workdir, "diff", base, "--numstat").Output()
+	withTree := gitutil.IncludesWorkingTree(diffMode)
+	diffArgs := append(append([]string{"diff"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--numstat")
+	out, err := gitCmd(ctx, workdir, diffArgs...).Output()
 	fileMap := make(map[string]store.ChangedFile)
 	if err != nil {
 		slog.Warn("git diff --numstat failed", "agent_name", name, "workdir", logsafe.Dir(workdir), "error", err)
@@ -199,9 +204,12 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	// Include untracked files
+	// Include untracked files (not for the last commit alone: they are not in it)
 	untrackedSet := make(map[string]bool)
-	untrackedOut, err := gitCmd(ctx, workdir, "ls-files", "--others", "--exclude-standard").Output()
+	untrackedOut, err := []byte(nil), error(nil)
+	if withTree {
+		untrackedOut, err = gitCmd(ctx, workdir, "ls-files", "--others", "--exclude-standard").Output()
+	}
 	if err != nil {
 		slog.Warn("git ls-files (untracked) failed", "agent_name", name, "workdir", logsafe.Dir(workdir), "error", err)
 	} else {
@@ -228,7 +236,10 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	// question about a handful of paths, which on a monorepo is the single
 	// most expensive thing here.
 	sidPtr := ptr.NonEmpty(sessionID)
-	events, _ := h.ts.ListAgentEvents(r.Context(), name, 200, sidPtr)
+	var events []store.AgentEvent
+	if withTree { // what the agent wrote but git has not reported is working-tree work: not part of the last commit
+		events, _ = h.ts.ListAgentEvents(r.Context(), name, 200, sidPtr)
+	}
 	candidates := make([]string, 0, 16)
 	seen := make(map[string]bool)
 	for _, ev := range events {
@@ -312,5 +323,6 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	}
 	h.gs.ReplaceChangedFiles(r.Context(), name, workdir, files, sidPtr, diffMode)
 
-	writeJSON(w, http.StatusOK, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode})
+	writeJSON(w, http.StatusOK, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode,
+		"compare": map[string]any{"mode": diffMode, "label": gitutil.CompareLabel(r.Context(), workdir, diffMode)}})
 }

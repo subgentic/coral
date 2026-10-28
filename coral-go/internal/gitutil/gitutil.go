@@ -85,7 +85,54 @@ func ResolveGitRoot(ctx context.Context, workdir string) string {
 // matches (#3631).
 func nativePath(p string) string { return filepath.Clean(filepath.FromSlash(p)) }
 
+// The comparisons the changed-files panel offers (the git_diff_mode setting).
+const (
+	DiffUncommitted    = "uncommitted"     // the working tree against HEAD
+	DiffLastCommit     = "last_commit"     // the last commit alone, HEAD~1..HEAD (#10054)
+	DiffPreviousCommit = "previous_commit" // the working tree against HEAD~1: the last commit and everything uncommitted
+	DiffBranchPoint    = "branch_point"    // the working tree against the merge-base with main or master (HEAD on main itself)
+	DiffMainHead       = "main_head"       // the working tree against main or master
+)
+
+// DiffRefs are the refs to hand `git diff`: one (the working tree against it) for every comparison but the last commit, which is two (HEAD~1 and HEAD: that commit's own change, no working-tree
+// edit and no untracked file). A repository with no commit, or one with a single commit (the last commit is the whole of it), compares against the empty tree, so every file is new.
+func DiffRefs(ctx context.Context, workdir, mode string) []string {
+	base := GetDiffBase(ctx, workdir, mode)
+	if mode == DiffLastCommit && Available() {
+		if _, err := git(ctx, workdir, "rev-parse", "--verify", "--quiet", "HEAD"); err == nil {
+			return []string{base, "HEAD"}
+		}
+	}
+	return []string{base}
+}
+
+// IncludesWorkingTree reports whether a comparison lists the working tree's own changes (uncommitted edits, untracked files): all but the last commit alone.
+func IncludesWorkingTree(mode string) bool { return mode != DiffLastCommit }
+
+// CompareLabel says in words what a comparison shows in this repository (#10054): the panel's caption, so its words match the list. On main or master the branch point is HEAD, which the label says.
+func CompareLabel(ctx context.Context, workdir, mode string) string {
+	switch mode {
+	case DiffUncommitted:
+		return "Uncommitted changes"
+	case DiffLastCommit:
+		return "Last commit"
+	case DiffPreviousCommit:
+		return "Last commit and uncommitted changes"
+	case DiffMainHead:
+		return "Changes compared with main"
+	}
+	if GetDiffBase(ctx, workdir, mode) == "HEAD" {
+		return "Uncommitted changes (on main the branch point is HEAD)"
+	}
+	return "Changes since the branch point"
+}
+
 // GetDiffBase returns the base ref for diffing.
+//
+// When mode is "uncommitted", returns "HEAD" (the working tree against the last commit).
+//
+// When mode is "last_commit", returns "HEAD~1" (DiffRefs adds HEAD): the last commit's own change.
+// On a repository with a single commit it is the empty tree, so the whole commit is its change.
 //
 // When mode is "previous_commit", returns "HEAD~1" to diff against the
 // previous commit on the current branch. Falls back to "HEAD" if there
@@ -105,6 +152,16 @@ func GetDiffBase(ctx context.Context, workdir, mode string) string {
 		if _, inRepo := git(ctx, workdir, "rev-parse", "--git-dir"); inRepo == nil {
 			return emptyTree(ctx, workdir)
 		}
+	}
+
+	if mode == DiffUncommitted {
+		return "HEAD"
+	}
+	if mode == DiffLastCommit {
+		if _, err := git(ctx, workdir, "rev-parse", "--verify", "HEAD~1"); err == nil {
+			return "HEAD~1"
+		}
+		return emptyTree(ctx, workdir)
 	}
 
 	if mode == "previous_commit" {

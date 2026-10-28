@@ -270,6 +270,7 @@ export async function loadChangedFiles(agentName, sessionId) {
         const data = await resp.json();
         _currentFiles = data.files || [];
         _notGit = data.is_git === false;
+        _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
         if (data.diff_mode) _cloudDiffMode = data.diff_mode;
     } catch (e) {
         _currentFiles = [];
@@ -380,8 +381,11 @@ async function _createFile(filePath) {
 
 /* ── Refresh & Render ──────────────────────────────────────── */
 
-const _diffModes = ['branch_point', 'previous_commit', 'main_head'];
-const _diffModeLabels = { branch_point: 'vs merge-base', previous_commit: 'vs HEAD~1', main_head: 'vs main' };
+// What each comparison lists, in the words of what it shows (#10054): "vs HEAD~1" and "vs merge-base" named refs and not the list, and on main listed only uncommitted changes. The server says what the
+// comparison is in this repository too (compare.label): where that differs from the option (the branch point on main is HEAD), the panel shows it beside the choice.
+const _diffModes = ['uncommitted', 'last_commit', 'branch_point', 'previous_commit', 'main_head'];
+const _diffModeLabels = { uncommitted: 'Uncommitted changes', last_commit: 'Last commit', branch_point: 'Since branch point', previous_commit: 'Last commit + uncommitted', main_head: 'Compared with main' };
+let _compareLabel = '';
 
 // On the hub the comparison base is the machine's own setting: it is read from the files response and changed through the one
 // narrow route the hub allows (PUT /api/settings/git-diff-mode, Interact tier), not through the hub's per-user settings.
@@ -445,6 +449,7 @@ export async function refreshChangedFiles() {
             const data = await resp.json();
             _currentFiles = data.files || [];
             _notGit = data.is_git === false;
+            _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
             if (data.diff_mode) _cloudDiffMode = data.diff_mode;
             renderStarredFiles();
             renderChangedFiles();
@@ -483,13 +488,15 @@ export async function refreshChangedFiles() {
             (acc, f) => ({ adds: acc.adds + (f.additions || 0), dels: acc.dels + (f.deletions || 0) }),
             { adds: 0, dels: 0 }
         );
-        const modeSelect = `<select class="field field-dense diff-mode-select" data-on-change="diff-mode" title="Diff comparison mode">${options}</select>`;
+        const modeSelect = `<select class="field field-dense diff-mode-select" data-on-change="diff-mode" title="${escapeAttr(_compareLabel || 'What the list compares')}" aria-label="Compare">${options}</select>`;
+        // where the server's words differ from the chosen option's (the branch point on main is HEAD), they are said beside it, so the list is never read as something it is not
+        const compareNote = _compareLabel && _compareLabel !== _diffModeLabels[diffMode] ? `<span class="changed-files-count files-compare-note">${escapeHtml(_compareLabel)}</span>` : '';
         const stats = files.length > 0
             ? `<span class="file-adds">+${totals.adds}</span><span class="file-dels">-${totals.dels}</span>`
             : '';
         const html = `<span class="changed-files-count">${files.length} file${files.length !== 1 ? 's' : ''} changed</span>
             ${stats}
-            ${modeSelect}`;
+            ${modeSelect}${compareNote}`;
         // The list is redrawn on every poll: the header is written only when it says something new, so its select and counts are not replaced under a person's pointer or a layout pass (#7671).
         if (titleEl._html !== html) { titleEl.innerHTML = html; titleEl._html = html; }
     }

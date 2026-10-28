@@ -171,9 +171,9 @@ export async function loadSettings() {
         if (!s.file_search_mode) {
             s.file_search_mode = 'directory';
         }
-        // Default git_diff_mode to 'previous_commit' (HEAD~1)
+        // Default git_diff_mode to the server's own default, branch_point: the panel used to show 'vs HEAD~1' while the server (which never had a stored value) listed the branch point's changes (#10054)
         if (!s.git_diff_mode) {
-            s.git_diff_mode = 'previous_commit';
+            s.git_diff_mode = 'branch_point';
         }
         state.settings = s;
         window.syncDisplayMenu?.();

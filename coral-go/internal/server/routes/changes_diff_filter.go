@@ -197,15 +197,17 @@ func safeDiff(diff []byte) []byte {
 // missing (#243). New files are taken whole while they fit in what the limit leaves after the tracked changes; the rest are
 // counted in a note. The notes come first, so the cap never cuts one off.
 func (h *SessionsHandler) generatePersistedDiff(ctx context.Context, workdir string) ([]byte, error) {
-	base := gitutil.GetDiffBase(ctx, workdir, h.getDiffMode(ctx))
-	tracked, err := gitOutput(ctx, workdir, "diff", "--binary", base, "--")
+	diffMode := h.getDiffMode(ctx)
+	tracked, err := gitOutput(ctx, workdir, append(append([]string{"diff", "--binary"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--")...)
 	if err != nil {
 		return nil, err
 	}
 	trackedDiff := filterPatch(tracked)
-	untracked, err := gitOutput(ctx, workdir, "ls-files", "--others", "--exclude-standard", "-z")
-	if err != nil {
-		return nil, err
+	var untracked []byte
+	if gitutil.IncludesWorkingTree(diffMode) { // the last commit alone has no untracked files
+		if untracked, err = gitOutput(ctx, workdir, "ls-files", "--others", "--exclude-standard", "-z"); err != nil {
+			return nil, err
+		}
 	}
 	var notes []byte
 	var files []string

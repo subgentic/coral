@@ -86,6 +86,7 @@
 1	changed_files.js	agentOnlyCls
 1	changed_files.js	agentsHtml
 2	changed_files.js	cls
+1	changed_files.js	compareNote
 2	changed_files.js	copyBtn
 1	changed_files.js	dels
 2	changed_files.js	editBtn

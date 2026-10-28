@@ -382,19 +382,19 @@ func (h *SystemHandler) DeleteDebugInputLog(w http.ResponseWriter, r *http.Reque
 }
 
 // gitDiffModes are the comparison bases the changed-files panel offers.
-var gitDiffModes = map[string]bool{"branch_point": true, "previous_commit": true, "main_head": true}
+var gitDiffModes = map[string]bool{"branch_point": true, "uncommitted": true, "last_commit": true, "previous_commit": true, "main_head": true}
 
-// PutGitDiffMode sets only the git_diff_mode setting, validated against the three bases the dashboard offers. It exists so
+// PutGitDiffMode sets only the git_diff_mode setting, validated against the comparisons the dashboard offers. It exists so
 // the changed-files panel can change the comparison base through the Cloud Hub without exposing PUT /api/settings (which can
 // set CLI paths and other machine settings and stays unreachable through the hub).
-// PUT /api/settings/git-diff-mode {"mode": "branch_point" | "previous_commit" | "main_head"}
+// PUT /api/settings/git-diff-mode {"mode": "branch_point" | "uncommitted" | "last_commit" | "previous_commit" | "main_head"}
 func (h *SystemHandler) PutGitDiffMode(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
 	var body struct {
 		Mode string `json:"mode"`
 	}
 	if err := decodeJSON(r, &body); err != nil || !gitDiffModes[body.Mode] {
-		errBadRequest(w, "mode must be branch_point, previous_commit or main_head")
+		errBadRequest(w, "mode must be branch_point, uncommitted, last_commit, previous_commit or main_head")
 		return
 	}
 	if _, err := h.db.ExecContext(r.Context(),
