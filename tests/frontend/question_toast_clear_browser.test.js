@@ -11,10 +11,10 @@ const BASE = require('./test_base').BASE;
     const S = `(window.__coralStatic || '/static/')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [width, height] of [[1280, 800], [1024, 768]]) {
+        for (const [width, height, dock] of [[1280, 800, 'false'], [1024, 768, 'false'], [1280, 800, 'true'], [1024, 768, 'true']]) { // the file column open (dock false = not collapsed) and shut
         await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`localStorage.setItem('coral-agentic-collapsed', 'false'); true`); // the file column is open: it is where the toast belongs
+        await ev(`localStorage.setItem('coral-agentic-collapsed', '${dock}'); true`); // the column open, where the toast belongs, and shut, where the card spans the chat
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'settings')`);
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); localStorage.removeItem('coral-agent-keys'); window.__m.add('coral-go', 'm', 3, { sleeping: false, session_id: 'o1' }); true`);
@@ -37,10 +37,10 @@ const BASE = require('./test_base').BASE;
         const said = () => ev(`(() => ({ card: [...document.querySelectorAll('#live-history-messages > .chat-needs-input')].filter(e => e.getClientRects().length > 0 && e.getAttribute('role') === 'alert').length, notice: ((document.getElementById('notice-live') || {}).textContent || '').trim(), keys: ((document.getElementById('agent-keys-status') || {}).textContent || '').trim(), toast: document.querySelectorAll('.notification-toast').length }))()`);
         await ask('o1', true); await new Promise(r => setTimeout(r, 900)); // sleep-ok: the toast slides in
         const g = await ev(`(() => { const r = e => { const b = e.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom) }; }; const card = document.querySelector('#live-history-messages > .chat-needs-input'), toasts = [...document.querySelectorAll('.notification-toast')].filter(e => e.getClientRects().length); return { card: card ? r(card) : null, toasts: toasts.map(r) }; })()`);
-        check(g.card && g.toasts.length >= 1, `${width}: the card and a toast are on screen: ${JSON.stringify(g)}`);
+        check(g.card && g.toasts.length >= 1, `${width} dock ${dock === 'true' ? 'shut' : 'open'}: the card and a toast are on screen: ${JSON.stringify(g)}`);
         const over = (g.toasts || []).filter(t => g.card && t.l < g.card.r && t.r > g.card.l && t.t < g.card.b && t.b > g.card.t);
-        check(over.length === 0, `${width}: no toast covers the question card: ${JSON.stringify(g)}`);
-        const shotDir = process.env.CORAL_SCREENSHOT_DIR; if (shotDir) { require('node:fs').mkdirSync(shotDir, { recursive: true }); require('node:fs').writeFileSync(`${shotDir}/question-toast-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+        check(over.length === 0, `${width} dock ${dock === 'true' ? 'shut' : 'open'}: no toast covers the question card: ${JSON.stringify(g)}`);
+        const shotDir = process.env.CORAL_SCREENSHOT_DIR; if (shotDir) { require('node:fs').mkdirSync(shotDir, { recursive: true }); require('node:fs').writeFileSync(`${shotDir}/question-toast-${width}-${dock === 'true' ? 'shut' : 'open'}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'a toast never covers the answer card:\n  ' + problems.join('\n  '));

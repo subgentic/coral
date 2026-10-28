@@ -229,7 +229,16 @@ function placeNotices() {
     const composer = document.getElementById("command-pane");
     const composerRect = composer && composer.getClientRects().length ? composer.getBoundingClientRect() : null;
     const aboveComposer = composerRect && composerRect.height > 0 && composerRect.top < window.innerHeight ? Math.ceil(window.innerHeight - composerRect.top) + 8 : 0;
-    document.getElementById("notices")?.style.setProperty("--notice-bottom", `${Math.max(20, pinned ? Math.ceil(window.innerHeight - pinned.top) + 8 : 0, aboveComposer)}px`);
+    // The chat's answer card is never under a toast either (#10251, Beta #10221): when the column would overlap it sideways (the file column shut, the card spans the chat), the column sits above the card, over the
+    // messages that came before it. A column taller than the room above the card keeps its place under the header (the cap below).
+    const notices = document.getElementById("notices");
+    const card = [...document.querySelectorAll("#live-history-messages > .chat-needs-input")].find(e => e.getClientRects().length > 0);
+    let aboveCard = 0;
+    if (card && notices && notices.getClientRects().length) {
+        const c = card.getBoundingClientRect(), n = notices.getBoundingClientRect();
+        if (c.right > n.left + 1 && c.left < n.right - 1 && c.top < window.innerHeight) aboveCard = Math.min(Math.ceil(window.innerHeight - c.top) + 8, Math.max(0, window.innerHeight - n.height - 8 - (bar ? Math.round(bar.getBoundingClientRect().bottom) : 0)));
+    }
+    notices?.style.setProperty("--notice-bottom", `${Math.max(20, pinned ? Math.ceil(window.innerHeight - pinned.top) + 8 : 0, aboveComposer, aboveCard)}px`);
     if (!placeNotices._wired) {
         placeNotices._wired = true; window.addEventListener("resize", placeNotices);
         if (typeof ResizeObserver === 'function') { const observer = new ResizeObserver(placeNotices); if (bar) observer.observe(bar); if (banner) observer.observe(banner); }
