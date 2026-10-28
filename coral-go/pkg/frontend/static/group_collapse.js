@@ -93,6 +93,16 @@ export function teamHeaderKey(event, header = event.currentTarget) {
     window.openTeamPage(header.dataset.board);
 }
 
+/** Open a group that is closed (the folder just opened or launched into), and draw the list again. */
+export function expandGroup(groupName) {
+    const groups = _getCollapsedGroups();
+    const idx = groups.indexOf(groupName);
+    if (idx < 0) return;
+    groups.splice(idx, 1);
+    browserLocal.set('coral_collapsed_groups', JSON.stringify(groups));
+    redrawLiveList();
+}
+
 export function toggleGroupCollapse(groupName) {
     const groups = _getCollapsedGroups();
     const idx = groups.indexOf(groupName);
