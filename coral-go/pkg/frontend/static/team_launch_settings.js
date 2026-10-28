@@ -23,6 +23,14 @@ const healthRows = () => healthFields({
     onReset: view => { for (const [k, v] of Object.entries(healthToValues(HEALTH_DEFAULTS))) view.set(k, v); },
 }).filter(f => f.key !== 'recipient' && !f.key.endsWith('_nudge')); // no members to pick from yet
 
+/** What each tab of the side list is, in a short plain line: its tooltip, and what a screen reader hears after the state (#10719). The visible words do not grow. */
+const TIPS = {
+    start: 'The first task for the team and any extra instructions.',
+    workflow: 'How the agents share the folder. It is guidance only: no worktrees are created.',
+    health: 'Checks on stuck or idle agents. Uses tokens each time.',
+    messaging: 'Lets this team message and share files with teams on other computers, through Coral Hub.',
+};
+
 const MODE_WORDS = { shared_checkout: 'Shared checkout', worktrees: 'Worktrees', task_queue: 'Task queue' };
 
 /** What each menu item holds, said under its name (Start: none, Health check: on), so nobody opens one to find out (#9971). */
@@ -46,7 +54,9 @@ function syncMenuStates() {
             s = document.createElement('small'); s.className = 'menu-item-state'; s.id = `team-start-state-${id}`; name.append(s);
             const tab = name.closest('.settings-tab');
             if (!tab.hasAttribute('aria-label')) tab.setAttribute('aria-label', name.firstChild.textContent);
-            tab.setAttribute('aria-describedby', s.id);
+            const tip = document.createElement('span'); tip.hidden = true; tip.id = `team-start-tip-${id}`; tip.textContent = TIPS[id] || ''; document.getElementById('team-start-host').append(tip); // a hidden description, said after the state: the tab's own words do not grow
+            tab.title = TIPS[id] || '';
+            tab.setAttribute('aria-describedby', `${s.id} ${tip.id}`);
         }
         if (s.textContent !== word) s.textContent = word;
     }
