@@ -110,7 +110,7 @@ const REPLY = "Hi! I'm mock-agent, a stand-in for a real agent, so this reply is
             const roles = await ev(`window.__nt.roles(window.__nt.dlg(${NT.team}))`);
             assert.deepEqual(roles, ['Orchestrator', 'Lead Developer', 'QA Engineer'], 'the default team is in Members');
             await t.click('button', NT.next); await t.step(3);
-            await t.type('textarea', /^First task/i, TASK, NT.team);
+            await t.type('textarea', /^What should the team work on/i, TASK, NT.team);
             const off = await ev(`(() => { const b = window.__nt.buttons(window.__nt.dlg(${NT.team})).find(x => ${NT.launch}.test(x.name)); return b ? b.disabled : null; })()`);
             assert.equal(off, false, 'Launch team is off with the defaults, and the line above the buttons says: ' + await ev(`document.getElementById('team-recap').textContent`));
             await t.click('button', NT.launch);

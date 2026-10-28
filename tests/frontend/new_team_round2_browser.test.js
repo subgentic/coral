@@ -17,7 +17,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNT(ev);
         await stubModels(ev); await openNewTeam(ev, waitFor);
         await t.to(3);
-        await S.run('Start tab: First task and Additional instructions span the pane under their label, not the right column only (#8479)', async () => {
+        await S.run('Start tab: What should the team work on? and Additional instructions span the pane under their label, not the right column only (#8479)', async () => {
             await tab('Start');
             const r = await ev(`(() => { const d = window.__nt.dlg(${N.team}); return ['team-goal', 'team-custom-instructions'].map(id => { const t = document.getElementById(id), row = t && t.closest('.sv-row'); if (!t || !row) return null; const a = t.getBoundingClientRect(), b = row.getBoundingClientRect(); return { id, left: Math.round(a.left - b.left), right: Math.round(b.right - a.right) }; }); })()`);
             for (const x of r) { assert.ok(x, 'both text areas are on the Start tab'); assert.ok(x.left <= 2 && x.right <= 2, `${x.id} spans its row (left gap ${x.left}, right gap ${x.right})`); }

@@ -48,7 +48,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
         });
         await S.run('step 3 working mode and health: the request carries working_mode {mode, dependency_guidance, custom_instructions} and health_monitor true', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
-            await tab('Start'); await t.type('textarea', /^Additional instructions/i, 'Keep the diff small.', N.team); await t.type('textarea', /^First task/i, 'Look at the build.', N.team);
+            await tab('Start'); await t.type('textarea', /^Additional instructions/i, 'Keep the diff small.', N.team); await t.type('textarea', /^What should the team work on/i, 'Look at the build.', N.team);
             await tab('Workflow'); assert.ok(await t.pick(/^Working mode$/i, /Worktrees/i), 'a Working mode choice Worktrees'); assert.ok(await check(/^Guidance for dependent tasks$/i, true), 'the Guidance for dependent tasks switch');
             await tab('Health check'); assert.ok(await check(/^Send health check/i, true), 'the Send health check switch');
             await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch request', 6000);
@@ -56,20 +56,33 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             assert.ok(q.working_mode, 'working_mode is in the request'); assert.equal(typeof q.working_mode.mode, 'string'); assert.equal(q.working_mode.dependency_guidance, true); assert.equal(q.working_mode.custom_instructions, 'Keep the diff small.', 'the additional instructions are custom_instructions');
             assert.equal(q.health_monitor, true, 'health_monitor is true');
         });
-        await S.run('the First task is a real task of the team assigned to the Orchestrator, and still a board line to it (#10007)', async () => {
-            await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
-            await tab('Start'); await t.type('textarea', /^First task/i, 'Look at the build.\nThen fix what is red.', N.team);
-            await ev(`(() => { const R = window.fetch; window.__qa.board = []; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = (o.method || 'GET').toUpperCase();
-                const hit = /^\\/api\\/board\\/[^/]+\\/(tasks|messages)$/.exec(url.pathname);
-                if (hit && m === 'POST') { window.__qa.board.push({ kind: hit[1], body: JSON.parse(o.body) }); return Promise.resolve(new Response(JSON.stringify({ id: 1 }), { status: 201, headers: { 'Content-Type': 'application/json' } })); }
-                return R(u, o); }; return true; })()`);
+        const boardStub = `(() => { const R = window.fetch; window.__qa.board = []; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = (o.method || 'GET').toUpperCase();
+                const hit = /^\\/api\\/board\\/[^/]+\\/(goals|tasks|messages)$/.exec(url.pathname);
+                if (hit && m === 'POST') { window.__qa.board.push({ kind: hit[1], body: JSON.parse(o.body) }); return Promise.resolve(new Response(JSON.stringify({ id: hit[1] === 'goals' ? 7 : 1 }), { status: 201, headers: { 'Content-Type': 'application/json' } })); }
+                return R(u, o); }; return true; })()`;
+        const toStep3 = async text => { await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3); await tab('Start'); await t.type('textarea', /^What should the team work on/i, text, N.team); await ev(boardStub); };
+        await S.run('the box is "What should the team work on?" and a goal is saved with it by default; the first task is a real task under that goal, still a board line (#10007, #10279)', async () => {
+            await toStep3('Look at the build.\nThen fix what is red.');
+            assert.ok(await check(/^Also save this as the team's goal/i, true), 'the goal switch is on by default');
+            await t.click('button', N.launch);
+            await waitFor(`window.__qa.board.length >= 3`, 'the goal, the first task and the board line', 8000);
+            const b = (await sent()).board, goal = b.find(x => x.kind === 'goals'), task = b.find(x => x.kind === 'tasks'), msg = b.find(x => x.kind === 'messages');
+            assert.ok(goal && goal.body.title === 'Look at the build.' && goal.body.outcome === 'Look at the build.\nThen fix what is red.', 'the goal: ' + JSON.stringify(goal));
+            assert.ok(task, 'a task is created'); assert.equal(task.body.title, 'Look at the build.', 'its first sentence is the title'); assert.equal(task.body.body, 'Look at the build.\nThen fix what is red.', 'the whole text is the body');
+            assert.equal(task.body.goal_id, 7, 'the task is under the goal'); assert.equal(task.body.assigned_to, 'Orchestrator', 'assigned to the Orchestrator'); assert.equal(task.body.created_by, 'Operator');
+            assert.ok(msg && /^@Orchestrator Look at the build\./.test(msg.body.content), 'the board line to the Orchestrator is kept');
+            assert.ok(b.indexOf(goal) < b.indexOf(task) && b.indexOf(task) < b.indexOf(msg), 'the goal, then the task, then the line that points at them');
+        });
+        await S.run('with the goal switch off the task has no goal; a long first sentence is cut at about 60 characters with an ellipsis, the full text in the body (#10279, Beta #10325)', async () => {
+            const long = 'Build a small invoice calculator that adds line items, applies tax and prints a PDF for the customer to keep and share with others';
+            await toStep3(long);
+            assert.ok(await check(/^Also save this as the team's goal/i, false), 'turned off');
             await t.click('button', N.launch);
             await waitFor(`window.__qa.board.length >= 2`, 'the first task and the board line', 8000);
-            const b = (await sent()).board, task = b.find(x => x.kind === 'tasks'), msg = b.find(x => x.kind === 'messages');
-            assert.ok(task, 'a task is created'); assert.equal(task.body.title, 'Look at the build.', 'its first line is the title'); assert.equal(task.body.body, 'Look at the build.\nThen fix what is red.', 'the whole text is the body');
-            assert.equal(task.body.assigned_to, 'Orchestrator', 'assigned to the Orchestrator'); assert.equal(task.body.created_by, 'Operator');
-            assert.ok(msg && /^@Orchestrator Look at the build\./.test(msg.body.content), 'the board line to the Orchestrator is kept');
-            assert.ok(b.indexOf(task) < b.indexOf(msg), 'the task exists before the line that points at it');
+            const b = (await sent()).board, task = b.find(x => x.kind === 'tasks');
+            assert.ok(!b.some(x => x.kind === 'goals'), 'no goal was made'); assert.equal(task.body.goal_id, undefined, 'and the task has none');
+            assert.ok(task.body.title.length <= 61 && task.body.title.endsWith('\u2026') && long.startsWith(task.body.title.slice(0, -1)), 'a short title cut at a word: ' + task.body.title);
+            assert.equal(task.body.body, long, 'the full text is the body');
         });
         await S.run('step 3 health number out of range (#8455): Launch team sends nothing, opens the Health check tab, names the number and focuses it', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);

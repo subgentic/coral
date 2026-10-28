@@ -15,7 +15,7 @@ let _view = null;
 let _defaultMode = 'none'; // the working mode a new team starts with: 'none', or the one the chosen team template names (#8919)
 
 // What a new team starts with: nothing from the last team stays.
-const startValues = () => ({ first_task: '', custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, require_goal: false, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: false, cross_team_artifacts: false });
+const startValues = () => ({ first_task: '', save_goal: true, custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, require_goal: false, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: false, cross_team_artifacts: false });
 
 // The health check's own rows, less who gets it: at launch that is the Orchestrator (a list of one is noise); another recipient is in Team settings.
 const healthRows = () => healthFields({
@@ -64,7 +64,8 @@ export function mountTeamLaunchSettings() {
         load: async () => startValues(),
         groups: [
             { id: 'start', label: 'Start', icon: 'play_arrow', fields: [
-                { key: 'first_task', type: 'textarea', id: 'team-goal', label: 'First task', help: 'Optional. It goes to the Orchestrator.', wide: true, rows: 4, placeholder: 'What should the team work on?', attrs: { maxlength: '2000' } },
+                { key: 'first_task', type: 'textarea', id: 'team-goal', label: 'What should the team work on?', help: 'Optional. It goes to the Orchestrator as the first task.', wide: true, rows: 4, placeholder: 'For example: build a small invoice calculator', attrs: { maxlength: '2000' } },
+                { key: 'save_goal', type: 'toggle', id: 'team-save-goal', label: "Also save this as the team's goal", help: 'The first task is then listed under that goal on the Goals tab.' },
                 { key: 'custom_instructions', type: 'textarea', id: 'team-custom-instructions', label: 'Additional instructions', help: 'Optional.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
             ] },
             { id: 'workflow', label: 'Workflow', icon: 'account_tree', fields: [
@@ -93,13 +94,14 @@ export function mountTeamLaunchSettings() {
  * settings) is the PUT after it. `problem` is { text } for a field out of its range, with its tab open and the field focused.
  */
 export function readTeamLaunchSettings() {
-    const out = { working_mode: null, health_monitor: undefined, board: null, problem: null };
+    const out = { working_mode: null, health_monitor: undefined, board: null, problem: null, save_goal: true };
     if (!_view) return out;
     const check = _view.validate({ focus: true });
     if (!check.ok) { out.problem = { text: document.querySelector('#team-start-host .sv-error:not([hidden])')?.textContent?.trim() || 'Check the settings of this step.' }; return out; }
     const v = _view.values();
     const wm = { mode: v.mode || 'none', dependency_guidance: !!v.dependency_guidance, asks_are_tasks: !!v.asks_are_tasks, custom_instructions: String(v.custom_instructions || '').trim() };
     if (wm.mode !== 'none' || wm.dependency_guidance || wm.asks_are_tasks || wm.custom_instructions) out.working_mode = wm; // a new team has Requests for work are tasks on: it is sent unless the person turned it off
+    out.save_goal = !!v.save_goal; // the first task's goal (team_dialogs.js): on by default
     const board = {};
     if (v.require_goal) board.require_goal = true;
     const h = valuesToHealth(v, HEALTH_DEFAULTS);
