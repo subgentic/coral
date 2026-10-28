@@ -1,4 +1,4 @@
-// The Automations pages on a phone, from the Mobile Beta Tester's pass (#10476): a run a job started links back to its job and says "Run by job <name>" (not a way back to the workflow); the pages are
+// The Automations pages on a phone, from the Mobile Beta Tester's pass (#10476): a run a job started links back to its job and says "Run by job <name>" (not a way back to the workflow); reopening Automations lands on the list, not the last run page; the pages are
 // drawn from the real modules with the server's answers stubbed in the page. At 390 px (a phone) and 1280 px. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -25,12 +25,11 @@ const STUB = `(() => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const problems = [];
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         for (const [w, h, mobile] of [[390, 844, true], [1280, 900, false]]) {
             const tag = `${w} px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(STUB + '; true');
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`window.openAutomationsFolder('jobs'); true`);
             await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-primary')].some(c => c.textContent.includes('Every night'))`, `${tag}: the job row`, 10000);
@@ -43,6 +42,15 @@ const STUB = `(() => {
             if (!/Jobs/.test(run.phoneBack.join(' '))) problems.push(`${tag}: the phone's way back says Jobs (${JSON.stringify(run.phoneBack)})`);
             await ev(`document.getElementById('wf-run-back').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-view .sched-title, #scheduler-detail h2')`, `${tag}: the job's page opens from the run's way back`, 10000);
+            // (2) a run's page is on screen, the person goes to another tab and comes back: the folder's list, not the last run's page
+            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/automations/workflows/7/runs/31' }); await Page.loadEventFired(); await install(); // the run's own address, as a reopened app or a shared link has it
+            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title')`, `${tag}: the run page again`, 10000);
+            if (!mobile) await ev(`window.switchNavTab('agents'); true`); // on a phone the Automations tab is tapped again from the run's page
+            await ev(`window.switchNavTab('automations'); true`);
+            await waitFor(`document.body.getAttribute('data-nav-tab') === 'automations' && !!document.querySelector('#group-table-view tbody tr[data-key]')`, `${tag}: the folder's list on coming back`, 10000);
+            const back = await ev(`(() => { const shown = e => !!e && e.getClientRects().length > 0; return { run: shown(document.querySelector('#wf-run-detail .wf-run-title')), list: shown(document.querySelector('#group-table-view tbody tr[data-key]')), item: document.getElementById('workflows-view').hasAttribute('data-phone-item') }; })()`);
+            if (back.run || !back.list || back.item) problems.push(`${tag}: reopening Automations lands on the list, not the last run page (${JSON.stringify(back)})`);
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the Automations pages on a phone:\n  ' + problems.join('\n  '));
