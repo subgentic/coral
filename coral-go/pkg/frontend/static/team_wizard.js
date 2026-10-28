@@ -47,7 +47,7 @@ function showTeamWizardModal() {
         if (directiveEl) directiveEl.value = '';
         if (generateBtn) {
             generateBtn.disabled = false;
-            generateBtn.textContent = 'Generate Team';
+            generateBtn.textContent = 'Generate team';
             generateBtn.style.display = '';
         }
     }
@@ -206,7 +206,7 @@ async function generateTeamFromWizard() {
         _setTeamWizardError(_plainGenerateError(error.message || 'Team generation failed.'));
         if (generateBtn) {
             generateBtn.disabled = false;
-            generateBtn.textContent = 'Generate Team';
+            generateBtn.textContent = 'Generate team';
         }
     }
 }
@@ -269,7 +269,7 @@ function _handleGenerateError(message) {
         const generateBtn = document.getElementById('team-wizard-generate-btn');
         if (generateBtn) {
             generateBtn.disabled = false;
-            generateBtn.textContent = 'Generate Team';
+            generateBtn.textContent = 'Generate team';
         }
     } else {
         showToast(message, true);
