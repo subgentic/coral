@@ -72,6 +72,8 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             assert.equal(task.body.goal_id, 7, 'the task is under the goal'); assert.equal(task.body.assigned_to, 'Orchestrator', 'assigned to the Orchestrator'); assert.equal(task.body.created_by, 'Operator');
             assert.ok(msg && /^@Orchestrator Look at the build\./.test(msg.body.content), 'the board line to the Orchestrator is kept');
             assert.ok(b.indexOf(goal) < b.indexOf(task) && b.indexOf(task) < b.indexOf(msg), 'the goal, then the task, then the line that points at them');
+            // the Goals 1 that appears says where it came from (#10532, mobile pass 33): a toast names the first task as the source and the Goals tab as the place
+            await waitFor(`/first task.*team's goal|team's goal.*first task/i.test([...document.querySelectorAll('.toast, [role=status], [role=alert]')].map(e => e.textContent).join(' | '))`, 'a toast saying the first task was saved as the team\'s goal', 6000);
         });
         await S.run('with the goal switch off the task has no goal; a long first sentence is cut at about 60 characters with an ellipsis, the full text in the body (#10279, Beta #10325)', async () => {
             const long = 'Build a small invoice calculator that adds line items, applies tax and prints a PDF for the customer to keep and share with others';
