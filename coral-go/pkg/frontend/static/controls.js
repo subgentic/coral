@@ -33,7 +33,7 @@ import { showWorktreeNotice } from './worktree_notice.js';
 import { killLiveSession, dropKilledRows } from './kill_live.js';
 import { MODES, modeFromFooterText, pressesFor } from './mode_cycle.js';
 import { _getXtermModule, sleepingBlocked } from './control_runtime.js';
-import { activeUploadPromisesBySession, getPendingAttachments, clearAttachments, openImagePicker, removeAttachment } from './image_composer.js';
+import { activeUploadPromisesBySession, getPendingAttachments, clearAttachments, openImagePicker, removeAttachment, openAttachment } from './image_composer.js';
 export { getPendingAttachments, initImageDrop, uploadAndInsertImage, renderAttachments, removeAttachment } from './image_composer.js';
 export { restartSession, restartStage, hideRestartModal, confirmRestart } from './restart_flow.js';
 /* Quick actions, command sending, mode toggling, and session controls */
@@ -797,5 +797,6 @@ registerActions({
     'send-menu-keys': () => { window.closeSendMenu(); setTimeout(() => document.getElementById('keys-chip')?.click(), 0); }, // and the terminal's Keys
     'send-menu-resend': () => { resendInputPrompt(); window.closeSendMenu(); },
     'send-menu-protocol': () => { sendBoardProtocol(); window.closeSendMenu(); },
+    'attachment-open': el => { const i = indexOf(el.dataset.index); if (i !== null) openAttachment(i); },
     'attachment-remove': el => { const i = indexOf(el.dataset.index); if (i !== null) removeAttachment(i); },
 });

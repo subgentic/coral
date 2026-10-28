@@ -270,10 +270,16 @@ export function renderAttachments(session = state.currentSession) {
     const pending = uploading ? `<div class="image-uploading">${escapeHtml(uploadingText)}</div>` : "";
     container.innerHTML = list.map((att, i) => `
         <div class="image-attachment" title="${escapeAttr(att.filename)}">
-            <img src="${escapeAttr(att.previewUrl)}" alt="${escapeAttr(imageName(i, list.length))}" />
+            <button type="button" class="image-attachment-open" data-on-click="attachment-open" data-index="${Number(i)}" aria-label="Enlarge ${escapeAttr(imageName(i, list.length).toLowerCase())}" title="Open ${escapeAttr(att.filename)} full size"><img src="${escapeAttr(att.previewUrl)}" alt="" /></button>
             <button type="button" class="image-attachment-remove" data-on-click="attachment-remove" data-index="${Number(i)}" aria-label="Remove ${escapeAttr(imageName(i, list.length).toLowerCase())}" title="Remove ${escapeAttr(att.filename)}">&times;</button>
         </div>
     `).join("") + pending;
+}
+
+/** The attachment's picture full size, in its own tab (#10147): the thumbnail is small. */
+export function openAttachment(index, session = state.currentSession) {
+    const att = getPendingAttachments(session || state.currentSession)[index];
+    if (att?.previewUrl) window.open(att.previewUrl, "_blank", "noopener");
 }
 
 export function removeAttachment(index, session = state.currentSession) {
