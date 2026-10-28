@@ -62,6 +62,8 @@ type SessionListItem struct {
 	DurationSec      *int    `json:"duration_sec"`
 	AgentName        string  `json:"agent_name,omitempty"`
 	DisplayName      string  `json:"display_name,omitempty"`
+	// BoardName is the team the live session belongs to ("" for an agent on none, or a session with no live record): a chat row names it, so two teams' agents of one role are told apart (#10592).
+	BoardName string `json:"board_name,omitempty"`
 	// Snippet is, for a search, one line of the chat's text around the matched words (#10137); empty without a search.
 	Snippet string `json:"snippet,omitempty"`
 }
@@ -241,6 +243,7 @@ type sessionNotesMeta struct {
 type liveAgentNames struct {
 	AgentName   string
 	DisplayName string
+	BoardName   string
 }
 
 func (s *SessionStore) sessionListExtras(ctx context.Context, sessionIDs []string) sessionListExtras {
@@ -331,18 +334,22 @@ func (s *SessionStore) sessionLatestBranches(ctx context.Context, sessionIDs []s
 func (s *SessionStore) liveAgentNamesOf(ctx context.Context, sessionIDs []string) map[string]liveAgentNames {
 	out := map[string]liveAgentNames{}
 	agentQuery, agentArgs, _ := sqlx.In(
-		`SELECT session_id, agent_name, display_name FROM live_sessions WHERE session_id IN (?)`,
+		`SELECT session_id, agent_name, display_name, board_name FROM live_sessions WHERE session_id IN (?)`,
 		sessionIDs)
 	var agentRows []struct {
 		SessionID   string  `db:"session_id"`
 		AgentName   string  `db:"agent_name"`
 		DisplayName *string `db:"display_name"`
+		BoardName   *string `db:"board_name"`
 	}
 	if err := s.reader().SelectContext(ctx, &agentRows, agentQuery, agentArgs...); err == nil {
 		for _, r := range agentRows {
 			names := liveAgentNames{AgentName: r.AgentName}
 			if r.DisplayName != nil {
 				names.DisplayName = *r.DisplayName
+			}
+			if r.BoardName != nil {
+				names.BoardName = *r.BoardName
 			}
 			out[r.SessionID] = names
 		}
@@ -361,8 +368,9 @@ func (x sessionListExtras) item(r sessionPageRow) SessionListItem {
 	if b, ok := x.branch[r.SessionID]; ok {
 		branch = &b
 	}
-	agentName, displayName := ptr.Value(r.AgentName), ptr.Value(r.DisplayName)
+	agentName, displayName, boardName := ptr.Value(r.AgentName), ptr.Value(r.DisplayName), ""
 	if info, ok := x.agent[r.SessionID]; ok {
+		boardName = info.BoardName
 		if info.AgentName != "" {
 			agentName = info.AgentName
 		}
@@ -390,6 +398,7 @@ func (x sessionListExtras) item(r sessionPageRow) SessionListItem {
 		DurationSec:      computeDuration(r.FirstTimestamp, r.LastTimestamp),
 		AgentName:        agentName,
 		DisplayName:      displayName,
+		BoardName:        boardName,
 		Snippet:          oneLine(r.Snippet, 200),
 	}
 }
