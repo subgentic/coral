@@ -1620,10 +1620,10 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 .server-group-header .server-group-more { position: static; }
 .server-group-more:not([open]) > .server-switcher-panel { display: none; } /* a closed menu has no boxes */
 .server-group-more > .server-switcher-panel { left: auto; right: 0; top: calc(100% - 2px); min-width: min(16em, 100%); max-width: 100%; box-sizing: border-box; }
-/* Keep the search box usable: it gives up width down to 5em (the whole "Search" placeholder still shows) and only a very narrow sidebar wraps the header (#3085, #4062); at 200% text the buttons stay on the search box's row (UI/UX's #7562 point). */
+/* Keep the search box usable: it gives up width down to 7em (the whole "Search agents" placeholder still shows, #10050) and only a very narrow sidebar wraps the header (#3085, #4062); at 200% text the buttons stay on the search box's row (UI/UX's #7562 point). */
 .sidebar-header { flex-wrap: wrap; }
-.sidebar-header .sidebar-search { flex: 1 1 5em; min-width: 5em; container-type: inline-size; }
-/* In a box that narrow (at 200% text the header's buttons leave it 5em) the magnifier goes and the placeholder takes its room: the whole word "Search" is shown, and the box's name is the same. */
+.sidebar-header .sidebar-search { flex: 1 1 7em; min-width: 7em; container-type: inline-size; }
+/* In a box that narrow (at 200% text the header's buttons leave it 7em) the magnifier goes and the placeholder takes its room: the whole placeholder is shown, and the box's name is the same. */
 @container (max-width: 8rem) { .sidebar-search-icon { display: none; } .sidebar-search-input.field-search { padding-left: 0.625rem; padding-right: 0.25rem; } }
 /* Status text for screen readers only (the dot carries it visually). */
 .row-server-prefix .sr-only {
