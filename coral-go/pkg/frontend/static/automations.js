@@ -12,7 +12,7 @@ import { setHidden } from './dom_write.js';
 import { announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
 import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf } from './scheduler.js';
-import { lastWords, lastChip, atWords, whenWords } from './job_words.js';
+import { lastWords, lastChip, atWords, whenWords, failureWords } from './job_words.js';
 import { liveRuns, onLiveRuns, selectLiveJobRun } from './live_jobs.js';
 const DT = await importOnce('./data_table.js'); // a lazy module imports only what loads at startup (import_hygiene): these load with it
 const VL = await importOnce('./view_list.js');
@@ -174,8 +174,15 @@ function nextCell(i) {
     if (i.enabled && i.job.next_fire_at) { cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`; cell.append(DT.el('span', 'sr-only', `, next run ${atWords(i.job.next_fire_at)} your time`)); } // also as text: a tooltip is not read, and a touch screen has none (#9117)
     return cell;
 }
-function lastCell(i) {
-    if (i.kind === 'job') return lastRunCell(i);
+function lastCell(i, withReason = false) {
+    if (i.kind === 'job') {
+        const chip = lastRunCell(i), why = withReason ? failureWords(i.run) : '';
+        if (!why || typeof chip === 'string') return chip;
+        // Failed: the chip and, beside it on the same line, why in words (the run has it; the list showed only "Failed", #9965)
+        const cell = DT.el('span', 'dt-last-run'); const reason = DT.el('span', 'dt-reason', why); reason.title = why;
+        cell.append(chip, ' ', reason);
+        return cell;
+    }
     if (i.kind === 'workflow') return i.run ? DT.chip(workflowResult(i) || 'Run', resultClass(i.run)) : 'Never run';
     return DT.chip('running now', resultClass(i.run));
 }
@@ -222,7 +229,7 @@ function attentionTable(key, rows, narrowed) {
                 { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, whatWords(i)) },
                 { key: 'kind', label: 'Kind', width: '7rem', dropAt: 36, sort: true, sortValue: i => KIND_WORD[i.kind], cell: i => DT.tag(KIND_WORD[i.kind]) },
                 { key: 'schedule', label: 'Schedule', width: '12rem', dropAt: 52, sort: true, sortValue: scheduleWords, cell: scheduleWords },
-                { key: 'last-run', label: 'Last run', width: '12rem', dropAt: 16, tone: 'tertiary', sort: 'date', sortValue: i => i.last, cell: lastCell },
+                { key: 'last-run', label: 'Last run', width: failed ? '24rem' : '12rem', dropAt: 16, tone: 'tertiary', sort: 'date', sortValue: i => i.last, cell: i => lastCell(i, failed) },
                 { key: 'next', label: 'Next', width: '7rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => (i.kind === 'job' && i.enabled ? i.job.next_fire_at : ''), cell: nextCell },
             ],
         }).el };
