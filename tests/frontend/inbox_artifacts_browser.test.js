@@ -13,7 +13,7 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
 
 const hex = n => String(n).padStart(64, '0');
 const WORLD = `(() => {
-    const real = window.fetch; window.__ta = [];
+    const real = window.fetch; window.__ta = []; window.__star = [];
     const at = m => new Date(Date.now() - m * 60000).toISOString();
     const A = [
         { n: 1, name: 'beta-notes.txt', mt: 'text/plain', board: 'beta', m: 5, task: 12, title: 'Write the notes' },
@@ -22,7 +22,7 @@ const WORLD = `(() => {
         { n: 4, name: 'alpha-chart.png', mt: 'image/png', board: 'alpha', m: 60, task: 8, title: 'Draw the chart' },
         { n: 5, name: 'alpha-plan.md', mt: 'text/markdown', board: 'alpha', m: 90, task: 6, title: 'Plan the work' },
     ].map(a => ({ id: String(a.n).padStart(64, '0'), name: a.name, media_type: a.mt, size: 1000 * a.n, created_at: at(a.m), task_id: a.task, task_title: a.title, source: 'task', uri: 'coral://artifacts/' + String(a.n).padStart(64, '0'),
-        available: true, inline: false, reference_count: 1, board_id: a.board, team: a.board }));
+        available: true, inline: false, reference_count: 1, board_id: a.board, team: a.board, starred: a.n === 2 }));
     const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o = {}) => {
         const url = new URL(String(u), location.origin), p = url.pathname, m = (o.method || 'GET').toUpperCase();
@@ -34,6 +34,7 @@ const WORLD = `(() => {
             return json({ artifacts: rows.slice(0, limit), limit, offset: 0, has_more: rows.length > limit, truncated: false, total: rows.length, all: A.length,
                 teams: [{ board_id: 'alpha', team: 'alpha', all: 3 }, { board_id: 'beta', team: 'beta', all: 2 }] });
         }
+        const sr = /^\\/api\\/artifacts\\/([0-9a-f]{64})\\/star$/.exec(p); if (sr && (m === 'PUT' || m === 'DELETE')) { window.__star.push(m + ' ' + sr[1]); return json({ starred: m === 'PUT' }); }
         if (p === '/api/system/artifact-store/kept') return json({ kept: [] });
         let r = /^\\/api\\/artifacts\\/([0-9a-f]{64})$/.exec(p);
         if (r && m === 'GET') return Promise.resolve(new Response('the text of ' + r[1].replace(/^0+/, ''), { status: 200, headers: { 'content-type': 'text/plain' } }));
@@ -77,6 +78,26 @@ const WORLD = `(() => {
             if (mobile) check(`${label}: no second Artifacts heading under the folder button (it names the page and its count), still in the page for a screen reader`, await ev(`(() => { const h = document.getElementById('group-table-title'), b = h && h.parentElement.getBoundingClientRect(), t = document.querySelector('#group-table-view .view-list-trigger'); return !!h && b.width <= 1 && b.height <= 1 && !!t && /Artifacts/.test(t.textContent); })()`));
             check(`${label}: the page is titled Artifacts with the count`, (await ev(`(document.getElementById('group-table-title') || {}).textContent + '|' + (document.querySelector('.inbox-artifacts-count') || {}).textContent`)) === 'Artifacts|5');
             check(`${label}: the rows of both teams are one list, newest first`, (await rows()).join() === 'beta-notes.txt,alpha-report.md,beta-data.json,alpha-chart.png,alpha-plan.md', (await rows()).join());
+            // The star on a row (#9834): the filled glyph on a starred row, the empty star only at a hover (a mouse), nothing on touch; the row's name says starred
+            const starRow = n => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => /${n}/.test(r.textContent))`;
+            const stars = await ev(`(() => { const st = ${starRow('alpha-report')}, un = ${starRow('beta-notes')}; const f = e => e ? { on: e.classList.contains('dt-star-on'), op: getComputedStyle(e).opacity, shown: getComputedStyle(e).display !== 'none', pe: getComputedStyle(e).pointerEvents } : null; return { starred: f(st.querySelector('.dt-star')), plain: f(un.querySelector('.dt-star')), name: (st.querySelector('.dt-mail-open, .dt-primary') || {}).getAttribute('aria-label') || (st.querySelector('.dt-primary') || {}).textContent }; })()`);
+            check(`${label}: a starred row has the filled star, always drawn`, stars.starred && stars.starred.on && stars.starred.shown && stars.starred.op === '1', JSON.stringify(stars));
+            if (!mobile) {
+                check(`${label}: an unstarred row's star is hidden at rest`, stars.plain && !stars.plain.on && stars.plain.op === '0', JSON.stringify(stars.plain));
+                const c = await ev(`(() => { const r = ${starRow('beta-notes')}.getBoundingClientRect(); return [Math.round(r.left + 60), Math.round(r.top + r.height / 2)]; })()`);
+                await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: c[0], y: c[1] });
+                await waitFor(`getComputedStyle(${starRow('beta-notes')}.querySelector('.dt-star')).opacity === '1'`, `${label}: a hovered row shows its empty star`, 4000);
+                await ev(`${starRow('beta-notes')}.querySelector('.dt-star').click(); true`);
+                await waitFor(`window.__star.length === 1 && ${starRow('beta-notes')}.querySelector('.dt-star').getAttribute('aria-pressed') === 'true'`, `${label}: the star calls PUT and the row is starred`, 4000);
+                check(`${label}: the star is PUT on that artifact and named for removing it`, (await ev(`window.__star.join()`)) === 'PUT ' + '0'.repeat(63) + '1' && (await ev(`${starRow('beta-notes')}.querySelector('.dt-star').getAttribute('aria-label')`)) === 'Remove the star from beta-notes.txt', await ev(`window.__star.join()`));
+                check(`${label}: the star does not open the row (no pane)`, !(await pane()));
+                await ev(`${starRow('beta-notes')}.querySelector('.dt-star').click(); true`);
+                await waitFor(`window.__star.length === 2`, `${label}: the second click calls DELETE`, 4000);
+                check(`${label}: and it is DELETE`, (await ev(`window.__star[1]`)).startsWith('DELETE '));
+                await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 5, y: 5 });
+            } else {
+                check(`${label}: on a phone an unstarred row has no star control, and the glyph is not a button`, stars.plain === null || !stars.plain.shown, JSON.stringify(stars)); check(`${label}: the starred row's name says starred, once`, (String(stars.name).match(/starred/g) || []).length === 1, String(stars.name)); check(`${label}: the glyph does not take a tap`, stars.starred.pe === 'none', JSON.stringify(stars.starred));
+            }
             check(`${label}: a Team column names each row's team`, (await ev(`[...document.querySelectorAll('#group-table-view thead th')].some(t => /Team/.test(t.textContent)) && /beta/.test(document.querySelector('#group-table-view tbody tr').textContent)`)));
             await shot(`inbox-artifacts-${label}`);
 
