@@ -214,3 +214,4 @@
     .av-col { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 8px; }
     .av-compare { padding: 8px 12px; }
 }
+.artifact-viewer-download[aria-disabled="true"] { opacity: 0.5; cursor: default; } /* until the artifact's kind is known it has no address (#9941) */
