@@ -213,7 +213,7 @@ function jobFields(host) {
             render: slot => {
                 slot.classList.add('job-type-toggle', 'btn-seg');
                 let value = 'workflow';
-                const buttons = [['workflow', 'account_tree', 'Workflow'], ['prompt', 'smart_toy', 'Agent prompt']].map(([type, icon, label]) => {
+                const buttons = [['prompt', 'smart_toy', 'Run a prompt'], ['workflow', 'account_tree', 'Run a workflow']].map(([type, icon, label]) => {
                     const b = el('button', 'btn job-type-btn'); b.type = 'button'; b.dataset.type = type;
                     const ic = el('span', 'material-icons', icon); ic.setAttribute('aria-hidden', 'true'); ic.style.fontSize = 'var(--fs-xl)';
                     b.append(ic, ` ${label}`);
