@@ -432,10 +432,16 @@ func (s *TaskStore) SessionTurn(ctx context.Context, sessionID string) (RunTurn,
 	return turn, nil
 }
 
-// GetLatestGoals returns the latest goal summary per session.
-func (s *TaskStore) GetLatestGoals(ctx context.Context, sessionIDs []string) (map[string]string, error) {
+// LatestGoal is a session's newest goal event: its words and when it was written (created_at, the stored ISO form).
+type LatestGoal struct {
+	Summary string
+	At      string
+}
+
+// GetLatestGoalRows returns the latest goal event per session, with its time: the age of a goal is said beside it (#10123), since the generator refreshes one at most every 30 minutes.
+func (s *TaskStore) GetLatestGoalRows(ctx context.Context, sessionIDs []string) (map[string]LatestGoal, error) {
 	if len(sessionIDs) == 0 {
-		return map[string]string{}, nil
+		return map[string]LatestGoal{}, nil
 	}
 	ids, err := sessionIDsJSON(sessionIDs)
 	if err != nil {
@@ -444,18 +450,32 @@ func (s *TaskStore) GetLatestGoals(ctx context.Context, sessionIDs []string) (ma
 	var rows []struct {
 		SessionID string `db:"session_id"`
 		Summary   string `db:"summary"`
+		CreatedAt string `db:"created_at"`
 	}
 	if err := s.reader().SelectContext(ctx, &rows,
-		`SELECT session_id, summary FROM agent_events WHERE id IN (
+		`SELECT session_id, summary, created_at FROM agent_events WHERE id IN (
 		   SELECT (SELECT e.id FROM agent_events e
 		           WHERE e.session_id = s.value AND e.event_type = 'goal'
 		           ORDER BY e.created_at DESC, e.id DESC LIMIT 1)
 		   FROM json_each(?) s)`, ids); err != nil {
 		return nil, err
 	}
-	result := make(map[string]string, len(rows))
+	result := make(map[string]LatestGoal, len(rows))
 	for _, r := range rows {
-		result[r.SessionID] = r.Summary
+		result[r.SessionID] = LatestGoal{Summary: r.Summary, At: r.CreatedAt}
+	}
+	return result, nil
+}
+
+// GetLatestGoals returns the latest goal summary per session.
+func (s *TaskStore) GetLatestGoals(ctx context.Context, sessionIDs []string) (map[string]string, error) {
+	rows, err := s.GetLatestGoalRows(ctx, sessionIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]string, len(rows))
+	for id, g := range rows {
+		result[id] = g.Summary
 	}
 	return result, nil
 }
