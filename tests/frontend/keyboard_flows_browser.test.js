@@ -78,7 +78,7 @@ const { settle } = require('./helpers/wait');
             // Tab into the composer from the control before it: the first stop in the pane is the text box
             await ev(`(() => { const t = document.getElementById('command-input'); const f = [...document.querySelectorAll('button, a[href], input, textarea, select, [tabindex="0"]')].filter(e => e.offsetParent && !e.disabled && e.tabIndex >= 0); const i = f.indexOf(t); f[i - 1].focus(); return true; })()`);
             const into = await tabs(1);
-            assert.equal(into[0], 'Enter command or paste image', `${w} px: Tab from the control before the composer reaches the text box first (got ${into[0]})`);
+            assert.equal(into[0], 'Message', `${w} px: Tab from the control before the composer reaches the text box first (got ${into[0]})`);
             const after = await tabs(mobile ? 3 : 12);
             if (mobile) {
                 assert.deepEqual(after, ['Add image', 'Send options', 'Send'], `${w} px: after the text box come Add image, Send options (the team reminder is in it, #7063) and Send`);

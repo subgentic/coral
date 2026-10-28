@@ -43,7 +43,7 @@ const VIEW = 'View only through Coral Hub';
         assert.deepEqual(await box(), { disabled: true, placeholder: VIEW });
         await readOnly(false);
         const backB = await box();
-        assert.equal(await ev(`document.getElementById('command-input').getAttribute('aria-label')`), 'Enter command or paste image', 'its own name is back');
+        assert.equal(await ev(`document.getElementById('command-input').getAttribute('aria-label')`), 'Message', 'its own name is back');
         assert.equal(backB.disabled, false); assert.ok(/Beta|ro-b/i.test(backB.placeholder) && !/Alpha|ro-a/i.test(backB.placeholder), `Beta's own placeholder is back: ${backB.placeholder}`);
 
         console.log('5. what a live update wrote while view only is what comes back');

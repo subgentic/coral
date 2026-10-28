@@ -30,7 +30,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
 
             // Chat view: no key bar, and the message box keeps its label
             assert.equal(await ev(`window.__vis('#terminal-key-bar')`), false, at + 'no key bar in the Chat view');
-            assert.equal(await ev(`document.getElementById('command-input').getAttribute('aria-label')`), 'Enter command or paste image');
+            assert.equal(await ev(`document.getElementById('command-input').getAttribute('aria-label')`), 'Message');
             await ev(`window.setLiveViewMode('terminal'); true`);
             await waitFor(`window.__vis('#terminal-statusbar')`, 'the terminal bar', 8000);
             if (!mobile) { assert.equal(await ev(`window.__vis('#terminal-key-bar')`), false, at + 'a desktop has a keyboard: no key bar'); continue; }
@@ -66,7 +66,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             // back in the Chat view the bar goes
             await ev(`window.setLiveViewMode('chat'); true`);
             await waitFor(`!window.__vis('#terminal-key-bar')`, 'the key bar to go with the terminal', 8000);
-            assert.equal(await ev(`document.getElementById('command-input').getAttribute('aria-label')`), 'Enter command or paste image', at + 'the message box is itself again');
+            assert.equal(await ev(`document.getElementById('command-input').getAttribute('aria-label')`), 'Message', at + 'the message box is itself again');
         }
         console.log('PASS terminal key bar: phone width and the Terminal view only, 44 px, named, sends its keys');
     } finally { await client.close(); }
