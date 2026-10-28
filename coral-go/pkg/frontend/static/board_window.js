@@ -194,7 +194,7 @@ export function openMessageActions(opener) {
     const messageId = row.dataset.messageId;
     const save = row.querySelector('.mb-save-btn'), del = row.querySelector('.mb-delete-msg-btn');
     const dlg = document.createElement('dialog'); dlg.className = 'mb-actions-sheet'; dlg.setAttribute('aria-labelledby', 'mb-actions-title');
-    const title = document.createElement('h3'); title.id = 'mb-actions-title'; title.textContent = (opener.getAttribute('aria-label') || 'Message actions').replace(/^Actions for the m/, 'M').replace(/:.*$/, '');
+    const title = document.createElement('h3'); title.id = 'mb-actions-title'; title.textContent = (opener.getAttribute('aria-label') || 'Message actions').replace(/^Actions for the m/, 'M').replace(/: .*$/, ''); // the snippet starts at ": "; the time's own colon (2:57 PM) is kept (it was cut to "Message from Operator, 2", #10730)
     dlg.append(title);
     const item = (cls, text, target) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text; b.addEventListener('click', () => { dlg.close(); target.click(); }); return b; };
     if (save) dlg.append(item('btn mb-actions-item', save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', save));
