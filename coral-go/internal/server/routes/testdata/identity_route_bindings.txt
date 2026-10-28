@@ -2,6 +2,7 @@ DELETE /api/agent/ui/{id} | token-bound
 DELETE /api/artifacts/{id}/comments/{cid} | token-session | operator-only
 DELETE /api/board/remotes | board-unchecked | operator-only
 DELETE /api/board/{project} | board-claims | operator-only
+DELETE /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | board-claims | operator-only
 DELETE /api/board/{project}/messages/{messageID} | board-claims | operator-only
 DELETE /api/board/{project}/reminder | board-claims
@@ -38,6 +39,7 @@ GET /api/board/tasks | board-unchecked | operator-only
 GET /api/board/{project} | board-claims
 GET /api/board/{project}/artifacts | board-claims +token-session
 GET /api/board/{project}/cross-team-candidates | board-claims +token-session | operator-only
+GET /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 GET /api/board/{project}/cross-team-state | board-claims +token-session | operator-only
 GET /api/board/{project}/cross-team/settings | board-claims | operator-only
 GET /api/board/{project}/goal-requests | board-claims
@@ -140,6 +142,7 @@ POST /api/artifacts/{id}/comments | token-session | operator-only
 POST /api/artifacts/{id}/comments/{cid}/reply | token-session
 POST /api/artifacts/{id}/comments/{cid}/send | token-session | operator-only
 POST /api/board/remotes | board-unchecked | operator-only
+POST /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 POST /api/board/{project}/cross-team/disable | board-claims | operator-only
 POST /api/board/{project}/cross-team/enable | board-claims | operator-only
 POST /api/board/{project}/cross-team/files/disable | board-claims | operator-only

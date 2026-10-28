@@ -71,6 +71,15 @@ Commands:
                                'coral-board help send' has what --attach sends
   targets                      The teams on other Corals this board may message
                                (Orchestrators and the Operator only)
+  link <team> <other> [--one-way] [--no-files]
+                               The Operator only: let two teams of this computer
+                               message each other (both ways and files on unless
+                               you say otherwise; --one-way: <team> may message
+                               <other> only). Not for an agent's terminal
+  unlink <team> <other> [--one-way]
+                               The Operator only: remove the link (--one-way:
+                               only <team> messaging <other>)
+  links [<team>]               The Operator only: who a team's links allow
   wait [--from <agent>] [--task <id>] [--commit <hash>] [--operator <question>]
        [--reason <text>]
        [--timeout <dur>] [--status] [--cancel] [--block]
@@ -193,6 +202,15 @@ Commands:
                                'coral-board help send' has what --attach sends
   targets                      The teams on other Corals this board may message
                                (Orchestrators and the Operator only)
+  link <team> <other> [--one-way] [--no-files]
+                               The Operator only: let two teams of this computer
+                               message each other (both ways and files on unless
+                               you say otherwise; --one-way: <team> may message
+                               <other> only). Not for an agent's terminal
+  unlink <team> <other> [--one-way]
+                               The Operator only: remove the link (--one-way:
+                               only <team> messaging <other>)
+  links [<team>]               The Operator only: who a team's links allow
   wait [--from <agent>] [--task <id>] [--commit <hash>] [--operator <question>]
        [--reason <text>]
        [--timeout <dur>] [--status] [--cancel] [--block]
@@ -316,6 +334,15 @@ Commands:
                                'coral-board help send' has what --attach sends
   targets                      The teams on other Corals this board may message
                                (Orchestrators and the Operator only)
+  link <team> <other> [--one-way] [--no-files]
+                               The Operator only: let two teams of this computer
+                               message each other (both ways and files on unless
+                               you say otherwise; --one-way: <team> may message
+                               <other> only). Not for an agent's terminal
+  unlink <team> <other> [--one-way]
+                               The Operator only: remove the link (--one-way:
+                               only <team> messaging <other>)
+  links [<team>]               The Operator only: who a team's links allow
   wait [--from <agent>] [--task <id>] [--commit <hash>] [--operator <question>]
        [--reason <text>]
        [--timeout <dur>] [--status] [--cancel] [--block]

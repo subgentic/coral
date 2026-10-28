@@ -34,6 +34,9 @@ type AllowedSender struct {
 	// Label is the board's name as the owner saw it when listing it (cleaned, bounded text, a claim for a board on another Coral): shown beside the id so a removed or renamed board is still
 	// recognisable. It is never compared: only Server and CrossTeamID admit a sender.
 	Label string `json:"label,omitempty"`
+	// Files is the link's own files grant (#9893): whether the files that come with this sender's messages are taken. Absent: as before, the board's files switch alone decides; a link
+	// the Operator makes with coral-board link says it, on unless turned off. Only a sender on this Coral is told apart by it.
+	Files *bool `json:"files,omitempty"`
 }
 
 // MaxAllowedSenders is the longest list a board may have.
@@ -51,6 +54,19 @@ func (b BoardSettings) AllowsSender(server, crossTeamID string) bool {
 	for _, e := range b.CrossTeamAllowed {
 		if e.Server == server && e.CrossTeamID == crossTeamID {
 			return true
+		}
+	}
+	return false
+}
+
+// AllowsFilesFrom reports whether the sender is on the list AND its entry does not turn files off. An entry that says nothing about files leaves it to the board's files switch (true here).
+func (b BoardSettings) AllowsFilesFrom(server, crossTeamID string) bool {
+	if server == "" || !ValidCrossTeamID(crossTeamID) {
+		return false
+	}
+	for _, e := range b.CrossTeamAllowed {
+		if e.Server == server && e.CrossTeamID == crossTeamID {
+			return e.Files == nil || *e.Files
 		}
 	}
 	return false

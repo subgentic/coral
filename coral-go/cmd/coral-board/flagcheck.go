@@ -30,6 +30,12 @@ func checkKnownFlags(args []string) error {
 		spec = clihelp.FlagSpec{Bools: []string{"--quiet"}}
 	case "projects", "subscribers", "leave", "delete", "targets":
 		spec = noFlags
+	case "link":
+		spec = clihelp.FlagSpec{Bools: []string{"--one-way", "--no-files"}, Positional: 2}
+	case "unlink":
+		spec = clihelp.FlagSpec{Bools: []string{"--one-way"}, Positional: 2}
+	case "links":
+		spec = clihelp.FlagSpec{Positional: 1}
 	case "status":
 		spec = clihelp.FlagSpec{Bools: []string{"--activity", "--json"}, Values: []string{"--board"}}
 	case "queue":

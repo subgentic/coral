@@ -1,5 +1,6 @@
 DELETE /api/board/remotes | (*BoardRemotesHandler).RemoveSubscription-fm
 DELETE /api/board/{project} | (*BoardHandler).DeleteBoard-fm
+DELETE /api/board/{project}/cross-team-links | (*BoardHandler).RemoveLocalLinks-fm
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | (*BoardHandler).RemoveGroupMember-fm
 DELETE /api/board/{project}/messages/{messageID} | (*BoardHandler).DeleteMessage-fm
 DELETE /api/board/{project}/reminder | (*BoardHandler).RemindSubscriber-fm
@@ -17,6 +18,7 @@ GET /api/board/tasks | (*BoardHandler).ListAllTasks-fm
 GET /api/board/{project} | (*BoardHandler).GetBoardInfo-fm
 GET /api/board/{project}/artifacts | (*BoardHandler).ListTeamArtifacts-fm
 GET /api/board/{project}/cross-team-candidates | (*BoardHandler).GetCrossTeamCandidates-fm
+GET /api/board/{project}/cross-team-links | (*BoardHandler).ListLocalLinks-fm
 GET /api/board/{project}/cross-team-state | (*BoardHandler).GetCrossTeamState-fm
 GET /api/board/{project}/cross-team/settings | (*BoardHandler).GetCrossTeamSettingsForHub-fm
 GET /api/board/{project}/goal-requests | (*BoardHandler).ListGoalRequests-fm
@@ -60,6 +62,7 @@ PATCH /api/board/{project}/goals/{goalID} | (*BoardHandler).UpdateGoal-fm
 PATCH /api/board/{project}/tasks/{taskID} | (*BoardHandler).UpdateTask-fm
 PATCH /api/board/{project}/tasks/{taskID}/amend | (*BoardHandler).AmendTask-fm
 POST /api/board/remotes | (*BoardRemotesHandler).AddSubscription-fm
+POST /api/board/{project}/cross-team-links | (*BoardHandler).AddLocalLinks-fm
 POST /api/board/{project}/cross-team/disable | (*BoardHandler).HubCrossTeamDisable-fm
 POST /api/board/{project}/cross-team/enable | (*BoardHandler).HubCrossTeamEnable-fm
 POST /api/board/{project}/cross-team/files/disable | (*BoardHandler).HubCrossTeamFilesDisable-fm

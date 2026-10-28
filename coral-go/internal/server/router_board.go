@@ -169,6 +169,9 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/board/{project}/working-mode", boardHandler.GetWorkingMode)
 	r.Put("/api/board/{project}/working-mode", boardHandler.SetWorkingMode)
 	r.Get("/api/board/{project}/cross-team-state", boardHandler.GetCrossTeamState)
+	r.Get("/api/board/{project}/cross-team-links", boardHandler.ListLocalLinks)      // #9893: the links between this computer's teams: the Operator's, never through Coral Hub
+	r.Post("/api/board/{project}/cross-team-links", boardHandler.AddLocalLinks)      // #9893
+	r.Delete("/api/board/{project}/cross-team-links", boardHandler.RemoveLocalLinks) // #9893
 	r.Get("/api/board/{project}/cross-team-candidates", boardHandler.GetCrossTeamCandidates)
 	r.Get("/api/board/{project}/settings/log", boardHandler.GetCrossTeamLog)
 	r.Get("/api/board/{project}/working-mode/presets", boardHandler.ListWorkflowPresets)
