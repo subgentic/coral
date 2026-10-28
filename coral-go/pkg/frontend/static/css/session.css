@@ -1750,7 +1750,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 /* A held-message chip (Message held) wraps under the name in a narrow row as Needs input does: in one nowrap row the name was squeezed to "H." beside it at 200% text (the look pass, #9804). */
 .session-info:has(.session-name-row .session-held-chip) { container-type: inline-size; }
 @container (max-width: 14rem) {
-    .session-name-row:has(.session-held-chip) { flex-wrap: wrap; }
+    .session-name-row:has(.session-held-chip) { flex-wrap: wrap; height: auto; } /* the row grows to hold the wrapped chip, as the Needs input rows do */
     .session-name-row:has(.session-held-chip) .session-label { flex: 1 1 calc(100% - 40px); }
     .session-name-row .session-held-chip { order: 2; margin-left: var(--row-dot-block, 16px); }
 }
