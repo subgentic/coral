@@ -42,13 +42,15 @@ try {
     V.selectView('calls', { fromHistory: true }); assert.equal(bar().hidden, true); assert.equal(active(), 'Tool and API calls');
     V.selectView('per-commit', { fromHistory: true }); assert.equal(bar().hidden, true, 'a metric page has its own Group by (analytics_efficiency.js)'); assert.equal(active(), 'Tokens per commit');
 
-    // Tokens per commit starts at Model, and an empty range says what to do
+    // Tokens per commit starts on All; grouped by Model an empty range says what to do
     const eff = await importUi('analytics_efficiency');
     eff.syncEfficiency('day');
     await new Promise(r => setTimeout(r, 40));
     const seg = doc.getElementById('cost-spend-section').querySelector('.eff-seg-btn[aria-pressed="true"]');
-    assert.equal(seg.textContent, 'Model', 'Tokens per commit starts grouped by Model');
-    assert.equal(doc.getElementById('cost-spend').hidden, true, 'so the comparison is the first sight, not the team view');
+    assert.equal(seg.textContent, 'All', 'Tokens per commit starts on All (#10482)');
+    assert.equal(doc.getElementById('cost-spend').hidden, false, 'so the team view is the first sight, and the comparison is a choice');
+    doc.getElementById('cost-spend-section').querySelector('.eff-seg-btn[data-group="model"]').click();
+    await new Promise(r => setTimeout(r, 40));
     assert.match(doc.getElementById('cost-eff-per-commit').textContent, /^No commits in the last 24 hours: pick a longer range above\.$/, 'the empty line says what to do');
     eff.syncEfficiency('month'); await new Promise(r => setTimeout(r, 40));
     assert.match(doc.getElementById('cost-eff-per-commit').textContent, /^No commits in the last 30 days: nothing to compare yet\.$/, 'and at the longest range there is no longer one to pick');

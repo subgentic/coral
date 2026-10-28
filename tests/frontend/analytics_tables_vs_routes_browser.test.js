@@ -53,6 +53,8 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         dump.agent = await table('#cost-by-agent'); await shot('tables-by-agent');
         // Tokens per commit by Model
         await ev(`document.querySelector('#cost-nav-list .row-btn[data-view="per-commit"]').click(); true`);
+        await waitFor(`!!document.querySelector('#cost-spend-section .eff-seg-btn[data-group="model"]')`, 'the Group by switch', 8000);
+        await ev(`document.querySelector('#cost-spend-section .eff-seg-btn[data-group="model"]').click(); true`); // the page starts on All (#10482): the by-model table is a choice
         await waitFor(`document.querySelectorAll('#cost-eff-per-commit tbody tr').length === 5`, 'the Tokens per commit rows', 10000);
         dump.tpc = await table('#cost-eff-per-commit'); await shot('tables-tokens-per-commit');
         // Task time by Thinking level

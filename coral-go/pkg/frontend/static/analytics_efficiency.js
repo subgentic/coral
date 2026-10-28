@@ -35,7 +35,7 @@ function build(key) {
     const cfg = SECTIONS[key], section = document.getElementById(cfg.section);
     if (!section || section.dataset.effBuilt) return !!section;
     section.dataset.effBuilt = '1';
-    let saved = 'model'; try { const v = browserLocal.get(cfg.key); if (groupsOf(cfg).some(g => g[0] === v)) saved = v; } catch { /* the choice lasts until the page closes */ }
+    let saved = 'all'; try { const v = browserLocal.get(cfg.key); if (groupsOf(cfg).some(g => g[0] === v)) saved = v; } catch { /* the choice lasts until the page closes */ }
     state[key] = { group: saved, data: null, loading: false, error: '', seq: 0 };
     const bar = el('div', 'eff-switch');
     bar.append(el('div', 'eff-switch-label', 'Group by'));
