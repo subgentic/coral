@@ -14,11 +14,11 @@ import { applySleepingView } from './sleeping_view.js';
 
 // What Kill does with the agent's terminal log, said in every Kill confirmation (#4399): it is kept, on both terminal backends
 // (#4437: tmux's KillSession no longer removes it), in <data dir>/logs.
-export const KILL_LOG_NOTE = "Its terminal log is kept, in the logs folder of Coral's data folder.";
+export const KILL_LOG_NOTE = "Its terminal log is kept.";
 
 // The same for a confirmation about several agents (Kill All Agents, Kill Team, Reset Team: Reset kills each agent and
 // starts it again under a new session id, so the old logs stay as they are).
-export const KILL_LOG_NOTE_MANY = "Their terminal logs are kept, in the logs folder of Coral's data folder.";
+export const KILL_LOG_NOTE_MANY = "Their terminal logs are kept.";
 
 // Reset's own, in plain words: it is the one confirmation that is not about ending anything, and where the folder is is Settings' to say (#10549).
 export const RESET_LOG_NOTE = "Their terminal logs are kept.";
@@ -32,7 +32,7 @@ export function killSessionDirect(name, agentType, sessionId) {
     const server = serverForSession(name, sessionId);
     const row = (state.liveSessions || []).find(s => s.session_id === sessionId);
     const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label; // the agent by its role and team, not the folder it works in (#10139)
-    showConfirmModal('Kill session', `Kill ${who}? This will terminate the agent. ${WHAT_STAYS_KILL} ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
+    showConfirmModal('Kill session', `Kill ${who}? It stops now. ${WHAT_STAYS_KILL} ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
         const result = await killLiveSession({ name, agent_type: agentType, session_id: sessionId }, server);
         if (!result) throw new Error('the kill answer was not JSON');
         if (result.error) { showToast(result.error, true); return; }

@@ -6,8 +6,8 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
-const NOTE = "Its terminal log is kept, in the logs folder of Coral's data folder.";
-const NOTE_MANY = "Their terminal logs are kept, in the logs folder of Coral's data folder.";
+const NOTE = "Its terminal log is kept.";
+const NOTE_MANY = "Their terminal logs are kept.";
 const NOTE_RESET = 'Their terminal logs are kept.'; // Reset says it in plain words: where the folder is is for Settings (#10549)
 
 (async () => {

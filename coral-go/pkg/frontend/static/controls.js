@@ -526,7 +526,7 @@ export async function killSession() {
 
     const cur = state.currentSession;
     const who = agentWords(cur, resolveSessionIdentity(cur)).label; // the agent by its role and team, not the folder it works in (#10139)
-    window.showConfirmModal('Kill session', `Kill ${who}? This will terminate the agent. ${WHAT_STAYS_KILL} ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
+    window.showConfirmModal('Kill session', `Kill ${who}? It stops now. ${WHAT_STAYS_KILL} ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
         try {
             const killed = state.currentSession;
             const result = await killLiveSession(killed, currentServer());

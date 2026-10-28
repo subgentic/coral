@@ -37,7 +37,7 @@ const BASE = require('./test_base').BASE;
         await select('sid-1');
         await ev(`window.__killAnswer = { ok: true, worktree: { state: 'kept', path: '/tmp/wt/agent-1', branch: 'coral-team/x', reason: 'it has uncommitted changes' } }; import(${S} + 'controls.js').then(m => m.killSession()); true`);
         const msg = await yes();
-        check('1. the confirmation names the agent and the logs note', /^Kill .+\? This will terminate the agent\. Its chat stays in History\./.test(msg) && !/"agent-1"/.test(msg) && /terminal log is kept/.test(msg), msg.slice(0, 80));
+        check('1. the confirmation names the agent and the logs note', /^Kill .+\? It stops now\. Its chat stays in History\./.test(msg) && !/"agent-1"/.test(msg) && /terminal log is kept/.test(msg), msg.slice(0, 80));
         const posts = await ev(`window.__posts`);
         check('1. one request, to the open agent, with its type and session id', posts.length === 1 && /\/live\/agent-1\/kill$/.test(posts[0].url) && posts[0].body.session_id === 'sid-1' && posts[0].body.agent_type === 'claude', JSON.stringify(posts));
         check('1. its row is gone at once, the other stays', JSON.stringify(await ids()) === JSON.stringify(['sid-2@local']), JSON.stringify(await ids()));
