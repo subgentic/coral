@@ -419,8 +419,12 @@ type gitInfo struct {
 	statusErr error
 }
 
+// gitQueryTimeout is the time one status read of a checkout may take: queryGit runs about ten git processes (each other than a filter-free one is preceded by its own config read), so on a busy
+// machine the 10 s are a real limit. A test binary sets it longer in TestMain: a package run of minutes, with other packages running beside it, can make the read of an empty repository time out (#10713, the likely cause of a flake seen once; not reproduced).
+var gitQueryTimeout = 10 * time.Second
+
 func queryGit(ctx context.Context, workdir string) (*gitInfo, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, gitQueryTimeout)
 	defer cancel()
 	logger := slog.Default().With("service", "git_poller", "workdir", workdir)
 
@@ -516,7 +520,7 @@ func statusEntries(out []byte) []statusEntry {
 // queryChangedFiles runs its own status; the poller passes the one queryGit ran instead
 // (queryChangedFilesFrom).
 func queryChangedFiles(ctx context.Context, workdir string) ([]store.ChangedFile, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, gitQueryTimeout)
 	defer cancel()
 	out, err := gitutil.Command(ctx, workdir, "status", "--porcelain", "-z", "--untracked-files=normal").Output()
 	return queryChangedFilesFrom(ctx, workdir, out, err)
@@ -525,7 +529,7 @@ func queryChangedFiles(ctx context.Context, workdir string) ([]store.ChangedFile
 // queryChangedFilesFrom lists the files changed since the diff base, with status (the output
 // of 'git status --porcelain -z --untracked-files=normal', or statusErr) for the untracked ones.
 func queryChangedFilesFrom(ctx context.Context, workdir string, status []byte, statusErr error) ([]store.ChangedFile, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, gitQueryTimeout)
 	defer cancel()
 	logger := slog.Default().With("service", "git_poller", "workdir", workdir)
 
