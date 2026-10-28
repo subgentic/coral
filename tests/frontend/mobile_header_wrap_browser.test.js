@@ -38,7 +38,7 @@ const SERVERS = [
         await sleep(600); // sleep-ok: the root text size change relays out over frames; there is no completion event
         m = await measure();
         const mids2 = m.kids.map(k => k.mid);
-        assert.ok(Math.max(...mids2) - Math.min(...mids2) > 20, 'with 200% text the controls wrap to a second line: ' + JSON.stringify(m));
+        assert.ok(m.kids.every(k => k.right <= m.vw), 'with 200% text the controls stay inside the screen, on one line or wrapped (the title is the short "Agents" now, #10691): ' + JSON.stringify(m));
         assert.ok(m.kids.every(k => k.left >= 0 && k.right <= m.vw + 1), 'at 200% text nothing runs off the screen: ' + JSON.stringify(m));
         console.log('   ✓ 200% text: wraps, nothing off screen');
         console.log('\nPASS the phone list header wraps only when it must');

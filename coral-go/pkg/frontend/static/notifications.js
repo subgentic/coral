@@ -212,7 +212,7 @@ function placeNotices() {
     const bar = document.querySelector("header.top-bar");
     const banner = document.getElementById("local-auth-banner");
     const head = document.querySelector("#live-session-view .terminal-header"); // an open agent's header (state, name, the Chat and Terminal toggle, Find, the panel) is not covered either (Mobile tester, #9985)
-    const listTitle = document.querySelector(".mobile-list-title"); // the phone's list title (Live Sessions) is not covered either (Mobile tester, #10052)
+    const listTitle = document.querySelector(".mobile-list-title"); // the phone's list title (Agents) is not covered either (Mobile tester, #10052)
     const teamHead = document.getElementById("team-page-head"); // nor is a team page's header, its name and status ("Team demo is awake" sat over both, #10359)
     const bottomOf = e => (e && e.getClientRects().length ? Math.round(e.getBoundingClientRect().bottom) : 0);
     const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead));

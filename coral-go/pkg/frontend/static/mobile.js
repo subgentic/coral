@@ -117,7 +117,7 @@ function _listHeader(agentList) {
     header = document.createElement('div');
     header.className = 'mobile-list-header';
     header.innerHTML = `
-            <h2 class="mobile-list-title">Live Sessions</h2>
+            <h2 class="mobile-list-title">Agents</h2>
             <button class="btn btn-quiet btn-icon sidebar-collapse-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="mobile-display-panel" title="Display options" aria-label="Display options">
                 <span class="material-icons" style="font-size:var(--icon-size)" aria-hidden="true">notes</span><span class="display-dot" data-display-badge hidden></span>
             </button>
