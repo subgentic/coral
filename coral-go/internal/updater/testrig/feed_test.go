@@ -231,3 +231,17 @@ func TestFeedTagsReadsOnlyTheReleaseTags(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, tags, 30)
 }
+
+// An installed version that is not X.Y.Z (a dev build) is refused by the check before any request, so the feed is never asked and nothing is concluded from it.
+func TestANonSemverInstalledVersionNeverReachesTheFeed(t *testing.T) {
+	for _, v := range []string{"dev", "1.4.130-rc1", ""} {
+		r := newRig(t)
+		r.publish(Spec{Version: "1.4.131", Sequence: 7})
+		r.cfg.Installed = v
+		res := r.check()
+		assert.Equal(t, stage.ResultFailed, res.Result, "installed %q: %+v", v, res)
+		assert.Equal(t, "installed_version", res.FailedStage)
+		assert.Zero(t, r.gh.Hits[feedKey], "no feed request")
+		assert.Zero(t, r.gh.Hits[listKey], "no API request")
+	}
+}
