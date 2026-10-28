@@ -153,13 +153,14 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Could not determine working directory", "files": []any{}})
 		return
 	}
-	// A folder that is not a git repository has nothing to compare: the panel says so (#6072); this is an answer, not an error. (ResolveGitRoot gives the folder itself back when it finds no repository.)
+	// A folder that is not a git repository has nothing to compare: the panel says so (#6072), and lists its recently changed files instead (#10256); this is an answer, not an error. (ResolveGitRoot gives the folder itself back when it finds no repository.)
 	if gitutil.Available() {
 		gctx, gcancel := context.WithTimeout(r.Context(), 5*time.Second)
 		err := gitCmd(gctx, workdir, "rev-parse", "--is-inside-work-tree").Run()
 		gcancel()
 		if err != nil && r.Context().Err() == nil {
-			writeJSON(w, http.StatusOK, map[string]any{"agent_name": name, "files": []any{}, "diff_mode": h.getDiffMode(r.Context()), "is_git": false})
+			// the folder's recently changed files stand in for the changes (#10256), inside the file viewer's bounds
+			writeJSON(w, http.StatusOK, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, recentFilesInPlainFolder(workdir, !localDashboard(r))), "diff_mode": h.getDiffMode(r.Context()), "is_git": false})
 			return
 		}
 	}
