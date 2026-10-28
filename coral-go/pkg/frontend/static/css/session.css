@@ -1774,6 +1774,7 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 .agent-phone-details { display: none; }
 .agent-phone-details:not([hidden]) { display: block; padding: 0 var(--space-lg); border-bottom: 1px solid var(--border); }
 .agent-phone-details > summary { min-height: var(--control-touch-height); display: flex; align-items: center; }
+#live-session-view:has(#live-history-messages > .chat-empty) .agent-phone-details { display: none; } /* a fresh chat (nothing said yet, the 'Say hello' line is up) has no Details bar above the first message: a collapsed bar with nothing under it looked empty (Mobile tester, #10041); it is back with the first message */
 .agent-phone-details .facts { padding-bottom: var(--space-md); }
 .agent-phone-details .facts dd { overflow-wrap: anywhere; }
 @media (max-height: 500px) { .agent-phone-details { display: none !important; } }
