@@ -54,17 +54,41 @@ func MinifyAsset(name string, data []byte) []byte {
 	return out
 }
 
-// tagGap is the indentation a multi-line template literal keeps before a tag that starts an indented line: ">\n            <". esbuild leaves a template's text as written, and the source's markup
-// is indented, so these gaps were about 10 KB of the shipped tree (#10594). HTML reads any run of whitespace as one space, so the gap becomes that one space: the page is laid out as it was.
-var tagGap = regexp.MustCompile(`\n[ \t]+<`)
+// tagGap is the indentation a multi-line template literal keeps inside its markup: before a tag that starts an indented line ("\n            <"), after the end of a tag before its text or a ${} ("> \n   ${"), and
+// before an attribute that is on its own line (`<input\n   type=`, `"\n   role=`). esbuild leaves a template's text as written and the source's markup is indented, so these gaps were about 17 KB of the shipped tree (#10594,
+// #10623). HTML reads any run of whitespace between tokens as one space, so the gap becomes that one space: the page is laid out as it was.
+var tagGap = regexp.MustCompile(`(\n[ \t]+<|>\n[ \t]+|("|<[a-zA-Z0-9-]+)\n[ \t]+[a-zA-Z-]+=)`)
+
+// gapRun is the newline and indentation of one gap.
+var gapRun = regexp.MustCompile(`\n[ \t]+`)
+
+// keepWhitespace are the elements whose text shows its whitespace: what is between their tags is left as written.
+var keepWhitespace = [][2][]byte{{[]byte("<pre"), []byte("</pre>")}, {[]byte("<textarea"), []byte("</textarea>")}}
 
 // collapseTagGaps shortens those gaps in the template literals of minified JS. esbuild's minified output has a newline only inside a literal (or a legal comment), so every match is template text.
-// A file that writes a <pre> or <textarea> keeps its text as it is: there whitespace shows. The result is a fixed point (a second call changes nothing), as MinifyAsset needs.
+// A <pre> or <textarea> keeps its text as it is (from its opening to its closing tag, or the rest of the file when the closing one is not there): there whitespace shows. The result is a fixed point
+// (a second call changes nothing), as MinifyAsset needs.
 func collapseTagGaps(js []byte) []byte {
-	if bytes.Contains(js, []byte("<pre")) || bytes.Contains(js, []byte("<textarea")) {
-		return js
+	var out []byte
+	for len(js) > 0 {
+		start, end := -1, 0
+		for _, k := range keepWhitespace {
+			if at := bytes.Index(js, k[0]); at >= 0 && (start < 0 || at < start) {
+				start = at
+				end = len(js)
+				if c := bytes.Index(js[at:], k[1]); c >= 0 {
+					end = at + c + len(k[1])
+				}
+			}
+		}
+		if start < 0 {
+			start, end = len(js), len(js)
+		}
+		out = append(out, tagGap.ReplaceAllFunc(js[:start], func(m []byte) []byte { return gapRun.ReplaceAll(m, []byte(" ")) })...)
+		out = append(out, js[start:end]...)
+		js = js[end:]
 	}
-	return tagGap.ReplaceAll(js, []byte(" <"))
+	return out
 }
 
 // minifyPasses is the most times MinifyAsset runs esbuild over one file (it stops at the first pass that does not shrink it).
