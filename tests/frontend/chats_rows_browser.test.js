@@ -47,6 +47,10 @@ const S = `(window.__coralStatic || '/static/')`;
             check(`${tag}: untitled chats are told apart (their titles differ)`, unt.length === 2 && unt[0].title !== unt[1].title, JSON.stringify(unt.map(r => r.title)));
             check(`${tag}: a chat with no timestamp still has its facts line`, by('A chat whose indexing').facts.length > 0, JSON.stringify(by('A chat whose indexing').facts));
             check(`${tag}: the count is said once: the footer does not repeat "9 sessions"`, await ev(`!/sessions?$/.test(((document.getElementById('history-pagination') || {}).textContent || '').trim())`), await ev(`((document.getElementById('history-pagination') || {}).textContent || '').trim()`));
+            if (w >= 768) { // at a mouse a chat row is one line: the agent, the title, the time (look check #9773 item 3)
+                const one = await ev(`[...document.querySelectorAll('#history-sessions-list li[data-session-id]')].filter(li => li.querySelector('.sidebar-agent-name') && li.querySelector('.session-time')).map(li => { const r = e => e.getBoundingClientRect(), a = r(li.querySelector('.sidebar-agent-name')), t = r(li.querySelector('.session-label')), when = r(li.querySelector('.session-time')); return { h: Math.round(r(li).height), agentLeft: Math.round(a.left), titleLeft: Math.round(t.left), timeLeft: Math.round(when.left), sameLine: Math.abs(a.top - t.top) < 6 && Math.abs(when.top - t.top) < 6, inside: when.right <= r(li).right + 1 }; })`);
+                check(`${tag}: a chat row is one line, agent then title then time, the time inside the row`, one.length >= 4 && one.every(x => x.h <= 40 && x.sameLine && x.agentLeft < x.titleLeft && x.titleLeft < x.timeLeft && x.inside), JSON.stringify(one));
+            }
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
