@@ -3974,8 +3974,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 #team-recap:empty { display: none; }
 #launch-agent-status:empty { display: none; }
 #launch-agent-status { border-top: 0; } /* the buttons' own rule is the one divider above the red line */
-.team-template-row { display: flex; align-items: flex-end; gap: 8px; margin: 0 0 14px; }
-.team-template-pick { flex: 1; min-width: 0; }
+.team-template-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 0 0 14px; } /* wraps: the Describe your team button beside the template list left the list 26 px wide at 200% text on a phone (#10524) */
+.team-template-pick { flex: 1 1 12rem; min-width: min(12rem, 100%); }
 .team-template-pick select { width: 100%; }
 .team-more-wrap, .team-agent-more { position: relative; flex: none; }
 .team-allworkers { margin: 0 0 14px; }
