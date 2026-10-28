@@ -91,6 +91,7 @@ const fs = require('node:fs');
         await ev(`window.__feed('pl-b-id', { summary: 'a goal set after the list was drawn' }); true`);
         await sleep(300); // sleep-ok: the feed's redraw
         await ev(`document.querySelector('${sel}').dispatchEvent(new MouseEvent('mouseenter')); true`);
+        await sleep(1000); // sleep-ok: the card opens after the pointer has rested 800 ms (#9999)
         const tip = await ev(`(() => { const t = document.querySelector('${sel} .session-tooltip'); return { shown: getComputedStyle(t).display, text: t.textContent }; })()`);
         assert.equal(tip.shown, 'block'); assert.match(tip.text, /State/); assert.match(tip.text, /Agent/);
         await ev(`document.querySelector('${sel}').dispatchEvent(new MouseEvent('mouseleave')); true`);

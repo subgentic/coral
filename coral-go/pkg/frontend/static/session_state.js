@@ -197,21 +197,23 @@ export function applyTerminalDot(dot, s) {
     setAttr(document.getElementById('command-pane'), 'data-can-stop', ['working', 'needs_input', 'check_terminal', 'stuck'].includes(info.key) ? 'true' : 'false');
 }
 
-export function buildSessionTooltip(s) {
+/** The hover card's facts (#9999): only what the row does not already show and that has a value. opts.nameCut: the row cut the name, so the whole name is a fact; opts.inTeam: the row sits under its team's heading, so the team is not. */
+export function buildSessionTooltip(s, opts = {}) {
     const stateLabel = getStateLabel(s);
     const lastAction = formatStaleness(s.staleness_seconds);
-    const goal = s.summary || "No goal set";
-    const status = s.status || "No status";
-    const branch = (_repoBranch(s.repo_name, s.branch) || "—") + (s.git_state?.is_worktree ? " (worktree)" : "");
+    const goal = s.summary || "";
+    const status = s.status || "";
+    const branchName = s.branch ? _repoBranch(s.repo_name, s.branch) || "" : ""; // no branch on record: no row, not the repository name alone
+    const branch = branchName ? branchName + (s.git_state?.is_worktree ? " (worktree)" : "") : "";
     const agent = s.agent_type || "claude";
 
     const rows = [
-        { label: 'Name', text: resolveSessionIdentity(s) }, // the row cut its name to its width and has no native title any more (it covered the next row, #9822): the whole name is here
+        ...(opts.nameCut ? [{ label: 'Name', text: resolveSessionIdentity(s) }] : []), // the row cut its name to its width and has no native title any more (it covered the next row, #9822): the whole name is here, when it was cut
         { label: 'State', text: stateLabel, cls: `tt-state-${stateLabel.toLowerCase().replace(/ /g, '-')}` },
         { label: 'Last action', text: lastAction },
-        { label: 'Goal', text: goal },
-        { label: 'Status', text: status },
-        { label: 'Branch', text: branch },
+        ...(goal ? [{ label: 'Goal', text: goal }] : []),
+        ...(status ? [{ label: 'Status', text: status }] : []),
+        ...(branch ? [{ label: 'Branch', text: branch }] : []),
         { label: 'Agent', text: agent },
     ];
     if (hasWorkingDisplayHint(s)) rows.push({ label: 'Permission', text: 'Codex’s terminal shows activity. Permission is not confirmed resolved; queued messages remain held.' });
@@ -223,10 +225,7 @@ export function buildSessionTooltip(s) {
     if (level) rows.push({ label: 'Thinking', text: `${level.name}${level.requested ? ' (as started)' : ''}` });
     // Context window usage moved out of the row (AGENT_LIST_COMPACT): explicit
     // null (unknown model) must read "unknown", never 0% or full.
-    const ctxText = (s.context_pct === null || s.context_pct === undefined)
-        ? 'unknown'
-        : (s.context_window ? `${s.context_pct}% of ${formatTokens(s.context_window)}` : `${s.context_pct}%`);
-    rows.push({ label: 'Context', text: ctxText });
+    if (s.context_pct !== null && s.context_pct !== undefined) rows.push({ label: 'Context', text: s.context_window ? `${s.context_pct}% of ${formatTokens(s.context_window)}` : `${s.context_pct}%` }); // no row while it is unknown: a word that says nothing is not a fact (#9999)
     if (s.working_directory) rows.push({ label: 'Directory', text: _shortPath(s.working_directory, 3), title: s.working_directory });
     if (s.changed_file_count > 0) rows.push({ label: 'Files changed', text: String(s.changed_file_count) });
     if (s.token_cost_usd > 0 || s.token_input > 0) {
@@ -241,8 +240,8 @@ export function buildSessionTooltip(s) {
     if (s.board_project) {
         const ttUnread = sessionUnreadCount(s);
         const unreadBadge = ttUnread > 0 ? ` <span class="tt-unread">(${ttUnread} unread)</span>` : '';
-        rows.push({ label: 'Board', html: `${escapeHtml(keyLabel(sessionTeamKey(s)))}${unreadBadge}` });
-        rows.push({ label: 'Role', text: s.board_job_title });
+        if (!opts.inTeam || ttUnread > 0) rows.push({ label: 'Board', html: `${escapeHtml(keyLabel(sessionTeamKey(s)))}${unreadBadge}` }); // under its team's heading the row says the team; the unread count is still news
+        if (s.board_job_title && String(s.board_job_title).trim().toLowerCase() !== String(resolveSessionIdentity(s)).trim().toLowerCase()) rows.push({ label: 'Role', text: s.board_job_title }); // a role that is the agent's own name is the row
     }
     return factsHtml(rows, { cls: 'session-tooltip-facts' });
 }
