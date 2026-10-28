@@ -271,7 +271,7 @@ document.addEventListener('click', e => {
     else if (action === 'own-hub') showHubSetup('own-hub');
     else if (action === 'back') showHubSetup('connect');
     else if (action === 'done-own') _dismiss('own-hub');
-    else if (action === 'open') { window.hideSettingsModal?.(); showHubSetup('connect'); }
+    else if (action === 'open') { window.hideSettingsModal?.(true); showHubSetup('connect'); }
     else if (action === 'home-hub') showHubSetup('connect');
     else if (action === 'home-own') showHubSetup('own-hub');
     else if (action === 'hide-home') { _saveSettings({ home_editions_hidden: 'True' }); syncHomeEditions(); }
