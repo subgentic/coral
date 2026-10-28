@@ -102,12 +102,12 @@ which path you mean.
 Either way, each agent does get its own terminal session (a tmux session on the tmux backend).
 
 Jobs are the path *designed* to behave the way the README described teams as behaving —
-`runWorktreeDir` in `internal/background` keys the worktree on `runID`, and `create_worktree`
+each run gets its own worktree, and `create_worktree`
 defaults to `true`.
 
 > **Correction — do not rely on this yet.** An earlier version of this page recommended
 > scheduled jobs as the workaround for per-agent isolation. That recommendation was based on
-> reading `scheduler.go`, not running it. **On the documented default configuration every job
+> reading the scheduler's code, not running it. **On the documented default configuration every job
 > run fails**, because `git worktree add <dir> main` is rejected when `main` is checked out in
 > your repo. The per-run worktree code is correct and never executes. See
 > [Troubleshooting](troubleshooting.md#every-scheduled-job-run-fails). Jobs do work if
@@ -163,11 +163,9 @@ This did not work out of the box on a non-default data directory.
 
 1. **Agents do not receive `CORAL_PORT` / `CORAL_URL`.** The generated settings file
    contains only `CORAL_SESSION_NAME`, `CORAL_SUBSCRIBER_ID`, and `PATH`, so `coral-board`
-   falls back to `http://localhost:8420` regardless of the server's port
-   (`serverURL` in `cmd/coral-board/main.go`).
+   falls back to `http://localhost:8420` regardless of the server's port.
 2. **Board subscription state is read from `~/.coral`, always.**
-   `stateFilePath()` builds `$HOME/.coral/board_state_<session>.json`
-   (`cmd/coral-board/state.go`) and never consults the server. With
+   The state file is `$HOME/.coral/board_state_<session>.json`, and the CLI never consults the server. With
    `--home /tmp/coral-t1` the server wrote the state file to the right place and the CLI
    looked in the wrong one:
 

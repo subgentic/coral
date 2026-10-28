@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -199,5 +201,26 @@ func TestDocsMetaIntroductionsHaveExplicitSummaries(t *testing.T) {
 		assert.Less(t, len([]rune(summaries[name])), 100, name+": a short topic description")
 		assert.NotContains(t, summaries[name], "v1.")
 		assert.NotContains(t, summaries[name], "checked against")
+	}
+}
+
+// #10093 v2 (Desktop #10087): the pages a newcomer reads first carry no source paths and no agent CLI flags (they are for developers, and a newcomer cannot use them). The example files of the quickstart's demo (stringutil.go) are not source paths.
+func TestNewcomerPagesHaveNoSourcePathsOrAgentFlags(t *testing.T) {
+	pages := []string{"how-do-i", "quickstart", "using-the-dashboard", "worked-demos", "workflow-quickstart", "troubleshooting"}
+	path := regexp.MustCompile("`(?:internal|pkg|cmd|tests)/[^`]*`|`[A-Za-z0-9_./-]*\\.(?:go|js):?[0-9]*`|\\((?:`[A-Za-z]+` in )?`(?:internal|pkg|cmd)/[^`]*`\\)")
+	flag := regexp.MustCompile("--(?:permission-mode|dangerously-skip-permissions|effort)\\b|model_reasoning_effort")
+	for _, p := range pages {
+		b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", p+".md"))
+		require.NoError(t, err, p)
+		text := strings.ReplaceAll(string(b), "\r\n", "\n")
+		for _, m := range path.FindAllString(text, -1) {
+			if strings.Contains(m, "stringutil") {
+				continue
+			}
+			t.Errorf("%s.md names a source path: %s", p, m)
+		}
+		for _, m := range flag.FindAllString(text, -1) {
+			t.Errorf("%s.md names an agent CLI flag: %s", p, m)
+		}
 	}
 }

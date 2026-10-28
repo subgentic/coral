@@ -121,7 +121,7 @@ The version is in the `[STARTUP]` log line, or in the `version` field of `GET /a
 
 You built with plain `go build`. `make dev` and `make build` stamp the latest release tag, so the
 build reports the next patch, `<next>-dev+<commit>[.dirty]` (e.g. `1.4.3-dev+<commit>` after
-v1.4.2; `ReportedVersion` in `internal/config/version.go`). This is the version shown in
+v1.4.2). This is the version shown in
 `/api/health`, the startup log and the Coral Hub tunnel Hello. Hubs treat `0.0.0-dev` as a very
 old version: the Coral Hub then connects with the plain `/ws/coral` feed instead of `feed=hub`, so
 that machine's dashboard notifications are taken by the hub's feed and never shown locally, and
@@ -132,7 +132,7 @@ the hub shows it as needing an update. Build with `make build` or `make dev`.
 ### Agents launch but never post to the message board
 
 Agents are launched with `CORAL_SESSION_NAME`, `CORAL_SUBSCRIBER_ID`, `CORAL_URL`,
-`CORAL_PORT`, `CORAL_HOST`, `CORAL_DIR` and `CORAL_DATA_DIR` (`internal/agent/agent.go`), and
+`CORAL_PORT`, `CORAL_HOST`, `CORAL_DIR` and `CORAL_DATA_DIR`, and
 `coral-board` reads its subscription state from `CORAL_DATA_DIR`, so a server on another
 port or `--home` normally works. Earlier builds did not pass the port or data directory;
 if you see `Not subscribed to any board` on an old build, upgrade.
@@ -179,8 +179,7 @@ go build -tags "dev fts5" -o /tmp/coral-test-bin/ ./cmd/coral ./cmd/coral-board 
   ./cmd/coral-hook-agentic-state ./cmd/coral-hook-session-start ./cmd/coral-hook-message-check ./cmd/coral-hook-task-sync
 ```
 
-or point `CORAL_HOOK_DIR` at a folder that holds them. The CDP runner and the test rigs under
-`tests/` build them next to `coral`.
+or point `CORAL_HOOK_DIR` at a folder that holds them. The test runners build them next to `coral`.
 
 The hooks log what they did to `<data dir>/hook_cache/debug.log`: event names and IDs only,
 never a payload, a task's subject or a title. The folder is readable only by you (0700, its
@@ -235,7 +234,7 @@ edits over the board.
 
 ### An unknown `agent_type` is rejected
 
-The launch API validates `agent_type` (`ValidateAgentType` in `internal/agent/agent.go`) and
+The launch API validates `agent_type` and
 returns an error listing the supported types instead of silently starting Claude. Valid
 launch types are `claude`, `codex`, `agy` and `pi`; `gemini` is a deprecated alias for `agy`.
 An empty `agent_type` uses the default (Claude).
@@ -311,7 +310,7 @@ Coral does not automatically kill an older tmux server during discovery.
 ### Searching session history returns nothing
 
 Earlier builds never populated the full-text index. The indexer now writes it whenever an
-agent parser supplies searchable text (`UpsertFTS` in `internal/background/indexer.go`),
+agent parser supplies searchable text,
 so search should return results for indexed sessions. *Unverified on a live database in
 this review.* If a term you can see in a session returns nothing, the session may not
 be indexed yet; browse and filter the history list meanwhile.
@@ -323,12 +322,10 @@ and cache tokens broken out — but only Claude agents reported usage in testing
 
 In a mixed team launched and stopped together, the Claude agent reported real figures and
 the Codex agent produced **no usage record at all**, even though its own session file
-under `~/.codex/sessions` contained token counts. Codex support exists in
-`internal/background/token_poller.go` (`extractCodexUsage`), so this is a runtime
+under `~/.codex/sessions` contained token counts. Coral reads Codex token counts, so this is a runtime
 ingestion failure rather than a missing feature — note that Codex names its rollout files
-with its *own* UUID, which defeats the filename-matching strategy of
-`resolveCodexTranscriptCtx` (`internal/jsonl`; it then falls back to a search for a marker in
-the file, `resolveCodexTranscriptByMarkerCtx`).
+with its *own* UUID, which defeats Coral's filename matching (it then falls back to a search for a marker in
+the file).
 
 Do not read a team total as complete spend across vendors. A missing agent shows as
 nothing rather than as an error.
@@ -368,8 +365,7 @@ When Coral starts and finds a team that was running but has no live agents (its 
 
 ### A scheduled job ends in `killed` / `timeout` instead of `completed`
 
-Expected with an interactive agent. `launchAndWatch` (`internal/background`, through
-`runOutcome`) records `completed` only when the launch call returns; an interactive agent session does not exit after answering, so the run
+Expected with an interactive agent. Coral records `completed` only when the launch call returns; an interactive agent session does not exit after answering, so the run
 runs until `max_duration_s` and is recorded `killed` with `exit_reason: timeout`. The agent's
 work still happened. Whether any agent configuration exits cleanly enough to record
 `completed` is untested.
@@ -380,7 +376,7 @@ work still happened. Whether any agent configuration exits cleanly enough to rec
 
 Session discovery merges tmux's default socket only for an install rooted at the default
 `~/.coral` (so an upgrade does not lose old agents). For any other `--home`,
-`defaultSocketFallback` (`internal/tmux/client.go`) turns the merge off. If you set
+Coral turns the merge off. If you set
 `CORAL_TMUX_FALLBACK=1` (or run a second instance on the default directory) the merge is on
 and a second instance can list and kill the first instance's agents. `CORAL_TMUX_NO_FALLBACK=1`
 forces it off.
@@ -425,17 +421,16 @@ ones agent tools read (`CORAL_URL`/`HOST`/`PORT`, `CORAL_DATA_DIR`/`DIR`, the ag
 `CORAL_SESSION_NAME`/`ID` and `CORAL_SUBSCRIBER_ID`, `CORAL_SHELL`, `CORAL_TELEMETRY_DISABLED`,
 `CORAL_DEBUG` and a workflow step's `CORAL_WORKFLOW_*`/`CORAL_STEP_*`/`CORAL_PREV*`) is removed
 from their environment, so `CORAL_SECRET_KEY`, `CORAL_CLOUD_URL`, the TLS paths and the like
-never reach an agent or a server it starts. The list is `internal/agentenv`.
+never reach an agent or a server it starts. 
 
 **What an agent's terminal shows at start (#5911).** Coral types ONE short line into the agent's shell, `. '<temp folder>/coral-command-<digits>.sh'`, and that script erases the screen and scrollback, removes itself and then holds what the line used to hold (the environment, the token file's path, the agent command), so a terminal opens with the agent and not with a screenful of exports. The session token's value is never in the script or on the screen: the shell reads it from its file and removes the file. The full command is still in the server's log (the `[launch] ... cmd=` line). To keep the script on disk after it has run, start Coral with `CORAL_KEEP_LAUNCH_SCRIPTS=1`; Coral's startup sweep removes a leftover `coral-command-*.sh` later.
 
-The frontend CDP suites read their server from `CORAL_TEST_URL` (`tests/frontend/test_base.js`),
+The frontend CDP suites read their server from `CORAL_TEST_URL`,
 never `CORAL_URL`: shells a running Coral spawns export `CORAL_URL` pointing at the live server.
 A URL on port 8420, or with no explicit port, is refused. Prefer the runners, which build a dev
 binary, start an isolated server with a temp data directory and set `CORAL_TEST_URL` for you:
-`tests/frontend/run.sh` (port from `CORAL_TEST_PORT`, default 8462) or
-`node tests/frontend/run_cdp_suites.mjs [--only name] [--shards N]` (N isolated server+Chrome
-pairs).
+the frontend runner script (port from `CORAL_TEST_PORT`, default 8462) or the CDP suite runner
+(`--only name`, `--shards N` isolated server and Chrome pairs).
 
 ### The disk fills up during test runs
 
