@@ -21,8 +21,8 @@ const BASE = require('./test_base').BASE;
         };
         assert.equal(await openWith([]), 'prompt', 'no workflow at all: Agent prompt');
         assert.equal(await openWith([{ id: 1, name: 'daily-motivation', description: 'Example: generates a motivational message and shows it as a popup', steps: [] }]), 'prompt', 'only the seeded example: Agent prompt');
-        assert.equal(await openWith([{ id: 1, name: 'daily-motivation', description: 'Example: generates a message', steps: [] }, { id: 2, name: 'nightly-build', description: 'Build and test', steps: [] }]), 'workflow', 'a workflow of the person\'s own: the Workflow choice stays');
-        console.log('PASS a new job opens on Agent prompt unless the person has a workflow of their own');
+        assert.equal(await openWith([{ id: 1, name: 'daily-motivation', description: 'Example: generates a message', steps: [] }, { id: 2, name: 'nightly-build', description: 'Build and test', steps: [] }]), 'prompt', 'a workflow of the person\'s own: the dialog still opens on Run a prompt, the first choice (#10515)');
+        console.log('PASS a new job always opens on Run a prompt');
         // 3b. the server refuses the repository path: under the field, with the focus
         await ev(`const real2 = window.fetch; window.fetch = (u, o) => { const url = String(u && u.url ? u.url : u); if (o && o.method === 'POST' && /\\/api\\/scheduled\\/jobs$/.test(url)) return Promise.resolve(new Response(JSON.stringify({ error: 'repo_path is not an existing directory: /tmp/nowhere/work' }), { status: 400, headers: { 'Content-Type': 'application/json' } })); return real2(u, o); }; true`);
         await ev(`Promise.resolve(window.showJobModal()).then(() => true)`);

@@ -14,7 +14,6 @@ const { limitSeconds, limitParts } = await importOnce('./time_limit.js');
 let view = null;
 let editingJobId = null;  // non-null when editing an existing job
 let openedJob = null;     // what the editor showed for the job it opened (#4423): Save sends only what the person changed since
-let noOwnWorkflows = false; // none of the workflows is the person's own: the list is empty or holds only the seeded example (its description starts with Example, #9965)
 let repoOffer = '';      // the server refused the folder for a missing repository or first commit (#10276): the form offers to make it one
 let noWorkflows = false;  // the workflow list came back empty: the form says so and offers to make one
 
@@ -209,10 +208,10 @@ function jobFields(host) {
     const prompt = v => v.job_type === 'prompt', workflow = v => v.job_type === 'workflow';
     return [
         {
-            key: 'job_type', type: 'custom', id: 'job-type-toggle', label: 'Type', default: 'workflow',
+            key: 'job_type', type: 'custom', id: 'job-type-toggle', label: 'Type', default: 'prompt',
             render: slot => {
                 slot.classList.add('job-type-toggle', 'btn-seg');
-                let value = 'workflow';
+                let value = 'prompt';
                 const buttons = [['prompt', 'smart_toy', 'Run a prompt'], ['workflow', 'account_tree', 'Run a workflow']].map(([type, icon, label]) => {
                     const b = el('button', 'btn job-type-btn'); b.type = 'button'; b.dataset.type = type;
                     const ic = el('span', 'material-icons', icon); ic.setAttribute('aria-hidden', 'true'); ic.style.fontSize = 'var(--fs-xl)';
@@ -222,7 +221,7 @@ function jobFields(host) {
                 });
                 const api = {
                     get: () => value,
-                    set: t => { value = t === 'prompt' ? 'prompt' : 'workflow'; for (const b of buttons) press(b, b.dataset.type === value); },
+                    set: t => { value = t === 'workflow' ? 'workflow' : 'prompt'; for (const b of buttons) press(b, b.dataset.type === value); },
                 };
                 slot.append(...buttons); api.set('workflow');
                 return api;
@@ -392,7 +391,6 @@ async function loadWorkflowOptions() {
         const data = await resp.json();
         const workflows = data.workflows || [];
         noWorkflows = workflows.length === 0;
-        noOwnWorkflows = workflows.every(w => /^Example/.test(w.description || ''));
         select.innerHTML = `<option value="">${workflows.length ? 'Select a workflow\u2026' : 'No workflows yet'}</option>` +
             workflows.map(w => `<option value="${Number(w.id)}">${escapeHtml(w.name)}${w.description ? ' \u2014 ' + escapeHtml(w.description) : ''}</option>`).join('');
     } catch (e) {
@@ -417,7 +415,7 @@ export function showJobModal() {
     if (state.settings?.default_working_dir) v.set('repo_path', state.settings.default_working_dir);
     v.fold(false);
     openModal('New job', 'Create job');
-    loadWorkflowOptions().then(() => { if (noOwnWorkflows && editingJobId === null) v.set('job_type', 'prompt'); }); // a first job with no workflow of the person's own to pick (none, or only the example) opens on the Agent prompt (#9297, #9965)
+    loadWorkflowOptions(); // the New job dialog opens on Run a prompt, the first choice; the workflow list is read for the other one (#10515)
     document.getElementById('cron-preview').textContent = '';
     checkSchedule();
     document.getElementById('job-modal-name').focus();

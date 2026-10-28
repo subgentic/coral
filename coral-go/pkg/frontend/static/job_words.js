@@ -127,8 +127,8 @@ export function reasonWords(run) {
     return run && run.error_msg ? stepWords(run.error_msg).replace(/ failed: exit code (\d+)/, ' exited with $1') : '';
 }
 
-/** When a scheduled job can run, true to the scheduler (internal/background/scheduler.go): only while Coral is running, and a slot missed while it was off (since the job's last run, at most a day, never before it was last edited or resumed) is caught up once when it starts. */
-export const RUNS_WHILE_OPEN = 'only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again, if it was due in the last day.'; // after "Runs": the form says it whole, the job's page as the Runs row
+/** When a scheduled job can run, true to the scheduler (internal/background/scheduler.go): only while Coral is running, and a slot missed while it was off (since the job's last run, or the last day for a job that never ran; never before it was last edited or turned on) is caught up once when it starts. */
+export const RUNS_WHILE_OPEN = 'only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again, unless the job was edited or turned on after it was due.'; // after "Runs": the form says it whole, the job's page as the Runs row
 
 /** What a run's exit_reason says that its status does not (#6907): a run whose agent ended while Coral was stopped is "completed" without Coral having seen its result, and one interrupted by a restart never
  *  launched its agent. The sentence for the status cell's hover and the row's details; '' for any other reason. */
