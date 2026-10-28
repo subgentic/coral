@@ -1,4 +1,5 @@
 /* The agent list's groups: a team's card, a workflow's, a folder's, and the order they go in (moved out of render.js, #4996; no behaviour change). */
+import { teamLinkOn } from './team_link_flag.js';
 import { state } from './state.js';
 import { keyLabel, splitKey, sessionTeamKey, sessionFolderKey } from './server_base.js';
 import { distillChip } from './knowledge_distill.js';
@@ -28,6 +29,7 @@ function _renderTeamCard(boardName, boardSessions) {
             <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(boardName)}">
                 <button class="menu-item overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
                 <button class="menu-item overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
+                ${teamLinkOn() ? `<button class="menu-item overflow-menu-item" data-on-click="team-link" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5l3-3"/><path d="M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1"/><path d="M9 11.5l-1 1A2.5 2.5 0 014.5 9l1-1"/></svg> Link team...</button>` : ''}
                 <button class="menu-item overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                     Add Agent
@@ -269,6 +271,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                     <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(boardName)}">
                 <button class="menu-item overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
                 <button class="menu-item overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
+                ${teamLinkOn() ? `<button class="menu-item overflow-menu-item" data-on-click="team-link" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5l3-3"/><path d="M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1"/><path d="M9 11.5l-1 1A2.5 2.5 0 014.5 9l1-1"/></svg> Link team...</button>` : ''}
                         <button class="menu-item overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                             Add Agent

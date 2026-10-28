@@ -20,6 +20,7 @@ export const CARDS = {
     'viz-card': 'regular',            // an Analytics chart
     'eff-card': 'regular',            // an efficiency figure
     'prompt-inspection-card': 'regular',
+    'team-link-card': 'regular',      // the Link team dialog's form
     'launch-type-card': 'regular',    // a choice in New agent
     'cloud-card': 'roomy',            // the sign-in page's card
     'note-card': 'none',              // a note: its head and body carry their own
