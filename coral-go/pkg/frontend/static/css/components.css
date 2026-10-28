@@ -3853,7 +3853,7 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 #launch-agent-pick .launch-agent-opt::before { grid-row: 1 / span 2; }
 #launch-agent-pick .launch-agent-name { grid-column: 2; grid-row: 1; align-self: end; line-height: var(--lh-label); }
 #launch-agent-pick .launch-agent-missing { grid-column: 2; grid-row: 2; align-self: start; height: 1.1em; line-height: var(--lh-label); }
-#launch-agent-pick label.launch-agent-opt { min-height: 52px; } /* the same height with or without the mark (the badge, the name and the mark fit in it), so the answer moves nothing */
+#launch-agent-pick label.launch-agent-opt { min-height: max(52px, calc(23px + var(--fs-md) * var(--lh-label) + var(--fs-sm) * 1.1)); } /* the same height with or without the mark: the padding, the gap, the name's line and the mark's line, which grow with the text size, so the answer moves nothing at 200% text either */
 #launch-agent-pick .launch-agent-opt:not(.has-mark) .launch-agent-name { grid-row: 1 / span 2; align-self: center; } /* no mark: the name is centred against the badge; with one, the name and the mark are centred together */
 #launch-agent-pick .launch-agent-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 #launch-agent-pick .launch-agent-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
