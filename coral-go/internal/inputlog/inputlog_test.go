@@ -76,7 +76,7 @@ func TestSettingTogglesLive(t *testing.T) {
 
 	SetSetting(true)
 	assert.True(t, State().Enabled)
-	assert.Contains(t, out.String(), "terminal input debug log is ON (the Log terminal input setting)")
+	assert.Contains(t, out.String(), "terminal input debug log is ON (the Record what Coral types setting)")
 	assert.Contains(t, out.String(), "with the secrets Coral recognises redacted")
 	Write("p", Text, "while on")
 

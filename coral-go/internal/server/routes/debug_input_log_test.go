@@ -16,7 +16,7 @@ import (
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
-// The "Log terminal input (debug)" setting is off by default and takes effect as
+// The "Record what Coral types (debug)" setting is off by default and takes effect as
 // soon as it is saved; the privacy status reports it so Settings can show that it
 // is on (#3256).
 func TestDebugInputLogSettingAppliesLive(t *testing.T) {

@@ -3,7 +3,7 @@
 // path that sent it (#3256).
 //
 // It is OFF by default and records nothing until it is turned on, either by the
-// "Log terminal input (debug)" setting (debug_input_log, applied live) or, for
+// "Record what Coral types (debug)" setting (debug_input_log, applied live) or, for
 // headless use, CORAL_DEBUG_INPUT=1 / --debug-input. It writes typed text, which
 // may include secrets, to <data dir>/input-debug.log (mode 0600, capped, one
 // rotated copy), and says so in coral.log whenever it turns on or off.
@@ -186,7 +186,7 @@ func applyLocked(why string) {
 	enabled.Store(on)
 	switch {
 	case on && !was:
-		via := "the Log terminal input setting"
+		via := "the Record what Coral types setting"
 		if forced {
 			via = "CORAL_DEBUG_INPUT / --debug-input"
 		}
