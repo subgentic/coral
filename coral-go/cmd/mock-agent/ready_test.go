@@ -210,6 +210,22 @@ func TestMockControlsMakeAQuestionAPermissionAndADeafBox(t *testing.T) {
 }
 
 // MOCK_EXIT ends the mock like a CLI that quit; the test only checks it asks to exit (and is a control).
+// MOCK_BUSY <seconds> keeps the stand-in working (#10602): the line is a turn with no Stop for that long, so a tester can reach Stop and queue sends. No number is 30 s; a bad number is not a control.
+func TestApplyControlBusy(t *testing.T) {
+	b := &inputBox{}
+	if h, w := applyControl(b, "MOCK_BUSY 5"); !h || !w || b.busyFor != 5*time.Second {
+		t.Fatalf("MOCK_BUSY 5: handled=%v waiting=%v busyFor=%v", h, w, b.busyFor)
+	}
+	b = &inputBox{}
+	if h, w := applyControl(b, "MOCK_BUSY"); !h || !w || b.busyFor != 30*time.Second {
+		t.Fatalf("MOCK_BUSY: handled=%v waiting=%v busyFor=%v", h, w, b.busyFor)
+	}
+	b = &inputBox{}
+	if h, _ := applyControl(b, "MOCK_BUSY soon"); h || b.busyFor != 0 {
+		t.Fatalf("a bad number is a message, not a control: handled=%v busyFor=%v", h, b.busyFor)
+	}
+}
+
 func TestMockExitControlEndsTheProcess(t *testing.T) {
 	var code = -1
 	old := exitNow

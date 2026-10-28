@@ -49,9 +49,10 @@ type inputBox struct {
 	// is open answers it (option 1, as Claude Code takes it) and is logged; Esc dismisses it.
 	trigger    string
 	promptOpen bool
-	question   bool // the open prompt is a question (AskUserQuestion), not a permission menu (#10168)
-	noSubmit   bool // MOCK_STUCK_ENTER: an Enter does not submit, so typed text stays in the box (#10168)
-	deaf       bool // MOCK_GO_DEAF: the box takes no more input and draws nothing (a CLI that has stopped reading), so a send is typed and never shows
+	question   bool          // the open prompt is a question (AskUserQuestion), not a permission menu (#10168)
+	noSubmit   bool          // MOCK_STUCK_ENTER: an Enter does not submit, so typed text stays in the box (#10168)
+	busyFor    time.Duration // MOCK_BUSY <seconds>: the turn the line began ends (its Stop) only after this long (#10602); set by applyControl, taken by the submit that read it
+	deaf       bool          // MOCK_GO_DEAF: the box takes no more input and draws nothing (a CLI that has stopped reading), so a send is typed and never shows
 	// notify, when set, hears the menu open ("permission_request") and close ("permission_answered", "permission_dismissed"): the run loop turns them into the hook events Claude Code runs for a tool's
 	// permission prompt, so Coral sees an agent waiting for a person (#8245), not only a menu on its screen.
 	notify func(kind string)
@@ -216,6 +217,13 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		control, waiting := applyControl(box, s)                                         // MOCK_ASK_QUESTION, MOCK_ASK_PERMISSION, MOCK_GO_DEAF: no turn of its own (ready.go)
 		if !control {
 			turn(s)
+		}
+		if busy := box.busyFor; busy > 0 { // MOCK_BUSY: the agent keeps working, its Stop comes later
+			box.busyFor = 0
+			go func() {
+				time.Sleep(busy)
+				events <- func() { hooks.fire("Stop", map[string]any{"stop_hook_active": false}) }
+			}()
 		}
 		if !waiting { // a menu that is open is the agent waiting: no Stop until it is answered
 			events <- func() { hooks.fire("Stop", map[string]any{"stop_hook_active": false}) }

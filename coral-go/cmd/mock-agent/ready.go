@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -82,10 +83,24 @@ const questionMenu = "\r\n Pick a color:\r\n \u276f 1. Red\r\n   2. Blue\r\n\r\n
 //	MOCK_ASK_QUESTION    a question opens ("Pick a color:", Red or Blue) with the AskUserQuestion permission request: a Needs you row ("question")
 //	MOCK_GO_DEAF         the mock stops reading: its box stays on screen but takes nothing and it answers nothing: a send is accepted and no reply ever comes (the chat stays blank)
 //	MOCK_STUCK_ENTER     the box takes text but an Enter does not submit it: the next send is refused (a message not submitted, then "an earlier message is still in the box"): the send-error box
+//	MOCK_BUSY [seconds]  the turn stays open (30 s without a number): the agent is working and sends no Stop until then, so a tester can reach Stop and queue sends (#10602)
 //	MOCK_EXIT            the mock ends at once, as a CLI that quit: the agent is over, and the next send is refused (the send-error box)
 //
 // An Enter answers an open menu (option 1) and an Escape dismisses it; both fire the hooks that end the wait. waiting says a menu is open: the line's UserPromptSubmit is sent (so Coral confirms the send) but not its Stop.
 func applyControl(box *inputBox, line string) (handled, waiting bool) {
+	if line == "MOCK_BUSY" || strings.HasPrefix(line, "MOCK_BUSY ") {
+		secs := 30.0
+		if f := strings.Fields(line); len(f) > 1 {
+			n, err := strconv.ParseFloat(f[1], 64)
+			if err != nil || n <= 0 || len(f) > 2 {
+				return false, false
+			}
+			secs = n
+		}
+		box.busyFor = time.Duration(secs * float64(time.Second))
+		fmt.Printf("\r\n[mock-agent] working for %gs\r\n", secs)
+		return true, true
+	}
 	switch line {
 	case "MOCK_ASK_PERMISSION":
 		box.promptOpen, box.question = true, false
