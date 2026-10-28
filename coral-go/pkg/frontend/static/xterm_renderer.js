@@ -700,7 +700,7 @@ export function createTerminal(containerEl) {
 
     _wireTerminalInput();
 
-    // Escape hatch: Ctrl+Shift+Escape or Ctrl+] unfocuses the terminal (Windows never delivers the first, #10345)
+    // Escape hatch: Ctrl+Shift+Escape, Ctrl+] or Ctrl+Shift+Enter unfocuses the terminal (Windows never delivers the first, #10345; an AltGr keyboard cannot type the second, #10497)
     // (attachCustomKeyEventHandler can be called before open)
     terminal.attachCustomKeyEventHandler((ev) => {
         if (isLeaveKey(ev)) {

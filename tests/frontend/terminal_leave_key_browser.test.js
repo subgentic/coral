@@ -40,12 +40,22 @@ const BASE = require('./test_base').BASE;
         check(!(await focused()), 'Ctrl+Shift+Escape still lets go where it arrives');
         await ev(`window.__term.focus(); true`); await key({ key: ']', code: 'BracketRight' }); await sleep(60);
         check(await focused(), 'a plain ] does not let go');
+        // Ctrl+Shift+Enter lets go on every layout (#10497, QA Reviewer 2: on a Windows AltGr keyboard Ctrl+] cannot be typed): Enter is on every layout, no agent CLI or browser takes the chord, and it sends nothing.
+        // A plain Escape is the CLIs' interrupt and Escape twice their rewind: both still reach the agent, and neither lets go.
+        await ev(`window.__term.focus(); true`); await key({ key: 'Enter', code: 'Enter', keyCode: 13, ctrlKey: true, shiftKey: true }); await sleep(60);
+        check(!(await focused()), 'Ctrl+Shift+Enter lets go of the terminal');
+        check(!(await ev(`window.__sent.map(m => JSON.parse(m).data || '').join('').length > 0`)), 'and sends nothing to the agent');
+        await ev(`window.__term.focus(); true`); await key({ key: 'Enter', code: 'Enter', keyCode: 13, ctrlKey: true }); await sleep(60);
+        check(await focused(), 'Ctrl+Enter does not let go');
+        await ev(`window.__term.focus(); window.__sent.length = 0; for (let i = 0; i < 2; i++) window.__term.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true, cancelable: true })); true`); await sleep(120); // sleep-ok: the typed keys are batched over a few ms
+        check(await focused(), 'Escape twice does not let go (it is the agent CLIs\' own key)');
+        check(await ev(`window.__sent.map(m => JSON.parse(m).data || '').join('') === '\\x1b\\x1b'`), 'and both Escapes reach the agent');
         // the words
         const words = await ev(`import((window.__coralStatic || '/static/') + 'terminal_leave_key.js').then(m => [m.leaveKeyWords(true), m.leaveKeyWords(false)])`).catch(e => ['missing: ' + e.message, '']);
-        check(words[0] === 'Ctrl+]', `on Windows the words name Ctrl+] only: ${JSON.stringify(words[0])}`);
-        check(/Ctrl\+Shift\+Escape/.test(words[1]) && /Ctrl\+\]/.test(words[1]), `elsewhere they name both: ${JSON.stringify(words[1])}`);
+        check(/Ctrl\+\]/.test(words[0]) && /Ctrl\+Shift\+Enter/.test(words[0]) && !/Escape/.test(words[0]), `on Windows the words name Ctrl+] and Ctrl+Shift+Enter, not Ctrl+Shift+Escape: ${JSON.stringify(words[0])}`);
+        check(/Ctrl\+Shift\+Escape/.test(words[1]) && /Ctrl\+\]/.test(words[1]) && /Ctrl\+Shift\+Enter/.test(words[1]), `elsewhere they name all three: ${JSON.stringify(words[1])}`);
         const hint = await ev(`(document.getElementById('xterm-focus-hint') || {}).textContent || ''`);
-        check(/Ctrl\+\]/.test(hint), `the status bar's hint names Ctrl+]: ${JSON.stringify(hint)}`);
+        check(/Ctrl\+\]/.test(hint) && /Ctrl\+Shift\+Enter/.test(hint), `the status bar's hint names Ctrl+] and Ctrl+Shift+Enter: ${JSON.stringify(hint)}`);
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the terminal leave key:\n  ' + problems.join('\n  '));
     console.log('PASS the terminal can be left with Ctrl+] on every OS, and the words name the key');
