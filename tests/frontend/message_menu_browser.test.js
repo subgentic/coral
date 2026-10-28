@@ -42,7 +42,11 @@ const BASE = require('./test_base').BASE;
                 assert.ok(/^rgb\(/.test(own.bg) && own.opacity === '1', `${w}/${theme}: the sent message's menu has a solid background: ${JSON.stringify(own)}`);
                 assert.ok(own.shadow && own.border !== '0px', `${w}/${theme}: and the shared menu's edge and shadow: ${JSON.stringify(own)}`);
             }
-            await ev(`document.documentElement.setAttribute('data-theme', 'dark'); true`);
+            // a custom theme that leaves --bg-elevated unset: the surface falls back to the menu colour instead of drawing see-through (#10774)
+            await ev(`document.documentElement.style.setProperty('--bg-elevated', 'initial'); true`);
+            const bare = await ev(`(() => { const c = getComputedStyle(document.getElementById('chat-msg-menu')); return { bg: c.backgroundColor, rest: getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary').trim() }; })()`);
+            assert.ok(/^rgb\(/.test(bare.bg), `${w}: with --bg-elevated unset the menu is still solid: ${JSON.stringify(bare)}`);
+            await ev(`document.documentElement.style.removeProperty('--bg-elevated'); document.documentElement.setAttribute('data-theme', 'dark'); true`);
             await waitFor(`document.getAnimations().length === 0`, `${w}: the menu has finished opening`, 3000); // a shot of a menu mid-fade shows the reply through it
             await shot(`message-menu-${w}`);
             // Escape gives the focus back to the button
