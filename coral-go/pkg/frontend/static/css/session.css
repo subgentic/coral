@@ -1144,8 +1144,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     .terminal-header-left { flex-basis: 100%; }
     .terminal-header-actions > .terminal-branch { max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
-.terminal-header-actions > .terminal-folder { flex: 0 1 auto; min-width: 0; }
-.terminal-header-actions > .terminal-folder .terminal-folder-text { max-width: 100%; }
 
 /* ── Sidebar colour (#3507, the operator's variant A): one palette that varies only in
    brightness and weight, from the server header (brightest, boldest) through team and
@@ -1696,8 +1694,8 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
    (a hint; the name is what the header is for): the name has 54 px at 320 and more where the branch shows, and the buttons keep their gaps. The targets stay 44 px. */
 @media (max-width: 400px) {
     html body .terminal-header { padding-left: 6px; padding-right: 6px; } /* both ends 6 px from the screen edge, where an OS edge swipe (the side panel's on the right, iOS back on the left) wins at 0 to 2 px (#6777, #6790) */
-    html body .terminal-header > .live-view-toggle { margin-right: 6px; } /* 10 px in output.css: the 6 px of start padding is made up here and in the gap below, so the name keeps 100 px at 320 px */
     html body .terminal-header-left { gap: 8px; }
+    html body .terminal-header-actions > .live-view-toggle { margin-right: 0; } /* the toggle's 6 px give the name its 100 px at 320 (header_text200) */
     html body .terminal-header-actions > .terminal-branch { max-width: 3em; }
 }
 
@@ -1759,13 +1757,20 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     .session-name-row .session-held-chip { order: 2; margin-left: var(--row-dot-block, 16px); }
 }
 
-/* A phone's Details disclosure (#9686): the folder, branch, model and thinking level of the open agent; a desktop's header has them. */
+/* The Details disclosure (#9686, #9837): the folder, branch, model, thinking level and context of the open agent, under the header at every width. The header itself is the state, the name,
+   the branch, the buttons and the view toggle; the folder is the hover and focus tip on the name. A phone turned sideways (44 px of its 390 would be a summary) and a raised keyboard (the Keys bar
+   closed for lack of room, terminal_keyboard) do without it. */
 .agent-phone-details { display: none; }
-/* A header this narrow (a window up to 1100 px, whose side panel takes half of it, or a phone) has no room for the model line beside the name: the Details disclosure has it instead (#9686; the folded model chip's 8 px margin and 4 px gap were the 12 px that overflowed the header at 1024). */
-@media (max-width: 1100px) { .terminal-header-actions > .terminal-model { display: none; } }
-.terminal-header[data-tight] .terminal-header-actions > .terminal-model { display: none; } /* a header under 44 rem (the window's side panel and the dock leave it 540 px at 1280) has no room for the model line: it was squeezed to nothing; the Details disclosure has it (#9784) */
-.terminal-header-actions > .terminal-model { flex: 0 1000 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the model line gives way first: a short branch and the folder keep their words (header_branch_cap) */
-@media (min-height: 501px) { .terminal-header[data-tight] ~ .agent-phone-details:not([hidden]) { display: block; padding: 0 var(--space-lg); border-bottom: 1px solid var(--border); } .terminal-header[data-tight] ~ .agent-phone-details > summary { min-height: var(--control-touch-height); display: flex; align-items: center; } .terminal-header[data-tight] ~ .agent-phone-details .facts { padding-bottom: var(--space-md); } .terminal-header[data-tight] ~ .agent-phone-details .facts dd { overflow-wrap: anywhere; } }
+.agent-phone-details:not([hidden]) { display: block; padding: 0 var(--space-lg); border-bottom: 1px solid var(--border); }
+.agent-phone-details > summary { min-height: var(--control-touch-height); display: flex; align-items: center; }
+.agent-phone-details .facts { padding-bottom: var(--space-md); }
+.agent-phone-details .facts dd { overflow-wrap: anywhere; }
+@media (max-height: 500px) { .agent-phone-details { display: none !important; } }
+/* The folder's full path, in a tip under the header (the header is the positioned ancestor, as for the branch's): on keyboard focus of the name everywhere, on hover where the primary pointer is not coarse. */
+.terminal-header[data-folder]:has(.terminal-identity:focus-visible)::after { content: attr(data-folder); }
+@media not all and (pointer: coarse) { .terminal-header[data-folder]:has(.terminal-identity:hover)::after { content: attr(data-folder); } }
+.terminal-header[data-folder]::after { content: none; position: absolute; left: 8px; top: calc(100% + 2px); z-index: 40; box-sizing: border-box; width: max-content; max-width: min(36rem, calc(100vw - 2rem)); padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); box-shadow: 0 4px 14px rgba(var(--black-rgb), 0.25); color: var(--text-primary); font-family: var(--font-mono); font-size: var(--fs-sm); white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
+.terminal-identity:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-xs); }
 @media (max-width: 1100px) and (min-height: 501px) { /* not a phone turned sideways: 44 px of its 390 would be a summary, and with the keyboard up the Keys bar closed for lack of room (terminal_keyboard) */
     .agent-phone-details:not([hidden]) { display: block; padding: 0 var(--space-lg); border-bottom: 1px solid var(--border); }
     .agent-phone-details > summary { min-height: var(--control-touch-height); display: flex; align-items: center; }

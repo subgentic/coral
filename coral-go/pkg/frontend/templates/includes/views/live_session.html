@@ -33,18 +33,9 @@
                     <div class="live-left-column">
                         <div id="capture-wrapper" class="capture-wrapper">
                             <div class="terminal-header">
-                                    <!-- Center view toggle: raw terminal vs. rendered chat transcript -->
-                                    <div class="live-view-toggle" role="group" aria-label="Center view">
-                                        <button type="button" class="live-view-toggle-btn active" id="live-view-btn-chat" data-on-click="live-view-mode" data-mode="chat" aria-pressed="true" title="Chat view" aria-label="Chat view">
-                                            <span class="material-icons" aria-hidden="true">chat</span><span>Chat</span>
-                                        </button>
-                                        <button type="button" class="live-view-toggle-btn" id="live-view-btn-terminal" data-on-click="live-view-mode" data-mode="terminal" aria-pressed="false" title="Terminal view" aria-label="Terminal view">
-                                            <span class="material-icons" aria-hidden="true">terminal</span><span>Terminal</span>
-                                        </button>
-                                    </div>
                                 <div class="terminal-header-left" id="popout-header-identity" aria-live="polite">
                                     <span class="terminal-status-dot" id="terminal-status-dot"></span><span class="terminal-state-word" id="terminal-state-word" aria-hidden="true"></span>
-                                    <span class="terminal-identity">
+                                    <span class="terminal-identity" id="terminal-header-identity" tabindex="0">
                                         <span class="terminal-session-label" id="terminal-header-label"></span>
                                         <!-- The agent's team, and its server on a hub with remotes (#3653): header_context.js -->
                                         <span class="terminal-session-context" id="terminal-header-context" hidden><span class="terminal-context-team" id="terminal-header-team"></span><span class="terminal-context-server" id="terminal-header-server"></span></span>
@@ -54,16 +45,21 @@
                                     <span class="chip chip-caps terminal-state-pill" id="terminal-state-pill" data-state="" hidden></span>
                                 </div>
                                 <div class="terminal-header-actions">
-                                    <span class="terminal-folder" id="terminal-header-folder" hidden>
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H8L6.5 3H3a1 1 0 0 0-1 1z"/></svg>
-                                        <span class="terminal-folder-text"></span>
                                     </span>
-                                    <span class="terminal-folder terminal-model" id="terminal-header-model" hidden><span class="terminal-folder-text"></span></span><!-- the model and thinking level (#9686: the row no longer says them) -->
                                     <span class="terminal-branch" id="terminal-header-branch" hidden>
                                         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v5a3 3 0 0 0 3 3h1"/><circle cx="6" cy="3" r="1.5"/><circle cx="11" cy="11" r="1.5"/></svg>
                                         <span class="terminal-branch-text" tabindex="0" role="button" aria-expanded="false"></span>
                                         <span class="branch-git-state"></span>
                                     </span>
+                                    <!-- View toggle: raw terminal vs. rendered chat transcript, the first of the header's actions on the right (#9836, the operator) -->
+                                    <div class="live-view-toggle" role="group" aria-label="Center view">
+                                        <button type="button" class="live-view-toggle-btn active" id="live-view-btn-chat" data-on-click="live-view-mode" data-mode="chat" aria-pressed="true" title="Chat view" aria-label="Chat view">
+                                            <span class="material-icons" aria-hidden="true">chat</span><span>Chat</span>
+                                        </button>
+                                        <button type="button" class="live-view-toggle-btn" id="live-view-btn-terminal" data-on-click="live-view-mode" data-mode="terminal" aria-pressed="false" title="Terminal view" aria-label="Terminal view">
+                                            <span class="material-icons" aria-hidden="true">terminal</span><span>Terminal</span>
+                                        </button>
+                                    </div>
                                     <!-- Find in conversation (chat view only) -->
                                     <button class="btn btn-quiet btn-icon btn-xs terminal-header-btn" id="chat-find-btn" type="button" data-on-click="chat-find-toggle" title="Find in conversation (Ctrl/Cmd+F)" aria-label="Find in conversation">
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>

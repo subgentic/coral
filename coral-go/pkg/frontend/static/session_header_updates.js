@@ -1,7 +1,7 @@
 /* Live updates to the open agent's header: its folder, branch, waiting state, goal and status (moved out of render.js, #4996; no behaviour change). */
 import { syncWaitingNotice } from './waiting.js'; // what waits for the open agent, with Send now (#7727)
 import { syncQueuedFromRow, paint as paintQueued } from './held_sends.js';
-import { _shortPath, _gitStateSummary, _repoBranch, presentationSessionState } from './session_state.js';
+import { _gitStateSummary, _repoBranch, presentationSessionState } from './session_state.js';
 import { startupSignedOut } from './signin_line.js';
 import { syncAgentKeys } from './agent_keys.js';
 import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill } from './dom_write.js';
@@ -22,29 +22,18 @@ let _headerDir = "";
 let _headerHasBranch = false;
 
 function _syncHeaderFolder() {
-    const el = document.getElementById("terminal-header-folder");
-    if (!el) return;
-    const show = !!_headerDir; // the folder and the branch are both in the header now (the row no longer says either, #9686); the full path is the hover
-    setHidden(el, !show);
-    if (!show) return;
-    setText(el.querySelector(".terminal-folder-text"), _shortPath(_headerDir, 2));
-    setTitle(el, _headerDir);
+    // The header has no folder of its own (the operator, #9837): the full path is the hover and keyboard-focus tip on the agent's name (data-folder on the header, drawn by the stylesheet), and the Details disclosure has it.
+    const el = document.querySelector("#live-session-view .terminal-header");
+    if (el) { if (_headerDir) el.dataset.folder = _headerDir; else el.removeAttribute('data-folder'); }
 }
 
-/** The model and thinking level in the open agent's header (#9686: the agent row is one line and no longer says them; the composer's chips still change them). Hidden when neither is on record. */
+/** The model, thinking level and context of the open agent, in the Details disclosure (#9686: the agent row is one line and no longer says them; #9837: neither does the header; the composer's chips still change them). */
 export function updateSessionModel(s) {
     const model = s ? modelName(s.agent_type, s.model, sessionServer(s)) : '';
     const level = s ? sessionLevel(s) : null;
     const pct = s && s.context_pct, ctx = pct === null || pct === undefined ? '' : pct >= 100 ? 'ctx full' : `ctx ${Math.round(pct)}%`; // the context window's use (the row's pill moved here, #9686)
     _details.model = model; _details.thinking = level ? `${level.name}${level.requested ? ' (as started)' : ''}` : ''; _details.context = ctx;
     _syncPhoneDetails();
-    const el = document.getElementById("terminal-header-model");
-    if (!el) return;
-    const text = [model, level && level.name, ctx].filter(Boolean).join(' \u00b7 ');
-    setHidden(el, !text);
-    if (!text) return;
-    setText(el.querySelector(".terminal-folder-text"), text);
-    setTitle(el, [model && `Model ${model}`, level && `Thinking ${level.name}${level.requested ? ' (as started)' : ''}`, ctx && `Context ${ctx.replace('ctx ', '')}`].filter(Boolean).join(', '));
 }
 
 // A phone's Details disclosure (#9686): the four facts the agent row no longer says, one tap away; a row with no value is not drawn, and with none the disclosure is not either.

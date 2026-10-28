@@ -760,30 +760,9 @@ body.panel-dragging .xterm-container {
 } /* a .prose (components.css): where it sits is all this says */
 @media (max-width: 600px) { .preview-pane-markdown { padding: 16px 16px 32px; } } /* a phone's markdown uses the width: the viewer's text was 245 px of 390 (#9478 item 10) */
 
-/* Current folder in the terminal header bar */
-.terminal-folder {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    min-width: 0;
-    font-family: var(--font-mono);
-    font-size: var(--fs-sm);
-    color: var(--text-secondary);
-}
-.terminal-folder[hidden] { display: none; }
-.terminal-folder svg { flex-shrink: 0; }
-.terminal-folder-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 32vw;
-}
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .terminal-folder { display: none; } }
-
-/* Chat/Terminal toggle sits at the left of the header, before the agent name */
-.terminal-header > .live-view-toggle { flex-shrink: 0; margin-right: 10px; }
-.terminal-header-actions .terminal-branch,
-.terminal-header-actions .terminal-folder { margin-right: 8px; }
+/* Chat/Terminal toggle: the first of the header's actions, at the right (#9836); the folder is the name's tip, not a header item (#9837) */
+.terminal-header-actions > .live-view-toggle { flex-shrink: 0; margin-right: 6px; } /* the first of the actions on the right (#9836) */
+.terminal-header-actions .terminal-branch { margin-right: 8px; }
 
 /* A window that does not set the pane's size (a viewer, View mode, a phone) renders the xterm at
    the pane's own size (#3422): scroll to see a pane wider or taller than the window. */
