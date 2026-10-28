@@ -39,13 +39,15 @@ const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''
 
 async function answer(s, o, ask, cell) {
     const buttons = [...cell.querySelectorAll('button')];
+    const had = cell.contains(document.activeElement); // the keyboard is on a choice: it must still be on something when the cell is drawn again or says Answered (#10560)
+    const keep = () => { if (had) (cell.querySelector(`.inbox-answer[data-n="${Number(o.n)}"]`) || cell.querySelector('.inbox-answer') || cell.closest('tr')?.querySelector('.dt-primary'))?.focus({ preventScroll: true }); };
     buttons.forEach(b => { b.disabled = true; });
     try {
         if (await hubBlocked(s)) { buttons.forEach(b => { b.disabled = false; }); return; } // a viewer: the reason is said
         const now = await readAsk(s); // the card is read again at the click: a row can be stale
         if (!ask || now.ask !== ask || !now.picks.some(p => Number(p.n) === Number(o.n) && p.label === o.label)) {
             read.delete(askKey(s));
-            fill(s, cell);
+            fill(s, cell).then(keep);
             showToast('That question changed; look at it again.', true);
             return;
         }
@@ -53,10 +55,11 @@ async function answer(s, o, ask, cell) {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ session_id: s.session_id, agent_type: s.agent_type || '', n: Number(o.n), label: o.label, text: '', ask_id: ask }),
         });
-        if (resp.status === 409) { read.delete(askKey(s)); fill(s, cell); showToast('That question changed; look at it again.', true); return; }
+        if (resp.status === 409) { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('That question changed; look at it again.', true); return; }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         read.delete(askKey(s));
         cell.replaceChildren(Object.assign(document.createElement('span'), { className: 'inbox-answered', textContent: `Answered: ${o.label}` }));
+        if (had) cell.closest('tr')?.querySelector('.dt-primary')?.focus({ preventScroll: true }); // the choices are gone: the keyboard stays in the row, on its Open
         showToast(`Answered: ${o.label} for ${resolveSessionIdentity(s)}`, false, 4000); // said once by the page's live region: nothing else says it
         document.dispatchEvent(new CustomEvent('coral:inbox-answered', { detail: { session_id: s.session_id } }));
     } catch {
@@ -70,7 +73,7 @@ async function answer(s, o, ask, cell) {
 function fill(s, cell) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [] })));
-    read.get(key).then(({ ask, picks }) => {
+    return read.get(key).then(({ ask, picks }) => {
         cell.replaceChildren();
         for (const o of picks) {
             const b = document.createElement('button');
