@@ -1975,7 +1975,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .launch-type-cards {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: 8px; /* the cards sit close together (#9876) */
     margin-bottom: 8px;
     padding: 4px; /* room for a card's focus ring: the step scrolls (overflow), which clips what a card draws outside itself (#7066) */
 }
@@ -3518,6 +3518,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 #launch-modal .modal-content { height: auto; max-height: 90dvh; }
 .modal-content:has(.settings-shell) { min-height: min(30rem, 90dvh); }
 #launch-modal .modal-content:not(.sd-modal-content) { min-height: 0; } /* the chooser and the terminal form hold the hidden New Agent step's .settings-shell, which gave them the tabbed dialogs' 30rem floor: half the chooser was empty (#6316) */
+#launch-modal .modal-content:not(.launch-wizard-content) { width: var(--dlg-w-form); } /* the chooser (and the terminal and folder forms) are short forms: 40 rem, as before the flow size reached them; the New agent and New team steps keep the flow dialog's width (#9876, the operator: the chooser was too spread out) */
 .launch-dir-recents { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
 .launch-dir-recents:empty { display: none; }
 .launch-dir-recent { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
