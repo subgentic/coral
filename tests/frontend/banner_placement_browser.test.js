@@ -36,22 +36,20 @@ const { connect } = require('./agent_view_harness');
                 const top = await ev(`(() => { const e = document.elementFromPoint(${s.l + (s.r - s.l) / 2}, ${s.t + (s.b - s.t) / 2}); return e ? !!e.closest('[data-on-click="cmd-send"]') : false; })()`);
                 assert.ok(top, `${at}: what is at Send's centre is Send`);
             }
-            // an open menu is never under a banner
-            await ev(`document.getElementById('top-menu-btn') && getComputedStyle(document.getElementById('top-menu-btn')).display !== 'none' ? document.getElementById('top-menu-btn').click() : (document.querySelector('[data-on-click="m-nav-more"]') || {click() {}}).click(); true`);
-            const menuOpen = await ev(`(() => { const m = document.getElementById('nav-more-menu'); return !!m && !m.hidden && m.getClientRects().length > 0; })()`);
-            if (menuOpen) {
-                await waitFor(`document.getElementById('notices').style.visibility === 'hidden'`, 'the banners step aside while the menu is open');
-                const items = await rects('#nav-more-menu .nav-more-item');
-                assert.ok(items.length > 0, `${at}: the menu has entries`);
-                for (const it of items) {
-                    const covered = await ev(`(() => { const e = document.elementFromPoint(${it.l + (it.r - it.l) / 2}, ${it.t + (it.b - it.t) / 2}); return !(e && e.closest('#nav-more-menu')); })()`);
-                    assert.ok(!covered, `${at}: a banner covers a menu entry ${JSON.stringify(it)}`);
-                }
+            // an open menu is never under a banner: open one (the hamburger on a phone; on a desktop the first control that says it opens a menu) and it must open
+            await ev(`(() => { const hb = document.getElementById('top-menu-btn'); const b = hb && getComputedStyle(hb).display !== 'none' ? hb : [...document.querySelectorAll('[aria-haspopup="menu"]')].find(x => x.getClientRects().length && !x.closest('#notices')); if (b) b.click(); return true; })()`);
+            const menuOpen = await ev(`[...document.querySelectorAll('.menu:not([hidden])')].some(m => m.getClientRects().length > 0)`);
+            assert.ok(menuOpen, `${at}: a menu opened (this test is about banners under an open menu)`);
+            await waitFor(`document.getElementById('notices').style.visibility === 'hidden'`, 'the banners step aside while the menu is open');
+            const items = await rects('.menu:not([hidden]) .menu-item');
+            assert.ok(items.length > 0, `${at}: the menu has entries`);
+            for (const it of items) {
+                const covered = await ev(`(() => { const e = document.elementFromPoint(${it.l + (it.r - it.l) / 2}, ${it.t + (it.b - it.t) / 2}); return !(e && e.closest('.menu')); })()`);
+                assert.ok(!covered, `${at}: a banner covers a menu entry ${JSON.stringify(it)}`);
             }
-            if (menuOpen) { // and they come back when it closes
-                await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.getElementById('nav-more-menu').hidden = true; true`);
-                await waitFor(`document.getElementById('notices').style.visibility !== 'hidden'`, 'the banners are back once the menu is closed');
-            }
+            // closed by anything but a click or a key (here: the code that owns it), the banners come back on their own
+            await ev(`document.querySelectorAll('.menu').forEach(m => { m.hidden = true; }); true`);
+            await waitFor(`document.getElementById('notices').style.visibility !== 'hidden'`, 'the banners are back once the menu is closed, whatever closed it');
             console.log(`PASS ${at}: banners clear of Send, the agent header and the top bar; Send is hittable; an open menu is not covered`);
         }
     } finally { await client.close(); }

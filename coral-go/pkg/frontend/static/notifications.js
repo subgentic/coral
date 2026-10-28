@@ -154,6 +154,8 @@ function syncMenuOpen() {
     if (!col) return;
     const open = [...document.querySelectorAll(".menu:not([hidden])")].some(m => m.getClientRects().length > 0);
     col.style.visibility = open ? "hidden" : "";
+    clearTimeout(_menuTimer);
+    if (open) _menuTimer = setTimeout(syncMenuOpen, 300); // while hidden for a menu it looks again, so a menu that closes without a click or a key (a timer, a route change, focus moving away) brings the banners back
 }
 function watchMenus() {
     if (watchMenus._wired) return;
