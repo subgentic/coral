@@ -413,6 +413,12 @@ async function _initTeamForm() {
         };
     }
 
+    // The default team is in Members when the dialog opens (#9877, the Operator): the Orchestrator, the Lead Developer and the QA Engineer, the first three of the Coding Team, each removable; a template still replaces them.
+    // A team the AI generated fills the list itself (launch.skipDefaultTeamAgents). #5989 opened it empty after four agents nobody picked were launched; three a person can see and remove are not that.
+    if (!launch.skipDefaultTeamAgents) {
+        for (const a of BUILTIN_TEAM_TEMPLATES[0].agents.slice(0, 3)) _addTeamAgent(a.name, a.prompt, a.capabilities, a.agent_type, a.model, a.flags);
+    }
+
     // Fetch existing boards for uniqueness validation
     await _loadExistingTeamBoards();
 
@@ -420,7 +426,6 @@ async function _initTeamForm() {
     resetTeamTemplatePicker();
     _syncTeamMembers();
 
-    // The dialog opens on the template choice with no members (#5989): four agents nobody picked were launched by a first-time Launch Team.
     launch.skipDefaultTeamAgents = false;
 
     // (no focus into the team name here: it sits in Board & workspace, which is not the section the dialog opens on, and focusing it would scroll that pane; section_dialog.js puts the keyboard in the list)
