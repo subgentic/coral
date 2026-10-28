@@ -28,6 +28,13 @@
 
     <!-- Summary Cards -->
     <div class="cost-summary-cards" id="cost-summary-cards" data-cview="overview">
+        <div class="cost-card cost-card-highlight">
+            <div class="cost-card-label">Total cost</div>
+            <div class="cost-card-value" id="cost-total-cost">$0.00</div>
+            <div class="cost-card-change" id="cost-change-cost"></div>
+            <div class="cost-card-calendar" id="cost-calendar-cost"></div><!-- today and this month, whatever the range: the two figures a person asks first (#10521) -->
+            <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-cost"></div>
+        </div>
         <div class="cost-card">
             <div class="cost-card-label">Input tokens</div>
             <div class="cost-card-value" id="cost-input-tokens">0</div>
@@ -57,12 +64,6 @@
             <div class="cost-card-value" id="cost-total-requests">0</div>
             <div class="cost-card-change" id="cost-change-requests"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-requests"></div>
-        </div>
-        <div class="cost-card cost-card-highlight">
-            <div class="cost-card-label">Total cost</div>
-            <div class="cost-card-value" id="cost-total-cost">$0.00</div>
-            <div class="cost-card-change" id="cost-change-cost"></div>
-            <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-cost"></div>
         </div>
         <div class="cost-card cost-card-burn">
             <div class="cost-card-label">Burn rate</div>
