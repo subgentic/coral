@@ -12,6 +12,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -115,7 +116,7 @@ func writePrivate(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(name, path); err != nil {
+	if err := fsreplace.Rename(name, path); err != nil {
 		return err
 	}
 	ok = true

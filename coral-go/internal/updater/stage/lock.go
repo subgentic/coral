@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/updater/verify"
 )
 
@@ -137,7 +138,7 @@ func removeDeadMutex(dir, mutex string, judged []byte) {
 	aside := tmp.Name()
 	tmp.Close()
 	os.Remove(aside)
-	if err := os.Rename(mutex, aside); err != nil {
+	if err := fsreplace.Rename(mutex, aside); err != nil {
 		return // gone already, or not ours to move
 	}
 	got, _ := os.ReadFile(aside)
@@ -193,7 +194,7 @@ func takeOver(dir, path string, body []byte, now time.Time) takeoverResult {
 		os.Remove(name)
 		return takeoverBusy
 	}
-	if err := os.Rename(name, path); err != nil { // atomic: the path holds the stale lock, then ours
+	if err := fsreplace.Rename(name, path); err != nil { // atomic: the path holds the stale lock, then ours
 		os.Remove(name)
 		return takeoverBusy
 	}

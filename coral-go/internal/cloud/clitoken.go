@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -62,7 +63,7 @@ func WriteCLIToken(dir string) (string, error) {
 	if err := f.Close(); err != nil {
 		return "", err
 	}
-	if err := os.Rename(tmp, filepath.Join(dir, CLITokenFile)); err != nil {
+	if err := fsreplace.Rename(tmp, filepath.Join(dir, CLITokenFile)); err != nil {
 		return "", err
 	}
 	return tok, nil

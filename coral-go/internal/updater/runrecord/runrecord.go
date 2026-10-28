@@ -6,6 +6,7 @@ package runrecord
 import (
 	"encoding/json"
 	"errors"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -134,5 +135,5 @@ func Write(dataDir string, argv, environ []string, cwd string) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(name, filepath.Join(dir, File))
+	return fsreplace.Rename(name, filepath.Join(dir, File))
 }

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -88,7 +89,7 @@ func WriteMarker(dataDir, version, installDir string, now time.Time) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp, markerPath(dataDir))
+	return fsreplace.Rename(tmp, markerPath(dataDir))
 }
 
 // RemoveMarker deletes the marker (a start that failed leaves none behind).

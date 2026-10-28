@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/safefs"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
@@ -279,7 +280,7 @@ func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 	if err := os.Chmod(tmp.Name(), mode); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), path)
+	return fsreplace.Rename(tmp.Name(), path)
 }
 
 // createSidecarOnce stores meta as the artifact's sidecar unless one exists, and returns

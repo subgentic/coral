@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/updater/verify"
 )
 
@@ -428,7 +429,7 @@ func (c *checker) stageInto(ctx context.Context, root, base string, rec *verify.
 	if err := os.RemoveAll(final); err != nil {
 		return err
 	}
-	if err := os.Rename(partial, final); err != nil {
+	if err := fsreplace.Rename(partial, final); err != nil {
 		return err
 	}
 	done = true

@@ -15,6 +15,7 @@ import (
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
+	"github.com/subgentic/coral/internal/fsreplace"
 )
 
 // taskReviewRequested: a list item says review_requested; a full task (an older
@@ -300,7 +301,7 @@ func noteSeenRound(project string, task map[string]any) {
 	}
 	_, werr := tmp.Write(data)
 	cerr := tmp.Close()
-	if werr != nil || cerr != nil || os.Chmod(tmp.Name(), 0o600) != nil || os.Rename(tmp.Name(), path) != nil {
+	if werr != nil || cerr != nil || os.Chmod(tmp.Name(), 0o600) != nil || fsreplace.Rename(tmp.Name(), path) != nil {
 		os.Remove(tmp.Name())
 	}
 }

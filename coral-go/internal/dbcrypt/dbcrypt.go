@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -105,7 +106,7 @@ func writeMigrationState(path, phase string, paths []string) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, path)
+	return fsreplace.Rename(tmpName, path)
 }
 
 // migrationFaultInjection is intentionally environment-gated and exists only
@@ -432,11 +433,11 @@ func MigratePlaintexts(paths []string, key string) error {
 			_ = os.Remove(items[i].path)
 		}
 		for i := backedUp - 1; i >= 0; i-- {
-			_ = os.Rename(items[i].backup, items[i].path)
+			_ = fsreplace.Rename(items[i].backup, items[i].path)
 		}
 	}
 	for i := range items {
-		if err := os.Rename(items[i].path, items[i].backup); err != nil {
+		if err := fsreplace.Rename(items[i].path, items[i].backup); err != nil {
 			rollback()
 			return fmt.Errorf("retain plaintext backup for %s: %w", filepath.Base(items[i].path), err)
 		}
@@ -452,7 +453,7 @@ func MigratePlaintexts(paths []string, key string) error {
 		return fmt.Errorf("update database migration recovery state: %w", err)
 	}
 	for i := range items {
-		if err := os.Rename(items[i].tmp, items[i].path); err != nil {
+		if err := fsreplace.Rename(items[i].tmp, items[i].path); err != nil {
 			rollback()
 			return fmt.Errorf("install encrypted database %s: %w", filepath.Base(items[i].path), err)
 		}
@@ -528,7 +529,7 @@ func Save(dir string, b Bootstrap) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(name, filepath.Join(dir, BootstrapName))
+	return fsreplace.Rename(name, filepath.Join(dir, BootstrapName))
 }
 
 // inMemoryDB reports whether a SQLite name is an in-memory database, not a file: ":memory:", or a

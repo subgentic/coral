@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -148,7 +149,7 @@ func downloadArtifactOpts(base, ref, output string, force bool) (string, error) 
 	if output != "" {
 		if force {
 			// An explicit --force: the file the person named is replaced (a rename over it; on Windows it fails if another program has it open).
-			if err := os.Rename(f.Name(), output); err != nil {
+			if err := fsreplace.Rename(f.Name(), output); err != nil {
 				return "", fmt.Errorf("cannot replace %s: %w", output, err)
 			}
 			keep = true

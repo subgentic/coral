@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -121,7 +122,7 @@ func saveMilestones(s milestoneState) error {
 		os.Remove(tmpName)
 		return err
 	}
-	if err := os.Rename(tmpName, milestonesPath()); err != nil {
+	if err := fsreplace.Rename(tmpName, milestonesPath()); err != nil {
 		os.Remove(tmpName)
 		return err
 	}

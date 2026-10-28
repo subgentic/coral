@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -103,7 +104,7 @@ func BindAgy(sessionID, conversationID string) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(f.Name(), filepath.Join(dir, sessionID+".json"))
+	return fsreplace.Rename(f.Name(), filepath.Join(dir, sessionID+".json"))
 }
 
 // agyMarker is the Coral session id in the head of a conversation's transcript ("" with none, or with no transcript yet). agy 1.4.7 cuts the long first prompt

@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -292,7 +293,7 @@ func StageRotatedKey(dir string) (next *Box, commit func() error, abort func(), 
 		os.Remove(tmp)
 		return nil, nil, nil, err
 	}
-	commit = func() error { return os.Rename(tmp, KeyFilePath(dir)) }
+	commit = func() error { return fsreplace.Rename(tmp, KeyFilePath(dir)) }
 	abort = func() { os.Remove(tmp) }
 	return box, commit, abort, nil
 }
