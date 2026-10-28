@@ -34,8 +34,7 @@ these official pages (and show the one-line command where the vendor has one).
 The Antigravity installer puts `agy` in `~/.local/bin`. Coral looks there itself, so it finds `agy`
 even when that folder is not on your `PATH`. To run `agy` in your own terminal, add
 `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` or `~/.bashrc` and open a new terminal. A custom executable can be set per agent type in **Settings > Agents > CLI paths** (a closed section; empty uses your `PATH`), which is the `cli_path_<type>`
-setting. The launch API rejects an unsupported `agent_type` (`ValidateAgentType` in
-`internal/agent/agent.go`); adding a new agent requires a source change and a rebuild.
+setting. Coral launches only the agent CLIs listed above; adding another one needs a code change and a rebuild.
 
 > **If you ever ran `pip install agent-coral`, remove it first.**
 > The retired Python package installs binaries with the *same names* as this one
@@ -125,10 +124,10 @@ coral --home /tmp/coral-t1 --port 8452 --no-browser
 
 > **What isolation covers.** A non-default `--home` gets its own tmux socket
 > (`<home>/tmux.sock`), and session discovery no longer merges tmux's default socket
-> for it (`defaultSocketFallback` in `internal/tmux/client.go`), so a second instance
+> for it, so a second instance
 > does not list the first instance's agents. `CORAL_TMUX_FALLBACK=1` re-enables the
-> merge. Agents receive `CORAL_URL`, `CORAL_PORT`, `CORAL_HOST` and `CORAL_DATA_DIR`
-> (`internal/agent/agent.go`), and `coral-board` keeps its state under `CORAL_DATA_DIR`,
+> merge. Agents receive `CORAL_URL`, `CORAL_PORT`, `CORAL_HOST` and `CORAL_DATA_DIR`,
+> and `coral-board` keeps its state under `CORAL_DATA_DIR`,
 > so the board follows a non-default data directory and port.
 >
 > A tmux socket path over about 104 characters (macOS) cannot bind, so keep the
