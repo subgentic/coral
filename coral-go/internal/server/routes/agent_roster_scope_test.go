@@ -325,3 +325,62 @@ func TestAgentTokenSeesNoRemoteMachinesOnAHub(t *testing.T) {
 	assert.NotContains(t, agentFeed, "Machine A")
 	assert.NotContains(t, agentFeed, "ra-1")
 }
+
+// #10510 (Security on #10467): what a person typed to an agent (held_messages, pending_sends) is not an agent's to read through the list, not even on its own row or a board mate's. The Operator's rows keep them.
+func TestAnAgentTokenGetsNoPersonTextOnRowsItMayRead(t *testing.T) {
+	rows := rosterRows()
+	for _, r := range rows[:2] { // itself and its board mate
+		r["held_messages"] = []map[string]any{{"id": "h1", "text": "HELD-" + r["name"].(string)}}
+		r["pending_sends"] = []map[string]any{{"id": "p1", "text": "SENT-" + r["name"].(string)}}
+	}
+	got := scopeRowsForAgent(rows, "sid-me")
+	for _, i := range []int{0, 1} {
+		assert.Contains(t, got[i], "held_messages", "the key stays, null: a screen that kept an earlier list drops it")
+		assert.Nil(t, got[i]["held_messages"], "%v", rows[i]["name"])
+		assert.Nil(t, got[i]["pending_sends"], "%v", rows[i]["name"])
+		assert.Equal(t, "PROMPT-"+rows[i]["name"].(string), got[i]["prompt"], "the rest of the row is whole")
+	}
+	assert.NotNil(t, rows[0]["held_messages"], "the shared rows are never changed in place")
+	assert.NotNil(t, rows[1]["pending_sends"])
+
+	tick := &wsTick{sessions: rows, current: map[string]string{}, byKey: map[string]map[string]any{}}
+	for _, r := range rows {
+		key := r["session_id"].(string)
+		b, _ := json.Marshal(r)
+		tick.current[key], tick.byKey[key] = string(b), r
+	}
+	scoped := scopeTickForAgent(tick, "sid-me")
+	for _, sid := range []string{"sid-me", "sid-mate"} {
+		assert.NotContains(t, scoped.current[sid], "HELD-", "the diff form the socket sends carries no held message")
+		assert.NotContains(t, scoped.current[sid], "SENT-", "nor a pending send")
+		assert.Nil(t, scoped.byKey[sid]["held_messages"])
+		assert.Contains(t, scoped.current[sid], `"prompt":"PROMPT-`, "the row is otherwise whole")
+	}
+	assert.Contains(t, tick.current["sid-me"], "HELD-me", "the shared tick is untouched")
+	again := scopeTickForAgent(tick, "sid-me")
+	assert.Equal(t, scoped.current, again.current, "the same tick scopes to the same serialized forms (no false diffs)")
+}
+
+func TestLiveListForAnAgentTokenHasNoPersonText(t *testing.T) {
+	r := newHoldRig(t, true)
+	require.Equal(t, http.StatusOK, r.send("TYPED-WORDS please").Code)
+	r.box("permission")
+	require.Equal(t, http.StatusAccepted, r.send("HELD-WORDS please").Code)
+	get := func(agent string) string {
+		req := httptest.NewRequest(http.MethodGet, "/api/sessions/live", nil)
+		if agent != "" {
+			req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: agent, SessionName: r.name}))
+		}
+		rec := httptest.NewRecorder()
+		r.h.List(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		return rec.Body.String()
+	}
+	op := get("")
+	assert.Contains(t, op, "HELD-WORDS", "the Operator's list has the queue")
+	assert.Contains(t, op, "TYPED-WORDS", "and what was just typed")
+	agent := get(r.sid) // the agent's own row: whole but for the person's words
+	assert.Contains(t, agent, r.sid, "its own row is in its list")
+	assert.NotContains(t, agent, "HELD-WORDS", "an agent's list has no held message, its own row's included")
+	assert.NotContains(t, agent, "TYPED-WORDS", "and no pending send")
+}
