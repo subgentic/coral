@@ -64,8 +64,8 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             check(`${label}: the icon says one filter is on`, /1 on/.test(await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').getAttribute('aria-label')`)));
             await setField('inbox-chats-tag', '7'); await waitFor(`(window.__hist || []).some(p => p.tag_ids === '7')`, 'a read with the tag', 6000);
             check(`${label}: a Tag filter is tag_ids, with the earlier filters kept`, (await lastRead()).tag_ids === '7' && (await lastRead()).source_types === 'codex' && /Tag: Release/.test(await chipText()), await chipText());
-            await setField('inbox-chats-folder', '/srv/app'); await waitFor(`(window.__hist || []).some(p => p.folder === '/srv/app')`, 'a read with the folder', 6000);
-            check(`${label}: a Folder filter is folder, a chip says its last part (#10390)`, (await lastRead()).folder === '/srv/app' && /Folder: app/.test(await chipText()), await chipText());
+            await setField('inbox-chats-folder', '/srv/app'); await waitFor(`(window.__hist || []).some(p => p.working_dir === '/srv/app')`, 'a read with the folder', 6000);
+            check(`${label}: a Folder filter is working_dir, a chip says its last part (#10390)`, (await lastRead()).working_dir === '/srv/app' && /Folder: app/.test(await chipText()), await chipText());
             await setField('inbox-chats-from', '2026-10-01'); await setField('inbox-chats-to', '2026-10-20');
             await waitFor(`(window.__hist || []).some(p => p.date_from === '2026-10-01' && p.date_to === '2026-10-20')`, 'a read with the dates', 6000);
             check(`${label}: the dates are date_from and date_to and one chip`, /Dates: 2026-10-01 to 2026-10-20/.test(await chipText()), await chipText());

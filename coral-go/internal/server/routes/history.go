@@ -210,7 +210,7 @@ func parseHistoryListQuery(q url.Values) (store.SessionListParams, string) {
 		Archived:       q.Get("archived") == "1",
 		Active:         q.Get("active") == "1",
 		WithNotes:      q.Get("with_notes") == "1",
-		Folder:         q.Get("folder"),
+		Folder:         historyFolderParam(q.Get("working_dir")),
 	}
 
 	// Chat type filter: all, agent, group
@@ -219,6 +219,15 @@ func parseHistoryListQuery(q url.Values) (store.SessionListParams, string) {
 		chatType = "all"
 	}
 	return params, chatType
+}
+
+// historyFolderParam is the folder filter's value as the index stores it: a "~" a Hub viewer was shown (hubDisplayPath) is this computer's home again, and the path is cleaned the way the
+// indexer cleans the folder it records (#10390, #10635).
+func historyFolderParam(v string) string {
+	if v == "" {
+		return ""
+	}
+	return filepath.Clean(hubExpandPath(v))
 }
 
 // optionalInt is v as a number, or nil when it is empty or not one.

@@ -33,7 +33,8 @@ assert.deepEqual(CF.without({ ...CF.EMPTY, from: '2026-10-01', to: '2026-10-20',
 assert.equal(CF.isFiltered({ ...CF.EMPTY, tagId: '7' }), true); assert.equal(CF.isFiltered(CF.EMPTY), false);
 
 // #10390: the Folder filter sends the folder a chat ran in, as chosen; a value that is no absolute path is dropped; the chip and the column say the last part
-assert.deepEqual(CF.toParams('chats', { ...CF.EMPTY, folder: '/srv/app' }), { folder: '/srv/app' });
+assert.deepEqual(CF.toParams('chats', { ...CF.EMPTY, folder: '/srv/app' }), { working_dir: '/srv/app' });
+assert.deepEqual(CF.toParams('chats', { ...CF.EMPTY, folder: '~/proj' }), { working_dir: '~/proj' }, 'the ~ form a Hub viewer is shown is kept (the machine expands it)');
 assert.deepEqual(CF.toParams('chats-group', { ...CF.EMPTY, folder: '/srv/app' }), {}, 'a board history has no folder field');
 assert.equal(CF.clean({ folder: 'app' }).folder, '', 'a folder is an absolute path'); assert.equal(CF.clean({ folder: 'C:\\work\\app' }).folder, 'C:\\work\\app');
 assert.deepEqual(CF.chips({ ...CF.EMPTY, folder: '/srv/app' }).map(c => c.label), ['Folder: app']);

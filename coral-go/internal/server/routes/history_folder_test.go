@@ -18,7 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/store/storetest"
 )
 
-// #10390: the history list takes folder=<path> and each chat row says the folder it ran in (working_dir).
+// #10390: the history list takes working_dir=<path> and each chat row says the folder it ran in (working_dir).
 func TestHistoryListFiltersByFolderAndRowsSayTheirFolder(t *testing.T) {
 	ctx := context.Background()
 	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "test.db"))
@@ -38,7 +38,7 @@ func TestHistoryListFiltersByFolderAndRowsSayTheirFolder(t *testing.T) {
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)
 
-	resp, err := http.Get(server.URL + "/api/sessions/history?type=agent&folder=%2Fsrv%2Fapp")
+	resp, err := http.Get(server.URL + "/api/sessions/history?type=agent&working_dir=%2Fsrv%2Fapp")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	var body struct {

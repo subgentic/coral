@@ -19,7 +19,7 @@ const model = defineFilters({
     cli: { type: 'choice', values: CLIS.map(c => c[0]), chip: v => `CLI: ${CLI_LABEL[v]}` },
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     tagId: { type: 'custom', empty: '', clean: v => (/^[1-9]\d{0,11}$/.test(String(v)) ? String(v) : ''), filtered: v => !!v, chip: v => `Tag: ${tagNames.get(v) || 'Tag'}`, clear: f => ({ ...f, tagId: '' }) }, // the key is tagId: the icon scanner reads a quoted lower-case word that is an icon's name as an icon
-    folder: { type: 'custom', empty: '', clean: v => (/^(\/|[A-Za-z]:[\\/])/.test(v) && v.length <= 500 ? v : ''), filtered: v => !!v, chip: v => `Folder: ${folderName(v)}`, clear: f => ({ ...f, folder: '' }) }, // the folder a chat ran in (#10390)
+    folder: { type: 'custom', empty: '', clean: v => (/^(\/|~(\/|$)|[A-Za-z]:[\\/])/.test(v) && v.length <= 500 ? v : ''), filtered: v => !!v, chip: v => `Folder: ${folderName(v)}`, clear: f => ({ ...f, folder: '' }) }, // the folder a chat ran in (#10390)
     dates: { type: 'range', from: 'from', to: 'to', chip: (a, b) => (a && b ? `Dates: ${a} to ${b}` : a ? `From ${a}` : `Until ${b}`) },
 });
 /** A folder path's last part: the words a row, a chip and the filter's choices show (the whole path is the tooltip). */
@@ -47,7 +47,7 @@ export function toParams(key, f) {
     if (has.has('cli') && c.cli) p.source_types = c.cli;
     if (has.has('agent') && c.agent) p.agent_name = c.agent;
     if (has.has('tagId') && c.tagId) p.tag_ids = c.tagId;
-    if (has.has('folder') && c.folder) p.folder = c.folder;
+    if (has.has('folder') && c.folder) p.working_dir = c.folder;
     if (has.has('dates')) { if (c.from) p.date_from = c.from; if (c.to) p.date_to = c.to; }
     return p;
 }
