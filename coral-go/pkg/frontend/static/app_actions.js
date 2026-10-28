@@ -48,6 +48,7 @@ const hideJobModal = (...args) => loadedModule('./job_form.js')?.hideJobModal(..
 const reshowJobModal = (...args) => loadedModule('./job_form.js')?.reshowJobModal(...args);
 
 registerActions({
+    'mb-jump-latest': () => boardPage()?.jumpToLatest(), // the board's own buttons are in the page's markup but their code loads with the board (a lazy group), so the action is here
     'mb-select-mode': () => boardPage()?.toggleSelectMode(),
     'mb-export': () => boardPage()?.showExportBoardModal(),
     'mb-pause': () => boardPage()?.toggleBoardPause(),
