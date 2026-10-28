@@ -25,7 +25,7 @@ async function prefill(row, text) {
     await window.selectLiveSession?.(row.name, row.agent_type, row.session_id, sessionServer(row), { focusChat: true });
     const box = document.getElementById('command-input');
     if (box && box.value !== draft) { box.value = draft; box.dispatchEvent(new Event('input', { bubbles: true })); }
-    showToast(`The message is in ${resolveSessionIdentity(row)}'s box. Press Send to send it.`);
+    showToast(`Added to ${resolveSessionIdentity(row)}'s message box. Not sent.`);
 }
 
 /** Open the menu for the message button `btn` (its bubble holds the text). */
@@ -46,7 +46,7 @@ export async function openMessageMenu(btn) {
     if (save) item(menu, save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', () => save.click());
     const head = document.createElement('div'); head.className = 'chat-msg-menu-head'; head.setAttribute('role', 'presentation'); head.textContent = 'Send to another agent'; menu.append(head);
     const cur = state.currentSession || {};
-    const others = (state.liveSessions || []).filter(s => s.session_id && s.session_id !== cur.session_id && !(cur.name && s.name === cur.name && sessionServer(s) === sessionServer(cur)) && !s.archived && s.agent_type !== 'terminal');
+    const others = (state.liveSessions || []).filter(s => s.session_id && (s.session_id !== cur.session_id || sessionServer(s) !== sessionServer(cur)) && !s.archived && s.agent_type !== 'terminal');
     if (!others.length) item(menu, 'No other agents', () => {}, { disabled: true });
     for (const s of others) item(menu, resolveSessionIdentity(s), () => prefill(s, text));
     const r = btn.getBoundingClientRect();
