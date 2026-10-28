@@ -1,5 +1,5 @@
 // The agent's Files, Browse and Activity tabs on a phone and at 200% text (task 7652, items 1, 2, 3, 4 and 6 of the real-content report on the Files, Browse, Notes, Activity and Agent UI tabs):
-//   1. a Files row keeps its whole name: Copy, Preview and Edit are behind one More button that opens them on a line under the row;
+//   1. a Files row keeps its whole name: Copy, Preview, Edit and Share as artifact are behind one More button that opens them on a line under the row;
 //   2. a file opened on a phone is a screen of its own (the phone-full preview) with a Back button, and Back returns to the list;
 //   3. Browse's folder is its name on one line (the whole path as its title), the two buttons never share its row when they do not fit;
 //   4. Activity's summaries keep their words at 200% (the time goes under them) and the Time and Count switch is 44 px;
@@ -51,13 +51,13 @@ const ROOT = '/work/demo/projects/queue-service';
             const rows = await ev(`[...document.querySelectorAll('#changed-files-list .file-item')].map(r => { const n = r.querySelector('.file-name'), more = r.querySelector('.file-more-btn'), b = more && (${TOUCH_AREA})(more); return { name: n.textContent, cut: n.scrollWidth > n.clientWidth + 1, more: !!more && b.w >= 43.5 && b.h >= 43.5, label: more && more.getAttribute('aria-label'), actionsShown: getComputedStyle(r.querySelector('.file-action-btns')).display !== 'none' }; })`);
             for (const r of rows) {
                 assert.equal(r.cut, false, `${at}${r.name} is shown whole`); assert.ok(r.more, `${at}${r.name} has a 44 px More button`);
-                assert.equal(r.actionsShown, false, `${at}${r.name}: Copy, Preview and Edit are closed`); assert.ok(/^More for /.test(r.label), `${at}named: ${r.label}`);
+                assert.equal(r.actionsShown, false, `${at}${r.name}: Copy, Preview, Edit and Share as artifact are closed`); assert.ok(/^More for /.test(r.label), `${at}named: ${r.label}`);
             }
             await shot(`files-${zoom}`);
             await ev(`document.querySelector('#changed-files-list .file-more-btn').click(); true`);
             await shot(`files-more-${zoom}`);
-            const opened = await ev(`(() => { const r = document.querySelector('#changed-files-list .file-item'); const b = r.querySelector('.file-more-btn'), a = r.querySelector('.file-action-btns'), n = r.querySelector('.file-path-wrap').getBoundingClientRect(), ar = a.getBoundingClientRect(); return { expanded: b.getAttribute('aria-expanded'), shown: getComputedStyle(a).display !== 'none' && ar.height > 0, under: ar.top >= n.bottom - 1, three: a.querySelectorAll('button').length, inside: ar.right <= innerWidth + 1 }; })()`);
-            assert.deepEqual(opened, { expanded: 'true', shown: true, under: true, three: 3, inside: true }, at + 'More opens the three on a line under the name');
+            const opened = await ev(`(() => { const r = document.querySelector('#changed-files-list .file-item'); const b = r.querySelector('.file-more-btn'), a = r.querySelector('.file-action-btns'), n = r.querySelector('.file-path-wrap').getBoundingClientRect(), ar = a.getBoundingClientRect(); return { expanded: b.getAttribute('aria-expanded'), shown: getComputedStyle(a).display !== 'none' && ar.height > 0, under: ar.top >= n.bottom - 1, buttons: a.querySelectorAll('button').length, inside: ar.right <= innerWidth + 1 }; })()`);
+            assert.deepEqual(opened, { expanded: 'true', shown: true, under: true, buttons: 4, inside: true }, at + 'More opens the four (Copy, Preview, Edit, Share as artifact: #10357) on a line under the name');
             await ev(`document.querySelector('#changed-files-list .file-more-btn').click(); true`);
             assert.equal(await ev(`document.querySelector('#changed-files-list .file-more-btn').getAttribute('aria-expanded')`), 'false', at + 'and closes them');
 
