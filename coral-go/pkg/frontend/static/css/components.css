@@ -3589,6 +3589,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .settings-tab .sd-dot { margin-left: auto; margin-right: .6rem; }
     .settings-tab:has(.sd-dot:not([hidden]))::after { margin-left: 0; }
     .settings-tab[aria-selected="true"] { background: none; box-shadow: none; font-weight: var(--fw-regular); }
+    #settings-modal[data-screen="pane"] .modal-header { padding: 0; min-height: 0; }
+    #settings-modal[data-screen="pane"] #settings-title { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* a section is open: its way back says Settings, so the title is not said twice; the dialog keeps its name (#10783) */
     #settings-modal[data-screen="pane"] .settings-back { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; margin: -.4rem 0 .4rem -.6rem; }
     .settings-panes { padding: .8rem 1rem 1.2rem; }
     /* the (i) stays a 1.5rem circle at every size (#6042, #6750); its 44 px touch target is the invisible ::after below */

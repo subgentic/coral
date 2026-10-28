@@ -244,9 +244,8 @@ function jobFields(host) {
             key: 'repo_offer', type: 'notice', visibleWhen: v => prompt(v) && !!repoOffer,
             render: slot => {
                 slot.id = 'job-repo-offer'; slot.classList.add('job-no-workflows');
-                const b = el('button', 'btn btn-small', 'Make this folder a git repo'); b.type = 'button'; b.id = 'job-make-repo'; b.addEventListener('click', makeRepo);
-                const n = el('button', 'btn btn-small', 'Run without a worktree'); n.type = 'button'; n.id = 'job-run-here'; n.addEventListener('click', runHere);
-                slot.append(el('span', '', 'A job works in its own worktree of this folder, which needs a git repository with one commit.'), ' ', b, ' ', n);
+                const b = el('button', 'btn btn-small', 'Make it a git repo'); b.type = 'button'; b.id = 'job-make-repo'; b.addEventListener('click', makeRepo);
+                slot.append(el('span', '', 'A job works in its own worktree of this folder, which needs a git repository with one commit.'), ' ', b); // one button, on the way to the job: the alternative, to run in the folder itself, is the switch under More options
             },
         },
         {
@@ -307,14 +306,7 @@ function jobFormValues() {
     return values;
 }
 
-/** Run in the folder itself (#10276): the worktree is switched off for this job, the refusal goes, and the person creates the job again. */
-function runHere() {
-    view.set('no_worktree', true); view.fold(true); // the switch is under More options: opened, so the person sees what was set
-    repoOffer = ''; view.error('repo_path', ''); view.refresh();
-    showToast('This job will work in the folder itself. Create it again.');
-}
-
-/** Make the folder a repository with one first commit, once the person has agreed (#10276); then the form is submitted again by the person, with nothing else changed. */
+/** Make the folder a repository with one first commit, once the person has agreed (#10276); then the job is created, with nothing else changed (#10783). */
 function makeRepo() {
     const dir = String(view.values().repo_path || '').trim();
     if (!dir) return;
@@ -324,7 +316,7 @@ function makeRepo() {
             const data = await resp.json().catch(() => ({}));
             if (!resp.ok || data.error) { showToast(data.error || 'Could not make the folder a git repo.', true); return; }
             repoOffer = ''; view.error('repo_path', ''); view.refresh();
-            showToast('The folder is a git repo with a first commit. Create the job again.');
+            submitJob(); // the person asked for this job: it is created now, not asked for again (#10783)
         } catch { showToast('Could not make the folder a git repo.', true); }
     }, undefined, { label: 'Make it a git repo', danger: false });
 }
@@ -358,6 +350,7 @@ async function submitJob() {
         repoOffer = why === 'an existing directory' ? '' : why; // a folder that is not there cannot be made a repository; the other two can
         view.refresh();
         view.focus('repo_path');
+        if (repoOffer) document.getElementById('job-repo-offer')?.scrollIntoView({ block: 'nearest' }); // the button under the error is on the screen too, on a phone (#10783)
         throw new Error('The folder above needs fixing first.'); // the dialog's foot says it in words; the server's own line names the field (repo_path) and is the field's, said above (#10558)
     }
     if (data.error) throw new Error(data.error);
