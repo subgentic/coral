@@ -64,7 +64,7 @@
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.5a1.5 1.5 0 0 0-1.5-1.5H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h2"/></svg>
                                     </button>
                                     <!-- Dashboard: "Open Agent Tab" opens this agent in its own tab (href set on selection). Hidden in popout mode. -->
-                                    <a class="btn btn-quiet btn-icon btn-xs terminal-header-btn" id="terminal-open-window-link" target="_blank" rel="noopener noreferrer" title="Open Agent Tab" aria-label="Open Agent Tab" hidden>
+                                    <a class="btn btn-quiet btn-icon btn-xs terminal-header-btn" id="terminal-open-window-link" target="_blank" rel="noopener noreferrer" title="Open this agent in its own window" aria-label="Open this agent in its own window" hidden>
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
                                     </a>
                                     <!-- Popout: back to the full dashboard (noopener new tab). -->
@@ -74,10 +74,10 @@
                                     </button>
                                     <!-- View toggle: raw terminal vs. rendered chat transcript, the last of the header's actions, at the far right after Search and Pop out (#9927, the operator) -->
                                     <div class="live-view-toggle" role="group" aria-label="Center view">
-                                        <button type="button" class="live-view-toggle-btn active" id="live-view-btn-chat" data-on-click="live-view-mode" data-mode="chat" aria-pressed="true" title="Chat view" aria-label="Chat view">
+                                        <button type="button" class="live-view-toggle-btn active" id="live-view-btn-chat" data-on-click="live-view-mode" data-mode="chat" aria-pressed="true" title="Chat view: read and send messages" aria-label="Chat view">
                                             <span class="material-icons" aria-hidden="true">chat</span><span>Chat</span>
                                         </button>
-                                        <button type="button" class="live-view-toggle-btn" id="live-view-btn-terminal" data-on-click="live-view-mode" data-mode="terminal" aria-pressed="false" title="Terminal view" aria-label="Terminal view">
+                                        <button type="button" class="live-view-toggle-btn" id="live-view-btn-terminal" data-on-click="live-view-mode" data-mode="terminal" aria-pressed="false" title="Terminal view: what the agent sees, live" aria-label="Terminal view">
                                             <span class="material-icons" aria-hidden="true">terminal</span><span>Terminal</span>
                                         </button>
                                     </div>

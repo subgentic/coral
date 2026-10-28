@@ -40,6 +40,7 @@ function draw(root, { sections, current }) {
             lab.append(el('span', 'view-list-name', it.label));
             b.append(lab);
             b.setAttribute('aria-label', it.soon ? `${it.label}, soon` : (it.count != null ? `${it.label}, ${it.count}${it.unread ? ' unread' : ''}` : it.label)); // a number that is the unread count says so
+            if (it.tip) b.title = it.tip; // what is behind the row, in one line (#10074)
             if (it.unread && it.total != null) b.title = `${it.total} in all`; // the name and the count are read apart ("Board history, 1"), the count once (it is not in the name's text twice)
             if (it.soon) { b.disabled = true; b.classList.add('view-list-soon'); b.append(el('span', 'view-list-count', 'soon')); }
             else if (it.count != null) b.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : it.unread ? 'view-list-count view-list-new' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
