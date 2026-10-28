@@ -3814,6 +3814,7 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-stage-sub b { color: var(--text-primary); }
 .launch-recap { flex: none; margin: 0; padding: 10px 24px 0; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .launch-recap b { color: var(--text-primary); font-weight: var(--fw-strong); }
+.launch-recap-note { display: block; font-size: var(--fs-base); } /* what the chosen mode allows, a line under the recap (#10000) */
 .launch-recap[hidden] { display: none; }
 .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { display: flex; align-items: center; gap: 8px; padding: 10px 24px 16px; border-top: 0; }
 .launch-wizard[data-stage="folder"] > .modal-actions { border-top: 1px solid var(--border); padding-top: 16px; }
@@ -3856,6 +3857,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
     #restart-modal .restart-wizard-content > .modal-footer { margin: 0 !important; padding: 10px 16px 14px !important; }
     .launch-page-folder, .launch-wizard .settings-panes { padding: 16px; }
     .launch-recap { padding: 10px 16px 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; } /* two lines at most, so large text leaves the body room */
+    .launch-recap:has(.launch-recap-note) { -webkit-line-clamp: 4; } /* the recap and the line saying what the mode allows (#10000): the second line would cut it off */
     .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { padding: 10px 16px 14px; }
     .launch-agent-pick, .seg-group:not(.seg-cards) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
     #launch-agent-pick .launch-agent-opt:nth-child(2n) { border-right: 0; }

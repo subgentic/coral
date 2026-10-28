@@ -27,6 +27,20 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
     bypassPermissions: 'Everything except protected paths — isolated containers and VMs only',
 };
 
+// What Auto really is differs by CLI (Security's review of #10000, from _getPermissionFlagsForAgentMode): Claude's --permission-mode auto has a safety classifier; Codex never asks but runs in a workspace sandbox; Antigravity and Gemini get
+// --dangerously-skip-permissions (no prompts and no checks at all); Pi has no permission system, so it always acts on its own. A description that says 'with safety checks' is true of Claude only.
+export const NO_CHECKS_DESCRIPTION = 'Everything, with no prompts and no safety checks.';
+export const PI_NO_PERMISSIONS = 'Pi has no permission prompts: it always acts on its own.';
+const SKIPS_ALL_PROMPTS = ['', 'auto', 'dontAsk', 'bypassPermissions'];
+/** What a permission mode allows for this CLI, in words; with no CLI (Settings' own select, which is for all of them) the generic description. */
+export function permissionDescription(type, value) {
+    const t = String(type || '').toLowerCase(), v = value || '';
+    if (t === 'pi') return PI_NO_PERMISSIONS;
+    if ((t === 'agy' || t === 'antigravity' || t === 'gemini') && SKIPS_ALL_PROMPTS.includes(v)) return NO_CHECKS_DESCRIPTION;
+    if (t === 'codex' && CODEX_NETWORK_MODES.includes(v)) return CODEX_AUTO_DESCRIPTION;
+    return PERMISSION_MODE_DESCRIPTIONS[v] || '';
+}
+
 // Codex's Auto is a workspace sandbox with the network on (Security's #7483): a board member needs it to reach Coral
 // Codex launches these as workspace-write that never asks, which has the network on (Security's #7503); so does Codex with no mode: its Default is the same launch (codex.go, #7527)
 export const CODEX_NETWORK_MODES = ['default', 'auto', 'dontAsk'];
@@ -45,8 +59,7 @@ export function _updatePermModeDescription(selectEl, unset = false) {
     }
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc') || selectEl.closest('.settings-row, .sv-row')?.querySelector('.perm-mode-desc'); // Settings' line is in the label, not beside the select
     if (!hint) return;
-    const codex = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value === 'codex';
-    hint.textContent = codex && CODEX_NETWORK_MODES.includes(selectEl.value) ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[selectEl.value] || '';
+    hint.textContent = permissionDescription(selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value, selectEl.value);
 }
 
 export function _getPermissionFlagsForAgentMode(agentType, mode) {
