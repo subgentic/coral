@@ -201,7 +201,20 @@ export async function setChatFlag(sessionId, flag, value, server = null) {
     resetChatLists();
     return true;
 }
-async function setFlag(s, flag, value, after) { if (await setChatFlag(s.session_id, flag, value, s.server)) after(); }
+// Starring or archiving from the keyboard keeps the keyboard where it was and says what happened (#10420, Beta #10409: focus dropped to the page and nothing said "starred"): the list is drawn again, so the same chat's button is looked for in the new
+// list (a few frames), and a polite status says the result. A row that leaves the list (an archived chat in a list of the unarchived) leaves the keyboard on the page's list as it was.
+function refocusFlag(sessionId, flag, tries = 20) {
+    const b = [...document.querySelectorAll('#group-table-view button.dt-flag')].find(x => x.dataset.sid === sessionId && x.dataset.flag === flag);
+    if (b) { b.focus({ preventScroll: true }); return; }
+    if (tries > 0) requestAnimationFrame(() => refocusFlag(sessionId, flag, tries - 1));
+}
+async function setFlag(s, flag, value, after, said) {
+    const hadFocus = !!document.activeElement && document.activeElement.matches?.('button.dt-flag') && document.activeElement.dataset.sid === s.session_id;
+    if (!(await setChatFlag(s.session_id, flag, value, s.server))) return;
+    after();
+    if (said) importOnce('./notifications.js').then(m => m.announceNotice(said)).catch(() => {});
+    if (hadFocus) refocusFlag(s.session_id, flag);
+}
 
 const chatState = DT.tableState(); // the chats the person has selected on a phone (an avatar tap): kept across the redraws of a folder
 /** The table spec of a chat folder. ctx: { query, params, open(session), redraw(), after() } (params: the Filters' extra parameters of the history read, chat_filters.js; open: the chat in the viewer; redraw: draw the table again; after: counts and rows read again). */
@@ -238,7 +251,7 @@ export function chatsSpec(key, ctx) {
                     if (isCloud() || (s.server && s.server !== 'local')) return '';
                     const w = DT.el('span', 'dt-chat-flags');
                     // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat
-                    const flag = (key, on, icon, label, pressed) => { const b = DT.el('button', `dt-flag${key === 'starred' && on ? ' dt-flag-on' : ''}`); b.type = 'button'; b.title = label; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); if (pressed) b.setAttribute('aria-pressed', String(!!on)); const i = DT.el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', (e) => { e.stopPropagation(); setFlag(s, key, !on, ctx.after); }); return b; };
-                    w.append(flag('starred', s.starred, 'star', s.starred ? 'Remove the star' : 'Star', true), flag('archived', s.archived, s.archived ? 'unarchive' : 'archive', s.archived ? 'Unarchive' : 'Archive', false)); return w; } },
+                    const flag = (key, on, icon, label, pressed) => { const b = DT.el('button', `dt-flag${key === 'starred' && on ? ' dt-flag-on' : ''}`); b.type = 'button'; b.title = label; b.dataset.sid = s.session_id; b.dataset.flag = key; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); if (pressed) b.setAttribute('aria-pressed', String(!!on)); const i = DT.el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', (e) => { e.stopPropagation(); const who = name(s) || historyLabel(s); setFlag(s, key, !on, ctx.after, key === 'starred' ? (on ? `Star removed: ${who}` : `Starred: ${who}`) : (on ? `Unarchived: ${who}` : `Archived: ${who}`)); }); return b; };
+                    w.append(flag('starred', s.starred, 'star', s.starred ? 'Unstar' : 'Star', false), flag('archived', s.archived, s.archived ? 'unarchive' : 'archive', s.archived ? 'Unarchive' : 'Archive', false)); return w; } },
             ] }); ctx.selection?.(chatState.selected.size ? table.bar : null); return table.el; } };
 }
