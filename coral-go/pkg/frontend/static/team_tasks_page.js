@@ -1,7 +1,7 @@
 /* The team page's Tasks tab and a task's page (#7453): the right panel's Tasks tab moves here. The tab is a table of the whole team's tasks (Task, State, Assigned to, Goal, Priority) under filter chips with counts; a row's title opens the
  * task's own page (state, who, goal as a link, priority, description, when it started and ended), with a back link to the Tasks list and a pinned bar. Everything drawn is built with the DOM and
  * textContent: titles, bodies and names are written by agents. The task's own actions (Edit, Complete, Cancel, Publish, Nudge) stay in the task dialog for now ("Task actions"): they move onto this page with the Tasks build. Lazy: team_page.js imports it. */
-import { boardFetch, pathId, serverUrl, splitKey } from './server_base.js';
+import { boardFetch, pathId, serverUrl, splitKey, inTeam } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
@@ -25,6 +25,11 @@ const PAGE = 50;
 const REREAD_PAGES = 5; // a refresh reads at most this many loaded pages again: a person who scrolled a big board to its end does not make 30 requests every 10 s (#9121); the pages beyond are dropped, Load more fetches them again
 const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['needs_review', 'Needs review'], ['done', 'Done']];
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css)
+/** The empty page says what to do next: the New task button, and the team's Orchestrator when it has one (it makes the tasks the person asks for; #10371). */
+function noTasksYet() {
+    const orch = (state.liveSessions || []).some(s => inTeam(s, model.project) && /orchestrator/i.test(`${s.display_name || ''} ${s.board_job_title || ''}`));
+    return `No tasks yet. Add one with New task${orch ? ', or tell the Orchestrator what you want' : ''}.`;
+}
 let phoneWatched = false, newTask = null; // one New task button, moved between the search row and the chips' row
 const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTotal: 0, truncated: false, busy: false, error: '' });
 // Hide completed (the old tab's toggle, same stored key): the Open chip, chosen until the person picks All; kept in this browser (#7453).
@@ -232,7 +237,7 @@ function draw() {
     if (query && L.total != null && L.total > all.length && all.length && !model.loading) body.append(el('p', 'goals-note team-count-line', `Showing ${all.length} of ${L.total}${L.truncated ? '+' : ''}`));
     if (failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, failed), btn('btn btn-small', 'Try again', loadTasks)); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
-    else if (!all.length) { if (!failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : 'No tasks yet')); body.append(e); } }
+    else if (!all.length) { if (!failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : noTasksYet())); body.append(e); } }
     else {
         const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'needs_review' ? needsReview(t) : model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter)));
         if (!shown.length) {
