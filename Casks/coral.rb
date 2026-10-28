@@ -16,6 +16,13 @@ cask "coral" do
 
   app "Coral.app"
 
+  # The install-source marker Coral's updater reads (coral-go/internal/updater/install, #10561): written next to this version's staged files, outside the signed bundle, so a DMG copy that is put over
+  # the cask's app later is told from the cask's own (it has no marker for its version, and the cask's records of an older version do not count for it).
+  postflight do
+    require "json"
+    (staged_path/"install-source.json").write(JSON.generate({ "source" => "homebrew-cask", "app" => "#{appdir}/Coral.app", "version" => version.to_s }))
+  end
+
   zap trash: "~/.coral"
 
   caveats <<~EOS

@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/updater/apply"
 	"github.com/subgentic/coral/internal/updater/status"
 )
@@ -18,7 +19,7 @@ func probeInstall() *status.Install {
 	writable := func(p string) bool { return unix.Access(p, unix.W_OK) == nil }
 	switch runtime.GOOS {
 	case "darwin":
-		return describeInstall(&apply.Mac{SwapSupported: func(string) bool { return true }}, "darwin", writable)
+		return describeInstall(&apply.Mac{SwapSupported: func(string) bool { return true }, CoralVersion: config.Version}, "darwin", writable)
 	case "linux":
 		return describeInstall(&apply.Linux{Uid: os.Getuid(), SwapSupported: func(string) bool { return true }}, "linux", writable)
 	}
