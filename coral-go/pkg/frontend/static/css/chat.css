@@ -1491,6 +1491,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 
 /* Code colours in the light theme (#5273): the vendored highlight.js theme is GitHub Dark, whose colours are 1.6 to 2.1:1 on a light panel. These are GitHub's light colours, a shade darker where
    GitHub's own are under 4.5:1 on the chat's code chip (#e7e9ed). */
+[data-theme="light"] .hljs { color: var(--text-primary); } /* the plain code: the vendored theme is GitHub Dark, whose #c9d1d9 is 1.2:1 on a light block (Docs code blocks, #10209) */
 [data-theme="light"] .hljs-doctag, [data-theme="light"] .hljs-keyword, [data-theme="light"] .hljs-meta .hljs-keyword, [data-theme="light"] .hljs-template-tag, [data-theme="light"] .hljs-template-variable,
 [data-theme="light"] .hljs-type { color: #a40e26; }
 [data-theme="light"] .hljs-title, [data-theme="light"] .hljs-title.function_ { color: #6639ba; }
