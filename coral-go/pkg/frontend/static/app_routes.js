@@ -25,6 +25,10 @@ function notFound(message, listRoute) {
     return go(listRoute, { replace: true });
 }
 
+/** A restored start (the last place, #10057) waits for the live list and, for a team, its page; if the person has gone somewhere else by then (clicked the Inbox tab, say), the late restore must not pull them back (#10151).
+ *  The route on screen is the person's: it is this restored one only while nobody has moved it. */
+const leftBehind = (opts, r) => !!(opts && opts.restored) && !(currentRoute() && currentRoute().view === r.view && (currentRoute().id || '') === (r.id || ''));
+
 /** The place the person left is gone (an agent removed, a chat deleted): Home, with no message and nothing kept (#10057). */
 function goneQuietly() {
     forgetLastPlace();
@@ -49,6 +53,7 @@ function registerRouteHandlers() {
             return;
         }
         await liveListReady;
+        if (leftBehind(opts, r)) return;
         const s = (state.liveSessions || []).find(x => String(x.session_id || '').toLowerCase() === r.id
             && liveRoute(sessionServer(x), x.session_id).server === r.server);
         if (!s) return opts.restored ? goneQuietly() : notFound('That agent is not running here', { view: 'agents' });
@@ -64,6 +69,7 @@ function registerRouteHandlers() {
     route('chats', async (r, opts) => {
         if (nativeInbox()) return go(inboxRouteFor(r), { replace: true }); // the Hub's native Inbox has no Chats tab: an old address is the same chat or list in the Inbox, never a not-found page (Goal #100, #9549)
         await liveListReady;
+        if (leftBehind(opts, r)) return;
         if ((r.server || !isCloud()) && !setHistorySource(r.server || 'local')) return notFound('That computer was not found', { view: 'chats' });
         if (r.id) {
             switchNavTab('history', { fromHistory: true });
@@ -94,6 +100,7 @@ function registerRouteHandlers() {
     onRoute('team', async (r, opts) => {
         await liveListReady;
         if (opts && opts.restored && await teamIsMissing(routeKey(r))) return goneQuietly(); // the team the person left was deleted: Home, no "No team named" page (#10057)
+        if (leftBehind(opts, r)) return; // the page module is loaded by now: what is left is synchronous up to the page's first read
         switchNavTab('agents', { fromHistory: true });
         await applyTeamRoute(routeKey(r), r.sub || 'goals', r.item || 0, r.query || ''); // the team page (#7453); /team/<name> is its Goals tab
     });
