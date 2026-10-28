@@ -3,7 +3,7 @@
  * controls (#10248: a toast over the top of the page hid the Inbox's folder picker); its sentence wraps, it is not cut. The permission box is asked only from that click (a browser ignores one that is not). The switch in Settings >
  * Notifications is always there afterwards. */
 import { browserLocal } from './safe_storage.js';
-import { showToast } from './notifications.js';
+import { showToast, announceNotice } from './notifications.js';
 import { desktopNotifySupported, desktopNotifyEnabled, desktopNotifyBlocked, enableDesktopNotify } from './desktop_notify.js';
 
 export const ALERTS_OFFERED_KEY = 'coral-alerts-offered';
@@ -37,4 +37,5 @@ function showOfferBanner() {
     banner.append(text, on, off);
     const after = document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
     if (after) after.after(banner); else document.body.prepend(banner);
+    announceNotice(OFFER); // a strip drawn with its words is not reliably read out: the notices' own live region says the sentence once
 }
