@@ -22,7 +22,7 @@ const TEAM = `qa-search-${Date.now() % 100000}`;
             return R(u, o); }; return true; })()`);
         await openTeam(ev, waitFor, TEAM); await settle(500);
         await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); t.click(); return true; })()`);
-        const rows = () => ev(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).map(r => r.querySelector('.dt-primary').textContent.trim().slice(1))`) // the avatar's letter comes first;
+        const rows = () => ev(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).map(r => r.querySelector('.dt-primary .dt-person-name').textContent.trim())`) // the agent's name (the button's text also holds a state word for a screen reader after it, #9747);
         await waitFor(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).length === 3`, 'the three agents', 8000);
         const type = async (q) => { await ev(`(() => { const i = document.querySelector('#team-agents-search'); i.focus(); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(400); return rows(); };
         const got = await type('release'); assert.deepEqual(got, ['Zed'], 'a role finds its agent: ' + JSON.stringify(got));
