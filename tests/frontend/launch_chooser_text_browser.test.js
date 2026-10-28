@@ -31,6 +31,11 @@ const WORDS = {
             const rows = new Map(); for (const c of cards) rows.set(c.top, [...(rows.get(c.top) || []), c.h]);
             check(`${label}: the cards of a row are one height`, [...rows.values()].every(hs => Math.max(...hs) - Math.min(...hs) <= 2), JSON.stringify([...rows.entries()]));
             check(`${label}: nothing is wider than the screen`, await ev(`document.documentElement.scrollWidth <= innerWidth + 1`));
+            if (!mobile) { // the chooser is a short form: 40 rem wide, its cards 8 px apart (#9876: it had spread to the flow dialog's 60 rem)
+                const g = await ev(`(() => { const m = document.querySelector('#launch-modal .modal-content').getBoundingClientRect(), cs = [...document.querySelectorAll('#launch-step-chooser .launch-type-card')].map(c => c.getBoundingClientRect()); return { w: Math.round(m.width), gap: Math.round(cs[1].left - cs[0].right) }; })()`);
+                check(`${label}: the chooser is 40 rem wide, not the flow dialog's 60`, g.w >= 636 && g.w <= 644, JSON.stringify(g));
+                check(`${label}: the cards are 8 px apart`, g.gap >= 6 && g.gap <= 10, JSON.stringify(g));
+            }
             if (process.env.CORAL_SCREENSHOT_DIR) require('fs').writeFileSync(process.env.CORAL_SCREENSHOT_DIR + '/launch-chooser-' + label + '.png', Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
         }
     } finally { await client.close(); }
