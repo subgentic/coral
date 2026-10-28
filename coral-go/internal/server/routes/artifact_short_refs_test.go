@@ -15,7 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #9841: a shortened artifact link (coral://artifacts/b801aafb…f5f) is made whole by the server that stores the text, or the text is refused with the way to fix it.
@@ -150,4 +152,61 @@ func TestResolveShortArtifactRefsRoute(t *testing.T) {
 	}
 	code, _ = rig.getAs("", "/api/artifacts/resolve")
 	assert.Equal(t, http.StatusBadRequest, code, "no link at all")
+}
+
+// Through Coral Hub a short ref is the owner's alone (Security Reviewer's condition on #9841): a Hub member who is not the owner is refused exactly as for an artifact that does not exist,
+// and never resolved against the owner's objects, in a post's text and in the resolve route; the owner of the same Hub gets the id.
+func TestShortArtifactRefsThroughTheHubAreTheOwnersAlone(t *testing.T) {
+	id := hexID("b801aafb", "f5f")
+	h := shortRefHandler(t, id)
+	short := "coral://artifacts/b801aafb…f5f"
+	for _, c := range []struct {
+		name   string
+		header map[string]string
+		label  string // the owner label this machine has enrolled ("" = none)
+		owner  bool
+	}{
+		{"the owner through the hub", ownerHeaders(ownerLabel), ownerLabel, true},
+		{"a grantee with no owner marker", granteeHeaders(), ownerLabel, false},
+		{"the owner marker with no hub user", map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner"}, ownerLabel, false},
+		{"the owner through a machine with no enrolled label", ownerHeaders(ownerLabel), "", false},
+		{"the marker of a hub user that is not the enrolled owner", ownerHeaders("hub-user-9999ffff"), ownerLabel, false},
+		{"two owner markers", map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: ownerLabel, tunnel.HubRoleHeader: "owner, owner"}, ownerLabel, false},
+	} {
+		withLabel(t, c.label, nil)
+		r := httptest.NewRequest(http.MethodPost, "/api/board/x/messages", nil)
+		for k, v := range c.header {
+			r.Header.Set(k, v)
+		}
+		require.True(t, cloud.Tunneled(r), c.name+": the request is a tunneled one")
+		got, problem := h.expandShortArtifactRefs(r, "see "+short)
+		if c.owner {
+			require.Nil(t, problem, c.name)
+			assert.Equal(t, "see coral://artifacts/"+id, got, c.name)
+			continue
+		}
+		require.NotNil(t, problem, c.name+": a Hub member who is not the owner resolves nothing")
+		assert.Equal(t, "artifact_ref_unknown", problem.code, c.name)
+		assert.NotContains(t, problem.message, id, c.name+": the refusal does not name it")
+		assert.Empty(t, shortRefCandidates(r, h.coralDir, "b801aafb", ""), c.name+": not even a candidate")
+	}
+}
+
+// The same through the resolve route, with the callers the artifact reads are tested with: the owner gets the id, anyone else is refused and the answer holds no id.
+func TestResolveShortArtifactRefsThroughTheHubIsTheOwnersAlone(t *testing.T) {
+	rig := uploadRig(t)
+	code, up := rig.upload("s1", "note.txt", "text/plain", strings.NewReader("an agent's note"))
+	require.Equal(t, http.StatusCreated, code, up)
+	id := strings.TrimPrefix(up["uri"].(string), "coral://artifacts/")
+	for _, c := range hubCallers() {
+		withLabel(t, c.label, nil)
+		status, body := hubGet(t, rig.srv.URL+"/api/artifacts/resolve?link="+id[:8], c.header)
+		if c.allow {
+			require.Equal(t, http.StatusOK, status, "%s: %s", c.name, body)
+			assert.Contains(t, body, id, c.name)
+			continue
+		}
+		assert.Equal(t, http.StatusForbidden, status, c.name)
+		assert.NotContains(t, body, id, c.name)
+	}
 }
