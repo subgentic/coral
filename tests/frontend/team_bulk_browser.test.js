@@ -54,7 +54,8 @@ const BASE = require('./test_base').BASE;
         await ev(`(async()=>{const n=await import((window.__coralStatic||'/static/')+'notifications.js');n.showToast('Closed 2 goals',false,60000);return true;})()`);
         await waitFor(`document.getElementById('notices').getBoundingClientRect().top>=document.getElementById('local-auth-banner').getBoundingClientRect().bottom+7`,'toast below sign-in banner');
         await ev(`document.getElementById('local-auth-banner').hidden=true;true`);
-        await waitFor(`document.getElementById('notices').getBoundingClientRect().top<=document.querySelector('header.top-bar').getBoundingClientRect().bottom+9`,'toast follows hidden banner');
+        // the card sits under what is above it: the app bar and the team page's own header (its name and status, #10359), never the hidden banner
+        await waitFor(`(()=>{const e=s=>{const x=document.querySelector(s);return x&&x.getClientRects().length?x.getBoundingClientRect().bottom:0;};return document.getElementById('notices').getBoundingClientRect().top<=Math.max(e('header.top-bar'),e('#team-page-head'))+9;})()`,'toast follows hidden banner');
         await ev(`document.getElementById('local-auth-banner').hidden=false;true`);
         await waitFor(`document.getElementById('notices').getBoundingClientRect().top>=document.getElementById('local-auth-banner').getBoundingClientRect().bottom+7`,'toast follows restored banner');
         await waitFor(`Number(getComputedStyle(document.querySelector('.toast.toast-front')).opacity)>=0.99`,'toast entrance finishes');
