@@ -59,6 +59,16 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/team-status-no-signal.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             await ev(`window.__avail = 'available'; true`);
         });
+        await S.run('a team just woken says how many agents have reported, until all have (#10052)', async () => {
+            await ev(`window.__avail = 'unknown'; import((window.__coralStatic || '/static/') + 'team_waking.js').then(m => m.startWaking(${JSON.stringify(TEAM)})).then(() => true)`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`);
+            await waitFor(`/^Waking the team/.test(document.getElementById('team-page-status').textContent.trim())`, 'the waking progress', 6000);
+            const st = await status();
+            assert.match(st, /^Waking the team: \d+ of \d+ agents have reported\./, `the progress, not only the wait: ${JSON.stringify(st)}`);
+            await ev(`window.__avail = 'available'; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`);
+            await waitFor(`document.getElementById('team-page-status').textContent.trim() === 'All well'`, 'the usual status once all have reported', 6000);
+        });
         await S.run('the rollup and the rows are never drawn as two moments: Updating… and aria-busy until the rows arrive', async () => {
             await ev(`window.__tp.find('button, a, [role=row], tr', /Ship it/).click(); true`); await settle(600);
             assert.ok(await ev(`/In progress/.test(document.querySelector('#team-panel-goals').textContent)`), 'the first draw: In progress, with a rollup that agrees');
