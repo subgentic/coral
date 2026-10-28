@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
         assert.ok(await ev(vis('#team-board-name')) && await ev(`!document.getElementById('team-board-name').closest('.settings-pane')`), 'the name is in view and in no section');
         assert.equal(await ev(`document.activeElement.id`), 'team-board-name', 'the keyboard starts in the name');
-        assert.deepEqual(await ev(`(document.getElementById('team-board-name').getAttribute('aria-describedby') || '').split(' ').map(id => (document.getElementById(id) || {}).textContent)`), ["Letters, digits, - and _. This is the team's name in the list.", ''], 'the name is described by its help, then the notice under it');
+        assert.deepEqual(await ev(`(document.getElementById('team-board-name').getAttribute('aria-describedby') || '').split(' ').map(id => (document.getElementById(id) || {}).textContent)`), ["A project is a team of agents working on one board. Letters, digits, - and _.", ''], 'the name is described by its help, then the notice under it');
         assert.ok(await ev(vis('#team-board-name')) && await ev(vis('#launch-team-dir')), 'the name and the folder are on the first step');
         await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'crew-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/x'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
         await waitFor(vis('#team-template-select'), 'the template picker on the second step');

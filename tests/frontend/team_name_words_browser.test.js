@@ -1,4 +1,4 @@
-// The New team name says what it is in words a newcomer has: the hint under the field is "This is the team's name in the list." (no "board"), a bad name is said once, short, on the field,
+// The New team name says what it is in words a newcomer has: the hint under the field is "A project is a team of agents working on one board. Letters, digits, - and _." (the project word tied to the team once, #10660), a bad name is said once, short, on the field,
 // and the footer points at it instead of saying it again (#10371, Beta #10367: "board" is a Coral word, and the long error was in the field and in the footer). 1280 px, the real server's launch dialog.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -14,8 +14,8 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
         const hint = await ev(`(document.getElementById('team-board-name').getAttribute('aria-describedby') || '').split(' ').map(id => (document.getElementById(id) || {}).textContent || '')[0]`);
-        assert.equal(hint, "Letters, digits, - and _. This is the team's name in the list.", 'the hint under the name: ' + hint);
-        assert.doesNotMatch(hint, /board/i, 'no Coral word in it');
+        assert.equal(hint, "A project is a team of agents working on one board. Letters, digits, - and _.", 'the hint under the name: ' + hint);
+        assert.doesNotMatch(hint.replace('working on one board', ''), /board/i, 'no other Coral word in it: the one sentence that ties project and team says board, as the Operator\'s words do (#10660)');
         await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'bad name!'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/x'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the validation draws after the click
         const said = await ev(`(() => { const f = document.getElementById('launch-step-team'); const err = [...f.querySelectorAll('.sv-error')].map(e => e.textContent.trim()).filter(Boolean); return { err, footer: (document.getElementById('team-recap') || {}).textContent || '' }; })()`);
