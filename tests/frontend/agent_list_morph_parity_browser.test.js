@@ -66,7 +66,7 @@ async function session(noMorph) {
         await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions(JSON.parse(JSON.stringify(window.__sessions))); true`);
 
         // ignoreActive: a switch moves the highlight on two rows without drawing the list (#4990), so until the next render the markup the last render wrote differs from the page in
-        // those two rows' class and aria-current and nothing else; the step after it (a render) must be exactly equal again.
+        // those two rows' active and list-row-current classes (#10273) and aria-current and nothing else; the step after it (a render) must be exactly equal again.
         const step = async (label, action, { ignoreActive = false } = {}) => {
             if (action) await ev(action);
             await nextFrame();
@@ -74,7 +74,7 @@ async function session(noMorph) {
                 const list = (document.getElementById('live-sessions-list') || document.getElementById('mobile-session-list'));
                 const r = await import((window.__coralStatic || '/static/') + 'render.js');
                 const fresh = document.createElement('div'); fresh.innerHTML = r.lastLiveListHtml();
-                const strip = h => h.replace(/\\sactive(?=["\\s])/g, '').replace(/ aria-current="true"/g, '');
+                const strip = h => h.replace(/\\s(?:active|list-row-current)(?=["\\s])/g, '').replace(/ aria-current="true"/g, '');
                 return {
                     equalsFresh: ${ignoreActive} ? strip(list.innerHTML) === strip(fresh.innerHTML) : list.innerHTML === fresh.innerHTML,
                     visible: [...list.querySelectorAll('.session-group-item')].filter(e => e.offsetParent).map(e => e.dataset.sessionId),
