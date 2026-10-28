@@ -213,6 +213,8 @@ function auditRouting(requests, expected) {
 }
 async function newContext() { const b = await browserClient(); const { browserContextId } = await b.Target.createBrowserContext(); await b.close(); return browserContextId; }
 
+// the identity element starts with the phone's back arrow button (#9999): the name is what follows it
+const noArrow = (t) => String(t).replace(/^\s*\u2190\s*/, '').trim();
 const SHELL_PROBE = `(() => {
     const vis = (sel) => { const el = document.querySelector(sel); if (!el) return 'absent'; const cs = getComputedStyle(el); return (cs.display === 'none' || cs.visibility === 'hidden') ? 'hidden' : 'visible'; };
     const p = window._coralPopout;
@@ -524,7 +526,7 @@ async function run() {
     const ta = await openTab(`${BASE}/agent/${A}`, { stub: stubSource(fx) });
     await ta.waitFor(`window._coralPopout && window._coralPopout.getState && window._coralPopout.getState() !== 'loading'`, 8000); await ta.settled();
     let sa = await ta.ev(SHELL_PROBE);
-    check('9 identity chain: auto_name wins over board_job_title when display_name empty', /^Auto Bot/.test(sa.identity.trim()), sa.identity.trim());
+    check('9 identity chain: auto_name wins over board_job_title when display_name empty', /^Auto Bot/.test(noArrow(sa.identity)), sa.identity.trim());
     check('9 pill reflects waiting_for_input from the resolver before any WS tick (no state flash)', sa.pill === 'waiting', JSON.stringify({ pill: sa.pill, banner: sa.overlays.waiting }));
     check('10 title glyph ⏸ for needs input', /^⏸ Auto Bot · Coral$/.test(sa.title), sa.title);
     const fxCalls = await ta.ev(`window.__calls.filter(c => /\\/api\\/sessions\\/live\\/[^/]+\\/(capture|poll|send|keys|resize)(\\?|$)/.test(c.path) || /^\\/api\\/sessions\\/live\\/[^/]+$/.test(c.path)).map(c => ({ path: c.path, method: c.method, query: c.query, body: c.body }))`);
@@ -534,9 +536,9 @@ async function run() {
     // rename via WS diff
     await ta.ev(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [${JSON.stringify({ ...liveA, display_name: 'Renamed Bot', waiting_for_input: false, working: true })}] }); true`); await ta.nextFrame();
     sa = await ta.ev(SHELL_PROBE);
-    check('25 rename via live tick updates identity, pill and title in place', /^Renamed Bot/.test(sa.identity.trim()) && sa.pill === 'working' && /^● Renamed Bot · Coral$/.test(sa.title) && sa.hash === '', JSON.stringify({ identity: sa.identity.trim(), pill: sa.pill, title: sa.title, hash: sa.hash }));
+    check('25 rename via live tick updates identity, pill and title in place', /^Renamed Bot/.test(noArrow(sa.identity)) && sa.pill === 'working' && /^\u25cf Renamed Bot \u00b7 Coral$/.test(sa.title) && sa.hash === '', JSON.stringify({ identity: sa.identity.trim(), pill: sa.pill, title: sa.title, hash: sa.hash }));
     await ta.ev(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [{ name: 'coral-go', agent_type: 'claude', session_id: ${JSON.stringify(A)}, summary: 'Completely different summary' }] }); true`); await ta.nextFrame();
-    check('25 summary-only tick leaves identity alone', /^Renamed Bot/.test((await ta.ev(SHELL_PROBE)).identity.trim()));
+    check('25 summary-only tick leaves identity alone', /^Renamed Bot/.test(noArrow((await ta.ev(SHELL_PROBE)).identity)));
     // unified state vocabulary on the popout pill + title glyph (tasks #165-#167)
     {
         const OFF = { working: false, waiting_for_input: false, awaiting_user: false, not_started: false, stuck: false, done: false, sleeping: false };
@@ -664,7 +666,7 @@ async function run() {
     check('15 "Open Agent Tab" is the FIRST actionable item in every awake/sleeping kebab menu', withAnchor.length >= 2 && withAnchor.every(r => r.isFirst), JSON.stringify(withAnchor.map(r => ({ sid: r.sid.slice(0, 8), isFirst: r.isFirst }))));
     check('15 kebab label/title/aria are exactly "Open Agent Tab" with the icon kept', withAnchor.every(r => r.label === 'Open Agent Tab' && r.title === 'Open Agent Tab' && r.aria === 'Open Agent Tab' && r.hasIcon), JSON.stringify(withAnchor.map(r => [r.label, r.title, r.aria, r.hasIcon])));
     check('15 workspace header carries the same anchor in the main app', !!anchors.header && anchors.header.tag === 'A' && anchors.header.href === `/agent/${A}` && anchors.header.target === '_blank' && /noopener/.test(anchors.header.rel || ''), JSON.stringify(anchors.header));
-    check('15 workspace header opener accessible text is "Open Agent Tab" with the icon kept', !!anchors.header && anchors.header.title === 'Open Agent Tab' && anchors.header.aria === 'Open Agent Tab' && anchors.header.hasIcon, JSON.stringify(anchors.header));
+    check('15 workspace header opener accessible text is "Open this agent in its own window" (the tip on the header icon, #10074) with the icon kept', !!anchors.header && anchors.header.title === 'Open this agent in its own window' && anchors.header.aria === 'Open this agent in its own window' && anchors.header.hasIcon, JSON.stringify(anchors.header));
     check('15 old "Open in new window" wording is absent from the main app DOM', !anchors.oldWording);
     // 35: null DOM targets must not throw
     await td.ev(`for (const id of ['nav-tab-agents-badge', 'terminal-header-label', 'session-name']) { const el = document.getElementById(id); if (el) el.remove(); } true`);
