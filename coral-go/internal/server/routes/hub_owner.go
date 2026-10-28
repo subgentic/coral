@@ -104,6 +104,8 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/artifacts"):                   textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/session-artifacts"):                           textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/team-artifacts"):                              textArtifactsOwnerOnly,
+	tunnel.OwnerRouteKey("PUT", "/api/artifacts/{hex64}/star"):                      textStarOwnerOnly,
+	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}/star"):                   textStarOwnerOnly,
 	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}"):                        "through Coral Hub only the account this computer is linked to can delete an artifact",
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comments"):                 textCommentsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comments/{id}/resolve"):    textCommentsOwnerOnly,
@@ -127,6 +129,7 @@ var ownerRefusals = map[string]string{
 
 const textCustomModelsOwnerOnly = "through Coral Hub only the account this computer is linked to can add or change custom models (#5996)"
 
+const textStarOwnerOnly = "through Coral Hub only the account this computer is linked to can star an artifact (#9819)"
 const textSavedOwnerOnly = "through Coral Hub the saved messages are for the account this computer is linked to only (#5753)"
 
 const textHubAutoAcceptOwnerOnly = "through Coral Hub only the account this computer is linked to can turn Coral Hub auto-accept on or off; on this computer use Settings > Network and Hub"

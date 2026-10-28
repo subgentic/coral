@@ -33,6 +33,8 @@ type allArtifact struct {
 	MediaType string `json:"media_type"`
 	Size      int64  `json:"size"`
 	CreatedAt string `json:"created_at"`
+	// Starred: the Operator starred this artifact on this computer (#9819).
+	Starred bool `json:"starred"`
 	// Board is the board's id the uploading agent was on ("" when unknown); BoardLabel its name, or "unknown".
 	Board      string `json:"board"`
 	BoardLabel string `json:"board_label"`
@@ -241,7 +243,7 @@ func (h *SessionsHandler) listAllArtifacts(w http.ResponseWriter, r *http.Reques
 	}
 	q := r.URL.Query()
 	for k := range q {
-		if k != "limit" && k != "cursor" && k != "board" {
+		if k != "limit" && k != "cursor" && k != "board" && k != "starred" {
 			errBadRequest(w, "unknown parameter "+k)
 			return
 		}
@@ -265,7 +267,29 @@ func (h *SessionsHandler) listAllArtifacts(w http.ResponseWriter, r *http.Reques
 		}
 		hasCursor = true
 	}
+	var starredFilter *bool
+	if v := q.Get("starred"); v != "" {
+		if v != "true" && v != "false" {
+			errBadRequest(w, "starred must be true or false")
+			return
+		}
+		b := v == "true"
+		starredFilter = &b
+	}
 	rows := listAllArtifactRows(h.cfg.CoralDir())
+	stars := h.starredArtifactIDs(r.Context())
+	for i := range rows {
+		rows[i].Starred = stars[rows[i].ID]
+	}
+	if starredFilter != nil {
+		kept := rows[:0]
+		for _, row := range rows {
+			if row.Starred == *starredFilter {
+				kept = append(kept, row)
+			}
+		}
+		rows = kept
+	}
 	if boardFilter != "" {
 		kept := rows[:0]
 		for _, row := range rows {
@@ -303,6 +327,22 @@ func (h *SessionsHandler) listAllArtifacts(w http.ResponseWriter, r *http.Reques
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, out)
+}
+
+// starredArtifactIDs is the set of starred artifact ids (#9819); empty when the table cannot be read.
+func (h *SessionsHandler) starredArtifactIDs(ctx context.Context) map[string]bool {
+	out := map[string]bool{}
+	if h.db == nil {
+		return out
+	}
+	var ids []string
+	if err := h.db.Reader().SelectContext(ctx, &ids, "SELECT hex FROM artifact_stars"); err != nil {
+		return out
+	}
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out
 }
 
 // labelAllArtifactBoards fills BoardLabel from the board names, for the boards the page names.

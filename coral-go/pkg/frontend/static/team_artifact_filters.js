@@ -36,6 +36,7 @@ const FIELDS = {
     origin: { type: 'choice', values: ORIGINS, chip: v => `Origin: ${ORIGIN_LABEL[v]}` },
     by: { type: 'text', max: 80, chip: v => `By: ${v}` },
     kept: { type: 'flag', chip: 'Kept' },
+    starred: { type: 'flag', chip: 'Starred' }, // #9819
     tag: { type: 'custom', empty: '', clean: v => normalizeTag(v), filtered: v => !!v, chip: v => `Tag: ${v}` }, // one of the team's tags (the route takes several; the menu offers one), #8594
     task: numberField('Task', 'task'),
     goal: numberField('Goal', 'goal'),
@@ -70,6 +71,7 @@ export function toParams(f) {
     if (c.origin) p.origin = c.origin;
     if (c.by) p.by = c.by;
     if (c.kept) p.kept = 'true';
+    if (c.starred) p.starred = 'true';
     if (c.tag) p.tag = c.tag;
     if (c.task) p.task = c.task;
     if (c.goal) p.goal = c.goal;

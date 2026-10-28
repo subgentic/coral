@@ -415,6 +415,12 @@ CREATE TABLE IF NOT EXISTS artifact_keep (
     kept_at TEXT NOT NULL
 );
 
+-- Artifacts the Operator stars (#9819), to find them again: per artifact id (the object's digest) and per computer; no effect on what is stored or pruned.
+CREATE TABLE IF NOT EXISTS artifact_stars (
+    hex        TEXT PRIMARY KEY,
+    starred_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS custom_views (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	name       TEXT NOT NULL,

@@ -81,8 +81,15 @@ const WORLD = `(() => {
             check(`${label}: Kept only has its checkbox beside its label, the box first`, kept && kept.sameRow && kept.boxFirst && kept.gap <= 16, JSON.stringify(kept)); // the column layout of the panel's fields put the box above the words (#8807)
             const target = await ev(`(() => { const c = document.getElementById('ia-kept'), lab = c.closest('label'), w = lab.querySelector('.list-bar-field-label'); const before = c.checked; w.click(); const toggled = c.checked !== before; w.click(); return { toggled, restored: c.checked === before, h: Math.round(lab.getBoundingClientRect().height) }; })()`);
             check(`${label}: the whole label is the click target (a press on its words toggles the box)${mobile ? ', and at least 44 px high' : ''}`, target.toggled && target.restored && (!mobile || target.h >= 44), JSON.stringify(target)); // (#8807, UI/UX)
+            // Starred only (#9819): a checkbox beside Kept only that asks the list route for starred=true, and clears again
+            check(`${label}: the Filters panel offers Starred only`, !!(await ev(`!!document.getElementById('ia-starred')`)));
+            await ev(`document.getElementById('ia-starred').closest('label').querySelector('.list-bar-field-label').click(); true`);
+            await waitFor(`window.__ta.some(q => /(^|[?&])starred=true(&|$)/.test(q))`, `${label}: Starred only asks the route for starred=true`, 8000);
+            await ev(`document.getElementById('ia-starred').closest('label').querySelector('.list-bar-field-label').click(); true`);
+            await ev(`window.__ta.length = 0; true`);
             await ev(`(() => { const s = document.getElementById('ia-team'); s.value = 'beta'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, `${label}: the rows narrowed to the team`, 8000);
+            check(`${label}: with Starred only cleared the route is not asked for starred`, !(await ev(`window.__ta.some(q => /starred=/.test(q))`)));
             check(`${label}: the Team filter asks the route for that team`, (await ev(`window.__ta.some(q => /(^|[?&])team=beta(&|$)/.test(q))`)));
             check(`${label}: with one team chosen the Team column goes`, !(await ev(`[...document.querySelectorAll('#group-table-view thead th')].some(t => /^Team$/.test(t.textContent.trim()))`)));
             await ev(`(() => { const s = document.getElementById('ia-team'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);

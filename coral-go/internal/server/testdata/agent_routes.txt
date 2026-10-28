@@ -11,6 +11,7 @@ b DELETE /api/shared-images/{id}
 b DELETE /api/artifacts/{id}/comments/lock
 b DELETE /api/artifacts/{id}/comments/{cid}
 b DELETE /api/artifacts/{id}/keep
+b DELETE /api/artifacts/{id}/star
 b DELETE /api/auth/sessions/{id}
 b DELETE /api/board/remotes
 b DELETE /api/board/{project}
@@ -415,6 +416,7 @@ b POST /api/worktrees/remove
 a PUT /api/agent/ui/{id}
 b PUT /api/artifacts/{id}/comments/lock
 b PUT /api/artifacts/{id}/keep
+b PUT /api/artifacts/{id}/star
 b PUT /api/auth/hub-origins
 b PUT /api/auth/hub-signin
 b PUT /api/board/{project}/artifacts/{id}/tags

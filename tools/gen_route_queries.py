@@ -33,9 +33,9 @@ EXTRA = {
     'GET /api/goals': {'state', 'board'},
     # The Team Artifacts list's query (#4572): parseTeamArtifactQuery reads these from a url.Values it is handed, not from the request,
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
-    'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor'},
+    'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor'},
     # The cross-team artifact list (Goal #62): ListAllTeamArtifacts hands the team route's query parser a url.Values it parsed itself, plus team, limit and offset, which the scan above does not follow.
-    'GET /api/team-artifacts': {'team', 'q', 'kind', 'origin', 'by', 'board', 'kept', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'limit', 'offset'},
+    'GET /api/team-artifacts': {'team', 'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'limit', 'offset'},
     # The board message search (#4745): SearchMessages reads these from a url.Values it parsed itself (a mistyped query string is refused,
     # not dropped), which the scan above does not follow.
     'GET /api/board/{}/messages/search': {'q', 'from', 'mentions', 'since', 'until', 'sort', 'limit', 'cursor', 'for_subscriber'},
@@ -58,7 +58,7 @@ EXTRA = {
     # (#3168) every artifact link is /api/artifacts/<digest>?v=2; the handler reads v and accepts only absent or 2 (#3179).
     'GET /api/artifacts/{}': {'v'},
     # The machine-wide list (#5575), the owner's: listAllArtifacts reads the page size, the cursor it gave and a board filter.
-    'GET /api/artifacts': {'limit', 'cursor', 'board'},
+    'GET /api/artifacts': {'limit', 'cursor', 'board', 'starred'},
     # The comments on an artifact (#5176), registered by SessionsHandler.RegisterArtifactComments (not followed by the scan above):
     # listArtifactComments reads the thread state filter and the board a lock is read for.
     'GET /api/artifacts/{}/comments': {'state', 'board'},

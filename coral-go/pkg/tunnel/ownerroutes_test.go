@@ -94,6 +94,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if p == "/api/custom-models" && (m == http.MethodGet || m == http.MethodPut) {
 				continue
 			}
+			// Starring an artifact (#9819) is the owner's alone through the hub: the old list never had it.
+			if strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/star") && (m == http.MethodPut || m == http.MethodDelete) {
+				continue
+			}
 			// Saved for later is the owner's alone since #5753 and #5763 (the list, the whole message of a bookmark, and the changes): the old list never had them.
 			if p == "/api/saved" || strings.HasPrefix(p, "/api/saved/") && (m == http.MethodGet && strings.HasSuffix(p, "/message") || m == http.MethodPatch || m == http.MethodDelete) {
 				continue // every saved-for-later route (#5763): the list, the whole message, and the changes

@@ -97,7 +97,8 @@ func TestTheOwnerDecisionHasOneImplementation(t *testing.T) {
 func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 	want := map[string]string{
 		"GET /api/artifacts": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
-		"DELETE /api/artifacts/{hex64}": "owner-only", "GET /api/board/{project}/artifacts": "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
+		"DELETE /api/artifacts/{hex64}": "owner-only", "PUT /api/artifacts/{hex64}/star": "owner-only", "DELETE /api/artifacts/{hex64}/star": "owner-only", // the star (#9819)
+		"GET /api/board/{project}/artifacts": "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
 		"GET /api/session-artifacts": "owner-only", "GET /api/team-artifacts": "owner-only", "GET /api/settings/prompt-inspection": "owner-only", "PUT /api/board/{project}/settings": "owner-only",
 		"POST /api/board/{project}/cross-team/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/disable": "owner-only-hub",
 		"POST /api/board/{project}/cross-team/files/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/files/disable": "owner-only-hub",
