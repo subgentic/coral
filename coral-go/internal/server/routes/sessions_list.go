@@ -231,12 +231,13 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 
 // liveExtra is what a live session's row adds from its stored metadata.
 type liveExtra struct {
-	Prompt        *string
-	Model         *string
-	Thinking      *string
-	Observed      *string
-	Capabilities  *string
-	ContextWindow int
+	Prompt         *string
+	Model          *string
+	Thinking       *string
+	Observed       *string
+	Capabilities   *string
+	ContextWindow  int
+	PermissionMode *string // the launch's effective permission mode as stored (#10253): the empty chat says how the agent acts from it
 }
 
 // liveIndex is the stored live sessions by session id: asleep, archived, launched when, the board (fallback for
@@ -265,7 +266,7 @@ func newLiveIndex(allLive []store.LiveSession) liveIndex {
 			lv.boardNames[session.SessionID] = [2]string{*session.BoardName, ptr.Value(session.DisplayName)}
 		}
 		lv.extras[session.SessionID] = liveExtra{
-			Prompt: session.Prompt, Model: session.Model, Thinking: session.Thinking, Observed: session.ObservedModel, Capabilities: session.Capabilities, ContextWindow: session.ContextWindow,
+			Prompt: session.Prompt, Model: session.Model, Thinking: session.Thinking, Observed: session.ObservedModel, Capabilities: session.Capabilities, ContextWindow: session.ContextWindow, PermissionMode: session.PermissionMode,
 		}
 	}
 	return lv
@@ -521,6 +522,9 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		}
 		if extra.Thinking != nil && *extra.Thinking != "" {
 			entry["thinking"] = *extra.Thinking // the level it was started with (#4969)
+		}
+		if extra.PermissionMode != nil && *extra.PermissionMode != "" {
+			entry["permission_mode"] = *extra.PermissionMode // what the launch was given: never guessed, so a row with none says none (#10253)
 		}
 		addCapabilities(entry, extra.Capabilities)
 	}

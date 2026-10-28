@@ -30,7 +30,7 @@ const BASE = require('./test_base').BASE;
         const words = () => ev(`(() => { const e = document.querySelector('#live-history-messages > .chat-empty'); return e ? { role: e.getAttribute('role'), title: (e.querySelector('.chat-empty-title') || {}).textContent || '', hint: (e.querySelector('.chat-empty-hint') || {}).textContent || '', size: getComputedStyle(e).fontSize } : null; })()`);
         const open = async (name, patch) => {
             await ev(`window.__m.add('${name}', '${name}', 0, { sleeping: ${patch.sleeping ? 'true' : 'false'} }); { const r = window.T.state.liveSessions.find(x => x.session_id === '${name}-id'); if (r) r.staleness_seconds = ${patch.fresh || patch.old ? 'null' : '5'}; ${patch.age !== undefined ? 'r.created_at = new Date(Date.now() - ' + patch.age + ' * 1000).toISOString();' : ''} } true`); // the CLI has written output (5 s ago) unless this one is a just-launched agent with none (#6058)
-            await ev(`{ const r = window.T.state.liveSessions.find(x => x.session_id === '${name}-id'); if (r) { r.working_directory = '/home/u/work-dir'; ${patch.mode ? `r.permission_mode = '${patch.mode}';` : ''} ${patch.type ? `r.agent_type = '${patch.type}';` : ''} } } true`);
+            await ev(`{ const r = window.T.state.liveSessions.find(x => x.session_id === '${name}-id'); if (r) { r.working_directory = '/home/u/work-dir'; ${patch.mode ? `r.permission_mode = '${patch.mode}';` : ''} ${patch.live ? `r.live_permission_mode = '${patch.live}';` : ''} ${patch.type ? `r.agent_type = '${patch.type}';` : ''} } } true`);
             await ev(`window.selectLiveSession('${name}', '${patch.type || 'claude'}', '${name}-id', 'local'); true`);
             await waitFor(`!!document.querySelector('#live-history-messages > .chat-empty')`, `the empty state of ${name}`, 8000);
         };
@@ -38,21 +38,27 @@ const BASE = require('./test_base').BASE;
         console.log('1. An idle new agent: a title, and what to do next');
         await open('ec-idle', {});
         const said = () => waitFor(`/mode:|Pi has no/.test((document.querySelector('#live-history-messages > .chat-empty .chat-empty-hint') || {}).textContent || '')`, 'the words of how the agent acts (the settings words load on first use)', 6000);
-        await said();
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: the settings words load on first use; with no mode on record there is nothing to wait for, so the line is read after they could have
         let w = await words();
         assert.equal(w.role, 'status');
         assert.equal(w.title, 'Say hello to your agent');
         assert.match(w.hint, /Type below to start\.$/); // #5991: the keys and what appears are said by the box itself
         assert.equal(w.size, '14px', 'sized in rem: 0.875rem is 14px at the default size');
         // #10035 (the desktop tester: no hint what this agent can touch): the empty chat says where the agent works and how it acts, in plain words; no mode on record is the default, Auto
-        assert.match(w.hint, /^Working in work-dir\. Auto mode: everything, with safety checks\. Type below to start\.$/, 'folder, then how it acts, Claude\'s Auto in the words of Settings: ' + JSON.stringify(w.hint));
+        assert.equal(w.hint, 'Working in work-dir. Type below to start.', 'no mode on record: the folder, and nothing about how it acts (a guess of Auto was wrong for a Default launch, #10253): ' + JSON.stringify(w.hint));
         await shot('idle');
         console.log('1a. How it acts, by the mode it was launched with');
-        for (const [mode, type, expected] of [['default', 'claude', 'Default mode: asks before acting (each CLI\'s normal mode).'], ['acceptEdits', 'claude', 'Accept edits mode: reads, file edits, and common filesystem commands (mkdir, touch, mv, cp, etc.) — best for iterating on code you\'re reviewing.'], ['plan', 'claude', 'Plan mode: reads only — best for exploring a codebase before changing it.'], ['auto', 'codex', 'Auto mode: workspace sandbox, with the network on so it can reach Coral.'], ['auto', 'agy', 'Auto mode: everything, with no prompts and no safety checks.'], ['auto', 'pi', 'Pi has no permission prompts: it always acts on its own.']]) {
+        for (const [mode, type, expected] of [['auto', 'claude', 'Auto mode: everything, with safety checks.'], ['default', 'claude', 'Default mode: asks before acting (each CLI\'s normal mode).'], ['acceptEdits', 'claude', 'Accept edits mode: reads, file edits, and common filesystem commands (mkdir, touch, mv, cp, etc.) — best for iterating on code you\'re reviewing.'], ['plan', 'claude', 'Plan mode: reads only — best for exploring a codebase before changing it.'], ['auto', 'codex', 'Auto mode: workspace sandbox, with the network on so it can reach Coral.'], ['auto', 'agy', 'Auto mode: everything, with no prompts and no safety checks.'], ['auto', 'pi', 'Pi has no permission prompts: it always acts on its own.']]) {
             const name = `ec-mode-${mode}-${type}`;
             await open(name, { mode, type }); await said();
             w = await words();
             assert.equal(w.hint, `Working in work-dir. ${expected} Type below to start.`, `${mode}: ` + JSON.stringify(w.hint));
+        }
+        // the CLI's own report (live_permission_mode, Claude's hook) follows Shift+Tab: it wins over the launch's stored mode, and stands alone when none is stored
+        for (const [mode, live, expected] of [['auto', 'plan', 'Plan mode: reads only — best for exploring a codebase before changing it.'], [undefined, 'default', 'Default mode: asks before acting (each CLI\'s normal mode).']]) {
+            await open(`ec-live-${live}-${mode || 'none'}`, { mode, live }); await said();
+            w = await words();
+            assert.equal(w.hint, `Working in work-dir. ${expected} Type below to start.`, `reported ${live}, stored ${mode}: ` + JSON.stringify(w.hint));
         }
         await open('ec-idle', {});
 
