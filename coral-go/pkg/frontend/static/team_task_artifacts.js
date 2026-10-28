@@ -45,3 +45,14 @@ export async function taskArtifactsSection(project, task, sort = serverArtifactS
     if (Number.isFinite(total) && total > items.length) section.append(el('p', 'goals-note', `${total - items.length} more are in the team's Artifacts tab.`));
     return section;
 }
+
+/** The task's results as links for its completion form (up to 5: the name opens the artifact), or [] when it has none or the list cannot be read. */
+export async function taskResultLinks(project, task) {
+    try {
+        const resp = await boardFetch(project, `/artifacts?task=${pathId(task.id)}&limit=5&sort=${encodeURIComponent(serverArtifactSort())}`);
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        const items = (Array.isArray(data && data.artifacts) ? data.artifacts : []).filter(a => a && Number(a.task_id) === Number(task.id));
+        return items.map(item => { const b = el('button', 'team-link', String(item.name || 'Artifact')); b.type = 'button'; b.addEventListener('click', () => { const p = openIt(item); if (p) p.catch(() => {}); }); return b; });
+    } catch { return []; }
+}
