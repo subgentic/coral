@@ -48,11 +48,12 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await ev(`document.querySelector('${host} [data-stop="reset"]').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog opens
             let d = await dialogText();
             check(/Reset team/.test(d) && /Reset all agents in/.test(d), `Reset Team asks first: ${d.slice(0, 120)}`);
+            check(/starts again from its first instructions, in a new chat\. The old chats stay in History and your files are not touched\./.test(d) && !/context|original prompts/i.test(d), `Reset Team says what happens to chats and files, in plain words (#10371): ${d.slice(0, 300)}`);
             await closeDialog(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
             await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             await ev(`document.querySelector('${host} [data-stop="kill"]').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog opens
             d = await dialogText();
-            check(/Kill team/i.test(d) && /terminate/.test(d), `Kill All asks first, in words: ${d.slice(0, 160)}`);
+            check(/Kill team/i.test(d) && /Kill (all \d+ agents|the 1 agent) in "/.test(d) && /stop now\. (Their chats|Its chat) stays? in History\./.test(d) && !/terminate|on board/i.test(d), `Kill All asks first, in plain words, and says what stays (#10371): ${d.slice(0, 300)}`);
             await closeDialog(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
             // a sleeping team says Wake Team
             await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', true), mk('s2', 'Worker', true)])}; T.render.renderLiveSessions(T.state.liveSessions); document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu follows the team
