@@ -199,6 +199,10 @@
 .htu-item {
     white-space: nowrap;
 }
+/* A phone's first screen is the chat's title and tabs: the usage line (five figures) is one tap away on Details, which also shows the chat's id; a desktop has it at once (#10578) */
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    #history-token-usage:not(.htu-open) { display: none !important; }
+}
 
 .htu-label {
     color: var(--text-muted);
