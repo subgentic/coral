@@ -45,7 +45,7 @@ function chipCounts(agents) {
     const count = {};
     for (const a of agents) count[a.availability || 'unknown'] = (count[a.availability || 'unknown'] || 0) + 1;
     const keys = [...FIRST, ...Object.keys(count).filter(k => !FIRST.includes(k))].filter(k => count[k] || k === 'available');
-    return [['all', 'All', agents.length], ...keys.map(k => [k, CHIP_WORD[k] || WORD[k] || k, count[k] || 0])];
+    return [['all', 'All', agents.filter(a => a.availability !== 'archived').length], ...keys.map(k => [k, CHIP_WORD[k] || WORD[k] || k, count[k] || 0])];
 }
 
 // ── the tab ──────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ function sidebarIndex(a) {
 }
 function visibleAgents() {
     const all = (model.data && model.data.agents) || [];
-    const byState = model.filter === 'all' ? all : all.filter(a => (a.availability || 'unknown') === model.filter);
+    const byState = model.filter === 'all' ? all.filter(a => a.availability !== 'archived') : all.filter(a => (a.availability || 'unknown') === model.filter);
     const q = model.search.trim().toLowerCase();
     const shown = q ? byState.filter(a => `${a.name || ''} ${a.role || ''}`.toLowerCase().includes(q)) : byState;
     return [...shown].sort((x, y) => (isOrchestrator(y) - isOrchestrator(x)) || (rank(x) - rank(y)) || (sidebarIndex(x) - sidebarIndex(y)));
@@ -147,7 +147,8 @@ function draw() {
     if (!data.agents.length) { body.append(el('div', 'empty-state empty-state-tight', 'No agents on this board yet.')); return; }
     drawChips(body);
     const ended = data.agents.filter(a => a.availability === 'offline').length; // the tab lists every member, the sidebar only the live ones: this says why they differ (#8271)
-    body.append(el('p', 'goals-note team-agents-count', `${data.agents.length} agent${data.agents.length === 1 ? '' : 's'}${ended ? `, ${ended} ended` : ''}`));
+    const archived = data.agents.filter(a => a.availability === 'archived').length, live = data.agents.length - archived; // the same rule as the tab's badge and the sidebar group: an archived agent is told apart, not counted (#10369)
+    body.append(el('p', 'goals-note team-agents-count', `${live} agent${live === 1 ? '' : 's'}${ended ? `, ${ended} ended` : ''}${archived ? `, +${archived} archived` : ''}`));
     const rows = visibleAgents();
     body.append(DT.dataTable({
         label: `Agents, ${rows.length}`, rows, rowKey: ag => ag.subscriber_id || ag.session_id || ag.name, state: agentsTableState,
