@@ -30,6 +30,13 @@ export function registerBundled(namespaces) {
     for (const [name, ns] of Object.entries(namespaces)) bundled.set('./' + name, ns);
 }
 
+/** The module's namespace when it is already loaded, else null: for a caller that only has something to do if the module has been used (closing a form that was never opened must not load it). */
+export function loadedModule(spec) {
+    if (bundled.has(spec)) return bundled.get(spec);
+    const entry = loads.get(new URL(spec, import.meta.url).href);
+    return (entry && entry.ns) || null;
+}
+
 /** Import `spec` ('./name.js'), sharing one load per module. On failure the
  *  promise rejects, the attempt is forgotten, and, when `label` is given (a
  *  load the user asked for), a toast says what could not be loaded. Background
@@ -42,7 +49,7 @@ export function importOnce(spec, label) {
     if (!entry.pending) {
         const suffix = entry.attempt ? `?retry=${entry.attempt}` : '';
         entry.attempt++;
-        entry.pending = import(url + suffix).catch(err => {
+        entry.pending = import(url + suffix).then(ns => { entry.ns = ns; return ns; }, err => {
             entry.pending = null;
             console.error('[coral]', err);
             if (label) {

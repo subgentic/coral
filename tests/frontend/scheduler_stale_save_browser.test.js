@@ -37,7 +37,7 @@ const { connect } = require('./agent_view_harness');
 
         console.log('1. A change made elsewhere after the page loaded shows; one made while the editor is open survives a Save of the name');
         assert.equal((await call(`/api/scheduled/jobs/${jobId}`, 'PUT', { description: 'changed after the page loaded' })).status, 200);
-        await ev(`window.showJobModal(); document.querySelector('.job-type-btn[data-type="prompt"]').click(); true`); // the editor last showed an agent job
+        await ev(`window.showJobModal().then(() => { document.querySelector('.job-type-btn[data-type="prompt"]').click(); return true; })`); // the editor last showed an agent job
         await open();
         assert.equal(await field('job-modal-description'), 'changed after the page loaded', 'the editor opens with the server\'s job');
         assert.equal(await ev(`document.getElementById('job-modal-workflow').closest('.sv-row').hidden`), false, 'a workflow job opens as one');
