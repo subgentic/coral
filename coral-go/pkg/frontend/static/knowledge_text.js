@@ -33,6 +33,19 @@ function tagsOf(v) {
     return inner.split(',').map(t => unquote(t.trim())).filter(Boolean);
 }
 
+/** The distilled index is written with the team's board id (a name like b-p23b3rfwea): its first heading and its title line say the team's own name instead (#10376). Only those two lines: the body is the entry's. */
+export function withTeamLabel(text, teamId, label) {
+    const id = String(teamId == null ? '' : teamId), t = String(text == null ? '' : text);
+    if (!id || !label || id === label) return t;
+    return t.split('\n').map((line, i, all) => {
+        const heading = line.startsWith('# ') && all.slice(0, i).every(l => !l.startsWith('# ')) && line.includes(id);
+        const title = /^title:\s/.test(line) && line.slice(line.indexOf(':') + 1).trim() === id;
+        if (heading) return line.split(id).join(label);
+        if (title) return line.replace(id, label);
+        return line;
+    }).join('\n');
+}
+
 /** The file name the distillation gives an agent's notes: the name lower-cased, spaces as hyphens, and only a-z, 0-9, - and _ kept (internal/background/knowledge.go slugify). */
 export function slugOf(name) {
     return String(name == null ? '' : name).toLowerCase().replace(/ /g, '-').replace(/[^a-z0-9_-]/g, '');

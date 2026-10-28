@@ -4,11 +4,11 @@
  * entry (./orchestrator.md) opens that entry in the same pane. When a distillation ends, the entry it wrote opens there. The sidebar is the documents pane with its resize handle (detail_pane.js, the goal page's column).
  * Everything is built with the DOM and textContent. Lazy: team_page.js imports it. */
 import { importOnce } from './import_once.js';
-import { teamFetch } from './server_base.js';
+import { teamFetch, keyLabel } from './server_base.js';
 import { refusedTooLarge } from './utils.js';
 import { whenText } from './when_text.js';
 import { refreshDistill, startDistill, distillJob } from './knowledge_distill.js';
-const { splitFrontMatter, entryForLink } = await importOnce('./knowledge_text.js'); // the entry's front matter and its links (pure)
+const { splitFrontMatter, entryForLink, withTeamLabel } = await importOnce('./knowledge_text.js'); // the entry's front matter and its links (pure)
 const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's renderer: DOM-built, no markup from text
 const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
@@ -58,12 +58,15 @@ function factsBlock(f) {
     return dl.children.length ? dl : null;
 }
 
+/** The entry's text with the team's name where the distillation wrote its board id (the index's heading and title, #10376). */
+const inTeamWords = (text) => withTeamLabel(text, String(model.team).split('/').pop(), keyLabel(model.team));
+
 /** Draws the entry's Markdown in `host` (its front matter is the pane's Details, entryFacts). The text is on screen as plain text first, and the rendered DOM replaces it when the renderer is there (a failed load leaves the plain text, never markup).
  *  A link to another entry of the team opens it through `open`; any other relative link is plain text. */
 async function showEntry(host, entry, open) {
     host.replaceChildren();
     if (!entry.text) { host.append(Object.assign(el('pre', 'team-task-text knowledge-text'), { textContent: 'Nothing written yet.' })); return; }
-    const { body } = splitFrontMatter(entry.text); // the front matter is behind the pane's Details button (#7775), not above the text
+    const { body } = splitFrontMatter(inTeamWords(entry.text)); // the front matter is behind the pane's Details button (#7775), not above the text
     const plain = Object.assign(el('pre', 'team-task-text knowledge-text'), { textContent: body });
     host.append(plain);
     try {
@@ -90,7 +93,7 @@ async function showEntry(host, entry, open) {
 }
 
 /** The entry's front matter as the block the pane's Details button holds, or null when it has none. */
-const entryFacts = (entry) => { const { facts } = splitFrontMatter(entry.text || ''); return facts ? factsBlock(facts) : null; };
+const entryFacts = (entry) => { const { facts } = splitFrontMatter(inTeamWords(entry.text || '')); return facts ? factsBlock(facts) : null; };
 
 function openEntry(entry, opener, { focus = true } = {}) {
     let more = null;

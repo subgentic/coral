@@ -1,6 +1,6 @@
 // The Knowledge tab's text helpers (#7761): the front matter of an entry, the file name an agent's notes get, and the entry a relative link names. Pure functions (knowledge_text.js).
 import assert from 'node:assert/strict';
-import { splitFrontMatter, slugOf, entryForLink } from '../../coral-go/pkg/frontend/static/knowledge_text.js';
+import { splitFrontMatter, slugOf, entryForLink, withTeamLabel } from '../../coral-go/pkg/frontend/static/knowledge_text.js';
 
 const okf = '---\ntype: Team Knowledge Bundle\ntitle: coral-go-team\ndescription: Distilled institutional knowledge for team coral-go-team\ntags: [orchestrator, lead-developer, "qa-engineer"]\ntimestamp: 2026-10-22T04:22:31Z\n---\n\n# coral-go-team\n\n## Agents\n';
 const a = splitFrontMatter(okf);
@@ -27,4 +27,12 @@ assert.equal(entryForLink('./BACKEND-DEV.md', entries).key, 'agent:Backend Dev',
 assert.equal(entryForLink('./con_.md', entries).key, 'agent:con', 'a Windows device name carries a trailing underscore');
 assert.equal(entryForLink('./index.md', entries).key, 'index');
 for (const bad of ['./nobody.md', 'https://example.com/backend-dev.md', '/backend-dev.md', './sub/backend-dev.md', './backend-dev.md#x', './backend-dev.txt', '..\\backend-dev.md', 'javascript:alert(1)', '']) assert.equal(entryForLink(bad, entries), null, `${bad} names no entry`);
+console.log('knowledge_text: ok');
+
+// the index says the team's name, not its board id (#10376, the Mobile tester: a page titled "b-p23b3rfwea — Team Knowledge" for the team demo)
+assert.equal(withTeamLabel('# b-p23b3rfwea \u2014 Team Knowledge\n\nAuto-distilled from agent session histories.\n', 'b-p23b3rfwea', 'demo'), '# demo \u2014 Team Knowledge\n\nAuto-distilled from agent session histories.\n', 'the first heading names the team');
+assert.equal(withTeamLabel('title: b-p23b3rfwea', 'b-p23b3rfwea', 'demo'), 'title: demo', 'a title line is the team too');
+assert.equal(withTeamLabel('# Index\nWhat b-p23b3rfwea knows.', 'b-p23b3rfwea', 'demo'), '# Index\nWhat b-p23b3rfwea knows.', 'only the heading and the title are changed, never the body');
+assert.equal(withTeamLabel('# x', '', 'demo'), '# x', 'no id, no change');
+assert.equal(withTeamLabel('# a.b \u2014 Team Knowledge', 'a.b', 'demo'), '# demo \u2014 Team Knowledge', 'an id with a dot is matched as text, not a pattern');
 console.log('knowledge_text: ok');
