@@ -85,6 +85,14 @@ async function _ensureLevels(s, server) {
     if (_cur && `${_cur.server}:${_cur.session.agent_type}` === key && _levels.has(key)) updateModelChip(_cur.session, _cur.server);
 }
 
+/** Where the chip's model comes from (#10080): the row's model_source says the model its own transcript recorded or a hook reported (what the agent runs, which can differ from what was asked), or the one it was started with. */
+function modelSourceNote(s) {
+    if (!s.model) return '';
+    if (s.model_source === 'transcript' || s.model_source === 'hook') return 'The model the agent reported: what it runs now.';
+    if (s.model_source === 'launch') return 'The model it was started with.';
+    return '';
+}
+
 export function updateModelChip(session, server) {
     _cur = session ? { session, server } : null;
     const p = parts();
@@ -105,7 +113,7 @@ export function updateModelChip(session, server) {
         setText(text, v[k].text);                  // plain text, never markup (a failure message is the CLI's own output)
         chip.classList.toggle('chip-keyed', /default|^model$/i.test(v[k].text)); // "Model: CLI default", "Thinking: Default": the word alone does not say what it is for (#7063)
         setData(chip, 'state', v[k].state);
-        setTitle(chip, v[k].state === 'requested' ? v.note : '');
+        setTitle(chip, v[k].state === 'requested' ? v.note : (k === 'model' && !v.model.state ? modelSourceNote(s) : ''));
         setAttr(chip, 'aria-label', labels[k]);    // the name holds what the chip shows (label in name), not a fixed phrase that hides it
     }
     setText(p.note, v.note); // the live region stays in the page, empty and out of the way (css), so a note that appears is announced
