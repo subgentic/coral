@@ -23,6 +23,12 @@ type ChatFlags struct {
 
 // UpdateChatFlags changes only supplied fields in one atomic write. These flags do
 // not sleep, stop or archive the agent itself.
+// archivedChatSQL is whether the chat of the session id (an SQL expression) is archived, as 1 or 0: its own mailbox flag, or its agent being archived (the sidebar's Archived section). One answer for the folder
+// counts, the list's Archived filter and each row's flag, so Archived (n) in the sidebar and Inbox > Archived agree (#10086). cf is the chat_flags join of the query it is in.
+func archivedChatSQL(id string) string {
+	return "(CASE WHEN COALESCE(cf.archived,0)=1 OR EXISTS(SELECT 1 FROM live_sessions als WHERE als.session_id=" + id + " AND als.status='active' AND als.is_archived=1) THEN 1 ELSE 0 END)"
+}
+
 func (s *SessionStore) UpdateChatFlags(ctx context.Context, id string, starred, archived *bool) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO chat_flags(session_id,starred,archived) VALUES(?,COALESCE(?,0),COALESCE(?,0))
  ON CONFLICT(session_id) DO UPDATE SET starred=COALESCE(?,chat_flags.starred),archived=COALESCE(?,chat_flags.archived)`, id, starred, archived, starred, archived)
@@ -84,7 +90,7 @@ func (s *SessionStore) CountChatFolders(ctx context.Context, boards []string) (*
 	}
 	query := `WITH chats AS MATERIALIZED (
  SELECT si.session_id AS id, si.source_type AS cli, 0 AS is_group,
- COALESCE(cf.starred,0) AS starred, COALESCE(cf.archived,0) AS archived, ` + activeChatSQL("si.session_id", "si.source_type") + ` AS active, ` + notesChatSQL("si.session_id") + ` AS notes
+ COALESCE(cf.starred,0) AS starred, ` + archivedChatSQL("si.session_id") + ` AS archived, ` + activeChatSQL("si.session_id", "si.source_type") + ` AS active, ` + notesChatSQL("si.session_id") + ` AS notes
  FROM session_index si LEFT JOIN chat_flags cf ON cf.session_id=si.session_id
  UNION ALL
  SELECT 'board:'||b.value,'board',1,COALESCE(cf.starred,0),COALESCE(cf.archived,0),

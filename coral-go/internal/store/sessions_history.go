@@ -118,7 +118,7 @@ func sessionListQuery(params SessionListParams) sessionListSQL {
 		whereClauses = append(whereClauses, clause)
 		q.args = append(q.args, arg)
 	}
-	where("COALESCE(cf.archived, 0) = ?", params.Archived)
+	where(archivedChatSQL("si.session_id")+" = ?", params.Archived)
 	if params.Starred {
 		where("COALESCE(cf.starred, 0) = ?", true)
 	}
@@ -198,7 +198,7 @@ func (s *SessionStore) pageSessions(ctx context.Context, q sessionListSQL, param
 	offset := (params.Page - 1) * params.PageSize
 	selectFields := `si.session_id, si.source_type, si.source_file,
 		si.first_timestamp, si.last_timestamp, si.message_count, si.display_summary, si.first_user_message,
-		si.agent_name, si.display_name, COALESCE(cf.starred,0) AS starred, COALESCE(cf.archived,0) AS archived, ` + activeChatSQL("si.session_id", "si.source_type") + ` AS active`
+		si.agent_name, si.display_name, COALESCE(cf.starred,0) AS starred, ` + archivedChatSQL("si.session_id") + ` AS archived, ` + activeChatSQL("si.session_id", "si.source_type") + ` AS active`
 	query, pageArgs, err := sqlx.In(fmt.Sprintf("SELECT %s FROM %s%s ORDER BY %s LIMIT ? OFFSET ?", selectFields, q.from, q.where, q.order),
 		append(q.args, params.PageSize, offset)...)
 	if err != nil {

@@ -136,3 +136,29 @@ func TestChatMailboxRoutesFlagsFiltersCountsAndAuth(t *testing.T) {
 	assert.EqualValues(t, 1, out["total"], "group-only history is not the empty-install fast path")
 
 }
+
+// #10086: Unarchive on a chat whose agent is archived puts the agent back in the sidebar too, so the two Archived lists never disagree.
+func TestChatUnarchiveAlsoUnarchivesTheAgent(t *testing.T) {
+	ctx := context.Background()
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "chats.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	h := NewHistoryHandler(db, &config.Config{}, nil)
+	stamp := "2026-10-25T20:00:00Z"
+	require.NoError(t, h.ss.UpsertSessionIndex(ctx, &store.SessionIndex{SessionID: "quiet-agent", SourceType: "claude", SourceFile: "/fixture/quiet-agent", LastTimestamp: &stamp}))
+	require.NoError(t, h.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "quiet-agent", AgentName: "quiet-agent", AgentType: "claude", WorkingDir: "/fixture"}))
+	require.NoError(t, h.ss.SetSessionArchived(ctx, "quiet-agent", true))
+	r := chi.NewRouter()
+	r.Patch("/api/sessions/history/{sessionID}/flags", h.SetChatFlags)
+	req := httptest.NewRequest("PATCH", "/api/sessions/history/quiet-agent/flags", strings.NewReader(`{"archived":false}`))
+	req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	archived, err := h.ss.IsSessionArchived(ctx, "quiet-agent")
+	require.NoError(t, err)
+	assert.False(t, archived, "the agent is out of the sidebar's Archived section")
+	got, err := h.ss.ListSessionsPaged(ctx, store.SessionListParams{PageSize: 10, Archived: true})
+	require.NoError(t, err)
+	assert.Empty(t, got.Sessions, "and out of Inbox > Archived")
+}
