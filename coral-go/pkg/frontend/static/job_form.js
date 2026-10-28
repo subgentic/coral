@@ -1,5 +1,6 @@
 /* The New job / Edit job dialog (#7908): a settings_view in form mode. The fields are drawn from the spec below (label above, Required, the first invalid field focused, a status line under the
  * form); what is the job's own stays here: the schedule picker with its sentence, the workflow list, the time limit in words, the request. The ids of the controls are the page's contract and stay. */
+import { state } from './state.js';
 import { mountSettingsView } from './settings_view.js';
 import { ensureBuilt } from './lazy_dom.js';
 import { escapeHtml, showToast } from './utils.js';
@@ -232,7 +233,7 @@ function jobFields(host) {
                 slot.append(el('span', '', 'No workflows yet.'), ' ', b);
             },
         },
-        { key: 'repo_path', type: 'path', id: 'job-modal-repo', label: 'Repository path', required: true, requiredMessage: 'Enter the repository path.', placeholder: '/path/to/repo', default: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' }, visibleWhen: prompt },
+        { key: 'repo_path', type: 'path', id: 'job-modal-repo', label: 'Repository path', required: true, requiredMessage: 'Enter the repository path.', placeholder: '/path/to/repo', default: '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' }, visibleWhen: prompt },
         {
             key: 'agent_type', type: 'select', id: 'job-modal-agent', label: 'Agent', default: 'claude', visibleWhen: prompt,
             options: [{ value: 'claude', label: 'Claude' }, { value: 'agy', label: 'Antigravity (agy)' }, { value: 'codex', label: 'Codex' }, { value: 'pi', label: 'Pi' }],
@@ -361,6 +362,8 @@ export function showJobModal() {
     editingJobId = null;
     openedJob = null;
     v.reset(); // every field at its default, no errors, an empty status line
+    // No folder is chosen for the person: the Settings default if they set one, else empty and required, never the home folder (as New Agent has it, #5989; #9958).
+    if (state.settings?.default_working_dir) v.set('repo_path', state.settings.default_working_dir);
     v.fold(false);
     openModal('New job', 'Create job');
     loadWorkflowOptions().then(() => { if (noWorkflows && editingJobId === null) v.set('job_type', 'prompt'); }); // a first job with no workflow to pick opens on the Agent prompt (#9297)

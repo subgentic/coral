@@ -85,6 +85,25 @@ async function loadWorkflowsById() {
     return workflowsById;
 }
 
+/** The job page's runs and its detail, read again and drawn (a run that was pending or running is read again every 3 s until it has ended, so the page does not keep saying "Waiting to start" for a run the sidebar already lists as Failed, #9958). */
+async function reloadJobDetail(job) {
+    const jobId = job.id;
+    const [jobRuns, , workflowPage] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null,
+        job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw new Error('Unable to load workflow runs'); return r.json(); }).then(data => ({ runs: data.runs || [], total: data.total })).catch(() => null) : null]);
+    if (selectedJobId !== jobId) return;
+    renderJobDetail(job, jobRuns.runs, workflowPage && workflowPage.runs, jobRuns.total, workflowPage && workflowPage.total);
+    watchJobRuns(job, jobRuns.runs);
+}
+let _runsWatch = null;
+function watchJobRuns(job, runs) {
+    clearTimeout(_runsWatch); _runsWatch = null;
+    if (!(runs || []).some(r => r.status === 'pending' || r.status === 'running')) return;
+    _runsWatch = setTimeout(() => {
+        const shown = document.getElementById('scheduler-view');
+        if (selectedJobId === job.id && shown && shown.getClientRects().length > 0) reloadJobDetail(job).catch(() => {});
+    }, 3000);
+}
+
 let _saved = null; // a job was just created or updated: its page says so once, under the title (#9298)
 export async function selectScheduledJob(jobId) {
     selectedJobId = jobId;
@@ -100,10 +119,8 @@ export async function selectScheduledJob(jobId) {
     state.currentSession = null;
     document.querySelectorAll('.session-list-item.active').forEach(el => setRowCurrent(el, false));
 
-    const [jobRuns, , workflowPage] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null,
-        job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw new Error('Unable to load workflow runs'); return r.json(); }).then(data => ({ runs: data.runs || [], total: data.total })).catch(() => null) : null]);
+    await reloadJobDetail(job);
     if (selectedJobId !== jobId) return;
-    renderJobDetail(job, jobRuns.runs, workflowPage && workflowPage.runs, jobRuns.total, workflowPage && workflowPage.total);
     if (isPhoneLayout()) { document.getElementById('scheduler-view')?.setAttribute('data-phone-item', ''); document.getElementById('scheduler-detail')?.scrollIntoView({ block: 'start' }); } // a phone shows the job's page as its own screen (#7443); the list is the screen before it (#6139)
 }
 
