@@ -77,7 +77,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
             await tap('#model-chip');
         }, { min: 10, expect: `!document.getElementById('model-chip-menu').hidden` });
         await ev(`document.body.click(); true`);
-        await sc('terminal view', async () => { await tap('#live-view-btn-terminal'); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').classList.contains('active') || document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true'` });
+        await sc('terminal view', async () => { await tap('#live-view-btn-terminal'); await waitFor(`(() => { const l = document.getElementById('changed-files-list'); return !l || l.getClientRects().length === 0 || (l.textContent.trim().length > 0 && !/Loading/i.test(l.textContent)); })()`, 'the Files list has been read (a row that arrives after the Tab walk would be a control no press reached, #10753)', 15000); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').classList.contains('active') || document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true'` });
         await tap('#live-view-btn-chat');
         await ev(`window.toggleAgenticPanel && window.toggleAgenticPanel(true); true`);
         for (const tab of await ev(`[...document.querySelectorAll('#agentic-block-top .agentic-tab[data-tab]')].filter(e => e.getClientRects().length).map(e => e.dataset.tab)`)) await sc(`side panel: ${tab}`, async () => { await ev(`window.switchAgenticTab(${JSON.stringify(tab)}, 'top'); true`); }, { min: 5, expect: `document.querySelector('#agentic-block-top .agentic-tab[data-tab="${tab}"]').classList.contains('active')` });

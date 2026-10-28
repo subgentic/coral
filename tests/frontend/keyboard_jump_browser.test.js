@@ -82,7 +82,7 @@ const BASE = require('./test_base').BASE;
         for (const l of [lists.mac, lists.pc]) assert.ok(has(l, /Search agents/) && has(l, /Stop a reply/), 'the list has Search agents and Stop a reply');
 
         // Cmd+Option+N is New agent on a Mac
-        await ev(`Object.defineProperty(navigator, 'platform', { configurable: true, get: () => 'MacIntel' }); document.activeElement && document.activeElement.blur(); true`);
+        await ev(`Object.defineProperty(navigator, 'platform', { configurable: true, get: () => 'MacIntel' }); Object.defineProperty(navigator, 'userAgentData', { configurable: true, get: () => ({ platform: 'macOS' }) }); document.activeElement && document.activeElement.blur(); true`); // the page asks userAgentData first, then platform: both say Mac (a Linux runner says Linux)
         await key('n', 'KeyN', META | ALT);
         await waitFor(`(() => { const d = document.getElementById('launch-step-agent'); return !!d && getComputedStyle(d).display !== 'none' && d.getClientRects().length > 0; })()`, 'New agent opens with Cmd+Option+N', 8000);
         console.log('PASS Jump to (Cmd/Ctrl+K) opens agents and chats by name; Cmd/Ctrl+, Settings; / Search agents; the list in the person\'s own keys');
