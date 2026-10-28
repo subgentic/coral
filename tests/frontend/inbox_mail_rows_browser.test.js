@@ -43,7 +43,7 @@ const AGENTS = [
             for (const x of r) {
                 assert.ok(x.leadW >= 44 && x.lead >= 44 && x.avatar === 32, at + 'a 44 px target around a 32 px avatar ' + JSON.stringify(x));
                 assert.ok(x.open && x.dot && x.bold >= 600, at + 'a button, the amber dot, the title bold ' + JSON.stringify(x));
-                assert.ok(x.h >= 64 && x.h <= 72 && x.ask, at + 'Needs you is two lines, 64 px or more ' + JSON.stringify(x));
+                assert.ok(x.h === 64 && x.ask, at + 'Needs you is two lines, exactly 64 px (with its dot) ' + JSON.stringify(x));
                 assert.ok(x.timeRight <= 16 && /ago|min|\d/.test(x.time), at + 'the time is at the right ' + JSON.stringify(x));
             }
             assert.ok(r.some(x => /^Wants to run: go test/.test(x.ask)) && r.some(x => x.ask && x.title === 'Agent Two'), at + 'the ask is the second line, the state when there is none ' + JSON.stringify(r));
@@ -69,6 +69,11 @@ const AGENTS = [
             assert.deepEqual(r.map(x => x.h), readHeights, at + 'an unread row is exactly as tall as a read one');
             await readAs('Date.now() + 1e10');
             await showTasks('the three tasks read again');
+            // forced colors draws no shadow: the divider between the rows is a border there
+            await Emulation.setEmulatedMedia({ features: [{ name: 'forced-colors', value: 'active' }] });
+            await waitFor(`getComputedStyle(document.querySelector('${T} tr.dt-mailed')).borderBottomWidth === '1px'`, at + 'a mail row keeps a divider in forced colors', 4000);
+            await Emulation.setEmulatedMedia({ features: [{ name: 'forced-colors', value: 'none' }] });
+            await waitFor(`getComputedStyle(document.querySelector('${T} tr.dt-mailed')).borderBottomWidth === '0px'`, at + 'and the divider is the shadow again', 4000);
             // at 200% text the title and the first words stack (a line each), neither cut to a few letters, and the time keeps its space (#9646)
             await ev(`document.documentElement.style.fontSize = '200%'; true`);
             await waitFor(`document.querySelector('${T} .dt-mail-line') && getComputedStyle(document.querySelector('${T} .dt-mail-line')).flexDirection === 'column'`, at + 'the line stacks at 200% text', 4000);
