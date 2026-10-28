@@ -29,8 +29,8 @@ function wantWords() { if (!permissionDescription) importOnce('./permission_flag
 function worksIn(row) {
     wantWords();
     const folder = String(row?.working_directory || '').split(/[\\/]/).filter(Boolean).pop();
-    const type = String(row?.agent_type || '').toLowerCase(), mode = row?.permission_mode || 'auto'; // no mode on record: new agents use Auto
-    const said = permissionDescription ? permissionDescription(type, mode).replace(/\.$/, '') : '';
+    const type = String(row?.agent_type || '').toLowerCase(), mode = [row?.live_permission_mode, row?.permission_mode].find(m => typeof m === 'string' && Object.prototype.hasOwnProperty.call(MODE_NAMES, m) && m !== '') || ''; // the CLI's own report (Claude's hook, follows Shift+Tab) first, then what the launch was given; none on record: no claim (a guess of Auto said 'safety checks' of a Default launch, #10253)
+    const said = permissionDescription && (mode || type === 'pi') ? permissionDescription(type, mode).replace(/\.$/, '') : ''; // Pi has no permission prompts whatever the mode (its words do not depend on it)
     const how = !said ? '' : type === 'pi' || !MODE_NAMES[mode] ? `${said}.` : `${MODE_NAMES[mode]}: ${said.charAt(0).toLowerCase()}${said.slice(1)}.`;
     return [folder ? `Working in ${folder}.` : '', how].filter(Boolean).join(' ');
 }
