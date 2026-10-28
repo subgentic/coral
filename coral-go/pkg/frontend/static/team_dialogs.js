@@ -18,7 +18,7 @@ const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { showSettingsModal } = await importOnce('./settings_dialog.js');
 const { modelName, levelName } = await importOnce('./model_labels.js');
 const { launchedMode } = await importOnce('./preset_enforcement.js');
-const { BUILTIN_TEAM_TEMPLATES, _renderTeamTemplateSelector, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
+const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, _renderTeamTemplateSelector, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
 const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings, setTeamLaunchMode } = await importOnce('./team_launch_settings.js');
 
@@ -415,15 +415,15 @@ async function _initTeamForm() {
 
     // The default team is in Members when the dialog opens (#9877, the Operator): the Orchestrator, the Lead Developer and the QA Engineer, the first three of the Coding Team, each removable; a template still replaces them.
     // A team the AI generated fills the list itself (launch.skipDefaultTeamAgents). #5989 opened it empty after four agents nobody picked were launched; three a person can see and remove are not that.
-    if (!launch.skipDefaultTeamAgents) {
-        for (const a of BUILTIN_TEAM_TEMPLATES[0].agents.slice(0, 3)) _addTeamAgent(a.name, a.prompt, a.capabilities, a.agent_type, a.model, a.flags);
-    }
+    const defaultsOnOpen = !launch.skipDefaultTeamAgents;
+    if (defaultsOnOpen) _addDefaultMembers();
 
     // Fetch existing boards for uniqueness validation
     await _loadExistingTeamBoards();
 
-    // The template picker starts with nothing chosen
+    // The template picker says what is in Members: the default team when it was filled in, nothing chosen otherwise (#9906)
     resetTeamTemplatePicker();
+    if (defaultsOnOpen) markTeamTemplate(DEFAULT_TEAM_KEY);
     _syncTeamMembers();
 
     launch.skipDefaultTeamAgents = false;
@@ -432,6 +432,11 @@ async function _initTeamForm() {
     _validateTeamName();
 }
 
+
+/** The default team's members: the first three of the Coding Team (#9877). */
+function _addDefaultMembers() {
+    for (const a of BUILTIN_TEAM_TEMPLATES[0].agents.slice(0, 3)) _addTeamAgent(a.name, a.prompt, a.capabilities, a.agent_type, a.model, a.flags);
+}
 
 function _loadTeamTemplate(name) {
     const all = [...BUILTIN_TEAM_TEMPLATES, ..._getSavedTeamTemplates()];
@@ -584,6 +589,15 @@ function _pickTeamTemplate(name) {
         document.getElementById('team-agents-list').innerHTML = '';
         _clearTeamUndo();
         markTeamTemplate('');
+        _syncTeamMembers();
+        return;
+    }
+    if (name === DEFAULT_TEAM_KEY) { // the default team again: it replaces the members, as any template does
+        launch.teamAgentCounter = 0;
+        document.getElementById('team-agents-list').innerHTML = '';
+        _clearTeamUndo();
+        _addDefaultMembers();
+        markTeamTemplate(DEFAULT_TEAM_KEY);
         _syncTeamMembers();
         return;
     }

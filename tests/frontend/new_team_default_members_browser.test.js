@@ -20,6 +20,8 @@ const BASE = require('./test_base').BASE;
         await openNewTeam(ev, waitFor);
         await t.to(2, {}); // the Members step, no template picked
         assert.deepEqual(await roles(), ['Orchestrator', 'Lead Developer', 'QA Engineer'], 'the dialog opens with the default team in Members, roles exact');
+        const chosen = () => ev(`(() => { const s = document.getElementById('team-template-select'); return s.options[s.selectedIndex].textContent.trim(); })()`);
+        assert.match(await chosen(), /^Default team/, 'the template choice says the default team is in Members, not "Blank team" (#9906)');
         assert.equal(await ev(`document.getElementById('team-orchestrator-line').hidden`), true, 'the "Add an Orchestrator" notice is not there: the team has one');
         assert.equal(await ev(`getComputedStyle(document.querySelector('#team-agents-list').parentElement.querySelector('.empty-state')).display`), 'none', 'and "No members yet" is not said');
         assert.equal(await ev(`document.querySelectorAll('#team-agents-list > *').length`), 3, 'three member rows');
@@ -32,6 +34,12 @@ const BASE = require('./test_base').BASE;
         assert.ok((await menuItems(1)).includes('Remove'), 'the Lead Developer can be removed');
         await ev(`[...window.__nt.dlg(${require('./helpers/new_team').N.team}).querySelectorAll('[role=menuitem]')].find(x => window.__na.name(x) === 'Remove').click(); true`); await settle(300);
         assert.deepEqual(await roles(), ['Orchestrator', 'QA Engineer'], 'Remove takes the member out');
+        // Blank team clears them and says so; the Default team choice brings the three back
+        await t.pick(require('./helpers/new_team').N.template, /^Blank/); await settle(300);
+        assert.deepEqual(await roles(), [], 'Blank team clears the members');
+        assert.match(await chosen(), /^Blank team/, 'and the choice says Blank team');
+        await t.pick(require('./helpers/new_team').N.template, /^Default team/); await settle(300);
+        assert.deepEqual(await roles(), ['Orchestrator', 'Lead Developer', 'QA Engineer'], 'the Default team choice puts the three back');
         // a template still replaces them
         await t.pick(require('./helpers/new_team').N.template, /Consumer Research/);
         await settle(300);
