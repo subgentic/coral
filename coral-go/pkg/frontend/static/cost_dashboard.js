@@ -313,8 +313,6 @@ export async function _refreshCostDashboard({ force = false } = {}) {
     const period = document.getElementById('cost-time-range')?.value || 'day';
     const { hoursAgo, since, sinceParam, interval, tsParams } = costRange(period, Date.now());
 
-    // Flash live indicator
-    _flashLiveIndicator();
     _refreshSeries(); // the chart above the open breakdown view (#7857)
     _refreshOverview(); // the change against the period before, and cost by team (#7930)
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
@@ -339,6 +337,7 @@ export async function _refreshCostDashboard({ force = false } = {}) {
             _setText('cost-cache-write', compactFigure(t.cache_write_tokens || 0));
             _setText('cost-total-requests', String(t.num_requests || 0)); // the calls recorded: the figure By agent's Requests column adds up to
             _setText('cost-total-cost', formatCost(t.cost_usd || 0, { zeroAsTwo: true }));
+            _flashLiveIndicator(); // the figures were read: say when
 
             // By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them).
             _renderProviderTable(providerRows(data.by_agent_type));
@@ -669,6 +668,8 @@ function _flashLiveIndicator() {
     const el = document.getElementById('cost-live-indicator');
     if (!el) return;
     el.classList.add('cost-live-flash');
+    const at = document.getElementById('cost-live-text'); // the word says what happened, not that something is "live": when the figures were last read (#10740)
+    if (at) at.textContent = `Updated ${new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
     setTimeout(() => el.classList.remove('cost-live-flash'), 1000);
 }
 
