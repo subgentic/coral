@@ -19,7 +19,7 @@ const docTableStates = new Map();
  *  these docs. The agent prompt says the same (internal/agent DocsPromptLine; a Go test keeps them equal). */
 export const DOCS_FOR_AGENTS = "Coral's docs for agents: run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read one (`coral-agent docs all` prints everything).";
 
-let docsList = [];
+let docsList = [], docsLoaded = false; // docsLoaded: the list was read (an empty one is an answer, not a wait)
 let selectedDoc = null;
 let wantedDoc = null; // a /docs/<name> page opened before the list loaded (#3532)
 let docsQuery = '';   // the sidebar search's text, lower case
@@ -152,6 +152,7 @@ async function fetchDocsList() {
     try {
         const list = await apiFetch('/api/agent-docs');
         docsList = Array.isArray(list) ? list : [];
+        docsLoaded = Array.isArray(list);
         return Array.isArray(list);
     } catch (e) {
         console.error('Failed to fetch docs list:', e);
@@ -181,7 +182,7 @@ function renderDocNav() {
     const stop = shown.some(d => d.name === selectedDoc) ? selectedDoc : (shown[0] || {}).name;
     const row = d => `<li class="session-list-item${escapeAttr(selectedDoc === d.name ? ' active' : '')}"><button type="button" class="row-btn" tabindex="${Number(d.name === stop ? 0 : -1)}"${selectedDoc === d.name ? ' aria-current="true"' : ''} data-on-click="doc-open" data-doc="${escapeAttr(d.name)}" data-on-keydown="doc-open-key">${esc(titleOf(d))}</button></li>`;
     list.innerHTML = groups.map(g => groupHeaderHtml('docs', g.key, g.label, g.docs.length) + (isGroupFolded('docs', g.key) ? '' : g.docs.map(row).join(''))).join('')
-        || (docsList.length ? `<li class="empty-state empty-state-tight">${docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches the search.'}</li>` : '');
+        || (docsList.length || docsLoaded ? `<li class="empty-state empty-state-tight">${docsList.length ? (docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches the search.') : 'No documentation found.'}</li>` : ''); // a build with none says so in the list too: a phone shows the list, not the content pane (#10266)
     syncPaneGroupToggle('docs');
     refreshGroupTable('docs');
 }
