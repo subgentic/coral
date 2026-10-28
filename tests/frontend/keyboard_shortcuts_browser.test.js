@@ -44,6 +44,15 @@ const BASE = require('./test_base').BASE;
         assert.equal(await newAgentOpen(), false, 'New agent is closed again');
         await platform('MacIntel'); await ev(`document.getElementById('command-input').focus(); true`); await altN();
         assert.equal(await newAgentOpen(), false, 'on a Mac Option+N in the message box stays a tilde: it does not open New agent');
+        // the Desktop tester ran on a Mac (#10253 recheck): Ctrl+Option+N is the Mac's key from the message box, and it opens New agent there
+        await ev(`document.getElementById('command-input').focus(); true`);
+        await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'n', code: 'KeyN', windowsVirtualKeyCode: 78, modifiers: 3 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'n', code: 'KeyN', windowsVirtualKeyCode: 78, modifiers: 3 });
+        await waitFor(`(() => { const d = document.getElementById('launch-step-agent'); return !!d && getComputedStyle(d).display !== 'none' && d.getClientRects().length > 0; })()`, 'Ctrl+Option+N in the message box opens New agent on a Mac', { timeout: 6000 });
+        await closeNewAgent();
+        await platform('Linux x86_64'); await ev(`document.getElementById('command-input').focus(); true`);
+        await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'n', code: 'KeyN', windowsVirtualKeyCode: 78, modifiers: 3 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'n', code: 'KeyN', windowsVirtualKeyCode: 78, modifiers: 3 }); await settle(300);
+        assert.equal(await newAgentOpen(), false, 'Ctrl+Alt+N is the Mac key: elsewhere it does nothing');
+        await platform('MacIntel');
         await ev(`document.getElementById('command-input').remove(); delete navigator.platform; true`);
         // Alt+N opens New agent
         await ev(`document.activeElement && document.activeElement.blur(); true`);

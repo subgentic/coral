@@ -3,7 +3,7 @@
 import { importOnce } from './import_once.js';
 
 export const SHORTCUTS = [
-    ['Alt+N', 'New agent'],
+    ['Alt+N', 'New agent (Ctrl+Option+N on a Mac)'],
     ['?', 'Show these shortcuts'],
     ['Enter', 'Send a message'],
     ['Shift+Enter', 'A new line in a message'],
@@ -32,6 +32,10 @@ export function newAgentShortcut() {
 export function wireShortcuts() {
     document.addEventListener('keydown', e => {
         if (e.defaultPrevented || e.isComposing) return;
+        if (e.altKey && e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'KeyN' && onMac()) { // Ctrl+Option+N: on a Mac the one way from the message box, since Option+N there is the tilde dead key (#10253); from a terminal or a dialog it does nothing, as Alt+N
+            if (dialogOpen() || (typing(e.target) && !inMessageBox(e.target))) return;
+            e.preventDefault(); newAgentShortcut(); return;
+        }
         if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'KeyN') { // from the page, the sidebar and the chat's message box (not on a Mac): Option+N is the tilde dead key there, and a terminal has its own meta-n
             if (dialogOpen() || (typing(e.target) && !(inMessageBox(e.target) && !onMac()))) return;
             e.preventDefault(); newAgentShortcut(); return;
