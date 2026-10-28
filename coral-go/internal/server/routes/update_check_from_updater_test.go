@@ -64,12 +64,18 @@ func TestTheNoticeIsAnsweredFromTheUpdatersRecordWithNoRequestToGitHub(t *testin
 		available bool
 		latest    string
 	}{
-		"a newer release the last check saw":     {freshRecord("not_promoted", "1.4.140"), true, "1.4.140"},
-		"up to date":                             {freshRecord("up_to_date", "1.4.130"), false, "1.4.130"},
-		"up to date, nothing newer seen":         {freshRecord("up_to_date", ""), false, ""},
-		"the newest seen is older than this one": {freshRecord("up_to_date", "1.4.100"), false, "1.4.100"},
-		"a rate limit with a newer release":      {freshRecord("rate_limited", "1.4.140"), true, "1.4.140"},
-		"a failed check keeps what it saw":       {freshRecord("failed", "1.4.140"), true, "1.4.140"},
+		"a newer release the last check saw":                         {freshRecord("not_promoted", "1.4.140"), true, "1.4.140"},
+		"up to date":                                                 {freshRecord("up_to_date", "1.4.130"), false, "1.4.130"},
+		"up to date, nothing newer seen":                             {freshRecord("up_to_date", ""), false, ""},
+		"the newest seen is older than this one":                     {freshRecord("up_to_date", "1.4.100"), false, "1.4.100"},
+		"a rate limit with a newer release":                          {freshRecord("rate_limited", "1.4.140"), true, "1.4.140"},
+		"a failed check keeps what it saw":                           {freshRecord("failed", "1.4.140"), true, "1.4.140"},
+		"a rate limit that saw nothing is still the record's answer": {freshRecord("rate_limited", ""), false, ""},
+		"a failed check that saw only a staged release": {func() UpdaterRecord {
+			r := freshRecord("failed", "")
+			r.Staged = &StagedUpdate{Version: "1.4.141", Verified: true}
+			return r
+		}(), true, "1.4.141"},
 		"a staged release is the newest": {func() UpdaterRecord {
 			r := freshRecord("staged", "1.4.140")
 			r.Staged = &StagedUpdate{Version: "1.4.141", Verified: true}
@@ -104,15 +110,17 @@ func TestARecordThatCannotBeTrustedLeavesTheNoticeAskingGitHub(t *testing.T) {
 		rec UpdaterRecord
 		err error
 	}{
-		"older than twice the check's interval": {stale, nil},
-		"dated in the future":                   {future, nil},
-		"never checked":                         {never, nil},
-		"the updater is off":                    {off, nil},
-		"an install the updater cannot update":  {unsupported, nil},
-		"a result that is not in the set":       {freshRecord("<script>", "1.4.130"), nil},
-		"unknown":                               {freshRecord("unknown", "1.4.130"), nil},
-		"no result":                             {freshRecord("", "1.4.130"), nil},
-		"the record cannot be read":             {UpdaterRecord{}, errors.New("the updater did not answer")},
+		"older than twice the check's interval":         {stale, nil},
+		"dated in the future":                           {future, nil},
+		"never checked":                                 {never, nil},
+		"the updater is off":                            {off, nil},
+		"an install the updater cannot update":          {unsupported, nil},
+		"a result that is not in the set":               {freshRecord("<script>", "1.4.130"), nil},
+		"unknown":                                       {freshRecord("unknown", "1.4.130"), nil},
+		"no result":                                     {freshRecord("", "1.4.130"), nil},
+		"a failed check that saw nothing":               {freshRecord("failed", ""), nil},
+		"a failed check whose newest was not a version": {freshRecord("failed", "1.4.140<b>"), nil},
+		"the record cannot be read":                     {UpdaterRecord{}, errors.New("the updater did not answer")},
 	} {
 		t.Run(name, func(t *testing.T) {
 			url, hits := updaterNoticeRig(t, tc.rec, tc.err)

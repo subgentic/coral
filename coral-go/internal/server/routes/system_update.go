@@ -177,5 +177,8 @@ func (h *SystemHandler) latestFromTheUpdater(ctx context.Context, ch updatecheck
 	if !updateVersionRe.MatchString(latest) {
 		latest = ""
 	}
+	if rec.CheckResult == "failed" && latest == "" {
+		return "", false // a check that failed (for reasons that need not be GitHub's) and saw nothing says nothing: the notice asks GitHub as before, not "up to date" for hours
+	}
 	return latest, true
 }
