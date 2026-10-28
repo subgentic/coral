@@ -1,7 +1,7 @@
 /* The team page's Tasks tab and a task's page (#7453): the right panel's Tasks tab moves here. The tab is a table of the whole team's tasks (Task, State, Assigned to, Goal, Priority) under filter chips with counts; a row's title opens the
  * task's own page (state, who, goal as a link, priority, description, when it started and ended), with a back link to the Tasks list and a pinned bar. Everything drawn is built with the DOM and
  * textContent: titles, bodies and names are written by agents. The task's own actions (Edit, Complete, Cancel, Publish, Nudge) stay in the task dialog for now ("Task actions"): they move onto this page with the Tasks build. Lazy: team_page.js imports it. */
-import { boardFetch, pathId, serverUrl, splitKey, inTeam } from './server_base.js';
+import { boardFetch, pathId, serverUrl, splitKey, inTeam, keyLabel } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
@@ -383,7 +383,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
  const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
     // what a queued task waits on, until it is claimed (#10200): the tasks it depends on while any is open, else the agent it is for (#10222)
-    const openBlockers = (Array.isArray(task.blocked_by) ? task.blocked_by : []).filter(d => d && d.satisfied === false).map(d => `#${Number(d.task_id)}`);
+    const openBlockers = (Array.isArray(task.blocked_by) ? task.blocked_by : []).filter(d => d && d.satisfied === false).map(d => (d.board_id && ctx.project && d.board_id !== ctx.project ? `${keyLabel(String(d.board_id))} #${Number(d.task_id)}` : `#${Number(d.task_id)}`)); // a blocker on another board names it (#10287)
     if ((task.status === 'pending' || task.status === 'blocked') && openBlockers.length) line.append(el('span', 'text-muted-sm', ` Waiting on ${openBlockers.join(', ')}.`));
     else if (task.status === 'pending' && task.assigned_to) line.append(el('span', 'text-muted-sm', ` Waiting for ${task.assigned_to} to pick it up.`));
     if (ctx.teamLink) {
