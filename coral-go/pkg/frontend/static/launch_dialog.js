@@ -5,6 +5,7 @@ import { showToast, escapeHtml, escapeAttr, boardNameProblem } from './utils.js'
 import { blockedReason } from './hub_access.js';
 import { loadLiveSessions } from './api.js';
 import { recordRecentDir, setDirServerResolver, getRecentDirs } from './browser.js';
+import { pinnedFolders } from './pinned_folders.js';
 import { defaultAgentName } from './session_state.js';
 import { serverFetch, identityKey, isHub, normServer, LOCAL_SERVER, keyLabel, noteBoardLabels } from './server_base.js';
 import { pickerVisible, pickerOptions, serverLabel, coerceSelection, bareBoardName } from './launch_server.js';
@@ -92,8 +93,20 @@ function _selectLaunchType(type) {
         _checkTmuxHere();
         document.getElementById('team-board-name')?.focus();
     } else {
+        _defaultTerminalDir();
         document.getElementById("launch-terminal-name").focus();
     }
+}
+
+/** A terminal opens in the folder the person keeps in their list, not in the home folder (#10077): the Settings default, else the first folder they opened. A folder they typed stays. */
+function _defaultTerminalDir() {
+    const input = document.getElementById('launch-terminal-dir');
+    if (!input || _effectiveServer(launch.server) !== LOCAL_SERVER) return;
+    const now = input.value.trim().replace(/[\\/]+$/, ''), root = (input.dataset.coralRoot || '').replace(/[\\/]+$/, '');
+    if (now && now !== root) return;
+    const pin = pinnedFolders().find(p => p.exists !== false);
+    const dir = _settingsFor(LOCAL_SERVER).default_working_dir || (pin && pin.path) || '';
+    if (dir) input.value = dir;
 }
 window._selectLaunchType = _selectLaunchType;
 
@@ -475,7 +488,7 @@ export async function launchSession() {
             // The agent as the list names it (its name, else its folder or CLI, or "Terminal"), not the session's raw id (#5895)
             const shown = agentName || (type === 'terminal' ? 'Terminal' : defaultAgentName(dir, type));
             const addedTo = launch.addTo && launch.addTo.board ? ` on board ${keyLabel(launch.addTo.board)}` : '';
-            const added = !!launch.addTo; // Add agent opens nothing: the person is on the team's page (#7778)
+            const added = !!(launch.addTo && launch.addTo.board); // Add agent to a team opens nothing: the person is on the team's page (#7778); one into a folder opens the new agent (#10077)
             showToast(server === LOCAL_SERVER ? `Launched: ${shown}${addedTo}` : `Launched on ${serverLabel(server, state.servers)}: ${shown}${addedTo}`);
             hideLaunchModal();
             setTimeout(loadLiveSessions, 2000);
@@ -492,7 +505,7 @@ export async function launchSession() {
 
 /** Open what was just launched (#5835): a person who pressed Launch expects to land in the new agent, not on the home screen with a row to find (the first run's biggest drop:
  *  launched, never prompted). The list is read first so the row exists; the composer is focused by selecting it. A failure leaves the toast and the row, as before. */
-async function _openLaunched(result, type) {
+export async function _openLaunched(result, type) {
     try {
         await loadLiveSessions();
         const { selectLiveSession } = await importOnce('./sessions.js');

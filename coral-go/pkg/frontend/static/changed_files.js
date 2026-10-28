@@ -465,9 +465,10 @@ export async function refreshChangedFiles() {
     if (!list) return;
 
     if (_notGit) { // no comparison to choose and no count to give (#6072)
-        if (titleEl) { titleEl.textContent = 'Not a git folder'; titleEl._html = ''; }
+        const shell = state.currentSession && state.currentSession.agent_type === 'terminal'; // a terminal has no changes to list: no talk of git for a shell (#10077)
+        if (titleEl) { titleEl.textContent = shell ? 'No changes to list' : 'Not a git folder'; titleEl._html = ''; }
         if (countEl) countEl.textContent = '';
-        list.innerHTML = '<div class="empty-state empty-state-tight">Changes show once the folder is a git repository.</div>';
+        list.innerHTML = `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'Changes show once the folder is a git repository.'}</div>`;
         return;
     }
 

@@ -43,6 +43,18 @@ export async function launchTerminalToBoard(boardName, workDir) {
     }
 }
 
+/** What a folder's menu launched (Add Agent, Add Terminal) is opened, and the folder is open in the list: the person asked for it, so it is not left as a row to find (#10077). Local only, as New agent's Launch is. */
+async function openFolderLaunch(server, result, type, workDir) {
+    if (normServer(server) !== LOCAL_SERVER) return;
+    try {
+        const { _openLaunched } = await importOnce('./launch_dialog.js');
+        await _openLaunched(result, type);
+        const { pinKeyForPath } = await importOnce('./pinned_folders.js');
+        const key = pinKeyForPath(workDir);
+        if (key) (await importOnce('./group_collapse.js')).expandGroup(key);
+    } catch { /* the toast and the list row are still there */ }
+}
+
 // ── Standalone Agent Launch (no board) ────────────────────────────────────
 
 export async function launchDefaultAgent(workDir, server) {
@@ -72,6 +84,7 @@ export async function launchDefaultAgent(workDir, server) {
         if (result) {
             showToast(`Launched ${agentType} agent${_onServerSuffix(server)}`);
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
+            await openFolderLaunch(server, result, agentType, workDir); // the person lands in the new chat, as New agent's Launch does (#10077)
         }
     } catch (e) {
         showToast('Could not start the agent. Check that the folder exists and that the agent is installed, then try again.', 'error');
@@ -117,6 +130,7 @@ export async function launchStandaloneTerminal(workDir, server) {
         if (result) {
             showToast(`Launched Terminal${_onServerSuffix(server)}`);
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
+            await openFolderLaunch(server, result, 'terminal', workDir);
         }
     } catch (e) {
         showToast('Could not start the terminal. Check that the folder exists, then try again.', 'error');

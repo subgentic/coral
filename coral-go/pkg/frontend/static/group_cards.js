@@ -147,11 +147,11 @@ function _renderFolderGroup(groupName, groupSessions) {
             <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
                 <button class="menu-item overflow-menu-item" data-on-click="folder-launch-default" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-                    Add Agent
+                    <span class="menu-item-text">Add Agent<span class="menu-item-hint">Starts your default agent now</span></span>
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="folder-add-agent" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="10" y1="5" x2="14" y2="5"/></svg>
-                    Add Custom Agent
+                    <span class="menu-item-text">Add Custom Agent<span class="menu-item-hint">Choose its persona, prompt and permissions first</span></span>
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
@@ -203,11 +203,11 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
             <div class="menu sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
                 <button class="menu-item overflow-menu-item" data-on-click="folder-launch-default" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-                    Add Agent
+                    <span class="menu-item-text">Add Agent<span class="menu-item-hint">Starts your default agent now</span></span>
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="folder-add-agent" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="10" y1="5" x2="14" y2="5"/></svg>
-                    Add Custom Agent
+                    <span class="menu-item-text">Add Custom Agent<span class="menu-item-hint">Choose its persona, prompt and permissions first</span></span>
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>

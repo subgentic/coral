@@ -213,6 +213,7 @@
                         <option value="tmux">tmux</option>
                         <option value="pty">PTY</option>
                     </select>
+                    <p class="settings-hint" id="launch-terminal-backend-help">tmux keeps the terminal running if you close the page or Coral restarts. PTY ends it with Coral.</p>
                 </div>
                 <div class="modal-actions">
                     <button class="btn" data-on-click="m-hide-launch-modal">Cancel</button>
@@ -320,7 +321,7 @@
     <div id="open-folder-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="open-folder-title" style="display:none" data-on-click="m-open-folder-backdrop">
         <div class="modal-content dlg-form">
             <h3 id="open-folder-title">Open folder</h3>
-            <p class="open-folder-help">The folder is pinned to the Agents list, ready to launch agents into. It stays there with no agents until you unpin it.</p>
+            <p class="open-folder-help">Adds this folder to your list. Start an agent or a terminal in it with one click from its menu; it stays there until you remove it.</p>
             <label for="open-folder-dir">Folder</label>
             <div class="dir-input-row">
                 <input type="text" id="open-folder-dir" placeholder="/path/to/project" autocomplete="off" data-on-keydown="m-open-folder-key">
