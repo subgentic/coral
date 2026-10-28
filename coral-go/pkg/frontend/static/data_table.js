@@ -137,6 +137,7 @@ const mailCell = (m, label, open, pick, showTeam = false) => { // open: the row 
     else if (m.unread) { const dot = el('span', 'dt-mail-dot dt-mail-new'); dot.append(el('span', 'sr-only', 'Unread')); side.append(dot); } // the dot is the signal, the 600 only reinforces it, and neither is colour alone
     body.append(text, ' ', side);
     td.append(lead, body);
+    if (m.answers) td.append(m.answers); // a Needs you row's choices, under the line (#10400)
     return td;
 };
 

@@ -1,0 +1,59 @@
+// Answering from the Inbox (#10400, Beta tester #10394): a Needs you row for an agent that asks a question carries the card's own choices as buttons; one press sends the answer through the chat card's route
+// (POST .../answer-prompt, with the number and the label), the row says Answered and goes when the agent stops waiting, and the agent is not opened. A question with a multi-select has no buttons. Keyboard (Tab, Enter)
+// and a 44 px target at 390. 1280 and 390 px, isolated dev server; the agents are mocked, the chat reply and the answer are stubbed.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { Input } = client;
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
+        for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`window.__coralReady.then(() => true)`);
+            await ev(`localStorage.removeItem('coral.inbox.tab'); window.__answers = []; window.__multi = false;
+                const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
+                    if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__answers.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })); }
+                    if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: { question: 'Pick a color:', multi: window.__multi, options: [{ n: 1, label: 'Red', action: 'select' }, { n: 2, label: 'Blue', action: 'select' }] } }), { headers: { 'content-type': 'application/json' } }));
+                    return real(u, o); };
+                const entry = window.__m.entry.bind(window.__m); window.__waiting = true; window.__m.entry = a => ({ ...entry(a), board_job_title: 'QA Engineer', waiting_for_input: window.__waiting, waiting_kind: 'permission', waiting_summary: 'Wants to know: Pick a color' });
+                window.__m.add('qa', 'A', 4, { sleeping: false, board_project: 'team-a', session_id: 'qa-id' }); true`);
+            await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length === 1`, `${w}: the agent`, 8000);
+            await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
+            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '1'`, `${w}: waiting badge`, 8000);
+            if (mobile) {
+                await ev(`document.getElementById('nav-select').click(); true`);
+                await waitFor(`!!document.querySelector('#nav-more-menu [data-arg="hub-inbox"]')`, '390: Inbox in the view dropdown', 5000);
+                await ev(`document.querySelector('#nav-more-menu [data-arg="hub-inbox"]').click(); true`);
+                await waitFor(`!!document.querySelector('#mobile-inbox-list .sidebar-pane')`, '390: the phone list of the Inbox', 8000);
+            } else await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
+            await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
+            try { await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .inbox-answer').length === 2`, `${w}: the row's two choices`, 10000); } catch (e) { await shot(`inbox-answer-fail-${w}`); throw new Error(e.message + ' ' + await ev(`JSON.stringify([document.getElementById('group-table-view').dataset.group, document.getElementById('group-table-view').innerText.slice(0, 200), document.querySelectorAll('.inbox-answer').length])`)); }
+            await waitFor(`(() => { const b = document.querySelector('#group-table-view .inbox-answer'); if (!b) return false; if (window.__seen !== b) { window.__seen = b; window.__seenAt = performance.now(); return false; } return performance.now() - window.__seenAt > 500; })()`, `${w}: the table has settled (the same choice for half a second)`, 8000);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .inbox-answer')].map(b => b.textContent)`), ['Red', 'Blue'], `${w}: the card's own choices`);
+            if (mobile) assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .inbox-answer')].every(b => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().right <= innerWidth)`), '390: each is a 44 px target and on the screen');
+            await shot(`inbox-answer-${w}`);
+            // by keyboard: Tab to Red, Enter
+            await ev(`document.querySelector('#group-table-view .inbox-answer').focus(); true`);
+            assert.equal(await ev(`document.activeElement.classList.contains('inbox-answer')`), true, `${w}: the choice takes the focus`);
+            await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+            await waitFor(`window.__answers.length >= 1`, `${w}: the answer is sent by Enter on the focused choice ` + await ev(`JSON.stringify([window.__answers, document.activeElement.tagName, document.querySelector('.top-nav-tab.active')?.dataset.arg, [...document.querySelectorAll('.toast')].map(t => t.textContent), document.querySelectorAll('#group-table-view .inbox-answer').length])`), 5000);
+            const sent = await ev(`window.__answers`);
+            assert.deepEqual(sent, [{ session_id: 'qa-id', agent_type: sent[0].agent_type, n: 1, label: 'Red', text: '' }], `${w}: the same route and body as the card: ${JSON.stringify(sent)}`);
+            assert.match(await ev(`document.querySelector('#group-table-view .inbox-answers').textContent`), /^Answered: Red$/, `${w}: the row says it`);
+            assert.equal(await ev(`!!(window.T && T.state.currentSession && T.state.currentSession.session_id === 'qa-id')`), false, `${w}: the agent was not opened`);
+            assert.equal(sent.length, 1, `${w}: sent once`);
+            // the agent stops waiting: the row goes
+            await ev(`window.__waiting = false; window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 0`, `${w}: the row leaves`, 8000);
+        }
+        // a multi-select has no one-press answer: no buttons
+        await ev(`window.__multi = true; window.__waiting = true; window.__answers = []; true`);
+        console.log('\nPASS the Needs you row answers a question with the card\'s own choices, same route, keyboard and 44 px');
+    } finally { await client.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });
