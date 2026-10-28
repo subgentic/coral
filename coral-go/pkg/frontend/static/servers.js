@@ -59,3 +59,4 @@ export function hideServersModal() {
 
 /** The cloud adapter expands inline; local deep links keep their existing row focus. */
 export function expandServer(id) { active?.view.expand?.(id); }
+export function collapseServer() { active?.view.collapse?.(); }
