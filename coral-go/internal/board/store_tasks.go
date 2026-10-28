@@ -318,17 +318,46 @@ func (s *Store) ListOpenTasks(ctx context.Context, project string) ([]Task, erro
 // message, session or cost columns (they are empty). The board status read (polled by every open sidebar), the health monitor and the claim nudges read the whole open set of a board on a timer, and
 // the wide rows were megabytes of text they never read (#9114).
 func (s *Store) ListOpenTaskStates(ctx context.Context, project string) ([]Task, error) {
-	var tasks []Task
-	err := s.reader().SelectContext(ctx, &tasks,
+	rows, err := s.reader().QueryContext(ctx,
 		`SELECT id, revision, board_id, title, status, priority, created_by, assigned_to, created_at, claimed_at, parked_reason, parked_until, remind_at, goal_id, `+updatedAtSQL+` AS updated_at FROM board_tasks
-		 WHERE board_id = ? AND status IN ('pending', 'in_progress', 'blocked', 'draft')
-		 ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, id ASC`,
+		 WHERE board_id = ? AND status IN ('pending', 'in_progress', 'blocked', 'draft')`,
 		project)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+	// Scanned by hand into the fields this read has: sqlx's reflection per row and column was a third of the read's time on a board of 1,600 open tasks (#9745).
+	var tasks []Task
+	for rows.Next() {
+		var t Task
+		if err := rows.Scan(&t.ID, &t.Revision, &t.BoardID, &t.Title, &t.Status, &t.Priority, &t.CreatedBy, &t.AssignedTo, &t.CreatedAt, &t.ClaimedAt, &t.ParkedReason, &t.ParkedUntil, &t.RemindAt, &t.GoalID, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// The order is made here, not by an ORDER BY: the database sorted the rows through a temporary b-tree (about a third of the read's time on a board of 1,600 open tasks, #9745), and the rows come
+	// out of the (board, status) index in an order the sort here replaces: critical, high, medium, low (a priority that is none of them first, as NULL sorts), then oldest first.
+	tasks = sortOpenStates(tasks)
 	s.loadOpenBlockedBy(ctx, tasks, project)
 	return tasks, nil
+}
+
+// openStatesPriority is a priority's place in the open task states' order: critical, high, medium, low; anything else (the CASE of the old ORDER BY gave it NULL, which sorts first) before them.
+func openStatesPriority(p string) int {
+	switch p {
+	case "critical":
+		return 0
+	case "high":
+		return 1
+	case "medium":
+		return 2
+	case "low":
+		return 3
+	}
+	return -1
 }
 
 // The status test is two parts on purpose: IN (...) gives the (board_id, status) index both its columns, so only the board's review_pending and in_progress tasks are looked at; the
@@ -994,4 +1023,29 @@ func (s *Store) CancelTask(ctx context.Context, project string, taskID int64, su
 	s.computeAndStoreTaskCost(ctx, project, taskID)
 
 	return s.getTaskByID(ctx, project, taskID)
+}
+
+// sortOpenStates orders the open tasks by priority (openStatesPriority), then id. A Task is a wide struct: sorting the slice itself swaps hundreds of bytes per move, so the order is made over a small key (rank, id,
+// place) and the tasks are placed once.
+func sortOpenStates(tasks []Task) []Task {
+	type key struct {
+		rank  int8
+		id    int64
+		place int32
+	}
+	keys := make([]key, len(tasks))
+	for i := range tasks {
+		keys[i] = key{int8(openStatesPriority(tasks[i].Priority)), tasks[i].ID, int32(i)}
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].rank != keys[j].rank {
+			return keys[i].rank < keys[j].rank
+		}
+		return keys[i].id < keys[j].id
+	})
+	out := make([]Task, len(tasks))
+	for i, k := range keys {
+		out[i] = tasks[k.place]
+	}
+	return out
 }
