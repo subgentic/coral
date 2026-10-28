@@ -291,6 +291,10 @@ function jobOf(run) {
 function renderRunDetail(run) {
     const container = document.getElementById('wf-run-detail');
     if (!container) return;
+    // A run on screen that changes state (running to completed, failed, stopped) is said once in the page's status line; the first draw of a run says nothing (#10496)
+    if (shownRun && Number(shownRun.id) === Number(run.id) && shownRun.status !== run.status) {
+        sayStarted(`${run.workflow_name ? run.workflow_name + ', run' : 'Run'} #${run.id} ${({ killed: 'was stopped' })[run.status] || run.status}`);
+    }
     shownRun = run;
 
     const steps = run.steps || [];

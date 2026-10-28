@@ -1,5 +1,5 @@
 // Automations by keyboard and screen reader (#10496): Enter on a job row, on the run page's way back to its job, on a workflow row and on a run row lands the keyboard on the page's heading (it was on the body, or on a
-// control that was gone). At 1280 px; the pages are drawn from the real modules with the server's answers stubbed in the page.
+// control that was gone); a run that goes from running to completed is said once in the page's status line. At 1280 px; the pages are drawn from the real modules with the server's answers stubbed in the page.
 // Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 // The Automations pages on a phone, from the Mobile Beta Tester's pass (#10476): a run a job started links back to its job and says "Run by job <name>" (not a way back to the workflow); reopening Automations lands on the list, not the last run page; the pages are
@@ -56,7 +56,15 @@ const STUB = `(() => {
         await waitFor(`!!document.querySelector('#wf-run-table tbody tr .dt-primary, #wf-run-table tbody tr button')`, 'the workflow page\'s runs', 10000);
         await ev(`document.querySelector('#wf-run-table tbody tr .dt-primary, #wf-run-table tbody tr button').focus(); true`);
         await enter(); await check('Enter on a run row', /^h2 "nightly-build, run #31/);
+        // a run that ends is said once
+        await ev(`window.__st32 = 'running'; window.__said = []; new MutationObserver(() => { const t = document.getElementById('wf-status').textContent; if (t) window.__said.push(t); }).observe(document.getElementById('wf-status'), { childList: true, characterData: true, subtree: true }); window.selectWorkflowRun(32); true`);
+        await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title') && /running/.test(document.querySelector('#wf-run-detail .wf-run-meta').textContent)`, 'the running run', 10000);
+        await ev(`window.__st32 = 'completed'; true`);
+        await waitFor(`/completed/.test(document.querySelector('#wf-run-detail .wf-run-meta').textContent)`, 'the run ends', 12000);
+        await sleep(4000); // sleep-ok: two more polls would show a repeat
+        const said = await ev(`window.__said.slice()`);
+        if (said.length !== 1 || !/run #32/.test(said[0]) || !/completed/.test(said[0])) problems.push(`a run that ends is said once, with its number and how it ended (said ${JSON.stringify(said)})`);
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'Automations by keyboard:\n  ' + problems.join('\n  '));
-    console.log('PASS Automations: the keyboard lands on the heading');
+    console.log('PASS Automations: the keyboard lands on the heading, a run that ends is said once');
 })().catch(e => { console.error(e); process.exit(1); });
