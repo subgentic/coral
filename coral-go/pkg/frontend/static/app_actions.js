@@ -108,6 +108,7 @@ registerActions({
     'm-on-agent-board-change': el => { window._onAgentBoardChange(); },
     'm-on-launch-server-change': el => { window._onLaunchServerChange(el.value); },
     'm-open-folder-backdrop': (el, event) => { if (event.target === el) window.hideOpenFolderModal(); },
+    'm-open-folder-edit': el => { const e = document.getElementById('open-folder-error'); if (e && !e.hidden && el.value.trim()) { e.hidden = true; e.textContent = ''; } }, // a folder in the box (typed, or chosen with Browse) takes the "Type a folder" line away (#10572)
     'm-open-folder-key': (el, event) => { if (event.key === 'Enter') { event.preventDefault(); window.submitOpenFolder(); } },
     'm-perm-mode-describe': el => { if (window._updatePermModeDescription) window._updatePermModeDescription(el); },
     'm-reset-default-prompt': el => { if (["orchestrator", "team_orchestrator", "team_worker", "worker"].includes(el.dataset.arg)) { window.resetDefaultPrompt(el.dataset.arg); } },
