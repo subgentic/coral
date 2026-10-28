@@ -23,6 +23,35 @@ const healthRows = () => healthFields({
     onReset: view => { for (const [k, v] of Object.entries(healthToValues(HEALTH_DEFAULTS))) view.set(k, v); },
 }).filter(f => f.key !== 'recipient' && !f.key.endsWith('_nudge')); // no members to pick from yet
 
+const MODE_WORDS = { shared_checkout: 'Shared checkout', worktrees: 'Worktrees', task_queue: 'Task queue' };
+
+/** What each menu item holds, said under its name (Start: none, Health check: on), so nobody opens one to find out (#9971). */
+function menuStates(v) {
+    return {
+        start: v.first_task || v.custom_instructions ? 'set' : 'none',
+        workflow: MODE_WORDS[v.mode] || (v.dependency_guidance ? 'guidance' : 'none'),
+        health: valuesToHealth(v, HEALTH_DEFAULTS).on ? 'on' : 'off',
+        messaging: v.cross_team_messaging || v.cross_team_artifacts ? 'on' : 'off',
+    };
+}
+function syncMenuStates() {
+    if (!_view) return;
+    const states = menuStates(_view.values());
+    for (const [id, word] of Object.entries(states)) {
+        const name = document.querySelector(`#team-start-host .settings-tab[data-section="${id}"] .settings-tab-name`);
+        if (!name) continue;
+        let s = name.querySelector('.menu-item-state');
+        if (!s) {
+            // the tab keeps its name (the state is its description, said after it), so a screen reader and the suites find "Start", not "Start none"
+            s = document.createElement('small'); s.className = 'menu-item-state'; s.id = `team-start-state-${id}`; name.append(s);
+            const tab = name.closest('.settings-tab');
+            if (!tab.hasAttribute('aria-label')) tab.setAttribute('aria-label', name.firstChild.textContent);
+            tab.setAttribute('aria-describedby', s.id);
+        }
+        if (s.textContent !== word) s.textContent = word;
+    }
+}
+
 /** Draw the step with a new team's own values (every time the team dialog opens: nothing from the last team stays). */
 export function mountTeamLaunchSettings() {
     const host = document.getElementById('team-start-host');
@@ -51,6 +80,12 @@ export function mountTeamLaunchSettings() {
             ] },
         ],
     });
+    // the line above the open pane, inside the scrolling panes (the host lays its view out as a row: a sibling would take a column of it)
+    const lead = document.createElement('p'); lead.className = 'team-start-lead';
+    lead.textContent = 'Everything on this step is optional. Launch team starts with what you see.';
+    host.querySelector('.settings-panes')?.prepend(lead);
+    host.addEventListener('input', syncMenuStates); host.addEventListener('change', syncMenuStates);
+    _view.ready.then(syncMenuStates);
 }
 
 /**
@@ -79,7 +114,7 @@ export function readTeamLaunchSettings() {
 /** The working mode a team template names becomes the step's choice (and what it starts with if the step is still loading); the person can change it. */
 export function setTeamLaunchMode(mode) {
     _defaultMode = mode;
-    if (_view) _view.set('mode', mode);
+    if (_view) { _view.set('mode', mode); syncMenuStates(); }
 }
 
 /** Apply the held board settings to the launched team. Returns '' when it worked (or there was nothing), else a sentence for the toast. */
