@@ -3,9 +3,9 @@
  *
  *   dataTable({ label, columns, rows, rowKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll, detail, decorate, decorateHead }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
- *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
+ *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', fixed (with a rem width: that width, no resize handle, never squeezed or kept: a list's Actions, #9845), nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, when(row), subtitle(row), subtitleTitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
- *   column widths (#7949): every header has a resize handle on its right edge (drag, Left and Right keys, double-click or Enter to fit the content); the widths are kept per list in this browser (widthsKey, else the label without its row count), and "Reset column widths" appears while any are set. minWidth per column (64 px by default), resize: false for one that must not.
+ *   column widths (#7949): every header has a resize handle on its right edge (drag, Left and Right keys, double-click or Enter to fit the content); the widths are kept per list in this browser (widthsKey, else the label without its row count), and there is no reset button: a double click on a column edge fits it to its content (#9845). minWidth per column (64 px by default), resize: false for one that must not.
  *   detail = { id(row), open(row) -> bool, render(row) -> Node }: a second full-width row under each row (hidden while open(row) is false); the surface's own toggle in a cell opens it (Coral Hub's Servers: health, what applies).
  *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
  *   cell types: chip(word, cls), avatar(name), avatars(people, label), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
@@ -168,19 +168,17 @@ export function dataTable(cfg) {
     const thead = el('thead'); thead.setAttribute('role', 'rowgroup'); const tbody = el('tbody'); tbody.setAttribute('role', 'rowgroup');
     const colgroup = el('colgroup');
     table.append(colgroup, thead, tbody);
-    const widthBar = el('div', 'dt-widthbar'); widthBar.hidden = true;
-    const resetWidths = button('btn btn-small dt-reset-widths', 'Reset column widths', () => { st.widths = {}; saveWidths(); applyWidths(); drawHead(); });
-    widthBar.append(resetWidths);
-    box.append(sortBar, widthBar, table);
+    box.append(sortBar, table);
 
     // ── column widths (#7949): a handle on each header's right edge; the widths are kept per list in this browser ──
     const MIN_W = 64, MAX_W = 2000, STEP = 16;
     const wkey = `coral-dt-widths:${cfg.widthsKey || String(cfg.label).replace(/,\s*\d.*$/, '')}`; // a label that counts its rows ("Tasks, 12") is the list "Tasks"
     const minOf = (c) => c.minWidth || MIN_W;
+    const fixedW = (c) => (c.fixed && /rem$/.test(c.width || '') ? c.width : null); // a fixed column (the Actions of a list) has the width it declares: no handle, never frozen or kept, so no other column's resize squeezes its buttons (#9845)
     function readWidths() {
         try {
             const o = JSON.parse(browserLocal.get(wkey) || 'null') || {}, out = {};
-            for (const c of columns) { const v = Number(o[c.key]); if (Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); }
+            for (const c of columns) { const v = Number(o[c.key]); if (!c.fixed && Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); } // a fixed column is never kept
             return out;
         } catch { return {}; }
     }
@@ -191,19 +189,19 @@ export function dataTable(cfg) {
     function applyWidths() {
         colgroup.replaceChildren();
         const any = Object.keys(st.widths).length > 0;
-        box.classList.toggle('dt-sized', any); widthBar.hidden = !any;
+        box.classList.toggle('dt-sized', any);
         if (cfg.layout !== 'fixed' && !cfg.oneLine) table.style.tableLayout = any ? 'fixed' : '';
         if (!any) { table.style.width = ''; return; }
         if (sel) { const k = el('col'); k.style.width = 'var(--table-check-w)'; colgroup.append(k); }
-        for (const c of columns) { const k = el('col'); if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; colgroup.append(k); }
+        for (const c of columns) { const k = el('col'); if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; else if (fixedW(c)) k.style.width = fixedW(c); colgroup.append(k); }
         // Every column has a width (the flexible name column's own separator was used): the table is as wide as its columns, not 100%. A fixed table at 100% spreads what is left over
         // across ALL its columns, so shrinking one column grew the others (#9228); this way a column's separator changes that column alone, and the table scrolls or ends short of the box.
-        const all = columns.every(c => st.widths[c.key]);
-        table.style.width = all ? `calc(${sel ? 'var(--table-check-w) + ' : ''}${columns.reduce((n, c) => n + st.widths[c.key], 0)}px)` : '';
+        const all = columns.every(c => st.widths[c.key] || fixedW(c));
+        table.style.width = all ? `calc(${sel ? 'var(--table-check-w) + ' : ''}${columns.map(c => st.widths[c.key] ? `${st.widths[c.key]}px` : fixedW(c)).join(' + ')})` : '';
     }
     /** The first resize freezes the other columns at the widths they have (the title column, 'grow', takes whatever is left) so nothing jumps. */
     function freezeWidths() {
-        for (const th of thead.querySelectorAll('th.dt-th')) { const c = columns.find(x => x.key === th.dataset.key); if (c && c.width !== 'grow' && !st.widths[c.key]) st.widths[c.key] = Math.max(minOf(c), Math.round(th.getBoundingClientRect().width)); }
+        for (const th of thead.querySelectorAll('th.dt-th')) { const c = columns.find(x => x.key === th.dataset.key); if (c && c.width !== 'grow' && !c.fixed && !st.widths[c.key]) st.widths[c.key] = Math.max(minOf(c), Math.round(th.getBoundingClientRect().width)); }
     }
     function setWidth(c, w, th) {
         st.widths[c.key] = Math.min(MAX_W, Math.max(minOf(c), Math.round(w)));
@@ -281,7 +279,7 @@ export function dataTable(cfg) {
                 const icon = el('span', 'material-icons', 'filter_list'); icon.setAttribute('aria-hidden', 'true'); f.append(icon);
                 th.append(f);
             }
-            if (cfg.resize !== false && c.resize !== false) th.append(resizeHandle(c, th));
+            if (cfg.resize !== false && c.resize !== false && !c.fixed) th.append(resizeHandle(c, th));
             if (cfg.decorateHead) cfg.decorateHead(th, c);
             tr.append(th);
         }
