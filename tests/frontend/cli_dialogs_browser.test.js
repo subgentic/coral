@@ -35,7 +35,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.__checkAnswer = type => type === 'claude' ? { status: 200, body: { found: true, version: '2.1.0' } } : type === 'codex' ? { status: 200, body: { found: true } } : type === 'agy' ? { status: 200, body: { found: false } } : { status: 403, body: { error: 'not allowed here' } }; true`);
         await ev(`document.getElementById('settings-cli-path-agy').value = ''; true`); // the runner points every CLI path at the mock agent: agy is cleared so this covers a CLI with no path of its own (#10083)
         await ev(`window._verifyAllCLIs(); true`);
-        await waitFor(`document.getElementById('verify-all-btn').textContent === 'Verify All' && !document.getElementById('verify-all-btn').disabled`, 'Verify All finished');
+        await waitFor(`document.getElementById('verify-all-btn').textContent === 'Verify All' && document.getElementById('verify-all-btn').getAttribute('aria-disabled') !== 'true'`, 'Verify All finished');
         const results = await ev(`['claude', 'codex', 'agy', 'pi'].map(t => { const e = document.getElementById('cli-result-' + t); return [e.textContent, e.className.replace('cli-verify-result', '').trim(), e.title]; })`);
         // a CLI with no path of its own that is not on PATH is "Not installed" and neutral; a refusal says why and what to do, under its result and as its hover (#10083)
         assert.deepEqual(results, [['2.1.0', 'cli-verify-ok', ''], ['Found', 'cli-verify-ok', ''], ['Not installed', 'cli-verify-none', ''], ['Not allowed', 'cli-verify-fail', 'Not allowed here. Empty the field to use PATH.']]);
@@ -44,11 +44,11 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual((await ev(`window.__checks.slice().sort()`)), ['agy', 'claude', 'codex', 'pi'], 'each CLI was asked once');
         // a path the person typed that is not there is a mistake: red, with the way out under it (#10083)
         await ev(`document.getElementById('settings-cli-path-agy').value = '/opt/tools/agy'; window._verifyAllCLIs(); true`);
-        await waitFor(`document.getElementById('verify-all-btn').textContent === 'Verify All' && !document.getElementById('verify-all-btn').disabled`, 'Verify All finished again');
+        await waitFor(`document.getElementById('verify-all-btn').textContent === 'Verify All' && document.getElementById('verify-all-btn').getAttribute('aria-disabled') !== 'true'`, 'Verify All finished again');
         assert.deepEqual(await ev(`(() => { const e = document.getElementById('cli-result-agy'); return [e.textContent, e.className.replace('cli-verify-result', '').trim()]; })()`), ['Not found', 'cli-verify-fail']);
         assert.match(await ev(`document.getElementById('cli-result-agy-why').textContent`), /nothing at that path/i, 'a typed path that is not there says so, under the result');
         await ev(`window.__checkAnswer = () => { throw new Error('down'); }; window._verifyAllCLIs(); true`);
-        await waitFor(`!document.getElementById('verify-all-btn').disabled && document.getElementById('cli-result-claude').textContent === 'Error'`, 'the failure shown');
+        await waitFor(`document.getElementById('verify-all-btn').getAttribute('aria-disabled') !== 'true' && document.getElementById('cli-result-claude').textContent === 'Error'`, 'the failure shown');
         await ev(`window.hideSettingsModal(); true`);
 
         console.log('A launch without the permission flag asks first: Cancel launches nothing');
