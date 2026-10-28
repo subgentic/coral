@@ -3249,6 +3249,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 @media (max-width: 767px) { .tb-learn { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } } /* a phone is 44 px wherever the Learn more is, in the page or the dialog (the coarse-pointer rule is in touch.css; a narrow window is not coarse) (#8079) */
 
 /* ── Browser password (#3948): the set-password prompt and Settings > Browser sign-in ─────────────────────────── */
+#set-password-modal .modal-body { scroll-padding-block: 1.25rem; } /* a field the keyboard reaches is scrolled into view with room, not flush against the footer: at 200% text the Confirm password label and the meter sat under it (#10067) */
 .pw-lead { margin: 8px 0 14px; line-height: var(--lh-body); color: var(--text-secondary); font-size: var(--fs-lg); }
 .pw-field { display: block; margin: 0 0 12px; font-size: var(--fs-md); }
 .pw-label { display: block; margin-bottom: 5px; font-weight: var(--fw-medium); color: var(--text-primary); }
