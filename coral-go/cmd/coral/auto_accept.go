@@ -97,6 +97,9 @@ func subcommand(args []string) (int, bool) {
 	if len(args) > 0 && args[0] == "reset-password" {
 		return runResetPassword(args[1:], os.Stdin, os.Stdout, os.Stderr), true
 	}
+	if len(args) > 0 && args[0] == "machine" {
+		return runMachine(args[1:], os.Stdin, os.Stdout, os.Stderr), true
+	}
 	if len(args) > 0 && args[0] == "api-key" {
 		return runAPIKey(args[1:], os.Stdout, os.Stderr), true
 	}

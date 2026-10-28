@@ -185,6 +185,21 @@ Rules Coral keeps:
 - **Only Coral's own user can change the connector.** Loopback requests skip the API key, so the `/api/cloud` routes check who is asking. On Linux, macOS and Windows, Coral refuses cloud changes (and the status, which shows an enrollment's code) from any other local user, including a pod sidecar running as another uid (`403`, `code: other_user`). A program running as Coral's own user cannot be told apart, and it could read Coral's files anyway. Beyond that, the dashboard keeps its browser rules, and `coral cloud` proves it can read `<data folder>/cli-token` (mode `0600`, so only Coral's user can read it; use `--home` if Coral runs with one) without sending it (see "How the command line proves who it is").
 - `--proof-file <path>` (bootstrap credentials): a JSON object of at most 16 KiB written by a provider helper, one of `{"kind":"aws","document","signature"}`, `{"kind":"gcp","token"}`, `{"kind":"kubernetes","token"}` (Azure is not available yet). Coral checks only that shape, sends it unchanged and never logs it.
 
+## Launching a cloud machine
+
+`coral machine launch` makes a cloud machine that runs Coral and joins Coral Hub (DigitalOcean first), from any computer with the `coral` command. It needs no running Coral server.
+
+```sh
+coral machine launch --provider digitalocean --token-file ~/.do-token --hub-key-file ~/.coralhub-key \
+    --agents claude@VERSION,codex@VERSION --max-mode launch [--name N] [--region nyc3] [--size s-2vcpu-4gb] [--yes]
+```
+
+- **Secrets come from files only.** `--token-file` is the provider's API token and `--hub-key-file` your Coral Hub automation key (`chk_...`, made in Coral Hub in a browser): each file must be yours, mode 0600, one link, no symlink, at most 4096 bytes; `-` reads one of them from standard input. Neither is ever taken from the command line or the environment, printed, logged, or sent anywhere but its own service; the Hub never sees the provider token.
+- **What it does, in order:** checks the provider token; reads the size's price from the provider and asks you to confirm (`--yes` skips only the question, the price is still printed); asks Coral Hub for one **single-use machine credential** (5 minutes, labelled with the machine's name) with your key; creates the machine with that credential as the one secret in its user-data; waits for the **machine at the provider** (the key cannot read the Hub, so it does not wait for the Hub); and prints where to approve it. The machine joins Coral Hub as **pending**: open Coral Hub, find it by its name and press **Keep**.
+- **A launch that fails or is interrupted deletes the machine it made** (and says so, or says that it could not and the id to delete). A machine costs money until it is deleted.
+- **`--agents`** names the agent CLIs to install: `claude`, `codex` and `pi` each need `@VERSION` (nothing is installed unpinned that can be pinned); `agy@unpinned` runs the Antigravity installer without a version. **`--max-mode`** is the most Coral Hub may do on the machine (`launch` by default; the owner can lower it in Coral Hub). `--coral-version` defaults to this command's own version; a development build must give it.
+- Exit codes: 0 launched; 1 not launched (declined, refused by the provider or the Hub, or the machine did not come up); 2 a usage problem or a secret file that is not safe to read; 130 interrupted.
+
 ## Identity
 
 An agent or team is identified by `(server, name)`. In the UI a remote key is `@{server}/{name}` and a popout is `/agent/{server}/{id}`. Names are unique only within one server.

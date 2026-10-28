@@ -14,6 +14,7 @@ Commands:
   reset-password   set a new password, or none (--clear); every browser is signed out
   setup-code       print the one-time code that setting the password from another computer asks for
   cloud            Coral Hub: connect this Coral, show its status, or disconnect
+  machine          make a cloud machine that runs Coral and joins Coral Hub (a pending machine you approve there)
   auto-accept      turn auto-accept off for every agent at once
   artifacts        prune stored artifacts (diffs and objects) to free disk
   db               compact the database, or rebuild its search index (stop Coral first)
@@ -130,6 +131,7 @@ Commands:
   reset-password   set a new password, or none (--clear); every browser is signed out
   setup-code       print the one-time code that setting the password from another computer asks for
   cloud            Coral Hub: connect this Coral, show its status, or disconnect
+  machine          make a cloud machine that runs Coral and joins Coral Hub (a pending machine you approve there)
   auto-accept      turn auto-accept off for every agent at once
   artifacts        prune stored artifacts (diffs and objects) to free disk
   db               compact the database, or rebuild its search index (stop Coral first)
