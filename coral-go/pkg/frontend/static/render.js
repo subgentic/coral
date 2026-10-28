@@ -126,6 +126,16 @@ let _filteredMatches = [];
 export function filterLiveAgents(value) {
     setAgentFilter((value || '').trim().toLowerCase());
     redrawLiveList();
+    syncSearchAllChats(value);
+}
+
+/** The line under the agent search that offers the same words as a search of every chat (#10050): shown while there is something typed, naming it. */
+function syncSearchAllChats(value) {
+    const q = (value || '').trim(), b = document.getElementById('agent-search-all-chats');
+    if (!b) return;
+    const text = q ? `Search all chats for \u201c${q.length > 40 ? q.slice(0, 40) + '\u2026' : q}\u201d` : '';
+    if (b.textContent !== text) b.textContent = text;
+    b.hidden = !q;
 }
 
 /** Enter opens the first match; Escape clears the search. */
