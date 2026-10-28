@@ -46,11 +46,13 @@ func (s *Store) ApplyLocalLinks(ctx context.Context, edits []LocalLinkEdit, self
 		var raw string
 		err := tx.GetContext(ctx, &raw, `SELECT value FROM board_settings WHERE project = ? AND key = ?`, target, settingCrossTeamAllowed)
 		var list []AllowedSender
-		if err == nil {
-			_ = json.Unmarshal([]byte(raw), &list)
-		}
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
+		}
+		if err == nil {
+			if jerr := json.Unmarshal([]byte(raw), &list); jerr != nil {
+				return fmt.Errorf("the stored list of senders of %q cannot be read, so it is not changed: %w", target, jerr) // never replace what cannot be read
+			}
 		}
 		lists[target] = list
 		before[target] = append([]AllowedSender(nil), list...)

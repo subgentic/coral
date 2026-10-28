@@ -97,3 +97,22 @@ func TestAnEntryWithNoFilesGrantStillAllowsFiles(t *testing.T) {
 	assert.False(t, b.AllowsFilesFrom(LocalServer, "x-bbbbbbbbbbbbbbbb"))
 	assert.False(t, b.AllowsFilesFrom("", "x-aaaaaaaaaaaaaaaa"))
 }
+
+// A stored list that cannot be read is never replaced (Security Reviewer's SHOULD on #9900): the edit fails and the value stays as it was, hub entries included.
+func TestApplyLocalLinksNeverReplacesAListItCannotRead(t *testing.T) {
+	ctx := context.Background()
+	bs := newAllowStore(t)
+	for _, name := range []string{"alpha", "beta"} {
+		_, err := bs.Subscribe(ctx, name, "Orchestrator", "Orchestrator", "tmux-"+name, nil, "mentions")
+		require.NoError(t, err)
+	}
+	a, _, err := bs.CrossTeamID(ctx, "alpha")
+	require.NoError(t, err)
+	_, err = bs.db.ExecContext(ctx, `INSERT INTO board_settings (project, key, value) VALUES ('beta', 'cross_team_allowed', 'not json {"server":"hub-1"')`)
+	require.NoError(t, err)
+	_, err = bs.ApplyLocalLinks(ctx, []LocalLinkEdit{{Target: "beta", Sender: AllowedSender{CrossTeamID: a}}}, map[string]string{})
+	require.Error(t, err, "an unreadable list is an error, not an empty one")
+	var raw string
+	require.NoError(t, bs.db.GetContext(ctx, &raw, `SELECT value FROM board_settings WHERE project = 'beta' AND key = 'cross_team_allowed'`))
+	assert.Equal(t, `not json {"server":"hub-1"`, raw, "and it is left exactly as it was")
+}

@@ -610,12 +610,15 @@ func (h *BoardHandler) crossTeamAttachments(ctx context.Context, r *http.Request
 	}
 	// With the list in force, a link may turn files off for one sender (#9893): the sender is already admitted, so saying so reveals nothing.
 	if h.allowlistOn(ctx) && role != crossTeamOperatorID {
-		if settings, err := h.bs.GetBoardSettings(ctx, target); err == nil {
-			if senderID, ok := h.senderIDOf(ctx, m.FromBoard); ok && !settings.AllowsFilesFrom(board.LocalServer, senderID) {
-				return nil, func(w http.ResponseWriter) {
-					writeError(w, http.StatusForbidden, "link_files_off", "the link between these teams does not share files: ask the Operator to turn files on for it (coral-board link <team> <other> --files)")
-				}
-			}
+		refuseFiles := func(w http.ResponseWriter) {
+			writeError(w, http.StatusForbidden, "link_files_off", "the link between these teams does not share files: ask the Operator to turn files on for it (coral-board link <team> <other>, without --no-files)")
+		}
+		settings, err := h.bs.GetBoardSettings(ctx, target)
+		if err != nil {
+			return nil, refuseFiles // fails closed: what cannot be read does not grant files
+		}
+		if senderID, ok := h.senderIDOf(ctx, m.FromBoard); !ok || !settings.AllowsFilesFrom(board.LocalServer, senderID) {
+			return nil, refuseFiles
 		}
 	}
 	sender := h.attachSenderFor(ctx, r, m.FromBoard, m.SubscriberID, senderSession)

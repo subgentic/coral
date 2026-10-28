@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 
@@ -197,4 +198,38 @@ func TestALinkCanTurnFilesOffForOneSender(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	code, out = e.send("alpha", "beta", alphaOrchSID, uri(d))
 	assert.Equal(t, http.StatusOK, code, "files on for the link: %v", out)
+}
+
+// With the list in force, a sender whose own cross-team id cannot be read is not granted files (fail closed, Security Reviewer's SHOULD on #9900).
+func TestAttachmentsFailClosedWhenTheSenderHasNoReadableID(t *testing.T) {
+	e := newAttachEnv(t, true)
+	e.h.SetAllowlistFlag(func(context.Context) bool { return true })
+	ctx := context.Background()
+	d := e.upload(alphaOrchSID, "alpha's report")
+	_, err := e.h.bs.UpdateBoardSettings(ctx, "alpha", board.BoardSettingsUpdate{CrossTeamMessaging: ptrBool(true)})
+	require.NoError(t, err)
+	_, err = e.h.bs.UpdateBoardSettings(ctx, "beta", board.BoardSettingsUpdate{CrossTeamMessaging: ptrBool(true)})
+	require.NoError(t, err)
+	m := &externalMessage{FromBoard: "alpha", SubscriberID: "Orchestrator", Content: "x", Attach: []string{uri(d)}}
+	// a linked sender with files on gets past the files check ...
+	code, _ := e.call("POST", "/api/board/alpha/cross-team-links", opHdr, map[string]any{"with": "beta", "both": false})
+	require.Equal(t, http.StatusOK, code)
+	_, refused := e.h.crossTeamAttachments(ctx, httptest.NewRequest("POST", "/", nil), m, "beta", "", "Orchestrator")
+	if refused != nil { // a bare request may fail a later step (who uploaded it); what matters is that it is not the files grant
+		rec := httptest.NewRecorder()
+		refused(rec)
+		assert.NotContains(t, rec.Body.String(), "link_files_off", "linked, files on: the grant lets it on to the next step")
+	}
+	// ... and a sender with no readable id of its own (a board with no row) does not, even with its files switch explicitly on
+	_, err = e.h.bs.UpdateBoardSettings(ctx, "ghost", board.BoardSettingsUpdate{CrossTeamMessaging: ptrBool(true), CrossTeamArtifacts: ptrBool(true)})
+	require.NoError(t, err)
+	_, err = e.h.bs.UpdateBoardSettings(ctx, "beta", board.BoardSettingsUpdate{CrossTeamArtifacts: ptrBool(true)})
+	require.NoError(t, err)
+	ghost := &externalMessage{FromBoard: "ghost", SubscriberID: "Orchestrator", Content: "x", Attach: []string{uri(d)}}
+	_, refused = e.h.crossTeamAttachments(ctx, httptest.NewRequest("POST", "/", nil), ghost, "beta", "", "Orchestrator")
+	require.NotNil(t, refused, "no id, no files")
+	rec := httptest.NewRecorder()
+	refused(rec)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Contains(t, rec.Body.String(), "link_files_off")
 }
