@@ -63,6 +63,7 @@
 .team-panel .team-toolbar-selecting > :is(.team-tb-pills, .team-tb-select, .team-tb-chip, .team-tb-chips, .team-tb-action, .list-bar-toggle, .list-bar-more, .list-bar-count) { display: none !important; }
 .team-panel .team-tb-selection { flex: 1 1 auto; display: flex; align-items: center; gap: var(--toolbar-gap); min-width: 0; }
 @container (max-width: 54rem) { .team-panel .team-tb-pills { display: none; } .team-panel .team-tb-select { display: block; } }
+@container (max-width: 62rem) { .team-panel .list-bar-search-row:has(.team-tb-pills-many) .team-tb-pills { display: none; } .team-panel .list-bar-search-row:has(.team-tb-pills-many) .team-tb-select { display: block; } } /* seven pills and their counts take about 42 rem: with the search, the Filters icon and the action they need 62 (#9861) */
 @media (max-width: 760px) {
     .team-panel .list-bar-search-row { flex-wrap: wrap; }
     .team-panel .list-bar-search-wrap, .team-panel .list-bar-search-row:has(.team-tb-pills) .list-bar-search-wrap { flex: 1 1 8em; max-width: none; }
