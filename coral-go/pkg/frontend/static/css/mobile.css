@@ -805,8 +805,8 @@
     #mobile-session-list .session-label {
         white-space: normal;
         line-height: var(--lh-ui);
-        font-size: var(--fs-lg);
-        font-weight: var(--fw-medium); /* agents are children of the 600-weight group header */
+        font-size: var(--sidebar-row-size);
+        font-weight: var(--sidebar-row-weight); /* agents are children of the 600-weight group header; the sidebar row style (#9926) */
     }
 
 

@@ -10,12 +10,13 @@
     width: 100%;
     padding: 0 10px;
     border: 0;
-    color: var(--text-secondary);
+    color: var(--sidebar-row-color);
     font-family: var(--font-sans);
-    font-size: var(--fs-lg);
+    font-size: var(--sidebar-row-size);
+    font-weight: var(--sidebar-row-weight);
     text-align: left;
 }
-.view-list-current { color: var(--text-primary); font-weight: var(--fw-strong); }
+.view-list-current { color: var(--sidebar-row-color-current); font-weight: var(--sidebar-row-weight-current); }
 .view-list-current .view-list-count { color: var(--text-primary); } /* on the hover-coloured current row the secondary colour is under 4.5:1 in the light theme */
 /* the red count pill: the same make as the tab strip's unread badge (layout.css .nav-tab-badge) */
 .view-list-count.view-list-alert {
