@@ -249,9 +249,12 @@
     font-weight: var(--fw-medium); /* an agent's name: 13/500 primary (UI/UX #9358, #9686); the one line of its row */
 }
 
+.session-list li.session-group-item.list-row { align-items: center; } /* the row's content block sits in the middle of its 36 px, not at the top (#9822) */
+
 .session-info {
     display: flex;
     flex-direction: column;
+    justify-content: center; /* the name's line sits in the middle of the 36 px row: equal space above and below (#9822) */
     min-width: 0;
     flex: 1;
 }
@@ -570,6 +573,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     padding: 5px 4px 5px 36px !important; /* a folder header's chevron (#5989) moved its label 22px right: 14px + 22px */
     min-height: 36px; /* one line a row (#9686): the dot, the name and at most one chip */
     align-items: center;
+    margin-top: 2px; /* a hovered row's tile does not touch the header or the row above (#9822) */
     margin-left: 6px;
     margin-right: 6px;
     cursor: grab;

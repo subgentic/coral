@@ -228,7 +228,7 @@ async function run() {
         // Screenshot cases (task #85): a sentence or a path in first_prompt is
         // goal text, never a name or initials.
         check('sentence prompt is not the row label (Agent)', bySid['sid-b'].label === 'coral-go · Claude', bySid['sid-b'].label);
-        check('row label carries a title with the resolved identity', bySid['sid-b'].labelTitle === 'coral-go · Claude' && bySid['sid-g'].labelTitle === 'Release Wrangler', `${bySid['sid-b'].labelTitle} / ${bySid['sid-g'].labelTitle}`);
+        check('row label has no native title (the row\'s own hover tip names the agent first, and a native one covered the next row, #9822)', bySid['sid-b'].labelTitle === null && bySid['sid-g'].labelTitle === null, `${bySid['sid-b'].labelTitle} / ${bySid['sid-g'].labelTitle}`);
         check('path prompt with board_job_title uses the job title as label', bySid['sid-g'].label === 'Release Wrangler', bySid['sid-g'].label);
         check('identity from board_job_title, not path words (aria-label)', /^Release Wrangler, /.test(bySid['sid-g'].ariaLabel || ''), bySid['sid-g'].ariaLabel);
         check('row label with no identity falls back to Agent', bySid['sid-c'].label === 'coral-go · Claude', bySid['sid-c'].label);

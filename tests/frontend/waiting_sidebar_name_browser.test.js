@@ -41,7 +41,7 @@ const NAME = 'Senior Backend Reliability Engineer for the Tunnel Subsystem';
                 const at = `${width}${narrow ? '-narrow' : ''}-${theme}`;
                 console.log(at + ': ' + JSON.stringify(facts));
                 try {
-                    assert.equal(facts.name, NAME); assert.equal(facts.title, NAME); assert.ok(facts.aria.startsWith(NAME + ','));
+                    assert.equal(facts.name, NAME); assert.equal(facts.title, '', 'no native title: the hover tip names the agent (#9822)'); assert.ok(facts.aria.startsWith(NAME + ','));
                     assert.ok(facts.firstVisible, 'name beginning remains visible: ' + JSON.stringify(facts));
                     assert.equal(facts.ellipsis, 'ellipsis'); assert.equal(facts.whiteSpace, 'nowrap');
                     // an agent row is one line, the dot, the name and at most one chip (#9686): a waiting agent's chip is DRAWN at every width, whole and not over the name; on a phone it sits on the line, not below

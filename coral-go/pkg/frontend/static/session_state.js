@@ -207,6 +207,7 @@ export function buildSessionTooltip(s) {
     const agent = s.agent_type || "claude";
 
     const rows = [
+        { label: 'Name', text: resolveSessionIdentity(s) }, // the row cut its name to its width and has no native title any more (it covered the next row, #9822): the whole name is here
         { label: 'State', text: stateLabel, cls: `tt-state-${stateLabel.toLowerCase().replace(/ /g, '-')}` },
         { label: 'Last action', text: lastAction },
         { label: 'Goal', text: goal },
