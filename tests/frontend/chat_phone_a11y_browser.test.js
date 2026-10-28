@@ -22,19 +22,19 @@ const { connect } = require('./agent_view_harness');
             await sleep(600); // sleep-ok: the roving stop and the names are set on the frame after the chat is drawn
 
             // the per-message Copy buttons: one Tab stop, named for the message, arrows between them
-            const copies = await ev(`(() => { const bs = [...document.querySelectorAll('#live-history-messages .chat-copy-btn')]; return { n: bs.length, tabbable: bs.filter(b => b.tabIndex >= 0).length, names: bs.map(b => b.getAttribute('aria-label')) }; })()`);
+            const copies = await ev(`(() => { const bs = [...document.querySelectorAll('#live-history-messages .chat-copy-btn')], group = [...document.querySelectorAll('#live-history-messages .chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn')]; return { n: bs.length, tabbable: group.filter(b => b.tabIndex >= 0).length, names: bs.map(b => b.getAttribute('aria-label')) }; })()`);
             assert.ok(copies.n >= 10, `${tag}: the chat has its Copy buttons (${copies.n})`);
             assert.equal(copies.tabbable, 1, `${tag}: the Copy buttons are one Tab stop, not ${copies.tabbable} (one per bubble before the message box)`);
             assert.equal(new Set(copies.names).size, copies.names.length, `${tag}: no two Copy buttons share a name (${JSON.stringify(copies.names.slice(0, 3))})`);
             assert.ok(copies.names.every(n => /^Copy message: \S/.test(n)), `${tag}: each says which message it copies (${JSON.stringify(copies.names.slice(0, 2))})`);
-            await ev(`document.querySelector('#live-history-messages .chat-copy-btn[tabindex="0"]').focus(); true`);
-            const stop = await ev(`[...document.querySelectorAll('#live-history-messages .chat-copy-btn')].indexOf(document.activeElement)`);
+            await ev(`document.querySelector('#live-history-messages .chat-copy-btn[tabindex="0"], #live-history-messages .chat-save-btn[tabindex="0"], #live-history-messages .chat-msg-menu-btn[tabindex="0"]').focus(); true`);
+            const stop = await ev(`[...document.querySelectorAll('#live-history-messages .chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn')].indexOf(document.activeElement)`);
             await key('ArrowUp', 38);
-            const up = await ev(`[...document.querySelectorAll('#live-history-messages .chat-copy-btn')].indexOf(document.activeElement)`);
+            const up = await ev(`[...document.querySelectorAll('#live-history-messages .chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn')].indexOf(document.activeElement)`);
             assert.equal(up, stop - 1, `${tag}: ArrowUp moves to the message before (${stop} to ${up})`);
-            assert.equal(await ev(`document.querySelectorAll('#live-history-messages .chat-copy-btn[tabindex="0"]').length`), 1, `${tag}: and the one Tab stop goes with it`);
-            await key('Home', 36); assert.equal(await ev(`[...document.querySelectorAll('#live-history-messages .chat-copy-btn')].indexOf(document.activeElement)`), 0, `${tag}: Home goes to the first`);
-            await key('End', 35); assert.equal(await ev(`[...document.querySelectorAll('#live-history-messages .chat-copy-btn')].indexOf(document.activeElement)`), copies.n - 1, `${tag}: End goes to the last`);
+            assert.equal(await ev(`document.querySelectorAll('#live-history-messages .chat-copy-btn[tabindex="0"], #live-history-messages .chat-save-btn[tabindex="0"], #live-history-messages .chat-msg-menu-btn[tabindex="0"]').length`), 1, `${tag}: and the one Tab stop goes with it`);
+            await key('Home', 36); assert.equal(await ev(`[...document.querySelectorAll('#live-history-messages .chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn')].indexOf(document.activeElement)`), 0, `${tag}: Home goes to the first`);
+            await key('End', 35); assert.equal(await ev(`[...document.querySelectorAll('#live-history-messages .chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn')].indexOf(document.activeElement)`), (await ev(`document.querySelectorAll('#live-history-messages .chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn').length`)) - 1, `${tag}: End goes to the last`);
 
             // the group is named: its Tab stop is described by a line that mentions the arrow keys
             const desc = await ev(`(() => { const b = document.querySelector('#live-history-messages .chat-copy-btn[tabindex="0"]'); const id = b && b.getAttribute('aria-describedby'); return id ? (document.getElementById(id) || {}).textContent || '' : ''; })()`);

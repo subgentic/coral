@@ -3,6 +3,7 @@
 // Preserve the original dependency evaluation order and listener registration order (#4996, #8353).
 import './hooks_review.js';
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
 import { escapeHtml, showToast, copyText } from './utils.js';
 import './actions.js';
 import './platform/detect.js';
@@ -97,6 +98,11 @@ document.addEventListener("toggle", (e) => {
 
 
 wireMessageActions(document.getElementById("live-history-messages")); // the chat container is in the page from the start
+
+document.addEventListener("click", (e) => {
+    const btn = e.target.closest && e.target.closest(".chat-msg-menu-btn");
+    if (btn) importOnce('./message_menu.js').then(m => m.openMessageMenu(btn)).catch(() => {}); // Copy, Save for later and Send to another agent on a message the person sent (#10159)
+});
 
 document.addEventListener("click", async (e) => {
     const btn = e.target.closest && e.target.closest(".chat-copy-btn");

@@ -3,7 +3,7 @@
  * move between them; the stop is described by a line that says so. Each Copy button says which message it copies. Touch and mouse are unchanged: every button is still on its bubble. Work is done once per new
  * button (a streaming chat of a thousand messages re-reads nothing: a mutation that adds no button does nothing, except words arriving in a bubble whose button has no name yet), and written only on a change. */
 
-const SEL = '.chat-copy-btn, .chat-save-btn';
+const SEL = '.chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn';
 const LABEL_CHARS = 40;
 const HINT = "Message buttons: use the arrow keys to move between messages, Home and End for the first and last.";
 
