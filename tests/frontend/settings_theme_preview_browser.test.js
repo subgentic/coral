@@ -27,6 +27,8 @@ const BASE = require('./test_base').BASE;
         const remembered = await ev(`localStorage.getItem('coral-theme')`);
         assert.notEqual(remembered, 'light', 'a preview is not remembered: ' + remembered);
         await ev(`window.hideSettingsModal(); true`); await settle(500);
+        assert.equal(await ev(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Discard changes' && b.getClientRects().length > 0)`), true, 'a changed theme is an unsaved change: closing asks before it discards (#10526)');
+        await ev(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Discard changes').click(); true`); await settle(500);
         assert.equal(await theme(), 'dark', 'closing without Save puts the saved Dark back');
         await openSettings(); await pick('light'); await settle(300);
         await ev(`window.applySettings(); true`);
