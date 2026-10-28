@@ -11,7 +11,7 @@ export const {
 export const { showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged } =
     lazyFns(loadCostDashboard, ['showCostDashboard', '_refreshCostDashboard', '_costTimeRangeChanged']);
 
-export const { openTeamPage, applyTeamRoute, exitTeamPage } = lazyFns(loadTeamPage, ['openTeamPage', 'applyTeamRoute', 'exitTeamPage']);
+export const { openTeamPage, applyTeamRoute, exitTeamPage, teamIsMissing } = lazyFns(loadTeamPage, ['openTeamPage', 'applyTeamRoute', 'exitTeamPage', 'teamIsMissing']);
 
 export const { showTeamWorkingModeWorkspace } = lazyFns(loadTeamSettings, ['showTeamWorkingModeWorkspace']);
 export const { showTeamLinkDialog } = lazyFns(loadTeamLinkDialog, ['showTeamLinkDialog']);

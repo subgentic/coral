@@ -27,7 +27,7 @@ const $ = (id) => document.getElementById(id);
 // A team no board has (a mistyped /team/<name>, #8848): the page says so and offers the way back, with none of a team's tabs, New goal or Add agent. Asked once per team of the page's life, with the same rule as
 // the Artifacts route's 404 (#8821: BoardKnown), so a new empty team that exists keeps its page; a probe that fails (offline, a computer that does not answer) leaves the page as it was.
 const missing = new Map(); // team key -> true (no such team) / false
-async function teamIsMissing(team) {
+export async function teamIsMissing(team) {
     if (missing.has(team)) return missing.get(team);
     try {
         const r = await boardFetch(team, '/artifacts?limit=1');

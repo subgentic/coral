@@ -5,7 +5,7 @@ import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { deserializeFromUrl } from './search_filters.js';
 import { selectHistorySession } from './sessions.js';
-import { startNav, go, note, onRoute, currentRoute } from './nav.js';
+import { startNav, go, note, onRoute, currentRoute, forgetLastPlace } from './nav.js';
 import { liveRoute, keyRoute, routeKey, AGENT_SUBTABS, parse as parseRoute, cloudRedirect, folderForSub, inboxRouteFor } from './routes.js';
 import { showTerminalView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
@@ -18,11 +18,17 @@ import { syncFilterDomToState } from './history_filters.js';
 import { historyServer, setHistorySource } from './history_source.js';
 import { switchNavTab, currentChatsQuery, showHome } from './app_navigation.js';
 import { START_SEARCH, liveListReady } from './initial_load.js';
-import { openTeamPage, applyTeamRoute, exitTeamPage } from './app_panels.js';
+import { openTeamPage, applyTeamRoute, exitTeamPage, teamIsMissing } from './app_panels.js';
 
 function notFound(message, listRoute) {
     showToast(message, true);
     return go(listRoute, { replace: true });
+}
+
+/** The place the person left is gone (an agent removed, a chat deleted): Home, with no message and nothing kept (#10057). */
+function goneQuietly() {
+    forgetLastPlace();
+    return go({ view: 'agents' }, { replace: true });
 }
 
 function registerRouteHandlers() {
@@ -45,7 +51,7 @@ function registerRouteHandlers() {
         await liveListReady;
         const s = (state.liveSessions || []).find(x => String(x.session_id || '').toLowerCase() === r.id
             && liveRoute(sessionServer(x), x.session_id).server === r.server);
-        if (!s) return notFound('That agent is not running here', { view: 'agents' });
+        if (!s) return opts.restored ? goneQuietly() : notFound('That agent is not running here', { view: 'agents' });
         switchNavTab('agents', { fromHistory: true });
         const cur = state.currentSession;
         const shown = cur && cur.type === 'live' && cur.session_id === s.session_id && sessionServer(cur) === sessionServer(s);
@@ -64,7 +70,7 @@ function registerRouteHandlers() {
             const cur = state.currentSession;
             if (!(cur && cur.type === 'history' && cur.name === r.id && sessionServer(cur) === historyServer()) && (await selectHistorySession(r.id)) === false) {
                 state.currentSession = null;
-                notFound('That chat was not found', { view: 'chats', query: currentChatsQuery() });
+                if (opts.restored) goneQuietly(); else notFound('That chat was not found', { view: 'chats', query: currentChatsQuery() });
             }
             return;
         }
@@ -85,8 +91,9 @@ function registerRouteHandlers() {
         else await m.openInboxGroup(folderForSub(sub));
     });
 
-    onRoute('team', async r => {
+    onRoute('team', async (r, opts) => {
         await liveListReady;
+        if (opts && opts.restored && await teamIsMissing(routeKey(r))) return goneQuietly(); // the team the person left was deleted: Home, no "No team named" page (#10057)
         switchNavTab('agents', { fromHistory: true });
         await applyTeamRoute(routeKey(r), r.sub || 'goals', r.item || 0, r.query || ''); // the team page (#7453); /team/<name> is its Goals tab
     });
