@@ -283,6 +283,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/live/{name}/chat", sessHandler.Chat)
 	r.Get("/api/sessions/live/{name}/attachment/{ref}", sessHandler.ChatAttachment) // a pasted image of the chat, for its chip (#5032)
 	r.Get("/api/sessions/live/{name}/info", sessHandler.Info)
+	r.Get("/api/sessions/live/{name}/mcp-servers", sessHandler.AgentMCPServers) // #9769: which MCP servers the agent has configured, read-only
 	r.Get("/api/sessions/live/{name}/files", sessHandler.Files)
 	r.Get("/api/sessions/live/{name}/memory", sessHandler.ListMemory)      // an agent's instruction and memory files (#7454): the Operator's, never through the Hub
 	r.Get("/api/sessions/live/{name}/memory/{id}", sessHandler.ReadMemory) // one of them as text, by an id the list issued

@@ -1,7 +1,37 @@
 /* Moved out of modals.js as it was (#4684): The Info dialog (agent session info and its copy button). No behaviour change. */
 import { state } from './state.js';
 import { showToast } from './utils.js';
-import { serverFetch, currentServer, identityKey, keyLabel } from './server_base.js';
+import { setHidden } from './dom_write.js';
+import { serverFetch, currentServer, identityKey, keyLabel, isCloud, isLocalServer } from './server_base.js';
+
+/** The lines the Info dialog shows for an agent's MCP servers (#9769): one per server, "name: transport, scope"; [] when the CLI is not one Coral reads, and one line saying none when it reads it and finds none. */
+export function mcpLines(result) {
+    if (!result || result.supported !== true || !Array.isArray(result.servers)) return [];
+    if (!result.servers.length) return ['None configured'];
+    const lines = result.servers.map(s => `${String(s.name)}: ${String(s.transport)}, ${String(s.scope)}`);
+    if (result.truncated) lines.push('and more');
+    return lines;
+}
+
+let mcpAsked = '';
+/** Fills the dialog's MCP servers row from the server, read-only and for this computer's own agents only (the route is the Operator's and never through Coral Hub). A failure or an unread CLI leaves the row hidden. */
+async function showMcpServers(name, sid) {
+    const label = document.getElementById('info-mcp-label'), val = document.getElementById('info-mcp');
+    if (!label || !val) return;
+    setHidden(label, true); setHidden(val, true);
+    if (!sid || isCloud() || !isLocalServer(currentServer())) return;
+    mcpAsked = sid;
+    let result = null;
+    try {
+        const r = await serverFetch(currentServer(), `/api/sessions/live/${encodeURIComponent(name)}/mcp-servers?session_id=${encodeURIComponent(sid)}`);
+        result = r.ok ? await r.json() : null;
+    } catch { result = null; }
+    if (mcpAsked !== sid) return; // the dialog was opened for another agent meanwhile
+    const lines = mcpLines(result);
+    if (!lines.length) return;
+    val.replaceChildren(...lines.map(l => Object.assign(document.createElement('div'), { textContent: l })));
+    setHidden(label, false); setHidden(val, false);
+}
 
 export async function showInfoModal() {
     if (!state.currentSession || state.currentSession.type !== "live") {
@@ -74,6 +104,7 @@ export async function showInfoModal() {
         }
 
         document.getElementById("info-modal").style.display = "flex";
+        showMcpServers(name, sid);
     } catch (e) {
         showToast("Failed to load session info", true);
         console.error("showInfoModal exception:", e);
