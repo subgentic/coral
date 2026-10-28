@@ -393,6 +393,10 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     opacity: 0.7;
 }
 
+.session-name-row > .btn[data-mode="wake"] { display: none; flex: none; } /* a sleeping agent's Wake takes the chip's place at a hover or the keyboard: the name keeps its room (#10062) */
+.session-group-item:hover .session-name-row > .btn[data-mode="wake"], .session-group-item:focus-within .session-name-row > .btn[data-mode="wake"] { display: inline-flex; }
+.session-group-item:hover .session-name-row:has(> .btn[data-mode="wake"]) > .chip, .session-group-item:focus-within .session-name-row:has(> .btn[data-mode="wake"]) > .chip { display: none; }
+@media (pointer: coarse) { .session-name-row > .btn[data-mode="wake"] { display: inline-flex; } .session-name-row:has(> .btn[data-mode="wake"]) > .chip { display: none; } } /* a touch screen has no hover: Wake is the row's word */
 .session-list .sleeping-summary-row {
     font-size: var(--fs-base);
     color: var(--text-muted);
