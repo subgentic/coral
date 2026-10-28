@@ -19,6 +19,7 @@ const ONE = 'a'.repeat(64), MANY = 'b'.repeat(64), PNG = 'c'.repeat(64), TXT = '
             window.fetch = (input, init) => {
                 const u = String(input && input.url ? input.url : input);
                 const json = body => Promise.resolve(new Response(body, { headers: { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="shots.json"' } }));
+                if (u.endsWith('/api/artifacts/${ONE}?v=2') && window.__held) return new Promise(res => { window.__release = () => res(json(manifest([['screenshot.png', '${PNG}', 'image/png']]))); });
                 if (u.endsWith('/api/artifacts/${ONE}?v=2')) return json(manifest([['screenshot.png', '${PNG}', 'image/png']]));
                 if (u.endsWith('/api/artifacts/${MANY}?v=2')) return json(manifest([['screenshot.png', '${PNG}', 'image/png'], ['notes.txt', '${SECOND}', 'text/plain']]));
                 if (u.endsWith('/api/artifacts/${TXT}?v=2')) return Promise.resolve(new Response('plain notes', { headers: { 'Content-Type': 'text/plain', 'Content-Disposition': 'inline; filename="notes.txt"' } }));
@@ -29,6 +30,15 @@ const ONE = 'a'.repeat(64), MANY = 'b'.repeat(64), PNG = 'c'.repeat(64), TXT = '
         const dl = () => ev(`(() => { const a = document.querySelector('.artifact-viewer-download'); return { href: a.getAttribute('href'), name: a.getAttribute('download'), hidden: a.hidden || a.getClientRects().length === 0 }; })()`);
         const open = async (hex, name, ready) => { await ev(`import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer('${hex}', { filename: ${JSON.stringify(name)} })).then(() => true)`); await waitFor(ready, 'the viewer rendered ' + name, 10000); };
 
+        // until the manifest is fetched and parsed nobody knows it is one: the Download has no address then, so an early click cannot save the .json (#9941)
+        await ev(`window.__held = true; import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer('${ONE}', { filename: 'shots.json' })); true`);
+        await waitFor(`!!window.__release`, 'the manifest fetch is held', 8000);
+        let held = await ev(`(() => { const a = document.querySelector('.artifact-viewer-download'); return { href: a.getAttribute('href'), disabled: a.getAttribute('aria-disabled') }; })()`);
+        assert.deepEqual([held.href, held.disabled], [null, 'true'], 'while the manifest is on its way the Download has no address and says so ' + JSON.stringify(held));
+        await ev(`window.__held = false; window.__release(); true`);
+        await waitFor(`/Artifact manifest/.test(document.querySelector('.artifact-viewer-title').textContent)`, 'the manifest rendered', 10000);
+        held = await ev(`(() => { const a = document.querySelector('.artifact-viewer-download'); return { href: a.getAttribute('href'), disabled: a.getAttribute('aria-disabled'), name: a.getAttribute('download') }; })()`);
+        assert.deepEqual([held.href, held.disabled, held.name], [`/api/artifacts/${PNG}?v=2`, null, 'screenshot.png'], 'then the file by its name, enabled ' + JSON.stringify(held));
         // one file: the file
         await open(ONE, 'shots.json', `/Artifact manifest/.test(document.querySelector('.artifact-viewer-title').textContent)`);
         let d = await dl();

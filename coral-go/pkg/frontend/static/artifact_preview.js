@@ -181,11 +181,18 @@ export function resolveArtifactSource(uri, options = {}) {
 /**
  * Render an artifact into `body`.
  * ctx: { signal, isStale(), renderContent(body, content, path), openEntry({name, uri, media_type}),
- *        setMeta({ title, filename, entries? }) }  (entries: the files of a manifest, so a Download can name the file and not the manifest, #9925)
+ *        setMeta({ title, filename }), typeKnown?(entries|null) }  (typeKnown: once, when the kind is known: the files of a manifest, so a Download can name the file and not the manifest (#9925), or null for any other artifact; a host with a Download offers none before it, #9941)
  */
 export async function renderArtifact(body, uri, options, ctx) {
     const source = resolveArtifactSource(uri, options);
-    if (!source) { body.innerHTML = '<div class="inline-preview-error">Artifact unavailable</div>'; return; }
+    if (!source) { body.innerHTML = '<div class="inline-preview-error">Artifact unavailable</div>'; ctx.typeKnown?.(null); return; }
+    // The host's Download waits until the artifact's kind is known (#9941): a manifest's own link would save its .json, and until it is fetched and parsed nobody knows it is one. Told once: the manifest's files, or null for any other artifact (also when it fails to load).
+    let kindKnown = false;
+    const kind = (entries) => { if (!kindKnown) { kindKnown = true; ctx.typeKnown?.(entries || null); } };
+    try { return await _renderArtifactInto(body, uri, options, ctx, source, kind); } finally { kind(null); }
+}
+
+async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
     const { url, externalURL } = source;
     const opened = CORAL_ARTIFACT_URI_RE.exec(uri);
     if (opened) importOnce('./inbox_reviews.js').then(m => m.markOpenedRead(opened[1])).catch(() => {}); // a for-review artifact opened in a preview is read (#9277); any other is never tagged
@@ -248,7 +255,8 @@ export async function renderArtifact(body, uri, options, ctx) {
             }
             const manifest = isJSON ? _parseManifest(content) : null;
             if (manifest) {
-                ctx.setMeta({ title: 'Artifact manifest', filename: filename || 'manifest.json', entries: manifest.entries });
+                ctx.setMeta({ title: 'Artifact manifest', filename: filename || 'manifest.json' });
+                kind(manifest.entries);
                 _renderManifest(body, manifest, filename || 'manifest.json', ctx);
             } else if (!isMarkdown && isJSON && renderJSONReport(body, content, filename)) {
                 // Recognized reports keep their original bytes in the raw view.

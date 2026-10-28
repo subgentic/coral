@@ -108,10 +108,12 @@ export function openArtifactViewer(hex, opts = {}) {
     const dl = d.querySelector('.artifact-viewer-download');
     dl.href = url;
     dl.hidden = false; // a manifest may have hidden it (below): this artifact is not that one
+    // No address until the artifact's kind is known (#9941): a manifest's own link would save its .json, and an early click on this one would. typeKnown (below) gives it its address.
+    dl.removeAttribute('href'); dl.setAttribute('aria-disabled', 'true');
     // An empty download attribute keeps the stored file's own name (Content-Disposition), not the link's label.
     dl.setAttribute('download', '');
     // Through Coral Hub a link can't navigate to /api/remote/...: the bytes are fetched and saved (artifact_download.js).
-    dl.onclick = isCloud() ? (e) => { e.preventDefault(); downloadArtifact(url, sanitizeDownloadName(opts.filename || 'artifact')).catch(err => { title.textContent = err.message; }); } : null;
+    dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(url, sanitizeDownloadName(opts.filename || 'artifact')).catch(err => { title.textContent = err.message; }); } : null;
     const body = d.querySelector('.artifact-viewer-body');
     const wasOpen = !d.hidden;
     d.hidden = false;
@@ -130,15 +132,19 @@ export function openArtifactViewer(hex, opts = {}) {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');
             if (m) openArtifactViewer(m[1], { server: opts.server, filename: entry.name, mediaType: entry.media_type });
         },
-        setMeta: ({ title: t, filename, entries }) => {
+        setMeta: ({ title: t, filename }) => {
             if (gen !== _gen) return;
             if (t || filename) title.textContent = t || filename;
-            if (entries) { // a manifest: Download saves its file, not the JSON list (#9925); with several files there is none here (each row has its own)
-                const target = manifestDownload(entries, opts.server);
-                if (!target) { dl.hidden = true; return; }
-                dl.href = target.url; dl.setAttribute('download', target.name);
-                dl.onclick = isCloud() ? (e) => { e.preventDefault(); downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
-            }
+        },
+        typeKnown: (entries) => { // the kind is known: Download gets its address (#9941)
+            if (gen !== _gen) return;
+            dl.removeAttribute('aria-disabled');
+            if (!entries) return void (dl.href = url); // any other artifact: its own bytes, under the stored name
+            // a manifest: Download saves its file, not the JSON list (#9925); with several files there is none here (each row has its own)
+            const target = manifestDownload(entries, opts.server);
+            if (!target) { dl.hidden = true; return; }
+            dl.href = target.url; dl.setAttribute('download', target.name);
+            dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
     });
     return true;

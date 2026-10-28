@@ -152,9 +152,9 @@ function _renderToolbar(tab) {
         // The managed-artifact url is server-relative; point it at the viewed server (the hub path) for the link/download.
         const dlUrl = src ? (src.externalURL ? src.url : serverUrl(src.url, src.server)) : '';
         // A manifest (a JSON list of files): Download is its one file by its own name, not the .json (#9925); with several files the toolbar has none (each row has its own).
-        const mf = tab.manifestDownload;
+        const mf = tab.manifestDownload; // undefined: the kind is not known yet (no link: a manifest's own would save its .json, #9941); false: a manifest of several files; null: any other artifact; an object: the manifest's one file
         const dlHref = mf ? mf.url : dlUrl, dlName = mf ? mf.name : (tab.options.filename || '');
-        const link = src && mf !== false
+        const link = src && (src.externalURL || mf !== undefined) && mf !== false
             ? `<a class="team-artifacts-action" href="${escapeAttr(dlHref)}" ${src.externalURL ? 'target="_blank" rel="noopener noreferrer"' : `download="${escapeAttr(dlName)}" data-artifact-download="${escapeAttr(dlHref)}" data-artifact-name="${escapeAttr(dlName)}"`}>${src.externalURL ? 'Open link' : 'Download'}</a>`
             : '';
         bar.innerHTML = `<span class="preview-toolbar-path" title="${escapeAttr(tab.options.filename || tab.filepath)}">${escapeHtml(tab.options.filename || 'Artifact preview')}</span>
@@ -431,7 +431,9 @@ async function _render(tab) {
                 if (comments && current()) comments.docRendered(content, true); // text the comments apply to (#5311)
             },
             openEntry: (entry) => openArtifactTab(entry.uri, { filename: entry.name, mediaType: entry.media_type }),
-            setMeta: ({ title, entries }) => { tab.title = title; if (entries) { tab.manifestDownload = manifestDownload(entries, tab.options?.server) || false; _renderToolbar(tab); } _renderTabs(); }, // a manifest: the toolbar's Download is its one file, or none (#9925)
+            setMeta: ({ title }) => { tab.title = title; _renderTabs(); },
+            // the kind is known: the toolbar's Download is its one file for a manifest, none for several (#9925), the artifact's own link otherwise; before this there is none (#9941)
+            typeKnown: (entries) => { tab.manifestDownload = entries ? (manifestDownload(entries, tab.options?.server) || false) : null; _renderToolbar(tab); },
         });
         return;
     }
