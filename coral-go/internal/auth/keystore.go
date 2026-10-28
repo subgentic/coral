@@ -68,6 +68,8 @@ type KeyStore struct {
 	setupCode    string
 	setupExpires time.Time
 	setupWrong   int
+	// signedOut: the hashes of sessions another browser ended with "Sign out other browsers" (#10431), so the sign-in page can say why. Memory only, bounded, 24 hours.
+	signedOut map[string]time.Time
 	// peerUser is the peer-user check (#3970): a sign-in link opened by another OS user of this
 	// computer is refused. nil, or "unsupported", keeps today's behaviour.
 	peerUser    func(*http.Request) (same, supported bool)

@@ -4,6 +4,7 @@
  * put in the page with textContent only, never as HTML. None of this exists through Coral Hub. */
 
 import { showToast } from './utils.js';
+import { showConfirmModal } from './confirm_dialog.js';
 import { isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { signOutThisBrowser } from './local_store.js';
@@ -116,7 +117,7 @@ function sessionsBlock(data) {
     box.append(ul);
     const others = all.filter(s => !s.current).length;
     const out = el('button', 'btn btn-small', 'Sign out other browsers'); out.type = 'button'; out.id = 'sec-signout-others'; out.disabled = others === 0;
-    out.addEventListener('click', async () => {
+    const signOutOthers = async () => {
         out.disabled = true;
         let res;
         try { res = await postJson('/api/auth/sessions/sign-out-others', {}); } catch { res = { ok: false, data: { error: 'Could not reach Coral.' } }; }
@@ -125,6 +126,11 @@ function sessionsBlock(data) {
         showToast(n ? `Signed out ${n} other browser${n === 1 ? '' : 's'}.` : 'No other browsers were signed in.');
         await loadSecurityRow();
         document.getElementById('sec-signout')?.focus(); // the button just used is redrawn disabled (nobody else is signed in now): keep focus in the block
+    };
+    out.addEventListener('click', () => { // it ends other people's sessions: it asks first (#10431), and names who is affected
+        showConfirmModal('Sign out other browsers',
+            `Sign out ${others} other browser${others === 1 ? '' : 's'}? ${others === 1 ? 'It' : 'They'} will have to sign in again; this browser stays signed in.`,
+            signOutOthers, undefined, { label: 'Sign out other browsers', danger: true });
     });
     // This browser's own Sign out, next to it: confirm-free (signing in again undoes it), a plain button for keyboard and touch.
     const me = el('button', 'btn btn-small', 'Sign out'); me.type = 'button'; me.id = 'sec-signout';

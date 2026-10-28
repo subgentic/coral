@@ -133,6 +133,9 @@ const BASE = require('./test_base').BASE;
             // sign out others
             reply['/api/auth/sessions/sign-out-others'] = { status: 200, body: { ok: true, signed_out: 1 } };
             const n0 = calls.length; $('sec-signout-others').click();
+            await waitFor(() => /Sign out 1 other browser\\? It will have to sign in again/.test((document.getElementById('confirm-modal-message') || {}).textContent || ''), 'the confirm that names who is signed out');
+            await sleep(150); /* sleep-ok: a negative check, nothing may be sent before the confirm */ out.askedFirst = calls.length === n0; // nothing is sent until it is confirmed
+            document.getElementById('confirm-modal-yes').click();
             await waitFor(() => calls.length > n0, 'sign out others');
             out.signOutCall = calls[calls.length - 1].url;
             // a caller with no browser sign-in: the list says so inline, never "signed out" (a 403, not dashboard_auth_required)
@@ -144,6 +147,7 @@ const BASE = require('./test_base').BASE;
             window.fetch = RealFetch; $('set-password-modal')?.remove(); row.remove();
             return out;
         })()`);
+        assert.equal(out.askedFirst, true, 'Sign out other browsers asks first and sends nothing until it is confirmed (#10431)');
         assert.equal(out.fields.newAc, 'new-password'); assert.equal(out.fields.confAc, 'new-password');
         assert.deepEqual(out.fields.username, { ac: 'username', hidden: true }, 'a username field for the password manager');
         assert.equal(out.fields.type, 'password'); assert.equal(out.fields.focused, 'set-password-new', 'focus moves to the password');

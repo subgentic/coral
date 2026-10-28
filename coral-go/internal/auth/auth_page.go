@@ -39,6 +39,7 @@ type PageState struct {
 	Local       bool
 	Strict      bool
 	Locked      bool
+	SignedOut   bool // this browser's session was ended by another browser's "Sign out other browsers" (#10431)
 	HubSignin   string
 	HubURL      string
 }
@@ -153,7 +154,8 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
   <section id="panel-signin" class="panel">
     <h1>Sign in</h1>
     <p class="sub">Enter the password you made for Coral on this computer.</p>
-    <div id="err" class="err" role="alert" hidden></div>
+{{if .SignedOut}}    <p class="note" id="signed-out-why" role="status"><b>You were signed out.</b> Another browser chose Sign out other browsers. Sign in again to continue.</p>
+{{end}}    <div id="err" class="err" role="alert" hidden></div>
     <div id="lock" class="lock" role="status" hidden><span>&#9202;</span><span><b>Sign-in is paused.</b> Too many wrong passwords. It opens again in <span class="count" id="count">0:00</span>.</span></div>
     <form id="signin-form" autocomplete="on">
       <input type="text" name="username" value="coral" autocomplete="username" hidden aria-hidden="true" readonly tabindex="-1">

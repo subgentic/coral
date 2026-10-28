@@ -382,9 +382,60 @@ func (ks *KeyStore) RevokeOtherSessions(r *http.Request) (int, error) {
 	if t := ks.extractSessionCookie(r); t != "" && ks.ValidateSession(t) {
 		keep = sessionHash(t)
 	}
+	if list, lerr := ks.backend().ListSessions(context.Background()); lerr == nil {
+		for _, sess := range list {
+			if sess.IDHash != keep {
+				ks.noteSignedOut(sess.IDHash) // the browser that comes back with this cookie is told why (#10431)
+			}
+		}
+	}
 	n, err := ks.backend().DeleteSessionsExcept(context.Background(), keep)
 	ks.live.close("", keep) // the others' open WebSockets close too
 	return n, err
+}
+
+const (
+	signedOutTTL = 24 * time.Hour
+	signedOutMax = 500
+)
+
+// noteSignedOut remembers that a session was ended by another browser's "Sign out other browsers". The list is bounded and its entries expire.
+func (ks *KeyStore) noteSignedOut(hash string) {
+	if hash == "" {
+		return
+	}
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+	now := time.Now()
+	if ks.signedOut == nil {
+		ks.signedOut = map[string]time.Time{}
+	}
+	for h, at := range ks.signedOut {
+		if now.Sub(at) > signedOutTTL {
+			delete(ks.signedOut, h)
+		}
+	}
+	for len(ks.signedOut) >= signedOutMax { // full: the oldest goes
+		oldest, oldestAt := "", now
+		for h, at := range ks.signedOut {
+			if oldest == "" || at.Before(oldestAt) {
+				oldest, oldestAt = h, at
+			}
+		}
+		delete(ks.signedOut, oldest)
+	}
+	ks.signedOut[hash] = now
+}
+
+// wasSignedOutByOthers reports whether the cookie value is a session another browser ended with "Sign out other browsers" in the last day.
+func (ks *KeyStore) wasSignedOutByOthers(token string) bool {
+	if token == "" {
+		return false
+	}
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+	at, ok := ks.signedOut[sessionHash(token)]
+	return ok && time.Since(at) <= signedOutTTL
 }
 
 // RevokeAllSessions ends every browser session.
