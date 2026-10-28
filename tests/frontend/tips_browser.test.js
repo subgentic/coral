@@ -50,13 +50,14 @@ const BASE = require('./test_base').BASE;
         check('Thinking, Flags and Tool permissions each say what they are', /how hard/i.test(dlg.thinking) && /options|command/i.test(dlg.flags) && /allow|without asking|tools/i.test(dlg.tools), JSON.stringify([dlg.thinking, dlg.flags, dlg.tools]));
         await shot('tips-new-agent-1280');
 
-        // Settings > Agents: each row says in one visible line what it does (the longer note stays behind its (i))
+        // Settings > Agents: each row says what it does in one visible line, or behind its Learn more (the longer note stays behind it either way)
         await ev(`window.hideLaunchModal && window.hideLaunchModal(); window.showSettingsModal(); true`);
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings', 8000);
         await ev(`document.getElementById('settings-tab-agents').click(); true`);
         await sleep(600); // sleep-ok: the pane is drawn when its tab is picked
         const rowsHelp = await ev(`Object.fromEntries(['settings-working-dir', 'settings-default-thinking-claude', 'settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority', 'settings-board-auto-attach', 'settings-nudge-claude-artifacts', 'settings-codex-trust-hooks'].map(id => { const e = document.getElementById(id), row = e && e.closest('.sv-row'), h = row && [...row.querySelectorAll('.sv-help')].find(x => x.getClientRects().length > 0 && x.textContent.trim()); return [id, h ? h.textContent.trim() : null]; }))`);
-        check('each Settings > Agents row has a visible one-line description', Object.values(rowsHelp).every(t => t && t.length > 15 && t.length < 110), JSON.stringify(rowsHelp));
+        // a row passes with a visible one-line hint OR a Learn more / More that holds it: the pane's word budget wins (simple to start, #10324; settings_text_budget_browser)
+        check('each Settings > Agents row has a one-line description, visible or behind Learn more', Object.values(rowsHelp).every(t => t && ((t.length > 15 && t.length < 110) || /^(learn )?more$/i.test(t))), JSON.stringify(rowsHelp));
         await shot('tips-settings-agents-1280');
     } finally { await client.close(); }
     if (results.some(x => !x)) { console.error(`${results.filter(x => !x).length} of ${results.length} failed`); process.exit(1); }
