@@ -491,7 +491,8 @@
                     <dt>Attach Command</dt>
                     <dd class="info-command-row">
                         <code id="info-tmux-command" class="info-code-block"></code>
-                        <button class="btn btn-small copy-btn" data-on-click="m-copy-info-command" title="Copy to clipboard">Copy</button>
+                        <button class="btn btn-small copy-btn" id="info-copy-btn" data-on-click="m-copy-info-command" title="Copy to clipboard">Copy</button>
+                        <span id="info-attach-note" hidden>This agent runs in Coral's own terminal, so there is nothing to attach to. <button type="button" class="cni-link" data-on-click="m-open-terminal-settings">Use tmux in Settings</button> to attach from your own terminal.</span>
                     </dd>
                     <dt>Working Directory</dt>
                     <dd id="info-working-dir" class="info-value-path"></dd>
@@ -534,6 +535,7 @@
                             <input type="text" id="resume-dir" placeholder="/path/to/project" data-coral-root="{{ .CoralRoot }}" value="{{ .CoralRoot }}">
                             <button class="btn" data-on-click="m-toggle-browser" data-browser="resume-dir resume-dir-browser resume-browser-list resume-browser-current-path">Browse</button>
                         </div>
+                        <p id="resume-dir-note" class="settings-hint" hidden></p><!-- where the session ran, and a warning when the folder is changed or gone (resume_dialog.js, #10291) -->
                     </div>
                     <div id="resume-dir-browser" class="dir-browser" style="display:none">
                         <div class="dir-browser-header">

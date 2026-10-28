@@ -1874,6 +1874,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     color: var(--text-secondary);
     margin-top: 2px;
 }
+#resume-dir-note.is-warning { color: var(--warning-text); } /* the folder was changed or is gone (#10291) */
 .settings-hint[data-state="restart-required"] { color: var(--warning); }
 /* Kept worktrees (#6743) */
 .wt-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }

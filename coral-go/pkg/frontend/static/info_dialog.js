@@ -60,6 +60,11 @@ export async function showInfoModal() {
         document.getElementById("info-agent-type").textContent = info.agent_type || "";
         document.getElementById("info-tmux-session").textContent = info.tmux_session_name || "";
         document.getElementById("info-tmux-command").textContent = info.tmux_command || "";
+        // Coral's own terminal (pty) has no tmux session to attach to: an empty code box says nothing, so the row says why and where tmux is chosen (#10291)
+        const hasAttach = !!info.tmux_command;
+        document.getElementById("info-tmux-command").hidden = !hasAttach;
+        document.getElementById("info-copy-btn").hidden = !hasAttach;
+        document.getElementById("info-attach-note").hidden = hasAttach;
         document.getElementById("info-working-dir").textContent = info.working_directory || "";
         document.getElementById("info-log-path").textContent = info.log_path || "";
         document.getElementById("info-pane-title").textContent = info.pane_title || "";
