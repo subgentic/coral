@@ -25,7 +25,7 @@ const { _reviewGeneratedTeam } = await importOnce('./team_wizard.js'); // loads 
 const { _selectAgentPreset } = personaIo;
 export const { showLaunchModal, launchSession } = launchDialog;
 export const { showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal } = boardLaunches;
-export const { exportPersonas, importPersonas, exportTeamTemplates, importTeamTemplates } = personaIo;
+export const { exportPersonas, importPersonas, exportTeamTemplates, exportTeamTemplate, importTeamTemplates } = personaIo;
 export const { _launchOn, hideLaunchModal } = launchCore; // _launchOn is exported for board_ids_browser
 export const { toggleFlag } = flagShortcuts;
 export const { showInfoModal, hideInfoModal, copyInfoCommand } = infoDialog;
@@ -70,7 +70,7 @@ registerActions({
     'team-agent-undo': () => teamDialogs._undoTeamAgentRemoval(),
     'team-step-next': () => teamDialogs.teamStepMove(1),
     'team-step-back': () => teamDialogs.teamStepMove(-1),
-    'team-menu': el => toggleMenu(el), // More (templates) and a member's actions (#7407)
+    'team-menu': el => { if (el.id === 'team-template-more') teamDialogs._syncTemplateMenu(); toggleMenu(el); }, // More (templates) and a member's actions (#7407); the template's Export is for a saved one only (#10366)
     'team-template-filter': el => teamDialogs._renderTeamTemplateSelector(textOf(el.value, 200) || ''), // textOf('') is null: an emptied search lists every template again (#6411)
     'team-template-select': el => teamDialogs._pickTeamTemplate(textOf(el.value, 200) || ''), // textOf('') is null: Blank team
     'team-set-all': el => teamDialogs._setAllWorkers(textOf(el.value, 40) || ''),
