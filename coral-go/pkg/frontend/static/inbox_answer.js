@@ -11,6 +11,9 @@ import { blockedReason, hubBlocked } from './hub_access.js';
 const MAX_CHOICES = 4;
 // Choices that last past this one answer, or change how the agent runs: never a button on a list row (each CLI's own words: Claude's "Yes, and don't ask again for ..." and "Yes, allow all edits during this session", Codex's "Yes, and don't ask again", Antigravity's "always allow").
 const LASTING = /don.?t ask|always|allow all|all edits|session|conversation|switch to|persist|remember|from now on|auto mode|accept edits/i;
+// What a permission's choice may say to be a button: a short Yes, Allow, Approve, No, Deny or Reject, and nothing about a place or a scope ("Yes, allow reading from <dir>/ from this project" reaches further than this one time): everything else is left to Open (Security Reviewer, #10462).
+const PLAIN = /^(yes|no|allow|deny|approve|reject)\b/i, SCOPE = /project|director|folder|repositor|\ball\b|\bfrom\b|\/|~/i, PERMISSION_WORDS = /^(yes|allow|approve)\b/i;
+const plainlyOneTime = (label, permission) => !LASTING.test(label) && !SCOPE.test(label) && (!permission || (PLAIN.test(label) && label.length <= (PERMISSION_WORDS.test(label) ? 40 : 60)));
 const read = new Map(); // server:session:waiting_since -> the choices, read once per ask
 
 /** The card's one-time choices and the ask they belong to: { ask, picks } ({ ask: '', picks: [] } when the card cannot be answered by one choice). */
@@ -21,7 +24,8 @@ async function readAsk(s) {
     if (!resp.ok) return none;
     const po = (await resp.json().catch(() => null) || {}).prompt_options;
     if (!po || po.multi || (po.review || []).length) return none;
-    const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && !LASTING.test(o.label));
+    const permission = (po.options || []).some(o => PERMISSION_WORDS.test(String(o.label || ''))); // a permission card: only a plain Yes or No is a button; a question's own choices (Red, Blue) are
+    const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && plainlyOneTime(String(o.label), permission));
     return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks } : none;
 }
 
