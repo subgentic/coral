@@ -1,6 +1,6 @@
 // After a team is launched the keyboard goes where the person types next on a computer, and to the page's heading on a touch screen (Mobile recheck, #10342, #10281): the team's message box took the focus, which raised the
 // on-screen keyboard over the team's page before the person had looked at it. The rule is the password dialog's (#10067): a coarse pointer gets the heading, a fine one the box. _openLaunchedTeam is what Launch team
-// calls once the agents are up, with and without a first task (a team with a first task took no focus at all on a desktop, Beta #10401 moment 3). At 1280 px with a mouse and at 390 px with touch; the isolated dev server, a board made through the API.
+// calls once the agents are up, with and without a first task (a team with a first task took no focus at all on a desktop, Beta #10401 moment 3). At 1280 px with a mouse, at 390 px with touch, and at 390 px with a mouse (a phone-width window or a browser that does not report a coarse pointer: the phone layout is a phone, #10589); the isolated dev server, a board made through the API.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -14,8 +14,8 @@ const BOARD = 'team-focus-' + Date.now().toString(36);
     const where = () => ev(`(() => { const a = document.activeElement; return !a || a === document.body ? 'the page (nothing)' : a.tagName.toLowerCase() + (a.id ? '#' + a.id : ''); })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, touch, want] of [[1280, 800, false, 'textarea#mb-post-input'], [390, 844, true, 'h1#team-page-title']]) {
-            const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
+        for (const [w, h, touch, want] of [[1280, 800, false, 'textarea#mb-post-input'], [390, 844, true, 'h1#team-page-title'], [390, 844, false, 'h1#team-page-title']]) {
+            const check = (ok, msg) => { if (!ok) problems.push(`${w}${touch ? ' touch' : ' mouse'}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: touch }); await Emulation.setTouchEmulationEnabled({ enabled: touch });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
             await ev(`fetch('/api/board/${BOARD}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator' }) }).then(r => r.status)`);

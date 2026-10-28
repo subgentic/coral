@@ -1,5 +1,6 @@
 /* Moved out of modals.js as it was (#4684): The AI team wizard, the team-agent dialog, and the Launch dialog's team form: its agents, templates and Launch Team. No behaviour change. */
 import { importOnce } from './import_once.js';
+import { isPhoneLayout } from './phone_layout.js';
 import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
@@ -843,7 +844,7 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
         showToast('The team started, but the first task was not sent. It is in the message box: press Send to try again.', true);
     }
     // A mouse: the box, where the person types next, with a first task sent or not (a launch left the keyboard on the page's body, Beta #10401). A touch screen: the page's heading, not the box, whose focus raises the on-screen keyboard over a page nobody has looked at yet (#10281, as the password dialog's close, #10067).
-    const heading = window.matchMedia?.('(pointer: coarse)').matches ? document.getElementById('team-page-title') : null;
+    const heading = window.matchMedia?.('(pointer: coarse)').matches || isPhoneLayout() ? document.getElementById('team-page-title') : null; // the phone layout counts as a phone whether or not the browser says coarse (#10589)
     (heading || input)?.focus({ preventScroll: !!heading });
 }
 window.launchTeam = launchTeam;
