@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { axName } = require('./helpers/ax_tree');
 const TEAM = `qa-ended-${Date.now() % 100000}`;
 
 (async () => {
@@ -34,9 +35,10 @@ const TEAM = `qa-ended-${Date.now() % 100000}`;
             const chipClass = await ev(`(() => { const c = n => { const row = [...document.querySelectorAll('tr.dt-row')].find(x => x.innerText.includes(n)); const chip = row && row.querySelector('.dt-chip'); return chip ? chip.className : ''; }; return { queued: c('Queued One'), asker: c('Asker'), ended: c('Gone One') }; })()`);
             assert.ok(/goal-state-blocked/.test(chipClass.asker) && !/goal-state-blocked/.test(chipClass.queued) && chipClass.queued === chipClass.ended, `${tag}: amber is for the agent that needs input; Queued is the quiet chip like Ended: ` + JSON.stringify(chipClass));
             if (process.env.SHOT_DIR) require('node:fs').writeFileSync(`${process.env.SHOT_DIR}/ended-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); // a picture for a review, when asked for
-            // where the Status column has given way (a phone) the state is the dot by the name, which a screen reader reads as Ended (the one-line row, #9713)
-            const dotName = await ev(`(() => { const row = [...document.querySelectorAll('tr.dt-row')].find(x => /Gone One/.test(x.innerText)); const d = row && row.querySelector('.team-agent-dot'); return d ? d.getAttribute('aria-label') : ''; })()`);
-            assert.match(r.gone + ' ' + dotName, /Ended/, `${tag}: an ended agent's status says Ended (its text or its dot's name): ` + r.gone + ' / ' + dotName);
+            // where the Status column has given way (a phone) the state is the dot by the name: what a screen reader hears for the row's button is read from the accessibility tree, not from the dot's attributes (the one-line row, #9713)
+            await ev(`(() => { const row = [...document.querySelectorAll('tr.dt-row')].find(x => /Gone One/.test(x.innerText)); const b = row && row.querySelector('button'); if (b) b.setAttribute('data-ax-probe', ''); return !!b; })()`);
+            const ax = await axName(client, '[data-ax-probe]');
+            assert.ok(/Ended/.test(r.gone || '') || (ax && /Ended/.test(ax.name)), `${tag}: an ended agent's status says Ended (its text, or the name of its button): ` + r.gone + ' / ' + JSON.stringify(ax));
             console.log(`PASS ${tag}: ended agents are not "need attention", are named Ended, and the tab counts them in words`);
         }
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
