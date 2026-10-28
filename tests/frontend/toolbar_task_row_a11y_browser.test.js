@@ -31,6 +31,7 @@ const TEAM = `qa-tbr-${Date.now() % 100000}`;
             }
         });
         await S.run('in forced colors the chosen pill and the open tab are drawn differently from the others (Highlight), on Goals, Tasks and Agents', async () => {
+            await Emulation.setDeviceMetricsOverride({ width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }); // the Tasks pills stand in as a select below 62 rem of page (#9861): at 1280 there is no pill to draw, so this scenario is at a width that has them
             await Emulation.setEmulatedMedia({ features: [{ name: 'forced-colors', value: 'active' }] }); await settle(300);
             for (const tab of ['Goals', 'Tasks', 'Agents']) {
                 await goTab(ev, settle, tab); await settle(500);
@@ -44,7 +45,7 @@ const TEAM = `qa-tbr-${Date.now() % 100000}`;
             await goTab(ev, settle, 'Tasks'); await settle(500);
             const dot = await ev(`(() => { const d = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) .goal-chip .goal-dot')].find(e => e.getClientRects().length); const i = document.createElement('i'); i.style.background = 'ButtonText'; document.body.append(i); const bt = getComputedStyle(i).backgroundColor; i.remove(); return { dot: d && getComputedStyle(d).backgroundColor, bt, w: d && Math.round(d.getBoundingClientRect().width) }; })()`);
             assert.ok(dot.dot && dot.w > 0 && dot.dot === dot.bt, 'the state chip dot is filled in ButtonText, not empty space: ' + JSON.stringify(dot));
-            await Emulation.setEmulatedMedia({ features: [] });
+            await Emulation.setEmulatedMedia({ features: [] }); await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         });
         await S.run('a More menu opens on Enter (the keyboard on its first item), ArrowDown moves, Escape closes it and returns to the button', async () => {
             await goTab(ev, settle, 'Board'); await settle(600);

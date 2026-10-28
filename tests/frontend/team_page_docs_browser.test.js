@@ -39,7 +39,7 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
                 const hd = await ev(`window.__tp.headers()`); assert.ok(hd, 'the Artifacts tab has a table');
                 if (!mobile) {
                     assert.equal(await ev(`window.__tp.table().querySelector('thead th input[type="checkbox"]')?.getAttribute('aria-label')`), 'Select all rows on this page', 'the first column selects artifacts for bulk actions');
-                    assert.deepEqual(hd.slice(1, 7).map(h => String(h).replace(/[\u2195\u2191\u2193]/g, '').trim().toLowerCase()), ['name', 'goal', 'type', 'tags', 'size', 'updated'], 'the data columns after selection: the shared artifact table with the Goal link (#9274: the column names the goal, the task is its tooltip)');
+                    assert.deepEqual(hd.slice(1, 7).map(h => String(h).replace(/[\u2195\u2191\u2193]/g, '').trim().toLowerCase()), ['name', 'type', 'size', 'updated'], 'the data columns after selection (Goal and Tags are not drawn while no artifact here has either, #9846): the shared artifact table with the Goal link (#9274: the column names the goal, the task is its tooltip)');
                 }
                 assert.ok((await ev(`window.__tp.rows()`)).length >= 5, 'the first page is present (the visible footer may already append the second)');
             });
