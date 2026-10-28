@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -32,28 +33,61 @@ var unreferencedImages = map[string]string{
 	"coral-icon-88x88.png": "icon, may be linked by URL from outside the repo (4 KB)",
 }
 
-func TestStaticTreeWithinBudget(t *testing.T) {
-	var total, source int64
-	err := fs.WalkDir(Static, "static", func(p string, d fs.DirEntry, err error) error {
+// shippedStaticBytes is what a release's static tree holds: every embedded file as the server serves it (JS and CSS minified), and the agent docs counted once, from the embedded tree when this
+// checkout has synced them into static/agent_docs and from docsDir (the source the sync copies) when it has not (#10530). It returns the shipped bytes and the source bytes.
+func shippedStaticBytes(fsys fs.FS, docsDir string) (total, source int64, err error) {
+	synced := false
+	err = fs.WalkDir(fsys, "static", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		info, err := d.Info()
+		if strings.HasPrefix(p, "static/agent_docs/") {
+			synced = true
+		}
+		data, err := fs.ReadFile(fsys, p)
 		if err != nil {
 			return err
 		}
-		if info.Size() > fileBudget {
-			t.Errorf("%s is %d bytes, over the %d-byte budget for one embedded file: every Coral binary carries it", p, info.Size(), fileBudget)
-		}
-		data, err := Static.ReadFile(p)
-		if err != nil {
-			return err
-		}
-		source += info.Size()
+		source += int64(len(data))
 		// What a release carries: its JS and CSS are embedded already minified (tools/strip-static, #6208), the bytes the server serves; MinifyAsset is the identity for every other file.
 		total += int64(len(MinifyAsset(strings.TrimPrefix(p, "static/"), data)))
 		return nil
 	})
+	if err != nil || synced {
+		return total, source, err
+	}
+	entries, rerr := os.ReadDir(docsDir)
+	if rerr != nil {
+		return total, source, nil // no docs folder here: nothing to add
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		info, ierr := e.Info()
+		if ierr != nil {
+			return total, source, ierr
+		}
+		total += info.Size()
+		source += info.Size()
+	}
+	return total, source, nil
+}
+
+func TestStaticTreeWithinBudget(t *testing.T) {
+	var big []string
+	_ = fs.WalkDir(Static, "static", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if info, ierr := d.Info(); ierr == nil && info.Size() > fileBudget {
+				big = append(big, fmt.Sprintf("%s is %d bytes, over the %d-byte budget for one embedded file: every Coral binary carries it", p, info.Size(), fileBudget))
+			}
+		}
+		return nil
+	})
+	for _, m := range big {
+		t.Error(m)
+	}
+	total, source, err := shippedStaticBytes(Static, filepath.Join("..", "..", "agent_docs"))
 	if err != nil {
 		t.Fatal(err)
 	}
