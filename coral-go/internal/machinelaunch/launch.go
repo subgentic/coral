@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"regexp"
 	"slices"
 	"time"
@@ -22,6 +23,8 @@ type Options struct {
 	Yes     bool     // skip the confirm prompt (and only that)
 	HubURL  string   // the Hub's origin, printed as the place to approve the machine
 	Wait    time.Duration
+	// RetryListAfter is how long a launch whose create timed out waits before it looks once more for a machine it may have made (a provider's list can lag the create); 0 is 5 seconds.
+	RetryListAfter time.Duration
 }
 
 // Deps are what a launch uses; tests give it stubs.
@@ -119,7 +122,7 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	userData, credential = "", "" // not kept past the call
 	if err != nil {
 		// A create that failed on the way (transport error, timeout, Ctrl-C) may still have made the machine: one with this launch's tag and name is deleted.
-		return nil, fmt.Errorf("could not create the machine: %w%s", err, cleanupAfterFailedCreate(p, launchTag, d.Out))
+		return nil, fmt.Errorf("could not create the machine: %w%s", err, cleanupAfterFailedCreate(p, launchTag, d.Out, err, retryAfter(o)))
 	}
 	fmt.Fprintf(d.Out, "Created %s (%s); waiting for it to run ...\n", inst.Name, inst.ID)
 
@@ -161,23 +164,48 @@ func newLaunchTag() (string, error) {
 }
 
 // cleanupAfterFailedCreate deletes an instance a failed Create may have made: only one that carries this launch's own tag (and the tool's), by its id, never one matched by name. A provider that cannot list says nothing.
-func cleanupAfterFailedCreate(p Provider, launchTag string, out io.Writer) string {
+func cleanupAfterFailedCreate(p Provider, launchTag string, out io.Writer, createErr error, retryAfter time.Duration) string {
 	l, ok := p.(Lister)
 	if !ok {
 		return ""
 	}
+	note, found, listed := deleteTagged(l, p, launchTag, out)
+	// A create that timed out may have made the machine after the first look (the list lags the create): once more, a few seconds later, before giving up.
+	if listed && !found && isTimeout(createErr) {
+		time.Sleep(retryAfter)
+		note, _, _ = deleteTagged(l, p, launchTag, out)
+	}
+	return note
+}
+
+// retryAfter is the wait before the second look.
+func retryAfter(o Options) time.Duration {
+	if o.RetryListAfter > 0 {
+		return o.RetryListAfter
+	}
+	return 5 * time.Second
+}
+
+// isTimeout reports whether err is a deadline or a network timeout.
+func isTimeout(err error) bool {
+	var ne net.Error
+	return errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &ne) && ne.Timeout())
+}
+
+// deleteTagged lists once and deletes by id every instance with this launch's tag and the tool's. listed is false when the list itself failed (and the person is told where to look).
+func deleteTagged(l Lister, p Provider, launchTag string, out io.Writer) (note string, found, listed bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	all, err := l.List(ctx)
 	if err != nil {
 		fmt.Fprintf(out, "Could not check whether %s made a machine for this launch: look for one tagged %s at %s, it costs money while it exists.\n", p.Name(), launchTag, p.Name())
-		return fmt.Sprintf("; could not check whether a machine was made: look for tag %s at %s", launchTag, p.Name())
+		return fmt.Sprintf("; could not check whether a machine was made: look for tag %s at %s", launchTag, p.Name()), false, false
 	}
-	note := ""
 	for _, in := range all {
 		if slices.Contains(in.Tags, launchTag) && slices.Contains(in.Tags, Tag) {
+			found = true
 			note += cleanup(p, in.ID, out)
 		}
 	}
-	return note
+	return note, found, true
 }
