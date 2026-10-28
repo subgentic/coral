@@ -2,6 +2,7 @@
 // .form-control-*, .form-check in components.css, and .settings-hint for the hint), never a style attribute of its own. This census reads every template and script: a <label>, <input>, <select> or <textarea>
 // with a style attribute that sets anything but display:none (a field a script shows later) fails. Write the look in a class (a new one in components.css when the row needs it).
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -32,7 +33,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const css = fs.readFileSync(path.join(fe, 'static/css/components.css'), 'utf8');
     for (const c of ['.form-row', '.form-label', '.form-control-full', '.form-check']) assert.ok(css.includes(c + ' ') || css.includes(c + ','), `components.css defines ${c}`);
     // the scan can fail: a styled field, a styled label with a quote style, and an allowed display:none
-    const tmp = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR || '/tmp'), 'frc-'));
+    const tmp = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR || os.tmpdir()), 'frc-'));
     try {
         const f = path.join(tmp, 'x.html');
         fs.writeFileSync(f, `<label style="margin:0">a</label> <input type='text' style='width:100%'> <select style="display:none;"></select> <textarea class="a"></textarea>`);
