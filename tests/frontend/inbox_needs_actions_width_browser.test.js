@@ -36,6 +36,17 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(m.buttons, ['Star Review file 02.txt', 'Open Review file 02.txt', 'Mark unread: Review file 02.txt', 'Mark reviewed: Review file 02.txt'], 'a read review row has its star and its three actions (the star #9834): ' + JSON.stringify(m));
         assert.ok(Math.abs(m.thW - 336) <= 3 && !m.handle, 'the Actions column is its declared 21 rem (19 and 2 for the star, #9834; not the 150 px kept for it) and has no handle: ' + JSON.stringify(m));
         assert.ok(m.lastRight <= m.tdRight + 1 && m.lastRight <= m.boxRight && !m.clipped, 'all three buttons are whole, inside the cell and inside the table: ' + JSON.stringify(m));
+        // the Operator's #10443: the last column's right edge dragged in from the right. The box drops Team and the others it has no room for; their <col>s must go with them, or every width after
+        // lands on the wrong column (Actions squeezed to 64 px, its buttons cut) and the table ends short of the card.
+        const keys = await ev(`[...document.querySelectorAll('#group-table-view thead th')].filter(t => t.getBoundingClientRect().width > 0).map(t => t.dataset.key)`);
+        const last = keys[keys.length - 1];
+        const h = await ev(`(() => { const r = document.querySelector('#group-table-view th[data-key="${last}"] .dt-resize').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+        const mouse = (type, x, y) => client.Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
+        await mouse('mouseMoved', h.x, h.y); await mouse('mousePressed', h.x, h.y); for (let k = 1; k <= 8; k++) await mouse('mouseMoved', h.x - 40 * k, h.y); await mouse('mouseReleased', h.x - 320, h.y);
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the settle after the drag
+        const d = await ev(`(() => { const b = document.querySelector('#group-table-view .dt-box'), t = b.querySelector('table'), th = k => b.querySelector('th[data-key="' + k + '"]'); return { review: Math.round(th('review').getBoundingClientRect().width), table: Math.round(t.getBoundingClientRect().width), box: b.clientWidth, last: Math.round(th(${JSON.stringify(last)}).getBoundingClientRect().right), boxRight: Math.round(b.getBoundingClientRect().right), buttonsWhole: [...document.querySelectorAll('#group-table-view td[data-key="review"] button')].every(x => x.getBoundingClientRect().right <= th('review').getBoundingClientRect().right + 1) }; })()`);
+        assert.ok(d.review >= 200 && d.buttonsWhole, 'dragging the last column leaves the Actions column its width and its buttons whole: ' + JSON.stringify(d));
+        assert.ok(d.table >= d.box - 1, 'the table is not short of its card: ' + JSON.stringify(d));
         console.log('PASS Needs you keeps a read review row\'s three actions whole whatever width was kept for them');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await ev(`localStorage.removeItem('coral-dt-widths:Needs you'); true`).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
