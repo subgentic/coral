@@ -389,12 +389,29 @@ export function refreshNeedsInputCard() {
     if (_lastCard) syncNeedsInputCard(_lastCard.container, _lastCard.session);
 }
 
+// The keyboard stays on the page when the card changes (#10247): drawn again with new words it is put back on the same answer, and answered (the card goes) it goes to the message box, where the
+// person types next; never to the body, where the next Tab starts again from the top of the page. A card that changes while the keyboard is elsewhere does not move it.
+function cardFocusKey(card) {
+    const a = document.activeElement;
+    if (!a || !card.contains(a)) return null;
+    const cls = [...a.classList].find(c => c.startsWith("cni-"));
+    return cls ? `.${cls}${a.dataset.n ? `[data-n="${CSS.escape(a.dataset.n)}"]` : ""}` : "";
+}
+function focusAfterCard(card, key) {
+    const now = document.activeElement;
+    if (now && now !== document.body) return; // something took it: leave it
+    const again = key && card.isConnected ? card.querySelector(key) : null;
+    const box = document.getElementById("command-input");
+    const to = again || (box && box.getClientRects().length > 0 ? box : null);
+    if (to) to.focus();
+}
+
 export function syncNeedsInputCard(container, session) {
     _lastCard = { container, session };
     const info = needsInputInfo(session);
     let el = container.querySelector(":scope > .chat-needs-input");
     if (!info) {
-        if (el) el.remove();
+        if (el) { const key = cardFocusKey(el); el.remove(); if (key !== null) focusAfterCard(el, null); }
         unwatchCardInView();
         return;
     }
@@ -423,7 +440,9 @@ export function syncNeedsInputCard(container, session) {
         const open = Array.from(el.querySelectorAll(".cni-text-form")).find(f => f.querySelector("input").value || document.activeElement === f.querySelector("input"));
         const typing = open ? { n: open.dataset.n, value: open.querySelector("input").value, focused: document.activeElement === open.querySelector("input") } : null;
         el.dataset.key = key; el._shape = shape;
+        const focusKey = cardFocusKey(el);
         el.innerHTML = needsInputHtml(info, session);
+        if (focusKey !== null) focusAfterCard(el, focusKey);
         const form = typing && el.querySelector(`.cni-text-form[data-n="${typing.n}"]`);
         if (form) {
             const input = form.querySelector("input");
