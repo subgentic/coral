@@ -12,6 +12,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await ev(`window.__coralFilesWatchMs = 1e9; true`); // the panel's own watch (#10485) has its own test: here the reads are the follow's alone
         await ev(`(() => { const R = window.fetch; window.__filesReads = 0;
             window.fetch = (u, o) => { const url = new URL(String(u), location.href);
                 if (/\\/api\\/sessions\\/live\\/rp\\/files(\\/refresh)?($|\\?)/.test(url.pathname + url.search)) { window.__filesReads++; (window.__filesCalls = window.__filesCalls || []).push((o && o.method || 'GET') + ' ' + url.pathname); if (/refresh/.test(url.pathname)) { const t0 = Date.now(); (window.__refreshes = window.__refreshes || []).push(t0); window.__inflight = (window.__inflight || 0) + 1; window.__maxInflight = Math.max(window.__maxInflight || 0, window.__inflight); return new Promise(res => setTimeout(() => { window.__inflight--; res(new Response(JSON.stringify({ files: [], is_git: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })); }, window.__refreshDelay || 0)); } return Promise.resolve(new Response(JSON.stringify({ files: [], is_git: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })); }

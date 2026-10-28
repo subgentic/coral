@@ -264,6 +264,7 @@ let _notGit = false; // the folder is not a git repository (#6072): there is not
 
 export async function loadChangedFiles(agentName, sessionId) {
     if (!agentName) return;
+    if (state.currentSession && state.currentSession.type === 'live' && filesPanelShowing()) watchFiles();
     if (_filesStale) { _filesStale = false; return refreshChangedFiles(); } // files changed while the panel was not showing: the server's cached list may predate them
     _filesStale = false;
     try {
@@ -300,7 +301,7 @@ const FOLLOW_DELAY_MS = 300;
 // has no refresh to call: it reads the list (#10268).
 const MIN_REFRESH_GAP_MS = 2000;
 let _refreshBusy = false, _refreshQueued = false, _refreshAt = 0;
-async function followRead() {
+async function followRead(quiet = false) {
     const cur = state.currentSession;
     if (cur && cur.hubReadOnly) { loadChangedFiles(cur.name, cur.session_id); return; }
     if (_refreshBusy) { _refreshQueued = true; return; }
@@ -309,15 +310,29 @@ async function followRead() {
         const wait = _refreshAt + MIN_REFRESH_GAP_MS - Date.now();
         if (wait > 0) await new Promise(r => setTimeout(r, wait));
         _refreshAt = Date.now();
-        await refreshChangedFiles();
+        await refreshChangedFiles(quiet);
     } finally {
         _refreshBusy = false;
         if (_refreshQueued) { _refreshQueued = false; followRead(); }
     }
 }
 
+// A file the person or another program changes moves no count until the git poller reads (every 15 s or more), so while the Files panel is showing the list is read again every few seconds and drawn only
+// when it moved (#10485: the panel said 0 files changed for 8 s after a file was changed outside the agent). It stops by itself when the panel is not showing, the tab is hidden or the agent is not live.
+const watchMs = () => Number(window.__coralFilesWatchMs) || 4000; // tests seed window.__coralFilesWatchMs before the panel shows
+let _watch = null;
+function watchFiles() {
+    if (_watch) return;
+    _watch = setInterval(() => { // interval-ok: only while the Files panel shows for a live agent in a visible tab; it clears itself otherwise
+        const cur = state.currentSession;
+        if (!cur || cur.type !== 'live' || document.hidden || !filesPanelShowing()) { clearInterval(_watch); _watch = null; return; }
+        followRead(true);
+    }, watchMs());
+}
+
 export function followChangedFiles(s) {
     if (!s || !state.currentSession || state.currentSession.type !== 'live') return;
+    if (filesPanelShowing()) watchFiles();
     // Two counts say that files changed: the agent's own Write/Edit tool calls (changed_file_count) and the repository's uncommitted files (git_state.dirty, what the header chip shows), which also moves for a file the person
     // or another program changed (#10268: the chip said 1 changed and the list 0 after a reply, because only the first was watched).
     const id = s.session_id || s.name, count = (s.changed_file_count || 0) * 1000 + Math.min(999, (s.git_state && s.git_state.dirty) || 0), working = deriveSessionState(s) === 'working';
@@ -479,9 +494,9 @@ function _getGitDiffMode() {
     return (state.settings || {}).git_diff_mode || 'branch_point';
 }
 
-export async function refreshChangedFiles() {
+export async function refreshChangedFiles(quiet = false) { // quiet: the panel's own watch (#10485), which draws only when the list moved
     if (!state.currentSession || state.currentSession.type !== 'live') return;
-    const btn = document.querySelector('.refresh-files-btn');
+    const btn = quiet ? null : document.querySelector('.refresh-files-btn');
     if (btn) btn.classList.add('refreshing');
 
     const agentName = state.currentSession.name;
@@ -501,6 +516,7 @@ export async function refreshChangedFiles() {
 
         if (resp.ok) {
             const data = await resp.json();
+            if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles)) return;
             _currentFiles = data.files || [];
             _notGit = data.is_git === false;
             _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
