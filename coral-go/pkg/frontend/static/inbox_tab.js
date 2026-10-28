@@ -91,6 +91,8 @@ export { askOf };
 /** The group the Inbox opens on, named before the tab is switched to, so no frame shows the last group first (the bookmark opens the Inbox on Saved, #7431). */
 export function rememberInboxGroup(name) { return importOnce('./inbox_sidebar.js').then(m => m.rememberGroup(name)); }
 export function selectInboxTab(name) { return importOnce('./inbox_sidebar.js').then(m => m.openInboxGroup(name)); }
+/** Words put in the open folder's search and run (the sidebar's Search all chats opens All chats this way, #10263). */
+export function searchInboxFolder(text) { return importOnce('./inbox_sidebar.js').then(m => m.setInboxSearch(text)); }
 
 /** Called by switchNavTab('hub-inbox'): where the hub serves the dashboard the page is loaded the first time the tab is shown, and kept after; elsewhere the dashboard's own Inbox is drawn. */
 /** `folder` names the folder to open on (a chat folder from an old Chats link); `quiet` draws the Inbox without opening a table (a chat is on screen over it). */

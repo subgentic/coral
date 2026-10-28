@@ -643,6 +643,13 @@ onViewShown(id => {
     }
 });
 
+/** Words searched from elsewhere (the sidebar's Search all chats, #10263): they go into the group's box and the search runs as if typed. */
+export function setInboxSearch(value) {
+    const input = $('inbox-search');
+    if (input) input.value = String(value || '');
+    filterInbox(value);
+}
+
 /** The search box was typed in: it narrows the group on screen (Saved's is the server's search). */
 export function filterInbox(value) {
     const text = String(value || '').trim();

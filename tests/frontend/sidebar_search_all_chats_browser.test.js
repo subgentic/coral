@@ -1,5 +1,5 @@
 // The sidebar's agent search says what it searches and offers every chat (#10050, the Desktop tester: a Claude Desktop user looks for a past conversation in the sidebar's one search box): the box reads "Search agents";
-// once something is typed a quiet line under it offers "Search all chats for <the words>", and pressing it opens the Inbox's All chats with those words searched (/chats?q=...). With nothing typed the line is not there.
+// once something is typed a quiet line under it offers "Search all chats for <the words>". With nothing typed the line is not there. (Pressing it opens All chats with the words searched: sidebar_search_all_chats_carries_browser.)
 // 1280 px, isolated dev server, the harness's stand-in agents.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -23,9 +23,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(() => { const i = document.getElementById('agent-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(200);
         assert.equal((await box()).line, null, 'cleared: the offer goes');
         await ev(`(() => { const i = document.getElementById('agent-search-input'); i.value = 'build failed'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(200);
-        await ev(`document.getElementById('agent-search-all-chats').click(); true`);
-        await waitFor(`location.pathname === '/chats' && new URLSearchParams(location.search).get('q') === 'build failed'`, 'the address /chats?q=build failed', { timeout: 8000 });
-        await waitFor(`document.body.getAttribute('data-nav-tab') === 'hub-inbox' || /^\\/chats/.test(location.pathname)`, 'the Inbox', { timeout: 8000 });
-        console.log('PASS the sidebar search offers a search of every chat, and it opens All chats with the words');
+        // pressing it opens the Inbox's All chats with the words searched: sidebar_search_all_chats_carries_browser
+        console.log('PASS the sidebar search offers a search of every chat');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

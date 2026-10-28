@@ -160,7 +160,7 @@ registerActions({
     'sidebar-search-focus': () => focusSidebarSearch(),
     'launch-show': () => window.showLaunchModal(),
     'agent-search-filter': el => window.filterLiveAgents(el.value),
-    'search-all-chats': () => { const q = (document.getElementById('agent-search-input')?.value || '').trim(); if (q) importOnce('./nav.js').then(m => m.go({ view: 'chats', query: 'q=' + encodeURIComponent(q) })); }, // the sidebar's search words, as a search of every chat: Inbox > All chats (#10050)
+    'search-all-chats': () => { const q = (document.getElementById('agent-search-input')?.value || '').trim(); if (q) importOnce('./inbox_tab.js').then(async m => { window.switchNavTab('hub-inbox'); await m.selectInboxTab('chats'); await m.searchInboxFolder(q); }); }, // the sidebar's search words, as a search of every chat: Inbox > All chats with the words in its box and the list read with them (#10050, #10263)
     'agent-search-key': (el, event) => window.agentSearchKey(event),
     'groups-toggle-all': el => { const kind = el.closest('.sidebar-pane')?.dataset.pane; if (kind && kind !== 'agents') toggleAllGroupFolds(kind); else toggleAllGroups(); }, // each tab's header folds its own groups (#7443)
     'display-panel-toggle': el => toggleDisplayPanel(el),
