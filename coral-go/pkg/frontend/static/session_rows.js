@@ -289,7 +289,8 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // anchor and the sparkle). Selection is delegated (see _wireListKeyboard).
     const ariaLabel = `${sameAsGroup ? `${identity}, ${typeName(s.agent_type)}` : identity}, ${stateInfo.label}`
         + (ctxHigh ? `, context ${s.context_pct >= 100 ? 'full' : Math.round(s.context_pct) + '%'}` : '')
-        + (unreadCount > 0 ? `, ${unreadCount} unread` : '');
+        + (unreadCount > 0 ? `, ${unreadCount} unread` : '')
+        + (heldChip ? ', message held' : ''); // the row's one chip says it in words: the name says it too (QA Engineer, #9723)
     const stuckClass = stateInfo.key === 'stuck' ? ' is-stuck' : '';
     return `<li class="session-group-item list-row${isActive ? ' active list-row-current' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
         draggable="${stale ? 'false' : 'true'}"${stale ? ` aria-disabled="true" title="${escapeAttr(staleReason(s))}"` : ''}
