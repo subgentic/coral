@@ -170,10 +170,15 @@ func cleanupAfterFailedCreate(p Provider, launchTag string, out io.Writer, creat
 		return ""
 	}
 	note, found, listed := deleteTagged(l, p, launchTag, out)
-	// A create that timed out may have made the machine after the first look (the list lags the create): once more, a few seconds later, before giving up.
-	if listed && !found && isTimeout(createErr) {
+	// A create that timed out or was cancelled may still be under way at the provider: it can land after the first look (the list lags the create). Once more, a few seconds later, before giving up.
+	if listed && !found && (isTimeout(createErr) || errors.Is(createErr, context.Canceled)) {
 		time.Sleep(retryAfter)
-		note, _, _ = deleteTagged(l, p, launchTag, out)
+		var found2, listed2 bool
+		note, found2, listed2 = deleteTagged(l, p, launchTag, out)
+		if listed2 && !found2 { // still nothing: say where to look, because it may yet appear
+			fmt.Fprintf(out, "No machine for this launch showed up at %s yet, but it may still be being made: in a minute or two look for one tagged %s there; it costs money while it exists.\n", p.Name(), launchTag)
+			note += fmt.Sprintf("; no machine showed up yet, but it may still be made: look for tag %s at %s in a minute or two", launchTag, p.Name())
+		}
 	}
 	return note
 }
