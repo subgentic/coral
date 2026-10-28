@@ -32,7 +32,7 @@ const HUB_OPERATOR_URL = '/api/system/hub-operator';
 // The command a server with no hub is started with (the OFF_TEXT's first step), with a Copy button beside it (UI audit #5589, finding 21: a command to run in a terminal was text only).
  const START_COMMAND = 'coral --cloud-url https://app.coralhub.dev';
 // In Settings the sentence says it once and the row holds the whole sequence, which Copy takes (UI audit #5589); the connect dialog keeps the sentence the command line says too (#3285).
- const OFF_SHORT = "Start Coral with the Hub address, then connect:";
+ const OFF_SHORT = "Only needed to use Coral Hub. Skip it otherwise. To use it, start Coral with the Hub address, then connect:"; // says first whether a newcomer needs the two commands at all (Beta Tester, #9955)
 const ENROLLED = ['connecting', 'connected', 'retrying', 'revoked', 'key_unreadable', 'upgrade_required'];
 const LIVE = ['enrolling', 'connecting', 'retrying'];
 
