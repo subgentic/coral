@@ -1008,6 +1008,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     max-width: min(520px, calc(100vw - 40px));
 }
 
+[data-theme="light"] .toast { border-color: var(--control-border); box-shadow: var(--shadow-md); } /* a toast is told apart from the page: 3:1 edge and a shadow (the panel is 1.17:1 and the hairline 1.46:1 on the light page, #10307) */
 .toast.error {
     border-color: var(--error);
     color: var(--error-text); /* red as text on the toast's panel: 4.5:1 (#6171) */
