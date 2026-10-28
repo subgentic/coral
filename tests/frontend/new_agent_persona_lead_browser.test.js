@@ -28,6 +28,15 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(r.inMenu, ['Save as persona', 'Export personas', 'Import personas'], `${label}: its three actions`);
             assert.deepEqual(r.shownClosed, [false, false], `${label}: none of them shows while it is closed`);
             assert.equal(r.sameRow, true, `${label}: on the select's row`); assert.equal(r.wide, true, `${label}: nothing is wider than the screen`);
+            // opened: Save as persona is the one clear action, with Export and Import under it as a quieter pair on one line (#10286)
+            await ev(`document.querySelector('#launch-persona-top details.persona-files summary').click(); true`);
+            const g = await ev(`(() => { const top = document.getElementById('launch-persona-top'), r = q => { const e = top.querySelector(q); return e && e.getBoundingClientRect(); };
+                const save = r('#agent-save-persona-btn'), exp = r('[data-on-click="m-export-personas"]'), imp = r('[data-on-click="m-import-personas"]'); if (!save || !exp || !imp) return null;
+                const sub = top.querySelector('.persona-files-sub'); const fs = q => parseFloat(getComputedStyle(top.querySelector(q)).fontSize);
+                return { saveAbove: save.bottom <= exp.top + 1 && save.bottom <= imp.top + 1, oneLine: Math.abs(exp.top - imp.top) <= 2, side: imp.left >= exp.right - 1, sub: !!sub && sub.contains(top.querySelector('[data-on-click="m-export-personas"]')) && sub.contains(top.querySelector('[data-on-click="m-import-personas"]')),
+                    quieter: top.querySelector('[data-on-click="m-export-personas"]').classList.contains('btn-quiet') && !top.querySelector('#agent-save-persona-btn').classList.contains('btn-quiet') }; })()`);
+            assert.ok(g, `${label}: the three actions show when it is open`);
+            assert.deepEqual([g.saveAbove, g.oneLine, g.side, g.sub, g.quieter], [true, true, true, true, true], `${label}: Save as persona, then Export and Import under it on one line, quieter: ${JSON.stringify(g)}`);
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/new-agent-step2-${label}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         }
         console.log('\nPASS New agent step 2: the sentence first, one More menu');
