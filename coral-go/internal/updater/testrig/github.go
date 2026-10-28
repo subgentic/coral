@@ -23,6 +23,10 @@ type FakeGitHub struct {
 	order    []string                 // tags of every release, products and promotions, in the order they were published
 	// ListBody, when set, is what the list answers instead of the real one (a test's junk or oversize list); FeedBody is the same for the Atom feed (its status key is "feed").
 	ListBody, FeedBody []byte
+	// FeedExtra are tags the feed names before the releases this server has (newest first): a prerelease, a version this server has no files for. FeedWithPromotions makes the feed name the
+	// promotion releases too; the real feed names none (they are tagged on the promote branch's commit, #9716), so a test turns it on only to check what a feed that did would do.
+	FeedExtra          []string
+	FeedWithPromotions bool
 	latest             string
 	// Mutate may change a file's bytes on its way out (the path is "<tag>/<file>" or "latest/<file>"); nil leaves them.
 	Mutate func(path string, body []byte) []byte
@@ -136,13 +140,19 @@ func (g *FakeGitHub) feedXML() []byte {
 	fmt.Fprintf(&b, `  <link type="text/html" rel="alternate" href="%s/%s/releases"/>`+"\n", g.srv.URL, FakeRepo)
 	b.WriteString("  <title>Release notes from the fake repository</title>\n")
 	n := 0
+	entry := func(tag string) {
+		fmt.Fprintf(&b, "  <entry>\n    <id>tag:github.com,2008:Repository/1/%s</id>\n    <updated>2026-10-27T12:00:00Z</updated>\n    <link rel=\"alternate\" type=\"text/html\" href=\"%s/%s/releases/tag/%s\"/>\n    <title>%s</title>\n    <content type=\"html\">&lt;p&gt;notes&lt;/p&gt;</content>\n  </entry>\n", tag, g.srv.URL, FakeRepo, tag, tag)
+	}
+	for _, tag := range g.FeedExtra {
+		entry(tag)
+	}
 	for i := len(g.order) - 1; i >= 0 && n < 10; i-- {
 		tag := g.order[i]
-		if p, ok := g.promos[tag]; ok && p.draft {
-			continue // a draft is not in the feed
+		if p, ok := g.promos[tag]; ok && (p.draft || !g.FeedWithPromotions) {
+			continue // a draft is not in the feed, and the real feed names no promotion
 		}
 		n++
-		fmt.Fprintf(&b, "  <entry>\n    <id>tag:github.com,2008:Repository/1/%s</id>\n    <updated>2026-10-27T12:00:00Z</updated>\n    <link rel=\"alternate\" type=\"text/html\" href=\"%s/%s/releases/tag/%s\"/>\n    <title>%s</title>\n    <content type=\"html\">&lt;p&gt;notes&lt;/p&gt;</content>\n  </entry>\n", tag, g.srv.URL, FakeRepo, tag, tag)
+		entry(tag)
 	}
 	b.WriteString("</feed>\n")
 	return []byte(b.String())

@@ -228,6 +228,10 @@ func (c *checker) run(ctx context.Context) Result {
 	p, _, err := c.findPromotion(ctx, "")
 	var nv *noneVerified
 	switch {
+	case errors.Is(err, errFeedNothingNewer):
+		c.save()
+		c.res.Result = ResultUpToDate
+		return c.res
 	case errors.Is(err, errNoPromotion):
 		c.save()
 		c.res.Result = ResultNotPromoted

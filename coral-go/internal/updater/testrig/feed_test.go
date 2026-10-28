@@ -21,8 +21,8 @@ func newAPIRig(t *testing.T) *rig {
 	return r
 }
 
-// The check asks github.com's releases feed first, never the API, and still verifies everything: the manifest comes from the promotion release's download URL and is checked against the pinned identity.
-func TestCheckFindsThePromotionInTheFeedAndNeverAsksTheAPI(t *testing.T) {
+// The check asks github.com's releases feed first, never the API for a feed that shows nothing newer. A newer product release in it is what makes the API's list worth asking (the real feed names no promotion).
+func TestANewerReleaseInTheFeedMakesTheCheckAskTheAPIList(t *testing.T) {
 	r := newRig(t)
 	rel := r.publish(Spec{Version: "1.4.131", Sequence: 7})
 	res := r.check()
@@ -30,14 +30,99 @@ func TestCheckFindsThePromotionInTheFeedAndNeverAsksTheAPI(t *testing.T) {
 	staged, err := stage.LoadStaged(r.cfg.DataDir)
 	require.NoError(t, err)
 	assert.Equal(t, sum(rel.Package), staged.Record.PackageSHA256)
-	assert.Positive(t, r.gh.Hits[feedKey], "the feed was asked for")
-	assert.Zero(t, r.gh.Hits[listKey], "and the API's list, which the anonymous rate limit counts, was not")
+	assert.Equal(t, 1, r.gh.Hits[feedKey], "the feed was asked for first")
+	assert.Positive(t, r.gh.Hits[listKey], "a release newer than the installed one is in it: the API's list finds its promotion")
 	assert.Positive(t, r.gh.Hits[FakeRepo+"/releases/download/"+PromotionTag("v1.4.131", 7)+"/promote.json"], "the manifest came from the promotion release's download URL")
+}
+
+// A feed that names product releases and none newer than the installed one ends the check with no API request and no download (#9716): up to date, nothing recorded but the check's time.
+func TestAFeedWithNothingNewerEndsTheCheckWithNoAPIRequest(t *testing.T) {
+	for name, setup := range map[string]func(r *rig){
+		"the installed version is the newest": func(r *rig) { r.publish(Spec{Version: installed, Sequence: 7}) },
+		"older releases only": func(r *rig) {
+			r.publish(Spec{Version: "1.4.100", Sequence: 7})
+			r.publish(Spec{Version: "1.4.129", Sequence: 8})
+		},
+		"a newer prerelease is not a newer release": func(r *rig) {
+			r.publish(Spec{Version: installed, Sequence: 7})
+			r.gh.FeedExtra = []string{"v1.4.131-rc1", "v1.4.140-beta2"}
+		},
+		"the installed version is ahead of the feed": func(r *rig) { r.publish(Spec{Version: "1.4.100", Sequence: 7}); r.cfg.Installed = "1.4.200" },
+		"a reordered feed: the newest by version, not by position": func(r *rig) {
+			r.publish(Spec{Version: installed, Sequence: 7})
+			r.publish(Spec{Version: "1.4.50", Sequence: 8})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t)
+			setup(r)
+			res := r.check()
+			assert.Equal(t, stage.ResultUpToDate, res.Result, "%+v", res)
+			assert.Equal(t, 1, r.gh.Hits[feedKey])
+			assert.Zero(t, r.gh.Hits[listKey], "no API request")
+			for k, n := range r.gh.Hits {
+				assert.False(t, n > 0 && strings.Contains(k, "promote"), "no promotion was downloaded: %s", k)
+			}
+			r.nothingStaged()
+		})
+	}
+}
+
+// A feed that cannot say is not "up to date": no product tag in it (empty, prereleases only, odd tags, an error page that happens to parse), an installed version that cannot be compared, or a newer one anywhere in it
+// (whatever its position) all ask the API's list as always. Only a feed with at least one well-formed product tag and none newer may stop the check.
+func TestAFeedThatCannotSayAsksTheAPIList(t *testing.T) {
+	for name, setup := range map[string]func(r *rig){
+		"no entries": func(r *rig) {
+			r.gh.FeedBody = []byte(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>`)
+		},
+		"prereleases only": func(r *rig) { r.gh.FeedBody = feedOf("v1.4.131-rc1", "v1.4.130-beta") },
+		"odd tags only": func(r *rig) {
+			r.gh.FeedBody = feedOf("nightly", "1.4.100", "v1.4", "v1.4.100.1", "vv1.4.100", "v1.4.100-")
+		},
+		"a parseable error page": func(r *rig) {
+			r.gh.FeedBody = []byte(`<html xmlns="http://www.w3.org/1999/xhtml"><body>Service Unavailable</body></html>`)
+		},
+		"an old tag first and a newer one last": func(r *rig) { r.gh.FeedBody = feedOf("v1.4.100", "v1.4.120", "v1.4.131") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t)
+			r.publish(Spec{Version: "1.4.131", Sequence: 7})
+			setup(r)
+			res := r.check()
+			assert.Positive(t, r.gh.Hits[listKey], "the API's list was asked; the result was %+v", res)
+		})
+	}
+}
+
+// The shortcut decides only whether to ask: a later release that appears is found by the next check (a stale or forged feed can only delay it, nothing is recorded as "up to date for a while"). The rollback
+// copy's own lookup is for an exact tag (onlyTag) and never takes the shortcut (promote.go).
+func TestAReleaseThatAppearsAfterTheShortcutIsFoundByTheNextCheck(t *testing.T) {
+	r := newRig(t)
+	r.publish(Spec{Version: installed, Sequence: 7})
+	res := r.check()
+	require.Equal(t, stage.ResultUpToDate, res.Result, "%+v", res)
+	assert.Zero(t, r.gh.Hits[listKey])
+	// a later release appears: the next check finds it
+	r.publish(Spec{Version: "1.4.131", Sequence: 8})
+	res = r.check()
+	assert.Equal(t, stage.ResultStaged, res.Result, "%+v", res)
+}
+
+// feedOf is a feed that names these tags, newest first.
+func feedOf(tags ...string) []byte {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">`)
+	for _, t := range tags {
+		b.WriteString(`<entry><link rel="alternate" type="text/html" href="https://github.com/a/b/releases/tag/` + t + `"/></entry>`)
+	}
+	b.WriteString(`</feed>`)
+	return []byte(b.String())
 }
 
 // A forged promotion in the feed is refused exactly as one in the API's list: a name narrows, the signature decides.
 func TestAForgedPromotionNamedInTheFeedIsRefused(t *testing.T) {
 	r := newRig(t)
+	r.gh.FeedWithPromotions = true // the real feed names none; a feed that did must not be trusted
 	rel := r.publish(Spec{Version: "1.4.131", Sequence: 5})
 	// a newer promotion release anyone with write access could name: its manifest has no valid signature
 	r.gh.PublishPromotion(PromotionTag("v1.4.140", 99), rel.Manifest, []byte("not a bundle"))
@@ -48,6 +133,7 @@ func TestAForgedPromotionNamedInTheFeedIsRefused(t *testing.T) {
 	assert.Equal(t, "1.4.131", staged.Record.Version, "the forged 1.4.140 was not taken")
 	// and with only the forged one named, the check refuses
 	r2 := newRig(t)
+	r2.gh.FeedWithPromotions = true
 	rel2, err := r2.s.NewRelease(Spec{Version: "1.4.131", Sequence: 5})
 	require.NoError(t, err)
 	r2.gh.PublishPromotion(PromotionTag("v1.4.131", 50), rel2.Manifest, []byte("not a bundle"))
@@ -73,7 +159,7 @@ func TestTheAPIListIsTheFallbackWhenTheFeedCannotAnswer(t *testing.T) {
 			r.gh.FeedBody = []byte(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>`)
 		},
 		"no promotion among its tags": func(r *rig) {
-			r.gh.FeedBody = []byte(`<feed xmlns="http://www.w3.org/2005/Atom"><entry><link rel="alternate" href="https://github.com/a/b/releases/tag/v1.4.100"/></entry></feed>`)
+			r.gh.FeedBody = feedOf("v1.4.131", "v1.4.100")
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
