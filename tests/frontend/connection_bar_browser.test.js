@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
+const { safePaused } = require('./helpers/paused');
 
 (async () => {
     const client = await CDP({ port: parseInt(process.env.CDP_PORT || '9222', 10) });
@@ -46,6 +47,25 @@ const BASE = require('./test_base').BASE;
             await client.Network.emulateNetworkConditions({ offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
             await waitFor(`(document.getElementById('connection-bar') || {}).textContent === 'Back online' || !document.getElementById('connection-bar')`, `${w}: back online after offline`, { timeout: 10000 });
             await waitFor(`!document.getElementById('connection-bar')`, `${w}: Back online goes by itself after offline`, { timeout: 9000 });
+            if (w === 1280) { // the feed comes back while connection_bar.js is still loading (#10500): the bar must not appear, with nothing to take it away
+                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady();
+                await waitFor(`${STATE}.then(s => !!s.coralWs && s.coralWs.readyState === 1)`, `${w}: the feed is open again`, { timeout: 8000 });
+                let held = null; const seen = [];
+                safePaused(client, async e => { seen.push(e.request.url); if (/connection_bar/.test(e.request.url) && !held) held = e.requestId; else await client.Fetch.continueRequest({ requestId: e.requestId }); });
+                await client.Network.enable(); await client.Network.setCacheDisabled({ cacheDisabled: true }); // the module was loaded above: a cached one would not be held
+                await client.Fetch.enable({ patterns: [{ urlPattern: '*connection_bar*' }] });
+                await ev(`(() => { window.__realWS = window.WebSocket; window.WebSocket = class { constructor() { this.readyState = 0; setTimeout(() => { this.readyState = 3; if (this.onclose) this.onclose({ code: 1006, reason: '' }); for (const f of (this._l || {}).close || []) f({ code: 1006 }); }, 0); } addEventListener(t, f) { (this._l = this._l || {})[t] = [...((this._l || {})[t] || []), f]; } send() {} close() {} }; return import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.coralWs.close(); return true; }); })()`);
+                await waitFor(`true`, 'the module request', { timeout: 1 }).catch(() => {});
+                for (let i = 0; i < 60 && !held; i++) await new Promise(r => setTimeout(r, 100)); // sleep-ok: the few seconds before the bar asks for its module
+                assert.ok(held, `${w}: the page asked for connection_bar.js after the feed was down a few seconds (${JSON.stringify(seen)})`);
+                await ev(`window.WebSocket = window.__realWS; true`);
+                await ev(`import((window.__coralStatic || '/static/') + 'websocket.js').then(m => (m.connectCoralWebSocket || m.connectWebSocket || (() => 0))()); true`).catch(() => {});
+                await waitFor(`${STATE}.then(s => !!s.coralWs && s.coralWs.readyState === 1)`, `${w}: the feed is back while the module is held`, { timeout: 25000 });
+                await client.Fetch.continueRequest({ requestId: held });
+                await client.Fetch.disable(); await client.Network.setCacheDisabled({ cacheDisabled: false });
+                await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the module loads and answers
+                assert.equal(await bar(), null, `${w}: the feed is up, so no "No connection, retrying" is left on screen`);
+            }
             console.log(`PASS ${w}: the page says when the connection is gone and when it is back`);
         }
     } finally { await client.close(); }
