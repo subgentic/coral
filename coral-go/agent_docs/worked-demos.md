@@ -73,7 +73,7 @@ trivial duplicate. The repository no longer compiles.
 ### And worktrees are off by default
 
 Launching a team **without** the `worktree` flag — the default in the dashboard, where the
-checkbox has no `checked` attribute — creates no worktree at all:
+**Launch in a git worktree** switch in New team starts off — creates no worktree at all:
 
 ```console
 # a script you run yourself, never an agent
