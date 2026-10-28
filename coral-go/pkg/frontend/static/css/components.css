@@ -3448,9 +3448,9 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-nav .settings-group-pick { display: none; }
 .info-grid.settings-grid .settings-row > dt, .settings-row > dt label { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .settings-tabs { display: flex; flex-direction: column; gap: 2px; }
-.settings-tab { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; background: none; border: 0; border-radius: var(--radius-md); color: var(--text-secondary); font: inherit; font-size: var(--fs-lg); padding: .5rem .7rem; min-height: 2.25rem; cursor: pointer; }
+.settings-tab { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; background: none; border: 0; border-radius: var(--radius-md); color: var(--sidebar-row-color); font: inherit; font-size: var(--sidebar-row-size); padding: .5rem .7rem; min-height: 2.25rem; cursor: pointer; }
 .settings-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
-.settings-tab[aria-selected="true"] { background: var(--bg-hover); color: var(--text-primary); font-weight: var(--fw-strong); box-shadow: inset 3px 0 0 var(--accent); }
+.settings-tab[aria-selected="true"] { background: var(--bg-hover); color: var(--sidebar-row-color-current); font-weight: var(--sidebar-row-weight-current); box-shadow: inset 3px 0 0 var(--accent); }
 .settings-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .settings-tab[hidden] { display: none; }
 .settings-tab .material-icons { font-size: var(--icon-size); flex: none; }

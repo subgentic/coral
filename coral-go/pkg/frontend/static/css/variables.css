@@ -167,6 +167,12 @@
     --fw-regular: 400;
     --fw-medium: 500;     /* UI text, buttons, labels */
     --fw-strong: 600;     /* titles, selected, badges, uppercase labels */
+    /* One row style for every sidebar list (#9926): the Inbox's views, the agents, the Analytics views, the Settings tabs. Quiet at rest; the row you are on is bold and primary. */
+    --sidebar-row-size: var(--fs-lg);                /* 14px */
+    --sidebar-row-weight: var(--fw-regular);
+    --sidebar-row-weight-current: var(--fw-strong);
+    --sidebar-row-color: var(--text-secondary);
+    --sidebar-row-color-current: var(--text-primary);
     --fw-title: 700;      /* only the 20 px and 32 px titles (Goal #84) */
     /* Line heights: three (Goal #84) */
     --lh-label: 1.2;      /* badges, tabs, single-line controls, the 20 and 32 px titles */

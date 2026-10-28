@@ -38,7 +38,7 @@ const { connect } = require('./agent_view_harness');
                 assert.ok(r.h >= rowH[0] && r.h <= rowH[1], `${label}: ${r.id} is one line, ${rowH[0]} to ${rowH[1]} px (${r.h}) ${JSON.stringify(r)}`);
                 assert.deepEqual(r.extra, [], `${label}: ${r.id} has no goal, model, branch, held or phone-card line ${JSON.stringify(r)}`);
                 assert.ok(r.dot && r.chips.length <= 1, `${label}: ${r.id} is a dot, a name and at most one chip ${JSON.stringify(r)}`);
-                assert.ok(Number(r.weight) === 500, `${label}: the name is 13/500, nothing bolder (${r.weight})`);
+                assert.ok([400, 600].includes(Number(r.weight)), `${label}: the name is the sidebar row style, 400 (600 on the current agent), nothing bolder (${r.weight}; #9926)`);
             }
             assert.ok(by('o5').dotDrawn && by('o5').dotBg && by('o5').dotBg !== 'rgba(0, 0, 0, 0)', `${label}: an idle agent draws its grey dot (a row with no dot has no state, #9784) ${JSON.stringify(by('o5'))}`);
             assert.deepEqual(by('o1').chips.concat(by('o5').chips), [], `${label}: a working agent and an idle one have no chip`);

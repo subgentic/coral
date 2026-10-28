@@ -20,6 +20,9 @@
     transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
+.session-list li.list-row { font-size: var(--sidebar-row-size); color: var(--sidebar-row-color); } /* a list's rows are the sidebar row style (#9926): the generic li above is 13 px primary */
+.session-list li.list-row-current { font-weight: var(--sidebar-row-weight-current); color: var(--sidebar-row-color-current); }
+
 /* The button is the row (UI/UX's rule for every sidebar list, #7473): the li around it has no padding, the button has it, 36 px high; a phone has 44 (mobile.css). The li's focus ring and hover stay the li's. */
 .sidebar-pane .session-list > li:not(.session-group-header):has(> .row-btn) { padding: 0; }
 .sidebar-pane .session-list > li:not(.session-group-header) > .row-btn { padding: 8px 16px; min-height: 36px; }
@@ -245,8 +248,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--fs-md);
-    font-weight: var(--fw-medium); /* an agent's name: 13/500 primary (UI/UX #9358, #9686); the one line of its row */
+    font-size: var(--sidebar-row-size);
+    font-weight: var(--sidebar-row-weight); /* an agent's name is the sidebar row style, 14/400 secondary (#9926; it was 13/500 primary, #9358) */
 }
 
 .session-list li.session-group-item.list-row { align-items: center; } /* the row's content block sits in the middle of its 36 px, not at the top (#9822) */
@@ -489,6 +492,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     min-width: 0;
     gap: 4px;
     color: var(--text-primary);
+    font-size: var(--sidebar-row-size);
     font-weight: var(--fw-strong);
 }
 
@@ -585,7 +589,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .session-group-item.sleeping .session-label {
     color: var(--text-secondary);
 }
-[data-theme="light"] .session-group-item.sleeping:hover .session-label { color: var(--text-primary); } /* the sleeping name on a hovered row was 4.4:1 in the light theme (goal_label_contrast, #9700): the primary colour passes, as on every other hovered row (#4218); the row is still muted at rest */
+[data-theme="light"] .session-group-item:hover .session-label { color: var(--text-primary); } /* a name on a hovered row is secondary at rest and 4.4:1 there in the light theme (goal_label_contrast, #9700, #9926): the primary colour passes, as on every other hovered row (#4218) */
 
 /* A sleeping row is still a readable, selectable item: its goal line must
    meet WCAG AA. components.css dims it to --text-muted with the same
@@ -598,10 +602,10 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 /* Selected and attention rows keep full-strength names for readability/contrast */
 .session-group-item.active .session-label,
-.session-list li.session-group-item.active .session-label,
-.session-group-item.needs-attention .session-label {
-    color: var(--text-primary);
-}
+.session-list li.session-group-item.active .session-label {
+    color: var(--sidebar-row-color-current);
+    font-weight: var(--sidebar-row-weight-current);
+} /* a row that needs input keeps the row style: its dot and chip say it (#9926) */
 
 /* The row's dot flashes by itself (opacity, pulse-working / -waiting / -stuck, the rules above) with no ring around it (#5140: "the flashing circle is enough"); the pill
    does not pulse, and carries the text. Reduced motion runs each animation once (animations.css). */
@@ -626,8 +630,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .session-group-item .session-label {
     /* Agents are children: .list-row-title's 13/400, slightly muted. Group headers stay
        the strongest text (600, --text-primary). */
-    color: var(--text-primary); /* fallback for engines without color-mix */
-    color: var(--agent-name-color, color-mix(in srgb, var(--text-primary) 80%, transparent));
+    color: var(--agent-name-color, var(--sidebar-row-color));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -955,7 +958,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 }
 
 .session-board-card-toplevel .board-card-header .group-name-line {
-    font-size: var(--fs-md);
+    font-size: var(--sidebar-row-size);
     font-weight: var(--fw-strong);
 }
 

@@ -10,8 +10,8 @@
 #settings-modal :is(button, input, select, textarea, code, kbd, samp, summary, pre) { font-family: var(--font-sans); }
 #settings-modal .modal-header h3 { font: var(--dlg-title); }
 #settings-modal .settings-pane-title { font: var(--dlg-pane); }
-#settings-modal .settings-tab { font: var(--fw-regular) var(--fs-lg)/var(--lh-ui) var(--font-sans); }
-#settings-modal .settings-tab[aria-selected="true"] { font-weight: var(--fw-strong); }
+#settings-modal .settings-tab { font: var(--sidebar-row-weight) var(--sidebar-row-size)/var(--lh-ui) var(--font-sans); }
+#settings-modal .settings-tab[aria-selected="true"] { font-weight: var(--sidebar-row-weight-current); }
 #settings-modal .settings-tab, #settings-modal .settings-tab[aria-selected="true"] { transition: none; }
 #settings-modal :is(dt, dt label, .toggle-dt label, .tb-label, summary) { font: var(--dlg-label); }
 #settings-modal :is(input, select, textarea) { font: var(--dlg-control); }
