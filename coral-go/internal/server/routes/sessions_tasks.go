@@ -565,6 +565,8 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		// a launch's first prompt is a held send waiting for that very start.
 		ptymanager.ForgetSession(owner.SessionName)
 		h.liveModes.Delete(body.SessionID) // an ended session keeps no mode (and the map no id for the life of the process)
+		// /exit or a quit leaves the CLI gone and its shell there: Ended now, not at the reconciler's next passes (#10295). /clear also says SessionEnd, and its CLI stays: the watch marks only a shell left alone.
+		h.watchForExit(owner.SessionName, agentType, body.SessionID)
 	}
 	// Only the agent's own (token-verified) notification wakes auto-accept early; the sweep
 	// itself acts only on the state derived from such events.
