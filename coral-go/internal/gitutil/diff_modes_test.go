@@ -39,9 +39,9 @@ func TestDiffRefsAndLabelsForEveryComparison(t *testing.T) {
 	for _, m := range []string{DiffUncommitted, DiffPreviousCommit, DiffBranchPoint, DiffMainHead, ""} {
 		assert.True(t, IncludesWorkingTree(m), m)
 	}
-	assert.Equal(t, "Uncommitted changes", CompareLabel(ctx, dir, DiffUncommitted))
-	assert.Equal(t, "Last commit", CompareLabel(ctx, dir, DiffLastCommit))
-	assert.Contains(t, CompareLabel(ctx, dir, DiffBranchPoint), "Uncommitted changes", "on main the words say HEAD, not a merge-base")
+	assert.Equal(t, "Since my last commit", CompareLabel(ctx, dir, DiffUncommitted))
+	assert.Equal(t, "In my last commit", CompareLabel(ctx, dir, DiffLastCommit))
+	assert.Contains(t, CompareLabel(ctx, dir, DiffBranchPoint), "Since my last commit", "on main the words say it is the same list, not a merge-base")
 	run("checkout", "-q", "-b", "feature")
-	assert.Equal(t, "Changes since the branch point", CompareLabel(ctx, dir, DiffBranchPoint))
+	assert.Equal(t, "Since I branched", CompareLabel(ctx, dir, DiffBranchPoint))
 }

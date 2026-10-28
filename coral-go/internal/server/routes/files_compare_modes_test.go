@@ -84,19 +84,19 @@ func TestFilesCompareModesListWhatTheirLabelsSay(t *testing.T) {
 
 	names, cmp := list("uncommitted")
 	assert.Equal(t, []string{"base.py", "scratch.txt"}, names, "uncommitted changes: the edit and the new file, not the last commit's")
-	assert.Equal(t, "Uncommitted changes", label(cmp))
+	assert.Equal(t, "Since my last commit", label(cmp))
 
 	names, cmp = list("last_commit")
 	assert.Equal(t, []string{"todo.py"}, names, "the last commit alone: HEAD~1..HEAD, no uncommitted change, no untracked file")
-	assert.Equal(t, "Last commit", label(cmp))
+	assert.Equal(t, "In my last commit", label(cmp))
 
 	names, cmp = list("previous_commit")
 	assert.Equal(t, []string{"base.py", "scratch.txt", "todo.py"}, names, "vs HEAD~1: the last commit and everything uncommitted")
-	assert.Equal(t, "Last commit and uncommitted changes", label(cmp))
+	assert.Equal(t, "Last commit + uncommitted", label(cmp))
 
 	names, cmp = list("branch_point")
 	assert.Equal(t, []string{"base.py", "scratch.txt"}, names, "on main the branch point is HEAD: uncommitted changes")
-	assert.Contains(t, label(cmp), "Uncommitted changes", "and the panel says so rather than 'merge-base'")
+	assert.Contains(t, label(cmp), "Since my last commit", "and the panel says so rather than 'merge-base'")
 
 	// a branch with its own commit: the branch point is where it left main
 	git("stash", "-q", "-u")
@@ -107,10 +107,10 @@ func TestFilesCompareModesListWhatTheirLabelsSay(t *testing.T) {
 	write("base.py", "print('base')\nprint('wip')\n") // uncommitted on the branch
 	names, cmp = list("branch_point")
 	assert.Equal(t, []string{"base.py", "feature.py"}, names, "on a branch: what the branch added since main, plus its uncommitted work")
-	assert.Equal(t, "Changes since the branch point", label(cmp))
+	assert.Equal(t, "Since I branched", label(cmp))
 	names, _ = list("last_commit")
 	assert.Equal(t, []string{"feature.py"}, names)
 	names, cmp = list("main_head")
 	assert.Contains(t, names, "feature.py")
-	assert.Equal(t, "Changes compared with main", label(cmp))
+	assert.Equal(t, "Compared with main", label(cmp))
 }
