@@ -1,5 +1,5 @@
 /* The agent list's groups: a team's card, a workflow's, a folder's, and the order they go in (moved out of render.js, #4996; no behaviour change). */
-import { teamLinkOffered } from './team_link_flag.js';
+import { teamLinkOffered } from './list_hooks.js';
 import { state } from './state.js';
 import { keyLabel, splitKey, sessionTeamKey, sessionFolderKey } from './server_base.js';
 import { distillChip } from './knowledge_distill.js';
