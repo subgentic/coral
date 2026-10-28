@@ -124,9 +124,10 @@ const mailCell = (m, label, open, pick, showTeam = false) => { // open: the row 
     if (m.data) Object.assign(body.dataset, m.data); // the data-* the row's primary button carried as a column (a task's data-task-id): what finds the row again and what a deep link or a focus return reads
     if (open) { body.type = 'button'; body.dataset.rowName = label; { const named = showTeam && m.team ? `${label}, ${m.team}` : label; body.setAttribute('aria-label', m.time && !String(named).includes(m.time) ? `${named}, ${m.time}` : named); } } // the name holds every word the row shows (the time too), so a visible label is in its name; its click is the row's (a .dt-primary button is not interactive to the row's handler: it opens, or toggles while selecting)
     const text = el('span', 'dt-mail-text'), line = el('span', 'dt-mail-line');
-    line.append(el('span', 'dt-mail-title', m.title || ''));
+    line.append(el('span', `dt-mail-title${m.medium ? ' dt-mail-medium' : ''}`, m.title || '')); // medium: the name at 13/500, for a list that opted into the one-line contract (#9740)
     if (showTeam && m.team) line.append(el('span', 'dt-mail-team', ` - ${m.team}`)); // who is asking: the team (with its computer when a hub has several) after the title in the tertiary colour
     line.append(' ', el('span', 'dt-mail-snippet', m.snippet || '')); // a space between the words: the row reads as words, not run together
+    if (m.live) { const dot = el('span', 'dt-mail-live'); dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', m.live); dot.title = m.live; line.append(dot); } // a live chat's state: a dot after the title (names stay in one column), its word the label (Active now) (#9740)
     text.append(line);
     if (m.ask) { text.classList.add('dt-mail-two'); const ask = el('span', 'dt-mail-ask', m.ask); ask.title = m.ask; text.append(ask); } // the whole ask is the line's title, so a cut one can be read (#9495)
     const side = el('span', 'dt-mail-side'); side.append(el('span', 'dt-mail-time', m.time || ''));

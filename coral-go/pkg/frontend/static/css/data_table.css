@@ -388,6 +388,9 @@
 .dt-mail-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dt-mail-line { display: flex; gap: 8px; min-width: 0; font-size: var(--fs-md); }
 .dt-mail-title { flex: 0 1 auto; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-regular); color: var(--table-primary-color); }
+.dt-mail-title.dt-mail-medium { font-weight: var(--fw-medium); } /* the name at 13/500 (the one-line contract, #9740); an unread row's 600 below still wins */
+.dt-primary.dt-chat-name { font-weight: var(--fw-medium); }
+.dt-mail-live { flex: none; align-self: center; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--success); }
 .dt-mail-snippet { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); }
 .dt-mail-ask { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--table-secondary-color); }
 .dt-mail-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
