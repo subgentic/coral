@@ -18,6 +18,25 @@ Each answer names the button as it reads on screen. The topics after this one go
 
 New agents use it unless you choose a model when you launch them.
 
+## Switch to the light theme
+
+1. Click the gear at the top right to open **Settings**. **General** is the first group.
+2. Next to **Theme**, pick **Light**. **System** follows your computer instead, and **Customize Theme** beside it makes your own.
+3. Press **Save settings**.
+
+## Copy a chat, or keep part of it
+
+- **Copy one reply:** point at an agent's reply and press **Copy message**. It copies the reply as the agent wrote it.
+- **Copy a message you sent:** open the **⋯** beside it and choose **Copy**. The same menu has **Save for later** and **Send to another agent**.
+- **A whole team's messages:** on the team's message board, press the select button in its header, choose the messages and press **Export Markdown**.
+- **A single chat has no export button yet.** Its **Summary** tab (open the chat from **Inbox**, then **All chats**) says what was done.
+
+## Find an old chat
+
+1. Open the **Inbox**, then **All chats**. Every chat Coral has read is listed there.
+2. Type words you remember in **Search chats** at the top of the list. Press **Star** on a chat you will want again: it is in the **Starred** folder after that.
+3. Typing in the Agents list's search offers **Search all chats** for the same words.
+
 ## Open Coral on your phone
 
 1. On Home, click **Mobile QR code** (at the bottom of the page). The **Use on your phone** dialog opens.
