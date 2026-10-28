@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -701,7 +702,63 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	}
 	h.refreshAfterConfirmedAnswer(r.Context(), body.AgentType, body.SessionID)
 	h.retrySkippedBoardNudge(r.Context(), body.SessionID, naming.SessionName(body.AgentType, body.SessionID), "request_resolved")
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": opt.Label})
+	at := h.answers.note(body.SessionID, opt.Label)
+	h.kickWS() // every screen showing the card takes the answer now
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": opt.Label, "at": at})
+}
+
+// answeredNoteFor is how long a prompt's answer is kept for another screen to say "Answered X from another device".
+const answeredNoteFor = 2 * time.Minute
+
+// promptAnswers is the last prompt answered per agent (session id): its option's label and when (Unix milliseconds). Its zero value is ready.
+type promptAnswers struct {
+	mu sync.Mutex
+	m  map[string]struct {
+		label string
+		at    int64
+	}
+}
+
+// note records an answer and returns its time.
+func (p *promptAnswers) note(sessionID, label string) int64 {
+	if sessionID == "" {
+		return 0
+	}
+	at := time.Now().UnixMilli()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.m == nil {
+		p.m = map[string]struct {
+			label string
+			at    int64
+		}{}
+	}
+	for id, v := range p.m {
+		if time.Since(time.UnixMilli(v.at)) > answeredNoteFor {
+			delete(p.m, id) // answers older than the note's life are dropped as new ones come: the map stays as small as the agents recently answered
+		}
+	}
+	p.m[sessionID] = struct {
+		label string
+		at    int64
+	}{label, at}
+	return at
+}
+
+// lastAnswerOf is the live row's last_answer: {label, at} for an answer given in the last two minutes, else nil (a null).
+func (h *SessionsHandler) lastAnswerOf(sessionID string) any {
+	p := &h.answers
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	v, ok := p.m[sessionID]
+	if !ok || time.Since(time.UnixMilli(v.at)) > answeredNoteFor {
+		return nil
+	}
+	label := []rune(v.label)
+	if len(label) > 80 {
+		label = append(label[:80], '…')
+	}
+	return map[string]any{"label": string(label), "at": v.at}
 }
 
 // navigatesByArrows: agent CLIs whose menus ignore a digit and take only the arrow keys and Enter, even when

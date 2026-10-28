@@ -181,7 +181,7 @@ func TestParsePromptScreen(t *testing.T) {
 }
 
 func TestAnswerPrompt(t *testing.T) {
-	server, _, terminal, ss := setupSessionsTestServer(t)
+	server, h, terminal, ss := setupSessionsTestServer(t)
 	const sid = "00000000-0000-0000-0000-00000000a5c0"
 	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "claude-ask", WorkingDir: "/tmp/test"}))
 	terminal.addSession("claude-ask", "/tmp/test")
@@ -238,13 +238,21 @@ func TestAnswerPrompt(t *testing.T) {
 	assert.Len(t, reply.PromptOptions.Options, 4)
 
 	// Answering sends the digit, but only for the option the screen shows
-	code, _ := answer(4, "No")
+	code, answered := answer(4, "No")
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, []string{"4"}, sentKeys())
+	// #10301: the answer is kept for the live row (last_answer), so a second device's card says what was picked and that it was another device; its time comes back to the one that answered
+	assert.Nil(t, h.lastAnswerOf("00000000-0000-0000-0000-000000000000"), "an agent nothing was answered for has none")
+	last, _ := h.lastAnswerOf(sid).(map[string]any)
+	require.NotNil(t, last)
+	assert.Equal(t, "No", last["label"])
+	assert.Equal(t, answered["at"], float64(last["at"].(int64)), "the answer's own time is the row's, so the screen that answered can tell it was its own")
 
 	setScreen(screenPermission)
 	code, _ = answer(1, "No")
 	assert.Equal(t, http.StatusConflict, code, "a label that no longer matches its number is refused")
+	last, _ = h.lastAnswerOf(sid).(map[string]any)
+	assert.Equal(t, "No", last["label"], "a refused answer is not an answer")
 	// A typed answer: the digit opens the field, then the text and Enter
 	setScreen(screenQuestion)
 	code, _ = answer(4, "Type something.")
@@ -353,4 +361,25 @@ func TestParsePromptScreen_Codex(t *testing.T) {
 	assert.Equal(t, "✨ Update available! 0.155.1 -> 0.156.1", s.Question, "the release-notes link is not the question")
 	assert.Equal(t, []string{"Update now (runs `npm install -g @openai/codex`)", "Skip", "Skip until next version"}, labels(s.Options))
 	assert.True(t, s.Options[0].Selected)
+}
+
+// #10301: a prompt's answer is kept for two minutes and its label is cut at 80 characters; older ones go as new ones come.
+func TestLastAnswerIsKeptBriefly(t *testing.T) {
+	h := &SessionsHandler{}
+	at := h.answers.note("s1", strings.Repeat("é", 100))
+	got, _ := h.lastAnswerOf("s1").(map[string]any)
+	require.NotNil(t, got)
+	assert.Equal(t, strings.Repeat("é", 80)+"…", got["label"])
+	assert.Equal(t, at, got["at"])
+	h.answers.mu.Lock()
+	v := h.answers.m["s1"]
+	v.at = time.Now().Add(-answeredNoteFor - time.Second).UnixMilli()
+	h.answers.m["s1"] = v
+	h.answers.mu.Unlock()
+	assert.Nil(t, h.lastAnswerOf("s1"), "an answer older than the note's life is not offered")
+	h.answers.note("s2", "Blue")
+	h.answers.mu.Lock()
+	_, kept := h.answers.m["s1"]
+	h.answers.mu.Unlock()
+	assert.False(t, kept, "a new answer drops the expired ones")
 }
