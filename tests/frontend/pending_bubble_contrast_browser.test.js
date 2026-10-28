@@ -1,5 +1,5 @@
 // A message that is sent but not yet in the transcript is legible (#10636, Beta's light-theme items (a)): its bubble was drawn at 60% opacity, which put its text at 3.72:1 and its "Sent" label at 2.25:1 in the
-// light theme (2.97:1 in dark). Its text and label are 4.5:1 in both themes. Measured on the real stylesheets with the bubble's
+// light theme (2.97:1 in dark). Its text and label are 4.5:1 in both themes, and a placeholder on the tertiary surface keeps a margin over 4.5:1 (it was 4.51). Measured on the real stylesheets with the bubble's
 // opacity composited; 1280 px, isolated dev server. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
                 const over = (f, g, a) => [f[0]*a+g[0]*(1-a), f[1]*a+g[1]*(1-a), f[2]*a+g[2]*(1-a), 1]; const page = rgba(getComputedStyle(b).backgroundColor); const res = {};
                 for (const [name, sel] of [['text', '.pending .message-text'], ['label', '.pending .pending-label']]) { const e = b.querySelector(sel), bub = e.closest('.chat-bubble'), bcs = getComputedStyle(bub), op = parseFloat(bcs.opacity), bubBg = rgba(bcs.backgroundColor); const bg = bubBg[3] > 0 ? over(bubBg, page, bubBg[3]) : page; const fgRaw = rgba(getComputedStyle(e).color); const fg = over(fgRaw, bg, fgRaw[3]); res[name] = ratio(over(fg, page, op), over(bg, page, op)); }
                 const ph = rgba(getComputedStyle(document.getElementById('cb-ph'), '::placeholder').color); res.placeholder = ratio(ph, rgba(getComputedStyle(b.lastElementChild).backgroundColor)); return res; })()`);
-            for (const [k, min] of [['text', 4.5], ['label', 4.5]]) if (r[k] < min) problems.push(`${theme}: the sent bubble's ${k} is ${min}:1 (it is ${r[k]}:1)`);
+            for (const [k, min] of [['text', 4.5], ['label', 4.5], ['placeholder', 4.7]]) if (r[k] < min) problems.push(`${theme}: the sent bubble's ${k} is ${min}:1 (it is ${r[k]}:1)`);
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the sent bubble and the placeholder:\n  ' + problems.join('\n  '));
