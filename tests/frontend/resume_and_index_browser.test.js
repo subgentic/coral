@@ -46,7 +46,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
         // ── (1) Resume: the folder the session ran in ──
         await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => { const url = new URL(String(u), location.href);
             const m = url.pathname.match(/\\/api\\/sessions\\/history\\/([^/]+)\\/resume-info$/);
-            if (m) { const info = { 'ran-here': { working_dir: '/work/project', working_dir_from: 'session', working_dir_exists: true, agent_type: 'claude', permission_mode: 'plan' }, 'ran-default': { working_dir: '/work/project', working_dir_from: 'session', working_dir_exists: true, agent_type: 'claude', permission_mode: 'default' }, 'ran-gone': { working_dir: '/work/removed', working_dir_from: 'session', working_dir_exists: false, agent_type: 'claude' }, 'ran-nowhere': { agent_type: 'claude' } }[m[1]] || {};
+            if (m) { const info = { 'ran-here': { working_dir: '/work/project', working_dir_from: 'session', working_dir_exists: true, agent_type: 'claude', permission_mode: 'plan', permission_mode_from: 'session' }, 'ran-default': { working_dir: '/work/project', working_dir_from: 'session', working_dir_exists: true, agent_type: 'claude', permission_mode: 'default', permission_mode_from: 'session' }, 'ran-bypass': { working_dir: '/work/project', working_dir_from: 'session', working_dir_exists: true, agent_type: 'claude', permission_mode: 'bypassPermissions', permission_mode_from: 'transcript' }, 'ran-tplan': { working_dir: '/work/project', working_dir_from: 'session', working_dir_exists: true, agent_type: 'claude', permission_mode: 'plan', permission_mode_from: 'transcript' }, 'ran-gone': { working_dir: '/work/removed', working_dir_from: 'session', working_dir_exists: false, agent_type: 'claude' }, 'ran-nowhere': { agent_type: 'claude' } }[m[1]] || {};
                 return Promise.resolve(new Response(JSON.stringify(info), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
             return R(u, o); }; return true; })()`);
         const resume = async id => { await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); st.state.currentSession = { type: 'history', name: '${id}', agent_type: 'claude' }; st.state.historySessionsList = [{ session_id: '${id}', source_type: 'claude' }]; const m = await import((window.__coralStatic || '/static/') + 'resume_dialog.js'); await m.showResumeModal(); })(); true`); await quiet(400); return ev(`(() => ({ dir: document.getElementById('resume-dir').value, note: document.getElementById('resume-dir-note').hidden ? '' : document.getElementById('resume-dir-note').textContent, warn: document.getElementById('resume-dir-note').classList.contains('is-warning') }))()`); };
@@ -82,6 +82,23 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
         assert.match(await ev(`document.getElementById('resume-mode-note').textContent`), /mode was not recorded: it resumes in your saved default/, 'none recorded says so');
         await ev(`window.__launchBody = null; window.resumeLaunchNew(); true`); await waitFor(`!!window.__launchBody`, 'the launch', 4000);
         assert.deepEqual(await ev(`[window.__launchBody.permission_mode || null, window.__launchBody.flags || null]`), [null, null], 'nothing is sent: the saved default applies');
+        // a transcript is a file, not Coral's record: its mode is taken only when it is no wider than the saved default (Default here)
+        await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); st.state.settings = { ...st.state.settings, default_permission_mode: 'default' }; })(); true`);
+        await resume('ran-tplan');
+        assert.equal(await ev(`document.getElementById('resume-mode-note').textContent`), 'Resumes in Plan mode: this chat started in it.', 'a narrower transcript mode is taken: ' + await ev(`document.getElementById('resume-mode-note').textContent`));
+        await ev(`window.__launchBody = null; window.resumeLaunchNew(); true`); await waitFor(`!!window.__launchBody`, 'the launch', 4000);
+        assert.deepEqual(await ev(`window.__launchBody.flags || null`), ['--permission-mode', 'plan']);
+        await resume('ran-bypass');
+        assert.equal(await ev(`document.getElementById('resume-mode-note').textContent`), 'This chat started in Bypass permissions mode; it resumes in your saved default (Default). Choose the mode below to change it.', 'a wider transcript mode is said, not taken');
+        assert.equal(await ev(`document.getElementById('resume-mode').value`), '', 'the picker is on the saved default');
+        await ev(`window.__launchBody = null; window.resumeLaunchNew(); true`); await waitFor(`!!window.__launchBody`, 'the launch', 4000);
+        assert.deepEqual(await ev(`[window.__launchBody.permission_mode || null, window.__launchBody.flags || null]`), [null, null], 'no flag of a transcript\'s wider mode is sent unless the person picks it');
+        await resume('ran-bypass');
+        await ev(`(() => { const m = document.getElementById('resume-mode'); m.value = 'bypassPermissions'; m.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await waitFor(`/as you chose/.test(document.getElementById('resume-mode-note').textContent)`, 'the note follows the pick', 3000);
+        assert.equal(await ev(`document.getElementById('resume-mode-note').textContent`), 'Resumes in Bypass permissions mode, as you chose.');
+        await ev(`window.__launchBody = null; window.resumeLaunchNew(); true`); await waitFor(`!!window.__launchBody`, 'the launch', 4000);
+        assert.deepEqual(await ev(`window.__launchBody.flags || null`), ['--permission-mode', 'bypassPermissions'], 'picked by the person: sent');
         console.log('PASS resume and index: the folder it ran in, opens when listed, Reading your past sessions, how to attach');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

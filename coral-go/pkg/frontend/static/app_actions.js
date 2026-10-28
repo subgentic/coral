@@ -37,7 +37,7 @@ import { _handleTeamFolderImport, _importTeamFromFolder } from './team_folder_im
 import { closeSidebarKebabs, closeTopBarSettings, toggleSidebarKebab, toggleTopBarSettings } from './sidebar_menus.js';
 import { loadHistoryPage } from './history_filters.js';
 import { switchNavTab } from './app_navigation.js';
-import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showTeamLinkDialog, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate, showResumeModal, hideResumeModal, resumeLaunchNew, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
+import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showTeamLinkDialog, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate, showResumeModal, hideResumeModal, resumeLaunchNew, syncResumeModeNote, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
 
 // The New job form (job_form.js, about 28 KB) loads when a person first opens it, not at start (#10218): these are the same calls, answered once the file is in.
@@ -90,6 +90,7 @@ registerActions({
     'm-dialog-step': el => { if (['persona', 'agent', 'next', 'back'].includes(el.dataset.arg)) restartStage(el.dataset.arg); }, // Restart's Next and Back: the name carries no "restart" so the popout's destructive-control scan (agent_popout) does not count them
     'm-hide-restart-modal': el => { window.hideRestartModal(); },
     'm-hide-resume-modal': el => { window.hideResumeModal(); },
+    'resume-mode-changed': () => { window.syncResumeModeNote(); }, // the Resume in picker: the note says what the pick means (#10487)
     'm-hide-save-template-modal': el => { window._hideSaveTemplateModal(); },
     'm-hide-settings-modal': el => { window.hideSettingsModal(); },
     'm-hide-settings-modal-then-show-default-prompts-modal': el => { window.hideSettingsModal(); window.showDefaultPromptsModal(); },
@@ -248,7 +249,7 @@ Object.assign(window, {
     showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts,
     showLaunchModal, hideLaunchModal, launchSession, toggleFlag,
     hideInfoModal, copyInfoCommand,
-    hideResumeModal, resumeLaunchNew,
+    hideResumeModal, resumeLaunchNew, syncResumeModeNote,
     showAddAgentToBoard, launchTerminalToBoard,
     launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal,
     exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate,
