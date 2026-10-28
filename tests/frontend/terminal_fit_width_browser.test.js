@@ -299,6 +299,9 @@ function assertFits(v, what) {
         await desk.load();
         await desk.ev(`(() => { setLiveViewMode('terminal'); selectLiveSession(${JSON.stringify(A.name)}, 'terminal', ${JSON.stringify(A.sid)}); return true; })()`);
         v = await desk.waitFor(`(async () => { const v = await ${VIEW}; return v && v.wsOpen && !v.following && v.sent > 0 ? v : null; })()`, 'the desktop sizing the pane');
+        // the pane is sized first and the Settings font and the hidden toggle follow it a moment later (the follow state turns off, then the font and the button are redrawn): wait for them as the phone steps do, and say what the window showed if they never come (#10621)
+        try { v = await settled(desk, 'the Settings font and no toggle on a desktop that sets the size', `v.font === 13 && v.btn && v.btn.shown === false`); }
+        catch (e) { throw new Error(`${e.message}: the window showed ${JSON.stringify(await desk.ev(VIEW))}`); }
         assert.equal(v.font, 13);
         assert.equal(v.btn.shown, false, 'no toggle where the window fits the pane');
         console.log(`   ✓ ${v.cols} cols at 13 px, toggle hidden`);
