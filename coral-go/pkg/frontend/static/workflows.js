@@ -114,7 +114,7 @@ async function fetchRunDetail(runId) {
 // ── Initialization ─────────────────────────────────────────────────────
 
 export const { launchWorkflowAgent, editWorkflowWithAgent } = WA;
-export const { showWorkflowCreateModal, hideWorkflowCreateModal, editWorkflow, saveWorkflow } = WE;
+export const { showWorkflowCreateModal, hideWorkflowCreateModal, editWorkflow, duplicateWorkflow, saveWorkflow } = WE;
 WE.initWorkflowEditor({ fetchDetail: id => fetchWorkflowDetail(id), saved: editedId => { fetchWorkflows(); if (editedId) selectWorkflow(editedId); } }); // the names the lazy panel hands the page (app.js)
 
 // ── Workflow detail ────────────────────────────────────────────────────
@@ -217,6 +217,7 @@ function renderWorkflowDetail(wf, runs) {
             <div class="wf-more">
                 <button class="btn btn-sm wf-more-btn" type="button" data-on-click="wf-more" aria-expanded="false" aria-controls="wf-more-menu-${Number(wf.id)}" aria-label="More for ${escAttr(wf.name)}">More</button>
                 <div class="menu wf-more-menu" id="wf-more-menu-${Number(wf.id)}" hidden>
+                    <button class="menu-item" data-on-click="wf-duplicate" data-workflow-id="${Number(wf.id)}">Duplicate</button>
                     <button class="menu-item menu-item-danger" data-on-click="wf-delete" data-workflow-id="${Number(wf.id)}" data-name="${escAttr(wf.name)}">Delete</button>
                 </div>
             </div>
