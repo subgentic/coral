@@ -15,7 +15,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
             await ev(`window.__m.add('focus-a', 'P', 4, { sleeping: false, session_id: 'focus-a-id' }); true`);
-            await ev(`document.body.focus(); import(${S} + 'sessions.js').then(m => m.selectLiveSession('focus-a', 'claude', 'focus-a-id')).then(() => true)`);
+            await ev(`document.body.focus(); import(${S} + 'sessions.js').then(m => m.selectLiveSession('focus-a', 'claude', 'focus-a-id', undefined, { focusChat: true })).then(() => true)`);
             await waitFor(`getComputedStyle(document.getElementById('live-session-view')).display !== 'none'`, label + ': the chat shows', 8000);
             const where = await ev(`(() => { const a = document.activeElement; return { id: a && a.id, tag: a && a.tagName, visible: !!a && a.getClientRects().length > 0 }; })()`);
             const want = mobile ? 'session-name' : 'command-input';
@@ -23,6 +23,11 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`document.activeElement.setAttribute('data-ax-probe', ''); true`);
             const ax = await axName(client, '[data-ax-probe]');
             assert.ok(ax && ax.name !== undefined && (mobile ? ax.role === 'heading' : /textbox|combobox/.test(ax.role)), `${label}: the focused element is named ${JSON.stringify(ax)}`);
+            // the sidebar's way in (no option) leaves focus on the row that was used
+            await ev(`(() => { const b = document.createElement('button'); b.id = 'row-stand-in'; b.textContent = 'row'; document.body.append(b); b.focus(); })()`);
+            await ev(`import(${S} + 'sessions.js').then(m => m.selectLiveSession('focus-a', 'claude', 'focus-a-id')).then(() => true)`);
+            await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: a late focus move would have landed by now
+            assert.equal(await ev(`document.activeElement.id`), 'row-stand-in', label + ': selecting from the sidebar leaves focus on the row');
             console.log('PASS ' + label + ': focus is on ' + want);
         }
     } finally { await client.close(); }

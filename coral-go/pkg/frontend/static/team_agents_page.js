@@ -92,7 +92,7 @@ async function sendReminder(agent, { message, seconds }) {
 const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, onSend: (v) => sendReminder(agent, v) });
 
 /** The agent's chat: its live session, local or a Hub computer's; null when it has none (an ended agent, a terminal). */
-const openChat = (session) => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); };
+const openChat = (session) => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server, { focusChat: true }); };
 
 function chatButton(agent) {
     const session = agent.availability !== 'offline' && agent.agent_type !== 'terminal' ? sessionOf(agent) : null;
