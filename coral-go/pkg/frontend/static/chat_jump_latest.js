@@ -97,7 +97,7 @@ async function openTerminalFromCard() {
         const input = document.querySelector('textarea[aria-label^="Terminal:"]');
         if (input && input.getClientRects().length > 0) {
             input.focus();
-            importOnce('./needs_input_card.js').then(m => m.announcePrompt('Terminal open. What you type goes to the agent. Press Ctrl+Shift+Escape to leave it.')).catch(() => {});
+            Promise.all([importOnce('./needs_input_card.js'), importOnce('./terminal_leave_key.js')]).then(([m, k]) => m.announcePrompt(`Terminal open. What you type goes to the agent. Press ${k.leaveKeyWords()} to leave it.`)).catch(() => {}); // the key for this OS: Ctrl+Shift+Escape is Task Manager on Windows (#10345)
             return;
         }
         await new Promise(r => setTimeout(r, 100)); // the terminal's own build

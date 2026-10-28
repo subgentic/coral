@@ -1,5 +1,5 @@
 // A card's Open terminal puts the keyboard in the terminal (#10247, decided on the first run by keyboard: that is where the person goes to answer): the keyboard used to drop to the page, and the person had to Tab
-// into the terminal, which holds Tab. The terminal is built after its view shows, so the input is waited for; a screen reader is told once how to leave (Ctrl+Shift+Escape). At 1280 and 640 px. Drives Chrome over
+// into the terminal, which holds Tab. The terminal is built after its view shows, so the input is waited for; a screen reader is told once how to leave (the key for the OS: Ctrl+] or, off Windows, Ctrl+Shift+Escape too). At 1280 and 640 px. Drives Chrome over
 // CDP through agent_view_harness.js; the terminal's input is stood in by a textarea named as the real one is (xterm_renderer.js), made a moment after showTerminalView.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -21,7 +21,7 @@ const { connect } = require('./agent_view_harness');
             await ev(`document.getElementById('kb-card').click(); true`);
             await waitFor(`document.activeElement && document.activeElement.id === 'kb-term'`, `${w}: the keyboard in the terminal`, 6000).catch(async () => check(false, 'after Open terminal the keyboard is in the terminal (it is on ' + await ev(`document.activeElement ? document.activeElement.tagName + '#' + document.activeElement.id : 'nothing'`) + ')'));
             const said = await ev(`(document.getElementById('coral-prompt-live') || {}).textContent || ''`);
-            check(/Ctrl\+Shift\+Escape/.test(said), 'a screen reader is told once how to leave the terminal: ' + JSON.stringify(said));
+            check(/Ctrl\+\]/.test(said), 'a screen reader is told once how to leave the terminal (the key for this OS): ' + JSON.stringify(said));
             await ev(`document.getElementById('kb-card').remove(); document.getElementById('kb-term') && document.getElementById('kb-term').remove(); true`);
         }
     } finally { await client.close(); }

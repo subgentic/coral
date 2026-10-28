@@ -1,6 +1,7 @@
 /* xterm.js terminal renderer — streams raw ANSI output via WebSocket */
 
 import { terminalFontFor, DESKTOP_FONT, isPhoneViewer } from './terminal_font.js';
+import { isLeaveKey } from './terminal_leave_key.js';
 import { setTerminalFocused, setTerminalSize, setTerminalState } from './terminal_statusbar.js';
 import { state } from './state.js';
 import { markRestarting, currentIsRestarting, showRestartingOverlay, hideSessionOverlay } from './session_overlay.js';
@@ -699,10 +700,10 @@ export function createTerminal(containerEl) {
 
     _wireTerminalInput();
 
-    // Escape hatch: Ctrl+Shift+Escape unfocuses terminal
+    // Escape hatch: Ctrl+Shift+Escape or Ctrl+] unfocuses the terminal (Windows never delivers the first, #10345)
     // (attachCustomKeyEventHandler can be called before open)
     terminal.attachCustomKeyEventHandler((ev) => {
-        if (ev.type === 'keydown' && ev.key === 'Escape' && ev.ctrlKey && ev.shiftKey) {
+        if (isLeaveKey(ev)) {
             terminal.blur();
             return false;
         }
