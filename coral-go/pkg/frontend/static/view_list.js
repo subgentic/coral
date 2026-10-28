@@ -6,6 +6,8 @@
  *   build({ id, label, sections, current, onPick, drawer })  -> the element (the column and the select; with `drawer`, the column and, on a phone, a drawer opened by a button that names the current view, in place of the select: the Inbox's, #9545)
  *   sections: [{ title?, items: [{ key, label, count?, unread?, total?, alert?, dot?, icon?, soon? }] }]      unread: the number is the unread count (its name says "3 unread", its tooltip "N in all" from total)      onPick(key) is not called for a disabled item; a section's title is also the select's group label
  *   update(root, { sections, current })               -> draws the same element again with new counts or another current view; the keyboard stays on the item it was on */
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('view_list.css'); // the list's rules are not in the start's stylesheet: they arrive with the first screen that draws one (#10706)
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 const HEX = /^#[0-9a-f]{3,8}$/i;
 
