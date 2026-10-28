@@ -66,7 +66,11 @@ export function chatSections(c = counts) {
 export const chatTags = () => (counts && counts.tags) || [];
 
 /** The chats changed since the marker began, read once (at most 200 a computer), counted by folder against the read marker: how many of each folder the person has not opened. The Chats list pages by folder, so the total the counts route gives cannot say it. */
+const RECOUNT_MS = 60000; // the unread numbers are recounted from the history at most once a minute (coral-hub's rate rule, #9703)
+let lastRecount = 0;
+const inboxShows = () => document.body?.getAttribute('data-nav-tab') === 'hub-inbox';
 async function loadUnread() {
+    lastRecount = Date.now();
     try {
         const day = new Date(IR.readSince() - 86400000).toISOString().slice(0, 10); // a day early: the stamps are compared exactly below
         const replies = await Promise.all(inboxSources().map(async server => {
@@ -81,6 +85,16 @@ async function loadUnread() {
     } catch { /* the folders keep their last numbers */ }
 }
 
+/** The folders a chat row is in, for the unread numbers. */
+const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['chats-starred'] : []), ...(s.active ? ['chats-active'] : []), ...(s.archived ? ['chats-archived'] : []),
+    ...(isGroup(s) ? [] : CLIS.filter(([t]) => (t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]).includes(s.source_type)).map(([t]) => `chats-cli-${t}`))];
+const bump = (keys, by) => { if (unread) for (const k of keys) unread[k] = Math.max(0, (unread[k] || 0) + by); };
+/** A chat was opened from the Inbox: marked read, and the numbers of the folders it is in go down by one, in memory, with no request (#9703). */
+export function chatOpened(s) {
+    if (IR.isUnread(readKind(s), readKey(s), stampOf(s))) bump(foldersOf(s), -1);
+    IR.markRead(readKind(s), readKey(s), stampOf(s) || Date.now());
+}
+
 export async function loadChatCounts(redraw) {
     try {
         const sources = inboxSources();
@@ -92,7 +106,7 @@ export async function loadChatCounts(redraw) {
         for (const key of ['all','group','notes','starred','active','archived']) counts[key] = replies.reduce((sum, d) => sum + (Number(d[key]) || 0), 0);
         for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
     } catch { /* the folders keep their last counts */ }
-    await loadUnread();
+    if (unread === null || (inboxShows() && Date.now() - lastRecount >= RECOUNT_MS)) await loadUnread(); // the first read at start; then at most one a minute, and only while the Inbox shows: an open or a flag updates the numbers in memory (chatOpened, setChatFlag), no request
     redraw?.();
     return counts;
 }
@@ -151,6 +165,10 @@ export async function setChatFlag(sessionId, flag, value, server = null) {
         const r = await read(`/api/sessions/history/${encodeURIComponent(sessionId)}/flags`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [flag]: value }) });
         if (!r || !r.ok) throw new Error('not saved');
     } catch { (await importOnce('./utils.js')).showToast?.('The chat could not be changed', true); return false; }
+    for (const L of lists.values()) { // an unread chat starred or archived moves between the folders' numbers: in memory, no request (#9703)
+        const row = L.rows.find(r => r.session_id === sessionId && (!server || r.server === server));
+        if (row) { if (IR.isUnread(readKind(row), readKey(row), stampOf(row)) && (flag === 'starred' || flag === 'archived')) bump([`chats-${flag}`], value ? 1 : -1); break; }
+    }
     resetChatLists();
     return true;
 }
