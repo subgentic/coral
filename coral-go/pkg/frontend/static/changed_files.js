@@ -260,6 +260,7 @@ let _notGit = false; // the folder is not a git repository (#6072): there is not
 
 export async function loadChangedFiles(agentName, sessionId) {
     if (!agentName) return;
+    if (_filesStale) { _filesStale = false; return refreshChangedFiles(); } // files changed while the panel was not showing: the server's cached list may predate them
     _filesStale = false;
     try {
         const params = new URLSearchParams();
@@ -291,7 +292,9 @@ const filesPanelShowing = () => { const p = document.getElementById('agentic-pan
 const FOLLOW_DELAY_MS = 300;
 export function followChangedFiles(s) {
     if (!s || !state.currentSession || state.currentSession.type !== 'live') return;
-    const id = s.session_id || s.name, count = s.changed_file_count || 0, working = deriveSessionState(s) === 'working';
+    // Two counts say that files changed: the agent's own Write/Edit tool calls (changed_file_count) and the repository's uncommitted files (git_state.dirty, what the header chip shows), which also moves for a file the person
+    // or another program changed (#10268: the chip said 1 changed and the list 0 after a reply, because only the first was watched).
+    const id = s.session_id || s.name, count = (s.changed_file_count || 0) * 1000 + Math.min(999, (s.git_state && s.git_state.dirty) || 0), working = deriveSessionState(s) === 'working';
     const same = _followed.id === id;
     const moved = same && _followed.count !== null && _followed.count !== count, ended = same && _followed.working && !working;
     _followed = { id, count, working };
@@ -301,7 +304,7 @@ export function followChangedFiles(s) {
         const cur = state.currentSession;
         if (!cur || cur.type !== 'live' || (cur.session_id || cur.name) !== id) return;
         if (!filesPanelShowing()) { _filesStale = true; return; } // nobody is looking: it is read when the panel opens (switchAgenticTab), not at every reply
-        loadChangedFiles(cur.name, cur.session_id);
+        refreshChangedFiles(); // the route's refresh, not its cached list: the server keeps a list for 30 s or more, and the change that moved the count may be inside it
     }, FOLLOW_DELAY_MS);
 }
 
