@@ -475,3 +475,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-star:hover { color: var(--accent); }
 .dt-mail-star { width: auto; height: auto; margin-inline-start: 4px; font-size: var(--fs-lg); flex: none; align-self: center; cursor: default; }
 @media (pointer: coarse), (max-width: 767px) { .dt-star:not(.dt-star-on) { display: none; } .dt-star.dt-star-on { pointer-events: none; } }
+@media (max-width: 760px) { /* the starred Needs you row on a phone (#9922) */
+    .inbox-review-actions-star > .dt-star { width: 16px; margin-inline-end: -4px; } /* on a phone the starred glyph is not a button: 16 px, and it leans 4 px into the gap (#9922) */
+    .dt-box.dt-fold-column.dt-folded tr:has(.inbox-review-actions-star > .dt-star-on) td.dt-line-1.dt-grow { flex-basis: 3.5rem; } /* a starred row name has 3.5 rem of its own, not 5, so the actions stay on its line at 360 px (#9922) */
+}
