@@ -6,6 +6,7 @@
 // The route is stood in by a fetch wrapper (two teams, five files); the page, the table, the filters and the pane are the real ones, on the isolated dev server. 1280 and 390 px.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { SIZING } = require('./helpers/table_sizing');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { ROW_WORDS } = require('./helpers/folder_rows');
@@ -64,6 +65,14 @@ const WORLD = `(() => {
                 await ev(`document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]').click(); true`);
             } else await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
             await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: five rows`, 10000);
+            if (!mobile) { // the table's default sizes (#9856): the artifact's name is at least 24 characters and nothing scrolls sideways, at 1280 and at 1024
+                for (const bw of [1280, 1024]) {
+                    await Emulation.setDeviceMetricsOverride({ width: bw, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
+                    const z = await ev(SIZING('#group-table-view .dt-box', 'name'));
+                    check(`${bw}: the artifact name is at least 24 characters and the table does not scroll sideways`, !!z && !z.scroll && z.name >= z.ch24 - 1, JSON.stringify(z));
+                }
+                await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: back to the suite's width
+            }
             if (!mobile) check(`${label}: a folder opened by the person puts the keyboard on the page's search box, not on the heading`, (await ev(`document.activeElement && document.activeElement.classList.contains('list-bar-search')`)) && !(await ev(`document.getElementById('group-table-title').matches(':focus, [tabindex]')`)));
             if (mobile) check(`${label}: no second Artifacts heading under the folder button (it names the page and its count), still in the page for a screen reader`, await ev(`(() => { const h = document.getElementById('group-table-title'), b = h && h.parentElement.getBoundingClientRect(), t = document.querySelector('#group-table-view .view-list-trigger'); return !!h && b.width <= 1 && b.height <= 1 && !!t && /Artifacts/.test(t.textContent); })()`));
             check(`${label}: the page is titled Artifacts with the count`, (await ev(`(document.getElementById('group-table-title') || {}).textContent + '|' + (document.querySelector('.inbox-artifacts-count') || {}).textContent`)) === 'Artifacts|5');
