@@ -569,7 +569,7 @@ registerGroupSource('hub-inbox', {
         }
         if (key === 'tasks') {
             const rows = taskRows();
-            return { title: 'Tasks', noun: ['task', 'tasks'], rows, empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No assigned tasks.', hint: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? undefined : 'Tasks given to you or to your agents are listed here.' },
+            return { title: 'Tasks', noun: ['task', 'tasks'], rows, empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No tasks assigned to you.', hint: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? undefined : "The tasks of your agents are in each team's Tasks tab." },
                 signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count, IR.isUnread('task', `${t.project}#${t.id}`, t.updated_at || t.created_at)])]), // the read state is part of what is drawn (#9687)
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
