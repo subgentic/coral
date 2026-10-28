@@ -14,9 +14,9 @@ const ART = { id: HEX, name: 'screen.png', media_type: 'image/png', starred: tru
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
     const shot = require('./helpers/scene_shots')(Page, 'inbox-starred');
-    const stub = (chats, arts) => ev(`(() => { const R = window.__qaFetch || (window.__qaFetch = window.fetch); window.__starRead = [];
+    const stub = (chats, arts, starredCount) => ev(`(() => { const R = window.__qaFetch || (window.__qaFetch = window.fetch); window.__starRead = [];
         window.fetch = (u, o) => { const url = new URL(String(u), location.href), json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-            if (url.pathname === '/api/sessions/history/counts') return json({ all: 1, group: 0, notes: 0, starred: ${chats.length}, active: 0, archived: 0, by_agent_type: { claude: 1 }, tags: [] });
+            if (url.pathname === '/api/sessions/history/counts') return json({ all: 1, group: 0, notes: 0, starred: ${starredCount === undefined ? chats.length : starredCount}, active: 0, archived: 0, by_agent_type: { claude: 1 }, tags: [] });
             if (url.pathname === '/api/sessions/history') return json({ sessions: ${JSON.stringify(chats)}, total: ${chats.length}, page: 1, page_size: 50 });
             if (url.pathname === '/api/team-artifacts') { window.__starRead.push(Object.fromEntries(url.searchParams)); return json({ artifacts: ${JSON.stringify(arts)}, teams: [], all: ${arts.length}, total: ${arts.length}, has_more: false }); }
             return R(u, o); }; return true; })()`);
@@ -29,7 +29,7 @@ const ART = { id: HEX, name: 'screen.png', media_type: 'image/png', starred: tru
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            const fresh = async (chats, arts) => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`); await ev('window.__qaFetch = null; true'); await stub(chats, arts);
+            const fresh = async (chats, arts, starredCount) => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`); await ev('window.__qaFetch = null; true'); await stub(chats, arts, starredCount);
                 await ev(`window.switchNavTab('hub-inbox'); true`); await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000); await openStarred(mobile); };
 
             console.log(`${label}: a starred chat and a starred artifact`);
@@ -43,6 +43,12 @@ const ART = { id: HEX, name: 'screen.png', media_type: 'image/png', starred: tru
             await ev(`document.querySelector('.inbox-starred-artifacts button.dt-primary').click(); true`);
             await waitFor(`!!document.getElementById('artifact-viewer') && getComputedStyle(document.getElementById('artifact-viewer')).display !== 'none'`, 'the preview', 8000);
             await ev(`document.getElementById('artifact-viewer').querySelector('[data-on-click="m-close-artifact-viewer"], .artifact-viewer-close, button')?.click(); true`);
+
+            // #10485: the counts read said 0 starred (read before the star, or from another index pass) while the list shows the chat: the header counts what is listed
+            console.log(`${label}: a listed starred chat the counts do not know`);
+            await fresh([CHAT], [], 0);
+            await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary, #group-table-view button.dt-person').length >= 1`, 'the starred chat', 10000);
+            await waitFor(`document.querySelector('#group-table-view .session-group-count')?.textContent.trim() === '1'`, `${label}: the header says 1 beside the one listed starred chat, not 0`, 8000);
 
             console.log(`${label}: a starred artifact and no starred chat`);
             await fresh([], [ART]);
