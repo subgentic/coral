@@ -26,7 +26,7 @@ const { replyToMessage, postBoardMessage } = await importOnce('./board_composer.
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
 // the moved exports, still importable from here
 export const { showExportBoardModal, toggleSelectMode } = BX;
-export { doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, postBoardMessage, toggleBoardPause };
+export { jumpToLatest, doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, postBoardMessage, toggleBoardPause };
 /* Message Board: project list, messages, subscribers, posting */
 
 // ── Sidebar rendering ────────────────────────────────────────────────────
@@ -272,7 +272,6 @@ connectBoard({ project: () => bs.currentProject, messages: () => bs._allMessages
 // before use; a bad one does nothing. Deleting a message never asked first, and still doesn't.
 registerActions({
     'mb-project': el => { const p = textOf(el.dataset.project); if (p) selectBoardProject(p); },
-    'mb-jump-latest': () => jumpToLatest(),
     'mb-msg-select': el => withId(el.dataset.msgId, id => toggleMessageSelect(id, el.checked)),
     'mb-msg-delete': el => withId(el.dataset.msgId, confirmDeleteBoardMessage),
     'mb-msg-more': el => openMessageActions(el),
