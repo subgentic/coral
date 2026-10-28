@@ -11,7 +11,7 @@ import { unreadReviewItems, refreshReviews, onReviewsChanged } from './inbox_rev
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { isCloud, nativeInbox, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
-import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
+import { resolveSessionIdentity, sessionStateInfo, askWords } from './session_state.js';
 import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy Inbox modules import it, and a lazy module imports only what loads at startup (import_hygiene)
 
 const INBOX_URL = '/inbox';
@@ -82,7 +82,7 @@ function announceNewlyWaiting(tab) {
 }
 
 /** What a Needs you row says an agent waits for, in one string: the state's words, then the agent's own ask when it has one (the same words as the row's two lines, so the announcement never differs from the row). */
-const askOf = s => String(s.waiting_summary || '').replace(/\s+/g, ' ').trim();
+const askOf = s => askWords(s.waiting_summary);
 const needsWords = s => { const why = sessionStateInfo(s).label, ask = askOf(s); return ask && ask !== why ? `${why}. ${ask}` : why; };
 
 export { askOf };

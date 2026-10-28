@@ -1109,6 +1109,9 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     line-height: 1;
     color: var(--text-on-accent);
 }
+/* A question's choices are full-width 44 px buttons, one under the other, like Yes and No on a phone (#10195). */
+.cni-options-stacked { flex-direction: column; align-items: stretch; }
+.chat-needs-input .cni-options.cni-options-stacked .cni-answer:not(.btn):not(.cni-link) { flex: 0 0 auto; width: 100%; min-height: var(--control-touch-height, 44px); justify-content: flex-start; }
 .cni-answer.is-checked {
     border-color: color-mix(in srgb, var(--accent) 70%, var(--border-light));
 }

@@ -992,7 +992,7 @@
           "detail_json": {
             "kind": "question",
             "tool_name": "AskUserQuestion",
-            "wants": "Wants to use AskUserQuestion"
+            "wants": "Wants to know: Pick a color"
           },
           "event_type": "permission_request",
           "permission_mode": "default",
