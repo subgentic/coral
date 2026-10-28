@@ -30,7 +30,7 @@ const BASE = require('./test_base').BASE;
         });
         await S.run('Codex with Default says it asks: Default sends no flags (#10362), so Codex runs its own default, and the card must not say the workspace sandbox that never asks (#10381)', async () => {
             await radio(N.mode, /^Default$/i);
-            assert.equal(await line(), "Asks before acting (each CLI's normal mode)");
+            assert.equal(await line(), 'Asks before every action and cannot reach Coral from its sandbox: use Auto for a team member.');
         });
         await S.run('another mode of Codex has its own line, and the size does not change', async () => {
             const before = await size();
