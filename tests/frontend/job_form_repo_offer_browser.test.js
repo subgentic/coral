@@ -30,7 +30,8 @@ const BASE = require('./test_base').BASE;
 
         await ev(`window.__refusal = 'repo_path is not a git repository: /work/plain'; true`); await create();
         await waitFor(`!!document.getElementById('job-repo-offer') && document.getElementById('job-repo-offer').getClientRects().length > 0`, 'the offer', 5000);
-        assert.match(await offer(), /needs a git repository with one commit\. Make this folder a git repo Run without a worktree$/, 'the offer says why and has both buttons');
+        assert.match(await offer(), /needs a git repository with one commit\. Make it a git repo$/, 'the offer says why and has one button (#10783)');
+        assert.equal(await ev(`document.querySelectorAll('#job-repo-offer button').length`), 1, 'one button: the way to run in the folder itself is the switch under More options');
         assert.match(await ev(`document.getElementById('job-form').textContent`), /That folder is not a git repository: \/work\/plain/);
         assert.doesNotMatch(await ev(`document.body.innerText`), /repo_path/, 'no field name from the code reaches the person (#10558): the field says it, the foot says to fix the folder');
 
@@ -38,33 +39,16 @@ const BASE = require('./test_base').BASE;
         await waitFor(`/has no commit yet/.test(document.getElementById('job-form').textContent)`, 'a repository with no commit is said', 5000);
         assert.ok(await offer(), 'and offers the same');
 
-        await ev(`document.getElementById('job-make-repo').click(); true`);
+        await ev(`window.__posts = []; document.getElementById('job-make-repo').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the person is asked first', 5000);
         assert.deepEqual(await ev(`window.__inits`), [], 'nothing is made before the person agrees');
         const asked = await ev(`document.getElementById('confirm-modal-message').textContent`);
         assert.match(asked, /git init in \/work\/plain/, 'the dialog names the folder: ' + asked);
         assert.match(asked, /one empty first commit/, 'and what Coral will do');
-        await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+        await ev(`window.__refusal = ''; document.getElementById('confirm-modal-yes').click(); true`); // the server will take the folder now
         await waitFor(`window.__inits.length === 1`, 'the folder is made a repository', 5000);
         assert.deepEqual(await ev(`window.__inits[0]`), { repo_path: '/work/plain' });
-        await waitFor(`!document.getElementById('job-repo-offer') || document.getElementById('job-repo-offer').getClientRects().length === 0`, 'the offer goes', 5000);
-        await ev(`window.__refusal = ''; true`); await create();
-        await waitFor(`getComputedStyle(document.getElementById('job-modal')).display === 'none'`, 'the job is created once the folder is a repository', 5000);
-
-        // or the person chooses to run in the folder itself: no worktree, so no repository is needed
-        await ev(`window.hideJobModal(); window.__posts = []; Promise.resolve(window.showJobModal()).then(() => true)`);
-        await waitFor(`!!document.getElementById('job-modal-name') && getComputedStyle(document.getElementById('job-modal')).display !== 'none'`, 'the dialog again', 8000);
-        await ev(`(() => { const b = [...document.querySelectorAll('#job-type-toggle button')].find(x => x.dataset.type === 'prompt'); if (b) b.click(); return true; })()`);
-        await fill();
-        await ev(`window.__refusal = 'repo_path is not a git repository: /work/plain'; true`); await create();
-        await waitFor(`!!document.getElementById('job-run-here') && document.getElementById('job-run-here').getClientRects().length > 0`, 'the second choice', 5000);
-        assert.equal(await ev(`document.getElementById('job-run-here').textContent`), 'Run without a worktree');
-        await ev(`document.getElementById('job-run-here').click(); true`);
-        await waitFor(`!!document.getElementById('job-modal-no-worktree') && document.getElementById('job-modal-no-worktree').checked`, 'the switch is on', 5000);
-        assert.equal(await offer(), null, 'the offer goes');
-        await ev(`window.__refusal = ''; window.__posts = []; true`); await create();
-        await waitFor(`window.__posts.length === 1`, 'the job is sent', 5000);
-        assert.equal(await ev(`window.__posts[0].no_worktree`), 1, 'saved to run in the folder itself');
-        console.log('PASS New job: a folder that is not a repository is offered "Make this folder a git repo", asked first, then made one; a missing folder is not offered');
+        await waitFor(`window.__posts.length === 1 && getComputedStyle(document.getElementById('job-modal')).display === 'none'`, 'the job is created at once, the person is not asked to create it again (#10783)', 5000);
+        console.log('PASS New job: a folder that is not a repository is offered one "Make it a git repo" button, asked first, made one, and the job is created; a missing folder is not offered');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
