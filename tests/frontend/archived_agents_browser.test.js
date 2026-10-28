@@ -126,7 +126,7 @@ const SLEEPING_PLACEHOLDER = '';
         await clearReqs();
         await ev(`(() => { window.__archR = undefined; window.toggleAgentArchive('solo-awake', 'claude', 'solo-awake-id', 'archive').then(v => { window.__archR = v; }); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'confirm modal');
-        assert.match(await ev(`document.getElementById('confirm-modal-message').textContent`), /stopped/i, 'archiving an awake agent says it will be stopped');
+        assert.match(await ev(`document.getElementById('confirm-modal-message').textContent`), /stops now/i, 'archiving an awake agent says it stops now');
         await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => /cancel/i.test(b.textContent)).click()`);
         await waitFor(`window.__archR === false`, 'archive promise to resolve false on cancel', 2000);
         assert.equal((await reqs()).filter(r => r.kind === 'archive').length, 0, 'no POST /archive after cancel');
