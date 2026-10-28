@@ -279,7 +279,13 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	}
 	// The funnel's eula_accepted (#10004): the terms were accepted before this point (the dialog, the legacy migration, the Hub's confirmation), but only now has the saved analytics choice been
 	// applied (applyPrivacySettings, above), so only now may it be said; with analytics off it is dropped here. Taken once.
-	if source, ok := license.TakeAcceptanceSource(); ok {
+	source, accepted := license.TakeAcceptanceSource()
+	if !accepted && tracking.IsFirstRun() {
+		// The terms were accepted in another process: the Coral app's own dialog, which then started this server as its child (#10106). The marker says how; only a first run, so an install that
+		// accepted long ago is not announced at an upgrade.
+		source, accepted = license.AcceptedSource()
+	}
+	if accepted {
 		tracking.TrackEULAAccepted(source)
 	}
 

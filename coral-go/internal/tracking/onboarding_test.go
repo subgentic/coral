@@ -85,7 +85,9 @@ func TestFirstAgentReplyIsOnceForAnOkEndAndOnceForAnErrorEnd(t *testing.T) {
 	waitForAsync()
 	assert.True(t, FirstReplyWanted(), "an error end does not use up the ok one")
 	TrackFirstAgentReply("claude", 12*time.Second, ReplyOK)
+	waitForAsync() // each in turn: the deliveries are goroutines, and the first one to run is the one that is kept
 	TrackFirstAgentReply("codex", 30*time.Second, ReplyOK) // a later reply is not the first
+	waitForAsync()
 	TrackFirstAgentReply("claude", time.Second, ReplyError)
 	waitForAsync()
 	assert.False(t, FirstReplyWanted(), "the ok reply was delivered")
@@ -168,4 +170,47 @@ func TestADeliveredMilestoneIsNotAskedAgainOnEveryMessage(t *testing.T) {
 	TrackFirstMessageSent(MessageViaTerminal)
 	waitForAsync()
 	assert.Equal(t, 1, rec2.count(EventFirstMessageSent))
+}
+
+// #10106: an acceptance reached while analytics were off is never announced later; one whose delivery failed is retried.
+func TestAnAcceptanceReachedWhileAnalyticsWereOffIsNeverSentLater(t *testing.T) {
+	rec, _ := newTestTracking(t)
+	SetTelemetryEnabled(false)
+	TrackEULAAccepted(EULASourceDialog)
+	waitForAsync()
+	assert.Empty(t, rec.all(), "off: nothing leaves")
+	SetTelemetryEnabled(true)
+	t.Cleanup(func() { SetTelemetryEnabled(true) })
+	TrackEULAAccepted(EULASourceDialog)
+	waitForAsync()
+	assert.Zero(t, rec.count(EventEULAAccepted), "turning analytics on afterwards does not announce what happened while they were off")
+}
+
+func TestAnAcceptanceWhoseDeliveryFailedIsRetried(t *testing.T) {
+	rec, _ := newTestTracking(t)
+	rec.mu.Lock()
+	rec.status = 500
+	rec.mu.Unlock()
+	TrackEULAAccepted(EULASourceHub)
+	waitForAsync()
+	rec.mu.Lock()
+	rec.status = 200
+	rec.mu.Unlock()
+	TrackEULAAccepted(EULASourceHub)
+	waitForAsync()
+	var accepted int
+	for _, e := range rec.all() {
+		if e.Event == EventEULAAccepted && e.Properties["source"] == "hub" {
+			accepted++
+		}
+	}
+	assert.GreaterOrEqual(t, accepted, 1, "the failed delivery was retried on the next start")
+	assert.True(t, rec.count(EventEULAAccepted) >= 1)
+}
+
+func TestIsFirstRunUntilAnOpenIsTracked(t *testing.T) {
+	newTestTracking(t)
+	assert.True(t, IsFirstRun(), "no tracked open yet")
+	recordFirstOpen()
+	assert.False(t, IsFirstRun(), "an open was tracked: an install from before")
 }

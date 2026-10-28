@@ -91,3 +91,26 @@ func TestEULAAcceptedIsSentOnlyFromStartup(t *testing.T) {
 	}
 	assert.Equal(t, []string{"../../internal/startup/startup.go"}, sites, "one call site, where the saved analytics choice is known")
 }
+
+// #10106: the server the Coral app starts is a child process: the terms were accepted in the app's own dialog, so this process has only the marker. It says how.
+func TestAcceptedSourceReadsTheMarkerAnotherProcessWrote(t *testing.T) {
+	marker := markerAt(t)
+	_, ok := AcceptedSource()
+	assert.False(t, ok, "no marker: not accepted")
+	for _, source := range []string{"dialog", "legacy", "hub"} {
+		writeMarker(t, marker, "accepted\nversion="+terms.EULAVersion+"\nsha256="+terms.EULADigest()+"\nsource="+source+"\n")
+		got, ok := AcceptedSource()
+		assert.True(t, ok, source)
+		assert.Equal(t, source, got)
+	}
+	writeMarker(t, marker, "accepted\n") // the Windows installer's bare marker
+	got, ok := AcceptedSource()
+	assert.True(t, ok)
+	assert.Equal(t, "legacy", got)
+	writeMarker(t, marker, "accepted\nversion=1999-01-01\nsha256=abc\nsource=dialog\n")
+	_, ok = AcceptedSource()
+	assert.False(t, ok, "another terms version is not an acceptance of these")
+	writeMarker(t, marker, "accepted\nversion="+terms.EULAVersion+"\nsha256="+terms.EULADigest()+"\nsource=a-name-nobody-chose\n")
+	_, ok = AcceptedSource()
+	assert.False(t, ok, "a source the funnel has no word for sends nothing")
+}
