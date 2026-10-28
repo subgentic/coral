@@ -205,7 +205,9 @@ async function renderCloud(body, own, teamName) {
             revoke.dataset.linkId = String(row.id); revoke.setAttribute('aria-label', `Revoke the link with ${row.end.label || row.end.team} on ${nameOf(row.end.server)}, ${directionWords(row)}${row.state ? `, ${row.state}` : ''}`); // named for the team, the computer, the direction and the state (#9892)
             revoke.addEventListener('click', () => confirmRevoke(row));
             const circle = DT.avatar(who).querySelector('.dt-avatar'); circle.classList.add('team-link-avatar'); // the circle only: the name is in the text beside it
-            if (filesChip) li.append(circle, text, filesChip, state, revoke); else li.append(circle, text, state, revoke);
+            const end = mk('div', 'team-link-end'); // the chip, the state word and Revoke stay together: one line at the row's right on a phone too (F4, #9905)
+            if (filesChip) end.append(filesChip); end.append(state, revoke);
+            li.append(circle, text, end);
             list.append(li);
         }
         body.append(list);
