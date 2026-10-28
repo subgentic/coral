@@ -519,7 +519,7 @@ func classifyAvailability(a *availableAgent, s store.LiveSession, online, subscr
 	default:
 		a.Availability = "available"
 		a.Available = true
-		a.Reason = "Idle with no active or ready assigned tasks"
+		a.Reason = "Free: nothing to do"
 	}
 }
 

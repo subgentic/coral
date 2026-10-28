@@ -82,6 +82,9 @@ func TestTeamAvailabilityQueuesAndRuntime(t *testing.T) {
 	for _, a := range result.Agents {
 		require.Equal(t, expected[a.Name], a.Availability, a.Name)
 		require.Equal(t, a.Name == "free", a.Available, a.Name)
+		if a.Name == "free" {
+			require.Equal(t, "Free: nothing to do", a.Reason, "a free agent says so in plain words (#10371), not as a log line")
+		}
 	}
 	require.Equal(t, 1, result.Summary["available"])
 	require.Len(t, result.Unassigned, 1)
