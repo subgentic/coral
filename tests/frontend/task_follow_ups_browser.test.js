@@ -64,6 +64,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 check(`${label}: the goal page's task counts say ${want ? `"${want}"` : 'nothing about follow-ups at 0'}`, want ? counts.includes(want) : !/follow-up/.test(counts), counts);
                 if (open === 2) await shot(`goal-follow-ups-${mobile ? 390 : 1280}`);
                 await ev(`window.closeTeamPage && window.closeTeamPage(); true`);
+                await ev(`try { localStorage.removeItem('coral-last-place'); } catch (e) {} true`); // the dashboard reopens the place the person left (#10057): the goal page would come back before this step's stub is in
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             }
         }
