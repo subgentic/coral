@@ -296,7 +296,7 @@ function showAgentsTab() {
     if (active && active.id !== 'nav-tab-agents') window.switchNavTab?.('agents', { fromHistory: true });
 }
 
-/** Shows an agent's page. `opts.focusChat` (Open chat) takes the keyboard to the chat; `opts.pointer` (a click on the sidebar's row) puts the cursor in the composer at a mouse; any other way in (Enter on a row, a link) leaves focus where it was. */
+/** Shows an agent's page. `opts.focusChat` (Open chat) takes the keyboard to the chat; `opts.pointer` (a click on the sidebar's row) puts the cursor in the composer at a mouse; any other way in (a link) leaves focus where it was; Enter on a row takes the keyboard to the chat as Open chat does (render.js, #10410). */
 export async function selectLiveSession(name, agentType, sessionId, server, opts = {}) {
     // Identity is (server, name). Callers that only know the session id (hash
     // restore, toasts) omit `server` and it is resolved from the live list.
