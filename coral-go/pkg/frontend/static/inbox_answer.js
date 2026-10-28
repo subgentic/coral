@@ -7,6 +7,7 @@
 import { serverFetch, sessionServer } from './server_base.js';
 import { showToast } from './utils.js';
 import { blockedReason, hubBlocked } from './hub_access.js';
+import { resolveSessionIdentity } from './session_state.js';
 
 const MAX_CHOICES = 4;
 // Choices that last past this one answer, or change how the agent runs: never a button on a list row (each CLI's own words: Claude's "Yes, and don't ask again for ..." and "Yes, allow all edits during this session", Codex's "Yes, and don't ask again", Antigravity's "always allow").
@@ -75,7 +76,7 @@ function fill(s, cell) {
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label;
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
-            b.setAttribute('aria-label', `Answer ${o.label}`);
+            b.setAttribute('aria-label', `Answer ${o.label} for ${resolveSessionIdentity(s)}`);
             b.addEventListener('click', e => { e.stopPropagation(); answer(s, o, ask, cell); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
