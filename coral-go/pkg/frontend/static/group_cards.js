@@ -186,7 +186,7 @@ function _renderFolderGroup(groupName, groupSessions) {
             <div class="group-header-text"><div class="group-name-line">${FOLDER_GROUP_ICON}${_rowNameWithServer(groupName)}${countBadge}</div></div>${tagDots}<span class="session-name-spacer"></span>${copyBtn}${groupKebab}</li>`;
 
         if (!collapsed && sorted.length) {
-            html += _renderAgentListWithSubgroups(sorted, groupWorkDir, false, groupName);
+            html += _renderAgentListWithSubgroups(sorted, groupWorkDir, false, groupName, true);
         }
     return html;
 }
@@ -330,7 +330,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
             }
 
             // Render unboarded items as flat list with subgroups
-            html += _renderAgentListWithSubgroups(unboardedItems, groupWorkDir, false, groupName);
+            html += _renderAgentListWithSubgroups(unboardedItems, groupWorkDir, false, groupName, true);
         }
     return html;
 }

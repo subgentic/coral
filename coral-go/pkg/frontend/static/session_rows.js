@@ -354,7 +354,11 @@ function _renderSleepingSummary(sleepingAgents, groupName, isCompact, teamDefaul
     return html;
 }
 
-export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact, groupName) {
+// A folder with many agents shows its first FOLDER_SHOWN and a "Show 19 more" row (#10319, Mobile pass 23): the long list does not push the others out of a phone's screen. The open agent stays in view; Show fewer folds it again.
+const FOLDER_SHOWN = 5;
+const isMoreOpen = groupName => { try { return browserLocal.get(`coral-more-expanded:${groupName}`) === 'true'; } catch { return false; } };
+
+export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact, groupName, limited = false) {
     if (!agents.length) return "";
 
     // An agent asleep because its terminal is gone stays in view with its "Terminal gone" chip
@@ -365,7 +369,13 @@ export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact,
 
     // One flat list: an agent's folder is shown in the header bar, not as
     // sidebar sub-groups.
-    let html = awake.map(s => _renderSessionItem(s, groupName, isCompact, false, teamDefaultDir)).join('');
+    const folds = limited && awake.length > FOLDER_SHOWN, open = folds && isMoreOpen(groupName), openId = state.currentSession && state.currentSession.session_id;
+    const shown = folds && !open ? awake.filter((s, i) => i < FOLDER_SHOWN || s.session_id === openId) : awake;
+    let html = shown.map(s => _renderSessionItem(s, groupName, isCompact, false, teamDefaultDir)).join('');
+    if (folds) {
+        const more = awake.length - FOLDER_SHOWN, label = open ? 'Show fewer' : `Show ${more} more`; const moreName = `${label} in ${keyLabel(groupName)}`;
+        html += `<li class="sleeping-summary-row folder-more-row" data-on-click="group-more-expand" data-group="${escapeAttr(groupName)}"><button type="button" class="row-btn" aria-expanded="${escapeAttr(String(open))}" aria-label="${escapeAttr(moreName)}"><span class="sleeping-summary-label">${label}</span></button></li>`;
+    }
 
     if (sleeping.length > 0) {
         html += _renderSleepingSummary(sleeping, groupName, isCompact, teamDefaultDir);
