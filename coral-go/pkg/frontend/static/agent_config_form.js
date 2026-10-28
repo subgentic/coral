@@ -226,7 +226,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
 /** The Behavior prompt: a field of settings_view (label above; the textarea keeps the class every read of the form uses). */
 function mountAcfPrompts(container, { promptVal }) {
     for (const host of container.querySelectorAll('.acf-prompt-host')) {
-        const view = mountSettingsView(host, { mode: 'form', fields: [{ key: 'prompt', type: 'textarea', label: 'Behavior prompt', optional: true, rows: Number(host.dataset.rows) || 8, placeholder: "Describe the agent's role and behavior...", setup: e => e.classList.add('acf-prompt') }] });
+        const view = mountSettingsView(host, { mode: 'form', fields: [{ key: 'prompt', type: 'textarea', label: 'Instructions for this agent', optional: true, rows: Number(host.dataset.rows) || 8, placeholder: "Describe the agent's role and behavior...", setup: e => e.classList.add('acf-prompt') }] });
         view.set('prompt', promptVal);
     }
 }
