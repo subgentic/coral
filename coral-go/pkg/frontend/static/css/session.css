@@ -1752,7 +1752,9 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 /* A phone's Details disclosure (#9686): the folder, branch, model and thinking level of the open agent; a desktop's header has them. */
 .agent-phone-details { display: none; }
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+/* A header this narrow (a window up to 1100 px, whose side panel takes half of it, or a phone) has no room for the model line beside the name: the Details disclosure has it instead (#9686; the folded model chip's 8 px margin and 4 px gap were the 12 px that overflowed the header at 1024). */
+@media (max-width: 1100px) { .terminal-header-actions > .terminal-model { display: none; } }
+@media (max-width: 1100px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .agent-phone-details:not([hidden]) { display: block; padding: 0 var(--space-lg); border-bottom: 1px solid var(--border); }
     .agent-phone-details > summary { min-height: var(--control-touch-height); display: flex; align-items: center; }
     .agent-phone-details .facts { padding-bottom: var(--space-md); }
