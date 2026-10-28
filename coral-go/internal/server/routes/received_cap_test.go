@@ -96,7 +96,7 @@ func TestReceivedUsageCountsEachObjectOnce(t *testing.T) {
 	assert.True(t, ids[id] && ids[other])
 }
 
-// Settings > Storage: the total, the cap, the default, and the one-time notice at 80% of a cap the Operator has not been told about.
+// Settings > Storage and cleanup: the total, the cap, the default, and the one-time notice at 80% of a cap the Operator has not been told about.
 func TestReceivedStatusAndNotice(t *testing.T) {
 	rig := newArtifactRig(t)
 	ctx := context.Background()

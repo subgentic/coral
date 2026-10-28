@@ -68,7 +68,7 @@ func TestLoadCloudMaxModeFromEnv(t *testing.T) {
 	}
 }
 
-// CORAL_HOST is an explicit host: it is kept, and Settings > Privacy's remote access does not widen it (#5124).
+// CORAL_HOST is an explicit host: it is kept, and Settings > Network and Hub's remote access does not widen it (#5124).
 func TestLoadHostFromEnvIsExplicit(t *testing.T) {
 	isolateConfigEnv(t)
 	t.Setenv("CORAL_HOST", "0.0.0.0")

@@ -15,7 +15,7 @@ import (
 
 // The cap on RECEIVED files (#4441, Security's #4438 SHOULD 2): the daily quotas let a linked Coral leave up to 500 MiB a day on this computer,
 // and nothing limited how much stayed. Past the cap new received files are refused as store_full; local uploads are never affected, and nothing
-// is ever deleted for it (user data is not removed automatically). The Operator sees the total in Settings > Storage and can raise or clear it.
+// is ever deleted for it (user data is not removed automatically). The Operator sees the total in Settings > Storage and cleanup and can raise or clear it.
 const (
 	ReceivedArtifactsMaxBytesSetting       = "received_artifacts_max_bytes" // whole bytes; unset is the default, 0 is no cap
 	ReceivedCapNoticeAckSetting            = "received_cap_notice_ack"      // the cap (in bytes) the Operator has been told about at 80%

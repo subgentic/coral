@@ -218,7 +218,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	if errors.Is(err, errStoreFull) {
 		b, _, max := st.size()
 		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store",
-			fmt.Sprintf("the artifact store is full (%s of %s): ask the Operator to delete old artifacts or raise the limit (Settings > Storage; artifact_store_max_bytes, 0 for none)", humanBytes(b), humanBytes(max)))
+			fmt.Sprintf("the artifact store is full (%s of %s): ask the Operator to delete old artifacts or raise the limit (Settings > Storage and cleanup; artifact_store_max_bytes, 0 for none)", humanBytes(b), humanBytes(max)))
 		return
 	}
 	if err != nil {

@@ -2,7 +2,7 @@
 //   - A board chat message a Hub user sent through Coral Hub carries origin 'hub_user' (set by
 //     the server, never by a client). It shows a "Coral Hub user" badge; a message whose sender
 //     only LOOKS like a Hub user (hub-user-… without origin) does not.
-//   - Settings > Coral Hub: "Let Coral Hub act as the Operator", a local-only owner setting
+//   - Settings > Network and Hub: "Let Coral Hub act as the Operator", a local-only owner setting
 //     (GET/PUT /api/system/hub-operator). Shown when this computer answers and a Hub link exists
 //     (or it is still on); off by default; a failed change is put back and explained; hidden when
 //     the route answers 404 (through the hub); read again when the Hub link comes or goes.

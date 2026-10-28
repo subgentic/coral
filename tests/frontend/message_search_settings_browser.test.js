@@ -1,4 +1,4 @@
-// #9685: Settings > Storage says whether the board message search index is on, its state (building, ready) and the disk it takes; an unreadable status, a build without FTS5 and the setting off each say so.
+// #9685: Settings > Storage and cleanup says whether the board message search index is on, its state (building, ready) and the disk it takes; an unreadable status, a build without FTS5 and the setting off each say so.
 // The server side (the setting, the state, the size) is in internal/board/message_fts_default_test.go and internal/server/routes/message_search_index_test.go; here the route is stubbed.
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');

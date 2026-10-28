@@ -23,7 +23,7 @@ func TestTheTextsNameTheScreenAndTheSwitchInTheSameWords(t *testing.T) {
 	assert.Equal(t, `Cross-team messaging is off on "alpha" and "beta". Turn it on in Team settings > Messaging.`, textCrossTeamOff([]string{`"alpha"`, `"beta"`}))
 	assert.Equal(t, `Sharing files with other teams is off on "alpha". Turn on Share files with teams on other computers in Team settings > Messaging.`, textFilesOff([]string{`"alpha"`}))
 	assert.Contains(t, textFilesTurnedOffMidSend(`"alpha"`, "attachment 1 of 2"), "Team settings > Messaging")
-	assert.Equal(t, "This Coral is not connected to Coral Hub. Connect it in Settings > Coral Hub.", textNotLinked)
+	assert.Equal(t, "This Coral is not connected to Coral Hub. Connect it in Settings > Network and Hub.", textNotLinked)
 	for name, text := range map[string]string{
 		"off": textCrossTeamOff([]string{"x"}), "files": textFilesOff([]string{"x"}), "mid": textFilesTurnedOffMidSend("x", "y"), "unlinked": textNotLinked,
 		"notfound": textNotFoundExplained("homelab/qa"),
@@ -61,8 +61,8 @@ func TestTheOwnersStatusLineByState(t *testing.T) {
 		{"an old team that is off", false, false, false, 0, "", statusOld, "cannot use the relay"},
 		{"off", true, false, false, 2, "", statusOff, "Turn it on in Team settings > Messaging."},
 		{"off wins over stale", true, false, true, 2, "", statusOff, "off for this team"},
-		{"stale, when it last heard", true, true, true, 2, "today 14:02", statusStale, "Waiting for Coral Hub: messages from other teams are refused until this computer reconnects. Last heard from Coral Hub today 14:02. Check the connection in Settings > Coral Hub."},
-		{"stale, never heard", true, true, true, 2, "", statusStale, "reconnects. Check the connection in Settings > Coral Hub."},
+		{"stale, when it last heard", true, true, true, 2, "today 14:02", statusStale, "Waiting for Coral Hub: messages from other teams are refused until this computer reconnects. Last heard from Coral Hub today 14:02. Check the connection in Settings > Network and Hub."},
+		{"stale, never heard", true, true, true, 2, "", statusStale, "reconnects. Check the connection in Settings > Network and Hub."},
 		{"waiting", true, true, false, 0, "", statusWaiting, "No team on another Coral is linked to this team yet."},
 		{"ready, one", true, true, false, 1, "", statusReady, "1 team on another Coral can message this team."},
 		{"ready, two", true, true, false, 2, "", statusReady, "2 teams on other Corals can message this team."},

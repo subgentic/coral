@@ -41,7 +41,7 @@ Every server flag:
   -cloud-connect string
     	Offer to connect to Coral Hub on a server not yet connected (also CORAL_CLOUD_CONNECT): prompt (the dashboard's first-launch screen, and a prompt in the terminal at startup; without a terminal, log the link and code), auto (the screen, and only log them) or off. Unset: prompt when --cloud-url/CORAL_CLOUD_URL is given, otherwise off (the build's default URL alone offers nothing; Coral Hub stays in Settings, on the home screen and in 'coral cloud connect')
   -cloud-max-mode string
-    	Most Coral Hub may do on this computer: view, interact or launch (also CORAL_CLOUD_MAX_MODE). Sets the same cap as Settings > Coral Hub, at startup, for a machine nobody sits at (a container); an invalid value stops Coral from starting. Unset leaves the saved setting (view by default). Only whoever starts Coral can set it: the hub and the API cannot
+    	Most Coral Hub may do on this computer: view, interact or launch (also CORAL_CLOUD_MAX_MODE). Sets the same cap as Settings > Network and Hub, at startup, for a machine nobody sits at (a container); an invalid value stops Coral from starting. Unset leaves the saved setting (view by default). Only whoever starts Coral can set it: the hub and the API cannot
   -cloud-url string
     	Coral Hub origin this server may connect to (also CORAL_CLOUD_URL). Release builds default to https://app.coralhub.dev; "" or off disables it. Nothing is sent until you connect
   -debug-input
@@ -51,7 +51,7 @@ Every server flag:
   -home string
     	Data directory (default: ~/.coral)
   -host string
-    	Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Privacy, or --remote); otherwise Coral listens on 127.0.0.1
+    	Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Network and Hub, or --remote); otherwise Coral listens on 127.0.0.1
   -hub
     	Run as a multi-server hub: manage and view remote Coral servers (also CORAL_HUB=1)
   -no-auto-loopback

@@ -101,7 +101,7 @@ func TestCloudStartupPromptOnATerminal(t *testing.T) {
 				if got["welcome_choice"] != "skipped" || got["welcome_pending"] != "False" {
 					t.Fatalf("an Enter must store the dashboard's own skip, got %v\nterminal:\n%s", got, seen())
 				}
-				if !strings.Contains(seen(), "Settings > Coral Hub") {
+				if !strings.Contains(seen(), "Settings > Network and Hub") {
 					t.Fatalf("the skip says where Connect is still offered:\n%s", seen())
 				}
 			} else {

@@ -20,7 +20,7 @@ import (
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
-// #4447: Settings > Storage deletes the terminal logs of ended agents, after a confirmation, by exact name inside the logs folder, never those of a live,
+// #4447: Settings > Storage and cleanup deletes the terminal logs of ended agents, after a confirmation, by exact name inside the logs folder, never those of a live,
 // sleeping or archived agent, and a log the sessions database cannot vouch for is kept.
 
 type logsRig struct {

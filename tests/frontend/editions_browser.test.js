@@ -12,7 +12,7 @@
 //     coral --hub explainer. A build with no hub configured never opens it.
 //   - From another computer (the cloud routes answer 403) it says to connect on the
 //     computer running Coral.
-//   - Settings > About reopens it without changing the stored answer.
+//   - Settings > Network and Hub reopens it without changing the stored answer.
 //   - The home section sits under the launch cards, opens the screen or the explainer,
 //     and its X hides it for good (server setting).
 // The /api/cloud/* routes are stubbed in the page (a scripted hub), so no hub is needed.
@@ -353,13 +353,13 @@ async function run() {
             check(`${label}: from another computer (#3285 server): its message as is, and its command`, !!s && s.status === own.error && s.command === 'coral cloud connect', JSON.stringify(s));
             await click('#editions-modal [data-editions="skip"]');
 
-            // ── Settings > About reopens it; closing keeps the stored answer ──
+            // ── Settings > Network and Hub reopens it; closing keeps the stored answer ──
             await load();
             await ev(`window.showSettingsModal(); true`);
             await until(`!!document.querySelector('#about-section [data-editions="open"]') && document.querySelector('#about-section [data-editions="open"]').offsetParent !== null`, 'About > Connect to Coral Hub');
             await click('#about-section [data-editions="open"]');
             s = await screen();
-            check(`${label}: Settings > About reopens it (settings closed)`, !!s && s.title === 'Connect to Coral Hub' && (await ev(`getComputedStyle(document.getElementById('settings-modal')).display === 'none'`)), JSON.stringify(s));
+            check(`${label}: Settings > Network and Hub reopens it (settings closed)`, !!s && s.title === 'Connect to Coral Hub' && (await ev(`getComputedStyle(document.getElementById('settings-modal')).display === 'none'`)), JSON.stringify(s));
             await escape();
             await until(`document.getElementById('editions-modal').style.display === 'none'`, 'closed');
             check(`${label}: closing a reopened screen keeps the stored answer`, (await settings()).welcome_choice === 'own-hub');

@@ -38,7 +38,7 @@ type Config struct {
 	// Host is the --host value: one address or a comma list (Hosts, ListenHosts; #3594).
 	Host string
 	// HostExplicit is true when the host was asked for (--host or CORAL_HOST): the default, this computer only
-	// (127.0.0.1), is widened to every interface when remote access is turned on (Settings > Privacy, #5124); an asked-for host is not.
+	// (127.0.0.1), is widened to every interface when remote access is turned on (Settings > Network and Hub, #5124); an asked-for host is not.
 	HostExplicit bool
 	Port         int
 	// NoAutoLoopback (--no-auto-loopback or CORAL_NO_AUTO_LOOPBACK=1): don't add the 127.0.0.1
@@ -95,13 +95,13 @@ type Config struct {
 	// it (the dashboard's first-launch screen, and the startup step), off never does,
 	// and unset offers it only for an explicitly given URL (see EffectiveCloudConnect).
 	// The build's default URL alone offers nothing. Coral Hub stays reachable either
-	// way, from the home screen, Settings > Coral Hub and 'coral cloud connect', and an
+	// way, from the home screen, Settings > Network and Hub and 'coral cloud connect', and an
 	// enrolled server reconnects on its own.
 	CloudConnect string
 
 	// CloudMaxMode is the most Coral Hub may do on this computer when the process was started
 	// with one: --cloud-max-mode or CORAL_CLOUD_MAX_MODE (view, interact or launch). It is the
-	// launch-time form of Settings > Coral Hub > "Most the hub may do on this computer", for a
+	// launch-time form of Settings > Network and Hub > "Most the hub may do on this computer", for a
 	// machine nobody sits at (a container, a CI runner). Whoever starts the process is the
 	// machine's owner; the hub, a tunneled request and the API still cannot change the cap.
 	// Empty leaves the saved setting alone (view if none).

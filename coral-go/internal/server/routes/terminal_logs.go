@@ -16,7 +16,7 @@ import (
 )
 
 // The terminal logs of ended agents (#4447): since #4437 Kill keeps an agent's terminal log on both backends, so the only way to remove those logs
-// was to delete files by hand from the logs folder. Settings > Storage shows how many logs belong to agents that have ended and how big they are, and
+// was to delete files by hand from the logs folder. Settings > Storage and cleanup shows how many logs belong to agents that have ended and how big they are, and
 // the Operator can delete them after a confirmation. Never automatic. A log is an ended agent's only when the sessions database has that session,
 // of the same agent type, stopped, not sleeping (wake needs the log) and not archived; anything else, or anything the database cannot say, is kept.
 // Files are removed by exact name through safefs.Root, inside the logs folder only, never by a pattern.
