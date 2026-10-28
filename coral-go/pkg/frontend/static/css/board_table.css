@@ -15,7 +15,7 @@
 /* ── The table ── */
 .mb-table { padding: 0 0 0.75rem; }
 #mb-messages.mb-table { max-width: none; } /* the table fills the pane like the other team tabs (#8504); the 840px cap of #mb-messages is the Chat view's line length */
-.mb-table .mb-message { display: block; margin: 0 !important; padding: 0 !important; border-radius: 0; border-bottom: 1px solid var(--border); } /* !important: a phone's chat bubble has 8 px of margin and padding (mobile.css), which made a table row 61 px with a 69 px pitch, not one 44 px line (#9728) */
+.mb-table .mb-message { display: block; margin: 0; padding: 0; border-radius: 0; border-bottom: 1px solid var(--border); } /* a phone's chat-bubble margin and padding (mobile.css) skip table rows, so a row is the 44 px line without !important (#9741) */
 .mb-table .mb-queue-run { margin: 0; padding: 0.5rem 0.875rem; border-bottom: 1px solid var(--border); }
 
 /* The row's own header is the chat's: the table shows only the Select checkbox from it (the head says who and when, the actions are under the open message). */
