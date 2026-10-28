@@ -68,7 +68,7 @@
     <header class="top-bar">
         <div class="top-bar-brand">
             <button class="tablet-sidebar-toggle" data-on-click="m-toggle-tablet-sidebar" title="Toggle sidebar" aria-label="Toggle sidebar" aria-expanded="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
                     <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
                 </svg>
             </button>
@@ -100,11 +100,11 @@
             <!-- #5275: the auto-update control, hidden until update_ui.js finds an update staged and verified (and only with the flag on) -->
             <button type="button" class="update-pill" id="update-pill" aria-haspopup="dialog" hidden><span class="update-dot" aria-hidden="true"></span><span class="update-long">Update and relaunch</span><span class="update-age"></span></button>
             <button class="btn btn-quiet btn-icon btn-small top-bar-btn" data-on-click="m-go-home" title="Home" aria-label="Home"><span class="material-icons top-bar-icon" aria-hidden="true">home</span></button>
-            <button class="btn btn-quiet btn-icon btn-small top-bar-btn" id="panel-toggle-btn" data-on-click="m-toggle-agentic-panel" title="Files, tasks and notes" aria-label="Files, tasks and notes"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="12" rx="1.5"/><line x1="10" y1="2" x2="10" y2="14"/></svg></button>
+            <button class="btn btn-quiet btn-icon btn-small top-bar-btn" id="panel-toggle-btn" data-on-click="m-toggle-agentic-panel" title="Files, tasks and notes" aria-label="Files, tasks and notes"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="2" width="14" height="12" rx="1.5"/><line x1="10" y1="2" x2="10" y2="14"/></svg></button>
             <div class="top-bar-settings-wrapper">
                 <button class="btn btn-quiet btn-icon btn-small top-bar-btn" data-on-click="m-toggle-top-bar-settings" title="Menu" aria-label="Settings menu" aria-haspopup="menu" aria-expanded="false" aria-controls="top-bar-settings-menu">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
-                        stroke-linecap="round" stroke-linejoin="round">
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path
                             d="M6.7 1.4h2.6l.4 1.8.5.2 1.6-.9 1.8 1.8-.9 1.6.2.5 1.8.4v2.6l-1.8.4-.2.5.9 1.6-1.8 1.8-1.6-.9-.5.2-.4 1.8H6.7l-.4-1.8-.5-.2-1.6.9-1.8-1.8.9-1.6-.2-.5-1.8-.4V6.7l1.8-.4.2-.5-.9-1.6 1.8-1.8 1.6.9.5-.2z" />
                         <circle cx="8" cy="8" r="2.5" />
@@ -119,7 +119,7 @@
                     <div id="tier-badge" class="overflow-menu-tier" style="display:none"></div>
                     <hr class="overflow-menu-divider">
                     <button class="menu-item overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-theme-configurator">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5v13M1.5 8h13"/><path d="M3 3l10 10M13 3L3 13"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5v13M1.5 8h13"/><path d="M3 3l10 10M13 3L3 13"/></svg>
                         Themes
                     </button>
                     <button class="menu-item overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-shortcuts">
@@ -127,11 +127,11 @@
                         Keyboard shortcuts
                     </button>
                     <button class="menu-item overflow-menu-item" data-hub-only style="display:none" data-on-click="m-close-top-bar-settings-then-show-servers-modal">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><circle cx="4.5" cy="4.75" r=".6" fill="currentColor"/><circle cx="4.5" cy="11.25" r=".6" fill="currentColor"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><circle cx="4.5" cy="4.75" r=".6" fill="currentColor"/><circle cx="4.5" cy="11.25" r=".6" fill="currentColor"/></svg>
                         Servers
                     </button>
                     <button class="menu-item overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-settings-modal">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M6.7 1.4h2.6l.4 1.8.5.2 1.6-.9 1.8 1.8-.9 1.6.2.5 1.8.4v2.6l-1.8.4-.2.5.9 1.6-1.8 1.8-1.6-.9-.5.2-.4 1.8H6.7l-.4-1.8-.5-.2-1.6.9-1.8-1.8.9-1.6-.2-.5-1.8-.4V6.7l1.8-.4.2-.5-.9-1.6 1.8-1.8 1.6.9.5-.2z"/>
                             <circle cx="8" cy="8" r="2.5"/>
                         </svg>
@@ -139,15 +139,15 @@
                     </button>
                     <hr class="overflow-menu-divider">
                     <a class="menu-item overflow-menu-item" href="https://subgentic.github.io/coral/" target="_blank" rel="noopener">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 1.5h4.5a2 2 0 0 1 2 2v11a1.5 1.5 0 0 0-1.5-1.5H2z"/><path d="M14 1.5H9.5a2 2 0 0 0-2 2v11a1.5 1.5 0 0 1 1.5-1.5H14z"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 1.5h4.5a2 2 0 0 1 2 2v11a1.5 1.5 0 0 0-1.5-1.5H2z"/><path d="M14 1.5H9.5a2 2 0 0 0-2 2v11a1.5 1.5 0 0 1 1.5-1.5H14z"/></svg>
                         Documentation
                     </a>
                     <a class="menu-item overflow-menu-item" href="https://github.com/subgentic/coral" target="_blank" rel="noopener">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
                         GitHub
                     </a>
                     <button class="menu-item overflow-menu-item" data-local-only data-on-click="m-close-top-bar-settings-then-check-for-updates">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 4v4l2.5 2.5"/><path d="M5 1.5A6.5 6.5 0 0 1 14.5 8"/><path d="M14.5 4v4h-4"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 4v4l2.5 2.5"/><path d="M5 1.5A6.5 6.5 0 0 1 14.5 8"/><path d="M14.5 4v4h-4"/></svg>
                         Check for Updates
                     </button>
                     <!-- The running Coral's version (#4589 follow-up): plain text, not a menu item; filled from the server's status (version_line.js). -->
@@ -395,7 +395,7 @@
     <!-- Mobile Bottom Tab Bar (3 tabs: Agents, Chat, Board) -->
     <nav class="mobile-tab-bar" role="tablist" aria-label="Mobile navigation">
         <button class="mobile-tab active" data-tab="agents" data-on-click="m-switch-mobile-tab" data-arg="agents">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/>
                 <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
                 <path d="M17 11a4 4 0 0 1 4 4v2"/>
@@ -403,13 +403,13 @@
             Agents
         </button>
         <button class="mobile-tab" data-tab="chat" data-on-click="m-switch-mobile-tab" data-arg="chat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
             Chat
         </button>
         <button class="mobile-tab" data-tab="board" data-on-click="m-switch-mobile-tab" data-arg="board">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                 <circle cx="9" cy="7" r="4"/>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>

@@ -4,14 +4,14 @@
             <!-- Collapsed icon rail: expand button, one avatar per agent, new agent -->
             <div class="sidebar-rail" id="sidebar-rail">
                 <button class="btn btn-quiet btn-icon btn-small sidebar-rail-btn" type="button" data-on-click="sidebar-rail-toggle" title="Expand sidebar" aria-label="Expand sidebar">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M13 9l3 3-3 3"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M13 9l3 3-3 3"/></svg>
                 </button>
                 <button class="btn btn-quiet btn-icon btn-small sidebar-rail-btn" id="sidebar-rail-search" type="button" data-on-click="sidebar-search-focus" title="Search agents" aria-label="Search agents">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
                 </button>
                 <div class="sidebar-rail-list" id="sidebar-rail-list"></div>
                 <button class="btn btn-quiet btn-icon btn-small sidebar-rail-btn" id="sidebar-rail-new" type="button" data-on-click="launch-show" title="New agent (Alt+N)" aria-label="New agent">
-                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                 </button>
             </div>
 
@@ -111,7 +111,7 @@
                     </button>
                     <!-- last in the row: the collapsed rail has its own way back (Expand sidebar) -->
                     <button class="btn btn-quiet btn-icon sidebar-collapse-btn sidebar-hide-btn" {{ if eq . "agents" }}id="sidebar-collapse-btn" {{ end }}type="button" data-on-click="sidebar-rail-toggle" title="Hide the sidebar" aria-label="Hide the sidebar">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M16 9l-3 3 3 3"/></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M16 9l-3 3 3 3"/></svg>
                     </button>
                     {{ if eq . "agents" }}<span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>{{ end }}
                     {{ if ne . "automations" }}{{ if ne . "docs" }}{{ if ne . "tokens" }}<div class="list-display-panel" id="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
