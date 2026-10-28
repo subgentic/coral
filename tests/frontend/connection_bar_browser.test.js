@@ -32,7 +32,7 @@ const { safePaused } = require('./helpers/paused');
             const b = await bar();
             assert.equal(b.text, 'No connection, retrying', `${w}: the words: ${JSON.stringify(b)}`);
             assert.ok(b.inFlow && b.belowTop && b.shown && b.over <= 0 && b.right <= w, `${w}: in the page's flow, under the top bar, inside the screen: ${JSON.stringify(b)}`);
-            assert.equal(b.role, 'status', `${w}: a status, so a screen reader hears it`);
+            assert.equal(b.role, null, `${w}: not a live region itself: announceNotice says the words once (#10620)`);
             // the server is back: the next retry connects
             await ev(`window.WebSocket = window.__realWS; true`);
             await waitFor(`(document.getElementById('connection-bar') || {}).textContent === 'Back online' || !document.getElementById('connection-bar')`, `${w}: back online`, { timeout: 20000 });
