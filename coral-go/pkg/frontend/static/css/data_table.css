@@ -100,7 +100,9 @@
 .dt-last-run { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; } /* a failed run: its chip, then why in words (the Failed list, #9965) */
 .dt-last-run .dt-reason { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); }
 .dt-title-cell { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.dt-title-snippet { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); } /* a search hit's line of the chat (#10137) */
+.dt-title-snippet { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: var(--table-secondary-size, 0.85em); } /* a search hit's line of the chat, under the title: the title cell wraps it onto its own line (#10137, #10262: at 1280 it had no width beside the title and was 0 by 0) */
+.dt-title-cell:has(> .dt-title-snippet), .dt-one-line .dt-title-cell:has(> .dt-title-snippet) { flex-wrap: wrap; row-gap: 2px; }
+.dt-title-cell > .dt-title-snippet { order: 9; }
 .dt-id { flex: none; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
 .dt-tag { white-space: nowrap; border: 1px solid var(--table-outer); color: var(--table-secondary-color); } /* a tag is one line: a server called build-west was build- / west at 390 (#8220) */
 .dt-person { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
