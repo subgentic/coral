@@ -202,11 +202,16 @@ const HEALTH = {
             if (d && /busy/.test(d.className)) return true; window.__injectServers(); return false; })()`, 'm1 health', 8000);
         const rows = await ev(`[...document.querySelectorAll('#servers-view .cs-row')].map(r => {
             const dot = r.querySelector('.cs-title .machine-health-dot');
-            const c = document.getElementById(r.id + '-detail').querySelector('.machine-health-card'); // the card is in the row's details
-            return { id: r.dataset.id, label: dot && dot.getAttribute('aria-label'), dot: dot && dot.className,
-                card: c ? c.querySelector('.machine-health-status').textContent : null,
-                load: c && [...c.querySelectorAll('dt')].find(d => d.textContent === 'Load per core')?.nextElementSibling.textContent || null };
+            return { id: r.dataset.id, label: dot && dot.getAttribute('aria-label'), dot: dot && dot.className };
         })`);
+        for (const r of rows) { // the health card is in the machine's page (a row opens it, #9722): open, read, back
+            await ev(`document.querySelector('#servers-view .cs-row[data-id="${r.id}"] .cs-toggle').click(); true`);
+            await waitFor(`!!document.querySelector('#servers-view section.cs-page#server-row-${r.id}')`, `${r.id}'s page`, 4000);
+            Object.assign(r, await ev(`(() => { const c = document.querySelector('#server-row-${r.id} .machine-health-card'); return { card: c ? c.querySelector('.machine-health-status').textContent : null,
+                load: c && [...c.querySelectorAll('dt')].find(d => d.textContent === 'Load per core')?.nextElementSibling.textContent || null }; })()`));
+            await ev(`document.getElementById('servers-back').click(); true`);
+            await waitFor(`document.querySelectorAll('#servers-view .cs-row').length === 3`, 'the list is back', 4000);
+        }
         const by = Object.fromEntries(rows.map(r => [r.id, r]));
         assert.equal(by.m1.label, 'Box One health: Busy (CPU)');
         assert.match(by.m1.dot, /machine-health-busy/);

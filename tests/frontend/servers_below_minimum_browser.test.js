@@ -66,7 +66,17 @@ const CLOUD_PRELOAD = `(() => {
         console.log('1. The Servers list: the hint beside the machines that are below, nowhere else');
         await ev(`document.getElementById('nav-tab-servers').click(); true`);
         await waitFor(`document.querySelectorAll('#servers-view .cs-row').length === ${SERVERS.length}`, 'the server rows', 6000);
-        const hints = () => ev(`Object.fromEntries([...document.querySelectorAll('#servers-view .cs-row')].map(r => [r.dataset.id, [...document.getElementById(r.id + '-detail').querySelectorAll('.server-below-minimum')].map(n => ({ text: n.textContent, kids: n.children.length, links: n.querySelectorAll('a, img').length }))]))`);
+        const hints = async () => { // each machine's hint is in its page (a row opens it, #9722): open, read, back
+            const out = {};
+            for (const id of await ev(`[...document.querySelectorAll('#servers-view .cs-row')].map(r => r.dataset.id)`)) {
+                await ev(`document.querySelector('#servers-view .cs-row[data-id="${id}"] .cs-toggle').click(); true`);
+                await waitFor(`!!document.querySelector('#servers-view section.cs-page#server-row-${id}')`, `${id}'s page`, 4000);
+                out[id] = await ev(`[...document.querySelectorAll('#server-row-${id} .server-below-minimum')].map(n => ({ text: n.textContent, kids: n.children.length, links: n.querySelectorAll('a, img').length }))`);
+                await ev(`document.getElementById('servers-back').click(); true`);
+                await waitFor(`document.querySelectorAll('#servers-view .cs-row').length === ${SERVERS.length}`, 'the list is back', 4000);
+            }
+            return out;
+        };
         let h = await hints();
         assert.deepEqual(h.m1, [{ text: 'Update Coral to 1.4.61', kids: 0, links: 0 }], 'm1: below, with its minimum');
         assert.equal(h.m2.length, 1, 'm2: one hint');

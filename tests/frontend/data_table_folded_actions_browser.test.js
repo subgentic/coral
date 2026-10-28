@@ -1,3 +1,4 @@
+// (Moved with #9722: the Hub list's rows open a page and carry no actions; what is pinned here now is the name whole at 200% text. The paragraph below is the history this guard came from.)
 // A folded table row at large text keeps its name whole (#9430, #9427 finding 4): on a phone at 200% text the Servers page's first line held the name and two nowrap buttons (Rename, More) and left the name
 // about 70 px ("Unnamed server" read "Unnar"). The shared table's folded first line gives the name a room of its own (8 rem, which grows with the text): when the actions do not fit beside it they go under
 // the name. 390 px, touch, the root font at 32 px, the Hub page mode with two computers, one with no name; at normal text the row is unchanged (name and actions on one line). Drives Chrome over CDP.
@@ -41,11 +42,12 @@ const CLOUD_PRELOAD = `(() => { const inner = window.fetch; window.fetch = (url,
         await waitFor(`document.querySelectorAll('#servers-view .cs-row').length === ${SERVERS.length}`, 'the server rows', 8000);
         const geo = () => ev(`[...document.querySelectorAll('#servers-view .cs-row')].map(r => { const name = r.querySelector('.dt-primary, .cs-name'), btns = [...r.querySelectorAll('button')].filter(b => b.getClientRects().length && /Rename|More/.test(b.textContent)); return { name: name ? { w: Math.round(name.getBoundingClientRect().width), top: Math.round(name.getBoundingClientRect().top), clipped: name.scrollWidth > name.clientWidth + 1, text: name.textContent.trim() } : null, btns: btns.map(b => ({ t: b.textContent.trim(), top: Math.round(b.getBoundingClientRect().top) })) }; })`);
         const normal = await geo();
-        assert.ok(normal.every(r => r.name && !r.name.clipped && r.btns.length === 2 && Math.abs(r.btns[0].top - r.name.top) < 16), `at normal text the name and its actions are one line, as before: ${JSON.stringify(normal)}`);
+        // The Hub list's rows no longer carry Rename and More: a row opens the machine's page, where they are in the foot bar (#9722). So here the name has the row to itself; the name-and-actions line is not exercised by this page any more.
+        assert.ok(normal.every(r => r.name && !r.name.clipped && r.btns.length === 0), `at normal text the name is whole and no action sits beside it: ${JSON.stringify(normal)}`);
         await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(800);
         const large = await geo();
         assert.ok(large.every(r => r.name && !r.name.clipped && r.name.w >= 160), `at 200% text the name is whole, not "Unnar" (at least 160 px): ${JSON.stringify(large)}`);
-        assert.ok(large.every(r => r.btns.length === 2 && r.btns.every(b => b.top > r.name.top + 20)), `and the actions are on the line under it: ${JSON.stringify(large)}`);
+        assert.ok(large.every(r => r.btns.length === 0), `and still no action in the row: ${JSON.stringify(large)}`);
         assert.equal(await ev(`document.documentElement.scrollWidth <= window.innerWidth`), true, 'nothing wider than the screen');
         await shot('large');
         console.log('data_table_folded_actions: ok');
