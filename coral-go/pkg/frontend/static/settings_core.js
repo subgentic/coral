@@ -276,6 +276,19 @@ export function applyTheme(theme, { remember = true } = {}) {
     updateTerminalTheme();
 }
 
+/** The Settings dialog's theme list is a live preview (#10481, Beta): the page changes with the choice, before Save; Cancel or the close button puts the saved theme back (restoreSavedTheme). Nothing is remembered here. */
+export async function previewTheme(value) {
+    clearCustomThemeVars();
+    if (typeof value === "string" && value.startsWith("custom:")) await applyCustomThemeByName(value.slice("custom:".length));
+    else applyTheme(value || defaultThemeChoice(), { remember: false });
+}
+
+/** The theme the settings on file say, back on the page (a preview the person did not save). */
+export async function restoreSavedTheme() {
+    const s = state.settings || {};
+    await previewTheme(s.custom_theme ? `custom:${s.custom_theme}` : (s.theme || defaultThemeChoice()));
+}
+
 /** Remove all custom CSS variables from inline styles (reset before switching themes) */
 export function clearCustomThemeVars() {
     const style = document.documentElement.style;
