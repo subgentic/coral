@@ -63,8 +63,10 @@ func TestSentenceCaseTitles(t *testing.T) {
 		"agent ui":            "Agent UI",
 		"using the dashboard": "Using the dashboard",
 		"Coordination Efficiency Reporting & Metrics": "Coordination efficiency reporting & metrics",
-		"Merge queue": "Merge queue",
-		"Hooks":       "Hooks",
+		"Merge queue":  "Merge queue",
+		"How do I...?": "How do I...?", // the pronoun stays a capital (#10093)
+		"How Do I...?": "How do I...?",
+		"Hooks":        "Hooks",
 	} {
 		assert.Equal(t, want, sentenceCase(in), in)
 		assert.Equal(t, want, sentenceCase(want), "idempotent: "+want)
@@ -96,12 +98,12 @@ func TestTheDocsListUsesEachDocsOwnHeading(t *testing.T) {
 		// no word after the first starts upper case unless it is a proper noun, an acronym or carries a capital inside (the old title-casing made every word capital)
 		words := strings.Fields(d.Title)
 		for _, w := range words[1:] {
-			core := strings.Trim(w, "()[]{}:,;.&\"'`")
+			core := strings.Trim(w, "()[]{}:,;.?&\"'`")
 			if core == "" || core == strings.ToLower(core) {
 				continue
 			}
 			low := strings.ToLower(core)
-			assert.True(t, docProperNouns[low] != "" || docAcronyms[low] != "" || hasInnerCapital(core) || isAllUpper(core), "%s: %q looks title-cased in %q", d.Name, w, d.Title)
+			assert.True(t, core == "I" || docProperNouns[low] != "" || docAcronyms[low] != "" || hasInnerCapital(core) || isAllUpper(core), "%s: %q looks title-cased in %q", d.Name, w, d.Title)
 		}
 	}
 	assert.Equal(t, "Using the dashboard", byName["using-the-dashboard"])

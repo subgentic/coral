@@ -230,7 +230,7 @@ var (
 func sentenceCase(s string) string {
 	words := strings.Fields(s)
 	for i, w := range words {
-		core := strings.Trim(w, "()[]{}:,;.\"'`")
+		core := strings.Trim(w, "()[]{}:,;.?\"'`")
 		if core == "" {
 			continue
 		}
@@ -243,6 +243,8 @@ func sentenceCase(s string) string {
 func wordCase(core string, first bool) string {
 	low := strings.ToLower(core)
 	switch {
+	case core == "I":
+		return core // the pronoun ("How do I...?")
 	case docAcronyms[low] != "":
 		return docAcronyms[low]
 	case docProperNouns[low] != "":
