@@ -195,7 +195,7 @@ export function chatsSpec(key, ctx) {
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
             unread: s => IR.isUnread(readKind(s), readKey(s), stampOf(s)),
-            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)); return { unread: IR.isUnread(readKind(s), readKey(s), stampOf(s)), lead: { text: who, name: who, square: group }, title: who, live: s.active ? 'Active now' : '', snippet: group ? '' : historyLabel(s), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
+            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)); return { unread: IR.isUnread(readKind(s), readKey(s), stampOf(s)), lead: { text: who, name: who, square: group }, title: who, medium: true, live: s.active ? 'Active now' : '', snippet: group ? '' : historyLabel(s), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, extra, ctx.redraw) } },
             oneLine: true, resize: false, sortBar: false, // one line per chat, never folded (#8961, the shared one-row table of #8931): Server, then Agent drop as the box narrows; the role and the first message are in the chat that opens
             columns: [
