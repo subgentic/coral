@@ -1,0 +1,27 @@
+// What a new user meets in the New job dialog (Beta Tester pass 3, #9965): it opens on Agent prompt when the person has no workflow of their own, even though the seeded example workflow (its description
+// starts with Example) is in the list (point 2). Isolated dev server, 1280 px, the workflow list stubbed through fetch.
+const assert = require('node:assert/strict');
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        const openWith = async workflows => {
+            await ev(`window.__wfList = ${JSON.stringify(workflows)}; if (!window.__wfStub) { window.__wfStub = true; const real = window.fetch; window.fetch = (u, o) => { const url = String(u && u.url ? u.url : u); if (/\\/api\\/workflows$/.test(url)) return Promise.resolve(new Response(JSON.stringify({ workflows: window.__wfList }), { headers: { 'Content-Type': 'application/json' } })); return real(u, o); }; } true`);
+            await ev(`Promise.resolve(window.showJobModal()).then(() => true)`);
+            await waitFor(`!!document.getElementById('job-modal-workflow') && document.getElementById('job-modal-workflow').options.length > 0`, 'the workflow list', 8000);
+            await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: the dialog settles on its type after the list is read
+            const type = await ev(`(() => { const b = [...document.querySelectorAll('#job-type-toggle button')].find(x => x.getAttribute('aria-pressed') === 'true'); return b ? b.dataset.type : null; })()`);
+            await ev(`window.hideJobModal(); true`);
+            return type;
+        };
+        assert.equal(await openWith([]), 'prompt', 'no workflow at all: Agent prompt');
+        assert.equal(await openWith([{ id: 1, name: 'daily-motivation', description: 'Example: generates a motivational message and shows it as a popup', steps: [] }]), 'prompt', 'only the seeded example: Agent prompt');
+        assert.equal(await openWith([{ id: 1, name: 'daily-motivation', description: 'Example: generates a message', steps: [] }, { id: 2, name: 'nightly-build', description: 'Build and test', steps: [] }]), 'workflow', 'a workflow of the person\'s own: the Workflow choice stays');
+        console.log('PASS a new job opens on Agent prompt unless the person has a workflow of their own');
+    } finally { await client.close(); }
+})().catch(e => { console.error(e); process.exit(1); });
