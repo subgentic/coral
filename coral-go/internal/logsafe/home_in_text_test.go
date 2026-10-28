@@ -16,18 +16,18 @@ func TestHomeInTextWritesTheHomeFolderAsATilde(t *testing.T) {
 		"claude not found at /home/someone/bin/claude (PATH=/usr/bin)": "claude not found at ~/bin/claude (PATH=/usr/bin)",
 		"two: /home/someone/a and '/home/someone/b'":                   "two: ~/a and '~/b'",
 		"the folder /home/someone":                                     "the folder ~",
-		"/home/someone2/x is another person's":                         "/home/someone2/x is another person's",
+		"/home/someoneelse/x is another person's":                      "/home/someoneelse/x is another person's",
 		"/srv/home/someone/x":                                          "/srv/home/someone/x",
-		"/home/someone-else/x":                                         "/home/someone-else/x",
+		"/home/someone" + "-else/x":                                    "/home/someone" + "-else/x", // a dash goes on a name: another folder
 	} {
 		assert.Equal(t, want, homeInText(in, homes), in)
 	}
 	assert.Equal(t, "/x", homeInText("/x", []string{"", "/"}), "an empty or root home is not a folder to hide")
-	assert.Equal(t, "~/x ~/y", homeInText("/home/a/x /srv/b/y", []string{"/home/a", "/srv/b/"}), "each home, and a home written with a trailing slash")
+	assert.Equal(t, "~/x ~/y", homeInText("/home/ann/x /srv/bob/y", []string{"/home/ann", "/srv/bob/"}), "each home, and a home written with a trailing slash")
 }
 
 func TestHomeInTextUsesTheEnvironmentsHome(t *testing.T) {
-	t.Setenv("HOME", "/home/runner-someone")
+	t.Setenv("HOME", "/home/runner")
 	t.Setenv("USERPROFILE", "")
-	assert.Equal(t, "~/.local/bin/agy is not installed", HomeInText("/home/runner-someone/.local/bin/agy is not installed"))
+	assert.Equal(t, "~/.local/bin/agy is not installed", HomeInText("/home/runner/.local/bin/agy is not installed"))
 }
