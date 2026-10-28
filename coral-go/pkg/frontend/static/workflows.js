@@ -8,6 +8,7 @@ import { pollEvery } from './overload.js';
 import { note } from './nav.js';
 import { KILL_LOG_NOTE } from './render.js';
 import { compactDuration } from './format.js';
+import { keepMenuOnScreen } from './menu_fit.js';
 import { runFailureHtml, runFailure } from './run_failure.js';
 import { resultWords, limitWords, lastWords } from './job_words.js'; // the Jobs pages' words: one set for both
 import { foldWayBack } from './sidebar_groups.js';
@@ -431,7 +432,7 @@ registerActions({
     // Deleting still asks first (deleteWorkflow's confirmation dialog); the name is only shown in it.
     'wf-delete': el => withId(el.dataset.workflowId, id => deleteWorkflow(id, String(el.dataset.name || ''))),
     'wf-kill-run': el => withId(el.dataset.runId, confirmKillWorkflowRun),
-    'wf-more': el => { const menu = document.getElementById(el.getAttribute('aria-controls')); if (!menu) return; menu.hidden = !menu.hidden; el.setAttribute('aria-expanded', String(!menu.hidden)); }, // Delete sits behind More, as on a job's page (#7156)
+    'wf-more': el => { const menu = document.getElementById(el.getAttribute('aria-controls')); if (!menu) return; menu.hidden = !menu.hidden; el.setAttribute('aria-expanded', String(!menu.hidden)); keepMenuOnScreen(menu, el); }, // Delete sits behind More, as on a job's page (#7156)
     'wf-output-toggle': el => {
         const out = document.getElementById(el.getAttribute('aria-controls'));
         if (out) el.setAttribute('aria-expanded', String(out.classList.toggle('wf-expanded')));

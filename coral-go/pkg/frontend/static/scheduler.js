@@ -1,6 +1,7 @@
 /* Scheduler: scheduled jobs sidebar list, job detail view, and CRUD operations */
 
 import { isPhoneLayout } from './phone_layout.js';
+import { keepMenuOnScreen } from './menu_fit.js';
 import { state } from './state.js';
 import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent } from './utils.js';
 import { announceNotice } from './notifications.js';
@@ -349,6 +350,7 @@ function toggleJobMore(btn, open) {
     const to = open === undefined ? menu.hidden : open;
     menu.hidden = !to;
     btn.setAttribute('aria-expanded', String(to));
+    keepMenuOnScreen(menu, btn);
 }
 
 /** Read the jobs again now (the 30 s poll's own call; the tests ask it too). */
