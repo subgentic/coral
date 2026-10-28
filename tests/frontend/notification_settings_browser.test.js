@@ -35,6 +35,16 @@ const BASE = require('./test_base').BASE;
         assert.match(s.note, /blocks alerts from Coral/, 'the reason is there before the person even tries');
         assert.match(s.note, /site settings/, 'and where to change it');
         assert.deepEqual(s.kindsDisabled, [true, true, true], 'the kinds wait for alerts to be on');
+        // a phone has no address bar to look at: its browser's site settings are where the permission is (#10266)
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await open(); await ev(STUB('denied', 'denied')); await show();
+        s = await state();
+        assert.match(s.note, /blocks alerts from Coral/, '390: the reason is there');
+        assert.match(s.note, /site settings/, '390: and where to change it');
+        assert.doesNotMatch(s.note, /address bar/, '390: a phone says site settings, not the address bar');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await open(); await ev(STUB('denied', 'denied')); await show();
+        s = await state();
         await ev(`document.getElementById('settings-desktop-notify').click(); true`);
         await waitFor(`document.getElementById('settings-desktop-notify').checked === false && !document.getElementById('settings-desktop-blocked').hidden`, 'the switch back off, with the reason shown');
         assert.match((await state()).note, /Allow notifications for this site/);
