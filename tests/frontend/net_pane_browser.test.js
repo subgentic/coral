@@ -2,7 +2,7 @@
 //   the groups are sections with an h5 under the pane's h4 (#7282) (the headings list reads Remote access, [Setup code], Coral Hub, Manage other computers), Coral Hub first on a phone;
 //   Remote access turning on is an explicit act (it waits for Save and says what it then lets in); the setup code is there only while Remote access is on or a Coral Hub link is being made, is not on the screen
 //   until "Show setup code" (a button that says whether it is open), is spelled for a screen reader, is copied with "Copy setup code", and hides itself after a minute; "Manage other computers from this one" says
-//   a hub has full control of those computers; an Operator opt-out is still said on the card when the computer is not linked. 1280 and 390 px; both themes for contrast. Routes are stood in at the page's fetch.
+//   a hub controls those computers, and the switch says who can use that; an Operator opt-out is still said on the card when the computer is not linked. 1280 and 390 px; both themes for contrast. Routes are stood in at the page's fetch.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -67,7 +67,7 @@ const BASE = require('./test_base').BASE;
             const learn = await ev(`(() => { const t = (g, sel) => document.querySelector('#' + g + ' ' + sel).getBoundingClientRect().top; const m = document.getElementById('settings-hub-mode-enabled').closest('.sv-row'); const hl = document.querySelector('#net-group-hub .settings-learn').getBoundingClientRect(), hs = document.getElementById('settings-cloud-status').getBoundingClientRect(); return { hub: hl.top >= hs.top - 2 && hl.top < hs.bottom + 12 && hl.left >= hs.left, /* on the sentence's own line, or right under it where the pane is too narrow for both (#8276): no lone line and gap */ manage: m.querySelector('.sv-learn').getBoundingClientRect().top >= m.querySelector('.sv-help-text').getBoundingClientRect().top }; })()`);
             assert.deepEqual(learn, { hub: true, manage: true }, at + 'Learn more follows the short line: after the Coral Hub sentence on its line, under the Manage line');
             // 2. Manage other computers: its wording
-            assert.equal(await ev(`document.getElementById('settings-hub-mode-enabled').closest('.sv-row').querySelector('.sv-help-text').textContent.trim()`), 'Adds a Servers tab, with full control of those computers.', at + 'a hub has full control of what it manages, said where the switch is');
+            assert.equal(await ev(`document.getElementById('settings-hub-mode-enabled').closest('.sv-row').querySelector('.sv-help-text').textContent.trim()`), 'Adds a Servers tab; whoever signs in here controls every computer you add.', at + 'a hub has full control of what it manages, said where the switch is');
             assert.equal(await ev(`document.getElementById('settings-hub-mode-enabled').getAttribute('aria-labelledby')`), 'settings-hub-mode-label');
             assert.match(await ev(`document.getElementById('settings-hub-mode-enabled').getAttribute('aria-describedby')`), /settings-hub-mode-status/);
 

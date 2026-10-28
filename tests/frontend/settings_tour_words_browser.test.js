@@ -53,6 +53,10 @@ const BASE = require('./test_base').BASE;
         assert.ok((await options('settings-permission-mode')).includes('Bypass permissions (turns off safety checks)'), 'Agents: Bypass permissions says what it does');
         // END Agents
 
+        // PANE Network
+        assert.match(await row('settings-remote-access-enabled'), /Lets other devices control your agents; unencrypted unless TLS is set up\./, 'Network and Hub: Remote access says its risk before the switch');
+        assert.match(await row('settings-hub-mode-enabled'), /Adds a Servers tab; whoever signs in here controls every computer you add\./, 'Network and Hub: Manage other computers says its risk before the switch');
+        // END Network
         console.log('PASS Settings tour words');
     } finally { await client.close(); await guard.restore(); }
 })().catch(e => { console.error(e); process.exit(1); });
