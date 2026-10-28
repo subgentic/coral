@@ -3,6 +3,7 @@
 // A desktop keeps its table. 390 and 412 px with touch, isolated dev server, the Inbox's census world and two waiting agents.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { axName } = require('./helpers/ax_tree');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
@@ -47,6 +48,8 @@ const AGENTS = [
                 assert.ok(x.timeRight <= 16 && /ago|min|\d/.test(x.time), at + 'the time is at the right ' + JSON.stringify(x));
             }
             assert.ok(r.some(x => /^Wants to run: go test/.test(x.ask)) && r.some(x => x.ask && x.title === 'Agent Two'), at + 'the ask is the second line, the state when there is none ' + JSON.stringify(r));
+            await ev(`document.querySelectorAll('${T} tr.dt-mailed .dt-primary').forEach((b, i) => b.setAttribute('data-axp', String(i))); true`);
+            for (let i = 0; i < r.length; i++) { const ax = await axName(client, `[data-axp="${i}"]`), x = await ev(`document.querySelector('[data-axp="${i}"] .dt-mail-ask').textContent`); assert.ok(ax && ax.name.includes(`, ${x}`), at + `a Needs you row's button says what the agent asks, as Chrome computes it (#9747): "${ax && ax.name}" lacks "${x}"`); }
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
             // the marker's `since` is in the future: every seeded task counts as read, so the plain row is measured
             const readAs = since => ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: ${since}, items: {} })); true`);
