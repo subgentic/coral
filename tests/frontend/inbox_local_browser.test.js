@@ -183,6 +183,12 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         await ev(tabBtn('needs'));
         await settle(`/Nothing needs your input/.test(document.getElementById('group-table-view').textContent) && document.getElementById('group-table-view').getClientRects().length > 0`, 'the empty line');
+        check('and says what puts something there (a hint under the line, as Tasks and Saved have)', await ev(`/review artifact, appear here/.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`), await ev(`(document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || ''`));
+        await ev(tabBtn('goals'));
+        await settle(`/No open goals/.test(document.getElementById('group-table-view').textContent)`, 'the Goals empty line');
+        check('an empty Goals says where one is made', await ev(`/Goals tab has New goal/.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`), await ev(`(document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || ''`));
+        await ev(tabBtn('needs'));
+        await settle(`/Nothing needs your input/.test(document.getElementById('group-table-view').textContent)`, 'Needs you again');
         s = await state();
         check('with nothing waiting Needs you says so, the badge is empty, Saved for later still lists everything', s.needsEmpty && s.needs.length === 0 && s.navBadge === '' && s.navLabel === null, JSON.stringify([s.needsEmpty, s.needs, s.navBadge, s.navLabel]));
 
