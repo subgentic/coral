@@ -47,6 +47,11 @@ const BASE = require('./test_base').BASE;
         assert.match(await row('settings-debug-input-log'), /including anything typed or pasted, such as passwords/, 'Security: and that it records secrets');
         // END Security
 
+        // PANE Agents
+        assert.match(await row('settings-codex-trust-hooks'), /Skip Codex's review of Coral's hooks/, 'Agents: the switch names what it skips');
+        assert.match(await row('settings-codex-trust-hooks'), /Turns off a safety check/, 'Agents: and says it turns off a safety check');
+        assert.ok((await options('settings-permission-mode')).includes('Bypass permissions (turns off safety checks)'), 'Agents: Bypass permissions says what it does');
+        // END Agents
 
         console.log('PASS Settings tour words');
     } finally { await client.close(); await guard.restore(); }
