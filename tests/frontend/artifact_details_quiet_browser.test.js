@@ -61,6 +61,20 @@ const STUB = `(() => {
    assert.match(rest.name, /^Details for /, `${width}: the name stays`);
    assert.ok(rest.h >= (width === 390 ? 44 : 28) && rest.w >= (width === 390 ? 44 : 28), `${width}: the hit area stays: ` + JSON.stringify(rest));
    await shot(`details-rest-${width}`);
+   // the quiet glyph at rest is a graphic (WCAG 1.4.11): at least 3:1 against its row, in the dark and the light theme (#10492)
+   for (const theme of ['dark', 'light']) {
+      await setTheme(ev, theme);
+      const m = await ev(`(() => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const cx = cv.getContext('2d', { willReadFrequently: true });
+         const rgba = c => { cx.clearRect(0, 0, 1, 1); cx.fillStyle = '#000'; cx.fillStyle = c; cx.fillRect(0, 0, 1, 1); const d = cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+         const lum = c => { const t = c.slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2]; };
+         const b = document.querySelector('#agentic-panel-artifacts .artifact-details'); let bg = [0, 0, 0, 0]; const layers = []; for (let e = b; e; e = e.parentElement) { const c = rgba(getComputedStyle(e).backgroundColor); if (c[3] > 0) layers.push(c); if (c[3] >= 1) break; }
+         let base = [255, 255, 255, 1]; for (const c of layers.reverse()) base = [c[0] * c[3] + base[0] * (1 - c[3]), c[1] * c[3] + base[1] * (1 - c[3]), c[2] * c[3] + base[2] * (1 - c[3]), 1];
+         const fg = rgba(getComputedStyle(b).color), x = lum(fg), y = lum(base); return { ratio: Math.round((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05) * 100) / 100, fg, base }; })()`);
+      if (process.env.PROBE && theme === 'light') throw new Error('PROBE ' + theme + ' ' + JSON.stringify(m));
+      assert.ok(m.ratio >= 3, `${width}, ${theme}: the Details glyph at rest is at least 3:1 against its row: ` + JSON.stringify(m));
+      await shot(`details-rest-${width}-${theme}`);
+   }
+   await setTheme(ev, 'dark');
    if (width === 1280) {
       const c = await ev(`(() => { const b = document.querySelector('#agentic-panel-artifacts .artifact-details'); const row = b.closest('tr'); row.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return true; })()`);
       const pt = await ev(`(() => { const r = document.querySelector('#agentic-panel-artifacts tbody .dt-row .dt-primary').getBoundingClientRect(); return { x: Math.round(r.left + 6), y: Math.round(r.top + r.height / 2) }; })()`);
