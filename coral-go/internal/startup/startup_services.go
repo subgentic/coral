@@ -443,7 +443,7 @@ func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, 
 		}
 		return
 	}
-	log.Printf("[CLOUD] Coral Hub: %s (nothing is sent until this server is connected: Settings > Coral Hub)", hubURL)
+	log.Printf("[CLOUD] Coral Hub: %s (nothing is sent until this server is connected: Settings > Network and Hub)", hubURL)
 	safeGo(ctx, "cloud_connector", func() {
 		if !cfg.TermsViaHub { // a start that left its Terms to the Hub enrolled before anything started (hubTermsFirst), with this same credential
 			mgr.Bootstrap(ctx, ss, hostname, src)

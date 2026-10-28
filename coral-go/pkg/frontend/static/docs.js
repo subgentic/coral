@@ -26,7 +26,7 @@ let docsQuery = '';   // the sidebar search's text, lower case
 
 // ── Groups (#7443): Getting started and API ───────────────────────────
 // The list the server sends has no groups; these topics are the ones a new reader starts with, every other topic is the API.
-const GETTING_STARTED = new Set(['README', 'quickstart', 'using-the-dashboard', 'views', 'worked-demos', 'workflow-quickstart', 'troubleshooting']);
+const GETTING_STARTED = new Set(['README', 'quickstart', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting']);
 const DOC_GROUPS = [
     { key: 'getting-started', label: 'Getting started', has: d => GETTING_STARTED.has(d.name) },
     { key: 'api', label: 'API', has: d => !GETTING_STARTED.has(d.name) },

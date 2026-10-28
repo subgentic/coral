@@ -1,7 +1,7 @@
 # What the redactor recognises
 
 Coral removes secrets from a board reply, a stream or an event before it leaves this computer for a Coral Hub viewer, and from the lines of `coral.log`
-(Settings > Coral Hub, "Hide tokens from view-only hub users"). The replacement is `[redacted token]`. Three sources of rules run together,
+(Settings > Network and Hub, "Hide tokens from view-only hub users"). The replacement is `[redacted token]`. Three sources of rules run together,
 so a library update cannot take Coral's own away, and the text is checked a chunk at a time with a time budget: text that could not be checked in time is
 never passed on as it is.
 
@@ -37,7 +37,7 @@ costs more (about a third of the base speed).
 
 ## Turning the keyword rules off
 
-They are on whenever Coral is connected to Coral Hub. Two switches, both local: the setting `hub_redact_keywords` (Settings > Coral Hub, or `PUT /api/settings`
+They are on whenever Coral is connected to Coral Hub. Two switches, both local: the setting `hub_redact_keywords` (Settings > Network and Hub, or `PUT /api/settings`
 with `{"hub_redact_keywords": false}`; read on every reply) and the environment variable `CORAL_REDACT_KEYWORDS=off` (also `0`, `no`, `false`; read at every
 reply). Off, the hub's redactor is rules 1 and 2 only, and so is the scan of what is sent to another Coral. Coral Hub cannot change either: `PUT /api/settings` is never reachable through the tunnel.
 
