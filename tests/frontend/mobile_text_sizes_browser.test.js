@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
             box.innerHTML = '<p class="empty-state empty-state-tight">x</p><div class="cs-meta">x</div><h4 class="machine-health-title">x</h4><span class="machine-health-status">x</span><dl class="machine-health-grid"><dt>a</dt><dd>b</dd></dl>'; document.body.append(box);
             const px = sel => parseFloat(getComputedStyle(box.querySelector(sel)).fontSize); const out = { servers: { empty: px('.empty-state.empty-state-tight'), meta: px('.cs-meta'), healthTitle: px('.machine-health-title'), healthStatus: px('.machine-health-status'), healthDt: px('.machine-health-grid dt'), healthDd: px('.machine-health-grid dd') } };
             const q = sel => [...document.querySelectorAll(sel)].filter(e => e.getClientRects().length); const sizes = sel => q(sel).map(e => parseFloat(getComputedStyle(e).fontSize));
-            out.list = { count: sizes('.session-group-count'), name: sizes('.session-label'), chip: sizes('.session-state-pill'), n: q('.session-group-item').length }; // an agent row is one line: the dot, the name and at most one chip (#9686)
+            out.list = { count: sizes('.session-group-count'), name: sizes('.session-label'), chip: sizes('.session-state-pill'), status: [...document.querySelectorAll('.session-group-item .session-info')].map(e => parseFloat(getComputedStyle(e, '::after').fontSize)).filter(Boolean), n: q('.session-group-item').length }; // an agent row is one line: the dot, the name and at most one chip (#9686)
             out.over = document.documentElement.scrollWidth - innerWidth;
             out.offscreen = q('.session-group-item *').filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > innerWidth + 1 || r.left < -1); }).map(e => e.className.toString().slice(0, 40));
             box.remove(); return out; })()`);
@@ -41,8 +41,8 @@ const BASE = require('./test_base').BASE;
             const m = await probe();
             for (const [k, v] of Object.entries(m.servers)) assert.ok(v >= 13, `${w}: ${k} is ${v}px`);
             assert.ok(m.list.n >= 3, 'the agent rows are drawn: ' + JSON.stringify(m.list));
-            for (const k of ['count', 'name', 'chip']) for (const v of m.list[k]) assert.ok(v >= 13, `${w}: the agent list's ${k} is ${v}px`);
-            assert.ok(m.list.name.length >= 1 && m.list.chip.length >= 1, 'a name and the Needs input chip were measured, drawn (the row is the dot, the name and at most one chip: a chip nobody sees has no size to hold to 13 px; the seed has an agent that waits for input): ' + JSON.stringify(m.list));
+            for (const k of ['count', 'name', 'chip', 'status']) for (const v of m.list[k]) assert.ok(v >= 13, `${w}: the agent list's ${k} is ${v}px`);
+            assert.ok(m.list.name.length >= 1 && m.list.status.length >= 1, 'a name and its status line were measured, drawn (a state is a sentence under the name, the pill is hidden, #10691): ' + JSON.stringify(m.list));
             assert.ok(m.over <= 1, `${w}: nothing scrolls sideways (${m.over})`);
             assert.deepEqual(m.offscreen, [], `${w}: no part of a row is off the screen`);
         }
