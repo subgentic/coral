@@ -12,6 +12,7 @@ import { setAttr, setText } from './dom_write.js';
 import { sendRawKeys } from './controls.js';
 import { browserLocal } from './safe_storage.js';
 import { setTerminalKeysOpen } from './terminal_statusbar.js';
+import { cancelHeldForStop, hasHeldForStop } from './held_sends.js';
 
 const $ = id => document.getElementById(id);
 const STOP_AGAIN_MS = 3000;
@@ -81,6 +82,25 @@ function stopNowWanted({ working, text, pictures, viewOnly }) {
 }
 let stopNow = false;
 let escHeldUntil = 0;
+let stoppingTimer = 0;
+const STOPPING_MAX_MS = 15000;
+/** Stop was pressed (any of its three ways): the button greys and says "Stopping…" at once, and goes back when the agent is not working (said aloud: "The agent stopped"), or after a while if it still is (said too). */
+function markStopping() {
+    const pane = $('command-pane');
+    if (!pane || pane.getAttribute('data-stopping') === 'true') return;
+    pane.setAttribute('data-stopping', 'true');
+    const b = $('mobile-send-btn'); if (b && b.classList.contains('is-stop')) setAttr(b, 'aria-label', 'Stopping the agent');
+    clearTimeout(stoppingTimer);
+    stoppingTimer = setTimeout(() => endStopping('The agent is still working'), STOPPING_MAX_MS); // timeout-ok: the escape hatch if the agent never reports it stopped
+}
+function endStopping(words) {
+    clearTimeout(stoppingTimer);
+    const pane = $('command-pane');
+    if (!pane || pane.getAttribute('data-stopping') !== 'true') return;
+    pane.removeAttribute('data-stopping');
+    const b = $('mobile-send-btn'); if (b && b.classList.contains('is-stop')) setAttr(b, 'aria-label', 'Stop the agent');
+    if (words) say(words);
+}
 /** A desktop's chat has its Stop in the toolbar (the ■): it turns red and says Stop while stopNow, and Escape in the empty box presses it. */
 function paintStopNow(want) {
     stopNow = want;
@@ -128,7 +148,20 @@ export function syncAgentKeys(row) {
     const { text, pictures } = inputState();
     paintStop(stopWanted({ working: key === 'working', text, pictures, viewOnly, phone: isPhoneLayout() }));
     paintStopNow(stopNowWanted({ working: key === 'working', text, pictures, viewOnly }));
+    if (key !== 'working') { const note = stoppedNote; stoppedNote = ''; endStopping(note ? `The agent stopped. ${note}` : 'The agent stopped'); }
 }
+
+/** Stop: the held messages of this device are dropped first (their text back in the box), then the agent gets its Escape; what happened is said once it is known. Returns false when the Escape was not sent. */
+async function stopAgent(silentFail) {
+    markStopping();
+    const sid = last && last.session_id;
+    const back = sid && hasHeldForStop(sid) ? await cancelHeldForStop(sid) : 0;
+    const sent = await sendRawKeys(['Escape'], { silent: true });
+    if (sent === false) { endStopping(silentFail); return false; }
+    stoppedNote = back ? `${back === 1 ? 'The message' : `${back} messages`} that waited ${back === 1 ? 'was' : 'were'} not sent: back in the box.` : '';
+    return true;
+}
+let stoppedNote = '';
 
 registerActions({
     'agent-keys-toggle': () => {
@@ -143,7 +176,7 @@ registerActions({
         clearTimeout(stopTimer);
         stopTimer = setTimeout(() => { if (stopShown) btn.removeAttribute('aria-disabled'); stopHeldUntil = 0; }, STOP_AGAIN_MS); // timeout-ok: the second press is allowed again if nothing changed
         say('Stopping the agent');
-        const sent = await sendRawKeys(['Escape'], { silent: true });
+        const sent = await stopAgent('Stop was not sent: the agent is not taking input');
         if (sent === false) { // blocked (asleep, a Hub block, a pop-out) or refused: say so, and let the person press again at once
             say('Stop was not sent: the agent is not taking input');
             stopHeldUntil = 0; clearTimeout(stopTimer); btn.removeAttribute('aria-disabled');
@@ -175,6 +208,15 @@ if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true }); else wire();
 }
 
+// the desktop toolbar's Stop (the ■) is the Escape key button while it is red: pressing it is a stop
+document.addEventListener('click', e => {
+    if (!stopNow || !e.target || !e.target.closest || !e.target.closest('#command-pane .btn-esc')) return;
+    if (Date.now() < escHeldUntil) { e.stopPropagation(); e.preventDefault(); return; } // one is enough: a second interrupt quits the CLI
+    escHeldUntil = Date.now() + STOP_AGAIN_MS;
+    e.stopPropagation(); e.preventDefault(); // the button's own Escape is sent by stopAgent, after the held messages are dropped
+    stopAgent('Stop was not sent: the agent is not taking input');
+}, true);
+
 // Escape in the empty message box stops a working agent: what the CLI itself does; a typed message, an open menu or a mention list keep their own Escape.
 document.addEventListener('keydown', e => {
     if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
@@ -182,5 +224,5 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (Date.now() < escHeldUntil) return; // one is enough: a second interrupt quits the CLI
     escHeldUntil = Date.now() + STOP_AGAIN_MS;
-    sendRawKeys(['Escape'], { silent: true });
+    stopAgent('Stop was not sent: the agent is not taking input');
 });

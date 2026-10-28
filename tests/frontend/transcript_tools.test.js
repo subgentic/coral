@@ -237,7 +237,7 @@ async function run() {
   await ev(`document.getElementById('command-input').value = 'Then update the docs'; window.sendCommand(); true`);
   await until(`!!${C}.querySelector('.pending-queued .chat-bubble.pending')`, 'the queued bubble');
   const busy = await ev(`(() => { const q = ${C}.querySelector('.pending-queued .chat-bubble.pending'); const w = ${C}.querySelector(':scope > .chat-working'); return { label: q && q.querySelector('.pending-label').textContent, rowAbove: !!w && w.nextElementSibling === q.parentElement }; })()`);
-  check('a message sent while the agent is working is Queued, below the Working row', busy.label === 'Queued' && busy.rowAbove, JSON.stringify(busy));
+  check('a message sent while the agent is working says it waits for the agent to finish, below the Working row', busy.label === 'Waiting for the agent to finish' && busy.rowAbove, JSON.stringify(busy));
 
   // Esc: the interrupt shows as a note, and the queued message is now being worked on
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(st => { const r = st.state.liveSessions.find(s => s.session_id === ${JSON.stringify(SID)}); r.working = false; r.awaiting_user = true; window.__msgs.push({ type: 'user', content: '[Request interrupted by user]', timestamp: new Date().toISOString() }); return true; })`);

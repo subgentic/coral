@@ -420,7 +420,7 @@ function syncPendingGroup(container, cls, items, label) {
     // "2 queued" is a line of text in the list (a phone shows it; the per-message labels go then), not a ::before: assistive technology reads text, not generated content (#6737)
     if (cls === "pending-queued") {
         let c = wrap.querySelector(":scope > .pending-count");
-        const said = items.length > 1 ? `${items.length} queued` : "";
+        const said = items.length > 1 ? `${items.length} waiting for the agent` : "";
         if (said) {
             if (!c) { c = document.createElement("div"); c.className = "pending-count"; wrap.prepend(c); }
             if (c.textContent !== said) c.textContent = said;
@@ -446,7 +446,7 @@ export function syncPendingBubbles(container, sessionId) {
     pendingBySession.set(sessionId, list);
     savePendingToStorage();
     const sent = syncPendingGroup(container, "pending-sent", list.filter(p => !p.queued && !p.sending && !p.unanswered), "Sent");
-    const queued = syncPendingGroup(container, "pending-queued", list.filter(p => p.queued && !p.sending && !p.unanswered), "Queued");
+    const queued = syncPendingGroup(container, "pending-queued", list.filter(p => p.queued && !p.sending && !p.unanswered), "Waiting for the agent to finish");
     const sending = syncPendingGroup(container, "pending-sending", list.filter(p => p.sending && !p.unanswered), "Sending…");
     const unanswered = syncPendingGroup(container, "pending-unanswered", list.filter(p => p.unanswered), "Not answered");
     // Always last, below any newly rendered messages: not answered (the agent ended), sent, then queued, then the ones still sending

@@ -1312,7 +1312,7 @@
     .mobile-send-btn.is-stop { background: var(--danger); color: var(--text-on-accent); border-radius: var(--radius-xl); margin-left: 4px; } /* a rounded square, 10 px from the team button: not the same round blue as its neighbour */
     .mobile-send-btn.is-stop .send-icon { display: none; }
     .mobile-send-btn.is-stop .stop-icon { display: block; }
-    .mobile-send-btn.is-stop[aria-disabled="true"] { opacity: .6; }
+    #command-pane[data-stopping="true"] .mobile-send-btn.is-stop { background: var(--bg-tertiary); color: var(--text-secondary); opacity: 1; }
     .command-pane.hub-view-only .keys-chip { display: none !important; }
 }
 
