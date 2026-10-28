@@ -141,3 +141,46 @@ func TestOneshotRuns(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, jobs) // sentinel excluded
 }
+
+// #10021: a run's error text is read by whoever may see the run (Hub viewers included), so the home folder is written as "~" in it, whichever way the text is stored.
+func TestRunErrorTextsHideTheHomeFolder(t *testing.T) {
+	t.Setenv("HOME", "/home/someone")
+	t.Setenv("USERPROFILE", "")
+	db := openTestDB(t)
+	s := NewScheduleStore(db)
+	ws := NewWorkflowStore(db)
+	ctx := context.Background()
+	const raw, want = "/home/someone/.local/bin/claude is not installed", "~/.local/bin/claude is not installed"
+
+	job, err := s.CreateScheduledJob(ctx, &ScheduledJob{Name: "j", CronExpr: "* * * * *", RepoPath: "/tmp", Prompt: "p", Enabled: 1})
+	require.NoError(t, err)
+	runID, err := s.CreateScheduledRun(ctx, job.ID, "2026-01-01T00:00:00Z", "pending")
+	require.NoError(t, err)
+	require.NoError(t, s.UpdateScheduledRun(ctx, runID, map[string]interface{}{"status": "failed", "error_msg": raw, "exit_reason": raw}))
+	run, err := s.GetScheduledRun(ctx, runID)
+	require.NoError(t, err)
+	require.NotNil(t, run.ErrorMsg)
+	assert.Equal(t, want, *run.ErrorMsg)
+	assert.Equal(t, want, *run.ExitReason)
+
+	second, err := s.CreateScheduledRun(ctx, job.ID, "2026-01-02T00:00:00Z", "running")
+	require.NoError(t, err)
+	ok, err := s.FinishScheduledRunIfActive(ctx, second, "failed", raw, raw, "code", "2026-01-02T00:01:00Z")
+	require.NoError(t, err)
+	require.True(t, ok)
+	run, err = s.GetScheduledRun(ctx, second)
+	require.NoError(t, err)
+	assert.Equal(t, want, *run.ErrorMsg)
+	assert.Equal(t, want, *run.ExitReason)
+
+	wf, err := ws.CreateWorkflow(ctx, &Workflow{Name: "w", StepsJSON: `[{"name":"s","type":"shell","command":"true"}]`, RepoPath: "/tmp", Enabled: 1})
+	require.NoError(t, err)
+	wr, err := ws.CreateWorkflowRun(ctx, wf.ID, "api", nil)
+	require.NoError(t, err)
+	msg := raw
+	require.NoError(t, ws.SetRunStatus(ctx, wr.ID, "failed", &msg))
+	got, err := ws.GetWorkflowRunDirect(ctx, wr.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got.ErrorMsg)
+	assert.Equal(t, want, *got.ErrorMsg)
+}

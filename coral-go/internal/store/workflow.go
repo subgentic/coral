@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/ptr"
 )
 
@@ -348,6 +349,7 @@ func (s *WorkflowStore) GetWorkflowRun(ctx context.Context, runID int64) (*Workf
 
 // UpdateWorkflowRun updates allowed fields on a run.
 func (s *WorkflowStore) UpdateWorkflowRun(ctx context.Context, runID int64, fields map[string]interface{}) error {
+	quietRunText(fields)
 	return dynamicUpdate(ctx, s.db, "workflow_runs", runID, fields, map[string]bool{
 		"status": true, "current_step": true, "step_results": true,
 		"worktree_path": true, "started_at": true, "finished_at": true,
@@ -457,6 +459,10 @@ func (s *WorkflowStore) GetActiveRunsForWorkflow(ctx context.Context, workflowID
 // Timestamps are set conditionally to avoid overwriting on repeated calls.
 func (s *WorkflowStore) SetRunStatus(ctx context.Context, runID int64, status string, errorMsg *string) error {
 	now := nowUTC()
+	if errorMsg != nil {
+		t := logsafe.HomeInText(*errorMsg)
+		errorMsg = &t
+	}
 
 	switch status {
 	case "running":
@@ -498,7 +504,7 @@ func IsSignInRefusalCode(code string) bool {
 func (s *WorkflowStore) SetRunSignInRefused(ctx context.Context, runID int64, errorMsg, code, agentType string) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE workflow_runs SET status = 'failed', finished_at = COALESCE(finished_at, ?), error_msg = ?, error_code = ?, agent_type = ? WHERE id = ?`,
-		nowUTC(), errorMsg, code, agentType, runID)
+		nowUTC(), logsafe.HomeInText(errorMsg), code, agentType, runID)
 	return err
 }
 
