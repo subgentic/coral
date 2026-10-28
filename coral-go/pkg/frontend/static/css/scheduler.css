@@ -220,14 +220,13 @@
     .sched-back { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); margin: 0 0 4px; }
 }
 
-/* Automations' create actions on the folder toolbar (Goal #74): the words at 1280; on a phone one 44 px "+" (or the agent icon), named whole for assistive technology (UI/UX #8862, Phone). */
+/* Automations' create actions on the folder toolbar (Goal #74): the words at 1280; on a phone too (#10275, Mobile pass 19: a bare "+" and a robot said nothing to a person looking at them), after a "+", on a row of their own under the search. */
 .automations-create { display: inline-flex; align-items: center; gap: 8px; }
 /* Recent runs (#9296): the dot before a run's name until it is opened, in the Inbox badge's red; the name carries "Not opened" for assistive technology. */
 .automations-unread { display: inline-block; flex: none; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--rail-badge-unread); vertical-align: middle; }
 .automations-act:not(.automations-act-icon)::before { content: "+"; display: none; font-size: var(--fs-2xl); line-height: 1; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .automations-create { gap: 4px; }
-    .automations-act { display: inline-flex; align-items: center; justify-content: center; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); padding: 0; }
-    .automations-act .automations-act-text { display: none; }
+    .automations-create { gap: 8px; flex: 1 1 100%; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; flex-wrap: wrap; justify-content: flex-start; margin-left: 0; }
+    .automations-act { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); padding: 0 14px; }
     .automations-act:not(.automations-act-icon)::before { display: inline; }
 }

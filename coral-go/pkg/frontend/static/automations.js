@@ -164,6 +164,15 @@ const lastRunCell = i => {
 const workflowResult = i => W.lastResult(i.run);
 /** A row's name button: the name is the one line; what the item is or runs is its tooltip (the page has it in full). */
 const nameButton = (i, what) => { const b = DT.primaryButton(i.name); if (what) b.title = `${i.name} \u2014 ${what}`; return b; };
+/** A job's Last run; a paused job also says Paused beside it when its Next column (where the chip is) has gone, in a narrow list (#10275: a phone's Jobs list did not say which job was paused). */
+const jobLastCell = i => {
+    const base = lastRunCell(i);
+    if (i.enabled) return base;
+    const cell = DT.el('span', 'dt-title-cell'), chip = DT.chip('Paused');
+    chip.classList.replace('dt-chip', 'dt-paused-name'); // not a .dt-chip: the Last run and Next columns' chips are what the table's own tests count
+    cell.append(base, chip);
+    return cell;
+};
 const KIND_WORD = { job: 'Job', workflow: 'Workflow', run: 'One-off' };
 const itemKey = i => (i.kind === 'run' ? i.id : `${i.kind}-${i.id}`); // a job and a workflow can share a number
 const scheduleWords = i => (i.kind === 'job' ? scheduleOf(i.job) : 'No schedule');
@@ -250,11 +259,11 @@ function folderTable(key) {
     if (key === 'jobs') {
         return { ...base, signature: JSON.stringify([_gone, !!firstRun().cards, rows.map(i => [i.job, lastWords(i.run), nextOf(i.job), runsWords(i)])]),
             node: () => DT.dataTable({
-                label: `Jobs, ${rows.length}`, rows, oneLine: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
+                label: `Jobs, ${rows.length}`, rows, oneLine: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
                 columns: [ // one line a row (Goal #79): what the job runs is the name's tooltip and its page's; a narrow list drops Schedule, then Next (dropAt, #8931)
                     { key: 'job', label: 'Job', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, runsWords(i)) },
                     { key: 'schedule', label: 'Schedule', width: '12rem', dropAt: 36, sort: true, sortValue: i => scheduleOf(i.job), cell: i => scheduleOf(i.job) },
-                    { key: 'last-run', label: 'Last run', width: '12rem', dropAt: 16, tone: 'tertiary', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: lastRunCell },
+                    { key: 'last-run', label: 'Last run', width: '12rem', dropAt: 16, tone: 'tertiary', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: jobLastCell },
                     { key: 'next', label: 'Next', width: '7rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => (i.enabled ? i.job.next_fire_at : ''), cell: i => {
                         const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip('Paused');
                         if (i.enabled && i.job.next_fire_at) { cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`; cell.append(DT.el('span', 'sr-only', `, next run ${atWords(i.job.next_fire_at)} your time`)); } // also as text (#9117)
@@ -265,7 +274,7 @@ function folderTable(key) {
     }
     return { ...base, signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.wf, i.usedBy, workflowResult(i)])]),
         node: () => DT.dataTable({
-            label: `Workflows, ${rows.length}`, rows, oneLine: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
+            label: `Workflows, ${rows.length}`, rows, oneLine: true, wrapNames: true, rowKey: i => i.id, rowName: i => i.name, state: stateOf(key), open: i => openRow(key, i),
             columns: [ // one line a row (Goal #79): the description is the name's tooltip and the page's; a narrow list drops Steps, then Used by (dropAt, #8931)
                 { key: 'workflow', label: 'Workflow', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, i.does) },
                 { key: 'steps', label: 'Steps', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'number', sortValue: i => i.stepCount, cell: stepsWords },

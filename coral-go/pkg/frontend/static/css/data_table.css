@@ -364,6 +364,8 @@
 @container (max-width: 36rem) { .dt-one-line [data-drop-at="36"] { display: none; } }
 @container (max-width: 28rem) { .dt-one-line [data-drop-at="28"] { display: none; } }
 @container (max-width: 16rem) { .dt-one-line [data-drop-at="16"] { display: none; } } /* a phone at 200% text (355 px is 11 rem): the name keeps the row, the Last run column gives way (run 154c) */
+@container (max-width: 36rem) { .dt-one-line.dt-wrap-names .dt-td { white-space: normal; text-overflow: clip; } .dt-box.dt-one-line.dt-wrap-names .dt-primary { display: block; white-space: normal; text-overflow: clip; overflow-wrap: break-word; text-align: left; } } /* Automations (#10275): a long name wraps at its words in a narrow list, not cut mid-word */
+.dt-paused-name { display: none; flex: none; } @container (max-width: 28rem) { .dt-one-line .dt-paused-name { display: inline-flex; } } /* a paused job says so beside its name when the Next column (with the same chip) is gone (#10275) */
 
 .dt-one-line .dt-title-cell { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; min-width: 0; }
 .dt-one-line .team-artifact-badge { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; max-width: 45%; }
