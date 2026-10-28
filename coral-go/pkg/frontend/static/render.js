@@ -468,7 +468,7 @@ registerActions({
     'team-header-key': (el, event) => window.teamHeaderKey(event, el),
     'team-name-open': el => { const b = textOf(el.dataset.board); if (b) window.openTeamPage(b); },
     'group-chevron': (el, event) => { event.stopPropagation(); const g = textOf(el.dataset.group); if (g) window.toggleGroupCollapse(g); },
-    'group-more-expand': el => { const g = textOf(el.dataset.group); if (g) { const k = `coral-more-expanded:${g}`; browserLocal.set(k, browserLocal.get(k) === 'true' ? 'false' : 'true'); redrawLiveList(); } }, // a folder's "Show 19 more" (#10319)
+    'group-more-expand': el => { const g = textOf(el.dataset.group); if (g) { const k = `coral-more-expanded:${g}`; browserLocal.set(k, browserLocal.get(k) === 'true' ? 'false' : 'true'); redrawLiveList(); requestAnimationFrame(() => requestAnimationFrame(() => [...document.querySelectorAll('.folder-more-row')].find(r => r.dataset.group === g)?.querySelector('.row-btn')?.focus({ preventScroll: true }))); } }, // a folder's "Show 19 more" (#10319): the keyboard stays on that row once the list is drawn again
     'group-sleeping-expand': el => { const g = textOf(el.dataset.group); if (g) window.expandSleepingGroup(g); },
     'archived-toggle': () => window.toggleArchivedSection(),
     'folder-tag': menu(el => { const g = textOf(el.dataset.group); if (g) window.showFolderTagDropdown(g, el.closest('.session-group-header')); }),

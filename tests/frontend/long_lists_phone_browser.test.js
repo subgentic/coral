@@ -22,8 +22,10 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.querySelectorAll('.session-group-item[data-session-id]').length > 0`, 'rows ' + await ev(`JSON.stringify([[...document.querySelectorAll('.session-group-header')].map(h => h.textContent.trim().slice(0, 40)), document.querySelectorAll('.session-group-item').length])`), 8000);
         assert.equal(await rows(), 5, 'a long folder shows its first 5 ' + await ev(`JSON.stringify([document.querySelectorAll('.session-group-item[data-session-id]').length, [...document.querySelectorAll('.session-group-header')].map(h => h.textContent.trim().slice(0, 30)), [...document.querySelectorAll('.session-group-item')].slice(0, 3).map(r => r.closest('ul') && r.closest('ul').id)])`));
         assert.equal(await more(), 'Show 19 more', 'and says how many more');
+        await ev(`document.querySelector('.folder-more-row .row-btn').focus(); true`);
         await ev(`document.querySelector('.folder-more-row .row-btn').click(); true`);
         await waitFor(`document.querySelectorAll('.session-group-item[data-session-id]').length === 24`, 'all 24 after Show more', 5000);
+        await waitFor(`!!document.activeElement && document.activeElement.closest('.folder-more-row') !== null`, 'the keyboard stays on the Show fewer row after the redraw', 5000);
         assert.equal(await more(), 'Show fewer', 'it can be folded again');
         await ev(`document.querySelector('.folder-more-row .row-btn').click(); true`);
         await waitFor(`document.querySelectorAll('.session-group-item[data-session-id]').length === 5`, 'folded again', 5000);
@@ -31,6 +33,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.selectLiveSession('many', 'claude', 'many-20-id', 'local'); true`); await sleep(800); // sleep-ok: the list redraws over frames
         await ev(`Promise.all([import((window.__coralStatic || '/static/') + 'render.js'), import((window.__coralStatic || '/static/') + 'state.js')]).then(([r, st]) => { r.renderLiveSessions(st.state.liveSessions); return true; })`);
         assert.equal(await ev(`!!document.querySelector('.session-group-item[data-session-id="many-20-id"]')`), true, 'the open agent is listed though it is the 21st');
+        assert.equal(await more(), 'Show 18 more', 'the open agent is in view, so 18 are hidden, not 19');
 
         // the Inbox's chat folders say how many they hold
         await ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => m.loadChatCounts ? m.loadChatCounts() : null).then(() => true)`).catch(() => {});
