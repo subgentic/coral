@@ -29,6 +29,11 @@ const BASE = require('./test_base').BASE;
             await leave(); await ev(`window.__waiting = ['qa-a-id']; true`); await refresh(); await settle(300);
             await open();
             assert.equal(await group(), 'hub-inbox:needs', `${label}: something waits for the person: the Inbox reopens on Needs you, not on Tasks`);
+            // nothing waits again: the folder from before Needs you was opened for the person comes back (Needs you was chosen for them, not by them)
+            await leave(); await ev(`window.__waiting = []; true`); await refresh(); await settle(300);
+            assert.equal(await ev(`localStorage.getItem('coral.inbox.tab')`), 'tasks', `${label}: Needs you opened for the person is not the remembered folder`);
+            await open();
+            assert.equal(await group(), 'hub-inbox:tasks', `${label}: nothing waits again: the Inbox reopens on Tasks, not on an empty Needs you`);
             // a link to a folder still opens that folder
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`); await settle(500);
             assert.equal(await group(), 'hub-inbox:tasks', `${label}: a chosen folder opens`);

@@ -611,11 +611,11 @@ registerGroupSource('hub-inbox', {
 });
 
 /** Which group is on screen: the search box is named for it and holds its text, and Display options (Saved's Filters and Sort) is there for Saved only. */
-function setGroup(key) {
+function setGroup(key, { auto = false } = {}) {
     if (!groupMeta(key)) key = 'needs';
     const was = group;
     group = key;
-    browserLocal.set(GROUP_KEY, key);
+    if (!auto) { _autoFrom = ''; browserLocal.set(GROUP_KEY, key); } // a folder the person chose is the remembered one; Needs you opened for them (auto) is not (#10212)
     const input = $('inbox-search'), g = groupMeta(key);
     if (input) {
         const text = key === 'saved' ? (saved.savedView().query || queries.saved) : (queries[key] || '');
@@ -637,7 +637,7 @@ onViewShown(id => {
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return;
     if (id === 'group-table-view') {
         const g = ($('group-table-view')?.dataset.group || '').split(':');
-        if (g[0] === 'hub-inbox') setGroup(g[1]);
+        if (g[0] === 'hub-inbox' && g[1] !== group) setGroup(g[1]); // a table that is already the group on screen sets nothing again (it would store Needs you, opened for the person, as the remembered folder, #10212)
         if (page) { goalMount?.dispose(); goalMount = null; page = null; $('inbox-page').hidden = true; $('inbox-view')?.removeAttribute('data-phone-item'); renderInboxNav(true); }
     }
 });
@@ -746,9 +746,11 @@ function closePage(openTable = true, focusBack = false) {
 
 // ── The tab ──────────────────────────────────────────────────────────────
 let _mounted = false;
-/** Called by switchNavTab('hub-inbox') (where the dashboard builds its own Inbox): the lists are read again and the group last on screen opens as a table (a phone shows the list). */
 let _wasShown = false; // the Inbox tab is on screen: cleared when another tab is (below), so the next show is a reopen
+let _autoFrom = ''; // the folder that was open before Needs you was opened for the person (#10205): it is the remembered one, and comes back when nothing waits again
+/** Called by switchNavTab('hub-inbox') (where the dashboard builds its own Inbox): the lists are read again and the group last on screen opens as a table (a phone shows the list). */
 export async function showInbox({ folder = '', quiet = false } = {}) {
+    let auto = false; // Needs you was chosen for the person: it is not stored as the remembered folder
     if (!_mounted) {
         _mounted = true;
         new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') _wasShown = false; }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
@@ -760,9 +762,12 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     }
     $('inbox-local').hidden = false;
     if (folder && groupMeta(folder)) { closePage(false); page = null; $('inbox-page') && ($('inbox-page').hidden = true); group = folder; } // a link to a folder: the folder, not the page that was open
-    else if (!_wasShown && !page && !nativeInbox() && countOf('needs') > 0) group = 'needs'; // a reopen with something waiting for the person: Needs you first, not the folder last on screen (#10205); with nothing waiting the remembered folder stays
+    else if (!_wasShown && !page && !nativeInbox()) { // a reopen: with something waiting for the person, Needs you first, not the folder last on screen (#10205); with nothing waiting again, the folder that was open before it
+        if (countOf('needs') > 0) { if (group !== 'needs') { _autoFrom = group; group = 'needs'; auto = true; } else if (_autoFrom) auto = true; }
+        else if (_autoFrom && group === 'needs') { group = _autoFrom; _autoFrom = ''; }
+    }
     _wasShown = true;
-    setGroup(group);
+    setGroup(group, { auto });
     renderInboxNav(true);
     CH.loadChatCounts(() => renderInboxNav(true));
     refreshBoards(); // the phone drawer's Boards group
