@@ -1899,6 +1899,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 #settings-modal input:disabled, #settings-modal select:disabled { opacity: .6; cursor: not-allowed; }
 .settings-hint[data-state="warn"], .settings-hint [data-state="warn"] { color: var(--warning); }
 .settings-hint[data-state="error"] { color: var(--danger); }
+#verify-all-btn[aria-disabled="true"] { opacity: .6; cursor: default; } /* checking: not disabled, so the keyboard stays on it (#10693) */
 .cli-verify-result {
     font-size: var(--fs-base);
     flex-shrink: 0;
