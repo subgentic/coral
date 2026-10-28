@@ -39,23 +39,36 @@ function loadDocText() {
     if (!docTextLoad) docTextLoad = Promise.all(docsList.map(async d => { const c = await fetchDocContent(d.name); if (c && c.content) { docRaw.set(d.name, String(c.content)); docText.set(d.name, String(c.content).toLowerCase()); } })).then(() => { docTextReady = true; });
     return docTextLoad;
 }
-// The search (#10093): the words may come in any order (every word must be in the topic's title or text), and the topics whose TITLE has them come first, then the ones with a word in the title, then the text-only hits.
-const queryWords = () => docsQuery.split(/\s+/).filter(Boolean);
+// The search (#10093, #10484): small words are dropped (how, do, I, to, the, on, my, use ... say nothing about which topic), the words may come in any order, a topic with ANY of the remaining words is a hit, and the
+// topics are ranked: "How do I...?" first, then the topics whose TITLE has all the words, then some of them, then the text-only hits; within a rank the topic with more of the words comes first.
+const SMALL_WORDS = new Set(['a', 'an', 'the', 'on', 'my', 'use', 'to', 'of', 'in', 'for', 'do', 'does', 'i', 'is', 'it', 'and', 'or', 'how', 'can', 'with', 'me', 'we', 'you', 'your', 'this', 'that', 'at', 'by', 'be', 'are', 'what', 'where', 'when', 'which', 'from', 'as', 'if', 'so']);
+const queryWords = () => { const all = docsQuery.split(/\s+/).filter(Boolean), kept = all.filter(w => !SMALL_WORDS.has(w)); return kept.length ? kept : all; }; // a search of nothing but small words ("how do i") still searches them
 function hitOf(d) {
-    const words = queryWords(); if (!words.length) return { rank: 0 };
+    const words = queryWords(); if (!words.length) return { rank: 0, titleAll: true };
     const title = `${titleOf(d)} ${d.name}`.toLowerCase(), body = docText.get(d.name) || '';
-    if (!words.every(w => title.includes(w) || body.includes(w))) return null;
-    return { rank: words.every(w => title.includes(w)) ? 0 : words.some(w => title.includes(w)) ? 1 : 2 };
+    const found = words.filter(w => title.includes(w) || body.includes(w));
+    if (!found.length) return null;
+    const titleAll = words.every(w => title.includes(w)), base = d.name === 'how-do-i' ? -1 : titleAll ? 0 : words.some(w => title.includes(w)) ? 1 : 2;
+    return { rank: base + (words.length - found.length) / 100, titleAll };
 }
-/** What matched, for a hit that is in the topic's text and not all in its title: about a line of the text around the first word found, without the Markdown marks. '' for a title hit (its summary shows). */
+/** The sentence of a topic's text that has the most of the query's words (the first, when two have as many), without the Markdown marks, cut to about 180 characters around the first word found; '' when no word is in the text. */
+function hitSentence(name) {
+    const words = queryWords(), raw = docRaw.get(name) || '';
+    if (!words.length || !raw) return '';
+    let best = '', most = 0;
+    for (const part of raw.split(/(?<=[.!?])\s+|\n+/)) {
+        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/[`*_|\[\]]+/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
+        const n = words.filter(w => low.includes(w)).length;
+        if (n > most) { most = n; best = text; }
+    }
+    if (best.length <= 180) return best;
+    const at = Math.max(0, Math.min(...words.map(w => best.toLowerCase().indexOf(w)).filter(i => i >= 0)) - 60);
+    return `${at > 0 ? '\u2026' : ''}${best.slice(at, at + 180).trim()}\u2026`;
+}
+/** What matched, for a hit that is in the topic's text and not all in its title: the sentence that has the words. '' for a title hit (its summary shows). */
 function snippetOf(d) {
-    const words = queryWords(), raw = docRaw.get(d.name) || '', low = docText.get(d.name) || '';
-    if (!words.length || !raw || hitOf(d)?.rank === 0) return '';
-    const at = words.map(w => low.indexOf(w)).filter(i => i >= 0).sort((a, b) => a - b)[0];
-    if (at === undefined) return '';
-    const from = Math.max(0, at - 50), to = Math.min(raw.length, at + 110);
-    const text = raw.slice(from, to).replace(/[#>*`|_\[\]]+/g, ' ').replace(/\s+/g, ' ').trim();
-    return `${from > 0 ? '\u2026' : ''}${text}${to < raw.length ? '\u2026' : ''}`;
+    const hit = hitOf(d);
+    return !hit || hit.titleAll ? '' : hitSentence(d.name);
 }
 const matches = d => hitOf(d) !== null;
 const ranked = ds => (docsQuery ? [...ds].sort((a, b) => hitOf(a).rank - hitOf(b).rank) : ds);
@@ -267,12 +280,27 @@ export async function selectDoc(name, { noteRoute = true, focusHeading = false }
 
     const h1 = content.querySelector('h1');
     if (acted && h1) { h1.tabIndex = -1; h1.focus(); } // the new page's heading takes the focus (the link they pressed is gone with the old page)
+    if (docsQuery) openAtHit(content, name); // a search found this topic: the page opens at the sentence it found (#10484)
 
     // Highlight code blocks once highlight.js has loaded (they show plain until
     // then, and stay plain if it cannot load).
     const blocks = content.querySelectorAll('pre code');
     if (blocks.length) loadHighlight().then(h => blocks.forEach(b => { if (b.isConnected) h.highlightElement(b); }), () => {});
 
+}
+
+const plainWords = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+/** Scroll the page to the sentence the search found and mark it (a block that has it, else the block with the most of the words); nothing when the topic's text does not have it. */
+function openAtHit(content, name) {
+    const sentence = hitSentence(name).replace(/\u2026/g, ' '), words = queryWords();
+    if (!sentence) return;
+    const target = plainWords(sentence).slice(0, 60), blocks = [...content.querySelectorAll('p, li, h2, h3, h4, td, th, blockquote')];
+    let el = blocks.find(b => plainWords(b.textContent).includes(target));
+    if (!el) { let most = 0; for (const b of blocks) { const t = plainWords(b.textContent), n = words.filter(w => t.includes(w)).length; if (n > most) { most = n; el = b; } } }
+    if (!el) return;
+    el.classList.add('doc-hit');
+    el.scrollIntoView({ block: 'center' });
+    sayDocs(`Found: ${plainWords(el.textContent).slice(0, 80)}`);
 }
 
 /** The Docs page's "Copy docs line for agents" button (its action is registered in app.js: the button is in the page, this file loads with the Docs tab). */

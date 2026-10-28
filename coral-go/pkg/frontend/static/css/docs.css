@@ -148,3 +148,6 @@
 /* A hit that is in a topic's text shows what matched under its title (#10093): small, quiet, two lines at most. */
 #docs-nav-list .row-btn:has(.doc-snippet) { flex-direction: column; align-items: flex-start; height: auto; padding-block: 6px; gap: 2px; }
 .doc-snippet { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); white-space: normal; text-align: left; }
+
+/* The sentence a search found, when its topic is opened from the results (#10484): a quiet band and an edge, not a flash. */
+.docs-content .doc-hit { background: var(--bg-hover); box-shadow: -4px 0 0 var(--accent); border-radius: 2px; }
