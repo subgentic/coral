@@ -39,6 +39,9 @@ const LONG = "[Task #4300 completed by QA Engineer] Outcome: success. Live smoke
         assert.ok(open > shut + 10, `open shows the whole text on more lines (${shut} -> ${open})`);
         await ev(`document.querySelector('#rf-box .chat-system-toggle').click()`);
         assert.equal(Math.round(await h()), Math.round(shut), 'closed again is one line');
+        // a steps row that holds only a reminder is named for it, not "1 step"
+        const rows = await ev(`[...document.querySelectorAll('#rf-box .work-group-count')].map(e => e.textContent)`);
+        assert.deepEqual(rows, ['Coral reminder', 'Coral reminder'], 'a group of only reminders says so: ' + JSON.stringify(rows));
         console.log('   ✓ labelled, long one folds');
         console.log('\nPASS Coral reminders are labelled and fold');
     } finally { await client.close(); }

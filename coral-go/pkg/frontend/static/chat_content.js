@@ -37,7 +37,9 @@ function stepCount(group) {
 export function updateWorkGroupSummary(group) {
     const body = group.querySelector(":scope > .work-group-body");
     const steps = stepCount(group);
-    group.querySelector(".work-group-count").textContent = `${steps} step${steps === 1 ? "" : "s"}`;
+    // A group of nothing but Coral's own reminders is named for what it holds, not "1 step" (#10012): a person reads it as Coral's, not as work.
+    const onlyReminders = steps > 0 && Array.from(body.children).every(c => c.classList.contains("chat-system"));
+    group.querySelector(".work-group-count").textContent = onlyReminders ? (steps === 1 ? "Coral reminder" : `${steps} Coral reminders`) : `${steps} step${steps === 1 ? "" : "s"}`;
     const last = body.lastElementChild;
     let latest = "";
     const lastTool = Array.from(body.querySelectorAll(":scope > .tool-call")).pop();
