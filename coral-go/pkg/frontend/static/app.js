@@ -3,6 +3,7 @@
 import { isPhoneLayout } from './phone_layout.js';
 import './update_banner.js';
 import './import_once.js';
+import './lazy_styles.js'; // the stylesheets of a lazy tab, loaded with it (#10706)
 import './update_flag.js';
 import { startChatPrefetch } from './chat_page.js';
 import './hub_blocked_controls.js';

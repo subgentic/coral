@@ -9,6 +9,8 @@ import { keyLabel } from './server_base.js';
 import { compactFigure, compactDuration, formatCost, noDataWords } from './format.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('cost_dashboard.css'); // the page's rules are not in the start's stylesheet: they arrive before the page is drawn or shown (#10706)
 const { dataTable, tableState, link: dtLink, chip, tag, avatar } = await importOnce('./data_table.js'); // the shared table (#7743)
 const { showViews, syncRangeLine, phoneOneLine } = await importOnce('./analytics_views.js'); // the sidebar's list of views and the page's title (#7473)
 const agentDetail = await importOnce('./analytics_agent.js'); // one agent over the range, opened from By agent (#7930)
