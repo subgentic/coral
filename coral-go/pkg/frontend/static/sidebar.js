@@ -234,12 +234,20 @@ export function initAgenticPanelCollapse() {
     }
 }
 
-/** Open or closed as the page on screen last had it. */
+/** Under this width (and not a phone, which has its own overlay) the side column starts folded and the chat has the window: beside a 420 px column a 853 px window left the chat 433 (#10306). */
+export const DOCK_FOLD_BELOW = 900;
+let narrowOpen = false; // the person opened the column in a narrow window: it stays open until the window is wide again
+const dockFolds = () => !isPhoneLayout() && window.innerWidth < DOCK_FOLD_BELOW && !narrowOpen;
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && typeof window.matchMedia('(min-width: 0px)')?.addEventListener === 'function') {
+    window.matchMedia(`(max-width: ${DOCK_FOLD_BELOW - 1}px)`).addEventListener('change', () => { narrowOpen = false; applyDockCollapsed(); fitTerminal?.(); }); // across the line the remembered state comes back, or folds
+}
+
+/** Open or closed as the page on screen last had it (folded in a narrow window, whatever it remembers). */
 function applyDockCollapsed() {
     const panel = document.getElementById('agentic-state');
     if (!panel) return;
     const stored = browserLocal.get(dockKey('coral-agentic-collapsed'));
-    const collapsed = stored === null ? !dockOpenByDefault() : stored === 'true';
+    const collapsed = dockFolds() || (stored === null ? !dockOpenByDefault() : stored === 'true');
     panel.classList.toggle('collapsed', collapsed);
     _syncPanelToggleBtn(!collapsed);
 }
@@ -281,7 +289,8 @@ export function toggleAgenticPanel(forceState) {
     if (typeof forceState === 'boolean') {
         panel.classList.toggle('collapsed', isCollapsed);
     }
-    browserLocal.set(dockKey('coral-agentic-collapsed'), isCollapsed);
+    if (window.innerWidth < DOCK_FOLD_BELOW) narrowOpen = !isCollapsed; // a choice made in a narrow window is for that window: the wide one's remembered state stays
+    else browserLocal.set(dockKey('coral-agentic-collapsed'), isCollapsed);
     _syncPanelToggleBtn(!isCollapsed);
     // Opened on the Saved tab: its list is read now (the tab's switch skips a shut sidebar, agentic_state.js)
     if (!isCollapsed && panel.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab === 'saved') window.switchAgenticTab?.('saved', 'top');
@@ -355,7 +364,27 @@ export function showSidebarPane(tab) {
     if (layout.classList.contains('sidebar-collapsed') !== collapsed) applyRail(collapsed);
 }
 
+/* The chat keeps at least this much (#10306: at 1024 px the sidebar's 320 and the file column's 420 left it 284): when the window is too narrow for the sidebar, the file column and the chat together, the sidebar
+ * goes to its rail first. It is the window's doing and not remembered; a person's own choice of the rail (the button) is theirs, and the sidebar comes back when the room does. */
+export const CHAT_MIN_WIDTH = 480;
+let autoRailed = false;
+export function fitColumns() {
+    const layout = document.querySelector('.layout'), sidebar = document.querySelector('.sidebar'), panel = document.getElementById('agentic-state');
+    if (!layout || !sidebar) return;
+    const wide = !isPhoneLayout() && window.innerWidth >= 1024; // under 1024 the sidebar is a drawer (mobile.css) and has no rail
+    const dock = panel && !panel.classList.contains('collapsed') ? panel.offsetWidth : 0;
+    const railed = layout.classList.contains('sidebar-collapsed');
+    if (wide && !railed && window.innerWidth - sidebar.offsetWidth - dock < CHAT_MIN_WIDTH) { autoRailed = true; applyRail(true); }
+    else if (autoRailed && railed && (!wide || window.innerWidth - (parseInt(sidebar.style.width, 10) || 320) - dock >= CHAT_MIN_WIDTH)) { autoRailed = false; applyRail(readRail(currentPane)); }
+}
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function' && typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    window.addEventListener('resize', () => requestAnimationFrame(fitColumns));
+    document.addEventListener('coral:dock-changed', () => requestAnimationFrame(fitColumns));
+    onDockPage(() => requestAnimationFrame(fitColumns));
+}
+
 export function toggleSidebarRail() {
+    autoRailed = false; // the person's choice, not the window's
     const collapsed = !document.querySelector('.layout')?.classList.contains('sidebar-collapsed');
     try { browserLocal.set(railKey(currentPane), collapsed ? '1' : '0'); } catch { /* storage unavailable */ }
     applyRail(collapsed);
