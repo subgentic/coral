@@ -33,13 +33,32 @@ const DOC_GROUPS = [
 ];
 const titleOf = d => d.title || d.name;
 // The search reads the topics' text too (#9965: "add a member" found nothing because only titles were searched): each topic's text is read once, on the first search, and kept lower case.
-const docText = new Map(); let docTextLoad = null, docTextReady = false;
+const docText = new Map(), docRaw = new Map(); let docTextLoad = null, docTextReady = false; // docRaw: the text as written, for the snippet under a hit (#10093)
 function loadDocText() {
-    if (!docTextLoad) docTextLoad = Promise.all(docsList.map(async d => { const c = await fetchDocContent(d.name); if (c && c.content) docText.set(d.name, String(c.content).toLowerCase()); })).then(() => { docTextReady = true; });
+    if (!docTextLoad) docTextLoad = Promise.all(docsList.map(async d => { const c = await fetchDocContent(d.name); if (c && c.content) { docRaw.set(d.name, String(c.content)); docText.set(d.name, String(c.content).toLowerCase()); } })).then(() => { docTextReady = true; });
     return docTextLoad;
 }
-const matches = d => !docsQuery || titleOf(d).toLowerCase().includes(docsQuery) || d.name.toLowerCase().includes(docsQuery) || (docText.get(d.name) || '').includes(docsQuery);
-const docGroups = () => DOC_GROUPS.map(g => ({ ...g, docs: docsList.filter(matches).filter(g.has) })).filter(g => g.docs.length);
+// The search (#10093): the words may come in any order (every word must be in the topic's title or text), and the topics whose TITLE has them come first, then the ones with a word in the title, then the text-only hits.
+const queryWords = () => docsQuery.split(/\s+/).filter(Boolean);
+function hitOf(d) {
+    const words = queryWords(); if (!words.length) return { rank: 0 };
+    const title = `${titleOf(d)} ${d.name}`.toLowerCase(), body = docText.get(d.name) || '';
+    if (!words.every(w => title.includes(w) || body.includes(w))) return null;
+    return { rank: words.every(w => title.includes(w)) ? 0 : words.some(w => title.includes(w)) ? 1 : 2 };
+}
+/** What matched, for a hit that is in the topic's text and not all in its title: about a line of the text around the first word found, without the Markdown marks. '' for a title hit (its summary shows). */
+function snippetOf(d) {
+    const words = queryWords(), raw = docRaw.get(d.name) || '', low = docText.get(d.name) || '';
+    if (!words.length || !raw || hitOf(d)?.rank === 0) return '';
+    const at = words.map(w => low.indexOf(w)).filter(i => i >= 0).sort((a, b) => a - b)[0];
+    if (at === undefined) return '';
+    const from = Math.max(0, at - 50), to = Math.min(raw.length, at + 110);
+    const text = raw.slice(from, to).replace(/[#>*`|_\[\]]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return `${from > 0 ? '\u2026' : ''}${text}${to < raw.length ? '\u2026' : ''}`;
+}
+const matches = d => hitOf(d) !== null;
+const ranked = ds => (docsQuery ? [...ds].sort((a, b) => hitOf(a).rank - hitOf(b).rank) : ds);
+const docGroups = () => DOC_GROUPS.map(g => ({ ...g, docs: ranked(docsList.filter(matches).filter(g.has)) })).filter(g => g.docs.length);
 const groupOfDoc = name => { const d = docsList.find(x => x.name === name); const g = d && DOC_GROUPS.find(x => x.has(d)); return g ? { key: g.key, label: g.label } : null; };
 
 export function filterDocs(value) {
@@ -54,12 +73,12 @@ registerGroupSource('docs', {
         const g = docGroups().find(x => x.key === key);
         if (!g) return null;
         if (!docTableStates.has(key)) docTableStates.set(key, DT.tableState());
-        return { title: g.label, rows: g.docs, signature: JSON.stringify(g.docs),
+        return { title: g.label, rows: g.docs, signature: JSON.stringify([docsQuery, g.docs.map(x => x.name)]),
             node: () => DT.dataTable({
                 label: `${g.label} topics, ${g.docs.length}`, rows: g.docs,
                 rowKey: d => d.name, rowName: titleOf, state: docTableStates.get(key),
                 open: d => selectDoc(d.name, { focusHeading: true }),
-                columns: [{ key: 'doc-name', label: 'Topic', primary: true, width: 'grow', line: 1, sort: true, sortValue: titleOf, cell: d => DT.primaryButton(titleOf(d)), subtitle: d => String(d.summary || '').trim() }],
+                columns: [{ key: 'doc-name', label: 'Topic', primary: true, width: 'grow', line: 1, sort: true, sortValue: titleOf, cell: d => DT.primaryButton(titleOf(d)), subtitle: d => snippetOf(d) || String(d.summary || '').trim() }],
             }).el,
             extra: { action: 'docs-copy-agent-line', label: 'Copy docs line for agents', icon: 'content_copy', title: 'Copies one line you can paste to an agent so it can read these docs' },
         };
@@ -179,7 +198,7 @@ function renderDocNav() {
     const groups = docGroups();
     const shown = groups.filter(g => !isGroupFolded('docs', g.key)).flatMap(g => g.docs);
     const stop = shown.some(d => d.name === selectedDoc) ? selectedDoc : (shown[0] || {}).name;
-    const row = d => `<li class="session-list-item${escapeAttr(selectedDoc === d.name ? ' active' : '')}"><button type="button" class="row-btn" tabindex="${Number(d.name === stop ? 0 : -1)}"${selectedDoc === d.name ? ' aria-current="true"' : ''} data-on-click="doc-open" data-doc="${escapeAttr(d.name)}" data-on-keydown="doc-open-key">${esc(titleOf(d))}</button></li>`;
+    const row = d => `<li class="session-list-item${escapeAttr(selectedDoc === d.name ? ' active' : '')}"><button type="button" class="row-btn" tabindex="${Number(d.name === stop ? 0 : -1)}"${selectedDoc === d.name ? ' aria-current="true"' : ''} data-on-click="doc-open" data-doc="${escapeAttr(d.name)}" data-on-keydown="doc-open-key"><span class="doc-nav-title">${esc(titleOf(d))}</span>${docsQuery && snippetOf(d) ? `<span class="doc-snippet">${esc(snippetOf(d))}</span>` : ''}</button></li>`; // under a hit that is in the topic's text: what matched (#10093)
     list.innerHTML = groups.map(g => groupHeaderHtml('docs', g.key, g.label, g.docs.length) + (isGroupFolded('docs', g.key) ? '' : g.docs.map(row).join(''))).join('')
         || (docsList.length ? `<li class="empty-state empty-state-tight">${docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches the search.'}</li>` : '');
     syncPaneGroupToggle('docs');
