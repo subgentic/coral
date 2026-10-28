@@ -239,6 +239,58 @@ func TestTeamArtifactsQueryKept(t *testing.T) {
 	assert.Empty(t, e.names("?kept=true&origin=received"))
 }
 
+// #9819: a row says whether its stored object is starred, and starred=true/false is the Starred view (and its complement), paged and counted like any filter.
+func TestTeamArtifactsQueryStarred(t *testing.T) {
+	e := newTAEnv(t)
+	db, err := sqlx.Open("sqlite", filepath.Join(t.TempDir(), "sessions.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	_, err = db.Exec(`CREATE TABLE artifact_stars (hex TEXT PRIMARY KEY, starred_at TEXT NOT NULL)`)
+	require.NoError(t, err)
+	for _, name := range []string{"diagram.png", "shared-plan.pdf", "huge.log"} {
+		_, err = db.Exec(`INSERT INTO artifact_stars (hex, starred_at) VALUES (?, ?)`, e.ids[name], time.Now().UTC().Format(time.RFC3339))
+		require.NoError(t, err)
+	}
+	e.h.bs.SetSessionsDB(db)
+	starred := e.names("?starred=true")
+	sort.Strings(starred)
+	assert.Equal(t, []string{"diagram.png", "huge.log", "shared-plan.pdf"}, starred)
+	code, r, _ := e.get("?starred=false")
+	require.Equal(t, 200, code)
+	assert.Equal(t, 10, *r.Total)
+	assert.NotContains(t, artifactNames(r.Artifacts), "diagram.png")
+	assert.Equal(t, []string{"shared-plan.pdf"}, e.names("?starred=true&origin=shared"))
+	assert.Empty(t, e.names("?starred=true&origin=received"))
+	// every row carries the flag, in the whole list too
+	code, r, _ = e.get("")
+	require.Equal(t, 200, code)
+	flagged := map[string]bool{}
+	for _, a := range r.Artifacts {
+		if a.Starred {
+			flagged[a.Name] = true
+		}
+	}
+	assert.Equal(t, map[string]bool{"diagram.png": true, "huge.log": true, "shared-plan.pdf": true}, flagged)
+	// a page of the Starred view is counted by its filter
+	code, r, _ = e.get("?starred=true&limit=2")
+	require.Equal(t, 200, code)
+	assert.Equal(t, 3, *r.Total)
+	assert.Len(t, r.Artifacts, 2)
+	assert.True(t, r.HasMore)
+	code, _, raw := e.get("?starred=maybe")
+	assert.Equal(t, 400, code, taJSON(raw))
+	// a database with no star table: the list still answers, nothing starred; only the Starred view cannot
+	_, err = db.Exec(`DROP TABLE artifact_stars`)
+	require.NoError(t, err)
+	code, r, _ = e.get("")
+	require.Equal(t, 200, code)
+	for _, a := range r.Artifacts {
+		assert.False(t, a.Starred, a.Name)
+	}
+	code, _, _ = e.get("?starred=true")
+	assert.Equal(t, 500, code)
+}
+
 func TestTeamArtifactsQuerySortAndPaging(t *testing.T) {
 	e := newTAEnv(t)
 	up := "&origin=upload"

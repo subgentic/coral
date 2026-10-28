@@ -99,6 +99,18 @@ export function createArtifactsList({ inbox = false } = {}) {
         say(`${on ? 'Kept' : 'Released'} ${name}`);
     }
 
+    // The star is a bookmark on an artifact (#9819): on this computer's store through the dashboard, and the owner's through Coral Hub, so it is offered for any artifact with a stored object.
+    async function toggleStar(hex, name, button, item) {
+        const on = button.getAttribute('aria-pressed') !== 'true';
+        const r = await fetch(`/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null);
+        if (!r || !r.ok) { showToast(`Couldn't ${on ? 'star' : 'unstar'} ${name}.`, true); return; }
+        item.starred = on;
+        button.setAttribute('aria-pressed', String(on));
+        button.textContent = on ? 'Starred' : 'Star';
+        button.title = on ? 'Starred (click to remove the star)' : 'Star: find this again in Starred only';
+        say(`${on ? 'Starred' : 'Unstarred'} ${name}`);
+    }
+
     function deleteArtifact(hex, name, size) {
         window.showConfirmModal?.('Delete artifact',
             `Delete ${name}${size ? ` (${size})` : ''}? It is removed from Coral, and links to it in board posts and task results will show "unavailable". A copy a browser already cached may remain. This can't be undone.`,
@@ -434,6 +446,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (link.preview) actions.push(isCloud() ? { label: 'Download', run: () => importOnce('./artifact_download.js').then(m => m.downloadArtifact(link.url, m.sanitizeDownloadName(name))).catch(() => showToast('The artifact could not be downloaded', true)) } : { label: 'Download', href: link.url, download: true });
             else actions.push({ label: 'Open link', primary: true, href: link.url });
             actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
+            if (hex) actions.push({ label: item.starred ? 'Starred' : 'Star', title: item.starred ? 'Starred (click to remove the star)' : 'Star: find this again in Starred only', pressed: !!item.starred, run: b => toggleStar(hex, name, b, item) });
             if (hex && local()) {
                 const on = model.kept.has(hex);
                 actions.push({ label: on ? 'Kept' : 'Keep', title: on ? 'Kept: never pruned (click to release)' : 'Keep: never prune this', pressed: on, run: b => toggleKeep(hex, name, b) });

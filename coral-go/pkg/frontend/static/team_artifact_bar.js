@@ -31,6 +31,7 @@ const specFor = (personal, page = false, teams = false) => {
                 { type: 'select', key: 'goal', id: `${idp}-goal`, label: 'Goal', values: [], labels: {}, any: 'Any goal' },
             ]),
             { type: 'check', key: 'kept', id: `${idp}-kept`, label: 'Kept only', wrapClass: 'list-bar-field list-bar-kept' },
+            { type: 'check', key: 'starred', id: `${idp}-starred`, label: 'Starred only', wrapClass: 'list-bar-field list-bar-starred' },
             { type: 'date', key: 'from', id: `${idp}-from`, label: 'From' },
             { type: 'date', key: 'to', id: `${idp}-to`, label: 'Until' },
         ],

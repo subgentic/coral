@@ -1,4 +1,5 @@
 DELETE /api/artifacts/{id} launch owner-only
+DELETE /api/artifacts/{id}/star interact owner-only
 DELETE /api/saved/{id} interact owner-only
 GET /api/artifacts view owner-only
 GET /api/artifacts/resolve view owner-only
@@ -28,5 +29,6 @@ POST /api/board/{project}/cross-team/files/enable launch owner-only-hub
 POST /api/hub-auto-accept launch owner-only-hub
 POST /api/saved interact owner-only
 POST /api/system/update/relaunch launch owner-update
+PUT /api/artifacts/{id}/star interact owner-only
 PUT /api/board/{project}/settings launch owner-only
 PUT /api/custom-models launch owner-only

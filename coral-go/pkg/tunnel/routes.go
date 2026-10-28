@@ -449,6 +449,9 @@ var routeTable = cat(
 	// Deleting an artifact from the hub's Artifacts tab (#5575): Launch, and the machine refuses anyone but the owner (the stamped marker, hubrole.go); each delete is
 	// recorded in the Operator actions with the hub user. Pasted images are artifacts too, so this removes them as well.
 	owner(OwnerRefuse, rules(http.MethodDelete, TierLaunch, "/api/artifacts/{hex64}")),
+	// Starring an artifact to find it again (#9819): a personal bookmark, Interact like the saved items, and the machine refuses anyone but the owner.
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/star")),
+	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/star")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, PromptInspectionPath)),
 	owner(OwnerUpdate, rules(http.MethodPost, TierLaunch, UpdateRelaunchPath)),
 	// Pinning a folder to the Agents list names a folder to launch into (#3630): Launch, like
