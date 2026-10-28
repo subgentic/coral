@@ -30,7 +30,7 @@ func TestVersionsAreReleaseNumbersAndNothingElse(t *testing.T) {
 	assert.Empty(t, typed, "a version of another shape, a source, channel and method outside their sets are never sent")
 	typed, _ = sanitizeProps(EventUpgrade, map[string]string{"from_version": "1.4.100", "to_version": "1.4.153"})
 	assert.Equal(t, map[string]any{"from_version": "1.4.100"}, typed)
-	assert.Equal(t, 4, SchemaVersion, "the update events are schema version 4")
+	assert.Equal(t, 5, SchemaVersion, "the new-user funnel events are schema version 5 (the update events came with 4 and are unchanged)")
 }
 
 func TestUpgradeCarriesTheVersionThatLastRanHere(t *testing.T) {
@@ -44,7 +44,7 @@ func TestUpgradeCarriesTheVersionThatLastRanHere(t *testing.T) {
 		if e.Event == EventUpgrade {
 			assert.Equal(t, "1.4.100", e.Properties["from_version"])
 			assert.Equal(t, "1.4.153", e.Properties["version"])
-			assert.EqualValues(t, 4, e.Properties["schema_version"])
+			assert.EqualValues(t, SchemaVersion, e.Properties["schema_version"])
 		}
 	}
 }

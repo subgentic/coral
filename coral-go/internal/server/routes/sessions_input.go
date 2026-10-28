@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -21,6 +22,7 @@ import (
 // Send sends a command to a live tmux session.
 // POST /api/sessions/live/{name}/send
 func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
+	sentAt := time.Now() // a reply is measured from here, not from when the agent took the prompt (a message behind a running turn waits)
 	name := chi.URLParam(r, "name")
 	var body struct {
 		Command   string `json:"command"`
@@ -58,7 +60,11 @@ func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
 		if held := h.sendAutomatedHTTP(w, r, name, body.AgentType, body.SessionID, body.Command, "/send", send); held {
 			return
 		}
-	} else if heldID, err := h.deliverPersonSend(r.Context(), name, body.AgentType, body.SessionID, body.Command, cloud.Tunneled(r), nil); heldID != "" {
+	} else if heldID, err := h.deliverPersonSend(r.Context(), name, body.AgentType, body.SessionID, body.Command, cloud.Tunneled(r), func(err error) {
+		if err == nil { // a message that waited behind a box and was typed later counts when it is typed
+			h.notePersonMessage(context.Background(), body.SessionID, tracking.MessageViaComposerHTTP, sentAt)
+		}
+	}); heldID != "" {
 		// The agent waits on a box that asks the person (#6610): the message is held and typed once none is left. Said plainly, so it is not sent again; its id cancels it (#6627).
 		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "held": true, "held_id": heldID, "command": body.Command, "note": heldNote})
 		return
@@ -79,6 +85,9 @@ func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
 	// The terminal accepted the input over HTTP: the narrowly labelled
 	// first_prompt_submitted milestone. It says nothing about what the agent did.
 	tracking.TrackOnce(tracking.EventFirstPromptSubmitted, map[string]string{"source": "http_send"})
+	if humanInputCaller(r) { // only a person's message is the funnel's (an agent's tool or a script is automation)
+		h.notePersonMessage(r.Context(), body.SessionID, tracking.MessageViaComposerHTTP, sentAt)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "command": body.Command})
 }
 

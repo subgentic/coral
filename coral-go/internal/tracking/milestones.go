@@ -235,6 +235,12 @@ func releaseMilestone(name string) {
 	milestoneMu.Unlock()
 }
 
+// firedHere remembers, per data folder, the milestones whose delivery this process has seen accepted, so a milestone that fires on every message (first_message_sent) costs a map lookup
+// afterwards instead of a goroutine and a read of the milestone file. The file stays the truth: this only skips work that would find the event already sent.
+var firedHere sync.Map
+
+func firedHereKey(name string) string { return resolveCoralDir() + "|" + name }
+
 // confirmMilestoneSent persists that the service accepted the one-time event.
 func confirmMilestoneSent(name string) {
 	milestoneMu.Lock()
@@ -245,13 +251,16 @@ func confirmMilestoneSent(name string) {
 		s.Fired = map[string]string{}
 	}
 	if _, ok := s.Fired[name]; ok {
+		firedHere.Store(firedHereKey(name), true)
 		return
 	}
 	s.Fired[name] = nowUTC()
 	delete(s.Pending, name)
 	if err := saveMilestones(s); err != nil {
 		logDeliveryFailure(name, 0, "milestone sent-state not persisted: "+err.Error())
+		return
 	}
+	firedHere.Store(firedHereKey(name), true)
 }
 
 // milestoneEventUUID is stable for an install, milestone and frozen snapshot
@@ -269,6 +278,9 @@ func milestoneEventUUID(name, snapshotTime string) string {
 // (product state); the one-time analytics event is marked sent only after the
 // service accepts it, and never while telemetry is off or the build is keyless.
 func TrackOnce(eventName string, extraProps map[string]string) {
+	if _, done := firedHere.Load(firedHereKey(eventName)); done {
+		return
+	}
 	gen := telemetryGen.Load()
 	asyncGo(func() {
 		send, snap := reserveMilestone(eventName, posthogKeyPresent() && telemetryValid(gen), extraProps)

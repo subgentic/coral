@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/terminalinput"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // composerSendsPerSocket bounds the composer_send deliveries under way on one terminal socket (#4587, Security):
@@ -727,6 +729,9 @@ func (t *terminalStream) handleFrame(msg terminalFrame) {
 		t.composerSend(msg)
 		return
 	case "terminal_input":
+		if strings.ContainsAny(msg.Data, "\r\n") {
+			t.h.person.noteEnter(t.sessionID, time.Now()) // only that an Enter was pressed, for the funnel (#10004): never what was typed
+		}
 		if msg.Data != "" {
 			// A person's keystrokes: the PTY backend records them for the gate
 			// (no automated text joins a draft it can't read, #3482).
@@ -792,15 +797,24 @@ func (t *terminalStream) composerSend(msg terminalFrame) {
 		return
 	}
 	t.composing.Add(1)
+	sentAt := time.Now() // the funnel measures a reply from here (#10004)
 	go func() {
 		defer safego.Recover("server/routes/websocket:composer_send")
 		defer t.composing.Add(-1)
 		// A message held behind the agent's box (#6610) is answered held now, and acked or refused by this id when it is typed.
-		reply := func(err error) { t.composerAnswer(id, err) }
+		reply := func(err error) {
+			if err == nil {
+				t.h.notePersonMessage(context.Background(), t.sessionID, tracking.MessageViaComposerWS, sentAt)
+			}
+			t.composerAnswer(id, err)
+		}
 		heldID, err := t.h.deliverPersonSend(t.ctx, t.name, t.agentType, t.sessionID, msg.Data, t.viaHub, reply)
 		if heldID != "" {
 			wsWriteJSON(t.ctx, t.conn, map[string]any{"type": "terminal_input_held", "id": id, "held_id": heldID, "note": heldNote})
 			return
+		}
+		if err == nil {
+			t.h.notePersonMessage(t.ctx, t.sessionID, tracking.MessageViaComposerWS, sentAt)
 		}
 		t.composerAnswer(id, err)
 	}()

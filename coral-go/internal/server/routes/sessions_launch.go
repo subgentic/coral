@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/agentmodels"
@@ -195,6 +196,9 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 
 	tracking.TrackEvent(tracking.EventSessionLaunched, nil)
 	tracking.TrackOnce(tracking.EventFirstAgentLaunched, nil)
+	if sid, _ := result["session_id"].(string); body.Prompt != "" && sid != "" && !agentCaller(r) { // the prompt a person wrote in the launch dialog is their first message (#10004)
+		h.notePersonMessage(r.Context(), sid, tracking.MessageViaLaunchPrompt, time.Now())
+	}
 	if body.BoardName != "" && (body.BoardServer == "" || body.BoardServer == "local") {
 		result["board_id"] = body.BoardName
 		result["board_label"] = h.boardLabel(body.BoardName)
