@@ -14,9 +14,9 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             window.__m_ = await import(st + 'modals.js'); window.__state_ = (await import(st + 'state.js')).state;
-            window.__answer = { body: {}, status: 200 }; window.__reqs = []; window.__copied = []; window.__selected = [];
+            window.__answer = { body: {}, status: 200 }; window.__mcp = { body: { supported: false, servers: [] }, status: 200 }; window.__reqs = []; window.__copied = []; window.__selected = [];
             const real = window.fetch;
-            window.fetch = (u, o) => { const url = String(u); if (/\\/api\\/sessions\\/live\\/[^/]+\\/info/.test(url)) { window.__reqs.push(url); return Promise.resolve(new Response(JSON.stringify(window.__answer.body), { status: window.__answer.status, headers: { 'content-type': 'application/json' } })); } return real(u, o); };
+            window.fetch = (u, o) => { const url = String(u); if (/\\/api\\/sessions\\/live\\/[^/]+\\/mcp-servers/.test(url)) { return Promise.resolve(new Response(JSON.stringify(window.__mcp.body), { status: window.__mcp.status })); } if (/\\/api\\/sessions\\/live\\/[^/]+\\/info/.test(url)) { window.__reqs.push(url); return Promise.resolve(new Response(JSON.stringify(window.__answer.body), { status: window.__answer.status, headers: { 'content-type': 'application/json' } })); } return real(u, o); };
             Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__copied.push(t); return Promise.resolve(); } }, configurable: true });
             window.selectBoardProject = key => window.__selected.push(key);
             return true; })()`);
@@ -51,6 +51,21 @@ const BASE = require('./test_base').BASE;
         assert.equal(await text('info-git-branch'), 'dev'); assert.equal(await text('info-git-commit'), '—');
         await ev(`window.__answer.body = { agent_name: 'x' }; true`); await run();
         assert.equal(await text('info-git-branch'), '—');
+
+        console.log('MCP servers (#9769): a row of name, transport and scope when the route answers; hidden when the CLI is not read or the route refuses');
+        await ev(`window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' };
+            window.__answer.body = { agent_name: 'info a', agent_type: 'claude', tmux_command: 'tmux attach -t tm-1' };
+            window.__mcp = { body: { supported: true, servers: [{ name: 'github', transport: 'http', scope: 'user' }, { name: 'files', transport: 'stdio', scope: 'project' }] }, status: 200 }; true`);
+        await run();
+        await waitFor(`document.getElementById('info-mcp').hidden === false`, 'the MCP servers row');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#info-mcp div')].map(d => d.textContent)`), ['github: http, user', 'files: stdio, project']);
+        assert.equal(await ev(`document.getElementById('info-mcp-label').hidden`), false);
+        await ev(`window.__mcp = { body: { supported: false, servers: [] }, status: 200 }; true`); await run();
+        await new Promise(r => setTimeout(r, 300)); // sleep-ok: the row's fetch answers asynchronously; nothing appears
+        assert.equal(await ev(`document.getElementById('info-mcp').hidden`), true, 'a CLI Coral does not read shows no row');
+        await ev(`window.__mcp = { body: { error: 'no' }, status: 403 }; true`); await run();
+        await new Promise(r => setTimeout(r, 300)); // sleep-ok: as above
+        assert.equal(await ev(`document.getElementById('info-mcp').hidden`), true, 'a refusal shows no row');
 
         console.log('Copy and close');
         await ev(`window.__answer.body = { agent_name: 'info a', tmux_command: 'tmux attach -t zz' }; true`); await run();

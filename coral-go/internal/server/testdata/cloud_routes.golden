@@ -151,6 +151,7 @@ GET /api/sessions/live/{name}/git view
 GET /api/sessions/live/{name}/history/context view
 GET /api/sessions/live/{name}/history/search view
 GET /api/sessions/live/{name}/info view
+GET /api/sessions/live/{name}/mcp-servers never
 GET /api/sessions/live/{name}/memory never
 GET /api/sessions/live/{name}/memory/{id} never
 GET /api/sessions/live/{name}/notes view
