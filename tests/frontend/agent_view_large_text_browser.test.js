@@ -25,9 +25,9 @@ const BASE = require('./test_base').BASE;
             // 2. the search icon has its own room: the input's text starts after the icon
             const search = await ev(`(() => { const i = document.getElementById('agent-search-input'), ic = document.querySelector('.sidebar-search-icon'); return { icon: Math.round(ic.getBoundingClientRect().right), text: Math.round(i.getBoundingClientRect().left + parseFloat(getComputedStyle(i).paddingLeft)) }; })()`);
             assert.ok(search.text >= search.icon, `${W} px: the search text starts after its icon: ` + JSON.stringify(search));
-            // 3. the header writes the state beside the dot, at any window and with a mouse
-            const word = await ev(`(() => { const w = document.getElementById('terminal-state-word'); return { shown: w.getClientRects().length > 0, text: w.getClientRects().length ? getComputedStyle(w, '::before').content : '' }; })()`);
-            if (W === 1280) assert.ok(word.shown && /Idle/i.test(word.text), `${W} px: the header says Idle beside the dot: ` + JSON.stringify(word));
+            // 3. the header draws only the dot (the operator, #9927): no word beside it; its words are its tip and accessible name
+            const word = await ev(`(() => { const d = document.getElementById('terminal-status-dot'); return { noWord: !document.getElementById('terminal-state-word'), title: d.title, label: d.getAttribute('aria-label') }; })()`);
+            if (W === 1280) assert.ok(word.noWord && /Idle/i.test(word.title) && /Idle/i.test(word.label), `${W} px: the dot says Idle in its tip and its name, and no word is drawn beside it: ` + JSON.stringify(word));
             // 4. an idle agent has no live Stop
             const stop = await ev(`[...document.querySelectorAll('button')].filter(b => /^Stop/.test(b.getAttribute('aria-label') || '')).map(b => ({ shown: b.getClientRects().length > 0, disabled: b.disabled }))`);
             assert.ok(stop.every(s => !s.shown || s.disabled), `${W} px: Stop is hidden or off while the agent is idle: ` + JSON.stringify(stop));

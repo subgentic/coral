@@ -1061,9 +1061,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 /* Selected-agent header: the identity may shrink; the actions on the right
    never do. */
-.terminal-state-word { display: none; flex: none; font-size: var(--fs-base); color: var(--text-secondary); white-space: nowrap; } /* #4327: the state in words beside the dot; since #7065 on every screen wider than a phone, not only where there is no hover (a dot and a tooltip are not the state) */
-.terminal-state-word::before { content: attr(data-word); } /* generated, so the identity's text stays the name (the pop-out and its tests read it) */
-@media (min-width: 768px) { .terminal-state-word[data-word]:not([data-word=""]) { display: inline; } } /* a phone has its own state chip */
 .terminal-header-left {
     flex: 1 1 0; /* basis 0: the header wraps its buttons to a second row only when even 3.5em of name cannot fit beside them (#9899, at 200% text; as on a phone, below) */
     min-width: 3.5em;
@@ -1697,7 +1694,8 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 @media (max-width: 400px) {
     html body .terminal-header { padding-left: 6px; padding-right: 6px; } /* both ends 6 px from the screen edge, where an OS edge swipe (the side panel's on the right, iOS back on the left) wins at 0 to 2 px (#6777, #6790) */
     html body .terminal-header-left { gap: 8px; }
-    html body .terminal-header-actions > .live-view-toggle { margin-right: 0; } /* the toggle's 6 px give the name its 100 px at 320 (header_text200) */
+    html body .terminal-header-actions > .live-view-toggle { margin-left: 0; }
+    html body .terminal-header-actions { gap: 2px; } /* the toggle's 6 px and 2 px a gap give the name its 100 px at 320 (header_text200) */
     html body .terminal-header-actions > .terminal-branch { max-width: 3em; }
 }
 

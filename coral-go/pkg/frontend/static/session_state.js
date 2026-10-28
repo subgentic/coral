@@ -185,7 +185,7 @@ export function terminalDotClass(s) {
 }
 
 /** The agent header's status dot (#4327, from the #4276 audit): its class, its tip and its accessible name all say the state in the sidebar's
- *  words, so it is not colour only. The word beside it (drawn on touch screens, which have no hover for the tip) is aria-hidden: read once. */
+ *  words, so it is not colour only. The header draws only the dot (the operator, #9927): there is no word beside it. */
 export function applyTerminalDot(dot, s) {
     if (!dot) return;
     const info = sessionStateInfo(s || {});
@@ -193,7 +193,6 @@ export function applyTerminalDot(dot, s) {
     setTitle(dot, info.label);
     setAttr(dot, 'role', 'img');
     setAttr(dot, 'aria-label', info.label);
-    setAttr(document.getElementById('terminal-state-word'), 'data-word', info.label);
     // Stop (Escape) has something to stop only while the agent works, asks or is stuck: in the chat view it is hidden otherwise (#7065); the terminal's Esc key stays
     setAttr(document.getElementById('command-pane'), 'data-can-stop', ['working', 'needs_input', 'check_terminal', 'stuck'].includes(info.key) ? 'true' : 'false');
 }
