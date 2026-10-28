@@ -61,10 +61,10 @@ function renderBoardSidebar(projects) {
 // ── View switching ───────────────────────────────────────────────────────
 
 /** A board's page is its team page's Messages tab (#8061): every link to a board (a chat, a message, a saved message, a list's row) opens it there, at /team/<team>/messages, and a message anchors where it is. */
-export function selectBoardProject(project, messageId = null) {
+export function selectBoardProject(project, messageId = null, { backTo = null } = {}) {
     if (!project) return;
     window.switchNavTab?.('agents', { fromHistory: true }); // the team page lives under Agents; it writes its own address
-    importOnce('./team_page.js').then(m => m.openTeamPage(project, { tab: 'messages', item: messageId != null ? Number(messageId) : 0 }));
+    importOnce('./team_page.js').then(m => m.openTeamPage(project, { tab: 'messages', item: messageId != null ? Number(messageId) : 0, ...(backTo ? { backTo } : {}) }));
 }
 
 /** The team page's Messages tab (#7453): the board's own column (#mb-board: the search bar, the messages, the composer) moved into `host`, and the board loaded and polled as on the board page. leaveBoardPage puts the column back and stops the poll. */
