@@ -19,7 +19,7 @@ const BASE = require('./test_base').BASE;
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.__answers = []; window.__multi = false;
                 const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
                     if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__answers.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })); }
-                    if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: { question: 'Pick a color:', multi: window.__multi, options: [{ n: 1, label: 'Red', action: 'select' }, { n: 2, label: 'Blue', action: 'select' }] } }), { headers: { 'content-type': 'application/json' } }));
+                    if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: { question: 'Pick a color:', ask_id: 'ask-1', multi: window.__multi, options: [{ n: 1, label: 'Red', action: 'select' }, { n: 2, label: 'Blue', action: 'select' }, { n: 3, label: "Yes, and don't ask again for colors", action: 'select' }] } }), { headers: { 'content-type': 'application/json' } }));
                     return real(u, o); };
                 const entry = window.__m.entry.bind(window.__m); window.__waiting = true; window.__m.entry = a => ({ ...entry(a), board_job_title: 'QA Engineer', waiting_for_input: window.__waiting, waiting_kind: 'permission', waiting_summary: 'Wants to know: Pick a color' });
                 window.__m.add('qa', 'A', 4, { sleeping: false, board_project: 'team-a', session_id: 'qa-id' }); true`);
@@ -35,7 +35,7 @@ const BASE = require('./test_base').BASE;
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             try { await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .inbox-answer').length === 2`, `${w}: the row's two choices`, 10000); } catch (e) { await shot(`inbox-answer-fail-${w}`); throw new Error(e.message + ' ' + await ev(`JSON.stringify([document.getElementById('group-table-view').dataset.group, document.getElementById('group-table-view').innerText.slice(0, 200), document.querySelectorAll('.inbox-answer').length])`)); }
             await waitFor(`(() => { const b = document.querySelector('#group-table-view .inbox-answer'); if (!b) return false; if (window.__seen !== b) { window.__seen = b; window.__seenAt = performance.now(); return false; } return performance.now() - window.__seenAt > 500; })()`, `${w}: the table has settled (the same choice for half a second)`, 8000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .inbox-answer')].map(b => b.textContent)`), ['Red', 'Blue'], `${w}: the card's own choices`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .inbox-answer')].map(b => b.textContent)`), ['Red', 'Blue'], `${w}: the card's own one-time choices (the lasting one is left to Open)`);
             if (mobile) assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .inbox-answer')].every(b => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().right <= innerWidth)`), '390: each is a 44 px target and on the screen');
             await shot(`inbox-answer-${w}`);
             // by keyboard: Tab to Red, Enter
@@ -44,7 +44,7 @@ const BASE = require('./test_base').BASE;
             await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
             await waitFor(`window.__answers.length >= 1`, `${w}: the answer is sent by Enter on the focused choice ` + await ev(`JSON.stringify([window.__answers, document.activeElement.tagName, document.querySelector('.top-nav-tab.active')?.dataset.arg, [...document.querySelectorAll('.toast')].map(t => t.textContent), document.querySelectorAll('#group-table-view .inbox-answer').length])`), 5000);
             const sent = await ev(`window.__answers`);
-            assert.deepEqual(sent, [{ session_id: 'qa-id', agent_type: sent[0].agent_type, n: 1, label: 'Red', text: '' }], `${w}: the same route and body as the card: ${JSON.stringify(sent)}`);
+            assert.deepEqual(sent, [{ session_id: 'qa-id', agent_type: sent[0].agent_type, n: 1, label: 'Red', text: '', ask_id: 'ask-1' }], `${w}: the same route and body as the card: ${JSON.stringify(sent)}`);
             assert.match(await ev(`document.querySelector('#group-table-view .inbox-answers').textContent`), /^Answered: Red$/, `${w}: the row says it`);
             assert.equal(await ev(`!!(window.T && T.state.currentSession && T.state.currentSession.session_id === 'qa-id')`), false, `${w}: the agent was not opened`);
             assert.equal(sent.length, 1, `${w}: sent once`);
