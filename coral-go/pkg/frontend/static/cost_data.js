@@ -64,23 +64,38 @@ export const thinkingRows = (rows) => (rows || []).map(a => ({
     cost_pct: 0,
 }));
 
-/** Per-agent (session) breakdown. */
-export const agentRows = (rows) => (rows || []).map(a => ({
-    session_id: a.session_id,
-    agent_name: a.agent_name,
-    display_name: a.agent_name || 'Agent',
-    board_name: a.board_name || '',
-    folder: a.folder || '',
-    working_dir: a.working_dir || '',
-    requests: a.requests || 0,
-    input_tokens: a.input_tokens || 0,
-    output_tokens: a.output_tokens || 0,
-    cache_read_tokens: a.cache_read_tokens || 0,
-    cache_write_tokens: a.cache_write_tokens || 0,
-    cost_usd: a.cost_usd || 0,
-    first_seen: a.first_seen || '',
-    last_seen: a.last_seen || '',
-    launched_at: a.launched_at || '',
-    stopped_at: a.stopped_at || '',
-}));
+/** Per-agent (session) breakdown. An agent with no name on record is called by its folder (never "Agent"); `live` (the live list) adds each live agent's context used and the live agents that sent nothing in
+ * the range, at $0.00 with no requests (#10272). */
+export const agentRows = (rows, live = []) => {
+    const byId = new Map((live || []).filter(s => s && s.session_id).map(s => [s.session_id, s]));
+    const out = (rows || []).map(a => {
+        const name = a.agent_name || a.folder || '', l = byId.get(a.session_id);
+        return {
+            session_id: a.session_id,
+            agent_name: name,
+            display_name: name || 'Agent',
+            board_name: a.board_name || '',
+            folder: a.folder || '',
+            working_dir: a.working_dir || '',
+            requests: a.requests || 0,
+            input_tokens: a.input_tokens || 0,
+            output_tokens: a.output_tokens || 0,
+            cache_read_tokens: a.cache_read_tokens || 0,
+            cache_write_tokens: a.cache_write_tokens || 0,
+            cost_usd: a.cost_usd || 0,
+            first_seen: a.first_seen || '',
+            last_seen: a.last_seen || '',
+            launched_at: a.launched_at || '',
+            stopped_at: a.stopped_at || '',
+            context_pct: l && l.context_pct != null ? l.context_pct : null,
+        };
+    });
+    const seen = new Set(out.map(r => r.session_id));
+    for (const l of byId.values()) {
+        if (seen.has(l.session_id)) continue;
+        const name = l.display_name || l.name || '', dir = l.working_directory || '';
+        out.push({ session_id: l.session_id, agent_name: name, display_name: name || 'Agent', board_name: l.board_name || l.board || '', folder: l.name || '', working_dir: dir, requests: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0, first_seen: '', last_seen: '', launched_at: l.created_at || '', stopped_at: '', is_live: true, context_pct: l.context_pct != null ? l.context_pct : null });
+    }
+    return out;
+};
 

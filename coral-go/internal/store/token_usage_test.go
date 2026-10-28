@@ -762,7 +762,7 @@ func TestTokenUsageStore_GetUsageSummaryByAgent_NameAndFolder(t *testing.T) {
 	for _, r := range rows {
 		byID[r.SessionID] = r
 	}
-	assert.Equal(t, "", byID["unnamed"].AgentName)
+	assert.Equal(t, "coral-go", byID["unnamed"].AgentName, "an agent with no name on record is called by its folder (#10272), never left empty to be labelled Agent")
 	assert.Equal(t, "coral-go", byID["unnamed"].Folder)
 	assert.Equal(t, "/tmp/coral-go", byID["unnamed"].WorkingDir)
 	assert.Equal(t, "Debugger", byID["renamed"].AgentName)
