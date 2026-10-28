@@ -317,6 +317,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/system/editors", sessHandler.ListEditors)
 	r.Get("/api/sessions/live/{name}/file-original", sessHandler.GetFileOriginal)
 	r.Put("/api/sessions/live/{name}/file-content", sessHandler.SaveFileContent)
+	r.Post("/api/sessions/live/{name}/share-file", sessHandler.ShareFileArtifact)
 	r.Put("/api/sessions/live/{name}/icon", sessHandler.SetIcon)
 	r.Put("/api/sessions/live/{name}/name-color", sessHandler.SetNameColor)
 	r.Post("/api/sessions/live/{name}/auto-accept/enable", sessHandler.EnableAutoAccept)

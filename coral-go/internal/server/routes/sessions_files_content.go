@@ -31,10 +31,29 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
+	content, workdir, ok := h.readWorkFile(w, r, name, sessionID, fp, maxFileBytes())
+	if !ok {
+		return
+	}
+	if r.URL.Query().Get("raw") == "1" {
+		writeRawFilePreview(w, fp, content)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"filepath":          fp,
+		"content":           string(content),
+		"working_directory": workdir,
+	})
+}
+
+// readWorkFile reads the file fp of an agent's working tree under the bounds of GetFileContent (the folder, the tunnel's strict roots, the denylist, a folder held open); it answers the
+// request itself and returns false when there is no file to give. limit is the most bytes it reads; workdir is the tree's root.
+func (h *SessionsHandler) readWorkFile(w http.ResponseWriter, r *http.Request, name, sessionID, fp string, limit int64) (content []byte, workdir string, ok bool) {
+	workdir = h.resolveGitRoot(agentCtx(r), name, "", sessionID)
 	if workdir == "" {
 		errBadRequest(w, "Could not determine working directory")
-		return
+		return nil, "", false
 	}
 
 	strict := strictBounds(r)
@@ -47,7 +66,7 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 			real := realPath(fp)
 			if !withinAny(h.sessionFileRoots(r, name, sessionID), real) {
 				errNotFound(w, "File not found")
-				return
+				return nil, "", false
 			}
 			fullPath = real
 		} else if real, rerr := safefs.Resolve(fp); rerr == nil {
@@ -57,11 +76,11 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 	}
 	if err != nil {
 		errBadRequest(w, "invalid path")
-		return
+		return nil, "", false
 	}
 	if strict && !rootAllowed(realPath(workdir)) {
 		errNotFound(w, "File not found")
-		return
+		return nil, "", false
 	}
 	if !tempFile && !isPathWithinDir(workdir, fullPath) {
 		if strict {
@@ -69,11 +88,11 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 		} else {
 			errForbidden(w, "Path traversal not allowed")
 		}
-		return
+		return nil, "", false
 	}
 	if sensitivePath(realOrSelf(fullPath)) {
 		errNotFound(w, "File not found")
-		return
+		return nil, "", false
 	}
 
 	// Read through a folder held open (#3672, path audit #3669 finding 2), as SaveFileContent
@@ -92,39 +111,32 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 	root, err := safefs.OpenRoot(rootDir)
 	if err != nil {
 		errNotFound(w, "File not found")
-		return
+		return nil, "", false
 	}
 	defer root.Close()
 	if rel == "" {
 		if rel, err = safefs.Within(root.Dir(), fullPath); err != nil || rel == "." {
 			errNotFound(w, "File not found")
-			return
+			return nil, "", false
 		}
 	}
 	read := root.ReadFile
 	if strict {
 		read = root.ReadFileOneLink
 	}
-	content, err := read(rel, maxFileBytes())
+	var rerr error
+	content, rerr = read(rel, limit)
+	err = rerr
 	if errors.Is(err, safefs.ErrTooLarge) {
 		errPayloadTooLarge(w, "File too large to preview")
-		return
+		return nil, "", false
 	}
 	if err != nil {
 		// Missing, a folder, not a regular file, or linked: all look like a missing file.
 		errNotFound(w, "File not found")
-		return
+		return nil, "", false
 	}
-	if r.URL.Query().Get("raw") == "1" {
-		writeRawFilePreview(w, fp, content)
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"filepath":          fp,
-		"content":           string(content),
-		"working_directory": workdir,
-	})
+	return content, workdir, true
 }
 
 // Image types the file preview can display, by extension.
