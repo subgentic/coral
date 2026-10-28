@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
         // PANE General
         assert.match(await row('settings-group-by-team'), /Group agents by team/, 'General: the grouping says team, not "board or team"');
         assert.doesNotMatch(await row('settings-group-by-team'), /board or team/, 'General: one word for it');
-        assert.match(await row('settings-group-by-team'), /Agents on the same team sit together in the list/, 'General: and what it does');
+        assert.match(await row('settings-group-by-team'), /Teammates sit together under their team name/, 'General: and what it does');
         // END General
 
         // PANE Terminal
