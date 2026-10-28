@@ -59,6 +59,9 @@ var notAStarter = map[string]string{
 	"tools/gen_windows_resources.sh": "resource generator",
 	"tools/make_windows_icon.py":     "icon generator",
 
+	// Reads run_cdp_suites.mjs as text to check that it takes each suite's limit from suite_timeout.mjs; runs no process at all.
+	"tests/frontend/suite_timeout.test.mjs": "reads the cdp runner's source for a string (the name run_cdp_suites matches startsCoral); starts no Coral",
+
 	// The update rehearsal builds its two releases; it starts a Coral only through update_rehearsal_windows_route.ps1, which sets the flag.
 	"tests/release/rehearsal_build.ps1": "builds the update rehearsal's two releases (go build, wix); starts no Coral",
 	// Inspect the bundle's files; do not execute Coral (file/otool/readelf, or a self-test on a
