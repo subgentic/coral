@@ -85,7 +85,7 @@ func TestFirstAgentReplyIsOnceForAnOkEndAndOnceForAnErrorEnd(t *testing.T) {
 	waitForAsync()
 	assert.True(t, FirstReplyWanted(), "an error end does not use up the ok one")
 	TrackFirstAgentReply("claude", 12*time.Second, ReplyOK)
-	waitForAsync() // each in turn: the deliveries are goroutines, and the first one to run is the one that is kept
+	waitForAsync()                                         // each in turn: the deliveries are goroutines, and the first one to run is the one that is kept
 	TrackFirstAgentReply("codex", 30*time.Second, ReplyOK) // a later reply is not the first
 	waitForAsync()
 	TrackFirstAgentReply("claude", time.Second, ReplyError)
