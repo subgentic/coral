@@ -26,6 +26,12 @@ export function queueRunWords(contents) {
     const events = (contents || []).map(queueEvent);
     const real = events.filter(e => e.kind !== 'ignore');
     if (!real.length) return events.length ? 'Coral told the agents that tasks are waiting' : '';
+    // a few lines say what happened to which task, line by line, as a person would: "#1 created; Orchestrator took #1; Orchestrator finished #1" (#10604); more of them are counted below
+    const line = e => !e.id ? '' : e.kind === 'claimed' ? (e.by ? `${e.by} took #${e.id}` : `#${e.id} taken`) : e.kind === 'finished' ? (e.by ? `${e.by} finished #${e.id}` : `#${e.id} finished`)
+        : e.kind === 'created' ? `#${e.id} created` : e.kind === 'review' ? `#${e.id} in review` : e.kind === 'sent back' ? `#${e.id} sent back` : '';
+    const lines = real.map(line), once = [...new Set(lines)]; // the same thing said twice of one task is said once
+    if (real.length <= 4 && once.length > 1 && lines.every(Boolean) && real.some(e => e.kind === 'claimed' || e.kind === 'finished')) return once.join('; ');
+    if (once.length === 1 && real.length === events.length && (real[0].kind === 'claimed' || real[0].kind === 'finished') && lines[0]) return lines[0];
     if (real.length === 1 && events.length === 1) {
         const e = real[0], verb = (KINDS.find(k => k[0] === e.kind) || [0, 'updated'])[1];
         return `${e.id ? `Task #${e.id}` : 'A task'} ${verb}${e.by && e.kind !== 'created' ? ` by ${e.by}` : ''}`;

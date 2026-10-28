@@ -69,7 +69,7 @@ const BASE = require('./test_base').BASE;
             return out;
         })()`);
         assert.deepEqual(g.kinds, ['msg', 'queue:3', 'msg', 'queue:1']);
-        assert.equal(g.labels[0], '1 task created, 1 claimed, 1 finished', 'the run in words, one task counted once per kind (#7183)');
+        assert.equal(g.labels[0], '#7 created; Backend Dev took #7; Backend Dev finished #7', 'a short run says what happened to which task and who did it (#10604; #7183 counted it)');
         assert.equal(g.labels[1], 'Task #8 created', 'a single line says its own task and what happened');
         assert.equal(g.lines, 3); assert.deepEqual(g.ids, ['2', '3', '4']);
         assert.equal(g.openAtFirst, false, 'collapsed by default');
@@ -122,7 +122,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(panel.bubbles, 6, 'only the 6 human messages are full messages');
         assert.equal(panel.runs, 6, 'each run of 4 task-queue lines between them is one row');
         assert.deepEqual(panel.humans, ['human 5', 'human 10', 'human 15', 'human 20', 'human 25', 'human 30']);
-        assert.match(panel.firstRun, /claimed|created|finished|in review/); assert.ok(!/task updates|coral-board/.test(panel.firstRun), 'the row is in words: ' + panel.firstRun);
+        assert.match(panel.firstRun, /claimed|created|finished|in review|took/); assert.ok(!/task updates|coral-board/.test(panel.firstRun), 'the row is in words: ' + panel.firstRun);
         console.log('   ✓ 24 task-queue lines are 6 rows; the 6 human messages stand out');
         console.log('PASS board task-queue lines are collapsed');
     } finally { await client.close(); }
