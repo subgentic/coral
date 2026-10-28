@@ -254,7 +254,7 @@ function machinePage(s) {
             ...fact('Coral', h('span', { text: version || '—' }), upd ? ' ' : null, upd),
             ...fact('Agents', String(serverAgentCount(live))),
             ...(n ? fact('Needs you', h('span', { className: 'cs-needs', text: String(n) })) : []),
-            ...fact(online ? 'Last seen' : 'Last contact', seenWords(s)),
+            ...fact('Last seen', seenWords(s)), // the list column's word, online or not: one word for one fact (#9798, UI/UX)
             ...fact('Hub access', accessPicker(s, isBusy, helpId))),
         detailCell(s, live, online, isBusy, helpId),
         h('div', { className: 'item-bar servers-page-bar cs-actions' }, rowActions(s, isBusy)));

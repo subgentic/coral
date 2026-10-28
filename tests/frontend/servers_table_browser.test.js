@@ -266,6 +266,7 @@ const contrast = (a, b) => {
         assert.deepEqual(await ev(`[...document.querySelectorAll('#server-row-m3 .cs-actions button')].map(b => b.textContent)`), ['Confirm revoke', 'Cancel']);
         assert.match(await ev(`document.querySelector('#server-row-m3 .cs-detail-cell').textContent`), /Revoke Box Three\? It disconnects this computer from Coral Hub\./);
         assert.ok(await ev(`!!document.querySelector('#server-row-m3 .cs-detail-cell .cs-note')`), 'the page shows the warning');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#server-row-m3 .cs-facts dt')].map(x => x.textContent).filter(t => /Last/.test(t))`), ['Last seen'], 'an offline machine\'s page calls it Last seen too, the list column\'s word, once (#9798)');
         await shot('page-desktop-revoke-confirm'); // an offline machine's page asking to revoke: the warning, Confirm revoke and Cancel (#9786: so it can be looked at; the others are page-<desktop|phone>-<dark|light> and table-*)
         // Revoke is never one click and never loses the keyboard: the ask puts focus on Cancel (the safe answer), the question is the buttons' description, Cancel and Escape leave the machine
         // connected (no DELETE) and put focus back on that row's Revoke.
