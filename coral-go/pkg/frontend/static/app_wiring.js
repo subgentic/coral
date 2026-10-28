@@ -10,6 +10,7 @@ import { initMacOS } from './platform/macos.js';
 import { initWindows } from './platform/windows.js';
 import { initBrowser } from './platform/browser.js';
 import { isCloud } from './server_base.js';
+import { wireShortcuts } from './shortcuts.js';
 import { handleUnauthorized, isSignedOut401 } from './auth_redirect.js';
 import { sendCommand, initImageDrop } from './controls.js';
 import { initFileSearch } from './changed_files.js';
@@ -97,8 +98,8 @@ export function wireComposer() {
         if (key) saveSessionDraft(key, cmdInput.value);
     });
 
-    // Global keyboard shortcuts removed — terminal input now handled by
-    // xterm.js onData when the terminal is focused.
+    // Terminal input is handled by xterm.js onData when the terminal is focused. The few page shortcuts (Alt+N, ?) are shortcuts.js, which leaves a focused terminal, field and dialog alone.
+    wireShortcuts();
 }
 
 /** Scroll tracking of the capture pane and the live history, and pausing capture updates while text in the terminal pane is selected. */

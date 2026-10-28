@@ -130,6 +130,7 @@ registerActions({
     'm-close-top-bar-settings-then-check-for-updates': () => { window.__coral.closeTopBarSettings(); window.checkForUpdates(true); },
     'm-close-top-bar-settings-then-show-servers-modal': () => { window.__coral.closeTopBarSettings(); window.showServersModal(); },
     'm-close-top-bar-settings-then-show-settings-modal': () => { window.__coral.closeTopBarSettings(); window.showSettingsModal(); },
+    'm-close-top-bar-settings-then-show-shortcuts': () => { window.__coral.closeTopBarSettings(); importOnce('./shortcuts.js').then(m => m.showShortcuts()); },
     'm-close-top-bar-settings-then-show-theme-configurator': () => { window.__coral.closeTopBarSettings(); window.showThemeConfigurator(); },
     'm-close-top-bar-settings-then-stop-all-auto-accept': () => { window.__coral.closeTopBarSettings(); window.stopAllAutoAccept(); },
     'm-dismiss-auto-wake': () => { window.dismissAutoWake(); },
