@@ -306,10 +306,10 @@
 1	session_rows.js	clickHandler
 1	session_rows.js	collapsedClass
 1	session_rows.js	compactClass
-1	session_rows.js	count
 1	session_rows.js	dirChip
 1	session_rows.js	dotClass
 1	session_rows.js	hooksMissingChip(s)
+1	session_rows.js	label
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
 1	session_rows.js	pillKind
 1	session_rows.js	reminderTag
@@ -321,6 +321,7 @@
 1	session_rows.js	stuckClass
 1	session_rows.js	terminalGoneChip(s)
 1	session_rows.js	typeTag
+1	session_rows.js	wake
 1	session_state.js	gs.ahead
 1	session_state.js	gs.behind
 1	session_state.js	gs.dirty
