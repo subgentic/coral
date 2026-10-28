@@ -41,13 +41,6 @@ function _renderTeamCard(boardName, boardSessions) {
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8l2 2v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M6 3v3h4V3"/><rect x="5" y="9" width="6" height="3"/></svg>
                     Save as Template
                 </button>
-                <hr class="overflow-menu-divider">
-                <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-reset" data-board="${escapeAttr(boardName)}">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg>
-                    Reset Team
-                </button>
-                ${killAllItem(boardName)}
-                ${deleteTeamItem(boardName)}
                 <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}-more">More</button>
                 <div id="${escapeAttr(kebabId('team', boardName))}-more" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(keyLabel(boardName))}" hidden>
                 <button class="menu-item overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
@@ -80,6 +73,13 @@ function _renderTeamCard(boardName, boardSessions) {
                     Move Down
                 </button>
                 </div>
+                <hr class="overflow-menu-divider overflow-menu-divider-danger">
+                <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-reset" data-board="${escapeAttr(boardName)}">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg>
+                    Reset Team
+                </button>
+                ${killAllItem(boardName)}
+                ${deleteTeamItem(boardName)}
             </div>
         </div>`;
         const sleepingClass = boardIsSleeping ? ' team-sleeping' : '';
@@ -285,9 +285,6 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8l2 2v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M6 3v3h4V3"/><rect x="5" y="9" width="6" height="3"/></svg>
                             Save as Template
                         </button>
-                <hr class="overflow-menu-divider">
-                        ${killAllItem(boardName)}
-                ${deleteTeamItem(boardName)}
                 <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}-more">More</button>
                 <div id="${escapeAttr(kebabId('team', boardName))}-more" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(keyLabel(boardName))}" hidden>
                 <button class="menu-item overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
@@ -312,6 +309,9 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                             Token Usage
                         </button>
                 </div>
+                <hr class="overflow-menu-divider overflow-menu-divider-danger">
+                        ${killAllItem(boardName)}
+                ${deleteTeamItem(boardName)}
                     </div>
                 </div>`;
                 html += `<li class="session-board-card session-team-group"${accentStyle}>
