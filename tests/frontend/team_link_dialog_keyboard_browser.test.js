@@ -106,6 +106,11 @@ const ALLOWED = [/^GET \/api\/sessions\/live$/, /^GET \/api\/relay\/links$/, /^P
             await key('Enter'); await new Promise(r => setTimeout(r, 700)); // sleep-ok: the call and the list
             const live2 = await dlg(`(d.querySelector('[role=status]') || {}).textContent || ''`), c6 = await act();
             check(/^Linked .+ on .+\./.test(live2) && c6.inDialog, `a done link is said and the keyboard stays in the dialog: ${JSON.stringify([live2, c6])}`);
+            // the same sentence twice is announced twice: the status is emptied before it is set again (a live region says only what changes)
+            await ev(`window.__liveSeen = []; const st = document.querySelector('#team-link-dialog [role=status]'); new MutationObserver(() => window.__liveSeen.push(st.textContent)).observe(st, { childList: true, characterData: true, subtree: true }); true`);
+            for (let i = 0; i < 2; i++) { await fx('#team-link-dialog .team-link-link'); await key('Enter'); await settle(); await fx('#team-link-dialog .team-link-go'); await key('Enter'); await new Promise(r => setTimeout(r, 700)); } // sleep-ok: the call and the list
+            const seen = await ev('window.__liveSeen'), sentences = seen.filter(t => /^Linked /.test(t));
+            check(sentences.length >= 2 && sentences[0] === sentences[1] && seen.slice(seen.indexOf(sentences[0]), seen.lastIndexOf(sentences[1])).includes(''), `the same sentence said twice is emptied between, so a screen reader says it twice: ${JSON.stringify(seen)}`);
             // 6. 200% text: the circle grows, nothing runs off the dialog
             await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle();
             const big = await dlg(`(() => { const r = d.getBoundingClientRect(), av = d.querySelector('.team-link-avatar'); const wide = [...d.querySelectorAll('*')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > r.right + 1).map(e => String(e.className || e.tagName).slice(0, 30)); return { avatar: av ? Math.round(av.getBoundingClientRect().width) : 0, wide, hscroll: d.scrollWidth > d.clientWidth + 1 }; })()`);
