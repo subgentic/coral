@@ -21,7 +21,7 @@ const { connect } = require('./agent_view_harness');
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(ROWS)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
             await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 5`, `${label}: the rows`, 6000);
-            const rows = await ev(`[...document.querySelectorAll('${root} .session-group-item')].map(li => { const r = li.getBoundingClientRect(), name = li.querySelector('.session-label'); return { id: li.dataset.sessionId, h: Math.round(r.height), weight: name ? getComputedStyle(name).fontWeight : null, nameLines: name ? Math.round(name.getBoundingClientRect().height / parseFloat(getComputedStyle(name).lineHeight || '16')) : 0, chips: [...li.querySelectorAll('.chip')].filter(c => c.getClientRects().length).map(c => c.textContent.trim()), extra: ['.session-goal', '.session-model', '.session-worktree-line', '.session-line2', '.session-held-line', '.session-mobile-meta', '.session-mobile-banner-row', '.session-ctx-pill'].filter(s => li.querySelector(s)), dot: !!li.querySelector('.session-dot') }; })`);
+            const rows = await ev(`[...document.querySelectorAll('${root} .session-group-item')].map(li => { const r = li.getBoundingClientRect(), name = li.querySelector('.session-label'); return { id: li.dataset.sessionId, h: Math.round(r.height), weight: name ? getComputedStyle(name).fontWeight : null, nameLines: name ? Math.round(name.getBoundingClientRect().height / parseFloat(getComputedStyle(name).lineHeight || '16')) : 0, chips: [...li.querySelectorAll('.chip')].filter(c => c.getClientRects().length).map(c => c.textContent.trim()), chipPx: (c => c ? parseFloat(getComputedStyle(c).fontSize) : 0)(li.querySelector('.session-state-pill')), extra: ['.session-goal', '.session-model', '.session-worktree-line', '.session-line2', '.session-held-line', '.session-mobile-meta', '.session-mobile-banner-row', '.session-ctx-pill'].filter(s => li.querySelector(s)), dot: !!li.querySelector('.session-dot') }; })`);
             const by = id => rows.find(r => r.id === id);
             for (const r of rows) {
                 assert.ok(r.h >= rowH[0] && r.h <= rowH[1], `${label}: ${r.id} is one line, ${rowH[0]} to ${rowH[1]} px (${r.h}) ${JSON.stringify(r)}`);
@@ -31,6 +31,7 @@ const { connect } = require('./agent_view_harness');
             }
             assert.deepEqual(by('o1').chips.concat(by('o5').chips), [], `${label}: a working agent and an idle one have no chip`);
             assert.match(by('o2').chips[0] || '', /Needs input/, `${label}: an agent that asks has the Needs input chip`);
+            if (mobile) assert.equal(by('o2').chipPx, 13, `${label}: the phone's chip is 13 px (the one thing that says an agent waits), the row still one line ${JSON.stringify(by('o2'))}`);
             assert.deepEqual(by('o3').chips, ['Message held'], `${label}: an agent whose message was held has "Message held"`);
             assert.match(by('o4').chips[0] || '', /Needs input/, `${label}: Needs you wins over the hold`);
             assert.equal(by('o4').chips.length, 1, `${label}: one chip`);
