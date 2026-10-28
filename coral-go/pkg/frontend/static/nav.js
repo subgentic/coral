@@ -4,9 +4,18 @@
    paging). One popstate listener shows the route of the entry the user went back or forward to.
    Paths come from routes.js (parse/build); old hash links are read once at startup and replaced. */
 
+import { isPhoneLayout } from './phone_layout.js';
+import { browserLocal } from './safe_storage.js';
 import { parse, build, fromLegacyHash, normalize, chatsQuery } from './routes.js';
 
 const handlers = new Map();
+const LAST_PLACE = 'coral-last-place'; // the team, agent or chat the person had open (#10057): the page at "/" reopens it after a restart; kept in this browser only, as the route's address
+
+function lastPlace(set) { return set === undefined ? browserLocal.get(LAST_PLACE) : set === null ? browserLocal.remove(LAST_PLACE) : browserLocal.set(LAST_PLACE, set); }
+/** Forget the place (it is gone, or Home was chosen). */
+export function forgetLastPlace() { lastPlace(null); }
+const isPlace = r => !!r && ((r.view === 'agents' && !!r.id) || r.view === 'team' || (r.view === 'chats' && !!r.id));
+const isHome = r => !!r && r.view === 'agents' && !r.id;
 let current = null;
 let started = false;
 
@@ -30,6 +39,7 @@ function write(route, replace, from) {
         history.pushState({ coralRoute: route, prev: here, ...(from ? { from: String(from) } : {}) }, '', url); // from: the title of the goal or task this was opened from, so its Back says where it goes (#8861)
     }
     current = route;
+    if (started) { if (isPlace(route)) lastPlace(url); else if (isHome(route)) lastPlace(null); } // a place is remembered; Home chosen forgets it; any other page leaves it as it was
 }
 
 /** Whether the entry before this one (the one Back returns to) is this route's page. */
@@ -92,8 +102,15 @@ export function startRoute(loc = location) {
 export function startNav() {
     if (started) return current;
     started = true;
-    const route = startRoute();
+    let route = startRoute(), restored = false;
+    // The bare start (the address "/", no query; /agents typed on purpose is the list) reopens the place the person left (#10057); a link, a phone (its Home is the Agents list) or a place that is gone is shown as it is.
+    if (isHome(route) && (location.pathname === '/' || location.pathname === '') && !location.search && (!location.hash || location.hash === '#') && !isPhoneLayout()) {
+        const back = parse(lastPlace() || '', '');
+        if (isPlace(back)) { route = back; restored = true; }
+    }
+    const kept = lastPlace();
     write(route, true);
+    if (kept && isHome(route)) lastPlace(kept); // the start itself is not the person choosing Home: a phone's Home start (or a link's) leaves the place for the next wide start
     window.addEventListener('popstate', () => {
         // The URL is the truth: the route is parsed from the location every time, never taken
         // from history.state, which may come from an older Coral, a restored session or a
@@ -107,6 +124,6 @@ export function startNav() {
         current = r;
         show(r, { fromHistory: true }).finally(routeChanged);
     });
-    show(route, { fromHistory: true, startup: true });
+    show(route, { fromHistory: true, startup: true, restored });
     return route;
 }
