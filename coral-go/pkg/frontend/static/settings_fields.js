@@ -175,6 +175,7 @@ export const SECURITY_FIELDS = [
 ];
 
 export const NETWORK_FIELDS = [
+    { key: 'net_use_title', type: 'heading', id: 'net-use-title', label: 'Use from my phone or another computer' }, // the first group (#10481, Beta): how to reach Coral from elsewhere; the health card (Status) and Coral Hub follow
     { key: 'remote_access', type: 'toggle', id: 'settings-remote-access-enabled', labelId: 'net-access-title', label: 'Remote access', live: ['settings-remote-access-status', 'net-remote-note'],
         help: { text: 'Lets other devices use Coral as you do (control agents, read files, change settings); unencrypted unless TLS is set up.', more: 'TLS is on when Coral was started with --tls-cert and --tls-key, or when you reach it through Coral Hub. A device needs your password or API key.' } },
     // the groups of this pane (#8491): a title drawn by settings_view (the sections are labelled by it) and the group's body, a part of the page its own module fills and shows or hides (the row and its title leave with it, settings_view.css)
