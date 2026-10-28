@@ -119,7 +119,8 @@
 1	chat_messages.js	sharedImageChips(lead.images)
 1	chat_messages.js	thumbHtml(a)
 1	chat_search.js	highlightExcerpt(hit.excerpt, hit.match_offsets)
-2	chat_thumbs.js	SIZE
+1	chat_thumbs.js	THUMB_H
+1	chat_thumbs.js	THUMB_W
 1	chat_thumbs.js	chips.join("")
 1	chat_thumbs.js	thumbHtml({ artifact: im.hex, name: im.name })
 1	chat_thumbs.js	unshare
