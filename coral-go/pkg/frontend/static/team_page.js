@@ -16,6 +16,7 @@ import { onViewShown } from './view_switch.js';
 import { setPreviewSession } from './preview_pane.js';
 import { renderLiveSessions } from './render.js';
 import { watchScrollCue } from './scroll_cue.js';
+import { isPhoneLayout } from './phone_layout.js';
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
@@ -73,6 +74,7 @@ function buildOnce() {
     });
     $('team-page-health').addEventListener('click', () => { goTab('agents', { user: true }); });
     $('team-page-missing-back')?.addEventListener('click', () => { go({ view: 'agents' }); });
+    $('team-page-back-agent')?.addEventListener('click', backToAgent);
     $('team-page-add-agent').addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
     $('team-page-settings').addEventListener('click', () => { openSettings(); });
     buildMore();
@@ -193,6 +195,14 @@ function releaseBoardActions() {
 
 /** The header again (the board was renamed). */
 export const refreshTeamHeader = () => { if (S.team) drawHeader(); };
+
+let backTo = null; // the agent whose dock's Board tab opened this page (#10703)
+async function backToAgent() {
+    const to = backTo; backTo = null; $('team-page-back-agent').hidden = true;
+    await window.selectLiveSession(to.name, to.agent_type, to.session_id || '', to.server);
+    if (isPhoneLayout()) window.toggleAgenticPanel?.(true);
+    $('agentic-tab-board').click();
+}
 
 function drawHeader() {
     const h = $('team-page-title');
@@ -469,6 +479,9 @@ export async function openTeamPage(team, opts = {}) {
         for (const t of ['goals', 'tasks', 'artifacts', 'agents', 'knowledge']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
         drawCounts(); drawStatus(null);
     }
+    backTo = opts.backTo || (changed ? null : backTo);
+    $('team-page-back-agent').hidden = !backTo;
+    if (backTo) $('team-page-back-agent').textContent = `\u2190 Back to ${backTo.display_name || backTo.name}`;
     drawHeader();
     drawMissing(missing.get(team) === true);
     if (changed && !missing.has(team)) teamIsMissing(team).then(gone => { if (gone && S.team === team) { drawMissing(true); drawStatus(null); } });
@@ -500,6 +513,7 @@ function leaveTeamPage() {
     releaseBoardActions();
     importOnce('./message_board.js').then(m => m.leaveBoardPage?.()).catch(() => {});
     S.team = ''; S.item = null;
+    backTo = null;
 }
 
 // Another page on screen (an agent, Chats, Jobs): the team page lets go of what it borrowed.

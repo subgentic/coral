@@ -492,7 +492,10 @@ registerActions({
     'board-open': el => { const b = textOf(el.dataset.board); if (b) window.selectBoardProject(b); },
     'msg-edit-resubmit': el => window.editAndResubmit(el),
     // The board chat panel beside an agent.
-    'board-chat-open': (el, event) => { event.preventDefault(); const b = textOf(el.dataset.board); if (b) window.selectBoardProject(b); },
+    'board-chat-open': (el, event) => { // from an agent's dock Board tab the page has a Back to that agent (#10703)
+        event.preventDefault(); const b = textOf(el.dataset.board), s = state.currentSession;
+        if (b) window.selectBoardProject(b, null, s && s.type === 'live' && el.closest('#agentic-panel-board') ? { backTo: s } : {});
+    },
     'board-chat-pause': el => { const b = textOf(el.dataset.board); if (b) boardChatNow()?._toggleBoardChatPause(b); },
     'board-chat-select': () => window.__coral._toggleBoardChatSelect(),
     'board-chat-all': () => { const i = document.getElementById('board-panel-input'); if (i) { i.value = '@all ' + i.value; i.focus(); } },
