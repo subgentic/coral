@@ -173,7 +173,7 @@ function drawTable() {
     const folderPage = bar?.node && tables[0] && tables[0].noun ? tables[0] : null;
     const drawn = html + (src.signature?.() || '') + (folderPage ? `|head:${folderPage.title}:${folderPage.count === undefined ? folderPage.rows.length : folderPage.count}` : '') + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
     // A row the keyboard is on keeps it across a redraw (the Inbox's "waiting 4 min" moves on every 30 seconds while the table is the only list, #7004): it is found again by its class and data attributes
-    const held = host.contains(a) && a.matches('.group-chip, .dt-primary, .dt-quiet, .inbox-answer') ? { cls: a.className, data: JSON.stringify(a.dataset) } : null;
+    const held = host.contains(a) && a.matches('.group-chip, .dt-primary, .dt-quiet, .inbox-answer') ? { cls: a.className, data: JSON.stringify(a.dataset), row: a.closest('tbody tr') ? [...a.closest('tbody').children].indexOf(a.closest('tr')) : -1 } : null;
     if (host.dataset.drawn !== drawn) {
         host.innerHTML = html; host.dataset.drawn = drawn; // a redraw of what is there would drop the focus from a row the keyboard is on
         if (bar?.node) host.prepend(bar.node);
@@ -188,6 +188,8 @@ function drawTable() {
         if (toolbarCaret) toolbarFocus.setSelectionRange(...toolbarCaret);
     }
     if (held && host.dataset.drawn === drawn && !host.contains(document.activeElement)) [...host.querySelectorAll('.group-chip, .dt-primary, .dt-quiet, .inbox-answer')].find(e => e.className === held.cls && JSON.stringify(e.dataset) === held.data)?.focus({ preventScroll: true });
+    // the row the keyboard was on is gone (answered, or the agent stopped waiting): the keyboard goes to the row that took its place, or the last one, not to the page (#10560)
+    if (held && held.row >= 0 && !host.contains(document.activeElement)) { const rows = [...host.querySelectorAll('tbody tr')]; rows[Math.min(held.row, rows.length - 1)]?.querySelector('.dt-primary')?.focus({ preventScroll: true }); }
     if (typing) { const again = document.getElementById('gt-search'); if (again && again !== a) { again.focus({ preventScroll: true }); try { again.setSelectionRange(typing.start, typing.end); } catch { /* a search field has a caret */ } } } // the person is typing in the page's search: the redraw keeps their caret
     return true;
 }
