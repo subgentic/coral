@@ -9,12 +9,15 @@ import { initFilesSourcePicker, syncFilesSourceTeam } from './team_artifacts.js'
 import { fileIconHtml } from './file_explorer.js';
 import { openPreviewTab, openArtifactTab, setPreviewSession } from './preview_pane.js';
 import { storeKey, readStars, writeStars } from './local_store.js';
+import { importOnce } from './import_once.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
 
 let _currentFiles = [];
 let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit open on a phone (#7652): kept across the list's redraws
 // A phone's row has one "More" button in place of the three icon buttons, so the name keeps the row (#7652); it opens them on a line under the row.
 const moreButton = (path, name) => { const label = `More for ${name}`; return `<button type="button" class="btn btn-quiet btn-icon btn-xs file-more-btn" data-on-click="file-more" data-path="${escapeAttr(path)}" aria-expanded="${escapeAttr(String(_actionsOpenFor === path))}" aria-label="${escapeAttr(label)}" title="More"><span aria-hidden="true">&#x22EF;</span></button>`; }; // the midline ellipsis as text: no icon font name to subset
+/** A file row's Share as artifact button (#10269): it names its file, as the row's other buttons do. */
+const shareButton = (path, name) => { const label = `Share ${name} as an artifact`; return `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-share" data-path="${escapeAttr(path)}" title="Share as artifact" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">link</span></button>`; };
 let _searchTimeout = null;
 let _renderTimer = null;
 
@@ -83,6 +86,7 @@ function renderStarredFiles() {
             const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-copy" data-path="${escapeAttr(filepath)}" title="Copy path" aria-label="${escapeAttr(copyLabel)}"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
             const previewBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(filepath)}" title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
             const editBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(filepath)}" title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
+            const shareBtn = shareButton(filepath, name);
             return `<div class="file-item file-starred${escapeAttr(_actionsOpenFor === filepath ? ' actions-open' : '')}" data-on-click="file-open" role="button" tabindex="0" data-key-click data-path="${escapeAttr(filepath)}">
                 ${starBtn}
                 <div class="file-path-wrap">
@@ -90,7 +94,7 @@ function renderStarredFiles() {
                     ${dir ? `<span class="file-dir">${escapeHtml(dir)}</span>` : ''}
                 </div>
                 ${moreButton(filepath, name)}
-                <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}</div>
+                <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}${shareBtn}</div>
             </div>`;
         }).join('');
 }
@@ -568,6 +572,7 @@ export async function refreshChangedFiles() {
         const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-copy" data-path="${escapeAttr(f.filepath)}" title="Copy path" aria-label="${escapeAttr(copyLabel)}"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
         const previewBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
         const editBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
+        const shareBtn = shareButton(f.filepath, rowName);
 
         // Clicking the row opens its diff in the preview pane; the buttons
         // copy the path, preview the file, and open it in the editor.
@@ -583,7 +588,7 @@ export async function refreshChangedFiles() {
             </div>
             ${stats}
             ${moreButton(f.filepath, rowName)}
-            <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}</div>
+            <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}${shareBtn}</div>
         </div>`;
     }).join('');
     if (heldMore) [...list.querySelectorAll('.file-more-btn')].find(b => b.dataset.path === heldMore)?.focus({ preventScroll: true });
@@ -599,6 +604,7 @@ registerActions({
     'file-more': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (!p) return; _actionsOpenFor = _actionsOpenFor === p ? '' : p; const row = el.closest('.file-item'); if (row) row.classList.toggle('actions-open', _actionsOpenFor === p); el.setAttribute('aria-expanded', String(_actionsOpenFor === p)); },
     'file-copy': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) copyFilePath(p); },
     'file-preview': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) openFilePreview(p, ...diffOpts(el)); },
+    'file-share': async (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) (await importOnce('./share_file.js')).shareFileAsArtifact(p); },
     'file-edit': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) openFileEdit(p, ...diffOpts(el)); },
     // On mousedown, as before: the @-mention list closes on the input's blur, which a click comes after.
     // Only a mode this list offers.
