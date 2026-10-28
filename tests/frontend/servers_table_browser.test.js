@@ -339,6 +339,12 @@ const contrast = (a, b) => {
                 assert.ok(over <= 0, `${tag}: the page has no sideways scroll (${over})`);
                 await shot(`page-${tag}-${theme}`);
             }
+            if (mobile) { // at 200% text on a phone the Hub access select stays on the screen: its 10 rem minimum is of the column, not of the page (#9804: it ran off the right edge)
+                await ev(`window.__fs0 = document.documentElement.style.fontSize; document.documentElement.style.fontSize = '32px'; true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the layout settles at the new size
+                const big = await ev(`(() => { const sel = document.querySelector('#servers-view section.cs-page .cs-facts select'), r = sel.getBoundingClientRect(); return { right: Math.round(r.right), vw: innerWidth, over: document.documentElement.scrollWidth - innerWidth }; })()`);
+                await ev(`document.documentElement.style.fontSize = window.__fs0 || ''; true`);
+                assert.ok(big.right <= big.vw && big.over <= 0, `${tag}: at 200% text the Hub access select is on the screen ${JSON.stringify(big)}`);
+            }
             await setTheme(ev, 'dark');
         }
         await client.Emulation.clearDeviceMetricsOverride(); await client.Emulation.setTouchEmulationEnabled({ enabled: false });
