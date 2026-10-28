@@ -17,7 +17,7 @@ const S = `(window.__coralStatic || '/static/')`;
         console.log('1. the chooser, its cards and the two dialogs');
         await ev(`(async () => { await window.showLaunchModal(); return true; })()`);
         assert.deepEqual(await text('#launch-title'), ['New agent or team']);
-        assert.deepEqual((await text('#launch-step-chooser .launch-type-label')).slice(0, 3), ['New agent', 'New team', 'Terminal']);
+        assert.deepEqual((await text('#launch-step-chooser .launch-type-label')).slice(0, 3), ['New agent', 'New team', 'Open folder']);
         await ev(`window._selectLaunchType('agent'); true`);
         assert.deepEqual(await text('#launch-agent-title'), ['New agent']);
         assert.equal(await ev(`(() => { const h = document.getElementById('launch-dir-hint'); return !h.textContent && getComputedStyle(h).display === 'none'; })()`), true, 'no "Pick your project folder." under the label');
