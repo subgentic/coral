@@ -349,12 +349,13 @@
 .dt-box.dt-tiny [data-tiny="hide"] { display: none !important; } /* a folded table narrower than 20 rem (a phone at 200% text): the columns that say tiny: true are not drawn */
 .dt-one-line .dt-table { width: 100%; table-layout: fixed; }
 .dt-one-line .dt-td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dt-one-line .dt-primary { min-height: 44px; display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-one-line .dt-primary { display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dt-one-line .dt-sortbar { display: none; }
 .artifact-table .artifact-tags-row { flex-wrap: nowrap; margin-top: 0; overflow: hidden; vertical-align: middle; }
 .artifact-table .artifact-tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .artifact-table .artifact-tag-more { flex-shrink: 0; }
-.artifact-table .artifact-details { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; }
+.artifact-table .artifact-details { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; }
+@media (max-width: 760px), (pointer: coarse) { .artifact-table .artifact-details { width: 44px; height: 44px; } } /* a row is 36 px at a mouse and its target 44 px on touch (#9734) */
 .artifact-table .artifact-details::after { content: none; }
 @container (max-width: 62rem) { .dt-one-line [data-drop-at="62"] { display: none; } } /* the Inbox artifact list's Tags go first */
 @container (max-width: 52rem) { .dt-one-line [data-drop-at="52"] { display: none; } }
