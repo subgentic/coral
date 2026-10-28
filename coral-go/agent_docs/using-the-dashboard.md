@@ -17,7 +17,7 @@ Task-oriented notes on the dashboard controls. Every statement was checked again
 
 Click the model chip to pick a model, or the thinking chip to pick a level. The model menu lists the models the agent's CLI offers; the thinking menu lists only the levels that model takes.
 
-The agent's header does not repeat the model (the chip and the agent row's tooltip carry it). It shows the git branch, cut short with an ellipsis when it is long (a worktree's branch can be 60 characters or more): hover it, move to it with Tab, or tap it and the whole name opens in place under the header, without moving any button. On a narrow header the branch is left out.
+The agent's header does not repeat the model (the chips, the **Details** disclosure and the agent row's hover tip carry it), and it has no folder line: the folder's full path is the hover and keyboard-focus tip on the agent's name (Escape puts it away) and is also in **Details**. The Chat/Terminal switch sits at the right with the actions. It shows the git branch, cut short with an ellipsis when it is long (a worktree's branch can be 60 characters or more): hover it, move to it with Tab, or tap it and the whole name opens in place under the header, without moving any button. On a narrow header the branch is left out.
 
 - **Claude Code switches live.** Coral types the CLI's own `/model` and `/effort` into the agent's terminal once the agent is between turns. The chip you used says `Switching to …` until the transcript confirms it, and shows the CLI's message if it refused. You can keep typing the whole time.
 - **Switches after this reply.** You changed it while the agent was in the middle of a turn. Coral waits for the reply to end and never types into the middle of one.
@@ -25,15 +25,12 @@ The agent's header does not repeat the model (the chip and the agent row's toolt
 
 A second change while one is still pending is refused with a message. The API behind this is `POST /api/sessions/live/{name}/model` in [Sessions](sessions.md).
 
-## See the model and thinking level in the agent list
+## See the model and thinking level of an agent
 
-Under each agent's name the list can show one line of what that agent runs: its provider, its model and its thinking level, for example `Claude · Opus 5.5 · High`. For Claude and Codex it is read from the CLI's own transcript, so it is what the newest turn used. Before an agent's first reply the level is the one it was *started* with, and the agent's hover card says so (`High (as started)`).
+The agent list is one line per agent: its name and what it is doing. The provider, model and thinking level are not on that line; **hover** or **focus** an agent row and its card has **Model** and **Thinking** rows (for example `Claude · Opus 5.5` and `High`), and the open agent's **Details** disclosure has them with the context use. For Claude and Codex they are read from the CLI's own transcript, so they are what the newest turn used. Before an agent's first reply the level is the one it was *started* with, and the card says so (`High (as started)`).
 
-![The agent list with Show provider, Show model and Show thinking level on: three agents' lines: Claude · Opus 4.1 · High, Claude · Opus 4.1 · Medium, and Claude · Opus 4.1 with no level](docs-img/agent-line-options.png)
-
-- **Three options** in the **Display** panel (see [Filter and sort the agent list](#filter-and-sort-the-agent-list)): **Show provider**, **Show model** and **Show thinking level**. Each is on by default, is remembered in this browser, and turns one word of the line on or off. With **Show model** and **Show thinking level** both off, the provider alone is shown. Someone who had turned the old single "Show agent type" switch off keeps it off for all three until they change one.
-- **Only what is on record.** A plain terminal has none of the three, and Pi reports no thinking level, so its line has none. Claude and Codex show the level an agent was started with until its first reply records the real one; Antigravity keeps showing the level it was started with. An agent started with no level shows none until then. An agent with nothing to show has no line, so the list does not grow a line per agent. Under the options the panel says how many agents have no thinking level on record.
-- **The hover card.** Hover an agent row and its card has **Model** and **Thinking** rows, independent of the three options.
+- **Only what is on record.** A plain terminal has none of the three, and Pi reports no thinking level, so there is none to show. Antigravity keeps showing the level it was started with. An agent started with no level shows none until its first reply.
+- **Changing them** is done from the chips beside the Send button (see above), not from the list.
 
 ## See cost by provider, model and thinking level
 
@@ -64,12 +61,9 @@ A separate switch, **Team health checks** in Settings > Agents, is on by default
 
 ## Filter and sort the agent list
 
-The ☰ **Display** button under the search box opens a panel in place (not a pop-up).
-
-![The Display panel open with a State filter on](docs-img/display-panel.png)
+The ☰ **Display options** button under the search box opens a panel in place (not a pop-up).
 
 - **State** (Needs input, Working, Idle, Asleep), **Board**, **Machine** (when other machines are connected) and **Sort** (List order, Name, Recent activity, Cost), then the count ("4 of 10 agents") and **Clear filters**.
-- **Show summaries**, **Show branches**, **Show provider**, **Show model** and **Show thinking level**; with other machines connected, **Show server** and **Group by server** too.
 - **A summary line** under the search says what is on, for example `State: Working (4 of 10 agents)`, with **Clear**, and a dot on the button marks that something is on.
 - **Escape** closes the panel and returns to its button. Whether it is open is remembered in this browser. On a phone the same panel is in the Agents page header.
 
@@ -83,7 +77,7 @@ A team's page has the tabs **Goals**, **Board**, **Tasks**, **Agents**, **Artifa
 
 ![The New agent dialog on its Agent section](docs-img/dialog-sections.png)
 
-- **Restart:** Agent, Prompt, Permissions, Advanced. **New Agent:** Workspace, Agent, Prompt, Permissions, Advanced. **Agent Team:** Members, Board & workspace, Defaults. A team's agent dialog adds a Role section.
+- **Restart:** Agent, Prompt, Permissions, Advanced. **New agent** has three steps: the folder, the persona and prompt, then **Agent**, **Permissions** and **Advanced** on the last (the model and thinking level are on **Agent**). **Agent Team:** Members, Board & workspace, Defaults. A team's agent dialog adds a Role section.
 - Moving between sections keeps what you typed. The arrow keys, Home and End move through the list and open the section; Tab goes from the list into the open section. A section holding a field with a problem is marked in the list.
 
 ## Pasted images show a thumbnail
@@ -95,7 +89,7 @@ When you paste or attach an image in the message box and send it, its chip in th
 
 ## Answer tasks and read whole messages in the Inbox
 
-The **Inbox** has three tabs: **Needs you** (agents waiting for you), **Tasks for you** and **Saved for later**.
+The **Inbox** lists **Needs you** (agents waiting for you), **Tasks**, **Goals**, **Artifacts** and **Saved** (through Coral Hub: Needs you, Tasks and Saved for later). **Tasks for you** below is the Tasks list.
 
 **Needs you** also lists a scheduled job or workflow run that failed and that you have not opened: press **Open** to go to its page, or **Dismiss** to clear it. Automations has a **Recent runs** folder with every run, newest first and a dot before each finished run you have not opened; opening a run (here, on your phone or in another tab) clears its dot everywhere.
 

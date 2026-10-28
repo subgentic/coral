@@ -58,7 +58,7 @@ boolean settings in any case, so `true` and `"true"` mean the same.
 | `update_channel` | `approved` | Which releases the update notice, the tray and the Updates pane tell you about: `approved` (the release marked latest) or `agentic` (every published release, approved or not, plain `vX.Y.Z` tags only). Any other value is refused when saved and reads as `approved`. It changes the NOTICE only: the updater (Hub relaunch into a staged update) installs approved releases whatever this says. Applies on the next check. |
 | `terminal_replay_bytes` | 262144 | How much recent terminal output a newly opened terminal is sent first (see websockets.md), clamped to 4 KiB to 16 MiB. Applies to terminals opened from then on. |
 
-**CLI paths:** `cli_path_<type>` (Settings › CLI paths: `claude`, `codex`, `agy`,
+**CLI paths:** `cli_path_<type>` (Settings › Agents › CLI paths: `claude`, `codex`, `agy`,
 `antigravity`, `gemini`, `pi`) is the program Coral runs for that agent type. The `gemini` type is Antigravity compatibility: it runs agy, with agy's flags and model list (`agy` and `gemini` share one path field in Settings), so a path that is the real Gemini CLI is refused when a launch or the CLI check reaches it, with a setup error naming the setting. A new value
 must be an absolute path to an executable regular file (a symlink to one is fine) with no
 shell metacharacters (`' " \` $ ; & | < > * ? !`) or control characters; `""` clears it.

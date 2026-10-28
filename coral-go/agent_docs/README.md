@@ -53,7 +53,7 @@ Run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read on
 - [Views](views.md) — Custom dashboard views/tabs
 
 ### Privacy
-- [Telemetry](telemetry.md) — Every event Coral sends, what it never collects, and why there is no opt-out
+- [Telemetry](telemetry.md) — Every event Coral sends, what it never collects, and the Usage analytics switch in Settings that turns them off
 - [What the redactor recognises](redaction.md) — The rules that hide tokens from Coral Hub viewers, the keyword rules, and every entropy threshold
 
 ### Observability
