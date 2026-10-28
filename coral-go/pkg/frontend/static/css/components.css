@@ -1904,6 +1904,20 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     color: var(--error);
 }
 
+/* A CLI the person does not have and never set a path for is not a failure (#10083); a refused path says why under its result. */
+.cli-verify-none {
+    color: var(--text-secondary);
+}
+
+.cli-verify-why {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-secondary);
+    font-size: var(--fs-sm);
+    line-height: var(--lh-ui);
+}
+.cli-verify-why[hidden] { display: none; }
+
 /* ── Overflow Menu ─────────────────────────────────────────── */
 
 .overflow-menu-trigger {

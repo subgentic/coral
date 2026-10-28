@@ -8,9 +8,10 @@ import { serverLabel } from './launch_server.js';
 const { _settingsFor } = await importOnce('./launch_models.js');
 const { defaultPermissionMode, _getPermissionFlagsForAgentMode, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { CLI_INSTALL_INSTRUCTIONS } = await importOnce('./cli_check.js');
+const { cliVerifyWords } = await importOnce('./cli_verify_words.js');
 const { showSettingsModal } = await importOnce('./settings_dialog.js');
 
-/** Verify a CLI path by calling the backend check endpoint. */
+/** Verify a CLI path by calling the backend check endpoint. The words (and what to do when a path is refused) are cli_verify_words.js's (#10083). */
 async function _checkOneCLI(inputId, resultId) {
     const input = document.getElementById(inputId);
     const resultEl = document.getElementById(resultId);
@@ -19,27 +20,40 @@ async function _checkOneCLI(inputId, resultId) {
     const binary = input.value.trim() || input.placeholder;
     resultEl.textContent = '...';
     resultEl.className = 'cli-verify-result';
+    resultEl.title = '';
+    const why = _whyLine(resultEl);
+    why.textContent = '';
+    why.hidden = true;
 
+    let words;
     try {
         // The type lets the server accept a path to that CLI's binary (#3583).
         const type = inputId.replace('settings-cli-path-', '');
         const resp = await fetch(`/api/system/cli-check?binary=${encodeURIComponent(binary)}&type=${encodeURIComponent(type)}`);
-        const data = await resp.json();
-        if (!resp.ok) {
-            resultEl.textContent = 'Not allowed';
-            resultEl.title = data.error || '';
-            resultEl.classList.add('cli-verify-fail');
-        } else if (data.found) {
-            resultEl.textContent = data.version || 'Found';
-            resultEl.classList.add('cli-verify-ok');
-        } else {
-            resultEl.textContent = 'Not found';
-            resultEl.classList.add('cli-verify-fail');
-        }
+        let data = null;
+        try { data = await resp.json(); } catch { data = null; }
+        words = cliVerifyWords({ ok: resp.ok, status: resp.status, data, typed: input.value, type: (CLI_INSTALL_INSTRUCTIONS[type] || {}).label || type });
     } catch {
-        resultEl.textContent = 'Error';
-        resultEl.classList.add('cli-verify-fail');
+        words = cliVerifyWords({ error: true });
     }
+    resultEl.textContent = words.text;
+    resultEl.classList.add(words.cls);
+    if (words.hint) { resultEl.title = words.hint; why.textContent = words.hint; why.hidden = false; resultEl.setAttribute('aria-describedby', why.id); } else resultEl.removeAttribute('aria-describedby');
+}
+
+/** The line under a result that says why a path was refused and what to do (made once, text only). */
+function _whyLine(resultEl) {
+    const id = `${resultEl.id}-why`;
+    let why = document.getElementById(id);
+    if (!why) {
+        why = document.createElement('small');
+        why.id = id;
+        why.className = 'cli-verify-why';
+        why.setAttribute('role', 'status');
+        why.hidden = true;
+        resultEl.insertAdjacentElement('afterend', why);
+    }
+    return why;
 }
 
 window._verifyAllCLIs = async function() {

@@ -258,3 +258,21 @@ func TestCLICheckByPathRefusesAnAgentToken(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), "operator_only")
 	}
 }
+
+// The dashboard turns a refusal into words and a fix by matching these phrases (pkg/frontend/static/cli_verify_words.js, #10083): a refusal worded another way would show as a bare "Not allowed" with
+// the server's raw sentence, so the wording is pinned here.
+func TestCLICheckRefusalsKeepTheWordsTheDashboardMatches(t *testing.T) {
+	h := newSystemHandlerForTest(t)
+	ctx := context.Background()
+	script, _ := markerCLI(t, t.TempDir(), "claude")
+	for query, want := range map[string]string{
+		"binary=" + script + "&type=claude": "temporary folder",
+		"binary=relative/claude":            "absolute path",
+		"binary=bash":                       "known CLI",
+	} {
+		rec := cliCheckAs(h, query, asOperator)
+		require.Equal(t, http.StatusBadRequest, rec.Code, query)
+		assert.Contains(t, rec.Body.String(), want, query)
+	}
+	assert.Contains(t, h.cliCheckRefusal(ctx, "/usr/local/bin/definitely-not-a-cli", "claude"), "a path to claude", "a path that is not the CLI's program names the program the dashboard is to point at")
+}
