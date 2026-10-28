@@ -49,6 +49,14 @@ function _downloadJson(data, filename) {
     URL.revokeObjectURL(url);
 }
 
+/** The most an imported personas or templates file may be: a person's own list is kilobytes; a file this size is not one (#10510). */
+export const MAX_IMPORT_BYTES = 1024 * 1024;
+export const MAX_IMPORT_TEMPLATES = 200;
+/** What is wrong with a file about to be read for import, in words, or ''. */
+export function importFileProblem(file) {
+    return file && file.size > MAX_IMPORT_BYTES ? `That file is too large to be imported (over ${MAX_IMPORT_BYTES / (1024 * 1024)} MB): a personas or template file is far smaller.` : '';
+}
+
 function _openFilePicker() {
     return new Promise((resolve) => {
         const input = document.createElement("input");
@@ -57,6 +65,8 @@ function _openFilePicker() {
         input.onchange = () => {
             const file = input.files[0];
             if (!file) { resolve(null); return; }
+            const tooBig = importFileProblem(file);
+            if (tooBig) { showToast(tooBig, "error"); resolve(null); return; }
             const reader = new FileReader();
             reader.onload = () => {
                 try { resolve(JSON.parse(reader.result)); }
@@ -110,6 +120,7 @@ export function readTeamTemplateFile(data) {
     const templates = Array.isArray(data) ? data : data.templates;
     if (!Array.isArray(templates)) return { entries: [], problems: [`That file has no "templates" list: it is not ${FORMAT}.`] };
     if (!templates.length) return { entries: [], problems: ['That file holds no templates.'] };
+    if (templates.length > MAX_IMPORT_TEMPLATES) return { entries: [], problems: [`That file holds ${templates.length} templates: Coral imports at most ${MAX_IMPORT_TEMPLATES} at once.`] };
     const entries = [], problems = [];
     templates.forEach((t, i) => {
         const named = t && typeof t.name === 'string' && t.name.trim() ? `"${t.name.trim().slice(0, 60)}"` : '';
@@ -125,10 +136,18 @@ export function readTeamTemplateFile(data) {
 export async function importTeamTemplates() {
     const data = await _openFilePicker();
     if (!data) return;
+    await applyTeamTemplateFile(data);
+}
+
+/** Do the import of a read template file: what it saves, what it skips, and, once, a warning when a template carries flags (they are run as given when the team launches). */
+export async function applyTeamTemplateFile(data) {
     const { entries, problems } = readTeamTemplateFile(data);
     if (!entries.length) { showToast(problems[0], "error"); return; }
     try { await _upsertSavedTeamTemplates(entries); } catch { showToast("Could not save the imported templates", "error"); return; }
     showToast(problems.length ? `Imported ${entries.length} template(s); skipped ${problems.length}: ${problems[0]}` : `Imported ${entries.length} template(s)`);
+    if (entries.some(t => String(t.flags || '').trim() || (t.agents || []).some(a => String(a.flags || '').trim()))) {
+        showToast("This template sets command-line flags. Check them before you launch: they are run as given.", "error"); // one warning for the whole file, from a file someone else may have made
+    }
     _renderTeamTemplateSelector();
 }
 
@@ -137,7 +156,7 @@ export function exportTeamTemplate(name) {
     const t = _getSavedTeamTemplates().find(x => x.name === name);
     if (!t) { showToast("Pick one of your saved templates to export it", "error"); return; }
     _downloadJson({ version: 1, type: "coral-team-templates", templates: [t] }, `coral-team-template-${String(t.name).replace(/[^a-zA-Z0-9-_]/g, "_")}.json`);
-    showToast(`Exported the template "${t.name}"`);
+    showToast(`Exported the template "${t.name}". Its instructions and flags are in the file: do not share it if they hold keys or other secrets.`);
 }
 
 // ── Agent Preset Selector (single-agent modal) ───────────────────────────
