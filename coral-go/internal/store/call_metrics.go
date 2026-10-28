@@ -227,9 +227,11 @@ func (d *DB) writeCallMetrics(ctx context.Context, batch []*CallMetric) error {
 // trimToRowCap keeps as many of batch as fit under callMetricMaxRows. The stored count is the
 // span of ids (MAX-MIN+1, two index probes, not a COUNT scan): the roll-up deletes whole hours
 // from the old end, so the span stays close to the count and errs toward dropping early.
+// The two probes are separate MAX and MIN subqueries on purpose: SQLite answers one MIN or MAX of the rowid with a seek, but MAX(id) - MIN(id) in one SELECT is a scan of every row (400,000 of them
+// near the cap: 35 ms of every flush and 38% of the server's CPU in the #9742 profile, #9771).
 func (d *DB) trimToRowCap(ctx context.Context, tx *sqlx.Tx, batch []*CallMetric) ([]*CallMetric, error) {
 	var span int64
-	if err := tx.GetContext(ctx, &span, `SELECT COALESCE(MAX(id) - MIN(id) + 1, 0) FROM call_metrics`); err != nil {
+	if err := tx.GetContext(ctx, &span, `SELECT COALESCE((SELECT MAX(id) FROM call_metrics) - (SELECT MIN(id) FROM call_metrics) + 1, 0)`); err != nil {
 		return nil, err
 	}
 	room := callMetricMaxRows - span
