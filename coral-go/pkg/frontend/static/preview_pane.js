@@ -538,7 +538,8 @@ async function saveTab(tab, btn) {
         if (data.error) {
             window.showAlertModal?.('Save Failed', `Error saving: ${data.error}`);
         } else {
-            tab.savedContent = content;
+            tab.savedContent = content; tab.diskText = null;
+            _body()?.querySelector('.preview-disk-note')?.remove();
             _renderTabs();
             showToast('Saved');
         }
@@ -548,6 +549,53 @@ async function saveTab(tab, btn) {
         const saveBtn = document.querySelector('#preview-toolbar [data-action="save"]');
         if (saveBtn) { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }
     }
+}
+
+/* ── The open files follow their file (#10334) ─────────────── */
+
+// The Files list is read again on Refresh and when the agent's reply ends (changed_files.js); the open text files are read with it. A file with no unsaved edits shows its new text where the reader was
+// (the scroll place is kept); one with unsaved edits keeps them and says the file changed, with a Reload that is the person's own click: an edit is never dropped, a file never overwritten silently.
+let _following = false;
+const _scrollerOf = body => [body, ...body.querySelectorAll('*')].find(e => e.scrollHeight > e.clientHeight + 20 && getComputedStyle(e).overflowY !== 'visible') || body;
+
+async function _showFresh(tab) {
+    const before = _body();
+    const top = before ? _scrollerOf(before).scrollTop : 0;
+    await _render(tab);
+    const body = _body();
+    if (body && top) _scrollerOf(body).scrollTop = top;
+}
+
+function _diskNote(tab) {
+    const body = _body();
+    if (!body || tab.id !== _activeId) return;
+    body.querySelector('.preview-disk-note')?.remove();
+    const note = document.createElement('div');
+    note.className = 'preview-disk-note'; note.setAttribute('role', 'status');
+    const reload = document.createElement('button');
+    reload.type = 'button'; reload.className = 'btn btn-small'; reload.textContent = 'Reload from disk'; reload.title = 'Replaces your unsaved edits with the file as it is now';
+    reload.addEventListener('click', () => { tab.content = tab.savedContent = tab.diskText; tab.diskText = null; tab.originalContent = null; _renderTabs(); _render(tab); });
+    note.append('The file changed on disk. Your unsaved edits are kept. ', reload);
+    body.prepend(note);
+}
+
+/** Read the open text files again (called when the Files list was read). */
+export async function refreshOpenFiles() {
+    if (_following || !agentName()) return;
+    const tabs = _tabs.filter(t => t.kind === 'file' && t.content !== null && !isImagePath(t.filepath) && !isMediaPath(t.filepath));
+    if (!tabs.length) return;
+    _following = true;
+    try {
+        _captureEditor(); // the editor's text is the tab's, so unsaved edits are seen as unsaved
+        for (const tab of tabs) {
+            let data;
+            try { data = await (await fetch(_fileUrl('file-content', tab.filepath), { cache: 'no-store' })).json(); } catch { continue; }
+            if (!data || data.error || typeof data.content !== 'string' || !_tabs.includes(tab) || data.content === tab.savedContent) continue;
+            if (_isDirty(tab)) { tab.diskText = data.content; _diskNote(tab); continue; }
+            tab.content = tab.savedContent = data.content; tab.originalContent = null; tab.diskText = null;
+            if (tab.id === _activeId) await _showFresh(tab);
+        }
+    } finally { _following = false; }
 }
 
 /**

@@ -1952,3 +1952,6 @@ body.panel-dragging .agentic-state {
 .list-bar-extras[hidden] { display: none; }
 .list-bar-menu-grid > .list-bar-extras { grid-column: 1 / -1; }
 .board-task-solo { display: flex; justify-content: flex-end; padding: 6px 12px; } /* + Task alone, when there are no tasks to search (#7924) */
+
+/* An open file's note when the file changed on disk under unsaved edits (#10334). */
+.preview-disk-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px; font-size: var(--fs-sm); color: var(--text-secondary); border-bottom: 1px solid var(--border); }

@@ -7,7 +7,7 @@ import { registerActions, textOf } from './actions.js';
 import { fetchFileList, fuzzyFilter } from './file_mention.js';
 import { initFilesSourcePicker, syncFilesSourceTeam } from './team_artifacts.js';
 import { fileIconHtml } from './file_explorer.js';
-import { openPreviewTab, openArtifactTab, setPreviewSession } from './preview_pane.js';
+import { openPreviewTab, openArtifactTab, setPreviewSession, refreshOpenFiles } from './preview_pane.js';
 import { storeKey, readStars, writeStars } from './local_store.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
 
@@ -281,6 +281,7 @@ export async function loadChangedFiles(agentName, sessionId) {
     }
     renderStarredFiles();
     renderChangedFiles();
+    refreshOpenFiles().catch(() => {}); // an open preview follows its file (#10334)
 }
 
 // The Files list follows the agent (#10268): it was read when the tab opened and on Refresh, so a reply that changed files left a stale "+2" until the button was pressed. The session feed
@@ -481,6 +482,7 @@ export async function refreshChangedFiles() {
             if (data.diff_mode) _cloudDiffMode = data.diff_mode;
             renderStarredFiles();
             renderChangedFiles();
+            refreshOpenFiles().catch(() => {});
         } else {
             await loadChangedFiles(agentName, sessionId);
         }
