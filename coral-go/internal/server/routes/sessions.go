@@ -59,6 +59,8 @@ type SessionsHandler struct {
 	sendGate humanSendGate
 	// holds are the person's chat messages held while their agent waits on a box (#6610, human_send_hold.go).
 	holds personHolds
+	// answers is each agent's last answered prompt, for the live row's last_answer: a second device that shows the card says who got there first (#10301).
+	answers promptAnswers
 	// modelSwitches tracks the live model and thinking-level switches in progress (#4969, model_switch.go).
 	modelSwitches modelSwitchTracker
 	// inOldTmux reports an agent session still running in Coral's private tmux server, for a

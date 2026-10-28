@@ -8,6 +8,7 @@ import { responseError } from './server_status.js';
 import { reportSendError, noteHooksAnswered } from './terminal_gone.js';
 import { announcePrompt, promptOptionsBySession, syncNeedsInputCard } from './needs_input_card.js';
 import { importOnce } from './import_once.js';
+import { noteOwnAnswer, answeredElsewhere } from './held_sends.js';
 
 // The first seconds of a new agent (#6058): its CLI has written nothing yet (the list has no output age for it), and it was started less than STARTING_MS ago by the list's created_at AND this page first saw it less than STARTING_MS ago (the second bounds a server clock that runs ahead of this one). "No messages yet" there reads as ready; it says the CLI is coming up.
 // After that the row's own states take over (the "Waiting in the terminal" card from 25 s with no event at all).
@@ -130,6 +131,7 @@ export async function sendPromptAnswer(card, n, label, action, text) {
                 : { session_id: session.session_id, agent_type: session.agent_type || "", n, label, text: text || "" }),
         });
         if (!resp.ok) {
+            if (resp.status === 409 && answeredElsewhere(session.session_id)) { controls.forEach(c => { c.disabled = false; }); return false; } // another device answered it first: said under the box, not an error (#10301)
             const { text, code } = await responseError(resp, sessionServer(session), "Could not send the answer. Use the terminal.");
             reportSendError(session, text, code); // under the composer (#3218)
             controls.forEach(c => { c.disabled = false; });
@@ -151,6 +153,7 @@ export async function sendPromptAnswer(card, n, label, action, text) {
         }
         // The card refreshes from the terminal: the next question, the review
         // step, or gone once the tool runs.
+        noteOwnAnswer(session.session_id, (await resp.clone().json().catch(() => null) || {}).at); // so the note about another device's answer is not said to this one
         promptOptionsBySession.delete(session.session_id);
         noteHooksAnswered();
         if (action === "submit") announcePrompt("Answer sent");
