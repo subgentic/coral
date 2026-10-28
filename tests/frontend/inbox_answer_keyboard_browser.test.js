@@ -51,12 +51,17 @@ const BASE = require('./test_base').BASE;
             // (3) Enter answers qa's Red: said once, and the keyboard stays in the row
             await ev(`window.__said = []; window.__last = {}; new MutationObserver(() => { for (const id of ['notice-live', 'notice-alert']) { const t = (document.getElementById(id) || {}).textContent; if (t && window.__last[id] !== t) { window.__last[id] = t; window.__said.push(t); } } }).observe(document.body, { childList: true, characterData: true, subtree: true }); document.querySelector('#group-table-view .inbox-answer').focus(); true`);
             await key('Enter', 13, '\r'); await waitFor(`window.__answers.length >= 1`, `${w}: the answer is sent`, 5000); await sleep(1500); // sleep-ok: the answer, the announcement and the redraw come a moment after the key
+            const said = await ev(`window.__said.filter(t => /Answered/.test(t))`);
+            if (said.length !== 1 || !/Answered: Red for qa/.test(said[0])) problems.push(`${w}: the result is said once in the page's live region (said ${JSON.stringify(said)})`);
             // (4) the agent stops waiting: the row leaves, the keyboard goes to the next row's first control
             await ev(`window.__done = ['qa-id']; window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, `${w}: the row leaves`, 8000); await sleep(800); // sleep-ok: the answer, the announcement and the redraw come a moment after the key
             // (5) a question that changed: said, and the keyboard is on a choice of the redrawn row
             await ev(`window.__ask = 'ask-2'; document.querySelector('#group-table-view .inbox-answer:last-of-type, #group-table-view .inbox-answer').focus(); true`);
+            await ev(`window.__said.length = 0; true`);
             await key('Enter', 13, '\r'); await sleep(1500); // sleep-ok: the answer, the announcement and the redraw come a moment after the key
+            const changed = await ev(`window.__said.filter(t => /changed/.test(t))`);
+            if (changed.length !== 1) problems.push(`${w}: "That question changed" is said once (said ${JSON.stringify(changed)})`);
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the Inbox answer buttons by keyboard:\n  ' + problems.join('\n  '));
