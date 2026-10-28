@@ -89,8 +89,11 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 	tool := prerequisiteTool(agentType)
 	trackable := tool != "" && r.URL.Query().Get("binary") == ""
 	source := tracking.SourceCLICheck
-	if r.URL.Query().Get("source") == tracking.SourceCLIRecheck {
+	switch r.URL.Query().Get("source") {
+	case tracking.SourceCLIRecheck:
 		source = tracking.SourceCLIRecheck
+	case tracking.SourceSettingsCheck: // the Settings dialog's Claude account Check (#10671)
+		source = tracking.SourceSettingsCheck
 	}
 
 	// Try LookPath first, then common install locations
