@@ -46,7 +46,7 @@ const HEX = c => c.repeat(64);
                 assert.equal(r.text, NAMES[i], at + 'the whole name is the button');
                 assert.ok(r.created && r.created.length <= 20, at + 'Created is short: ' + r.created);
                 assert.ok(r.createdTitle && /\d{4}|\d{1,2}:\d{2}/.test(r.createdTitle), at + 'the whole time is the tooltip');
-                assert.equal(r.tds, w > 832 ? 6 : w > 576 ? 5 : w > 448 ? 4 : 3, at + `${r.folded ? 'all facts in the folded row' : 'every column'}: ${r.tds}`); // Name, Size, Created and the Details link: the agent's list has no Type or Task column since #8793 (one line per row)
+                assert.equal(r.tds, w > 576 ? 5 : w > 448 ? 4 : 3, at + `${r.folded ? 'all facts in the folded row' : 'every column'}: ${r.tds}`); // Name, Type, Size, Created and the Details link: the agent's list has no Task column since #8793 (one line per row), and Tags is not drawn while no file has a tag (#9846)
             }
             if (w === 680) await shot('artifacts-name-680');
             if (w === 480) await shot('artifacts-name-480');

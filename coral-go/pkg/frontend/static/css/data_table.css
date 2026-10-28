@@ -465,9 +465,10 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box:not(.dt-folded) .dt-table :is(th, td)[data-dt-w] { width: var(--dt-w); }
 
 /* The star on an artifact row (#9834): the filled one is always there, the empty one only while the row is hovered or has the keyboard, and not at all on touch (the star is in the item). */
-.dt-star { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-inline-start: 6px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--table-secondary-color); cursor: pointer; vertical-align: middle; }
+.dt-star { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-inline-start: 6px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--table-secondary-color); cursor: pointer; vertical-align: middle; }
 .dt-star .material-icons, .dt-star.material-icons { font-size: var(--fs-lg); }
 .dt-star-on { color: var(--text-primary); }
+.dt-title-cell > .dt-star { margin-inline-start: -4px; } /* the star is a 24 px target with an 18 px glyph: the cell's gap and 4 px of the box's own side are the space, so a file name in the Inbox's Name column at 1280 is whole (#9916) */
 
 .dt-star:not(.dt-star-on) { opacity: 0; color: var(--text-muted); }
 .dt-row:hover .dt-star, .dt-row:focus-within .dt-star, .dt-star:focus-visible { opacity: 1; }
