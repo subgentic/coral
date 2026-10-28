@@ -111,7 +111,7 @@ const BASE = require('./test_base').BASE;
         await shot('task-page-complete');
         { const { setTheme } = require('./helpers/contrast'); await setTheme(ev, 'light'); await shot('task-page-complete-light'); await setTheme(ev, 'dark'); } // the light theme, by eye too
         check('the form has the message, the outcome and the optional evidence; its message has the focus', await ev(`document.activeElement.id === 'task-complete-message' && !!document.getElementById('task-complete-outcome') && !!document.querySelector('.task-completion-evidence')`));
-        check('the bar holds Back and Complete', JSON.stringify(await barButtons()) === JSON.stringify(['Back', 'Complete']), JSON.stringify(await barButtons()));
+        check('the bar holds Back, Not yet: send back (the task has an agent) and Complete (#10337)', JSON.stringify(await barButtons()) === JSON.stringify(['Back', 'Not yet: send back', 'Complete']), JSON.stringify(await barButtons()));
         await set('task-complete-message', 'Finished from the page'); await click('Complete');
         await waitFor(`!document.getElementById('task-complete-message') && /Finished from the page/.test(document.getElementById('team-panel-item').innerText)`, 'the finished page', 8000);
         const tf = await task(finish);
