@@ -767,6 +767,7 @@
     }
 
     /* A card that needs the Operator has no amber border or glow of its own (#5123): its flashing dot and the state chip carry it. */
+    #mobile-session-list .session-group-item .chip.session-state-pill { font-size: var(--fs-md); } /* the one thing on the row that says an agent waits for you: 13 px, not the chip family's 11 (#9686, mobile_text_sizes) */
 
     #mobile-session-list .session-group-item.needs-attention .session-dot.waiting,
     #mobile-session-list .session-group-item.needs-attention .session-dot.stuck {
