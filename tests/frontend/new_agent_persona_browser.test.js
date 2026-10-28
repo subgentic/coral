@@ -34,22 +34,28 @@ const BASE = require('./test_base').BASE;
         await type('input', N.folder, '/work/payments-app'); await click('button', N.next);
         await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000);
 
+        // Save as persona is in the More menu (#9998): open it, then press it
+        const saveAsPersona = async () => {
+            await ev(`(() => { const d = [...window.__na.dialog().querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))).closest('details'); d.open = true; return true; })()`); await settle(100);
+            await click('button', /^Save as persona$/i);
+            await ev(`[...window.__na.dialog().querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))).closest('details').open = false; true`);
+        };
         await S.run('Save as persona with no name says "Enter a name before saving" and saves nothing', async () => {
             const before = await options(); assert.ok(before, 'the persona select');
-            await click('button', /^Save as persona$/i); await settle(400);
+            await saveAsPersona(); await settle(400);
             assert.match(await toasts(), /Enter a name before saving/, 'a message says why');
             assert.deepEqual(await options(), before, 'the persona list is unchanged');
         });
         await S.run('Save as persona with a built-in preset\'s name is refused', async () => {
             const builtin = await ev(`(() => { const s = window.__na.find('select', ${N.persona}); const o = [...s.options].map(o => o.textContent.trim()).find(t => t && !/^Blank/i.test(t)); return o || null; })()`);
             if (!builtin) return; // no built-in preset to test with
-            await type('input', N.name, builtin); await type('textarea', N.prompt, 'x'); await click('button', /^Save as persona$/i); await settle(400);
+            await type('input', N.name, builtin); await type('textarea', N.prompt, 'x'); await saveAsPersona(); await settle(400);
             assert.match(await toasts(), /Can't overwrite a built-in preset|Saved persona/, 'the answer is a toast');
             if (/Saved persona/.test(await toasts())) assert.fail('a built-in preset\'s name was saved over');
         });
         await S.run('a name and a prompt: the persona is saved, listed in "Start from a persona", and choosing it fills the name and the prompt', async () => {
             await type('input', N.name, NAME); await type('textarea', N.prompt, 'You are the QA persona. Check every claim.');
-            await click('button', /^Save as persona$/i);
+            await saveAsPersona();
             await waitFor(`/Saved persona/.test([...document.querySelectorAll('.toast, [role=status]')].map(e => e.textContent).join(' '))`, 'a "Saved persona" message', 5000);
             await waitFor(`(() => { const s = window.__na.find('select', ${N.persona}); return !!s && [...s.options].some(o => o.textContent.trim() === ${JSON.stringify(NAME)}); })()`, 'the new persona in the select', 5000);
             await type('input', N.name, ''); await type('textarea', N.prompt, '');
@@ -62,19 +68,19 @@ const BASE = require('./test_base').BASE;
             await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000);
             assert.ok((await options()).includes(NAME), 'the persona is listed');
         });
-        await S.run('Persona files is a disclosure named "Persona files": closed it hides Export and Import, opened (mouse) it shows both', async () => {
-            const hidden = await ev(`(() => { const d = window.__na.dialog(); const s = [...d.querySelectorAll('summary')].find(e => /persona files/i.test(window.__na.name(e))); if (!s) return null; const det = s.closest('details'); return { open: det.open, exp: !!window.__na.find('button', /^Export$/i), imp: !!window.__na.find('button', /^Import$/i) }; })()`);
-            assert.ok(hidden, 'a summary named Persona files'); assert.equal(hidden.open, false, 'closed at first'); assert.ok(!hidden.exp && !hidden.imp, 'Export and Import are not shown while closed');
-            await ev(`[...window.__na.dialog().querySelectorAll('summary')].find(e => /persona files/i.test(window.__na.name(e))).click(); true`); await settle(200);
-            assert.ok(await ev(`!!window.__na.find('button', /^Export$/i) && !!window.__na.find('button', /^Import$/i)`), 'Export and Import after opening');
-            await ev(`[...window.__na.dialog().querySelectorAll('summary')].find(e => /persona files/i.test(window.__na.name(e))).click(); true`); await settle(200);
+        await S.run('the More menu is a disclosure named "More": closed it hides Export and Import, opened (mouse) it shows both', async () => {
+            const hidden = await ev(`(() => { const d = window.__na.dialog(); const s = [...d.querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))); if (!s) return null; const det = s.closest('details'); return { open: det.open, exp: !!window.__na.find('button', /^Export personas$/i), imp: !!window.__na.find('button', /^Import personas$/i) }; })()`);
+            assert.ok(hidden, 'a summary named More'); assert.equal(hidden.open, false, 'closed at first'); assert.ok(!hidden.exp && !hidden.imp, 'Export and Import are not shown while closed');
+            await ev(`[...window.__na.dialog().querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))).click(); true`); await settle(200);
+            assert.ok(await ev(`!!window.__na.find('button', /^Export personas$/i) && !!window.__na.find('button', /^Import personas$/i)`), 'Export and Import after opening');
+            await ev(`[...window.__na.dialog().querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))).click(); true`); await settle(200);
         });
-        await S.run('Persona files by keyboard: Enter on the summary opens it and Escape from inside it does not close the whole dialog before the menu', async () => {
-            await ev(`[...window.__na.dialog().querySelectorAll('summary')].find(e => /persona files/i.test(window.__na.name(e))).focus(); true`);
+        await S.run('the More menu by keyboard: Enter on the summary opens it and Escape from inside it does not close the whole dialog before the menu', async () => {
+            await ev(`[...window.__na.dialog().querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))).focus(); true`);
             await key('Enter', 13, '\r');
-            assert.ok(await ev(`!!window.__na.find('button', /^Export$/i)`), 'Enter opens the menu');
+            assert.ok(await ev(`!!window.__na.find('button', /^Export personas$/i)`), 'Enter opens the menu');
             await key(' ', 32, ' ');
-            assert.ok(!(await ev(`!!window.__na.find('button', /^Export$/i)`)), 'Space on the summary closes it again (a details element)');
+            assert.ok(!(await ev(`!!window.__na.find('button', /^Export personas$/i)`)), 'Space on the summary closes it again (a details element)');
             assert.ok(await ev(`!!window.__na.dialog()`), 'the dialog is still open');
         });
         await restoreAndCheck(); S.finish(); // finish() exits the process, so the setting goes back first

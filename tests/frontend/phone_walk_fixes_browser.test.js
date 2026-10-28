@@ -39,11 +39,11 @@ const BASE = require('./test_base').BASE;
 
             await section('workspace');
             const on = await ev(`({ save: ${shown('#agent-save-persona-btn')}, exp: ${shown('#launch-persona-top [data-on-click="m-export-personas"]')}, imp: ${shown('#launch-persona-top [data-on-click="m-import-personas"]')} })`);
-            check(`${tag}: Save Persona is the one persona button on show`, on.save && !on.exp && !on.imp, JSON.stringify(on));
+            check(`${tag}: the persona actions are all behind the one More menu while it is closed`, !on.save && !on.exp && !on.imp, JSON.stringify(on));
             const more = await ev(`(() => { const d = document.querySelector('#launch-persona-top details.persona-files'); const s = d && d.querySelector('summary'); return { has: !!d, text: s ? s.textContent.trim() : '', open: !!d && d.open }; })()`);
-            check(`${tag}: Export and Import are in a closed disclosure named for them ("Persona files")`, more.has && !more.open && /^persona files$/i.test(more.text), JSON.stringify(more));
+            check(`${tag}: a closed disclosure named More`, more.has && !more.open && /^more$/i.test(more.text), JSON.stringify(more));
             await ev(`document.querySelector('#launch-persona-top details.persona-files summary').click(); true`);
-            check(`${tag}: opened, both buttons show`, await ev(shown('#launch-persona-top [data-on-click="m-export-personas"]')) && await ev(shown('#launch-persona-top [data-on-click="m-import-personas"]')));
+            check(`${tag}: opened, Save as persona, Export and Import show`, await ev(shown('#agent-save-persona-btn')) && await ev(shown('#launch-persona-top [data-on-click="m-export-personas"]')) && await ev(shown('#launch-persona-top [data-on-click="m-import-personas"]')));
             const fit = await ev(`(() => { const p = document.querySelector('#launch-step-agent'); return document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1; })()`);
             check(`${tag}: no sideways scroll on the page`, fit);
             await ev(`document.querySelector('#launch-agent-back, #launch-step-agent [data-on-click="launch-hide"]') && 0; true`);
