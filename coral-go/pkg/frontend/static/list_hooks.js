@@ -13,6 +13,11 @@ export function redrawLiveList() {
     if (_render) _render(state.liveSessions || []);
 }
 
+/** Whether the team menu offers "Link team..." (#9888): the answer is this small state, read when the menu draws; team_link_flag.js (loaded on first use, #10218) reads the account and fills it. */
+export const teamLinkState = { on: false, own: new Set() };
+/** The item for a team on `server` (its server id): the Hub's switch is on and the computer is the viewer's own. */
+export const teamLinkOffered = (server) => teamLinkState.on && teamLinkState.own.has(String(server ?? ''));
+
 /** The agent list's element: #live-sessions-list in the sidebar, or the same element as #mobile-session-list while it sits in the phone's page (#4497). */
 export function liveListEl() {
     return document.getElementById('live-sessions-list') || document.getElementById('mobile-session-list');
