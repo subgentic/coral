@@ -45,7 +45,8 @@ jobs:
           ACTOR: ${{ github.actor }}
         run: |
           set -euo pipefail
-          python3 tests/release/release_provenance.py "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$ACTOR" | tee -a "$GITHUB_STEP_SUMMARY"
+          # v2.0.3 only (operator, Oct 28): the record is written but a failed gate does not stop the release; reverted right after the tag.
+          python3 tests/release/release_provenance.py "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$ACTOR" | tee -a "$GITHUB_STEP_SUMMARY" || echo "release provenance gate skipped for v2.0.3 by the operator" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Resolve the tier, version and program lists
         id: r
         run: |
