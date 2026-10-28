@@ -91,7 +91,7 @@ const HEX = c => c.repeat(64);
         a = await active();
         assert.equal(a.body, undefined, JSON.stringify(a)); assert.match(a.label, /^Search this agent/, 'the search box when nothing is left (the tab has no Refresh)');
         assert.equal(await ev(`!!document.querySelector('#agentic-panel-artifacts-view .dt-table')`), false, 'an empty list is its line, with no table header over nothing');
-        assert.equal(await ev(`(() => { const l = document.querySelector('#agentic-panel-artifacts-view .team-count-line'); return [...l.childNodes].filter(n => !(n.classList && n.classList.contains('empty-state-hint'))).map(n => n.textContent).join('').trim(); })()`), 'No artifacts yet.'); // the line's own words: its hint ("Files agents share ...") is a span inside it
+        assert.equal(await ev(`(() => { const l = document.querySelector('#agentic-panel-artifacts-view .team-count-line'); return [...l.childNodes].filter(n => !(n.classList && n.classList.contains('empty-state-hint'))).map(n => n.textContent).join('').trim(); })()`), 'No artifacts yet. Files your agents share show up here.'); // the line's own words (the plain-words pass made it say how files get there): its hint ("Files agents share ...") is a span inside it
         assert.equal(await ev(`document.querySelector('#agentic-panel-artifacts-view .team-count-line .empty-state-hint')?.textContent`), 'An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact.', 'the empty list says how a file gets there, and says nothing about uploading (#9971)');
 
         console.log('4. An error is red, has no table, and Retry keeps the focus on the panel; a reload keeps it while loading');
