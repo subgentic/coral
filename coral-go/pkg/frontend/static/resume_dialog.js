@@ -6,6 +6,8 @@ import { importOnce } from './import_once.js';
 import { recordRecentDir } from './browser.js';
 import { loadLiveSessions } from './api.js';
 
+const MODE_WORDS = { default: 'Default', plan: 'Plan', acceptEdits: 'Accept edits', auto: 'Auto', dontAsk: "Don't ask", bypassPermissions: 'Bypass permissions' };
+
 // ── Resume Modal ───────────────────────────────────────────────────────────
 
 export async function showResumeModal() {
@@ -31,11 +33,13 @@ export async function showResumeModal() {
     let boardName = "";
     let displayName = "";
     let resumeSessionId = sessionId;
+    let ranMode = ""; // the mode it ran in: the recorded one, else where the transcript keeps it (#10487)
     let ranIn = "", ranInExists = true; // the folder the session ran in, from its transcript or live row (#10291)
     try {
         const resp = await fetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/resume-info`);
         if (resp.ok) {
             const info = await resp.json();
+            if (info.permission_mode) ranMode = info.permission_mode;
             if (info.working_dir) resumeDir = info.working_dir;
             if (info.working_dir && info.working_dir_from === "session") { ranIn = info.working_dir; ranInExists = info.working_dir_exists !== false; }
             if (info.board_name) boardName = info.board_name;
@@ -55,6 +59,8 @@ export async function showResumeModal() {
     const modalEl = document.getElementById("resume-modal");
     modalEl.dataset.ranIn = ranIn;
     modalEl.dataset.ranInExists = ranInExists ? "1" : "0";
+    modalEl.dataset.ranMode = ranMode;
+    syncResumeModeNote();
     if (!dirInput.dataset.noteWired) { dirInput.dataset.noteWired = "1"; dirInput.addEventListener("input", syncResumeDirNote); }
     syncResumeDirNote();
 
@@ -75,6 +81,16 @@ export async function showResumeModal() {
     modal.dataset.displayName = displayName || historyEntry?.display_name || "";
     modal.dataset.resumeSessionId = resumeSessionId;
     modal.style.display = "flex";
+}
+
+/** Under the folder: the mode the chat resumes in. It keeps the mode it ran in, never the saved default (a Plan or Default chat resumed in Auto was the gap, #10487); with none recorded the saved default applies and says so. */
+function syncResumeModeNote() {
+    const modal = document.getElementById("resume-modal"), note = document.getElementById("resume-mode-note");
+    if (!modal || !note) return;
+    const mode = modal.dataset.ranMode || "";
+    const words = mode ? `Resumes in ${MODE_WORDS[mode] || mode} mode, the mode this chat ran in.` : "This chat's mode was not recorded: it resumes in your saved default mode.";
+    if (note.textContent !== words) note.textContent = words;
+    note.hidden = false;
 }
 
 /** Under the folder: where the session ran, and a warning when the folder is changed (its files may not be found) or gone. Written only when the words change. */
@@ -135,6 +151,10 @@ export async function resumeLaunchNew() {
             agent_type: agentType,
             resume_session_id: resumeSessionId,
         };
+        // The mode it ran in is kept: Default is the one mode a launch names (permission_mode), the others are the CLI's own flags for it; with none recorded nothing is sent and the saved default applies (#10487).
+        const ranMode = modal.dataset.ranMode || "";
+        if (ranMode === "default") payload.permission_mode = "default";
+        else if (ranMode) { const { _getPermissionFlagsForAgentMode } = await importOnce("./permission_flags.js"); const flags = _getPermissionFlagsForAgentMode(agentType, ranMode).split(/\s+/).filter(Boolean); if (flags.length) payload.flags = flags; }
         if (displayName) payload.display_name = displayName;
         if (boardName) payload.board_id = payload.board_name = boardName; // rejoins that board (#3536)
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -16,13 +17,17 @@ const resumeCwdScanBytes = 256 << 10
 
 // transcriptCwd is the folder a past session ran in, read from the start of its transcript (#10291, Desktop pass 25: Resume offered Coral's folder, not the session's own, for a chat Coral had no
 // live row for). "" when the file has none, is not readable or names no absolute path. The text is only returned: nothing is opened under it.
-func transcriptCwd(sourceFile string) string {
+func transcriptCwd(sourceFile string) string { cwd, _ := transcriptStart(sourceFile); return cwd }
+
+// transcriptStart is the folder a past session ran in and, where the CLI keeps it in its transcript (Claude's entries carry permissionMode), the permission mode the chat started in, both read from
+// the first 256 KiB of the file (#10291, #10487). Each is "" when the file has none; a mode that is no known mode is not returned.
+func transcriptStart(sourceFile string) (cwd, mode string) {
 	if sourceFile == "" {
-		return ""
+		return "", ""
 	}
 	f, err := secfile.OpenNoFollow(sourceFile, os.O_RDONLY, 0) // a history file the indexer recorded, never read through a link
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	defer f.Close()
 	r := bufio.NewReaderSize(io.LimitReader(f, resumeCwdScanBytes), 64<<10)
@@ -30,21 +35,28 @@ func transcriptCwd(sourceFile string) string {
 		line, err := r.ReadBytes('\n')
 		if len(line) > 0 {
 			var entry struct {
-				Cwd     string `json:"cwd"`
-				Payload struct {
+				Cwd            string `json:"cwd"`
+				PermissionMode string `json:"permissionMode"`
+				Payload        struct {
 					Cwd string `json:"cwd"`
 				} `json:"payload"`
 			}
 			if json.Unmarshal(line, &entry) == nil {
-				for _, c := range []string{entry.Cwd, entry.Payload.Cwd} {
-					if c != "" && filepath.IsAbs(c) {
-						return filepath.Clean(c)
+				if cwd == "" {
+					for _, c := range []string{entry.Cwd, entry.Payload.Cwd} {
+						if c != "" && filepath.IsAbs(c) {
+							cwd = filepath.Clean(c)
+							break
+						}
 					}
+				}
+				if mode == "" && agent.ValidPermissionMode(entry.PermissionMode) {
+					mode = entry.PermissionMode
 				}
 			}
 		}
-		if err != nil {
-			return ""
+		if err != nil || (cwd != "" && mode != "") {
+			return cwd, mode
 		}
 	}
 }
