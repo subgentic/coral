@@ -158,7 +158,7 @@ function buildTabs(modal) {
         b.setAttribute('aria-controls', p.id); b.setAttribute('aria-selected', String(!p.hidden)); b.tabIndex = p.hidden ? -1 : 0;
         b.innerHTML = `<span class="material-icons" aria-hidden="true">${p.dataset.icon}</span><span class="settings-tab-name"></span>`;
         b.querySelector('.settings-tab-name').textContent = p.dataset.title;
-        b.addEventListener('click', () => { showSettingsGroup(id); setScreen('pane'); });
+        b.addEventListener('click', () => { showSettingsGroup(id); setScreen('pane'); if (!b.getClientRects().length) p.focus({ preventScroll: true }); }); // on a phone the list goes away: the keyboard is on the section, which the tab names (it was on nothing, #10644)
         tabs.append(b);
         const o = document.createElement('option'); o.value = id; o.textContent = p.dataset.title; pick?.append(o);
     }
