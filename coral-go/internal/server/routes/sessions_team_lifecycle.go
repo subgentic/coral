@@ -207,8 +207,9 @@ func (h *SessionsHandler) ResurrectTeam(w http.ResponseWriter, r *http.Request) 
 			Model        string                 `json:"model"`
 			Tools        []string               `json:"tools"`
 			Hooks        map[string]interface{} `json:"hooks"`
-			// "default" is the only value a launch stores here (#10362): a member who picked Default comes back in Default, not in the saved default (#10380)
-			PermissionMode string `json:"permission_mode"`
+			// The mode the member started in (#10430) and the flags of its own: a member comes back as it was, never in the saved default (#10380)
+			PermissionMode string   `json:"permission_mode"`
+			Flags          []string `json:"flags"`
 		}
 		if err := json.Unmarshal([]byte(m.AgentConfigJSON), &agentCfg); err != nil {
 			log.Printf("[resurrect] failed to parse agent config for %s: %v", m.AgentName, err)
@@ -224,10 +225,16 @@ func (h *SessionsHandler) ResurrectTeam(w http.ResponseWriter, r *http.Request) 
 		// Inject distilled knowledge if available
 		resurrectPrompt := InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), team.Name, m.AgentName, agentCfg.Prompt)
 
+		if agentCfg.PermissionMode != "" && !agent.ValidPermissionMode(agentCfg.PermissionMode) {
+			log.Printf("[resurrect] corrupt stored permission mode for %s: %s", m.AgentName, agentCfg.PermissionMode)
+			launched = append(launched, map[string]any{"name": m.AgentName, "error": "invalid stored permission mode"})
+			continue
+		}
+		memberFlags := resurrectFlags(agentType, agentCfg.PermissionMode, agentCfg.Flags, agentCfg.Capabilities)
 		result, err := h.launchSession(ctx, launchSpec{
 			WorkDir: workingDir, AgentType: agentType, DisplayName: m.AgentName, Prompt: resurrectPrompt, BoardName: team.Name,
 			Model: agentCfg.Model, Capabilities: agentCfg.Capabilities, Tools: agentCfg.Tools, Hooks: agentCfg.Hooks,
-			PermissionMode: explicitDefaultMode(agentCfg.PermissionMode, nil),
+			Flags: memberFlags, PermissionMode: agentCfg.PermissionMode,
 		})
 		if err != nil {
 			log.Printf("[resurrect] failed to launch %s: %v", m.AgentName, err)
@@ -265,4 +272,20 @@ func (h *SessionsHandler) ResurrectTeam(w http.ResponseWriter, r *http.Request) 
 		"board_label": h.boardLabel(team.Name),
 		"agents":      launched,
 	})
+}
+
+// resurrectFlags are a resurrected member's flags: its own, with the mode it started in as the flags of its type (the way a team reset does it): a member with permission flags of its
+// own keeps them as they were, and one with capabilities gets the mode as its permission mode only (#10430).
+func resurrectFlags(agentType, mode string, own []string, caps *agent.Capabilities) []string {
+	flags := stripAgentPermissionFlags(own)
+	if caps != nil && !caps.IsEmpty() {
+		return flags
+	}
+	if carried, _ := agent.SplitPermissionFlags(own); len(carried) > 0 {
+		return append(flags, carried...)
+	}
+	if mode != "" && mode != "default" {
+		flags = append(flags, agent.PermissionFlagsForAgent(agentType, mode)...)
+	}
+	return flags
 }

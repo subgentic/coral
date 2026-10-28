@@ -158,3 +158,53 @@ func TestAResurrectedMemberWhoPickedDefaultStaysInDefault(t *testing.T) {
 	assert.Equal(t, "default", modes["D"], "the member who picked Default: %s", body)
 	assert.Equal(t, "auto", modes["N"], "a member with nothing chosen still gets the saved default")
 }
+
+// #10430 (Security, safety): a team launched in Plan or Accept edits, killed and resurrected, came back in the saved default (Auto): the member was stored without the mode it started in.
+// Each member comes back in the mode it had, never a wider one, with Auto saved; a member with permission flags of its own keeps them.
+func TestAResurrectedMemberKeepsTheModeItStartedIn(t *testing.T) {
+	url, _, h := teamServerH(t)
+	ctx := context.Background()
+	require.NoError(t, h.ss.SetSetting(ctx, "default_permission_mode", "auto"))
+	for _, tc := range []struct {
+		name      string
+		teamFlags []string
+		member    map[string]any
+		want      string
+	}{
+		{"plan", []string{"--permission-mode", "plan"}, map[string]any{"name": "A", "agent_type": "claude"}, "plan"},
+		{"acceptedits", []string{"--permission-mode", "acceptEdits"}, map[string]any{"name": "A", "agent_type": "claude"}, "acceptEdits"},
+		{"ownflags", nil, map[string]any{"name": "A", "agent_type": "claude", "flags": []string{"--permission-mode", "plan"}}, "plan"},
+		{"default", nil, map[string]any{"name": "A", "agent_type": "claude", "permission_mode": "default"}, "default"},
+		{"nothing", nil, map[string]any{"name": "A", "agent_type": "claude"}, "auto"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			board := "resmode" + tc.name
+			b, _ := json.Marshal(map[string]any{"board_name": board, "new_board": true, "working_dir": t.TempDir(), "agent_type": at.Claude, "flags": tc.teamFlags, "agents": []map[string]any{tc.member}})
+			resp, err := http.Post(url+"/api/sessions/launch-team", "application/json", bytes.NewReader(b))
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			var launched struct {
+				BoardID string `json:"board_id"`
+			}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&launched))
+			status, body := apiPost(t, url+"/api/sessions/live/team/"+launched.BoardID+"/kill")
+			require.Equal(t, http.StatusOK, status, body)
+
+			status, body = apiPost(t, url+"/api/teams/detail/"+launched.BoardID+"/resurrect")
+			require.Equal(t, http.StatusOK, status, body)
+			var res struct {
+				Agents []map[string]any `json:"agents"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(body), &res), body)
+			require.Len(t, res.Agents, 1, body)
+			id, _ := res.Agents[0]["session_id"].(string)
+			require.NotEmpty(t, id, body)
+			ls, err := h.ss.GetLiveSession(ctx, id)
+			require.NoError(t, err)
+			require.NotNil(t, ls)
+			require.NotNil(t, ls.PermissionMode)
+			assert.Equal(t, tc.want, *ls.PermissionMode, "the resurrected member's mode")
+		})
+	}
+}
