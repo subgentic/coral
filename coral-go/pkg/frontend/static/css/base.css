@@ -19,6 +19,8 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    padding-left: env(safe-area-inset-left, 0px); /* edge to edge (viewport-fit=cover): a landscape phone's notch and rounded corners (#10095) */
+    padding-right: env(safe-area-inset-right, 0px);
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
