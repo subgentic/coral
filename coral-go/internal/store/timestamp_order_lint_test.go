@@ -46,6 +46,7 @@ var nanoWriters = map[string]nanoWriter{
 	"tracking/milestones.go":                 {calls: 1, why: "a JSON file, parsed"},
 	"server/routes/token_usage.go":           {calls: 1, why: "a response field, not stored"},
 	"background/health_held.go":              {calls: 1, why: "part of an episode id, not compared"},
+	"server/routes/pending_sends.go":         {calls: 1, why: "a field of the live row (pending_sends.at), parsed by Date.parse; held in memory, never stored or ordered as text"},
 }
 
 // nanoTables and their time columns that hold such text.
