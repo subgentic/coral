@@ -476,7 +476,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 .model-chip-note[data-state="failed"] { color: var(--error-text, var(--fx-red-hot)); }
 .model-chip-menu { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 30; min-width: 260px; max-width: min(92vw, 360px); max-height: 50vh; overflow-y: auto; } /* where it sits and how big: what it looks like is the one menu's (.menu, layout.css) */
 .model-chip-menu[hidden] { display: none; }
-.model-chip-head { padding: 6px 8px 2px; font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.model-chip-head { padding: 6px 8px 2px; font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: var(--ls-caps); color: var(--text-muted); }
 .model-chip-how { text-transform: none; letter-spacing: 0; margin-left: 6px; color: var(--link-text); } /* the accent was 4.44:1 on the menu in the light theme */
 .model-chip-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 36px; padding: 6px 8px; border: 0; border-radius: var(--radius-md);
     background: transparent; color: var(--text-primary); font: inherit; font-size: var(--fs-md); text-align: left; cursor: pointer; }

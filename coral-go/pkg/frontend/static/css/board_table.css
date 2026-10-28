@@ -63,7 +63,7 @@
 .mb-table .mb-message.mb-is-reply > .mb-row-toggle { padding-inline-start: 2.25rem; }
 
 /* The day lines stay at the top while their day's rows pass under them. */
-.mb-day { position: sticky; top: 0; z-index: 2; padding: 0.375rem 0.875rem; font-size: var(--fs-sm); font-weight: var(--fw-strong); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); background: var(--bg-primary); border-bottom: 1px solid var(--border); }
+.mb-day { position: sticky; top: 0; z-index: 2; padding: 0.375rem 0.875rem; font-size: var(--fs-sm); font-weight: var(--fw-strong); letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--text-secondary); background: var(--bg-primary); border-bottom: 1px solid var(--border); }
 
 /* The pills. */
 .mb-table[data-pill="questions"] > :is(.mb-message:not(.mb-q), .mb-queue-run, .mb-day),

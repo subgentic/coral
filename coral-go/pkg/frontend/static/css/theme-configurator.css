@@ -44,7 +44,7 @@
     font-weight: var(--fw-strong);
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: var(--ls-caps);
     padding: 8px 0 4px;
     position: sticky;
     top: 0;

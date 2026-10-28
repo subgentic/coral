@@ -422,7 +422,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     font-size: var(--fs-sm, 11px);
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--ls-caps);
     padding: 6px 8px 2px 14px;
     list-style: none;
 }
@@ -462,7 +462,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     color: var(--text-secondary);
     padding: 4px 12px !important;
     text-transform: none;
-    letter-spacing: 0.02em;
+    letter-spacing: var(--ls-caps);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1236,7 +1236,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .team-availability-dialog h2, .team-availability-dialog header p { margin: 0 0 var(--space-sm); }
 .team-availability-dialog h2 { font-size: var(--fs-xl); }
 .team-availability-dialog header p { font-size: var(--fs-base); color: var(--text-secondary); }
-.team-availability-dialog button { min-height: var(--control-compact-height); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-md); padding: 7px 12px; }
+.team-availability-dialog button { min-height: var(--control-compact-height); font: var(--fw-medium) var(--fs-md)/var(--lh-ui) var(--font-sans); cursor: pointer; color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--control-border); border-radius: var(--radius-md); padding: 7px 12px; }
 .team-availability-dialog button:disabled { opacity: .5; }
 .availability-toolbar { margin: 8px 0 12px; font-size: var(--fs-md); justify-content: flex-end; } /* Refresh alone, on the right (UI audit #5589, finding 15: the sentence beside it repeated the heading) */
 .availability-summary { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -1262,7 +1262,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 
 .preset-editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; overflow: auto; min-height: 0; padding: 2px 4px 2px 0; }
 .preset-editor[hidden] { display: none; }
-.preset-editor label { display: block; font: 500 var(--fs-md)/1.4 var(--font-sans); }
+.preset-editor label { display: block; font: var(--fw-medium) var(--fs-md)/var(--lh-ui) var(--font-sans); }
 .preset-editor select, .preset-editor textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .preset-editor p { font-size: var(--fs-md); color: var(--text-secondary); margin: 0; }
 .team-settings-section { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; margin: 0; display: grid; gap: 12px; min-width: 0; }
@@ -1292,7 +1292,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .prompt-inspection-bar { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 12px; }
 .prompt-inspection-bar label { margin: 0; }
 .prompt-inspection-card[hidden] { display: none; }
-.prompt-inspection-fragment pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 0; padding: 8px; border-radius: 5px; background: var(--bg-primary); color: var(--text-primary); font: 0.75rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.prompt-inspection-fragment pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 0; padding: 8px; border-radius: 5px; background: var(--bg-primary); color: var(--text-primary); font: var(--fs-base)/var(--lh-ui) var(--font-mono); }
 
 /* The (i) is a circle in Team settings as in Settings (#6042): the dialog's generic button rule (padding, radius, min-height) must not reshape it. */
 .team-availability-dialog .settings-info-btn { min-height: 0; padding: 0; border-radius: 50%; width: 1.5rem; height: 1.5rem; }

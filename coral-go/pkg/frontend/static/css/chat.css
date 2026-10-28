@@ -966,7 +966,7 @@ body:has(.model-chip-menu:not([hidden])) .chat-jump-latest-btn { visibility: hid
 .cni-kicker {
     font-size: var(--fs-sm);
     font-weight: var(--fw-strong);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--ls-caps);
     text-transform: uppercase;
     color: var(--warning);
 }
