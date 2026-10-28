@@ -500,7 +500,7 @@ started and recorded (`kill <pid>`, or a tree walked down from that PID).
 ### Seeing exactly what Coral types into an agent's terminal
 
 If an agent did something you didn't expect (it exited, or ran a command nobody typed), turn on
-**Settings > Security and privacy > Log terminal input (debug)**, or start Coral with `CORAL_DEBUG_INPUT=1` or
+**Settings > Security and privacy > Record what Coral types (debug)**, or start Coral with `CORAL_DEBUG_INPUT=1` or
 `--debug-input`. It is off by default. While it is on, every write Coral makes to an agent's
 terminal goes to `<data dir>/input-debug.log`, one line each: time, terminal, the code path that
 sent it (`source=`, for example the board notifier or the dashboard's composer), how it was sent
