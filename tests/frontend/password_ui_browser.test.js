@@ -153,7 +153,7 @@ const BASE = require('./test_base').BASE;
         assert.doesNotMatch(out.lead1 + out.lead2, /nothing changed|now asks browsers/);
         assert.deepEqual(out.weak, { level: 'weak', disabled: false }, 'the meter advises and never blocks');
         assert.equal(out.meterEmpty, 'none', 'no empty strength bar before anything is typed (#9971)'); assert.notEqual(out.meterTyped, 'none', 'the bar shows once something is typed');
-        assert.match(out.notNowNote, /^Not now keeps Coral open to any program on this computer\. You can set a password later in Settings, Security and privacy\.$/, 'the prompt says what Not now leaves you with');
+        assert.match(out.notNowNote, /^Not now\. The Coral app, the tray and coral open still open Coral here, and nothing else can reach it\. A password lets you sign in from any browser and from other devices: set one later in Settings, Security and privacy\.$/, 'the prompt says what Not now leaves you with');
         assert.equal(out.emptyErr, 'Enter a password.'); assert.equal(out.callsAfterEmpty, 0);
         assert.match(out.mismatchErr, /do not match/); assert.equal(out.callsAfterMismatch, 0, 'nothing is sent for a mismatch');
         assert.deepEqual(out.setCall, { url: '/api/auth/password/set', body: { password: '  a b  ' } }, 'sent exactly as typed, spaces kept');
