@@ -99,9 +99,9 @@ export async function maybePromptSetPassword() {
     showSetPasswordModal({ local: st.local === true });
 }
 
-/** Home's first control by keyboard: its New agent card (or first button), else the agent search box (a phone's too), else the menu button or the current top tab. */
+/** Home's first control by keyboard: its New agent card, else the agent search box (a phone's too), else the menu button or the current top tab. */
 function pageControl() {
-    for (const sel of ['#welcome-screen button:not([disabled]), #welcome-screen a[href]', '#agent-search-input', '#mobile-agent-list .mobile-search-input', '#top-menu-btn', '.top-nav-tab.active']) {
+    for (const sel of ['#welcome-screen .welcome-launch[data-arg="agent"]', '#agent-search-input', '#mobile-agent-list .mobile-search-input', '#top-menu-btn', '.top-nav-tab.active']) {
         const e = [...document.querySelectorAll(sel)].find(x => x.getClientRects().length > 0);
         if (e) return e;
     }
