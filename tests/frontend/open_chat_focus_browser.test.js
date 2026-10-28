@@ -25,7 +25,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.ok(ax && ax.name !== undefined && (mobile ? ax.role === 'heading' : /textbox|combobox/.test(ax.role)), `${label}: the focused element is named ${JSON.stringify(ax)}`);
             // the sidebar's way in (no option) leaves focus on the row that was used
             await ev(`(() => { const b = document.createElement('button'); b.id = 'row-stand-in'; b.textContent = 'row'; document.body.append(b); b.focus(); })()`);
-            await ev(`import(${S} + 'sessions.js').then(m => m.selectLiveSession('focus-a', 'claude', 'focus-a-id')).then(() => true)`);
+            await ev(`Promise.resolve(window.selectLiveSession('focus-a', 'claude', 'focus-a-id')).then(() => true)`);
             await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: a late focus move would have landed by now
             assert.equal(await ev(`document.activeElement.id`), 'row-stand-in', label + ': selecting from the sidebar leaves focus on the row');
             if (!mobile) { // the sidebar's row (the old behaviour, #9794): a click puts the cursor in the composer, Enter on the row does not move focus
@@ -42,7 +42,7 @@ const S = `(window.__coralStatic || '/static/')`;
                 await waitFor(`window.__opts.length === 2`, label + ': Enter reached the handler', 4000);
                 assert.deepEqual(await ev(`window.__opts`), [true, false], label + ': a click is a pointer open, Enter is not');
                 // and a pointer open puts the cursor in the composer from wherever focus was (here a stand-in outside the list)
-                await ev(`document.getElementById('row-stand-in').focus(); import(${S} + 'sessions.js').then(m => m.selectLiveSession('focus-a', 'claude', 'focus-a-id', undefined, { pointer: true })).then(() => true)`);
+                await ev(`document.getElementById('row-stand-in').focus(); Promise.resolve(window.selectLiveSession('focus-a', 'claude', 'focus-a-id', undefined, { pointer: true })).then(() => true)`);
                 await waitFor(`document.activeElement && document.activeElement.id === 'command-input'`, label + ': a pointer open puts the cursor in the composer', 4000);
             }
             console.log('PASS ' + label + ': focus is on ' + want);
