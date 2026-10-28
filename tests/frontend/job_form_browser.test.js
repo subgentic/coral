@@ -40,7 +40,7 @@ const STUB = `(() => {
             assert.equal(await ev(vis('#job-modal-workflow')), true, at + 'Workflow');
             for (const id of ['#job-modal-description', '#job-modal-timezone', '#job-modal-timeout', '#job-modal-cleanup', '#job-modal-cron']) assert.equal(await ev(vis(id)), false, at + id + ' is not on the first screen');
             const labels = await ev(`[...document.querySelectorAll('#job-form .sv-row')].filter(r => r.checkVisibility()).map(r => r.querySelector('.sv-label').textContent.trim() + '|' + (r.querySelector('.sv-required') ? 'req' : ''))`);
-            assert.deepEqual(labels, ['Type|', 'Name|req', 'Workflow|req', 'When|req'], at + 'labels, in order, with Required in words: ' + JSON.stringify(labels));
+            assert.deepEqual(labels, ['Type|', 'Name|req', 'When|req', 'Workflow|req'], at + 'labels, in order (When right after Name, #9965), with Required in words: ' + JSON.stringify(labels));
             assert.deepEqual(await ev(`[...document.querySelectorAll('.sched-preset')].map(b => b.textContent.trim())`), ['Every N minutes', 'Every N hours', 'Daily at', 'Weekly on', 'Advanced'], at + 'the schedule is picked: minutes, hours, daily, weekly; the cron box is Advanced');
             const prev = await ev(`document.getElementById('cron-preview').textContent`);
             assert.match(prev, /^Runs every hour\. Next: (today|tomorrow) \d\d:\d\d\.$/, at + 'the preview is one sentence, in the person\'s own zone (no zone named): ' + prev);
