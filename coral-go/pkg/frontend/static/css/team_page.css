@@ -335,7 +335,7 @@
 .inbox-review-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .inbox-review-item > :not(.inbox-review-name) { flex: none; }
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
-.inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; }
+.inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904) */
 .inbox-review-actions-read { grid-template-columns: max-content max-content max-content; } /* a read item has Unread beside Open and Mark reviewed (#9277) */
 .inbox-review-actions-star { grid-template-columns: max-content max-content max-content; } /* the star is the first of the actions (#9834) */
 .inbox-review-actions-star.inbox-review-actions-read { grid-template-columns: max-content max-content max-content max-content; }
