@@ -49,6 +49,10 @@ const path = require('node:path');
             await ev(`window.__idMode=${JSON.stringify(mode)};window.showSettingsModal('security')`);
             assert.equal(await ev(`document.getElementById('settings-telemetry-install-copy').disabled`),true);
             assert.notEqual(await ev(`document.getElementById('settings-telemetry-install-id').textContent`),id);
+            if (mode === 'missing') { // no ID yet is a state, not an error (Beta Tester, #9955): a plain word and nothing to copy
+                assert.equal(await ev(`document.getElementById('settings-telemetry-install-id').textContent`),'Not created yet','missing says so plainly');
+                assert.equal(await ev(`document.getElementById('settings-telemetry-install-copy').hidden`),true,'and has no Copy button');
+            } else assert.equal(await ev(`document.getElementById('settings-telemetry-install-copy').hidden`),false,'an error keeps its disabled Copy');
             await ev(`window.hideSettingsModal();true`);
         }
         assert.deepEqual(await ev(`window.__idWrites`),[],'read/copy never writes settings or analytics state');
