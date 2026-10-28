@@ -97,6 +97,17 @@ export function chatOpened(s) {
     IR.markRead(readKind(s), readKey(s), stampOf(s) || Date.now());
 }
 
+/** A folder's list read before its chats were all indexed (after a restart the index fills in for a while) stays at the total it had, while the counts read moves on: the header said 2 over a list of 1 (#10197). An unfiltered list whose total is not the folder's count is read again, once for each count it differs from (a count that stays different, as with a computer that does not answer, does not read again and again). */
+const rereadFor = new Map(); // list key -> the folder count it was last read again for
+function dropStaleLists() {
+    for (const [k, L] of [...lists]) {
+        const [, folder, q, extra] = k.split('|');
+        const n = q === '' && extra === '{}' && !L.busy && L.page > 0 && !L.error ? folderCount(folder) : undefined;
+        if (n === undefined || L.total === n || rereadFor.get(k) === n) continue;
+        rereadFor.set(k, n); lists.delete(k);
+    }
+}
+
 export async function loadChatCounts(redraw) {
     try {
         const sources = inboxSources();
@@ -107,6 +118,7 @@ export async function loadChatCounts(redraw) {
         if (nativeInbox()) delete counts.tags; // tags are per computer: the Hub-served Inbox has no Tags folder
         for (const key of ['all','group','notes','starred','active','archived']) counts[key] = replies.reduce((sum, d) => sum + (Number(d[key]) || 0), 0);
         for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
+        dropStaleLists();
     } catch { /* the folders keep their last counts */ }
     if (Date.now() - lastRecount >= RECOUNT_MS && (unread === null || inboxShows())) await loadUnread(); // the first read at start (and a start read that failed is tried again only after a minute, not at every counts read); then at most one a minute, and only while the Inbox shows: an open or a flag updates the numbers in memory (chatOpened, setChatFlag), no request
     redraw?.();
