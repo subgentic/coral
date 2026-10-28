@@ -48,6 +48,10 @@ const AGENTS = [
             }
             assert.ok(r.some(x => /^Wants to run: go test/.test(x.ask)) && r.some(x => x.ask && x.title === 'Agent Two'), at + 'the ask is the second line, the state when there is none ' + JSON.stringify(r));
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
+            // the marker's `since` is in the future: every seeded task counts as read, so the plain row is measured
+            const readAs = since => ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: ${since}, items: {} })); true`);
+            const showTasks = async n => { await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`); await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 3`, at + n, 10000); };
+            await readAs('Date.now() + 1e10');
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 3`, at + 'the three tasks as mail rows', 10000);
             r = await rows();
@@ -56,6 +60,15 @@ const AGENTS = [
                 assert.ok(x.bold <= 500, at + 'no unread bold where nothing is unread ' + JSON.stringify(x));
             }
             assert.deepEqual(r.map(x => x.snippet), ['Queued', 'In progress', 'In review'], at + 'the state is the first words');
+            // a task nobody has opened is as tall as a read one: the dot adds no height (so the list does not jump as rows are opened)
+            const readHeights = r.map(x => x.h);
+            await readAs('0');
+            await showTasks('the three tasks again, unread');
+            r = await rows();
+            for (const x of r) assert.ok(x.h >= 56 && x.h <= 60 && x.dot && x.bold >= 600 && x.sameLine, at + 'an unread task is still one 56 px line, with the dot and the title at 600 ' + JSON.stringify(x));
+            assert.deepEqual(r.map(x => x.h), readHeights, at + 'an unread row is exactly as tall as a read one');
+            await readAs('Date.now() + 1e10');
+            await showTasks('the three tasks read again');
             // at 200% text the title and the first words stack (a line each), neither cut to a few letters, and the time keeps its space (#9646)
             await ev(`document.documentElement.style.fontSize = '200%'; true`);
             await waitFor(`document.querySelector('${T} .dt-mail-line') && getComputedStyle(document.querySelector('${T} .dt-mail-line')).flexDirection === 'column'`, at + 'the line stacks at 200% text', 4000);
