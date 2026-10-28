@@ -24,8 +24,6 @@ let _boardChatTimer = null;
 let _activeBoardChat = null;
 let _boardChatGen = 0;   // bumped whenever the board chat panel is rebuilt, to drop stale loads
 
-/** The board whose chat the panel currently shows (or null). */
-export function getActiveBoardChat() { return _activeBoardChat; }
 let _boardChatMessages = [];
 let _boardChatTotal = 0;
 let _boardChatOffset = 0;   // older messages not loaded yet
