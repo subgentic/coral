@@ -367,8 +367,8 @@ export function initScheduler() {
 // The scheduled jobs' markup (#3645): data-on-* names, never code.
 // Ids are checked (idOf, uuidOf) before use: a bad one does nothing. Deleting still asks first.
 registerActions({
-    'job-new': () => importOnce('./job_form.js').then(m => m.showJobModal()), // the form loads when it is first opened (#10218)
-    'job-edit': el => withId(el.dataset.jobId, id => importOnce('./job_form.js').then(m => m.editScheduledJob(id))),
+    'job-new': () => importOnce('./job_form.js', 'the job form').then(m => m.showJobModal()).catch(() => {}), // the form loads when it is first opened (#10218)
+    'job-edit': el => withId(el.dataset.jobId, id => importOnce('./job_form.js', 'the job form').then(m => m.editScheduledJob(id)).catch(() => {})),
     'job-toggle': el => withId(el.dataset.jobId, toggleScheduledJob),
     'job-run-now': el => withId(el.dataset.jobId, id => runScheduledJobNow(id, el)),
     'job-delete': el => withId(el.dataset.jobId, deleteScheduledJob),
