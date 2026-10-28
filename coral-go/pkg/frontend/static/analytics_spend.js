@@ -72,6 +72,7 @@ function figures(data, range) {
 }
 
 function headline(f) {
+    if (f.noCommits && /no repository found/i.test(f.reason)) return `Tokens per commit needs a git folder, and none of this team's agents is in one. ${fmtTokens(f.win)} tokens were spent.`; // none in use: the count has nothing to count (#10482)
     if (f.noCommits) return `Commits could not be read${f.reason ? `: ${f.reason}` : ''}. ${fmtTokens(f.win)} tokens were spent.`;
     if (!f.commits) return `No commit landed in ${f.windowWord}. ${fmtTokens(f.win)} tokens were spent.`;
     const parts = [`${fmtTokens(f.per)} tokens per commit`];
