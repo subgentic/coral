@@ -479,7 +479,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"needs_login":           state.NeedsLogin,
 		"awaiting_user":         state.AwaitingUser,
 		"not_started":           state.NotStarted,
-		"starting":              agentStarting(agent.AgentType, startedEv(latestEv, d.started[sid]), sessionAgeSeconds(lv.createdAt[sid]), lv.sleeping[sid], lv.archived[sid]),
+		"starting":              agentStarting(agent.AgentType, startedEv(latestEv, d.started[sid]), sessionAgeSeconds(lv.createdAt[sid]), lv.sleeping[sid], lv.archived[sid], state.NotStarted),
 		"done":                  state.Done,
 		"waiting_reason":        nilIf(!state.NeedsInput, state.WaitingReason),
 		"waiting_summary":       waitingLineIf(state.NeedsInput, waitingSource(state.WaitingWants, state.WaitingSummary)),

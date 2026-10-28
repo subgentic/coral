@@ -968,9 +968,10 @@ func agentNeverStarted(agentType, latestEvent string, stalenessSeconds, sessionA
 
 // agentStarting reports that an agent's CLI has not emitted its first event yet (#6381): a signal, the absence of the first hook event, and not a timer, so the composer can say
 // "Starting" from the status and not from a clock. It is bounded by the same window as agentNeverStarted so an agent whose hooks never report is not "starting" forever, and it is
-// never true for a terminal, a sleeping or an archived session.
-func agentStarting(agentType, latestEvent string, sessionAgeSeconds float64, sleeping, archived bool) bool {
-	if agentType == at.Terminal || sleeping || archived || latestEvent != "" {
+// never true for a terminal, a sleeping or an archived session, and no longer once the row says the agent has not started (notStarted: silent for 25 s, "Check terminal"): the composer
+// does not go on saying "Starting" under a row that says to look at the terminal (#9948).
+func agentStarting(agentType, latestEvent string, sessionAgeSeconds float64, sleeping, archived, notStarted bool) bool {
+	if agentType == at.Terminal || sleeping || archived || latestEvent != "" || notStarted {
 		return false
 	}
 	return sessionAgeSeconds > 0 && sessionAgeSeconds <= notStartedWindowSeconds

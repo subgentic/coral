@@ -20,20 +20,22 @@ func TestAgentStartingIsTheAbsenceOfTheFirstEvent(t *testing.T) {
 		agentType, latest string
 		age               float64
 		sleeping, arch    bool
+		notStarted        bool
 		want              bool
 	}{
-		"a new agent, no event yet":    {"claude", "", 2, false, false, true},
-		"a Codex agent, no event yet":  {"codex", "", 40, false, false, true},
-		"its first event arrived":      {"claude", "SessionStart", 2, false, false, false},
-		"any event":                    {"claude", "Stop", 90, false, false, false},
-		"a terminal is a shell":        {"terminal", "", 2, false, false, false},
-		"asleep":                       {"claude", "", 2, true, false, false},
-		"archived":                     {"claude", "", 2, false, true, false},
-		"no creation time":             {"claude", "", 0, false, false, false},
-		"past the window: not forever": {"claude", "", notStartedWindowSeconds + 1, false, false, false},
-		"at the window's end":          {"claude", "", notStartedWindowSeconds, false, false, true},
+		"a new agent, no event yet":               {"claude", "", 2, false, false, false, true},
+		"a Codex agent, no event yet":             {"codex", "", 40, false, false, false, true},
+		"its first event arrived":                 {"claude", "SessionStart", 2, false, false, false, false},
+		"any event":                               {"claude", "Stop", 90, false, false, false, false},
+		"a terminal is a shell":                   {"terminal", "", 2, false, false, false, false},
+		"asleep":                                  {"claude", "", 2, true, false, false, false},
+		"archived":                                {"claude", "", 2, false, true, false, false},
+		"no creation time":                        {"claude", "", 0, false, false, false, false},
+		"past the window: not forever":            {"claude", "", notStartedWindowSeconds + 1, false, false, false, false},
+		"at the window's end":                     {"claude", "", notStartedWindowSeconds, false, false, false, true},
+		"the row says it has not started (#9948)": {"claude", "", 40, false, false, true, false},
 	} {
-		assert.Equal(t, c.want, agentStarting(c.agentType, c.latest, c.age, c.sleeping, c.arch), name)
+		assert.Equal(t, c.want, agentStarting(c.agentType, c.latest, c.age, c.sleeping, c.arch, c.notStarted), name)
 	}
 }
 
