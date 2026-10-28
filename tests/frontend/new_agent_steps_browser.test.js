@@ -119,6 +119,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`window.__na.find('input', ${N.name}).value`), 'QA Engineer', 'the name typed is kept');
         });
 
+        const shotIf = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
         await S.run('step 3 is "The agent": tabs Agent, Permissions, Advanced as one tablist, Back, Cancel and Launch, no Next, and the recap above the footer', async () => {
             await click('button', N.next);
             await waitFor(`/Step 3 of 3/.test(window.__na.dialog().textContent)`, 'step 3 of 3', 4000);
@@ -131,6 +132,19 @@ const BASE = require('./test_base').BASE;
             assert.ok(!(await has('button', N.next)), 'no Next on step 3');
             await footerOrder(N.launch, 'step 3');
             assert.match(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /QA Engineer: Claude, \/work\/payments-app, default model, \w+ mode/, 'the recap');
+            // the footer says what the chosen mode allows (Desktop tester, #10000), and follows the choice
+            const noteOf = () => ev(`(() => { const n = window.__na.dialog().querySelector('.launch-recap-note'); return n ? n.textContent : ''; })()`);
+            assert.match(await noteOf(), /^\w+ mode allows: [a-z].{10,}\.$/, 'a line under the recap says what the mode allows');
+            await ev(`(() => { const sel = window.__na.dialog().querySelector('.acf-permission-mode'); sel.value = 'plan'; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await waitFor(`/^Plan mode allows: reads only/.test((window.__na.dialog().querySelector('.launch-recap-note') || {}).textContent || '')`, 'the line follows the mode', 4000);
+            // Auto is not the same on every CLI (Security's review): safety checks are Claude's; Codex has its sandbox; Antigravity and Gemini skip every prompt and check; Pi has no permissions
+            const as = async (type, mode) => { await ev(`(() => { const d = window.__na.dialog(), t = d.querySelector('.acf-agent-type'); t.value = ${JSON.stringify(type)}; t.dispatchEvent(new Event('change', { bubbles: true })); const sel = d.querySelector('.acf-permission-mode'); sel.value = ${JSON.stringify(mode)}; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await new Promise(r => setTimeout(r, 250)); return noteOf(); }; // sleep-ok: the recap follows
+            assert.match(await as('claude', 'auto'), /^Auto mode allows: everything, with safety checks\.$/, 'Claude Auto has safety checks');
+            assert.match(await as('codex', 'auto'), /workspace sandbox/, 'Codex Auto is its workspace sandbox');
+            assert.equal(await as('agy', 'auto'), 'Auto mode allows: everything, with no prompts and no safety checks.', 'Antigravity Auto has no prompts and no safety checks');
+            assert.equal(await as('pi', 'auto'), 'Pi has no permission prompts: it always acts on its own.', 'Pi has no permission system');
+            await as('claude', 'plan');
+            await shotIf('new-agent-mode-note-1280');
         });
         await S.run('Cancel closes the dialog', async () => {
             await click('button', N.cancel);
@@ -150,6 +164,7 @@ const BASE = require('./test_base').BASE;
                 for (const x of b) assert.ok(x.h >= 44, `phone step ${n}: ${x.name} is ${x.h}px tall`);
                 const cancel = b.find(x => /^Cancel$/i.test(x.name)); const pl = await ev(`window.__na.box(window.__na.panel()).x`); assert.ok(cancel.x - pl <= 24, `phone step ${n}: Cancel is within 24 px of the dialog's left edge (it is ${Math.round(cancel.x - pl)} px in)`);
                 assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), `phone step ${n}: no sideways scroll`);
+                if (n === 3) { assert.ok(await ev(`(() => { const d = window.__na.dialog(), n = d.querySelector('.launch-recap-note'), r = n && n.closest('.launch-recap'); if (!n || !r) return false; const a = n.getBoundingClientRect(), b = r.getBoundingClientRect(); return a.height > 0 && a.bottom <= b.bottom + 1 && r.scrollHeight <= r.clientHeight + 1; })()`), 'phone step 3: the mode note is whole inside the recap, not cut off by its line clamp'); await shotIf('new-agent-mode-note-390'); }
             }
         });
         S.finish();
