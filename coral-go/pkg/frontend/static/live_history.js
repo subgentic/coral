@@ -270,15 +270,26 @@ function _showHistoryBusy(container, resp, server, generation) {
 /** True while older transcript pages remain unloaded (used by find-in-chat). */
 export function chatHasOlder() { return historyHasMore; }
 
+/** The button at the top of the chat says it is loading while an older page is fetched (#10050: after a reload the history fills in from the top and nothing said so), and has its words back after. */
+function sayLoadingEarlier(on) {
+    const btn = document.querySelector("#live-history-messages > .load-more-btn");
+    if (!btn) return;
+    const text = on ? "Loading earlier messages\u2026" : "Load older messages";
+    if (btn.textContent !== text) btn.textContent = text;
+    if (on) btn.setAttribute("aria-busy", "true"); else btn.removeAttribute("aria-busy");
+}
+
 export async function loadMoreHistory() {
     if (!state.currentSession || !historyHasMore || loadingMore) return;
     loadingMore = true;
     const generation = historyGeneration;
     let ok = false;
+    sayLoadingEarlier(true);
     try {
         ok = await _loadMoreHistory(generation);
     } finally {
         if (generation === historyGeneration) loadingMore = false;
+        sayLoadingEarlier(false);
     }
     // A page shorter than the view leaves the sentinel in sight, and the
     // observer only reports changes: keep loading while it is still within
