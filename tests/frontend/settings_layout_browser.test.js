@@ -31,7 +31,7 @@ const AGENT_PARTS = {
         console.log('1. Agents: five headed parts, each control under its own heading');
         await open('agents');
         const heads = await ev(`[...document.querySelectorAll('#settings-pane-agents .sv-heading')].map(h => h.id + '=' + h.textContent.trim())`);
-        assert.deepEqual(heads, ['settings-agents-defaults=Defaults', 'settings-agents-models=Default models', 'settings-agents-behaviour=Behaviour', 'settings-agents-team=Team and board', 'settings-agents-tools=Tools']);
+        assert.deepEqual(heads, ['settings-agents-models=Default models', 'settings-agents-defaults=Defaults', 'settings-agents-behaviour=Behaviour', 'settings-agents-team=Team and board', 'settings-agents-tools=Tools']);
         for (const [head, ids] of Object.entries(AGENT_PARTS)) {
             // #8460 put CLI paths inside a settings_view fold. Its rows belong to the heading
             // before the disclosure (Defaults since #9955): at the first folded row, continue before it (#8530).

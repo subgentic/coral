@@ -95,6 +95,11 @@ const CLI_PLACEHOLDERS = { agy: 'agy (Antigravity)', pi: 'pi (the Pi coding agen
 const cliPath = (type, label) => ({ key: `cli_path_${type}`, type: 'path', id: `settings-cli-path-${type}`, label: `${label} CLI path`, placeholder: CLI_PLACEHOLDERS[type] || type, live: [`cli-result-${type}`], setup: el => el.classList.add('settings-mono-input') });
 
 const AGENTS_FIELDS = host => [
+    { key: 'default_models', type: 'heading', id: 'settings-agents-models', label: 'Default models', help: 'Pick one, or type any model id.' },
+    modelRow('claude', 'Claude'), modelRow('codex', 'Codex'), modelRow('agy', 'Antigravity'), modelRow('pi', 'Pi'),
+    { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
+    { key: 'custom_models', type: 'custom', id: 'settings-custom-models', wide: true, label: 'Custom models', help: moreOnly('Model ids are passed to the CLI as they are written here.', "They appear in every model picker, including the one that switches a running agent's model."), // the list and its form: custom_models.js draws them and shows the row once the server has the route
+        render: slot => slot.classList.add('settings-custom-models') },
     { key: 'agents_defaults', type: 'heading', id: 'settings-agents-defaults', label: 'Defaults' },
     { key: 'permission_mode', type: 'select', id: 'settings-permission-mode', labelId: 'settings-permission-mode-label', label: 'Default permission mode', options: PERMISSION_OPTIONS,
         help: { text: 'Everything; safety checks on Claude only.', about: 'Default permission mode', more: "Default asks before acting; Auto acts on its own; Not set starts a new agent in Auto and a new team member in Default. With such a default, an orchestrator's launches are refused until you pick Default or start them yourself. Auto differs by CLI: Claude checks each action for safety; Codex runs in a workspace sandbox; Antigravity, Gemini and Pi have no safety checks, and Pi has no permission prompts at all." }, helpTextClass: 'perm-mode-desc',
@@ -106,11 +111,6 @@ const AGENTS_FIELDS = host => [
     { key: 'cli_paths', type: 'heading', id: 'settings-cli-paths', label: 'CLI paths (empty uses PATH)', fold: true },
     cliPath('claude', 'Claude'), cliPath('codex', 'Codex'), cliPath('agy', 'Antigravity'), cliPath('pi', 'Pi'),
     live('verify-all-btn'),
-    { key: 'default_models', type: 'heading', id: 'settings-agents-models', label: 'Default models', help: 'Pick one, or type any model id.' },
-    modelRow('claude', 'Claude'), modelRow('codex', 'Codex'), modelRow('agy', 'Antigravity'), modelRow('pi', 'Pi'),
-    { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
-    { key: 'custom_models', type: 'custom', id: 'settings-custom-models', wide: true, label: 'Custom models', help: moreOnly('Model ids are passed to the CLI as they are written here.', "They appear in every model picker, including the one that switches a running agent's model."), // the list and its form: custom_models.js draws them and shows the row once the server has the route
-        render: slot => slot.classList.add('settings-custom-models') },
     { key: 'agents_behaviour', type: 'heading', id: 'settings-agents-behaviour', label: 'Behaviour' },
     { key: 'auto_resume', type: 'toggle', id: 'settings-auto-resume', label: 'Resume after API errors', help: moreOnly('Wakes an agent again after a rate limit or API error.', "When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.") },
     { key: 'auto_goals', type: 'toggle', id: 'settings-auto-goals', label: "Name each agent's goal", help: helpLine('Your requests go to Haiku, through your Claude Code account, for a short goal line.', "Coral asks Claude Code's smallest model (Haiku) for a short goal line for each agent, from your requests only: once when the agent first answers, then for a new request at most every 30 minutes. Each one is a short call made with your Claude Code account (about 1,300 input tokens). When off, the goal shows your first prompt.") },
