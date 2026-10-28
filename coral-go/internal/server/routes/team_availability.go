@@ -15,6 +15,12 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
+// availabilityBlocker is an open blocker of a task on another board.
+type availabilityBlocker struct {
+	BoardID string `json:"board_id"`
+	ID      int64  `json:"id"`
+}
+
 type availabilityTask struct {
 	ID     int64  `json:"id"`
 	Scope  string `json:"scope"`
@@ -22,6 +28,8 @@ type availabilityTask struct {
 	Status string `json:"status"`
 	// WaitingOn is the tasks this one waits on, its open blockers (#10222): a pending task that waits on another is not waiting for its assignee to pick it up.
 	WaitingOn []int64 `json:"waiting_on,omitempty"`
+	// WaitingOnElsewhere is the open blockers that belong to another board, each with its board (#10287): a bare number would read as a task of this team.
+	WaitingOnElsewhere []availabilityBlocker `json:"waiting_on_elsewhere,omitempty"`
 }
 
 type availableAgent struct {
@@ -327,7 +335,12 @@ func boardTasksAssignedTo(tasks []board.Task, subscriber string) []availabilityT
 		if assignee == subscriber && openAvailabilityTask(t.Status) {
 			task := availabilityTask{ID: t.ID, Scope: "board", Title: t.Title, Status: t.Status}
 			for _, dep := range t.BlockedBy {
-				if !dep.Satisfied {
+				if dep.Satisfied {
+					continue
+				}
+				if dep.BoardID != "" && dep.BoardID != t.BoardID {
+					task.WaitingOnElsewhere = append(task.WaitingOnElsewhere, availabilityBlocker{BoardID: dep.BoardID, ID: dep.TaskID})
+				} else {
 					task.WaitingOn = append(task.WaitingOn, dep.TaskID)
 				}
 			}
