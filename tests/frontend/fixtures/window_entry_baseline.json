@@ -1,0 +1,81 @@
+{
+  "action_limit_browser.test.js": [
+    "selectBoardProject"
+  ],
+  "actions_workflows_browser.test.js": [
+    "selectWorkflowRun"
+  ],
+  "board_delete_running_agents_browser.test.js": [
+    "loadLiveSessions"
+  ],
+  "board_ids_browser.test.js": [
+    "hideLaunchModal",
+    "loadLiveSessions",
+    "showLaunchModal"
+  ],
+  "board_jobs_identity_browser.test.js": [
+    "selectBoardProject"
+  ],
+  "capture_poll_304_browser.test.js": [
+    "loadLiveSessions"
+  ],
+  "capture_poll_pacing_browser.test.js": [
+    "connectTerminalWs"
+  ],
+  "header_branch_cap_browser.test.js": [
+    "selectHistorySession"
+  ],
+  "heap_growth_browser.test.js": [
+    "openTeamPage"
+  ],
+  "keyboard_census_desktop_browser.test.js": [
+    "showConfirmModal"
+  ],
+  "kill_session_view_browser.test.js": [
+    "killBoard",
+    "killSessionDirect"
+  ],
+  "mobile_connect_browser.test.js": [
+    "showSettingsModal"
+  ],
+  "perf_probe_browser.test.js": [
+    "syncDisplayMenu"
+  ],
+  "privacy_verification_e2e.test.js": [
+    "applySettings",
+    "showSettingsModal"
+  ],
+  "remote_browse.test.mjs": [
+    "toggleBrowser"
+  ],
+  "saved_for_later_browser.test.js": [
+    "openTeamPage",
+    "selectLiveSession"
+  ],
+  "settings_save_before_open_browser.test.js": [
+    "applySettings",
+    "showSettingsModal"
+  ],
+  "task_links_browser.test.js": [
+    "showCostDashboard"
+  ],
+  "task_workflow.test.js": [
+    "showCreateTaskModal"
+  ],
+  "team_page_consistency_browser.test.js": [
+    "openTeamPage"
+  ],
+  "theme_editor_layout_browser.test.js": [
+    "hideThemeConfigurator",
+    "showThemeConfigurator"
+  ],
+  "transcript_tools.test.js": [
+    "selectLiveSession"
+  ],
+  "window_entry_census.test.mjs": [
+    "selectLiveSession"
+  ],
+  "workflow_run_a11y_browser.test.js": [
+    "selectWorkflowRun"
+  ]
+}
