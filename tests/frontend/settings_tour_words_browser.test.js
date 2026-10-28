@@ -42,6 +42,10 @@ const BASE = require('./test_base').BASE;
         assert.equal(await text('settings-storage-shrink'), 'Shrink saved diffs…', 'Storage: Shrink says what it shrinks');
         // END Storage
 
+        // PANE Security
+        assert.match(await row('settings-debug-input-log'), /Record what Coral types \(debug\)/, 'Security: the switch says what it records');
+        assert.match(await row('settings-debug-input-log'), /including anything typed or pasted, such as passwords/, 'Security: and that it records secrets');
+        // END Security
 
 
         console.log('PASS Settings tour words');
