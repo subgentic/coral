@@ -38,11 +38,11 @@ const BASE = require('./test_base').BASE;
 
     await openDialog();
     await pick('auto');
-    assert.deepEqual(await state(), { value: 'auto', notSet: true, first: 'Not set (Auto)', mode: 'Everything, with safety checks.', warn: true }, 'picking Auto shows its own line and the warning at once');
+    assert.deepEqual(await state(), { value: 'auto', notSet: true, first: 'Not set (Auto)', mode: 'Everything; safety checks on Claude only.', warn: true }, 'picking Auto shows its own line and the warning at once');
     await save();
     assert.equal(await saved(), 'auto', 'picking Auto from Not set is a real change, and it is saved');
     await openDialog();
-    assert.deepEqual(await state(), { value: 'auto', notSet: false, first: 'Default', mode: 'Everything, with safety checks.', warn: true }, 'a saved Auto: no Not set option, and the warning line');
+    assert.deepEqual(await state(), { value: 'auto', notSet: false, first: 'Default', mode: 'Everything; safety checks on Claude only.', warn: true }, 'a saved Auto: no Not set option, and the warning line');
 
     await pick('default'); await save();
     assert.equal(await saved(), 'default', 'Default is saved');
