@@ -1,6 +1,6 @@
 // task_list_data.js: the dock task list's pure parts: the review flag, a row's state words, the sort clicks and the shown order (#8386).
 import assert from 'node:assert/strict';
-import { canSendBack, reviewRequested, taskStatus, defaultSort, nextSort, filterAndSortTasks } from '../../coral-go/pkg/frontend/static/task_list_data.js';
+import { canComplete, canSendBack, reviewRequested, taskStatus, defaultSort, nextSort, filterAndSortTasks } from '../../coral-go/pkg/frontend/static/task_list_data.js';
 
 assert.equal(reviewRequested(null), false);
 assert.equal(reviewRequested({}), false);
@@ -54,4 +54,10 @@ assert.equal(canSendBack({ assigned_to: 'Worker' }, ''), true, 'a task with an a
 assert.equal(canSendBack({ assigned_to: 'Worker' }, 'View only through Coral Hub'), false, 'a view-only Hub viewer does not get it');
 assert.equal(canSendBack({ assigned_to: '' }, ''), false, 'no agent to tell');
 assert.equal(canSendBack(null, ''), false);
+// Complete (#10337): the same Interact tier as the board post, so a view-only Hub viewer does not get it either; a blocked task or a draft never does
+assert.equal(canComplete({ status: 'in_progress' }, ''), true);
+assert.equal(canComplete({ status: 'pending' }, 'View only through Coral Hub'), false, 'a view-only Hub viewer');
+assert.equal(canComplete({ status: 'blocked' }, ''), false, 'a blocked task');
+assert.equal(canComplete({ status: 'draft' }, ''), false, 'a draft');
+assert.equal(canComplete(null, ''), false);
 console.log('task_list_data: ok');

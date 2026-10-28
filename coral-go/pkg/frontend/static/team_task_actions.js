@@ -15,7 +15,7 @@ const { readOpenGoals, readGoal, fillGoalSelect, showGoalInvalid, chooseGoalLabe
 const { _renderDepPicker, _getSelectedDeps } = await importOnce('./task_dep_picker.js');
 const { _taskRequiredOutputs, nudgeBoardTask, remindBoardTask, stopBoardTaskReminder } = await importOnce('./task_reminders.js');
 const { loadBoardTasks } = await importOnce('./task_list.js');
-const { reviewRequested, canSendBack } = await importOnce('./task_list_data.js');
+const { reviewRequested, canSendBack, canComplete } = await importOnce('./task_list_data.js');
 
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
@@ -29,7 +29,7 @@ async function failure(resp) { const data = await resp.json().catch(() => ({}));
 export function taskButtons(task, ctx) {
     if (!isOpen(task)) return ['completed', 'skipped'].includes(task.status) ? [] : [btn('btn', 'Edit', () => ctx.redraw(task, 'edit'))];
     const out = [];
-    const canComplete = task.status !== 'blocked' && task.status !== 'draft';
+    const mayComplete = canComplete(task, blockedReason(splitKey(ctx.project).server, 'interact')); // blocked, a draft, or a Hub viewer below Interact (the complete call is an Interact rule): no Complete
     const canNudge = (task.status === 'pending' || task.status === 'in_progress') && !!task.assigned_to;
     // The bar has two buttons, the primary last (#9076, the Operator: fewer buttons): everything else is under More, Cancel last. The agent is the Assigned-to link on the page (team_tasks_page.js factsOf).
     const items = [{ label: 'Edit', run: () => ctx.redraw(task, 'edit') }];
@@ -40,7 +40,7 @@ export function taskButtons(task, ctx) {
     items.push({ label: 'Cancel task', danger: true, className: 'team-task-cancel', run: () => ctx.redraw(task, 'cancel') });
     out.push(moreMenu(`task-more-${task.id}`, items));
     if (task.status === 'draft') out.push(btn('btn btn-primary', 'Publish', () => publish(task, ctx)));
-    if (canComplete) out.push(btn('btn btn-primary', 'Complete', () => ctx.redraw(task, 'complete')));
+    if (mayComplete) out.push(btn('btn btn-primary', 'Complete', () => ctx.redraw(task, 'complete')));
     return out;
 }
 
