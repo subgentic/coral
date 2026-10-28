@@ -95,15 +95,16 @@
                     </div>
                     <div class="launch-page-agent">
                     <div id="launch-persona-top" class="launch-persona-top">
+                        <p class="launch-persona-lead">A persona is a saved role: a name and a prompt. Pick one, or leave it blank and press Next.</p>
                         <div class="launch-field-head"><label for="launch-persona-select">Start from a persona</label> <span class="launch-optional">optional</span></div>
                         <div class="launch-persona-row">
                             <div id="agent-preset-selector" class="agent-preset-selector"></div>
-                            <button class="btn" id="agent-save-persona-btn" data-on-click="m-save-current-persona" title="Save what is on this page as a reusable persona">Save as persona</button>
                             <details class="persona-files">
-                                <summary class="btn">Persona files</summary>
+                                <summary class="btn">More</summary>
                                 <div class="persona-files-row">
-                                    <button class="btn btn-small" data-on-click="m-export-personas" title="Export saved personas">Export</button>
-                                    <button class="btn btn-small" data-on-click="m-import-personas" title="Import personas from file">Import</button>
+                                    <button class="btn btn-small" id="agent-save-persona-btn" data-on-click="m-save-current-persona" title="Save what is on this page as a reusable persona">Save as persona</button>
+                                    <button class="btn btn-small" data-on-click="m-export-personas" title="Export saved personas">Export personas</button>
+                                    <button class="btn btn-small" data-on-click="m-import-personas" title="Import personas from file">Import personas</button>
                                 </div>
                             </details>
                         </div>
