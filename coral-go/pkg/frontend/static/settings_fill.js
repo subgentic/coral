@@ -6,6 +6,7 @@ import { escapeHtml, escapeAttr } from './utils.js';
 import { getEngineNames } from './renderers.js';
 import { desktopNotifySupported, desktopNotifyEnabled, desktopNotifyBlocked, enableDesktopNotify, disableDesktopNotify, alertPrefs, setAlertPref } from './desktop_notify.js';
 import { isCloud } from './server_base.js';
+import { isPhoneLayout } from './phone_layout.js';
 import { settingBool, renderRemoteAccessStatus, renderDebugInputLogStatus, renderToolsFolderStatus, defaultThemeChoice } from './settings_core.js';
 import { browserLocal } from './safe_storage.js';
 const { _fillModelDatalist, _getAgentModels } = await importOnce('./launch_models.js');
@@ -314,7 +315,7 @@ export function _fillTerminalAndBrowserPrefs(s) {
     };
     const say = text => { if (why) { why.textContent = text; why.hidden = !text; } };
     const blockedText = () => desktopNotifyBlocked()
-        ? "Your browser blocks alerts from Coral. Allow notifications for this site in the browser's address bar or site settings, then turn this on again."
+        ? `Your browser blocks alerts from Coral. Allow notifications for this site in ${isPhoneLayout() ? "your browser's site settings" : "the browser's address bar or site settings"}, then turn this on again.` // a phone has no address bar to look at (#10266)
         : "";
     if (desktopCheck) {
         desktopCheck.checked = desktopNotifyEnabled();
