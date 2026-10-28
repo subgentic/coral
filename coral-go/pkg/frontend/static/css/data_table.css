@@ -97,6 +97,8 @@
 .dt-td.dt-tone-tertiary { font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
 .dt-subtitle { display: block; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-secondary-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dt-time { font-variant-numeric: tabular-nums; }
+.dt-last-run { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; } /* a failed run: its chip, then why in words (the Failed list, #9965) */
+.dt-last-run .dt-reason { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); }
 .dt-title-cell { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .dt-id { flex: none; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
 .dt-tag { white-space: nowrap; border: 1px solid var(--table-outer); color: var(--table-secondary-color); } /* a tag is one line: a server called build-west was build- / west at 390 (#8220) */

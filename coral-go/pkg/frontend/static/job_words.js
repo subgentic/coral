@@ -142,6 +142,13 @@ const startFail = run => (run && run.status === 'failed' && START_FAILS[run.exit
 /** The line under a run's status where the status words do not already carry it: the server's error for a run that failed to start, else the exit_reason's sentence when the run has no error of its own. */
 export function resultLine(run) { return startFail(run) ? reasonWords(run) : (!reasonWords(run) ? exitNote(run) : ''); }
 
+/** Why a failed run failed, in words, for the Failed list's Last run cell (#9965): "couldn't start the agent: claude: command not found", "step 2 (Test) exited with 3", "Coral restarted"; '' for a run that did not fail or says nothing. */
+export function failureWords(run) {
+    if (!run || run.status !== 'failed') return '';
+    if (startFail(run)) return run.error_msg ? `${startFail(run)}: ${String(run.error_msg).trim()}` : startFail(run);
+    return reasonWords(run) || (restarted(run) ? 'Coral restarted' : '');
+}
+
 /** A run's result in words: "Passed", "Failed: step 2 (Test) exited with 3", "Stopped", "Running", "Waiting to start". */
 export function resultWords(run) {
     if (!run) return '';
