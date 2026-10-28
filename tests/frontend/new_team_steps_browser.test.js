@@ -146,8 +146,8 @@ const BASE = require('./test_base').BASE;
             assert.ok(!(await t.has('button', N.next)), 'no Next on step 3'); await footer(N.launch, 'step 3');
             assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /alpha: \d+ members?, \/work\/payments-app/, 'the recap: "<team>: N members, <folder>"');
         });
-        await S.run('step 3 Start: First task and Additional instructions; no team-wide Mode or Provider anywhere in the dialog', async () => {
-            for (const rx of [/^First task/i, /^Additional instructions/i]) assert.ok(await t.has('textarea', rx), `${rx}`);
+        await S.run('step 3 Start: What should the team work on? and Additional instructions; no team-wide Mode or Provider anywhere in the dialog', async () => {
+            for (const rx of [/^What should the team work on/i, /^Additional instructions/i]) assert.ok(await t.has('textarea', rx), `${rx}`);
             assert.ok(!(await ev(`!!window.__nt.find(window.__nt.dlg(${N.team}), 'select, [role=radiogroup]', /^(Mode|Permission mode|Provider)$/i)`)), 'no team-wide Mode or Provider (each member has its own)');
         });
         S.finish();

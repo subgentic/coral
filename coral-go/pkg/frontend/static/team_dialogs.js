@@ -766,7 +766,7 @@ async function launchTeam() {
                 const boardId = result.board_id || boardName; // the id the server made (a repeated name gets its own, "Create another"), not the label that was typed
                 const seen = _refreshAfterLaunch(server, { boardName: boardId });
                 // The team opens the way a single agent does (#5989): its board with the Team view beside it, and the goal, if one was typed, as the Operator's first message to the lead. On a remote this waits for the hub to see the team.
-                if (launched.length - failed.length > 0) _openLaunchedTeam(server, boardId, goal, agents, seen, settings.board);
+                if (launched.length - failed.length > 0) _openLaunchedTeam(server, boardId, goal, agents, seen, settings.board, settings.save_goal);
             }
         }
     } catch (e) {
@@ -775,22 +775,42 @@ async function launchTeam() {
         if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch team'; }
     }
 }
-/** The first task as a task of the team, assigned to its lead: its first line is the title (at most 120 characters), the whole text the body. A refusal is said in a toast and the board line still goes (#10007). */
-async function addFirstTask(key, lead, goal) {
-    const line = goal.split('\n').find(l => l.trim()) || goal;
-    const flat = line.trim().replace(/\s+/g, ' ');
-    const title = flat.length > 120 ? flat.slice(0, 119).trimEnd() + '\u2026' : flat;
+/** A first task's title: its first sentence (up to 80 characters), else its first 60 characters cut at a word with an ellipsis; the whole text is the body (#10279, Beta #10325). */
+function firstTaskTitle(text) {
+    const flat = String(text || '').trim().replace(/\s+/g, ' ');
+    const sentence = /^.*?[.!?](?=\s|$)/.exec(flat);
+    if (sentence && sentence[0].length <= 80) return sentence[0];
+    if (flat.length <= 80) return flat;
+    const cut = flat.slice(0, 60), at = cut.lastIndexOf(' ');
+    return (at > 30 ? cut.slice(0, at) : cut).replace(/[\s.,;:!?-]+$/, '') + '\u2026';
+}
+
+/** The first task as a task of the team, assigned to its lead (titled by its first sentence, the whole text the body), and, when asked, the team's goal with the task under it. A refusal is said in a toast and the board line still goes (#10007, #10279). */
+async function addFirstTask(key, lead, goal, saveGoal = false) {
+    const title = firstTaskTitle(goal);
+    let goalId = null;
+    if (saveGoal) { // the first task is also the team's goal, and the task is listed under it (#10279)
+        try {
+            const g = await boardFetch(key, '/goals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, ...(goal !== title ? { outcome: goal } : {}), subscriber_id: OPERATOR_ID }),
+            });
+            if (!g.ok) throw new Error(String(g.status));
+            goalId = Number((await g.json()).id) || null;
+        } catch { showToast('The team started, but its goal was not saved. Add it on the Goals tab.', true); }
+    }
     try {
         const r = await boardFetch(key, '/tasks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, body: goal, assigned_to: lead, created_by: 'Operator' }),
+            body: JSON.stringify({ title, body: goal, assigned_to: lead, created_by: 'Operator', ...(goalId ? { goal_id: goalId } : {}) }),
         });
         if (!r.ok) throw new Error(String(r.status));
     } catch { showToast('The team started, but the first task was not added to its Tasks tab.', true); }
 }
 /** Open the launched team, and post the goal to its lead: the agent named Orchestrator, else the first member. The goal that could not be sent is left in the message box of the team page's Messages tab with a toast, to send again without launching the team twice. */
-async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSettings = null) {
+async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSettings = null, saveGoal = false) {
     const key = identityKey(server, boardName);
     const lead = (agents.find(a => isOrchestrator(a.name)) || agents[0]).name;
     const content = goal ? `@${lead} ${goal}` : '';
@@ -800,7 +820,7 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
         const unsaved = await applyTeamBoardSettings(key, boardSettings); // Require a goal, the health check's rules and the messaging switches, held until the board existed (#7407)
         if (unsaved) showToast(unsaved, true, undefined, { action: { label: 'Open Team settings', onClick: () => window.showTeamWorkingModeWorkspace?.(key) } });
         if (goal) {
-            await addFirstTask(key, lead, goal); // the request is work on the Tasks tab as well as a line on the board (#10007)
+            await addFirstTask(key, lead, goal, saveGoal); // the request is work on the Tasks tab as well as a line on the board (#10007)
             const r = await boardFetch(key, '/messages', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
