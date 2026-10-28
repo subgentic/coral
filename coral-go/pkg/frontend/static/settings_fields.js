@@ -30,7 +30,7 @@ const NOTIFICATIONS_FIELDS = [
 ];
 
 const FILES_FIELDS = [
-    { key: 'file_search_mode', type: 'select', id: 'settings-file-search-mode', label: 'File search mode', help: 'How @ mentions and file browser search for files', options: [{ value: 'directory', label: 'Directory Browsing' }, { value: 'fuzzy', label: 'Fuzzy Matching' }] },
+    { key: 'file_search_mode', type: 'select', id: 'settings-file-search-mode', label: 'File search mode', help: 'How @ mentions and the file browser find files', options: [{ value: 'directory', label: 'Browse folders' }, { value: 'fuzzy', label: 'Match any part of a name' }] },
     { key: 'file_search_limit', type: 'select', id: 'settings-file-search-limit', label: 'File search limit', help: 'Max number of files returned in search results', default: '500',
         options: [{ value: '50', label: '50' }, { value: '100', label: '100' }, { value: '200', label: '200' }, { value: '500', label: '500' }, { value: '1000', label: '1,000' }] },
     { key: 'git_diff_mode', type: 'select', id: 'settings-git-diff-mode', label: 'Git diff mode', help: 'What to compare changed files against',
