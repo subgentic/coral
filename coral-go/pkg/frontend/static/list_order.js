@@ -94,15 +94,18 @@ export function _getGroupOrder() {
     } catch { return []; }
 }
 
+// The rows a person has not dragged keep the place they were first drawn in (#10386, Beta: a folder row jumped from under the pointer when an agent in it started, because the list's own order puts the folder of the
+// newest session first). A new group goes after the ones already seen; the saved order, when there is one, still decides first.
+const _firstSeen = new Map();
 export function _sortGroups(groupEntries) {
+    for (const [name] of groupEntries) if (!_firstSeen.has(name)) _firstSeen.set(name, _firstSeen.size);
     const order = _getGroupOrder();
-    if (!order.length) return groupEntries;
     const posMap = {};
     order.forEach((name, i) => { posMap[name] = i; });
     return [...groupEntries].sort((a, b) => {
         const pa = posMap[a[0]] ?? 9999;
         const pb = posMap[b[0]] ?? 9999;
-        return pa - pb;
+        return pa !== pb ? pa - pb : _firstSeen.get(a[0]) - _firstSeen.get(b[0]);
     });
 }
 
