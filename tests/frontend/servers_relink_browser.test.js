@@ -101,24 +101,31 @@ const CLOUD_PRELOAD = `(() => {
             await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await open('servers');
             await waitFor(`document.querySelectorAll('#servers-view .cs-row').length === 3`, 'the three machines', 15000);
-            const state = () => ev(`(() => { const row = id => document.querySelector('#servers-view .cs-row[data-id="' + id + '"]'); const btn = id => row(id).querySelector('.cs-relink'); const b = btn('r1');
+            const visit = async id => { await ev(`document.querySelector('#servers-view .cs-row[data-id="${id}"] .cs-toggle').click(); true`); await waitFor(`!!document.querySelector('#servers-view section.cs-page#server-row-${id}')`, `${id}'s page`, 5000); };
+            const leave = async () => { await ev(`document.getElementById('servers-back').click(); true`); await waitFor(`document.querySelectorAll('#servers-view .cs-row').length === 3`, 'the list is back', 5000); };
+            // the button is in the machine's page foot bar (a row opens its page: the actions moved there, #9722)
+            const state = id => ev(`(() => { const page = document.getElementById('server-row-${id}'); const b = page.querySelector('.cs-relink');
                 const note = document.getElementById(b ? b.getAttribute('aria-controls') : 'none'); const r = b ? b.getBoundingClientRect() : null;
-                return { r1: !!b, r2: !!btn('r2'), r3: !!btn('r3'), text: b ? b.textContent : null, expanded: b ? b.getAttribute('aria-expanded') : null, noteHidden: note ? note.hidden : null, noteText: note ? note.textContent : null,
-                    detailOpen: !document.getElementById(row('r1').id + '-detail').hidden, box: r ? [Math.round(r.width), Math.round(r.height)] : null, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }; })()`);
-            let s = await state();
-            assert.deepEqual([s.r1, s.r2, s.r3], [true, false, false], dev + ': the button is on the machine that needs it only: ' + JSON.stringify(s));
+                return { btn: !!b, text: b ? b.textContent : null, expanded: b ? b.getAttribute('aria-expanded') : null, noteHidden: note ? note.hidden : null, noteText: note ? note.textContent : null,
+                    box: r ? [Math.round(r.width), Math.round(r.height)] : null, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }; })()`);
+            const has = {};
+            for (const id of ['r2', 'r3']) { await visit(id); has[id] = (await state(id)).btn; await leave(); }
+            await visit('r1');
+            let s = await state('r1');
+            assert.deepEqual([s.btn, has.r2, has.r3], [true, false, false], dev + ': the button is on the machine that needs it only: ' + JSON.stringify({ s, has }));
             assert.deepEqual([s.text, s.expanded, s.noteHidden, s.noteText], ['Owner not confirmed', 'false', true, HELP], dev + ': ' + JSON.stringify(s));
             if (mobile) assert.ok(s.box[1] >= 44, dev + ': a 44 px target ' + JSON.stringify(s.box));
             assert.ok(s.sw <= s.cw + 1, dev + ': no sideways scroll ' + s.sw + ' vs ' + s.cw);
             if (process.env.SHOTS) { fs.mkdirSync(process.env.SHOTS, { recursive: true }); fs.writeFileSync(`${process.env.SHOTS}/relink-${dev}-closed.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
-            await ev(`document.querySelector('#servers-view .cs-row[data-id="r1"] .cs-relink').click(); true`);
-            s = await state();
-            assert.deepEqual([s.expanded, s.noteHidden, s.detailOpen], ['true', false, true], dev + ': opened shows the words in the row: ' + JSON.stringify(s));
+            await ev(`document.querySelector('#server-row-r1 .cs-relink').click(); true`);
+            s = await state('r1');
+            assert.deepEqual([s.expanded, s.noteHidden], ['true', false], dev + ': opened shows the words on the page: ' + JSON.stringify(s));
             assert.equal(await ev(`document.activeElement && document.activeElement.classList.contains('cs-relink')`), true, dev + ': the keyboard stays on the button');
             if (process.env.SHOTS) fs.writeFileSync(`${process.env.SHOTS}/relink-${dev}-open.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
-            await ev(`document.querySelector('#servers-view .cs-row[data-id="r1"] .cs-relink').click(); true`);
-            s = await state();
+            await ev(`document.querySelector('#server-row-r1 .cs-relink').click(); true`);
+            s = await state('r1');
             assert.deepEqual([s.expanded, s.noteHidden], ['false', true], dev + ': and closes again');
+            await leave();
         }
         console.log('PASS servers relink: the button only on needs_relink true, its words, 44 px on a phone');
     } finally { await client.close(); }
