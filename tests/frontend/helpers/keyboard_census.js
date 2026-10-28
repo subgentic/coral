@@ -13,8 +13,8 @@ const ALLOW_KEYBOARD = [
 const allowedKb = (scene, kind, c) => ALLOW_KEYBOARD.some(([s, p, k]) => new RegExp(s).test(scene) && new RegExp(p).test(c) && new RegExp(k).test(kind));
 
 async function press(Input, key, { shift = false, ctrl = false } = {}) {
-    const vk = { Tab: 9, Escape: 27, Enter: 13 }[key];
-    const o = { key, code: key, windowsVirtualKeyCode: vk, modifiers: (shift ? 8 : 0) | (ctrl ? 2 : 0) };
+    const vk = { Tab: 9, Escape: 27, Enter: 13, ']': 221 }[key];
+    const o = { key, code: key === ']' ? 'BracketRight' : key, windowsVirtualKeyCode: vk, modifiers: (shift ? 8 : 0) | (ctrl ? 2 : 0) };
     await Input.dispatchKeyEvent({ type: 'rawKeyDown', ...o }); await Input.dispatchKeyEvent({ type: 'keyUp', ...o });
 }
 
@@ -49,18 +49,18 @@ async function walk(ev, Input, { max = 250, within = null } = {}) {
         if (s.again !== undefined) {
             // a date or time field is several tab stops in one element (its day, month and year parts): Tab moves between them and then on, so the same element again is not a trap until its parts are used up (#6288)
             if (s.again === stops.length - 1 && stops.length && /^(date|time|datetime-local|month|week)$/.test(await ev(`document.activeElement.type || ''`)) && (dateParts += 1) <= 4) continue;
-            // the same control again: Tab goes nowhere. The terminal keeps Tab for the shell by design and says how to leave (its status bar: Ctrl+Shift+Esc to unfocus): that way out must work, and the walk goes on from there.
+            // the same control again: Tab goes nowhere. The terminal keeps Tab for the shell by design and says how to leave (its status bar: Ctrl+] to unfocus): that way out must work, and the walk goes on from there.
             if (s.again === stops.length - 1 && stops.length) {
                 const last = stops[stops.length - 1];
                 if (/xterm-helper-textarea/.test(last.d) && !escaped) {
                     escaped = true;
-                    const h = await ev(`(() => { const t = document.activeElement; const el = t.getAttribute('aria-describedby') && document.getElementById(t.getAttribute('aria-describedby')); return { ok: !!el && el.getClientRects().length > 0 && /Ctrl\\+Shift\\+Esc/.test(el.textContent), op: el ? Number(getComputedStyle(el).opacity) : 0 }; })()`);
-                    if (!h.ok) extra.push('the terminal input is not described by a visible hint that names Ctrl+Shift+Esc (how a keyboard user leaves it)');
+                    const h = await ev(`(() => { const t = document.activeElement; const el = t.getAttribute('aria-describedby') && document.getElementById(t.getAttribute('aria-describedby')); return { ok: !!el && el.getClientRects().length > 0 && /Ctrl\\+\\]/.test(el.textContent), op: el ? Number(getComputedStyle(el).opacity) : 0 }; })()`);
+                    if (!h.ok) extra.push('the terminal input is not described by a visible hint that names Ctrl+] (how a keyboard user leaves it)');
                     else if (h.op < 0.85) extra.push('the terminal hint is dimmed to ' + h.op + ' while the terminal has focus');
-                    await press(Input, 'Escape', { shift: true, ctrl: true });
+                    await press(Input, ']', { ctrl: true });
                     const left = await ev(`document.activeElement !== window.__kbSeen[window.__kbSeen.length - 1]`);
-                    if (left) { terminalEscape = 'Ctrl+Shift+Esc releases the terminal'; continue; }
-                    trapped = last.d + ' (and Ctrl+Shift+Esc does not release it)'; break;
+                    if (left) { terminalEscape = 'Ctrl+] releases the terminal'; continue; }
+                    trapped = last.d + ' (and Ctrl+] does not release it)'; break;
                 }
                 trapped = last.d;
             }
