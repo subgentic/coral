@@ -65,10 +65,19 @@ export function applyMachineHealth(msg) {
     return h && typeof h.status === 'string' && STATUS.has(h.status) ? h.status : 'unknown';
 }
 
-/** One line for the status, e.g. "Busy (CPU)", "OK", "Unknown". */
+/** Busy on the processor, but not by Coral or its agents (#9955): the host's load is over its limit while Coral and the agents use under a quarter of the cores that load stands for. It is other programs, not a fault of Coral. */
+ function busyByOthers(h) {
+    if (healthStatus(h) !== 'busy' || !h || h.reason !== 'cpu') return false;
+    const c = num(h.coral && h.coral.cpu_percent), a = num(h.agents && h.agents.cpu_percent), per = num(h.host && h.host.load1_per_core), n = num(h.host && h.host.cpu_count);
+    if (c === null || a === null || per === null || !n) return false;
+    return (c + a) / 100 < 0.25 * per * n;
+}
+
+/** One line for the status, e.g. "Busy (CPU)", "OK", "Unknown"; "Busy (other programs)" when the load is not Coral's. */
  function healthStatusText(h) {
     const s = healthStatus(h);
     if (s === 'unknown') return 'Unknown';
+    if (busyByOthers(h)) return 'Busy (other programs)';
     const r = typeof h.reason === 'string' ? REASON.get(h.reason) : undefined;
     return s !== 'ok' && r ? `${STATUS.get(s)} (${r})` : STATUS.get(s);
 }
@@ -113,7 +122,8 @@ export function healthCard(h, { title = 'Machine health', online = false, waitin
     status.textContent = healthStatusText(h);
     if (chip) { // the status as the shared chip, the dot and the word as the Servers table shows them (#8276)
         const tones = { ok: 'goal-state-done', busy: 'goal-state-blocked', stalled: 'goal-state-failed' };
-        const c = chip(healthStatusText(h), tones[healthStatus(h)] || '');
+        const tone = busyByOthers(h) ? '' : tones[healthStatus(h)] || ''; // other programs' load is not an amber warning about Coral
+        const c = chip(healthStatusText(h), tone);
         c.classList.add('machine-health-status', `machine-health-${healthStatus(h)}`); // the card's status and its state, as the dot carried them (the suites and the page read them)
         c.setAttribute('role', 'img'); c.setAttribute('aria-label', `Machine health: ${healthStatusText(h)}`); // as the dot said it
         head.append(t, c);
@@ -136,6 +146,12 @@ export function healthCard(h, { title = 'Machine health', online = false, waitin
         ['Disk free', num(d.total_bytes) ? `${formatBytes(d.free_bytes)} of ${formatBytes(d.total_bytes)}` : '–'],
         ['Responsiveness', num(h.responsiveness_ms) === null ? '–' : `${h.responsiveness_ms} ms`],
     ];
+    if (busyByOthers(h)) { // the busy badge is the host's, say whose load it is (#9955)
+        const who = document.createElement('p');
+        who.className = 'machine-health-note machine-health-others';
+        who.textContent = `Coral and your agents use ${pct(num(c.cpu_percent) + num(a.cpu_percent))} CPU; the rest is other programs on this computer.`;
+        card.appendChild(who);
+    }
     const dl = document.createElement('dl');
     dl.className = 'machine-health-grid';
     for (const [k, v] of rows) {

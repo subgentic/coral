@@ -21,7 +21,7 @@ const HEALTH = {
     status: 'busy', reason: 'cpu', responsiveness_ms: 42,
     coral: { cpu_percent: 3.5, rss_bytes: 210 * 1024 ** 2 },
     agents: { count: 3, cpu_percent: 120.4, rss_bytes: 2.5 * GB },
-    host: { load1_per_core: 1.37, cpu_count: 8, mem_total: 16 * GB, mem_available: 6 * GB },
+    host: { load1_per_core: 1.37, cpu_count: 2, mem_total: 16 * GB, mem_available: 6 * GB },
     disk: { free_bytes: 120 * GB, total_bytes: 500 * GB },
 };
 
@@ -36,6 +36,8 @@ const HEALTH = {
         return { status: c.querySelector('.machine-health-status').textContent, dot: dot.className, label: dot.getAttribute('aria-label'),
             rows: Object.fromEntries([...c.querySelectorAll('dt')].map(dt => [dt.textContent, dt.nextElementSibling.textContent])) };
     })()`);
+    const IDLE = { status: 'busy', reason: 'cpu', responsiveness_ms: 0, coral: { cpu_percent: 0, rss_bytes: 438 * 1024 ** 2 }, agents: { count: 0, cpu_percent: 0, rss_bytes: 0 },
+        host: { load1_per_core: 1.71, cpu_count: 18, mem_total: 64 * GB, mem_available: 27 * GB }, disk: { free_bytes: 356 * GB, total_bytes: 926 * GB } }; // an idle Coral on a busy computer (Beta Tester, #9955)
     const send = msg => ev(`(async () => { ${ws}.handleCoralMessage(${JSON.stringify(msg)}); return true; })()`);
     // The server's own coral_updates on /ws/coral, counted as they arrive. The real server's
     // machine_health is taken out of every feed message before the page sees it (its value is the
@@ -97,19 +99,32 @@ const HEALTH = {
         assert.deepEqual(c.rows, {
             'Coral': '4% CPU · 210 MB',
             'Agents': '3 · 120% CPU · 2.5 GB',
-            'Load per core': '1.37 (8 cores)',
+            'Load per core': '1.37 (2 cores)',
             'Memory available': '6.0 GB of 16.0 GB',
             'Disk free': '120.0 GB of 500.0 GB',
             'Responsiveness': '42 ms',
         });
         console.log(`   ✓ ${c.status}: ${JSON.stringify(c.rows)}`);
 
+        console.log('2b. Busy by other programs: Coral and the agents use nothing, the load is not theirs');
+        await send({ type: 'coral_update', sessions: [], active_runs: [], machine_health: IDLE });
+        c = await card();
+        assert.equal(c.status, 'Busy (other programs)', 'not Busy (CPU): it is not a fault of Coral');
+        assert.equal(c.label, 'Machine health: Busy (other programs)');
+        assert.match(c.dot, /machine-health-busy/, 'the status is still busy for the suites and the dot');
+        const others = await ev(`(() => { const c = document.querySelector('#machine-health-local .machine-health-card'), s = c.querySelector('.machine-health-status'); return { note: (c.querySelector('.machine-health-others') || {}).textContent || '', amber: /goal-state-blocked/.test(s.className) }; })()`);
+        assert.equal(others.note, 'Coral and your agents use 0% CPU; the rest is other programs on this computer.');
+        assert.equal(others.amber, false, 'neutral, not the amber of a warning about Coral');
+        await send({ type: 'coral_update', sessions: [], active_runs: [], machine_health: HEALTH });
+        assert.equal((await card()).status, 'Busy (CPU)', 'when Coral and the agents are the load it stays Busy (CPU)');
+        console.log('   ✓ Busy (other programs)');
+
         console.log('3. coral_diff merges; null removes a field');
         await send({ type: 'coral_diff', machine_health: { status: 'ok', reason: null, host: { ...HEALTH.host, load1_per_core: 0.42 } } });
         c = await card();
         assert.equal(c.status, 'OK', 'no reason once OK');
         assert.match(c.dot, /machine-health-ok/);
-        assert.equal(c.rows['Load per core'], '0.42 (8 cores)');
+        assert.equal(c.rows['Load per core'], '0.42 (2 cores)');
         assert.equal(c.rows['Coral'], '4% CPU · 210 MB', 'unchanged fields stay');
         console.log('   ✓ OK, load 0.42, the rest kept');
 
@@ -216,7 +231,7 @@ const HEALTH = {
         assert.equal(by.m1.label, 'Box One health: Busy (CPU)');
         assert.match(by.m1.dot, /machine-health-busy/);
         assert.equal(by.m1.card, 'Busy (CPU)');
-        assert.equal(by.m1.load, '1.37 (8 cores)');
+        assert.equal(by.m1.load, '1.37 (2 cores)');
         assert.equal(by.m2.label, 'Box Two health: Unknown', 'online without a value: unknown');
         assert.equal(by.m2.card, 'Unknown');
         assert.equal(by.m3.label, 'Box Three health: Unknown', 'offline: unknown');
