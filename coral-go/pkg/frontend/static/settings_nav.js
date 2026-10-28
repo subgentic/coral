@@ -9,6 +9,7 @@ import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
 import { onBuilt } from './lazy_dom.js';
 import { updatesUiOn } from './update_flag.js';
+import { advancedOn, advancedOnly, tagLevels, setAdvanced, buildAdvancedToggles, openCliPathsIfMissing } from './settings_level.js';
 
 const GROUP_KEY = 'coral-settings-group';
 const FIRST = 'general';
@@ -17,7 +18,7 @@ let infoSeq = 0;
 const modalEl = () => document.getElementById('settings-modal');
 const panes = () => [...(modalEl()?.querySelectorAll('.settings-pane') || [])];
 /** Panes with something to show: Coral Hub's dashboard hides every row a hub user cannot change, and a group with none is left out. */
-const shown = () => panes().filter(p => !p.dataset.empty);
+const shown = () => panes().filter(p => !p.dataset.empty && (advancedOn() || !advancedOnly(p))); // Basics: a pane with only Advanced rows is not on the list (settings_level.js)
 
 function tabFor(id) { return document.getElementById(`settings-tab-${id}`); }
 
@@ -26,6 +27,9 @@ const setScreen = screen => modalEl()?.setAttribute('data-screen', screen);
 
 /** Opens the pane for a group; an unknown or empty group opens the first one. Returns the group shown. */
 function showSettingsGroup(id, { focus = false, remember = true } = {}) {
+    tagLevels(modalEl());
+    const asked = panes().find(p => p.dataset.group === id);
+    if (asked && advancedOnly(asked) && !advancedOn()) setAdvanced(true, redrawTabs); // a group opened by name is shown, with Advanced on
     const list = shown();
     const pane = list.find(p => p.dataset.group === id) || list[0];
     if (!pane) return null;
@@ -44,8 +48,22 @@ function showSettingsGroup(id, { focus = false, remember = true } = {}) {
     return pane.dataset.group;
 }
 
+/** The tabs and the section list follow Basics or Advanced: a pane with only Advanced rows is drawn with Advanced on; one left on screen without it moves to the first pane. */
+function redrawTabs() {
+    tagLevels(modalEl());
+    const pick = document.getElementById('settings-group-select');
+    for (const p of panes()) {
+        const hide = !!p.dataset.empty || (!advancedOn() && advancedOnly(p));
+        const tab = tabFor(p.dataset.group); if (tab) tab.hidden = hide;
+        const o = pick && [...pick.options].find(x => x.value === p.dataset.group); if (o) o.hidden = hide;
+    }
+    const cur = panes().find(p => !p.hidden);
+    if (!cur || cur.dataset.empty || (!advancedOn() && advancedOnly(cur))) showSettingsGroup(FIRST, { remember: false });
+}
+
 /** The group Settings opens on: the one last used in this browser. */
 export function openSettingsGroup(id) {
+    redrawTabs(); openCliPathsIfMissing(modalEl(), redrawTabs);
     setScreen(id ? 'pane' : 'sections'); // asked for a section: that section; otherwise a phone starts at the list of sections
     return showSettingsGroup(id || browserLocal.get(storeKey(GROUP_KEY)) || FIRST, { remember: false });
 }
@@ -60,8 +78,7 @@ export function refreshSettingsGroups() {
     }
     const pick = document.getElementById('settings-group-select');
     if (pick) for (const o of pick.options) o.hidden = !!panes().find(p => p.dataset.group === o.value)?.dataset.empty;
-    const cur = panes().find(p => !p.hidden);
-    if (!cur || cur.dataset.empty) showSettingsGroup(FIRST, { remember: false });
+    redrawTabs();
 }
 
 /** The explanation of a row is its hint line, under the label, always visible (#7405: the (i) tooltips are gone): one short line, about ten words. A longer one is not shown; the row has a "Learn more" link that opens it in place (UI/UX's rule). */
@@ -185,4 +202,9 @@ function buildTabs(modal) {
 onBuilt('settings-modal', modal => {
     if (!updatesUiOn()) modal.querySelectorAll('[data-flag="updates"]').forEach(e => e.remove()); // behind the flag: no tab, no pane (#5275)
     buildTabs(modal); buildInfoButtons(modal); buildCloudInfoButtons(modal);
+    buildAdvancedToggles(modal, redrawTabs);
+    let queued = false; // the rows are drawn after the modal is built, and again as the dialog fills: tag and draw the tabs once per frame of changes
+    if (typeof MutationObserver === 'function') new MutationObserver(() => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; redrawTabs(); }); }).observe(modal.querySelector('.settings-panes') || modal, { childList: true, subtree: true });
+    modal.addEventListener('cli-blocks-launch', () => openCliPathsIfMissing(modal, redrawTabs));
+    redrawTabs();
 });

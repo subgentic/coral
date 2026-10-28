@@ -39,3 +39,10 @@
 /* round 2 (UI/UX's #7405 notes) */
 [data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; } /* a dialog opened by a pointer: no ring on what the script focused (quiet_focus.js; the ring comes with the first key) */
 #settings-modal .settings-pane-title { margin-bottom: 8px; }
+
+/* Basics and Advanced (#10114): settings_level.js tags each row and fold; Advanced is off until the person asks, and what it hides stays in its pane. */
+#settings-modal:not([data-advanced]) [data-level="advanced"] { display: none; }
+#settings-modal .settings-advanced-toggle { display: flex; align-items: center; align-self: stretch; justify-content: flex-start; gap: .6rem; width: 100%; margin-top: .5rem; padding: .5rem .7rem; min-height: 2.25rem; text-align: left; }
+#settings-modal .settings-advanced-toggle .material-icons { font-size: var(--fs-lg); }
+#settings-modal .settings-advanced-more { display: none; margin-top: 1rem; gap: .5rem; }
+#settings-modal:not([data-advanced]) .settings-pane[data-has-advanced="1"] .settings-advanced-more { display: inline-flex; }

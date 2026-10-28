@@ -37,6 +37,7 @@ const SCEN = [
     let cloud = false;
     try {
         await Promise.all([Page.enable(), Runtime.enable(), Network.enable()]);
+        await Page.addScriptToEvaluateOnNewDocument({ source: `try { localStorage.setItem('coral-settings-advanced', '1'); } catch (e) {}` }); // Settings opens on Basics (#10114): the trace records every setting
         await Network.setCacheDisabled({ cacheDisabled: true });
         await Network.setBypassServiceWorker({ bypass: true }); // the service worker would answer the document before Fetch sees it
         await Fetch.enable({ patterns: [{ urlPattern: `${BASE}/`, resourceType: 'Document', requestStage: 'Response' }, { urlPattern: `${BASE}/auth/session`, requestStage: 'Request' }] });
