@@ -57,6 +57,13 @@ export function autosizeCommandInput() {
     if (!desktopComposer.matches || !input.offsetParent) {
         input.style.height = "";
         fitPlaceholder(input);
+        // A phone's box is three lines tall and grows with the text to the CSS cap (about five lines), then scrolls (#10281); with no text it keeps its three lines.
+        if (input.offsetParent && !desktopComposer.matches) {
+            input.style.height = "0px";
+            const need = input.scrollHeight;
+            input.style.height = "";
+            if (need > input.offsetHeight + 0.5) input.style.height = `${need}px`;
+        }
         return;
     }
     // Collapse first so scrollHeight measures the text, not the old height
