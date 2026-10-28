@@ -39,12 +39,14 @@ const BASE = require('./test_base').BASE;
             await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
             await waitFor(`document.getElementById('chat-msg-menu').hidden`, `${w}: Escape closes it`, 3000);
             assert.equal(await ev(`document.activeElement === document.querySelector(${JSON.stringify(btn)})`), true, `${w}: and the focus is back on the button`);
+            // the other agent already has an unsent draft: the message is added after it, a blank line between; it is not replaced (#10159)
+            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { const row = m.state.liveSessions.find(s => s.session_id === 'fe-sid'); m.saveSessionDraft(m.sessionKey(row), 'half typed'); return true; })`);
             // pick the other agent: its box holds the text, nothing was sent
             await ev(`document.querySelector(${JSON.stringify(btn)}).click(); true`);
             await waitFor(`!document.getElementById('chat-msg-menu').hidden`, `${w}: the menu opens by click`, 3000);
             await ev(`[...document.querySelectorAll('#chat-msg-menu [role=menuitem]')].find(b => /fe/i.test(b.textContent)).click(); true`);
             await waitFor(`T.state.currentSession && T.state.currentSession.session_id === 'fe-sid'`, `${w}: the other agent opens`, 8000);
-            await waitFor(`document.getElementById('command-input').value.trim() === ${JSON.stringify(bubbleText)}`, `${w}: its box holds the message`, 5000);
+            await waitFor(`document.getElementById('command-input').value === ${JSON.stringify('half typed\n\n' + bubbleText)}`, `${w}: its box holds its draft, a blank line, then the message`, 5000);
             assert.deepEqual(await ev(`window.__sends`), [], `${w}: nothing was sent`);
         }
         console.log('\nPASS a sent message has a menu: Copy, Save, and Send to another agent that fills the other box and sends nothing');
