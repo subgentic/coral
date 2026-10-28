@@ -140,7 +140,8 @@
     row-gap: 4px;
     margin-bottom: 12px;
     min-width: min-content; /* a tile is never narrower than its figure (which does not break): they share a row when there is room and wrap to more rows when the text is large */
-    background: var(--bg-secondary);
+    background: var(--card-fill);
+    box-shadow: var(--card-shadow);
     border: var(--card-border);
     border-radius: var(--card-radius);
     padding: var(--card-pad);
@@ -237,7 +238,8 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 12px;
-    background: var(--bg-secondary);
+    background: var(--card-fill);
+    box-shadow: var(--card-shadow);
     overflow: hidden;
 }
 
@@ -309,7 +311,7 @@
 .spend-card .cost-card-value-word { white-space: normal; font-size: var(--fs-xl); }
 .spend-card-sub { font-size: var(--fs-base); color: var(--text-secondary); margin-top: 2px; }
 .spend-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; margin-bottom: 16px; }
-.spend-box { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); padding: 14px 16px; min-width: 0; }
+.spend-box { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card-fill); box-shadow: var(--card-shadow); padding: 14px 16px; min-width: 0; }
 .spend-box-title { margin: 0 0 8px; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .spend-how { align-self: start; }
 .spend-note { margin: 8px 0 0; font-size: var(--fs-base); color: var(--text-secondary); }
@@ -429,12 +431,12 @@
 .eff-view { display: flex; flex-direction: column; gap: 16px; }
 .eff-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 760px) { .eff-cards { grid-template-columns: 1fr; } }
-.eff-card { padding: var(--card-pad); border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-secondary); }
+.eff-card { padding: var(--card-pad); border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); box-shadow: var(--card-shadow); }
 .eff-card-k { font-size: var(--fs-base); color: var(--text-secondary); margin-bottom: 4px; }
 .eff-card-v { font-size: var(--fs-2xl); font-weight: var(--fw-strong); overflow-wrap: anywhere; }
 .eff-card-d { font-size: var(--fs-base); color: var(--text-secondary); margin-top: 2px; }
 .eff-card-d.eff-good { color: var(--success-text, var(--success)); }
-.eff-panel { padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
+.eff-panel { padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card-fill); box-shadow: var(--card-shadow); }
 .eff-panel-title { margin: 0 0 2px; font-size: var(--fs-lg); }
 .eff-hint, .eff-note { margin: 0 0 10px; font-size: var(--fs-base); color: var(--text-secondary); }
 .eff-note { margin: 10px 0 0; }

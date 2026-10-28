@@ -7,7 +7,7 @@
     --table-radius: var(--radius-lg, 8px);
     --table-outer: var(--border);
     --table-border: var(--border-subtle, var(--border));
-    --table-bg: var(--bg-primary);
+    --table-bg: var(--table-surface, var(--bg-primary));
     --table-head-bg: var(--bg-secondary);
     --table-hover: var(--bg-hover);
     --table-selected: color-mix(in srgb, var(--accent) 14%, transparent);
@@ -57,9 +57,9 @@
     --table-danger: var(--danger);
 }
 
-.dt-box { border: 1px solid var(--table-outer); border-radius: var(--table-radius); background: var(--table-bg); overflow-x: clip; container: dt / inline-size; } /* clip, not auto: a scroll box here would keep the sticky header from sticking to the page */
+.dt-box { border: 1px solid var(--table-outer); border-radius: var(--table-radius); background: var(--table-bg); box-shadow: var(--card-shadow); overflow-x: clip; container: dt / inline-size; } /* clip, not auto: a scroll box here would keep the sticky header from sticking to the page */
 .dt-box.dt-scroll { overflow-x: auto; --dt-fade: color-mix(in srgb, var(--text-primary) 16%, transparent); background: linear-gradient(to right, var(--table-bg) 30%, transparent) left / 24px 100% no-repeat local, linear-gradient(to left, var(--table-bg) 30%, transparent) right / 24px 100% no-repeat local, linear-gradient(to right, var(--dt-fade), transparent) left / 12px 100% no-repeat scroll, linear-gradient(to left, var(--dt-fade), transparent) right / 12px 100% no-repeat scroll, var(--table-bg); } /* a wide table: the shade at an edge says there is more that way */
-.dt-box.dt-bare { border: 0; border-radius: 0; background: none; } /* a table that is a column of its page (a goal's tasks): no card around it */
+.dt-box.dt-bare { border: 0; border-radius: 0; background: none; box-shadow: none; } /* a table that is a column of its page (a goal's tasks): no card around it */
 .dt-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .dt-table th { position: sticky; top: 0; z-index: 1; background: var(--table-head-bg); border-bottom: 1px solid var(--table-outer); padding: 8px var(--table-pad-x); text-align: left; font-size: var(--table-head-size); font-weight: var(--table-head-weight); letter-spacing: var(--table-head-track); text-transform: uppercase; color: var(--table-head-color); white-space: nowrap; }
 .dt-table th.dt-end, .dt-table td.dt-end { text-align: right; }
