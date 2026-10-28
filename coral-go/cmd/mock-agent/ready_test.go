@@ -20,13 +20,16 @@ func TestReadyModeSetsWhatTheOtherModesRead(t *testing.T) {
 		}
 	})
 	t.Run("on: the box and hooks, idle, and the transcript", func(t *testing.T) {
-		t.Setenv("TMPDIR", t.TempDir())
+		t.Setenv("HOME", t.TempDir()) // a home under the temp folder: the transcript cannot reach a real one
+		t.Setenv("USERPROFILE", os.Getenv("HOME"))
+		t.Setenv("CLAUDE_PROJECTS_DIR", "")
 		t.Setenv("MOCK_AGENT_READY", "1")
 		t.Setenv("MOCK_AGENT_RAW_DIR", "")
 		t.Setenv("MOCK_AGENT_IDLE", "")
 		if !applyReadyMode(false) {
 			t.Error("the transcript is not written")
 		}
+		t.Cleanup(func() { os.RemoveAll(rawInputDir()) })
 		if dir := rawInputDir(); dir == "" || !strings.HasPrefix(dir, os.TempDir()) {
 			t.Errorf("raw-input mode is not on, in a folder of its own: %q", dir)
 		}
@@ -70,5 +73,63 @@ func TestReadyModeRepliesWithAGreeting(t *testing.T) {
 	t.Setenv("MOCK_AGENT_READY", "")
 	if got := read("00000000-0000-4000-8000-00000000a0d2"); !strings.Contains(got, "Mock reply 1 to: hello, what can you do?") {
 		t.Errorf("default reply changed: %q", got)
+	}
+}
+
+// Ready mode never writes a transcript into a real ~/.claude/projects (#10033): only with CLAUDE_PROJECTS_DIR set or a HOME under a temp folder; else it goes on without one.
+func TestReadyModeTranscriptNeverReachesARealHome(t *testing.T) {
+	setup := func(t *testing.T, home, projects string) {
+		t.Setenv("MOCK_AGENT_READY", "1")
+		t.Setenv("MOCK_AGENT_RAW_DIR", t.TempDir())
+		t.Setenv("HOME", home)
+		t.Setenv("USERPROFILE", home)
+		t.Setenv("CLAUDE_PROJECTS_DIR", projects)
+	}
+	t.Run("a home that is not under a temp folder: no transcript", func(t *testing.T) {
+		setup(t, "/nonexistent/real-home", "")
+		if applyReadyMode(false) {
+			t.Error("the transcript is written into a real home")
+		}
+	})
+	t.Run("a caller that asked for the transcript keeps its choice", func(t *testing.T) {
+		setup(t, "/nonexistent/real-home", "")
+		if !applyReadyMode(true) {
+			t.Error("MOCK_AGENT_TRANSCRIPT=1 was overridden")
+		}
+	})
+	t.Run("CLAUDE_PROJECTS_DIR set: the transcript goes there", func(t *testing.T) {
+		setup(t, "/nonexistent/real-home", t.TempDir())
+		if !applyReadyMode(false) {
+			t.Error("no transcript with a projects folder set")
+		}
+	})
+	t.Run("a home under the temp folder: the transcript is written", func(t *testing.T) {
+		setup(t, t.TempDir(), "")
+		if !applyReadyMode(false) {
+			t.Error("no transcript in a test's own home")
+		}
+	})
+	t.Run("the temp folder itself is not a home", func(t *testing.T) {
+		setup(t, os.TempDir(), "")
+		if applyReadyMode(false) {
+			t.Error("the temp folder was taken as a home")
+		}
+	})
+}
+
+// The raw-input folder is one of its own per agent, not a fixed path shared by every mock.
+func TestReadyModeRawFolderIsOwnPerAgent(t *testing.T) {
+	t.Setenv("MOCK_AGENT_READY", "1")
+	var dirs []string
+	for i := 0; i < 2; i++ {
+		t.Setenv("MOCK_AGENT_RAW_DIR", "")
+		t.Setenv("CLAUDE_PROJECTS_DIR", t.TempDir())
+		applyReadyMode(false)
+		d := rawInputDir()
+		t.Cleanup(func() { os.RemoveAll(d) })
+		dirs = append(dirs, d)
+	}
+	if dirs[0] == "" || dirs[0] == dirs[1] || strings.HasSuffix(dirs[0], "mock-agent-ready") {
+		t.Errorf("the raw folders are not each their own: %v", dirs)
 	}
 }

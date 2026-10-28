@@ -6,26 +6,60 @@ package main
 // variable. The hooks run only where Coral's hooks are installed (a dev or test server needs CORAL_HOOK_DIR pointing at the built coral-hook-* programs). Off by default: every other suite reads the heartbeat mock.
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // readyMode is whether MOCK_AGENT_READY=1.
 func readyMode() bool { return os.Getenv("MOCK_AGENT_READY") == "1" }
 
-// applyReadyMode sets the environment the other modes read, for ready mode, and says whether the transcript is written. A setting the caller made wins (MOCK_AGENT_RAW_DIR, MOCK_AGENT_IDLE).
+// underTemp is whether path is inside a temp folder (the OS's, or /tmp and /var/tmp), after symlinks: a test's own HOME, never a person's.
+func underTemp(path string) bool {
+	resolve := func(p string) string {
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			return r
+		}
+		return filepath.Clean(p)
+	}
+	p := resolve(path)
+	for _, t := range []string{os.TempDir(), "/tmp", "/var/tmp"} {
+		root := resolve(t)
+		if p == root || strings.HasPrefix(p, root+string(filepath.Separator)) {
+			return p != root // the temp folder itself is not a home
+		}
+	}
+	return false
+}
+
+// readyTranscriptSafe is whether the ready mode's transcript can only land in a test's own folder: CLAUDE_PROJECTS_DIR is set, or HOME is under a temp folder. Otherwise the transcript would go to the
+// real ~/.claude/projects, where Claude Code's own sessions are (#10033).
+func readyTranscriptSafe() bool {
+	if os.Getenv("CLAUDE_PROJECTS_DIR") != "" {
+		return true
+	}
+	home, err := os.UserHomeDir()
+	return err == nil && home != "" && underTemp(home)
+}
+
+// applyReadyMode sets the environment the other modes read, for ready mode, and says whether the transcript is written. A setting the caller made wins (MOCK_AGENT_RAW_DIR, MOCK_AGENT_IDLE). The
+// transcript is written only where it cannot reach a real ~/.claude/projects (readyTranscriptSafe); otherwise ready mode says why on stderr and goes on without it.
 func applyReadyMode(writeTranscript bool) bool {
 	if !readyMode() {
 		return writeTranscript
 	}
 	if os.Getenv("MOCK_AGENT_RAW_DIR") == "" {
-		dir := filepath.Join(os.TempDir(), "mock-agent-ready")
-		if os.MkdirAll(dir, 0o700) == nil {
+		if dir, err := os.MkdirTemp("", "mock-agent-ready-"); err == nil { // one of its own per agent, owner-only
 			os.Setenv("MOCK_AGENT_RAW_DIR", dir)
 		}
 	}
 	if os.Getenv("MOCK_AGENT_IDLE") == "" {
 		os.Setenv("MOCK_AGENT_IDLE", "1")
+	}
+	if !readyTranscriptSafe() {
+		fmt.Fprintln(os.Stderr, "[mock-agent] ready mode: no transcript is written: HOME is not under a temp folder and CLAUDE_PROJECTS_DIR is not set, so it would go to the real ~/.claude/projects. Start the server with its own HOME under /tmp, or set CLAUDE_PROJECTS_DIR.")
+		return writeTranscript
 	}
 	return true
 }
