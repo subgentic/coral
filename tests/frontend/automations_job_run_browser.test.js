@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
 const WF = { id: 7, name: 'nightly-build', description: '', enabled: true, steps: [{ name: 'Build', type: 'shell', command: 'make' }], max_duration_s: 300, created_at: '2026-10-27T10:00:00Z' };
-const JOB = { id: 5, name: 'Every night', description: '', enabled: true, workflow_id: 7, cron_expr: '0 2 * * *', timezone: 'UTC', next_fire_at: '2026-10-29T02:00:00Z', created_at: '2026-10-27T10:00:00Z', last_run: null };
+const JOB = { id: 5, name: 'Every night', description: '', enabled: false, workflow_id: 7, cron_expr: '0 2 * * *', timezone: 'UTC', next_fire_at: '2026-10-29T02:00:00Z', created_at: '2026-10-27T10:00:00Z', last_run: null };
 const RUN = { id: 31, workflow_id: 7, workflow_name: 'nightly-build', trigger_type: 'job', trigger_context: JSON.stringify({ scheduled_job_id: 5, scheduled_run_id: 9 }), status: 'completed', started_at: '2026-10-28T02:00:00Z', finished_at: '2026-10-28T02:00:03Z', steps: [{ name: 'Build', type: 'shell', status: 'completed', exit_code: 0, output_tail: 'ok' }, { name: 'Say hello', type: 'agent', status: 'completed', output_tail: JSON.stringify({ is_error: false, result: 'Hello from the agent. The build is green.', duration_ms: 4200 }) }] };
 const STUB = `(() => {
     const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
@@ -47,7 +47,18 @@ const STUB = `(() => {
             if (steps[0] !== 'ok') problems.push(`${tag}: a shell step's output is as it is (${JSON.stringify(steps[0])})`);
             await ev(`document.getElementById('wf-run-back').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-view .sched-title, #scheduler-detail h2')`, `${tag}: the job's page opens from the run's way back`, 10000);
-            // (2) a run's page is on screen, the person goes to another tab and comes back: the folder's list, not the last run's page
+            // (4) the job's Turn on and the workflow's Run do not sit in the same spot (a tap meant for one started a run): Run now is where Run is, Turn on is not
+            await ev(`window.selectScheduledJob(5).then(() => true)`);
+            await waitFor(`!!document.querySelector('#scheduler-view .sched-actions [data-on-click="job-toggle"]')`, `${tag}: the job's page with its bar`, 10000);
+            const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })()`);
+            const turnOn = await rect('#scheduler-view .sched-actions [data-on-click="job-toggle"]'), runNow = await rect('#scheduler-view .sched-actions [data-on-click="job-run-now"]');
+            await ev(`window.selectWorkflow(7).then(() => true)`);
+            await waitFor(`!!document.querySelector('#wf-detail-container .wf-detail-actions [data-on-click="wf-trigger"]')`, `${tag}: the workflow's page with its bar`, 10000);
+            const runBtn = await rect('#wf-detail-container .wf-detail-actions [data-on-click="wf-trigger"]');
+            const overlap = (a, b) => a && b && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+            if (overlap(turnOn, runBtn)) problems.push(`${tag}: the workflow's Run sits where the job's Turn on does (${JSON.stringify([runBtn, turnOn])})`);
+            if (!overlap(runNow, runBtn)) problems.push(`${tag}: the job's Run now sits where the workflow's Run does (${JSON.stringify([runNow, runBtn])})`);
+            // (2) a run's page is open at its own address (a reopened app), the person goes to another tab and comes back, or taps the Automations tab again on a phone: the folder's list, not the last run's page (pinned: this held when it was measured, #10476)
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/automations/workflows/7/runs/31' }); await Page.loadEventFired(); await install(); // the run's own address, as a reopened app or a shared link has it
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title')`, `${tag}: the run page again`, 10000);

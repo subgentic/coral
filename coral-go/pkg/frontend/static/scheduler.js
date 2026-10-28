@@ -238,11 +238,11 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
                     <button class="menu-item menu-item-danger sched-delete" type="button" data-on-click="job-delete" data-job-id="${Number(job.id)}" aria-label="Delete ${escapeAttr(job.name)}">Delete</button>
                 </div>
             </div>
+            ${job.enabled ? '' : `<button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">Turn on</button>`}
             <button class="btn btn-small" data-on-click="job-edit" data-job-id="${Number(job.id)}">Edit</button>
             ${job.enabled
                 ? `<button class="btn btn-small btn-primary" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>`
-                : `<button class="btn btn-small" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>
-            <button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">Turn on</button>`}
+                : `<button class="btn btn-small" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>`}
         </div>
     `;
     container.querySelector('#sched-run-history').append(renderRunsTable(runsPage));
