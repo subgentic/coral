@@ -137,6 +137,7 @@ var joinSites = map[string]joinEntry{
 	"internal/agent/pi.go\tPiAgent.LaunchCommand":                                            {1, joinID, "the session id is checked (IsResumeID, a canonical UUID) before it is joined; the project folder name has its separators replaced"},
 	"internal/agent/shell.go\tFindCLIInCommonPaths":                                          {7, joinOwn, "a CLI or tool name constant"},
 	"internal/agent/tempsweep.go\tSweepStaleTempFiles":                                       {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
+	"internal/appdownload/appdownload.go\tSave":                                              {1, joinOwn, "the file name is SafeName's (a base name: no path part, none of : * ? \" < > | or control characters, no leading dot, a Windows device name prefixed), with \" (n)\" and its extension added, joined to the person's Downloads folder"},
 	"internal/auth/login_token.go\tKeyStore.WriteLoginTokenFile":                             {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
 	"internal/auth/login_token.go\tRemoveLoginTokenFile":                                     {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
 	"internal/auth/password.go\tCreatePasswordHash":                                          {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
