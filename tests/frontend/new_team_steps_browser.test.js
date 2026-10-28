@@ -98,10 +98,10 @@ const BASE = require('./test_base').BASE;
             for (const rx of [N.addMember, N.back, N.cancel, N.next]) assert.ok(await t.has('button', rx), `${rx}`);
             await footer(N.next, 'step 2');
         });
-        await S.run('step 2: the More menu holds Generate with AI, Import a template, Import from a folder, Save this team as a template', async () => {
+        await S.run('step 2: the More menu holds Import a template, Import from a folder, Save this team as a template', async () => {
             await t.click('button', /^More/i); await settle(200);
             const items = await names('[role=menuitem]');
-            for (const want of [/Generate with AI/i, /Import a template/i, /Import from a folder/i, /Save this team as a template/i]) assert.ok(items.some(x => want.test(x)), `${want} in ${JSON.stringify(items)}`);
+            for (const want of [/Import a template/i, /Import from a folder/i, /Save this team as a template/i]) assert.ok(items.some(x => want.test(x)), `${want} in ${JSON.stringify(items)}`);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await settle(150);
         });
         await S.run('step 2: a template fills the members as quiet read-only rows named "Edit <role>: <provider>, <model>", "Gets the first task" on the first only', async () => {

@@ -249,10 +249,10 @@
                                 <input type="search" id="team-template-search" class="team-template-search" aria-label="Search templates" placeholder="Search templates" autocomplete="off" data-on-input="team-template-filter" hidden>
                                 <select id="team-template-select" data-on-change="team-template-select"></select>
                             </div>
+                            <button type="button" class="btn" id="team-describe" data-on-click="m-show-team-wizard-modal">Describe your team</button><!-- the AI draft is a choice beside the templates, not behind More (#10314) -->
                             <div class="team-more-wrap">
                                 <button type="button" class="btn" id="team-template-more" aria-haspopup="menu" aria-expanded="false" aria-controls="team-template-menu" data-on-click="team-menu">More</button>
                                 <div class="menu team-menu" id="team-template-menu" role="menu" aria-label="Template options" hidden>
-                                    <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-show-team-wizard-modal">Generate with AI</button>
                                     <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-import-team-templates">Import a template</button>
                                     <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-import-team-from-folder" title="A folder with SKILL.md (the Orchestrator's prompt) and agents/role-name.md (one agent each)">Import from a folder</button>
                                     <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-save-team-template">Save this team as a template</button>
@@ -356,8 +356,8 @@
     <div id="team-wizard-modal" class="modal" role="dialog" aria-labelledby="team-wizard-title" aria-modal="true" style="display:none">
         <div class="modal-content dlg-flow">
             <div class="modal-header">
-                <h3 id="team-wizard-title">Create your own team</h3>
-                <p class="team-wizard-subtitle">Tell Coral what the team should achieve and how you want it staffed. You can review and edit every generated agent before launch.</p>
+                <h3 id="team-wizard-title">Describe your team</h3>
+                <p class="team-wizard-subtitle">Say what the team should do and, if you like, who should be on it. Coral drafts the members; you review and edit each one before anything starts.</p>
             </div>
             <div class="modal-body team-wizard-body">
                 <div class="team-wizard-intro">
@@ -366,20 +366,17 @@
                     </div>
                     <div>
                         <strong>AI team builder</strong>
-                        <p>Coral will generate a team JSON draft that opens directly in the existing launch flow.</p>
+                        <p>The draft opens on the Members step, where you can change anything.</p>
                     </div>
                 </div>
-                <label for="team-wizard-directive">Directive
-                    <textarea id="team-wizard-directive" rows="5" placeholder="Example: Build a launch plan for a developer tool aimed at small engineering teams. The team should uncover positioning, messaging, onboarding friction, and a realistic release strategy."></textarea>
-                </label>
-                <label for="team-wizard-composition">Team Composition
-                    <textarea id="team-wizard-composition" rows="4" placeholder="Example: Create 5 agents: an orchestrator, product strategist, GTM marketer, UX researcher, and launch copywriter. Use Claude by default, but make the researcher a stronger reasoning model."></textarea>
+                <label for="team-wizard-directive">Describe your team
+                    <textarea id="team-wizard-directive" rows="7" placeholder="For example: Build a launch plan for a developer tool aimed at small engineering teams. I want an orchestrator, a product strategist, a marketer and a copywriter."></textarea>
                 </label>
                 <div id="team-wizard-error" class="team-wizard-error" style="display:none"></div>
             </div>
             <div class="modal-actions modal-footer">
                 <button class="btn" data-on-click="m-hide-team-wizard-modal">Cancel</button>
-                <button id="team-wizard-test-btn" class="btn" data-on-click="m-test-team-wizard" title="Test flow with sample data (no API call)" style="font-size:var(--fs-base);opacity:0.7">Test</button>
+                <button id="team-wizard-test-btn" class="btn" data-on-click="m-test-team-wizard" title="Fills the Members step with a sample team of three; nothing is generated and no model is called.">Try a sample</button>
                 <button id="team-wizard-generate-btn" class="btn btn-primary" data-on-click="m-generate-team-from-wizard">Generate Team</button>
             </div>
         </div>

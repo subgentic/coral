@@ -170,15 +170,13 @@ const BASE = require('./test_base').BASE;
         assert.match(remote.urls[0], /box-b/); assert.match(remote.urls[0], /crew-r/);
         assert.equal(remote.team, '@box-b/crew-r', 'the team opens under its server-qualified key');
 
-        console.log('The wizard: both fields are required, a failed request shows its error, a finished job is reviewed in the team form');
+        console.log('The wizard: its one box is required, a failed request shows its error, a finished job is reviewed in the team form');
         await ev(`window.hideLaunchModal(); window.showTeamWizardModal(); window.generateTeamFromWizard(); true`);
-        assert.match(await ev(`document.getElementById('team-wizard-error').textContent`), /Add a directive/);
-        await ev(`document.getElementById('team-wizard-directive').value = 'Ship it'; window.generateTeamFromWizard(); true`);
-        assert.match(await ev(`document.getElementById('team-wizard-error').textContent`), /Describe the team composition/);
-        await ev(`document.getElementById('team-wizard-composition').value = 'two devs'; window.generateTeamFromWizard(); true`);
+        assert.match(await ev(`document.getElementById('team-wizard-error').textContent`), /^Describe your team first/);
+        await ev(`document.getElementById('team-wizard-directive').value = 'Ship it, with two devs'; window.generateTeamFromWizard(); true`);
         await waitFor(`/the model is down/.test(document.getElementById('team-wizard-error').textContent)`, 'the failure');
         assert.deepEqual(await ev(`[document.getElementById('team-wizard-generate-btn').disabled, document.getElementById('team-wizard-generate-btn').textContent]`), [false, 'Generate Team']);
-        assert.deepEqual(await ev(`window.__generates`), [{ directive: 'Ship it', composition: 'two devs' }]);
+        assert.deepEqual(await ev(`window.__generates`), [{ directive: 'Ship it, with two devs', composition: '' }]);
         await ev(`window.__generateAnswer = { status: 200, body: { team: { name: 'Gen Team', flags: ['--x'], agents: [{ name: 'Lead', prompt: 'lead it' }, { name: 'Dev', prompt: 'build it' }] } } }; window.generateTeamFromWizard(); true`);
         await waitFor(`!!document.querySelector('.team-wizard-success')`, 'the success state');
         assert.equal(await ev(`document.querySelector('.team-wizard-success p').textContent`), '2 agents created for "Gen Team"');
@@ -195,7 +193,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await chosenTemplate(), 'Blank team', 'and says Blank team; the Generated team choice is gone');
 
         console.log('A job that is polled: its result is shown when it finishes');
-        await ev(`window.hideLaunchModal(); window.showTeamWizardModal(); document.getElementById('team-wizard-directive').value = 'd'; document.getElementById('team-wizard-composition').value = 'c';
+        await ev(`window.hideLaunchModal(); window.showTeamWizardModal(); document.getElementById('team-wizard-directive').value = 'd';
             window.__generateAnswer = { status: 200, body: { job_id: 'j1' } }; window.__jobAnswer = { status: 'done', result: { name: 'Polled', agents: [{ name: 'P1', prompt: 'p' }] } }; window.generateTeamFromWizard(); true`);
         await waitFor(`!!document.querySelector('.team-wizard-success')`, 'the polled success', { timeout: 9000 });
         assert.equal(await ev(`document.querySelector('.team-wizard-success p').textContent`), '1 agents created for "Polled"');
