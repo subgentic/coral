@@ -34,7 +34,7 @@
                         <div id="capture-wrapper" class="capture-wrapper">
                             <div class="terminal-header">
                                 <div class="terminal-header-left" id="popout-header-identity" aria-live="polite">
-                                    <span class="terminal-status-dot" id="terminal-status-dot"></span><span class="terminal-state-word" id="terminal-state-word" aria-hidden="true"></span>
+                                    <span class="terminal-status-dot" id="terminal-status-dot"></span>
                                     <span class="terminal-identity" id="terminal-header-identity" tabindex="0">
                                         <span class="terminal-session-label" id="terminal-header-label"></span>
                                         <!-- The agent's team, and its server on a hub with remotes (#3653): header_context.js -->
@@ -51,15 +51,6 @@
                                         <span class="terminal-branch-text" tabindex="0" role="button" aria-expanded="false"></span>
                                         <span class="branch-git-state"></span>
                                     </span>
-                                    <!-- View toggle: raw terminal vs. rendered chat transcript, the first of the header's actions on the right (#9836, the operator) -->
-                                    <div class="live-view-toggle" role="group" aria-label="Center view">
-                                        <button type="button" class="live-view-toggle-btn active" id="live-view-btn-chat" data-on-click="live-view-mode" data-mode="chat" aria-pressed="true" title="Chat view" aria-label="Chat view">
-                                            <span class="material-icons" aria-hidden="true">chat</span><span>Chat</span>
-                                        </button>
-                                        <button type="button" class="live-view-toggle-btn" id="live-view-btn-terminal" data-on-click="live-view-mode" data-mode="terminal" aria-pressed="false" title="Terminal view" aria-label="Terminal view">
-                                            <span class="material-icons" aria-hidden="true">terminal</span><span>Terminal</span>
-                                        </button>
-                                    </div>
                                     <!-- Find in conversation (chat view only) -->
                                     <button class="btn btn-quiet btn-icon btn-xs terminal-header-btn" id="chat-find-btn" type="button" data-on-click="chat-find-toggle" title="Find in conversation (Ctrl/Cmd+F)" aria-label="Find in conversation">
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
@@ -81,6 +72,15 @@
                                     <button class="btn btn-quiet btn-icon btn-xs terminal-header-btn session-panel-toggle-btn" id="popout-panel-toggle-btn" type="button" data-on-click="agentic-panel-toggle" title="Toggle side panel" aria-label="Toggle side panel" aria-pressed="false">
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/></svg>
                                     </button>
+                                    <!-- View toggle: raw terminal vs. rendered chat transcript, the last of the header's actions, at the far right after Search and Pop out (#9927, the operator) -->
+                                    <div class="live-view-toggle" role="group" aria-label="Center view">
+                                        <button type="button" class="live-view-toggle-btn active" id="live-view-btn-chat" data-on-click="live-view-mode" data-mode="chat" aria-pressed="true" title="Chat view" aria-label="Chat view">
+                                            <span class="material-icons" aria-hidden="true">chat</span><span>Chat</span>
+                                        </button>
+                                        <button type="button" class="live-view-toggle-btn" id="live-view-btn-terminal" data-on-click="live-view-mode" data-mode="terminal" aria-pressed="false" title="Terminal view" aria-label="Terminal view">
+                                            <span class="material-icons" aria-hidden="true">terminal</span><span>Terminal</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <!-- A phone's header has no room for the folder, the branch, the model and its thinking level (the agent row is one line, #9686): one tap on Details shows them (session_header_updates.js fills it). -->

@@ -761,7 +761,7 @@ body.panel-dragging .xterm-container {
 @media (max-width: 600px) { .preview-pane-markdown { padding: 16px 16px 32px; } } /* a phone's markdown uses the width: the viewer's text was 245 px of 390 (#9478 item 10) */
 
 /* Chat/Terminal toggle: the first of the header's actions, at the right (#9836); the folder is the name's tip, not a header item (#9837) */
-.terminal-header-actions > .live-view-toggle { flex-shrink: 0; margin-right: 6px; } /* the first of the actions on the right (#9836) */
+.terminal-header-actions > .live-view-toggle { flex-shrink: 0; margin-left: 6px; } /* the last of the actions on the right, after Search and Pop out (#9927) */
 .terminal-header-actions .terminal-branch { margin-right: 8px; }
 
 /* A window that does not set the pane's size (a viewer, View mode, a phone) renders the xterm at
