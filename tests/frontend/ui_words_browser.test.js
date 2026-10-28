@@ -32,7 +32,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!!document.querySelector('.btn-create-task')`, at + 'the Tasks tab', 10000);
             assert.equal(await ev(`document.querySelector('.btn-create-task').textContent.trim()`), 'New task', at + 'the Tasks bar says New task');
             // a dialog: no Close X, Cancel closes it
-            await ev(`window.showJobModal(); true`);
+            await ev(`window.showJobModal().then(() => true)`); // the form loads on first use (#10218)
             await waitFor(`getComputedStyle(document.getElementById('job-modal')).display !== 'none'`, at + 'New job', 8000);
             assert.equal(await ev(`!!document.querySelector('.modal-close-btn')`), false, at + 'no dialog has a Close X');
             assert.equal(await ev(`document.querySelector('#job-modal h3').textContent.trim()`), 'New job');
