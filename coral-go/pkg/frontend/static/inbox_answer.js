@@ -60,7 +60,8 @@ async function answer(s, o, ask, cell) {
         document.dispatchEvent(new CustomEvent('coral:inbox-answered', { detail: { session_id: s.session_id } }));
     } catch {
         buttons.forEach(b => { b.disabled = false; });
-        showToast('Could not send the answer. Open the agent and use its terminal.', true);
+        // the way to answer it is a button, not a place to go looking for (#10399): Open agent shows that agent's own card
+        showToast('Could not send the answer from here. Open the agent to answer it there.', true, 10000, { action: { label: 'Open agent', onClick: () => { window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); } } });
     }
 }
 
