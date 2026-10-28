@@ -1,6 +1,7 @@
 DELETE /api/artifacts/{id} launch owner-only
 DELETE /api/saved/{id} interact owner-only
 GET /api/artifacts view owner-only
+GET /api/artifacts/resolve view owner-only
 GET /api/artifacts/{id} view owner-only
 GET /api/artifacts/{id}/comments view owner-only
 GET /api/artifacts/{id}/meta view owner-only

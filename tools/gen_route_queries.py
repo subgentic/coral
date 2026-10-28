@@ -31,6 +31,8 @@ FILE_PARAMS = {'filepath', 'dir', 'path', 'working_directory', 'file', 'ref', 'c
 EXTRA = {
     # The all-boards goals read (#7260): ListAllGoals reads state and board from a url.Values it parsed itself (a mistyped query string is refused, not dropped), which the scan above does not follow.
     'GET /api/goals': {'state', 'board'},
+    # Which artifact a shortened link means (#9841): resolveArtifactRefs reads the repeatable link from the query map, which the scan above does not follow (not named ref: that name is a file reference here).
+    'GET /api/artifacts/resolve': {'link'},
     # The Team Artifacts list's query (#4572): parseTeamArtifactQuery reads these from a url.Values it is handed, not from the request,
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
     'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor'},

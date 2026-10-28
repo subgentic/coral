@@ -230,6 +230,17 @@ func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 	if text, ok := body.Changes["body"].(string); ok && refuseTextTooLarge(w, "body_too_large", "a task body", len(text), maxTaskBodyBytes) {
 		return
 	}
+	if h.refuseShortArtifactRefs(w, r, &body.Reason) { // #9841
+		return
+	}
+	for _, field := range []string{"title", "body"} {
+		if text, ok := body.Changes[field].(string); ok {
+			if h.refuseShortArtifactRefs(w, r, &text) {
+				return
+			}
+			body.Changes[field] = text
+		}
+	}
 	if !h.requireTaskPlanner(w, r, project, body.SubscriberID) {
 		return
 	}

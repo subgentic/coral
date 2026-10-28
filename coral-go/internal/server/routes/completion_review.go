@@ -42,6 +42,9 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		errBadRequest(w, "subscriber_id and valid JSON required")
 		return
 	}
+	if h.refuseShortArtifactRefs(w, r, &body.Message) || h.refuseShortArtifactRefs(w, r, &body.Reason) { // #9841
+		return
+	}
 	areas := body.Areas
 	if len(areas) == 0 && len(body.Paths) > 0 {
 		areas = reviewAreasFromPaths(body.Paths)
@@ -207,6 +210,9 @@ func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, app
 	}
 	if derr != nil || body.SubscriberID == "" {
 		errBadRequest(w, "subscriber_id and valid JSON required")
+		return
+	}
+	if h.refuseShortArtifactRefs(w, r, &body.Note) { // #9841
 		return
 	}
 	ctx := r.Context()

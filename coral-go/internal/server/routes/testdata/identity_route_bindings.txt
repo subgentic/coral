@@ -21,6 +21,7 @@ GET /api/agent/tasks/{taskID} | token-bound
 GET /api/agent/ui | token-bound
 GET /api/agent/ui/{id}/content | token-bound
 GET /api/agent/ui/{id}/events | token-bound
+GET /api/artifacts/resolve | token-session | operator-only
 GET /api/artifacts/series/{series_id} | token-session
 GET /api/artifacts/series/{series_id}/versions | token-session
 GET /api/artifacts/{id} | token-session
@@ -122,7 +123,7 @@ PATCH /api/artifacts/{id}/comments/{cid} | token-session | operator-only
 PATCH /api/board/{project} | board-claims | operator-only
 PATCH /api/board/{project}/goals/{goalID} | board-claims
 PATCH /api/board/{project}/tasks/{taskID} | board-claims
-PATCH /api/board/{project}/tasks/{taskID}/amend | board-claims
+PATCH /api/board/{project}/tasks/{taskID}/amend | board-claims +token-session
 PATCH /api/sessions/history/{sessionID}/flags | unbound | operator-only
 PATCH /api/sessions/live/{name}/notes/{noteID} | token-bound
 PATCH /api/sessions/live/{name}/tasks/{taskID} | token-bound
@@ -160,25 +161,25 @@ POST /api/board/{project}/relay-messages | board-claims +token-session
 POST /api/board/{project}/reminder | board-claims
 POST /api/board/{project}/resume | board-claims | operator-only
 POST /api/board/{project}/subscribe | board-claims
-POST /api/board/{project}/tasks | board-claims
+POST /api/board/{project}/tasks | board-claims +token-session
 POST /api/board/{project}/tasks/claim | board-claims
 POST /api/board/{project}/tasks/current | board-claims
-POST /api/board/{project}/tasks/{taskID}/approve | board-claims
+POST /api/board/{project}/tasks/{taskID}/approve | board-claims +token-session
 POST /api/board/{project}/tasks/{taskID}/attach | board-claims
-POST /api/board/{project}/tasks/{taskID}/cancel | board-claims
-POST /api/board/{project}/tasks/{taskID}/complete | board-claims
+POST /api/board/{project}/tasks/{taskID}/cancel | board-claims +token-session
+POST /api/board/{project}/tasks/{taskID}/complete | board-claims +token-session
 POST /api/board/{project}/tasks/{taskID}/mark-landed | board-claims
 POST /api/board/{project}/tasks/{taskID}/nudge | board-claims
 POST /api/board/{project}/tasks/{taskID}/park | board-claims +token-session
 POST /api/board/{project}/tasks/{taskID}/publish | board-claims
 POST /api/board/{project}/tasks/{taskID}/reassign | board-claims
-POST /api/board/{project}/tasks/{taskID}/reject | board-claims
+POST /api/board/{project}/tasks/{taskID}/reject | board-claims +token-session
 POST /api/board/{project}/tasks/{taskID}/release-review | board-claims
 POST /api/board/{project}/tasks/{taskID}/reminder | board-claims
 POST /api/board/{project}/tasks/{taskID}/reply | board-claims +token-session
 POST /api/board/{project}/tasks/{taskID}/review | board-claims
 POST /api/board/{project}/tasks/{taskID}/send-back | board-claims
-POST /api/board/{project}/tasks/{taskID}/submit-review | board-claims
+POST /api/board/{project}/tasks/{taskID}/submit-review | board-claims +token-session
 POST /api/board/{project}/waits | board-claims
 POST /api/board/{project}/working-mode/presets | board-claims | operator-only
 POST /api/board/{project}/working-mode/presets/{presetID}/reset | board-claims | operator-only
