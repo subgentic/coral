@@ -117,6 +117,8 @@ registerActions({
     'm-reset-default-prompt': el => { if (["orchestrator", "team_orchestrator", "team_worker", "worker"].includes(el.dataset.arg)) { window.resetDefaultPrompt(el.dataset.arg); } },
     'm-resume-launch-new': el => { window.resumeLaunchNew(); },
     'm-save-current-persona': el => { window._saveCurrentPersona(); },
+    'm-rename-persona': el => { window._renamePersona(); },
+    'm-delete-persona': el => { window._deletePersona(); },
     'm-save-default-prompts': el => { window.saveDefaultPrompts(); },
     'm-save-team-member': el => { window.saveTeamAgentFromModal(); },
     'm-save-team-template': el => { window._saveTeamTemplate(); },

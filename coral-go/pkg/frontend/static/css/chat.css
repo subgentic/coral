@@ -1629,3 +1629,8 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 
 /* The Copy button hangs 4 px past its bubble (right: -4px), which on a phone, where the scroller's side padding is 12 px, made the scroller 2 px wider than its box and drew a 16 px horizontal scrollbar: the dim strip above the composer (#10923). 4 px more room on the right takes the overflow away instead of hiding it, so a wide code block or table still scrolls inside itself. */
 @media (max-width: 767px) { #live-history-messages.chat-messages.chat-prose { padding-right: 16px; } }
+
+/* The agent's standing instructions under the empty chat's hint: one line cut with an ellipsis, then Edit (#10285). */
+.chat-standing { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.5rem; font-size: var(--fs-md); }
+.chat-standing[hidden] { display: none; }
+.chat-standing-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

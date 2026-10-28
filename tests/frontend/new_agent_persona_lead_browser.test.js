@@ -25,7 +25,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(r.lead, 'A persona is a saved name and prompt. Pick one, or skip.', `${label}: the sentence`);
             assert.equal(r.leadAbove, true, `${label}: it is above the select`);
             assert.equal(r.more, 'More', `${label}: one More menu`); assert.equal(r.open, false, `${label}: closed at first`);
-            assert.deepEqual(r.inMenu, ['Save as persona', 'Export personas', 'Import personas'], `${label}: its three actions`);
+            assert.deepEqual(r.inMenu, ['Save as persona', 'Rename persona', 'Delete persona', 'Export personas', 'Import personas'], `${label}: its five actions (Rename and Delete came with #10285)`);
             assert.deepEqual(r.shownClosed, [false, false], `${label}: none of them shows while it is closed`);
             assert.equal(r.sameRow, true, `${label}: on the select's row`); assert.equal(r.wide, true, `${label}: nothing is wider than the screen`);
             // opened: Save as persona is the one clear action, with Export and Import under it as a quieter pair on one line (#10286)
