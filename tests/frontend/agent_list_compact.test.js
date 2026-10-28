@@ -156,15 +156,15 @@ async function run() {
     const pills = hrows.filter(r => r.pillText);
     check('155 attention pill: sentence-case label, no uppercase transform, contrast >= 4.5:1', pills.length >= 1 && pills.every(r => /^(Needs input|Check terminal|Stuck)$/.test(r.pillText) && r.pillTransform !== 'uppercase' && r.pillContrast >= 4.5), JSON.stringify(pills.map(r => [r.pillText, r.pillTransform, +r.pillContrast.toFixed(2)])));
     check('155 every row is 36px (one line, #9686)', hrows.every(r => Math.abs(r.h - 36) <= 1), JSON.stringify(hrows.map(r => r.h)));
-    // ── #159 neutral status dot: visually hidden, slot reserved, no layout shift on state ticks ──
+    // ── #159 status dot: an idle agent's is grey (it was hidden until #9784), its slot is reserved, no layout shift on state ticks ──
     await ev(`localStorage.setItem('coral-group-by-team','false'); window._coralSetLiveSessions(JSON.parse(JSON.stringify(window.__fixture))); true`); await nextFrame();
     const DOTS = (listId) => `(() => Object.fromEntries(Array.from(document.querySelectorAll('#' + ${JSON.stringify('LIST')} + ' .session-group-item')).map(li => { const d = li.querySelector('.session-dot'); const n = li.querySelector('.session-label'); const cs = d ? getComputedStyle(d) : null; const r = d ? d.getBoundingClientRect() : null; const range = document.createRange(); range.selectNodeContents(n); const nx = range.getClientRects()[0].left;
       const shown = !!cs && cs.visibility !== 'hidden' && parseFloat(cs.opacity) > 0.05 && cs.display !== 'none' && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(cs.backgroundColor);
       return [li.dataset.sessionId, { cls: d ? d.className : null, shown, slotW: r ? r.width : 0, display: cs ? cs.display : null, nameX: nx, dotX: r ? r.left : null, aria: li.getAttribute('aria-label') }]; })))()`.replace('LIST', listId);
     let dots = await ev(DOTS('live-sessions-list'));
-    check('159 neutral (idle) dot is visually hidden but its slot is reserved (width >= 6px, not display:none)', /stale/.test(dots[F].cls || '') && !dots[F].shown && dots[F].slotW >= 6 && dots[F].display !== 'none', JSON.stringify(dots[F]));
+    check('159 an idle agent draws its grey dot (the row always has a state, look check #9773 item 1) in the same reserved slot (width >= 6px)', /stale/.test(dots[F].cls || '') && dots[F].shown && dots[F].slotW >= 6 && dots[F].display !== 'none', JSON.stringify(dots[F]));
     check('159 meaningful dots stay visible: working (+ctx-high), needs-input, check-terminal', dots[A].shown && /working/.test(dots[A].cls) && dots[B].shown && dots[C].shown, JSON.stringify({ A: dots[A].cls, B: dots[B].cls, C: dots[C].cls }));
-    check('159 hidden dot is visual only: aria-label still carries the idle state', /, Idle$/.test(dots[F].aria || ''), dots[F].aria);
+    check('159 the dot is decoration: aria-label still carries the idle state', /, Idle$/.test(dots[F].aria || ''), dots[F].aria);
     check('159 name x is identical for hidden-dot and visible-dot rows in the same layout (slot preserved)', Math.abs((dots[F].nameX - dots[F].dotX) - (dots[A].nameX - dots[A].dotX)) <= 1, JSON.stringify({ F: [dots[F].dotX, dots[F].nameX], A: [dots[A].dotX, dots[A].nameX] }));
     const nameXBefore = dots[F].nameX;
     await ev(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [{ name: 'other-proj', agent_type: 'claude', session_id: '${F}', working: true }] }); true`); await nextFrame();
@@ -190,7 +190,7 @@ async function run() {
     const mrows = hierM.flatMap(g => g.rows.map(r => ({ ...r, headerWeight: g.headerWeight, headerColor: g.headerColor })));
     check('155 phone: names lighter than headers, no goal line (#9686)', mrows.length >= 3 && mrows.every(r => r.goalX === null) && mrows.every(r => r.weight <= 500 && (r.active || r.attention || r.color !== r.headerColor) && (r.goalContrast === null || r.goalContrast >= 4.5)), JSON.stringify(mrows.map(r => [r.goalX === null ? null : +(r.goalX - r.nameX).toFixed(1), r.weight, r.goalContrast === null ? null : +r.goalContrast.toFixed(2)])));
     const mdots = await ev(DOTS('mobile-session-list'));
-    check('159 phone clone: neutral dot hidden with slot reserved, meaningful dots visible', mdots[F] && !mdots[F].shown && mdots[F].slotW >= 6 && mdots[A].shown && mdots[B].shown && Math.abs((mdots[F].nameX - mdots[F].dotX) - (mdots[A].nameX - mdots[A].dotX)) <= 1, JSON.stringify({ F: mdots[F], A: mdots[A] && mdots[A].cls }));
+    check('159 phone clone: the idle dot is drawn in its reserved slot, meaningful dots visible', mdots[F] && mdots[F].shown && mdots[F].slotW >= 6 && mdots[A].shown && mdots[B].shown && Math.abs((mdots[F].nameX - mdots[F].dotX) - (mdots[A].nameX - mdots[A].dotX)) <= 1, JSON.stringify({ F: mdots[F], A: mdots[A] && mdots[A].cls }));
     check('8 phone row: one flat 44px line, no avatar, no elapsed text, no goal, banner or status chip, one chip (Needs input), 44px kebab', m && !m.avatar && !m.activity && Math.abs(m.h - 44) <= 1 && !m.goal && !m.banner && !m.statusChip && m.chip.length === 1 && m.chip[0] === 'Needs input' && m.kebab && m.kebab[0] >= 44 && m.kebab[1] >= 44, JSON.stringify(m));
     await ev(`document.querySelector('#mobile-session-list [data-session-id="${B}"]').focus(); true`);
     await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
