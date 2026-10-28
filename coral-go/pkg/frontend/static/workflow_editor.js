@@ -143,6 +143,7 @@ function limitField() {
 // The first step a new workflow starts with: a named one to fill in, so the form shows what a step is for (#9297). Its command is empty with an example as the placeholder, so nothing runnable is saved by accident.
 const EXAMPLE_STEP = { name: 'Run tests', type: 'shell', command: '' };
 const EXAMPLE_COMMAND = 'e.g. npm test';
+const STEP_CLIS = ['claude', 'codex', 'gemini', 'agy', 'antigravity', 'pi']; // the agent types the server knows for a workflow step
 const TEMPLATE_NONE = '';
 
 function workflowFields() {
@@ -182,8 +183,9 @@ async function submitWorkflow(values) {
         if (r.type === 'shell') { step.command = r.content; delete step.prompt; }
         else {
             step.prompt = r.content; delete step.command;
-            // The form has no field for the agent: an agent step goes with the CLI Settings names as the default (else Claude), unless it already has its own (a template's, an edited workflow's). The server refuses an agent step with no agent_type (#10732).
-            if (!(step.agent && step.agent.agent_type)) step.agent = { ...(step.agent || {}), agent_type: (state.settings || {}).default_agent_type || 'claude' };
+            // The form has no field for the agent, and the server refuses an agent step with no agent_type (#10732): a step with none of its own (a template's, an edited workflow's) gets Claude, the one CLI a
+            // non-interactive step can run on today (the server's printStepCLIs); an interactive step takes Settings' default agent when that is one of the CLIs a step may name.
+            if (!(step.agent && step.agent.agent_type)) step.agent = { ...(step.agent || {}), agent_type: step.interactive && STEP_CLIS.includes((state.settings || {}).default_agent_type) ? state.settings.default_agent_type : 'claude' };
         }
         return step;
     });

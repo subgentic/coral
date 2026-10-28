@@ -53,7 +53,7 @@ const WF = { id: 41, name: 'Nightly', description: 'd', repo_path: '/tmp/repo', 
         body = await saveOnce(`(() => { const it = ${item(0)}; it.querySelector('.wf-step-type-select').value = 'agent'; it.querySelector('.wf-step-content').value = 'Build it'; return true; })()`);
         const { command, ...rest } = STEPS[0];
         assert.equal(command, 'make build');
-        assert.deepEqual(body.steps[0], { ...rest, type: 'agent', prompt: 'Build it' });
+        assert.deepEqual(body.steps[0], { ...rest, type: 'agent', prompt: 'Build it', agent: { agent_type: 'claude' } }); // a step with no agent of its own gets one: the server refuses an agent step without (#10732)
         console.log('PASS workflow editor keeps step fields');
     } finally {
         try { await client.close(); } catch (_) {}
