@@ -280,12 +280,6 @@
     flex: 1;
 }
 
-/* No summary / first prompt yet: inline generate-goal affordance, always visible */
-
-/* The sparkle is the only goal trigger: give it a visible hover state and a
-   24x24 hit target. Negative vertical margins keep the row height at the
-   goal line's 15px so density (D6) is unaffected. */
-
 /* ── Sidebar Kebab Menu ───────────────────────────────────── */
 
 .sidebar-kebab-wrapper {

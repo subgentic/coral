@@ -43,10 +43,10 @@ const BASE = require('./test_base').BASE;
         await key('Enter', 'Enter', '\r');
         await waitFor(`document.activeElement && document.activeElement.id === 'command-input'`, 'the message box has the focus after Enter on a row', 8000);
 
-        // the skip link: the first stop of the pane, to the message box
+        // the skip link: the first stop of the page (#10802), to the message box
         await ev(`document.querySelector('#live-sessions-list .session-group-item[tabindex="0"]').focus(); true`);
-        const link = await ev(`(() => { const a = document.querySelector('.sidebar-pane[data-pane="agents"] .skip-link'); return a ? { text: a.textContent.trim(), first: !!(a.compareDocumentPosition(document.querySelector('#live-sessions-list')) & Node.DOCUMENT_POSITION_FOLLOWING) } : null; })()`);
-        assert.deepEqual(link, { text: 'Skip to message box', first: true }, 'the pane starts with the link');
+        const link = await ev(`(() => { const a = document.querySelector('body > .skip-link'); return a ? { text: a.textContent.trim(), first: !!(a.compareDocumentPosition(document.querySelector('#live-sessions-list')) & Node.DOCUMENT_POSITION_FOLLOWING) } : null; })()`);
+        assert.deepEqual(link, { text: 'Skip to message box', first: true }, 'the page starts with the link');
         await ev(`document.querySelector('.skip-link').focus(); true`);
         assert.ok(await ev(`(() => { const r = document.activeElement.getBoundingClientRect(); return r.width > 20 && r.left >= 0; })()`), 'it is shown while the keyboard is on it');
         await key('Enter', 'Enter', '\r');

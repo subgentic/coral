@@ -352,6 +352,8 @@ function _wireDirNote() {
     input.addEventListener('input', _syncDirNote); input.addEventListener('change', _syncDirNote);
     input.addEventListener('input', _syncLaunchBlock); input.addEventListener('change', _syncLaunchBlock); // Next and Launch say why they are off until there is a folder
     input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); _launchStage('next'); } }); // Enter is Next
+    const persona = document.getElementById('launch-persona-select'); // step 2's persona list: Enter is Next there too (#10802)
+    if (persona && !persona.dataset.enterWired) { persona.dataset.enterWired = '1'; persona.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); _launchStage('next'); } }); }
 }
 
 
