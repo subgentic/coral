@@ -205,6 +205,10 @@ async function loadChoices() {
 }
 const rowsNow = () => (TF.isQuery(model.filters) ? model.q.rows : model.rows);
 
+// The Open view also keeps a task that finished today, so what an agent just did is not behind Show all (#10604): its result is the first thing a person looks for.
+const sameDay = iso => { const d = new Date(iso), n = new Date(); return !Number.isNaN(d.getTime()) && d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate(); };
+const doneToday = t => bucket(t) === 'done' && !!t.completed_at && sameDay(t.completed_at);
+
 const counts = () => {
     const c = { open: 0, all: 0, queued: 0, active: 0, blocked: 0, review: 0, needs_review: 0, done: 0 };
     for (const t of rowsNow()) { c.all++; c[bucket(t)]++; if (needsReview(t)) c.needs_review++; }
@@ -212,7 +216,7 @@ const counts = () => {
         if (model.totalOpen != null && model.totalDone != null) c.all = model.totalOpen + model.totalDone;
         if (model.totalDone != null) c.done = model.totalDone;
     }
-    c.open = c.all - c.done;
+    c.open = c.all - c.done + rowsNow().filter(doneToday).length; // Open and the tasks finished today
     return c;
 };
 
@@ -240,7 +244,7 @@ function draw() {
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (!all.length) { if (!failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : noTasksYet())); body.append(e); } }
     else {
-        const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'needs_review' ? needsReview(t) : model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter)));
+        const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'needs_review' ? needsReview(t) : model.filter === 'open' ? bucket(t) !== 'done' || doneToday(t) : bucket(t) === model.filter)));
         if (!shown.length) {
             const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', 'No tasks match this filter.'), btn('btn empty-state-action', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {

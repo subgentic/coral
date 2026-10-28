@@ -63,7 +63,8 @@ const B = 'open-paging-' + Date.now().toString(36);
             await ev(`[...document.querySelectorAll('#team-panel-tasks .goals-more')].find(b => /Load more open tasks/.test(b.textContent)).click(); true`);
             await waitFor(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].filter(r => /Open task/.test(r.textContent)).length > ${n}`, 'the next page again', 10000);
         }
-        assert.equal((await openRows()).length, 359, 'Load more fetched the rest: every open task but the finished one');
+        // the task that finished is a task finished today: the Open view keeps it too (#10604), as Done; it is not one of the open ones
+        assert.equal((await openRows()).filter(t => !t.includes(finished.title)).length, 359, 'Load more fetched the rest: every open task but the finished one');
         console.log('PASS open set paging: 50 rows and ' + first.bytes + ' bytes for the first read instead of the whole ' + whole.bytes + '; Load more open tasks follows the cursor; a refresh read ' + refreshReads + ' pages of the 8 loaded and dropped the rest');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
