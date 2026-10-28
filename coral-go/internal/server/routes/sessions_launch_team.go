@@ -644,7 +644,12 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 		h.ss.UpdateWorktreeInfo(ctx, sessionID, worktreePath, body.WorkingDir)
 	}
 	if teamID > 0 && h.teamStore != nil {
-		agentConfigJSON, _ := json.Marshal(def)
+		// The member is stored with the mode it actually started in, so a resurrect restores that and never the saved default (#10430). A member's own mode field only ever says Default (#10362).
+		stored := def
+		if ls, _ := h.ss.GetLiveSession(ctx, sessionID); ls != nil && ls.PermissionMode != nil && *ls.PermissionMode != "" {
+			stored.PermissionMode = *ls.PermissionMode
+		}
+		agentConfigJSON, _ := json.Marshal(stored)
 		h.teamStore.CreateTeamMember(ctx, &store.TeamMember{
 			TeamID:          teamID,
 			AgentName:       def.Name,
