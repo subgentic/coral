@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Coral",
   "short_name": "Coral",
-  "description": "Multi-agent orchestration dashboard",
+  "description": "The control plane for the coding agents you already have.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

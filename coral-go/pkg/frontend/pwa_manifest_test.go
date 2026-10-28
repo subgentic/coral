@@ -8,6 +8,8 @@ import (
 	_ "image/png"
 	"io/fs"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -20,18 +22,31 @@ func TestWebAppManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	var m struct {
-		ID, Scope string
-		StartURL  string `json:"start_url"`
-		Name      string
-		ShortName string `json:"short_name"`
-		Display   string
-		Icons     []struct{ Src, Sizes, Type, Purpose string }
+		ID, Scope   string
+		Description string
+		StartURL    string `json:"start_url"`
+		Name        string
+		ShortName   string `json:"short_name"`
+		Display     string
+		Icons       []struct{ Src, Sizes, Type, Purpose string }
 	}
 	if err := json.Unmarshal(raw, &m); err != nil {
 		t.Fatal(err)
 	}
 	if m.ID != "/" || m.Scope != "/" || m.StartURL != "/" {
 		t.Errorf("id, scope and start_url are all /: %q %q %q", m.ID, m.Scope, m.StartURL)
+	}
+	// what a person does, in the words of the README's first line (#10469), not a category
+	readme, err := os.ReadFile(filepath.Join("..", "..", "..", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = "The control plane for the coding agents you already have"
+	if !strings.Contains(string(readme), "Coral: the control plane for the coding agents you already have") {
+		t.Fatal("the README's first line changed: update this test and the manifest description together")
+	}
+	if !strings.Contains(m.Description, want) || strings.Contains(strings.ToLower(m.Description), "multi-agent orchestration") {
+		t.Errorf("the manifest description says %q: it should say %q, as the README does", m.Description, want)
 	}
 	have := map[string]bool{}
 	for _, ic := range m.Icons {
