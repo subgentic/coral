@@ -3,7 +3,7 @@
  * brings its line forward), the lines are the top 7 by cost and the rest as Other, and the chart is aria-hidden: the table beside it is its text alternative. Under the table a line says whether the
  * rows add up to where the chart ends. It reads GET /api/token-usage/timeseries?group_by=team|agent|provider|model (each bucket lists its series). Everything is built with the DOM and textContent:
  * names are written by agents. */
-import { compactFigure, formatCost, noDataWords } from './format.js';
+import { compactFigure, formatCost, noDataWords, costDigits } from './format.js';
 import { watchScrollCue } from './scroll_cue.js';
 
 export const METRICS = [
@@ -101,6 +101,8 @@ export function agrees(a, b) { return Math.abs(a - b) <= 1e-6 * Math.max(1, Math
 
 /** An axis label: money from $100 up drops the cents (the axis steps are round numbers), so a label never outgrows the margin. */
 const axisLabel = (fmt, v) => { const t = fmt(v); return t.startsWith('$') && v >= 100 ? (v >= 1000 ? `$${compactFigure(v)}` : `$${Math.round(v)}`) : t; };
+/** The labels of a whole axis: money steps that read the same ($0.01, $0.01) are shown with the decimals that tell them apart (#10740). */
+const axisLabels = (fmt, values) => { const labels = values.map(v => axisLabel(fmt, v)); if (!labels[0].startsWith('$') || new Set(labels).size === labels.length) return labels; const digits = costDigits(values); return values.map(v => (v >= 100 ? axisLabel(fmt, v) : formatCost(v, { zeroAsTwo: true, digits }))); };
 const niceMax = v => { if (!(v > 0)) return 1; const p = 10 ** Math.floor(Math.log10(v)), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
 const colorOf = line => (line.other ? 'var(--viz-other)' : `var(--viz-${((line.slot ?? 0) % 7) + 1})`);
 
@@ -121,7 +123,8 @@ export function drawChart(host, { times, lines, metric, interval, hi, phone, xLa
     const x = i => L + (N > 1 ? (i / (N - 1)) * pw : pw / 2), y = log ? (v => T + ph - (Math.log10(1 + Math.max(v, 0)) / Math.log10(1 + max)) * ph) : (v => T + ph - (v / max) * ph);
     const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true', focusable: 'false', class: 'viz-svg', 'data-scale': log ? 'log' : 'linear' });
     const gridAt = log ? [0, ...Array.from({ length: Math.round(Math.log10(max)) }, (_, k) => 10 ** (k + 1))].filter(v => v <= max) : [0, 1, 2, 3, 4].map(g => (max / 4) * g); // a log axis steps by powers of ten
-    for (const v of gridAt) { s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, axisLabel(m.fmt, v))); }
+    const gridText = axisLabels(m.fmt, gridAt);
+    gridAt.forEach((v, k) => { s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, gridText[k])); });
     const ticks = N <= 1 ? [0] : [0, Math.round((N - 1) / 3), Math.round(((N - 1) * 2) / 3), N - 1].filter((v, i, a) => a.indexOf(v) === i);
     for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, label(i)));
     const order = lines.map((l, k) => k).sort((a, b) => (hi === lines[a].key) - (hi === lines[b].key)); // the highlighted line is drawn last, so in front
@@ -291,7 +294,8 @@ function drawArea(host, { times, lines, metric, interval, hi, phone }) {
     const max = niceMax(Math.max(0, ...sums));
     const x = i => L + (N > 1 ? (i / (N - 1)) * pw : pw / 2), y = v => T + ph - (v / max) * ph;
     const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true', focusable: 'false', class: 'viz-svg' });
-    for (let g = 0; g <= 4; g++) { const v = (max / 4) * g; s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, axisLabel(m.fmt, v))); }
+    const gridVals = [0, 1, 2, 3, 4].map(g => (max / 4) * g), gridText = axisLabels(m.fmt, gridVals);
+    gridVals.forEach((v, g) => { s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, gridText[g])); });
     const ticks = N <= 1 ? [0] : [0, Math.round((N - 1) / 3), Math.round(((N - 1) * 2) / 3), N - 1].filter((v, i, a) => a.indexOf(v) === i);
     for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, timeLabel(times[i], interval)));
     let base = new Array(N).fill(0);
@@ -360,7 +364,8 @@ export function drawBars(host, { times, parts, fmt, interval, sel, onPick, phone
     const sums = times.map((_, i) => parts.reduce((a, p) => a + p.vals[i], 0));
     const max = niceMax(Math.max(0, ...sums) * 1.05), y = v => T + ph - (v / max) * ph, bw = Math.max(2, pw / Math.max(N, 1) - 2);
     const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true', focusable: 'false', class: 'viz-svg' });
-    for (let g = 0; g <= 3; g++) { const v = (max / 3) * g; s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, axisLabel(fmt, v))); }
+    const gridVals = [0, 1, 2, 3].map(g => (max / 3) * g), gridText = axisLabels(fmt, gridVals);
+    gridVals.forEach((v, g) => { s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, gridText[g])); });
     const tip = el('div', 'viz-tip'); tip.hidden = true;
     const ticks = N <= 1 ? [0] : [0, Math.round((N - 1) / 3), Math.round(((N - 1) * 2) / 3), N - 1].filter((v, i, a) => a.indexOf(v) === i).slice(0, phone ? 3 : 4);
     for (let i = 0; i < N; i++) {
