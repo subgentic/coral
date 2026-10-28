@@ -14,6 +14,7 @@ function _setTeamWizardError(message = '') {
     const errorEl = document.getElementById('team-wizard-error');
     if (!errorEl) return;
     errorEl.textContent = message || '';
+    errorEl.classList.remove('team-wizard-note');
     errorEl.classList.toggle('team-wizard-error-quiet', !message); // the room stays: the buttons below do not move when it fills (#10517)
 }
 
@@ -50,6 +51,8 @@ function showTeamWizardModal() {
             generateBtn.style.display = '';
         }
     }
+    _samplePreviewed = false;
+    { const tb = document.getElementById('team-wizard-test-btn'); if (tb) tb.textContent = 'Try a sample'; }
     modal.style.display = 'flex';
     if (!_activeGenerateJobId) directiveEl?.focus();
 
@@ -95,6 +98,7 @@ function showDraftedNote(n) {
 }
 
 function _populateGeneratedTeamDraft(team) {
+    const typedName = team.keepTyped ? (document.getElementById('team-board-name')?.value || '').trim() : '', typedDir = team.keepTyped ? (document.getElementById('launch-team-dir')?.value || '') : ''; // the sample keeps what the person typed (#10658)
     launch.skipDefaultTeamAgents = true;
     // Open the launch modal directly to the team step, skipping the chooser.
     // Don't call showLaunchModal() — it resets to the chooser and clears the agent list.
@@ -121,7 +125,7 @@ function _populateGeneratedTeamDraft(team) {
     const teamAgentsList = document.getElementById('team-agents-list');
 
     if (teamNameEl) {
-        teamNameEl.value = team.name || 'Generated Team';
+        teamNameEl.value = typedName || team.name || 'Generated Team';
         window._validateTeamName?.();
     }
     if (teamFlagsEl) {
@@ -133,6 +137,7 @@ function _populateGeneratedTeamDraft(team) {
         teamAgentsList.innerHTML = '';
     }
 
+    if (typedDir) { const dirEl = document.getElementById('launch-team-dir'); if (dirEl) { dirEl.value = typedDir; dirEl.dispatchEvent(new Event('input', { bubbles: true })); } }
     for (const agent of team.agents) {
         _addTeamAgent(
             agent.name || '',
@@ -278,16 +283,30 @@ function _reviewGeneratedTeam() {
     _populateGeneratedTeamDraft(team);
 }
 
-/** The sample's three members: names no template uses, so a draft is told apart from the template it replaced (#10517). */
+/** The sample's three members: the one Orchestrator a team needs (Next is blocked without a member named exactly Orchestrator, #10658) and two names no template uses, so a draft is told apart from the template it replaced (#10517). */
 const SAMPLE_AGENTS = [
-            { name: 'Sample Orchestrator', prompt: 'You are the orchestrator. Break down the task, assign work to the team via the message board, and track progress.', capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'], deny: [] }, agent_type: 'claude', model: '' },
+            { name: 'Orchestrator', prompt: 'You are the orchestrator. Break down the task, assign work to the team via the message board, and track progress.', capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'], deny: [] }, agent_type: 'claude', model: '' },
             { name: 'Sample Builder', prompt: 'You are a developer. Implement features, write code, and fix bugs. Wait for instructions from the Orchestrator.', capabilities: { allow: ['file_read', 'file_write', 'shell'], deny: [] }, agent_type: 'claude', model: '' },
             { name: 'Sample Reviewer', prompt: 'You are a QA engineer. Review code, write tests, and verify work. Wait for instructions from the Orchestrator.', capabilities: { allow: ['file_read', 'file_write', 'shell'], deny: [] }, agent_type: 'claude', model: '' },
 ];
 
+let _samplePreviewed = false; // the sample has said what it will add; the next press does it
+
 async function testTeamWizard() {
+    const testBtn = document.getElementById('team-wizard-test-btn');
+    const have = document.querySelectorAll('#team-agents-list > *').length;
+    if (have > 0 && !_samplePreviewed) { // it replaces the members on the step: say what it adds first (#10658)
+        const errorEl = document.getElementById('team-wizard-error');
+        if (errorEl) { errorEl.textContent = `The sample replaces the ${_membersWords(have)} on the Members step with: ${SAMPLE_AGENTS.map(a => a.name).join(', ')}. Your team name and folder stay.`; errorEl.classList.remove('team-wizard-error-quiet'); errorEl.classList.add('team-wizard-note'); }
+        if (testBtn) testBtn.textContent = 'Replace members';
+        _samplePreviewed = true;
+        return;
+    }
+    _samplePreviewed = false;
+    if (testBtn) testBtn.textContent = 'Try a sample';
     const sampleTeam = {
         name: 'sample-team',
+        keepTyped: true, // the person's team name and folder stay (#10658)
         flags: '',
         agents: SAMPLE_AGENTS,
     };

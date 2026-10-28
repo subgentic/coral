@@ -2237,6 +2237,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .team-wizard-error-quiet { visibility: hidden; }
+.team-wizard-note { color: var(--text-primary); background: var(--bg-secondary); border-color: var(--border); } /* what the sample will add, said before it replaces the members: a note, not an error (#10658) */
 
 .generated-team-banner { margin: 12px 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 
