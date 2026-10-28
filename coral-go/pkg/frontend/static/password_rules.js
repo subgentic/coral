@@ -22,9 +22,9 @@ export function strengthOf(password) {
     if (!n) return { level: 'empty', pct: 0, label: '', hint: '' };
     const words = (password.match(/\S+/g) || []).length;
     const effective = words >= 3 ? n + 4 : n;
-    if (effective < 8) return { level: 'weak', pct: 25, label: 'Short.', hint: 'Longer is stronger, but any password works.' };
-    if (effective < 12) return { level: 'fair', pct: 50, label: 'Fair.', hint: 'Longer is stronger: a few words with spaces works well.' };
-    if (effective < 16) return { level: 'good', pct: 75, label: 'Good.', hint: 'Longer is stronger: a few words with spaces works well.' };
+    if (effective < 8) return { level: 'weak', pct: 25, label: 'Short.', hint: 'Longer is stronger.' };
+    if (effective < 12) return { level: 'fair', pct: 50, label: 'Fair.', hint: 'A few words with spaces are stronger.' };
+    if (effective < 16) return { level: 'good', pct: 75, label: 'Good.', hint: 'A few words with spaces are stronger.' };
     return { level: 'strong', pct: 100, label: 'Strong.', hint: '' };
 }
 
