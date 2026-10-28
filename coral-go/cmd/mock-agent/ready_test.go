@@ -170,6 +170,17 @@ func TestMockControlsMakeAQuestionAPermissionAndADeafBox(t *testing.T) {
 			t.Error("an Enter did not answer it")
 		}
 	})
+	t.Run("a digit answers a question, as the dashboard's answer buttons send it", func(t *testing.T) {
+		b, kinds := newBox()
+		applyControl(b, "MOCK_ASK_QUESTION")
+		b.feed([]byte("1"), func(string) {})
+		if want := []string{"question_request", "question_answered"}; !reflect.DeepEqual(*kinds, want) {
+			t.Errorf("hooks %v, want %v", *kinds, want)
+		}
+		if b.promptOpen || b.question {
+			t.Error("a digit did not answer it")
+		}
+	})
 	t.Run("a dismissed question", func(t *testing.T) {
 		b, kinds := newBox()
 		applyControl(b, "MOCK_ASK_QUESTION")
