@@ -36,7 +36,7 @@ export function settingsErrorMessage(status, body) {
 // Dialog controls that map to hub settings, or are kept in this browser: everything else in the dialog is hidden.
 const SHOWN_CONTROLS = new Set([
     'settings-theme', 'settings-renderer-select', 'settings-agent-type', 'settings-permission-mode',
-    'settings-group-by-team', 'settings-fit-pane-width', 'settings-notify-needs-input', 'settings-desktop-notify',
+    'settings-group-by-team', 'settings-fit-pane-width', 'settings-notify-needs-input', 'settings-desktop-notify', 'settings-alert-needs-input', 'settings-alert-reply', 'settings-alert-sound',
     'settings-file-search-limit',
 ]);
 

@@ -4,7 +4,7 @@ import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 import { getEngineNames } from './renderers.js';
-import { desktopNotifySupported, desktopNotifyEnabled, enableDesktopNotify, disableDesktopNotify } from './desktop_notify.js';
+import { desktopNotifySupported, desktopNotifyEnabled, desktopNotifyBlocked, enableDesktopNotify, disableDesktopNotify, alertPrefs, setAlertPref } from './desktop_notify.js';
 import { isCloud } from './server_base.js';
 import { settingBool, renderRemoteAccessStatus, renderDebugInputLogStatus, renderToolsFolderStatus, defaultThemeChoice } from './settings_core.js';
 import { browserLocal } from './safe_storage.js';
@@ -295,16 +295,43 @@ export function _fillTerminalAndBrowserPrefs(s) {
     const notifyCheck = document.getElementById("settings-notify-needs-input");
     if (notifyCheck) notifyCheck.checked = !!s.notify_needs_input;
 
-    // Desktop alerts: a per-browser opt-in, never sent to the server
+    // Desktop alerts: a per-browser opt-in, never sent to the server. What the person may do when it cannot turn on is said under it, never a silent snap back (#10068).
     const desktopCheck = document.getElementById("settings-desktop-notify");
+    const why = document.getElementById("settings-desktop-blocked");
+    const kinds = [["settings-alert-needs-input", "needsInput"], ["settings-alert-reply", "finished"], ["settings-alert-sound", "sound"]];
+    const paintAlertKinds = () => {
+        const on = desktopNotifyEnabled(), prefs = alertPrefs();
+        for (const [id, name] of kinds) {
+            const box = document.getElementById(id);
+            if (!box) continue;
+            box.checked = !!prefs[name];
+            box.disabled = !on;
+            if (!box.dataset.bound) {
+                box.dataset.bound = "1";
+                box.addEventListener("change", () => setAlertPref(name, box.checked));
+            }
+        }
+    };
+    const say = text => { if (why) { why.textContent = text; why.hidden = !text; } };
+    const blockedText = () => desktopNotifyBlocked()
+        ? "Your browser blocks alerts from Coral. Allow notifications for this site in the browser's address bar or site settings, then turn this on again."
+        : "";
     if (desktopCheck) {
         desktopCheck.checked = desktopNotifyEnabled();
         desktopCheck.disabled = !desktopNotifySupported();
+        say(desktopNotifySupported() ? blockedText() : "This browser has no desktop alerts.");
+        paintAlertKinds();
         if (!desktopCheck.dataset.bound) {
             desktopCheck.dataset.bound = "1";
             desktopCheck.addEventListener("change", async () => {
-                if (desktopCheck.checked) desktopCheck.checked = await enableDesktopNotify();
-                else disableDesktopNotify();
+                if (desktopCheck.checked) {
+                    desktopCheck.checked = await enableDesktopNotify();
+                    say(desktopCheck.checked ? "" : (blockedText() || "Alerts need your permission: choose Allow when the browser asks, then turn this on again."));
+                } else {
+                    disableDesktopNotify();
+                    say("");
+                }
+                paintAlertKinds();
             });
         }
     }

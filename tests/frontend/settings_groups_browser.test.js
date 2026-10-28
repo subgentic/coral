@@ -11,7 +11,7 @@ const GROUPS = {
     general: ['settings-theme', 'settings-agent-type', 'settings-group-by-team', 'settings-show-scrollbars', 'settings-check-updates'], // Render engine moved to Terminal, About to Network and Hub (#7040)
     agents: ['settings-permission-mode', 'settings-working-dir', 'settings-cli-path-claude', 'settings-default-model-claude', 'settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority', 'settings-board-auto-attach', 'settings-board-health-monitor'],
     terminal: ['settings-terminal-font-size', 'settings-terminal-scrollback', 'settings-fit-pane-width', 'tb-choice', 'settings-renderer-select'],
-    notifications: ['settings-notify-needs-input', 'settings-desktop-notify'],
+    notifications: ['settings-notify-needs-input', 'settings-desktop-notify', 'settings-alert-needs-input', 'settings-alert-reply', 'settings-alert-sound'],
     files: ['settings-file-search-mode', 'settings-file-search-limit', 'settings-git-diff-mode', 'settings-git-poll-interval'],
     cleanup: ['settings-artifact-store-max', 'settings-received-max', 'settings-prune-days', 'settings-retention-enabled', 'settings-terminal-logs-delete'],
     network: ['settings-remote-access-enabled', 'settings-cloud', 'settings-hub-mode-enabled', 'app-version-label', 'machine-health-local'],
