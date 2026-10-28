@@ -16,11 +16,12 @@ const BASE = require('./test_base').BASE;
         'name in the middle (Inbox Tasks)': ['state', 'name', 'team', 'updated'],
         'no flexible column (Inbox Needs you)': ['name', 'state', 'team', 'updated'], // every column has a width the first time one is dragged
     };
-    const mount = (shape, noGrow) => ev(`(async () => { const DT = await import(${MOD} + 'data_table.js'); document.getElementById('dt-host')?.remove(); localStorage.removeItem('coral-dt-widths:Shape');
-        const host = document.createElement('div'); host.id = 'dt-host'; host.style.cssText = 'position:fixed;inset:60px 20px 20px 20px;overflow:auto;background:var(--bg-primary);z-index:9999'; document.body.append(host);
+    const mount = (shape, noGrow, narrow) => ev(`(async () => { const DT = await import(${MOD} + 'data_table.js'); document.getElementById('dt-host')?.remove(); localStorage.removeItem('coral-dt-widths:Shape');
+        const host = document.createElement('div'); host.id = 'dt-host'; host.style.cssText = ${narrow ? "'position:fixed;top:60px;left:20px;width:520px;bottom:20px;overflow:auto;background:var(--bg-primary);z-index:9999'" : "'position:fixed;inset:60px 20px 20px 20px;overflow:auto;background:var(--bg-primary);z-index:9999'"}; document.body.append(host);
         const rows = [{ id: 1, name: 'Fix the flaky test', state: 'Queued', team: 'alpha', progress: '2 of 4', updated: '3 min ago' }, { id: 2, name: 'Review the shared table', state: 'In progress', team: 'alpha', progress: '1 of 4', updated: '5 min ago' }];
         const def = { name: { key: 'name', label: 'Name', primary: true, width: ${noGrow ? 'undefined' : "'grow'"}, sort: true, field: 'name', cell: r => DT.primaryButton(r.name, 'Open ' + r.name) } };
-        for (const k of ['state', 'team', 'progress', 'updated']) def[k] = { key: k, label: k[0].toUpperCase() + k.slice(1), sort: true, field: k };
+        for (const k of ['state', 'team', 'progress', 'updated']) def[k] = { key: k, label: k[0].toUpperCase() + k.slice(1), sort: true, field: k }
+        if (${narrow ? 'true' : 'false'}) def.team.drop = 1; // a column the narrow box drops: its <col> must go with it, or every width after it lands on the wrong column (#10443)
         const t = DT.dataTable({ label: 'Shape', columns: ${JSON.stringify(shape)}.map(k => def[k]), rows, rowKey: r => 'r' + r.id, open: () => {}, rowName: r => r.name, state: DT.tableState() });
         host.append(t.bar, t.selectButton, t.el); return true; })()`);
     const widths = () => ev(`(() => { const b = document.querySelector('#dt-host .dt-box'); return { cols: Object.fromEntries([...b.querySelectorAll('thead th')].filter(t => t.getBoundingClientRect().width > 0).map(t => [t.dataset.key || 'check', Math.round(t.getBoundingClientRect().width)])), sw: b.scrollWidth, cw: b.clientWidth, table: Math.round(b.querySelector('table').getBoundingClientRect().width) }; })()`);
@@ -55,6 +56,11 @@ const BASE = require('./test_base').BASE;
                 if (how === 'drag') await drag(lastKey, -300); else await press(lastKey, 'ArrowLeft', 12);
                 const w = await widths(), edge = await ev(`(() => { const b = document.querySelector('#dt-host .dt-box'), th = b.querySelector('th[data-key="${lastKey}"]'); return { box: Math.round(b.getBoundingClientRect().right - parseFloat(getComputedStyle(b).borderRightWidth || 0)), last: Math.round(th.getBoundingClientRect().right), left: b.scrollLeft }; })()`);
                 check(`${name}: the last column (${lastKey}), ${how === 'drag' ? 'dragged left' : 'narrowed by keys'}, still fills to the box's edge: no short table, no scrollbar`, w.table >= w.cw - 1 && w.sw <= w.cw + 1 && Math.abs(edge.box - edge.last) <= 2 && edge.left === 0, JSON.stringify({ table: w.table, cw: w.cw, sw: w.sw, ...edge }));
+            }
+            if (name.startsWith('no flexible')) { // the Operator's Needs you: a narrow box drops a column; dragging the last column then moves it alone, the others keep the widths they show
+                await mount(shape, true, true); const before = await widths();
+                await drag('updated', -60); const after = await widths(), d = moved(before, after);
+                check(`${name}, a column dropped by the narrow box: dragging the last column moves it and not the others (the colgroup keeps its slots)`, Object.keys(d).every(k => k === 'updated') && Object.keys(before.cols).length < 5, JSON.stringify({ d, shown: Object.keys(before.cols) }));
             }
             await mount(shape, name.startsWith('no flexible')); const w0 = await widths(); await drag('name', 200); const w1 = await widths();
             check(`${name}: the name column widened past the box: the table scrolls inside its box and the others keep their widths`, w1.sw > w1.cw && Object.keys(moved(w0, w1)).every(k => k === 'name'), JSON.stringify({ sw: w1.sw, cw: w1.cw, moved: moved(w0, w1) }));

@@ -190,6 +190,7 @@ export function dataTable(cfg) {
         if (Object.keys(st.widths).length) browserLocal.set(wkey, JSON.stringify(st.widths)); else browserLocal.remove(wkey); // a convenience: the store is guarded, and the widths last until the page closes without it
     }
     let emptyKeys = new Set(); // the columns no row has anything in (syncEmptyColumns, below)
+    let tightKeys = new Set(); // the columns dropped because the box is narrow (syncTight, below): their <col> is hidden too, or the widths of the colgroup shift onto the wrong columns (#10443)
     st.widths ||= cfg.oneLine ? {} : readWidths();
     function applyWidths() {
         colgroup.replaceChildren();
@@ -198,7 +199,7 @@ export function dataTable(cfg) {
         if (cfg.layout !== 'fixed' && !cfg.oneLine) table.style.tableLayout = any ? 'fixed' : '';
         if (!any) { table.style.width = ''; return; }
         if (sel) { const k = el('col'); k.style.width = 'var(--table-check-w)'; colgroup.append(k); }
-        const shown = columns.filter(c => !emptyKeys.has(c.key)), all = shown.every(c => st.widths[c.key] || fixedW(c));
+        const shown = columns.filter(c => !emptyKeys.has(c.key) && !tightKeys.has(c.key)), all = shown.every(c => st.widths[c.key] || fixedW(c));
         const part = c => (st.widths[c.key] ? `${st.widths[c.key]}px` : fixedW(c)), checkW = sel ? ['var(--table-check-w)'] : [];
         // Every column has a width (the flexible name column's own separator was used): the table is as wide as its columns, never narrower than its box. A fixed table at 100% spreads what is left over
         // across ALL its columns, so shrinking one column grew the others (#9228); so the last column that can be resized takes what the others leave, up to the box's edge (#10443: dragging the last
@@ -208,7 +209,7 @@ export function dataTable(cfg) {
             const k = el('col');
             if (c === fill) k.style.width = `max(${part(c)}, calc(100% - (${[...checkW, ...shown.filter(x => x !== c).map(part)].join(' + ') || '0px'})))`;
             else if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; else if (fixedW(c)) k.style.width = fixedW(c);
-            if (emptyKeys.has(c.key)) k.classList.add('dt-col-unused'); colgroup.append(k);
+            if (emptyKeys.has(c.key)) k.classList.add('dt-col-unused'); if (tightKeys.has(c.key)) k.classList.add('dt-col-tight'); colgroup.append(k);
         }
         table.style.width = all ? `max(calc(${[...checkW, ...shown.map(part)].join(' + ')}), 100%)` : '';
     }
@@ -299,7 +300,7 @@ export function dataTable(cfg) {
     // When the columns do not fit the box, the optional ones go by priority (#9846, rule 5): a column with `drop: n` is hidden, the lowest n first (1 goes first), until the table fits; Actions and the name never carry a drop. They return as the box grows.
     function syncTight() {
         if (mailOn() || box.classList.contains('dt-folded') || !box.clientWidth) return;
-        const hide = (key, on) => { for (const n of box.querySelectorAll(`th.dt-th[data-key="${attrEsc(key)}"], td.dt-td[data-key="${attrEsc(key)}"]`)) n.classList.toggle('dt-col-tight', on); };
+        const hide = (key, on) => { for (const n of box.querySelectorAll(`th.dt-th[data-key="${attrEsc(key)}"], td.dt-td[data-key="${attrEsc(key)}"]`)) n.classList.toggle('dt-col-tight', on); if (on) tightKeys.add(key); else tightKeys.delete(key); applyWidths(); };
         const cand = columns.filter(c => c.drop && !emptyKeys.has(c.key)).sort((a, b) => a.drop - b.drop);
         for (const c of cand) hide(c.key, false);
         for (const c of cand) { if (box.scrollWidth <= box.clientWidth + 1) break; hide(c.key, true); }
