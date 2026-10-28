@@ -44,16 +44,16 @@ export function permissionDescription(type, value) {
 }
 
 // Codex's Auto is a workspace sandbox with the network on (Security's #7483): a board member needs it to reach Coral
-// Codex launches these as workspace-write that never asks, which has the network on (Security's #7503); so does Codex with no mode: its Default is the same launch (codex.go, #7527)
-export const CODEX_NETWORK_MODES = ['default', 'auto', 'dontAsk'];
+// Codex launches these as workspace-write that never asks, which has the network on (Security's #7503); so does Codex with nothing chosen (the saved default or Auto). Default is not one of them since #10362: it sends no flags
+export const CODEX_NETWORK_MODES = ['auto', 'dontAsk']; // not Default: an explicit Default sends no flags (#10362), so Codex runs its own default, which asks
 export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
 
 // The modes in which an agent's launch of a worker is refused: agent.SkipsPermissionPrompts keeps only Default as asking (Plan too, for the CLIs other than Claude, #5894)
 const WORKERS_REFUSED = { plan: 'Claude agents cannot start workers in this mode.' };
 const WORKERS_REFUSED_ANY = 'Agents cannot start workers in this mode.';
 
-// A CLI offers only the modes it has (#10381): Codex has no Accept edits, and its Default, Auto and Don't ask are one launch (a workspace sandbox that never asks, #7527) under one name, Default (what its row records), so its list is Default, Plan and Bypass permissions.
-const MODES_A_CLI_LACKS = { codex: ['acceptEdits', 'auto', 'dontAsk'] };
+// A CLI offers only the modes it has (#10381): Codex has no Accept edits (its sandbox and approval pair for it is Codex's own default, which Default is) and no Don't ask (it is Auto's launch), so its list is Default, Plan, Auto and Bypass permissions.
+const MODES_A_CLI_LACKS = { codex: ['acceptEdits', 'dontAsk'] };
 export function modeOffered(type, value) { return !(MODES_A_CLI_LACKS[String(type || '').toLowerCase()] || []).includes(value); }
 /** Hides the modes the CLI lacks; a pick that is one of them (the type was changed to this CLI) falls to Default. */
 export function offerModesFor(selectEl, type) {

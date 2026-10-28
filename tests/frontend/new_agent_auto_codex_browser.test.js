@@ -28,9 +28,9 @@ const BASE = require('./test_base').BASE;
             await tab('Permissions'); await radio(N.mode, /^Auto$/i);
             assert.equal(await line(), 'Workspace sandbox, with the network on so it can reach Coral.');
         });
-        await S.run('Codex with Default says the same: it never asks, so the card must not say it asks (#7527)', async () => {
+        await S.run('Codex with Default says it asks: Default sends no flags (#10362), so Codex runs its own default, and the card must not say the workspace sandbox that never asks (#10381)', async () => {
             await radio(N.mode, /^Default$/i);
-            assert.equal(await line(), 'Workspace sandbox, with the network on so it can reach Coral.');
+            assert.equal(await line(), "Asks before acting (each CLI's normal mode)");
         });
         await S.run('another mode of Codex has its own line, and the size does not change', async () => {
             const before = await size();
