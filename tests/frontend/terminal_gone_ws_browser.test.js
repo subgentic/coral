@@ -88,9 +88,10 @@ async function run() {
         check('live: typing saves the draft', (await savedDraft()) === 'echo ws-accepted', await savedDraft());
         await ev(`window.sendCommand()`);
         check('live: the box clears at once', (await ev(`document.getElementById('command-input').value`)) === '');
-        check('live: the saved draft stays until the send is accepted', (await savedDraft()) === 'echo ws-accepted', await savedDraft());
-        await until(`(async () => { const m = ${ST}; return !m.state.sessionInputText[m.sessionKey(m.state.currentSession)]; })()`, 'live: draft cleared on accept', 4000);
-        check('live: accepted, the saved draft is cleared', (await savedDraft()) === null, await savedDraft());
+        // a message that was sent is not a saved draft any more: the box and its draft are emptied at the send, and a refusal puts the text back (#10085 point 2)
+        check('live: the saved draft is emptied at the send, not kept until the answer', (await savedDraft()) === null, await savedDraft());
+        await until(`[...document.querySelectorAll('.toast .toast-message')].some(t => /^Sent: echo ws-accepted/.test(t.textContent))`, 'live: "Sent" once the send is accepted', 6000);
+        check('live: accepted, the saved draft is still empty', (await savedDraft()) === null, await savedDraft());
         check('live: "Sent" only once accepted, no error line', (await toasts()).some(t => /^Sent: echo ws-accepted/.test(t)) && await ev(`document.getElementById('composer-error').hidden`), JSON.stringify(await toasts()));
 
         // ── The terminal goes away under an open socket ──
@@ -110,6 +111,7 @@ async function run() {
             await ev(`(async () => { const x = ${XT}; x.sendTerminalInputWs('exit'); await new Promise(r => setTimeout(r, 300)); return x.sendTerminalInputWs('\\r'); })()`); // sleep-ok: the composer's own text-then-Enter gap (bracketed paste), so the shell runs exit
             const deadline = Date.now() + 8000;
             while (!(await paneGone(gone)) && Date.now() < deadline) await new Promise(r => setTimeout(r, 50)); // sleep-ok: poll interval of a condition wait
+            await ev(`window.__termFrames = []; true`); // what is counted below is the server's answer to the composer's input: the acks of the 'exit' and its Enter (sent above) are not it
             await clearToasts();
             await type('hello gone');
             if (await ev(`window.__termFrames.includes('terminal_closed')`)) { console.log(`attempt ${attempts}: the stream ended before the send; again`); continue; }
