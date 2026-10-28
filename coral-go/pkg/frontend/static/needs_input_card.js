@@ -3,6 +3,7 @@ import { standingOptions } from './standing_option.js';
 /* Moved out of live_chat.js as it was (#3837): no behaviour change. */
 import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, renderMarkdown } from './utils.js';
+import { askWords } from './session_state.js';
 import { state } from './state.js';
 import { claudeSignedIn, askSigninSoon, isLocalClaude, isLocalAgent, setClaudeSignedIn } from './signin_line.js';
 import { registerActions } from './actions.js';
@@ -55,7 +56,11 @@ function needsInputInfoOf(session) {
     const screen = promptOptionsBySession.get(session.session_id) || null;
     if (pt && BLOCKING_TOOLS[pt.tool_name]) return { kind: BLOCKING_TOOLS[pt.tool_name], tool: pt, screen };
     if (hasWorkingDisplayHint(row) && !(screen && screen.options.length)) return null;
-    if (row.waiting_for_input && row.waiting_kind !== "login") return { kind: "permission", tool: pt, screen, summary: String(row.waiting_summary || "").replace(/^Notification:\s*/, "") };
+    if (row.waiting_for_input && row.waiting_kind !== "login") {
+        const summary = askWords(String(row.waiting_summary || "").replace(/^Notification:\s*/, ""));
+        // The event says it is a question ("Wants to know: ...", or the tool's own name): the card is headed Question, not Permission needed (#10195).
+        return { kind: /^(Wants to know:|Has a question for you$)/.test(summary) ? "question" : "permission", tool: pt, screen, summary };
+    }
     if (readsPromptsFromScreen(session) && screen && screen.options.length) return { kind: pt ? "permission" : "prompt", tool: pt, screen };
     if (key === "check_terminal") {
         // A new Claude agent that has not started: when the server says Claude is not signed in (#5838's check after the first launch), the card says that, not the generic "startup prompt" (#5852).
@@ -85,7 +90,7 @@ function needsInputInfoOf(session) {
 // primary action. Open terminal is a footer link.
 
 const KICKERS = {
-    question: "Claude is asking",
+    question: "Question",
     plan: "Plan ready for your review",
     permission: "Permission needed",
     startup: "Waiting in the terminal",
@@ -146,7 +151,7 @@ function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
         const button = multi ? checkOptionButtonHtml : optionButtonHtml;
         const apart = !multi && !withDesc && info.kind === "permission" && phoneBar() && selects.length > 1 ? standingOptions(selects) : []; // out of the bar, above it: every answer that is not plainly one-time (standing_option.js fails closed)
         if (apart.length) body += `<div class="cni-standing">${apart.map(o => optionButtonHtml(o, "", fullLabels[o.label])).join("")}</div>`;
-        body += `<div class="cni-options ${withDesc ? "cni-options-cards" : "cni-options-chips"}"${multi ? ` role="group" aria-label="Pick everything that applies"` : ""}>`
+        body += `<div class="cni-options ${withDesc ? "cni-options-cards" : "cni-options-chips"}${info.kind === "question" && !multi && !withDesc ? " cni-options-stacked" : ""}"${multi ? ` role="group" aria-label="Pick everything that applies"` : ""}>`
             + selects.filter(o => !apart.includes(o)).map(o => button(o, descriptions[fullLabels[o.label] || o.label] || descriptions[o.label], fullLabels[o.label])).join("") + `</div>`;
         const submit = info.screen && info.screen.submit;
         if (multi && submit) foot += `<button type="button" class="cni-answer btn btn-sm btn-primary cni-submit" data-n="0" data-label="${escapeHtml(submit.label)}" data-action="submit">${escapeHtml(submit.label)}</button>`;
@@ -177,7 +182,7 @@ function needsInputHtml(info, session) {
     const screenQuestion = onScreen ? (screen.question || "") : "";
     const screenTitle = onScreen ? (screen.title || "") : ""; // the dialog's heading line, when it has one (#306)
     const name = agentDisplayName(session);
-    let kicker = (info.kind === "question") ? `${name} is asking` : (KICKERS[info.kind] || "Needs your input");
+    let kicker = KICKERS[info.kind] || "Needs your input";
     let question = "";
     let context = "";
     let descriptions = {};
@@ -197,7 +202,7 @@ function needsInputHtml(info, session) {
         const norm = (t) => String(t || "").replace(/\s+/g, " ").trim().toLowerCase();
         const onScreenQ = norm(screenQuestion);
         const match = onScreenQ ? qs.find(q => { const h = norm(q.question); return h && (h === onScreenQ || h.endsWith(onScreenQ) || onScreenQ.endsWith(h) || h.includes(onScreenQ)); }) : null;
-        question = (match && match.question) || screenQuestion || (qs[0] && qs[0].question) || "";
+        question = (match && match.question) || screenQuestion || (qs[0] && qs[0].question) || String(info.summary || "").replace(/^Wants to know:\s*/, "").replace(/^Has a question for you$/, "") || "";
         const hookLabels = (match ? match.options : qs.flatMap(q => q.options || [])) || [];
         for (const o of (screen.options || [])) {
             const full = hookLabels.find(h => {

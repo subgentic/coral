@@ -21,6 +21,8 @@ func TestWantsOfIsTheSentenceForWhatTheRequestWants(t *testing.T) {
 		{"an edit", "Edit", map[string]any{"file_path": "/work/a.go"}, "Wants to edit /work/a.go"},
 		{"a read", "Read", map[string]any{"file_path": "/etc/hosts"}, "Wants to read /etc/hosts"},
 		{"another tool with a path", "Mystery", map[string]any{"path": "/x"}, "Wants to use /x"},
+		{"a question", "AskUserQuestion", map[string]any{"questions": []any{map[string]any{"question": "Pick a color:", "options": []any{"Red", "Blue"}}}}, "Wants to know: Pick a color"},
+		{"a question with no text is only the tool", "AskUserQuestion", map[string]any{"questions": []any{map[string]any{"options": []any{"Red"}}}}, "Wants to use AskUserQuestion"},
 		{"a fetch", "WebFetch", map[string]any{"url": "https://example.org/a"}, "Wants to fetch https://example.org/a"},
 		{"only a tool", "mcp__x__do", map[string]any{"n": 1}, "Wants to use mcp__x__do"},
 		{"nothing", "", nil, ""},

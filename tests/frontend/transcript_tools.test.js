@@ -266,7 +266,7 @@ async function run() {
   await ev(`window.__pendingTool = { tool_use_id: 'q1', tool_name: 'AskUserQuestion', input: { questions: [{ question: 'Which layout?', options: [{ label: 'Compact', description: 'Denser rows' }, { label: 'Roomy' }] }] } }; true`);
   await cycles(4);
   let cd = await card();
-  check('an open question shows as a card with the question up front, replacing the Working row', cd && cd.kicker === 'Claude is asking' && cd.question === 'Which layout?' && !cd.working && cd.last, JSON.stringify(cd));
+  check('an open question shows as a card with the question up front, replacing the Working row', cd && cd.kicker === 'Question' && cd.question === 'Which layout?' && !cd.working && cd.last, JSON.stringify(cd));
 
   // Answer from the chat: every option on screen, numbered like the terminal's keys
   await ev(`window.__promptScreen = { question: 'Which layout?', options: [{ n: 1, label: 'Compact', selected: true, action: 'select' }, { n: 2, label: 'Roomy', action: 'select' }, { n: 3, label: 'Type something.', action: 'text' }, { n: 4, label: 'Chat about this', action: 'chat' }] }; true`);

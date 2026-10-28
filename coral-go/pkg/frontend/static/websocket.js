@@ -16,7 +16,7 @@ import { updateChangedFileCount } from './changed_files.js';
 import { showNotificationToast, showWorkflowNotification, showAlertNotification, escapeHtml, dbg } from './utils.js';
 import { serverWsBase, identityKey, sessionServer, isCloud } from './server_base.js';
 import { updateHeaderContext } from './header_context.js';
-import { deriveSessionState } from './session_state.js';
+import { deriveSessionState, askWords } from './session_state.js';
 import { isPopout, popoutAllowsToastFor, popoutUpdateFromSession, popoutHandleSessionsTick, formatTerminalLabel } from './popout.js';
 import { applySleepingView } from './sleeping_view.js';
 import { updateServersTabVisibility } from './servers_tab.js';
@@ -214,8 +214,8 @@ export const CODEX_REVIEW_HOLD_MS = 6000;
 
 /** The needs-input toast, and the opt-in desktop alert, for row s. */
 function _raiseNeedsInputAlert(s, id) {
-    const label = escapeHtml(s.display_name || s.name);
-    const detail = s.waiting_summary ? escapeHtml(s.waiting_summary) : null;
+    const label = escapeHtml(resolveSessionIdentity(s)); // the role or the name the row shows (the row's own words), not the folder twice
+    const detail = s.waiting_summary ? escapeHtml(askWords(s.waiting_summary)) : null;
     const sessionName = s.name;
     const agentType = s.agent_type;
     const sessionId = s.session_id;

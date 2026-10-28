@@ -640,7 +640,7 @@ func parseRequestEvent(d map[string]any, hookType, sessionID string) map[string]
 // maxWantsInput is how much of one tool input a request's wants reads.
 const maxWantsInput = 1 << 10
 
-// wantsOf is the sentence for what a PermissionRequest wants to do, from the tool's own input: "Wants to run: <command>" for a command, "Wants to edit <path>" for a file, "Wants to
+// wantsOf is the sentence for what a PermissionRequest wants to do, from the tool's own input: "Wants to run: <command>" for a command, "Wants to know: <question>" for a question, "Wants to edit <path>" for a file, "Wants to
 // fetch <url>", else "Wants to use <tool>". "" when it names no tool. Each input is cut to 1 KiB; the server cleans, redacts and cuts it again before it is stored.
 func wantsOf(tool string, inp map[string]any) string {
 	cut := func(s string) string {
@@ -651,6 +651,14 @@ func wantsOf(tool string, inp map[string]any) string {
 	}
 	if cmd := commandOf(inp); cmd != "" {
 		return "Wants to run: " + cut(cmd)
+	}
+	// A question to the person (AskUserQuestion): what it asks, not the tool's name (#10195).
+	if qs, _ := inp["questions"].([]any); len(qs) > 0 {
+		if q, _ := qs[0].(map[string]any); q != nil {
+			if text, _ := q["question"].(string); strings.TrimSpace(text) != "" {
+				return "Wants to know: " + cut(strings.TrimRight(strings.TrimSpace(text), ":?"))
+			}
+		}
 	}
 	for _, key := range []string{"file_path", "path", "filePath", "notebook_path"} {
 		if p, _ := inp[key].(string); p != "" {
