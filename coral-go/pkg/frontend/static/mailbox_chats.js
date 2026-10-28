@@ -14,7 +14,7 @@ const DT = await importOnce('./data_table.js');
 const IR = await importOnce('./inbox_read.js'); // which chats and boards the person has opened since they changed (#9687)
 const readKey = s => `${s.server}:${s.session_id}`, readKind = s => (isGroup(s) ? 'board' : 'chat');
 const { historyFetch } = await importOnce('./history_source.js');
-const { historyLabel } = await importOnce('./history_label.js');
+const { historyLabel, hitWithoutTitle } = await importOnce('./history_label.js');
 const SA = await importOnce('./mailbox_starred_artifacts.js'); // the Starred folder's second part: starred artifacts (#10258)
 
 const PAGE = 50;
@@ -255,13 +255,13 @@ function chatFolderSpec(key, ctx) {
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
             unread: s => IR.isUnread(readKind(s), readKey(s), stampOf(s)),
-            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)); return { unread: IR.isUnread(readKind(s), readKey(s), stampOf(s)), lead: { text: who, name: who, square: group }, title: who, medium: true, live: s.active ? 'Active now' : '', snippet: group ? '' : (s.snippet || historyLabel(s)), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
+            mail: s => { const group = isGroup(s), who = name(s) || (group ? 'Board' : historyLabel(s)); return { unread: IR.isUnread(readKind(s), readKey(s), stampOf(s)), lead: { text: who, name: who, square: group }, title: who, medium: true, live: s.active ? 'Active now' : '', snippet: group ? '' : (hitWithoutTitle(s) || historyLabel(s)), time: DT.shortTime(stampOf(s)) }; }, // a phone's row: the agent or board, the chat's title after it, the time
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, extra, ctx.redraw) } },
             oneLine: true, resize: false, sortBar: false, // one line per chat, never folded (#8961, the shared one-row table of #8931): Server, then Agent drop as the box narrows; the role and the first message are in the chat that opens
             columns: [
                 { key: 'title', label: key === 'chats-group' ? 'Board' : 'Title', primary: true, width: 'grow', cell: s => { const group = isGroup(s), n = group ? (name(s) || 'Board') : historyLabel(s), who = group ? '' : name(s); const b = DT.primaryButton(n, group ? `Open the chat of the board ${n}` : `Open the chat ${n}${who ? ` of ${who}` : ''}`); b.dataset.sessionId = s.session_id; b.classList.add('dt-chat-name'); b.title = [n, who, multipleServers() ? serverLabel(serverOf(s)) : ''].filter(Boolean).join(' · '); /* what the row no longer draws is on the hover: the agent and, with several computers, which one (#9730) */ // the Server column goes first on a narrow row (#8961): the computer stays on the hover
                     const marks = []; /* one chip a row at most (Goal #79, #9730): the first of Active now, Archived (an archived board stays in Board history, marked), Board; a folder that already says it (Archived, Board history) leaves its own word off */ const word = s.active ? 'Active now' : (s.archived && key !== 'chats-archived') ? 'Archived' : (group && key !== 'chats-group') ? 'Board' : ''; if (word) marks.push(DT.tag(word)); if (word && word !== 'Board') b.setAttribute('aria-label', `${b.getAttribute('aria-label')}, ${word.toLowerCase()}`); /* the chip beside the button is its state: the name ends with it, as the phone row's does (#9747; a board's own name already says Board) */
-                    const hit = !group && s.snippet ? DT.el('span', 'dt-title-snippet') : null; if (hit) { hit.textContent = s.snippet; hit.title = s.snippet; } /* a search's hit: one line of the chat around the matched words (#10137) */
+                    const shownHit = group ? '' : hitWithoutTitle(s); const hit = shownHit ? DT.el('span', 'dt-title-snippet') : null; if (hit) { hit.textContent = shownHit; hit.title = shownHit; } /* a search's hit: one line of the chat around the matched words (#10137) */
                     if (!marks.length && !hit) return b; const w = DT.el('span', 'dt-title-cell'); w.append(b, ...marks, ...(hit ? [hit] : [])); return w; } },
                 ...(key === 'chats-group' ? [] : [{ key: 'agent', label: 'Agent', width: '9rem', dropAt: 36, cell: s => name(s) }]),
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '10rem', cell: s => DT.timeCell(stampOf(s)) },

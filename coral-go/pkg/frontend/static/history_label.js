@@ -5,3 +5,15 @@ export function historyLabel(s) {
         .replace(/\b[A-Za-z]:\\(?:[^\\\s]+\\)*([^\\\s]+)/g, '$1');
     return title || (s && s.session_id ? `Chat ${String(s.session_id).replace(/^board:/, '').slice(0, 6)}` : 'Chat'); // an untitled chat still tells its row from the next one's (#6961)
 }
+
+/** A row's search hit (`snippet`, one line of the chat around the matched words) without the row's own title repeated in it, or '' when nothing else is left: "Three day plan. plan a trip to lisbon Three day plan." under the title
+ *  "Three day plan." read the title twice (#10641). The match is shown once, in the chat's own words. */
+export function hitWithoutTitle(s) {
+    const raw = String((s && s.snippet) || '').replace(/\s+/g, ' ').trim();
+    if (!raw) return '';
+    const title = historyLabel(s).replace(/[\s.…]+$/, '').trim();
+    if (!title) return raw;
+    // only the whole title: on word edges (a letter, digit or underscore before or after is part of another word: the title "Plan" is not cut out of "planning")
+    const bare = raw.replace(new RegExp('(?<![\\p{L}\\p{N}_])' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[.…]*(?![\\p{L}\\p{N}_])', 'giu'), ' ').replace(/\s+/g, ' ').trim();
+    return bare.replace(/^[\s.,;:…-]+|[\s,;:-]+$/g, '').trim();
+}
