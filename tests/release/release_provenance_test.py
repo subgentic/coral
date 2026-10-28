@@ -31,9 +31,21 @@ def run(name, sha, conclusion="success", status="completed", event="push", branc
             "path": f".github/workflows/{name}.yml@refs/heads/{branch}"}
 
 
-def api(commits, compare, runs, artifacts=None):
-    """commits: sha -> {files, parents}; compare: sha -> status; runs: list of run dicts; artifacts: run id -> list of artifact dicts"""
+def full_jobs(n=9, conclusion="success"):
+    return [{"name": f"cdp (job {i})", "conclusion": conclusion} for i in range(n)] + [{"name": "cdp (repeat)", "conclusion": "skipped"}, {"name": "cdp-gate", "conclusion": "success"}]
+
+
+def repeat_only_jobs():
+    """what a dispatch with suites=... runs: the repeat job, and one skipped placeholder for the matrix"""
+    return [{"name": "cdp (repeat)", "conclusion": "success"}, {"name": "cdp (${{ matrix.name }})", "conclusion": "skipped"}, {"name": "cdp-gate", "conclusion": "skipped"}]
+
+
+def api(commits, compare, runs, artifacts=None, jobs=None):
+    """commits: sha -> {files, parents}; compare: sha -> status; runs: list of run dicts; artifacts: run id -> list of artifact dicts;
+    jobs: run id -> list of job dicts (default: a full green matrix)"""
     def get(path):
+        if path.startswith("/actions/runs/") and "/jobs" in path:
+            return {"jobs": (jobs or {}).get(int(path.split("/")[3]), full_jobs())}
         if path.startswith("/actions/runs/") and "/artifacts" in path:
             return {"artifacts": (artifacts or {}).get(int(path.split("/")[3]), [])}
         if path.startswith("/commits/"):
@@ -48,9 +60,9 @@ def api(commits, compare, runs, artifacts=None):
     return get
 
 
-def go(commits, compare, runs, actor="the-pusher", artifacts=None, zips=None):
+def go(commits, compare, runs, actor="the-pusher", artifacts=None, zips=None, jobs=None):
     lines = []
-    rc = p.provenance(CFG, api(commits, compare, runs, artifacts), REPO, TAGGED, actor, out=lines.append, get_zip=(lambda i: zips[i]) if zips is not None else None)
+    rc = p.provenance(CFG, api(commits, compare, runs, artifacts, jobs), REPO, TAGGED, actor, out=lines.append, get_zip=(lambda i: zips[i]) if zips is not None else None)
     return rc, "\n".join(lines)
 
 
@@ -84,6 +96,46 @@ class T(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertIn(f"gated commit: {TAGGED}", out)
         self.assertNotIn("adds the release notes only", out)
+
+    # the v2.0.2 dry run: the candidate was main's tip (no notes commit, no trailer); the full cdp-gate push run was red, and a newer repeat-only dispatch
+    # (suites=..., only the "cdp (repeat)" job ran) was green and was read as the gate: the dry run said GO over a red cdp.
+    def tip(self):
+        return {TAGGED: {"files": ["coral-go/main.go"], "parents": [GATED]}}
+
+    def test_a_repeat_only_dispatch_does_not_replace_the_red_push_run_on_the_candidate_itself(self):
+        runs = [run("go-tests", TAGGED, rid=1), run("go-race", TAGGED, rid=2),
+                run("cdp-gate", TAGGED, conclusion="failure", rid=3, branch="ci/v14144", at="2026-10-21T01:00:00Z"),
+                run("cdp-gate", TAGGED, rid=9, event="workflow_dispatch", branch="main", at="2026-10-21T02:00:00Z")]
+        rc, out = go(self.tip(), {TAGGED: "identical"}, runs, jobs={9: repeat_only_jobs()})
+        self.assertEqual(rc, 1, out)
+        self.assertIn("| cdp-gate | failure | run 3 |", out)
+
+    def test_a_green_push_run_is_not_replaced_by_a_newer_red_dispatch_on_the_candidate_itself(self):
+        runs = [run("go-tests", TAGGED, rid=1), run("go-race", TAGGED, rid=2), run("cdp-gate", TAGGED, rid=3),
+                run("cdp-gate", TAGGED, conclusion="failure", rid=9, event="workflow_dispatch", branch="main", at="2026-10-21T02:00:00Z")]
+        rc, out = go(self.tip(), {TAGGED: "identical"}, runs)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("| cdp-gate | success | run 3 |", out)
+
+    def test_with_no_push_run_a_repeat_only_dispatch_is_not_the_gate(self):
+        runs = [run("go-tests", TAGGED, rid=1), run("go-race", TAGGED, rid=2), run("cdp-gate", TAGGED, rid=9, event="workflow_dispatch", branch="main")]
+        rc, out = go(self.tip(), {TAGGED: "identical"}, runs, jobs={9: repeat_only_jobs()})
+        self.assertEqual(rc, 1, out)
+        self.assertIn("| cdp-gate | not a full run |", out)
+        self.assertIn("run 9 (dispatched, not a push run)", out)
+
+    def test_with_no_push_run_a_full_dispatch_is_the_gate_and_is_marked_dispatched(self):
+        runs = [run("go-tests", TAGGED, rid=1), run("go-race", TAGGED, rid=2), run("cdp-gate", TAGGED, rid=9, event="workflow_dispatch", branch="main")]
+        rc, out = go(self.tip(), {TAGGED: "identical"}, runs)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("| cdp-gate | success | run 9 (dispatched, not a push run) |", out)
+
+    def test_a_dispatch_with_a_skipped_or_short_matrix_is_not_a_full_run(self):
+        runs = [run("go-tests", TAGGED, rid=1), run("go-race", TAGGED, rid=2), run("cdp-gate", TAGGED, rid=9, event="workflow_dispatch", branch="main")]
+        for jobs in (full_jobs(8), full_jobs(9)[:8] + [{"name": "cdp (job 8)", "conclusion": "skipped"}]):
+            rc, out = go(self.tip(), {TAGGED: "identical"}, runs, jobs={9: jobs})
+            self.assertEqual(rc, 1, out)
+            self.assertIn("| cdp-gate | not a full run |", out)
 
     def test_a_failed_gate_fails_the_release(self):
         runs = [run("go-tests", GATED), run("go-race", GATED, conclusion="failure", rid=2), run("cdp-gate", GATED, rid=3)]

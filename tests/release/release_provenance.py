@@ -112,6 +112,20 @@ def judge_waiver(cfg, get, get_zip, gated, run, names):
     return True, f"run {rid} attempt {attempt}, {d['suites_run']} suites ran, {url_of(run)}"
 
 
+CDP_JOB = re.compile(r"cdp \((?!repeat\))[^)]+\)")  # a matrix job of cdp-gate; "cdp (repeat)" is the flake-repeat job, not a part
+
+
+def full_cdp_run(cfg, get, rid):
+    """Whether cdp-gate run `rid` is a FULL run: at least cfg['cdp_parts'] matrix jobs, every one of them success (none skipped). A repeat-only dispatch
+    (suites=..., runs=N) skips every matrix job and is green when the repeat is: it says nothing about the other suites. Returns (ok, reason)."""
+    jobs = get(f"/actions/runs/{rid}/jobs?per_page=100").get("jobs", [])
+    matrix = [j for j in jobs if isinstance(j.get("name"), str) and CDP_JOB.fullmatch(j["name"])]
+    good = [j for j in matrix if j.get("conclusion") == "success"]
+    if len(matrix) < cfg.get("cdp_parts", 1) or len(good) != len(matrix):
+        return False, f"{len(good)} of {len(matrix)} matrix jobs succeeded, {cfg.get('cdp_parts', 1)} needed: not a full run (a repeat-only dispatch?)"
+    return True, "full run"
+
+
 def url_of(run):
     u = str(run.get("html_url", ""))
     return u if re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/runs/[0-9]+", u) else "(no run link)"
@@ -128,9 +142,10 @@ def provenance(cfg, get, repo, sha, actor, out=print, get_zip=None):
         return g.Gate(cfg, get, [], s, repo=repo).latest_runs()
 
     def runs_for_named(s):
-        """The runs of a commit the notes commit NAMED (#6067): each gate's newest automatic push run on exactly that commit; only a gate with no push run there
+        """The runs of a commit the release is judged on: each gate's newest automatic push run on exactly that commit; only a gate with no push run there
         falls back to a dispatched one. A manual repeat or a stray dispatch of a heavy gate (a flake repeat, a cdp-gate on main) is a newer run of the same
-        workflow, and must not become the one the release reads."""
+        workflow, and must not become the one the release reads. Used by the named (Gated-commit) path and, since the v2.0.2 dry run, by the plain one too:
+        the dry run on main's tip read a repeat-only cdp-gate dispatch as the gate while the full push run was red."""
         push_cfg = dict(cfg, events=["push"], always_events=["push"])
         best_push = g.Gate(push_cfg, get, [], s, repo=repo).latest_runs()
         if all(n in best_push for n in need):
@@ -168,14 +183,23 @@ def provenance(cfg, get, repo, sha, actor, out=print, get_zip=None):
         else:
             gated, best = named[0], runs_for_named(named[0])
     else:
-        gated, best = sha, runs_for(sha)
+        gated, best = sha, runs_for_named(sha)
         if not any(n in best for n in need) and files == [NOTES] and len(parents) == 1:
-            gated, best = parents[0], runs_for(parents[0])
+            gated, best = parents[0], runs_for_named(parents[0])
     for n in need:
         r = best.get(n)
         if r is None:
             lines.append(f"| {n} | none | no run for {gated[:9]} |")
             ok = False
+        elif r["status"] == "completed" and r["conclusion"] == "success" and r.get("event") != "push":
+            how = f"run {r['id']} (dispatched, not a push run)"
+            if n == "cdp-gate":
+                full, why = full_cdp_run(cfg, get, r["id"])
+                if not full:
+                    lines.append(f"| {n} | not a full run | {how}: {why} |")
+                    ok = False
+                    continue
+            lines.append(f"| {n} | success | {how} |")
         elif r["status"] == "completed" and r["conclusion"] == "success":
             lines.append(f"| {n} | success | run {r['id']} |")
         elif n == "cdp-gate" and waive and named and r["status"] == "completed" and r["conclusion"] == "failure":
