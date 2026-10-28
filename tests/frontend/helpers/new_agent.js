@@ -34,7 +34,7 @@ const install = ev => ev(SOURCE);
 const N = {
     dialogNew: /^New agent$/i, dialogRestart: /^Restart .+$/i, // "Restart <the agent's name>" (#7886)
     folder: /^Folder/i, recents: /^Recent folders$/i, machine: /^Machine$/i,
-    persona: /persona/i, name: /^Name/i, prompt: /^Behavior prompt$/i,
+    persona: /persona/i, name: /^Name/i, prompt: /^Instructions for this agent$/i,
     provider: /^Provider$/i, model: /^Model$/i, thinking: /^Thinking/i, mode: /mode$/i, flags: /^Flags/i,
     cancel: /^Cancel$/i, back: /^Back$/i, next: /^Next$/i, launch: /^Launch$/i, restart: /^Restart$/i,
     tabs: ['Agent', 'Permissions', 'Advanced'], restartTabs: ['Agent', 'Persona', 'Permissions', 'Advanced'],

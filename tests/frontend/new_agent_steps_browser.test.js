@@ -1,5 +1,5 @@
 // New Agent is three steps (#7374, #7376; UI/UX's IA v4, notes a8d59b25, mockup c5294957), written failing-first by QA for the redesign (#7392): 1 Where it launches (folder, Recent: chips, Machine only with several
-// machines), 2 Persona (persona first, then Name, then the Behavior prompt), 3 The agent (tabs Agent, Permissions, Advanced). Cancel is the leftmost control of every footer, the primary the rightmost, Back and Next
+// machines), 2 Persona (persona first, then Name, then the Instructions for this agent), 3 The agent (tabs Agent, Permissions, Advanced). Cancel is the leftmost control of every footer, the primary the rightmost, Back and Next
 // move between steps and keep what was typed, Next says why it is off when there is no folder, the recap sits above the footer from step 2. Controls are found by role and accessible name (helpers/new_agent.js), never by id.
 // 1280 and 390 px, isolated dev server.
 const assert = require('node:assert/strict');
@@ -84,12 +84,12 @@ const BASE = require('./test_base').BASE;
         });
         await S.run('step 1 footer: Cancel leftmost, Next rightmost, one row', async () => { await reopen(); await setFolder('/work/payments-app'); await footerOrder(N.next, 'step 1'); });
 
-        await S.run('step 2 is "Step 2 of 3: Persona. In /work/payments-app": persona first, then Name, then the Behavior prompt, with Back, Cancel and Next and no tabs', async () => {
+        await S.run('step 2 is "Step 2 of 3: Persona. In /work/payments-app": persona first, then Name, then the Instructions for this agent, with Back, Cancel and Next and no tabs', async () => {
             await reopen(); await toStep(2);
             assert.match(await stepLine(ev), /^Step 2 of 3: Persona\. In \/work\/payments-app/);
             const y = await ev(`(() => { const f = (s, rx) => { const e = window.__na.find(s, rx); return e ? window.__na.box(e).y : null; }; return { persona: f('select', ${N.persona}), name: f('input', ${N.name}), prompt: f('textarea', ${N.prompt}) }; })()`);
             for (const k of ['persona', 'name', 'prompt']) assert.notEqual(y[k], null, `${k} is on step 2`);
-            assert.ok(y.persona < y.name && y.name < y.prompt, `the order is Persona, Name, Behavior prompt (y ${JSON.stringify(y)})`);
+            assert.ok(y.persona < y.name && y.name < y.prompt, `the order is Persona, Name, Instructions for this agent (y ${JSON.stringify(y)})`);
             for (const rx of [N.back, N.cancel, N.next]) assert.ok(await has('button', rx), `${rx} on step 2`);
             assert.ok(!(await ev(`!![...window.__na.dialog().querySelectorAll('[role=tablist]')].filter(window.__na.vis).length`)), 'no tabs on step 2');
             assert.ok(!(await has('button', N.launch)), 'Launch is only on step 3 (the approved plan)');
