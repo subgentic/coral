@@ -195,7 +195,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
 
     const moreId = `sched-more-${Number(job.id)}`;
     // One status line: the state and the last result. When it runs next is the Next fact below, not said twice (#9294, the Operator's audit).
-    const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Paused'), lastWords(job.last_run)].filter(Boolean).join(' \u00b7 ');
+    const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Turned off'), lastWords(job.last_run)].filter(Boolean).join(' \u00b7 ');
     // A short prompt is shown; a long one is folded (it would push the runs off the page)
     const longPrompt = (job.prompt || '').length > 600 || (job.prompt || '').split('\n').length > 10;
     const promptHtml = !isWorkflow && job.prompt
@@ -217,7 +217,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${escapeHtml(zoneNote(job.timezone))}</dd>
             ${job.enabled
                 ? (job.next_fire_at ? `<dt>Next</dt><dd title="${escapeAttr(awayWords(job.next_fire_at))}">${escapeHtml(atWords(job.next_fire_at))} your time</dd>` : '<dt>Next</dt><dd>not scheduled</dd>')
-                : `<dt>Paused</dt><dd>${job.paused_reason ? `${escapeHtml(job.paused_reason)}. Fix the cause, then Enable to resume.` : 'Enable it to run on schedule.'}</dd>`}
+                : `<dt>${job.paused_reason ? 'Paused' : 'Turned off'}</dt><dd>${job.paused_reason ? `${escapeHtml(job.paused_reason)}. Fix the cause, then turn it on to resume.` : 'Turn it on to run it on schedule.'}</dd>`}
             <dt>Does</dt><dd>${doesHtml}</dd>
             ${job.repo_path ? `<dt>Folder</dt><dd><span class="sched-path">${escapeHtml(job.repo_path)}</span></dd>` : ''}
         </dl>
@@ -234,7 +234,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             <div class="sched-more">
                 <button class="btn btn-small sched-more-btn" type="button" data-on-click="job-more" aria-expanded="false" aria-controls="${escapeAttr(moreId)}" aria-label="More for ${escapeAttr(job.name)}">More</button>
                 <div class="menu sched-more-menu" id="${escapeAttr(moreId)}" hidden>
-                    ${job.enabled ? `<button class="menu-item" type="button" data-on-click="job-toggle" data-job-id="${Number(job.id)}" aria-label="Pause ${escapeAttr(job.name)}">Pause</button>` : ''}
+                    ${job.enabled ? `<button class="menu-item" type="button" data-on-click="job-toggle" data-job-id="${Number(job.id)}" aria-label="Turn off ${escapeAttr(job.name)}">Turn off</button>` : ''}
                     <button class="menu-item menu-item-danger sched-delete" type="button" data-on-click="job-delete" data-job-id="${Number(job.id)}" aria-label="Delete ${escapeAttr(job.name)}">Delete</button>
                 </div>
             </div>
@@ -242,7 +242,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             ${job.enabled
                 ? `<button class="btn btn-small btn-primary" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>`
                 : `<button class="btn btn-small" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>
-            <button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">Enable</button>`}
+            <button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">Turn on</button>`}
         </div>
     `;
     container.querySelector('#sched-run-history').append(renderRunsTable(runsPage));
@@ -277,10 +277,10 @@ function renderRunsTable(page) {
             } },
             { key: 'result', label: 'Result', width: 'grow', cell: resultCell },
             { key: 'duration', label: 'Duration', width: '6rem', dropAt: 36, tone: 'tertiary', cell: tookOf },
-            ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, width: '5rem', when: r => !!r.session_id, cell: r => {
+            ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, width: '6.5rem', when: r => !!r.session_id, cell: r => {
                 if (!r.session_id) return '';
-                // short, so the Result keeps its room at 390 (Started 9.5 rem, Chat 5 rem)
-                const b = DT.link('Chat'); b.setAttribute('aria-label', 'Open the conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
+                // short, so the Result keeps its room at 390 (Started 9.5 rem, See result 6.5 rem); it is where a newcomer looks for what the run said (#10378)
+                const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
             } }] : []),
         ],
     });
@@ -394,5 +394,13 @@ registerActions({
     'job-delete': el => withId(el.dataset.jobId, deleteScheduledJob),
     'job-more': el => toggleJobMore(el),
     'job-workflow': (el, event) => { event.preventDefault(); withId(el.dataset.workflowId, id => window.selectWorkflow(id)); },
-    'job-run-session': (el, event) => { event.preventDefault(); const sid = uuidOf(el.dataset.sessionId); if (sid) window.selectHistorySession(sid); },
+    'job-run-session': async (el, event) => {
+        event.preventDefault();
+        const sid = uuidOf(el.dataset.sessionId); if (!sid) return;
+        const jobId = selectedJobId, job = scheduledJobs.find(j => j.id === jobId);
+        const opened = await window.selectHistorySession(sid);
+        const back = document.getElementById('history-back'); // the way back is the job it came from, not All chats (#10378)
+        if (opened !== false && job && back) { back.hidden = false; back.textContent = `\u2190 ${job.name}`; back.setAttribute('data-on-click', 'job-result-back'); back.dataset.jobId = String(jobId); }
+    },
+    'job-result-back': el => { const id = Number(el.dataset.jobId); if (id) { window.switchNavTab?.('automations'); selectScheduledJob(id); } },
 });
