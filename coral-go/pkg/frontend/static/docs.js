@@ -32,11 +32,20 @@ const DOC_GROUPS = [
     { key: 'api', label: 'API', has: d => !GETTING_STARTED.has(d.name) },
 ];
 const titleOf = d => d.title || d.name;
-const matches = d => !docsQuery || titleOf(d).toLowerCase().includes(docsQuery) || d.name.toLowerCase().includes(docsQuery);
+// The search reads the topics' text too (#9965: "add a member" found nothing because only titles were searched): each topic's text is read once, on the first search, and kept lower case.
+const docText = new Map(); let docTextLoad = null, docTextReady = false;
+function loadDocText() {
+    if (!docTextLoad) docTextLoad = Promise.all(docsList.map(async d => { const c = await fetchDocContent(d.name); if (c && c.content) docText.set(d.name, String(c.content).toLowerCase()); })).then(() => { docTextReady = true; });
+    return docTextLoad;
+}
+const matches = d => !docsQuery || titleOf(d).toLowerCase().includes(docsQuery) || d.name.toLowerCase().includes(docsQuery) || (docText.get(d.name) || '').includes(docsQuery);
 const docGroups = () => DOC_GROUPS.map(g => ({ ...g, docs: docsList.filter(matches).filter(g.has) })).filter(g => g.docs.length);
 const groupOfDoc = name => { const d = docsList.find(x => x.name === name); const g = d && DOC_GROUPS.find(x => x.has(d)); return g ? { key: g.key, label: g.label } : null; };
 
-export function filterDocs(value) { docsQuery = String(value || '').trim().toLowerCase(); renderDocNav(); }
+export function filterDocs(value) {
+    docsQuery = String(value || '').trim().toLowerCase(); renderDocNav();
+    if (docsQuery && !docTextReady) { const q = docsQuery; loadDocText().then(() => { if (docsQuery === q) renderDocNav(); }); } // the topics' text arrives: the list is drawn again with what it matches
+}
 
 registerGroupSource('docs', {
     keys: () => docGroups().map(g => g.key),
@@ -172,7 +181,7 @@ function renderDocNav() {
     const stop = shown.some(d => d.name === selectedDoc) ? selectedDoc : (shown[0] || {}).name;
     const row = d => `<li class="session-list-item${escapeAttr(selectedDoc === d.name ? ' active' : '')}"><button type="button" class="row-btn" tabindex="${Number(d.name === stop ? 0 : -1)}"${selectedDoc === d.name ? ' aria-current="true"' : ''} data-on-click="doc-open" data-doc="${escapeAttr(d.name)}" data-on-keydown="doc-open-key">${esc(titleOf(d))}</button></li>`;
     list.innerHTML = groups.map(g => groupHeaderHtml('docs', g.key, g.label, g.docs.length) + (isGroupFolded('docs', g.key) ? '' : g.docs.map(row).join(''))).join('')
-        || (docsList.length ? '<li class="empty-state empty-state-tight">No topic matches the search.</li>' : '');
+        || (docsList.length ? `<li class="empty-state empty-state-tight">${docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches the search.'}</li>` : '');
     syncPaneGroupToggle('docs');
     refreshGroupTable('docs');
 }
