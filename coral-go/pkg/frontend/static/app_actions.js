@@ -93,8 +93,8 @@ registerActions({
     'resume-mode-changed': () => { window.syncResumeModeNote(); }, // the Resume in picker: the note says what the pick means (#10487)
     'm-hide-save-template-modal': el => { window._hideSaveTemplateModal(); },
     'm-hide-settings-modal': el => { window.hideSettingsModal(); },
-    'm-hide-settings-modal-then-show-default-prompts-modal': el => { window.hideSettingsModal(); window.showDefaultPromptsModal(); },
-    'm-hide-settings-modal-then-show-theme-configurator': el => { window.hideSettingsModal(); window.showThemeConfigurator(); },
+    'm-hide-settings-modal-then-show-default-prompts-modal': el => { window.hideSettingsModal(true); window.showDefaultPromptsModal(); },
+    'm-hide-settings-modal-then-show-theme-configurator': el => { window.hideSettingsModal(true); window.showThemeConfigurator(); },
     'm-hide-task-detail-modal': el => { window.hideTaskDetailModal(); },
     'm-hide-team-wizard-modal': el => { window.hideTeamWizardModal(); },
     'm-hide-view-modal': el => { window._hideViewModal(); },

@@ -15,12 +15,18 @@ export const formKey = () => { try { return JSON.stringify(readSettingsForm().pa
 export const payloadNow = () => { try { return readSettingsForm().payload; } catch { return null; } };
 /** The part of a saved payload the person changed since the dialog opened (or was last saved). */
 export const changedSince = payload => Object.fromEntries(Object.entries(payload).filter(([k, v]) => !payloadAtOpen() || JSON.stringify(payloadAtOpen()[k]) !== JSON.stringify(v)));
+/** Whether a field or the database encryption choice holds a change not saved yet: read at once, so Close can decide in the same turn (#10526). */
+export const unsavedFields = () => formAtOpen() !== null && (formKey() !== formAtOpen() || databaseEncryptionChanged());
+/** unsavedFields, or the terminal backend choice (saved apart): what the note and the Cancel word show. */
+async function hasUnsavedChanges() {
+    if (unsavedFields()) return true;
+    if (formAtOpen() === null) return false;
+    try { return await importOnce('./terminal_backend.js').then(tb => tb.hasUnsavedBackendChange(), () => false); } catch { return false; }
+}
 export async function refreshUnsavedNote() {
     const note = document.getElementById('settings-unsaved');
     if (!note) return;
-    let dirty = formAtOpen() !== null && formKey() !== formAtOpen();
-    if (!dirty && formAtOpen() !== null) { dirty = databaseEncryptionChanged(); }
-    if (!dirty && formAtOpen() !== null) { try { dirty = await importOnce('./terminal_backend.js').then(tb => tb.hasUnsavedBackendChange(), () => false); } catch { dirty = false; } }
+    const dirty = await hasUnsavedChanges();
     if (note.hidden === dirty) note.hidden = !dirty;
     const away = document.getElementById('settings-cancel-btn'), word = dirty ? 'Cancel' : 'Close'; // nothing to cancel until something is changed: on a page with nothing to edit it is plain Close (Beta Tester, #9955)
     if (away && away.textContent !== word) away.textContent = word;

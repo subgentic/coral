@@ -13,10 +13,16 @@ import { savedWords, renderRemoteAccessStatus, renderDebugInputLogStatus, applyT
 import { browserLocal } from './safe_storage.js';
 const { _invalidateAgentModels, _invalidateDefaultModels } = await importOnce('./launch_models.js');
 const { databaseEncryptionChanged, saveDatabaseEncryptionSettings } = await importOnce('./settings_machine.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
-const { readSettingsForm, formKey, payloadNow, changedSince, refreshUnsavedNote } = await importOnce('./settings_form.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { readSettingsForm, formKey, payloadNow, changedSince, refreshUnsavedNote, unsavedFields } = await importOnce('./settings_form.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { showConfirmModal } = await importOnce('./confirm_dialog.js'); // lazy like this file (import_hygiene)
 const { settingsAtOpen, setSettingsAtOpen, setFormAtOpen, setPayloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
-export function hideSettingsModal() {
+/** Close Settings. With a change not saved yet it asks first (Close, Cancel, Escape and the backdrop all come here, #10526); force === true closes without asking (after a Save, or on the way to another dialog). */
+export function hideSettingsModal(force) {
+    if (force !== true && unsavedFields()) { // decided at once: a Close with nothing changed still closes in the same turn
+        showConfirmModal('Discard unsaved changes?', 'Settings you changed have not been saved.', () => hideSettingsModal(true), undefined, { label: 'Discard changes', cancelLabel: 'Keep editing', danger: true });
+        return;
+    }
     document.getElementById("settings-modal").style.display = "none";
     restoreSavedTheme().catch(() => {}); // a theme previewed in the dialog and not saved goes back to the saved one (#10481)
     if (!isCloud()) importOnce('./custom_models.js').then(m => m.discardCustomModels()).catch(() => {}); // unsaved custom models are dropped with the dialog (#5480)
@@ -139,5 +145,5 @@ export async function applySettings() {
         const tb = await importOnce('./terminal_backend.js');
         if (!(await tb.applyTerminalBackendChange())) return; // cancelled: the dialog stays open
     } catch { /* the rest is saved */ }
-    hideSettingsModal();
+    hideSettingsModal(true);
 }
