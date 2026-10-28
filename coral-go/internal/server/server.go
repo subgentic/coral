@@ -327,6 +327,9 @@ func (s *Server) SetIndexer(idx routes.Indexer) {
 			s.historyHandler.SetIndexKick(k.Kick)
 		}
 	}
+	if p, ok := idx.(routes.IndexProgress); ok && s.historyHandler != nil {
+		s.historyHandler.SetIndexReady(p.FirstPassDone)
+	}
 }
 
 // SetWorkflowRunner injects the workflow runner into the workflow handler for triggering/killing.
