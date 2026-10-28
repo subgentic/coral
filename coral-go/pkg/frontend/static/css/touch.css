@@ -195,3 +195,8 @@ svg[width="48"][height="48"] { width: 3rem; height: 3rem; }
     .disclosure[open] > summary::before { content: '\25BE' / ''; }
     .terminal-branch-text, .title-branch .branch-text { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); line-height: var(--control-touch-height, 44px); vertical-align: middle; }
 }
+
+/* Stop is its own button, apart from Send options: 16 px, not the 4 of the pair (a mis-tap between them stopped an agent or opened the options, #10388) */
+@media (pointer: coarse) {
+    .command-pane .mobile-send-btn.is-stop { margin-left: 16px; }
+}
