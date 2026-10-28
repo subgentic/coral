@@ -197,13 +197,13 @@ function recentTable(rows, narrowed) {
         signature: JSON.stringify([!!firstRun().cards, rows.map(i => [i.key, i.run.status, AR.isUnread(i), i.name, AR.resultWords(i.run).full])]),
         node: () => DT.dataTable({
             label: `Recent runs, ${rows.length}`, rows, oneLine: true, rowKey: i => i.key, rowName: i => `${i.name}, ${AR.resultWords(i.run).full}${AR.isUnread(i) ? ', not opened' : ''}`, state: stateOf('recent'), open: openRun,
-            columns: [ // one line a row (Goal #79): a narrow list drops Kind, then When it started and How long it took (dropAt, #8931): the name and the result stay, the name whole
+            columns: [ // one line a row (Goal #79): a narrow list drops Kind (under 52 rem: the run's name is at least 24 characters, #9856), then When it started and How long it took (dropAt, #8931): the name and the result stay, the name whole
                 { key: 'name', label: 'Run', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => {
                     const b = nameButton(i, i.kind === 'workflow' ? 'A workflow run' : 'A job run');
                     if (AR.isUnread(i)) { b.prepend(DT.el('span', 'automations-unread', ''), DT.el('span', 'sr-only', 'Not opened: ')); b.querySelector('.automations-unread').setAttribute('aria-hidden', 'true'); }
                     return b;
                 } },
-                { key: 'kind', label: 'Kind', width: '7rem', dropAt: 36, sort: true, sortValue: i => i.kind, cell: i => DT.tag(i.kind === 'workflow' ? 'Workflow' : 'Job') },
+                { key: 'kind', label: 'Kind', width: '7rem', dropAt: 52, sort: true, sortValue: i => i.kind, cell: i => DT.tag(i.kind === 'workflow' ? 'Workflow' : 'Job') },
                 { key: 'result', label: 'Result', width: '7rem', sort: true, sortValue: i => AR.resultWords(i.run).word, cell: i => { const w = AR.resultWords(i.run), c = DT.chip(w.word, resultClass(i.run)); c.title = w.full; return c; } },
                 { key: 'started', label: 'Started', width: '7rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => i.atMs, firstDir: 'desc', cell: i => DT.el('span', 'dt-time', whenWords(i.at)) },
                 { key: 'took', label: 'Took', width: '6rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => (i.finishedAt ? Date.parse(i.finishedAt) - i.atMs : -1), cell: i => AR.tookWords(i.at, i.finishedAt) },
