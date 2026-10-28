@@ -276,10 +276,12 @@ async function select(tab, a) {
         m = await matches(main, B.name, 'after showing the hidden terminal');
         console.log(`   ✓ hidden: pane kept ${bHidden.cols}; shown: pane ${m.p.cols} = xterm`);
         await select(main, A);
-        const owner = (await matches(main, A.name, 'owner back on A')).p;
+        await main.size(1700, 950); // a wide owner: its pane is wider than the popout's window below, so the viewer has something to scroll (the dock beside the terminal has grown, and at 1250 the pane was narrower than the popout)
+        const owner = (await matches(main, A.name, 'owner back on A, wide')).p;
 
         console.log('7. A same-browser viewer (the popout)');
-        const pop = await openTab(`${BASE}/agent/${A.sid}`, { width: 820, height: 640 });
+        assert.ok(owner.cols * 7 > 780, `the owner's pane is wider than the popout window (${owner.cols} cols)`);
+        const pop = await openTab(`${BASE}/agent/${A.sid}`, { width: 780, height: 640 }); // wider than the phone breakpoint (767): a desktop viewer, not a phone's
         tabs.push(pop);
         await pop.waitFor(`(async () => { const x = await ${XTERM}; return !!x && x.wsOpen; })()`, 'the popout terminal');
         m = await matches(pop, A.name, 'the popout viewer');
