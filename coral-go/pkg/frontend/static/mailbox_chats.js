@@ -73,11 +73,13 @@ async function loadUnread() {
     lastRecount = Date.now();
     try {
         const day = new Date(IR.readSince() - 86400000).toISOString().slice(0, 10); // a day early: the stamps are compared exactly below
-        const replies = await Promise.all(inboxSources().map(async server => {
+        const settled = await Promise.allSettled(inboxSources().map(async server => {
             const r = await serverFetch(server, `/api/sessions/history?${new URLSearchParams({ date_from: day, page: '1', page_size: '200' })}`);
-            if (!r.ok) return [];
+            if (!r.ok) throw new Error('History unavailable'); // a read that failed is not "nothing is unread": the numbers stay as they were (unknown at start)
             const d = await r.json(); return (d.sessions || []).map(row => ({ ...row, server }));
         }));
+        const replies = settled.filter(r => r.status === 'fulfilled').map(r => r.value); // a computer that does not answer must not blank the others' numbers
+        if (!replies.length && settled.length) return;
         const rows = replies.flat().filter(s => IR.isUnread(readKind(s), readKey(s), stampOf(s)));
         const next = { chats: rows.filter(s => !isGroup(s)).length, 'chats-group': rows.filter(isGroup).length, 'chats-starred': rows.filter(s => s.starred).length, 'chats-active': rows.filter(s => s.active).length, 'chats-archived': rows.filter(s => s.archived).length };
         for (const [t] of CLIS) { const types = t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]; next[`chats-cli-${t}`] = rows.filter(s => !isGroup(s) && types.includes(s.source_type)).length; }
@@ -106,7 +108,7 @@ export async function loadChatCounts(redraw) {
         for (const key of ['all','group','notes','starred','active','archived']) counts[key] = replies.reduce((sum, d) => sum + (Number(d[key]) || 0), 0);
         for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
     } catch { /* the folders keep their last counts */ }
-    if (unread === null || (inboxShows() && Date.now() - lastRecount >= RECOUNT_MS)) await loadUnread(); // the first read at start; then at most one a minute, and only while the Inbox shows: an open or a flag updates the numbers in memory (chatOpened, setChatFlag), no request
+    if (Date.now() - lastRecount >= RECOUNT_MS && (unread === null || inboxShows())) await loadUnread(); // the first read at start (and a start read that failed is tried again only after a minute, not at every counts read); then at most one a minute, and only while the Inbox shows: an open or a flag updates the numbers in memory (chatOpened, setChatFlag), no request
     redraw?.();
     return counts;
 }
