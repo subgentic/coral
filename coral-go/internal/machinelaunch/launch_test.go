@@ -327,3 +327,33 @@ func TestLaunchCreateFailureThatIsNotATimeoutListsOnlyOnce(t *testing.T) {
 		t.Fatalf("lists %d, err %v", l.lists, err)
 	}
 }
+
+func TestLaunchCancelledCreateGetsTheSecondLookToo(t *testing.T) {
+	base := &stubProvider{createErr: context.Canceled}
+	l := &laggingProvider{stubProvider: base}
+	o, d, _ := setup(base, &stubHub{})
+	d.Provider, o.RetryListAfter = l, time.Millisecond
+	_, err := Launch(context.Background(), o, d)
+	if err == nil || l.lists != 2 || !strings.Contains(strings.Join(base.calls, ","), "delete:late") {
+		t.Fatalf("lists %d, err %v, calls %v", l.lists, err, base.calls)
+	}
+}
+
+func TestLaunchTimedOutCreateThatStillFindsNothingSaysWhereToLook(t *testing.T) {
+	base := &stubProvider{createErr: context.DeadlineExceeded}
+	l := &emptyLister{stubProvider: base}
+	o, d, out := setup(base, &stubHub{})
+	d.Provider, o.RetryListAfter = l, time.Millisecond
+	_, err := Launch(context.Background(), o, d)
+	if err == nil || l.lists != 2 || !strings.Contains(err.Error(), "look for tag coral-launch-") || !strings.Contains(out.String(), "costs money") {
+		t.Fatalf("lists %d, err %v, out %s", l.lists, err, out.String())
+	}
+}
+
+// emptyLister never has the machine, on either look.
+type emptyLister struct {
+	*stubProvider
+	lists int
+}
+
+func (l *emptyLister) List(context.Context) ([]Instance, error) { l.lists++; return nil, nil }
