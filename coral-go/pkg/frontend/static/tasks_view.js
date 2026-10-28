@@ -60,7 +60,7 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
         who: { key: 'who', label: 'Who', sort: true, sortValue: (t) => doerOf(t) || '', line: 1, width: '6rem', max: 12, cell: (t) => whoCell(t) },
         goal: { key: 'goal', label: 'Goal', min: 16, share: 1, drop: 4, sort: true, sortValue: (t) => (t.goal_id ? ctx.goalTitleOf(t.goal_id) : ''), line: 0,
             cell: (t) => { if (!t.goal_id) return ctx.noGoal || 'No goal'; const l = DT.link(ctx.goalTitleOf(t.goal_id), () => ctx.openGoal?.(t.goal_id)); l.dataset.goalLink = String(t.goal_id); return l; } },
-        team: { key: 'team', label: 'Team', max: 14, drop: 1, sort: true, sortValue: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || ''), line: 0, cell: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || '') },
+        team: { key: 'team', label: 'Team', max: 26, drop: 1, sort: true, sortValue: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || ''), line: 0, cell: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || '') },
         priority: { key: 'priority', label: 'Priority', tone: 'tertiary', max: 9, drop: 3, sort: true, sortValue: (t) => PRIORITY_RANK[String(t.priority || '').toLowerCase()] ?? 3, line: 0, when: (t) => String(t.priority || '').toLowerCase() === 'high', cell: (t) => priorityWord(t.priority) },
         // How many artifacts the task's results reference (the server's artifact_count, #8575): a quiet "3 files" that opens the task page at its Artifacts. Not through Coral Hub: the team's artifacts are the owner's alone there.
         files: { key: 'files', label: 'Files', tone: 'tertiary', max: 8, drop: 2, line: 0, when: (t) => Number(t.artifact_count) > 0 && !isCloud(),
