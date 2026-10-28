@@ -34,6 +34,15 @@ const BASE = require('./test_base').BASE;
             const canSave = await ev(`!!document.querySelector(${JSON.stringify(btn)}).closest('.chat-bubble').querySelector('.chat-save-btn')`);
             assert.equal(items.some(x => /^(Save for later|Remove from saved)$/.test(x)), canSave, `${w}: Save for later is in the menu when the message has a save button (${canSave}): ${JSON.stringify(items)}`);
             assert.ok(items.every(x => x === 'Copy' || /^(Save for later|Remove from saved)$/.test(x)), `${w}: the menu is Copy and Save for later, nothing that sends it to another agent (the Operator, #10682): ${JSON.stringify(items)}`);
+            // the menu a person's own message opens is as solid as a reply's (#10768): a surface of the shared menu colour, in both themes, not the page showing through
+            for (const theme of ['dark', 'light']) {
+                await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
+                await waitFor(`document.getAnimations().length === 0`, `${w}/${theme}: the menu has finished opening`, 3000);
+                const own = await ev(`(() => { const m = document.getElementById('chat-msg-menu'), c = getComputedStyle(m), t = document.createElement('div'); t.className = 'menu'; t.hidden = false; document.body.append(t); const shared = getComputedStyle(t).backgroundColor; t.remove(); return { bg: c.backgroundColor, opacity: c.opacity, shared, shadow: c.boxShadow !== 'none', border: c.borderTopWidth }; })()`);
+                assert.ok(/^rgb\(/.test(own.bg) && own.opacity === '1', `${w}/${theme}: the sent message's menu has a solid background: ${JSON.stringify(own)}`);
+                assert.ok(own.shadow && own.border !== '0px', `${w}/${theme}: and the shared menu's edge and shadow: ${JSON.stringify(own)}`);
+            }
+            await ev(`document.documentElement.setAttribute('data-theme', 'dark'); true`);
             await waitFor(`document.getAnimations().length === 0`, `${w}: the menu has finished opening`, 3000); // a shot of a menu mid-fade shows the reply through it
             await shot(`message-menu-${w}`);
             // Escape gives the focus back to the button
