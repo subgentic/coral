@@ -1,5 +1,7 @@
 /* Mobile connection flow: saved preference is not proof of effective access. */
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
+const { ENABLE_LABEL, USE_HUB_LABEL, DISABLED_WORDS, OPEN_ON_PHONE, SAME_NETWORK, SETUP_CODE_WHERE, NO_SETUP_CODE, SHOW_CODE, HIDE_CODE, CODE_SHOW_MS, setupCodeHint } = await importOnce('./mobile_words.js'); // this file is loaded lazily: a module it needs is loaded through importOnce, so a failure can be retried
 
 let generation = 0;
 let controller = null;
@@ -9,7 +11,10 @@ let saving = false;
 const byId = id => document.getElementById(id);
 const current = gen => gen === generation && byId('mobile-connect-modal')?.style.display !== 'none';
 
+let codeTimer = 0;
 function clearConnection() {
+    clearTimeout(codeTimer); codeTimer = 0;
+    byId('mobile-connect-setup')?.replaceChildren(); // a shown setup code never outlives the connection it belongs to
     byId('mobile-connect-details').hidden = true;
     byId('mobile-connect-qr').replaceChildren();
     byId('mobile-connect-api-key').replaceChildren();
@@ -77,8 +82,8 @@ async function renderAccess(status, gen, signal) {
             renderState('Mobile access is enabled in settings but is not running yet. Restart Coral to apply the change, then check again.',
                 [button('Check again', checkAccess, true), button('Close', hideMobileConnectModal)]);
         } else {
-            renderState('Mobile access is disabled. Enable it, or use Coral Hub, which needs no network access.',
-                [button('Enable', enableMobileAccess, true), button('Cancel', hideMobileConnectModal)]);
+            renderState(DISABLED_WORDS,
+                [button(ENABLE_LABEL, enableMobileAccess, true), button(USE_HUB_LABEL, useCoralHub), button('Cancel', hideMobileConnectModal)]);
         }
         return;
     }
@@ -128,7 +133,52 @@ async function renderAccess(status, gen, signal) {
         hint.className = 'text-secondary-sm'; hint.textContent = 'Use this key to connect securely from your phone.';
         keyDisplay.append(hint);
     }
+    byId('mobile-connect-open').textContent = OPEN_ON_PHONE;
+    byId('mobile-connect-network').textContent = SAME_NETWORK;
     byId('mobile-connect-details').hidden = false;
+    renderSetupCode(gen, signal); // after the details are up: the QR and the address first, the code when it arrives
+}
+
+/** "Use Coral Hub instead": the dialog closes and Settings opens on Network and Hub, where the Hub link is made. It changes nothing by itself. */
+function useCoralHub() {
+    hideMobileConnectModal();
+    window.showSettingsModal?.('network');
+}
+
+/** The setup code, in the one panel (#10149): where a phone types it, and the code itself behind a button (not on the screen until asked, read aloud letter by letter, gone after a minute, as in Settings).
+ *  The route answers only a dashboard signed in on this computer, and only while there is a code (no password yet); otherwise the panel says the phone signs in with the password. */
+async function renderSetupCode(gen, signal) {
+    const box = byId('mobile-connect-setup');
+    if (!box) return;
+    let code = '', expires = 0;
+    try {
+        const r = await fetch('/api/auth/setup-code/show', { signal, cache: 'no-store' });
+        if (r.ok) { const d = await r.json(); if (d && typeof d.code === 'string' && d.code) { code = d.code; expires = d.expires_in; } }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    if (!current(gen)) return;
+    const line = text => { const p = document.createElement('p'); p.className = 'text-secondary-sm'; p.textContent = text; return p; };
+    if (!code) { box.replaceChildren(line(NO_SETUP_CODE)); return; }
+    const { spellCode } = await importOnce('./cloud_words.js');
+    if (!current(gen)) return;
+    const title = document.createElement('strong'); title.textContent = 'Setup code';
+    const reveal = button(SHOW_CODE, () => (shown.hidden ? show() : hide()));
+    reveal.classList.add('btn-small'); reveal.setAttribute('aria-expanded', 'false');
+    const shown = document.createElement('div'); shown.hidden = true;
+    const codeEl = document.createElement('code'); codeEl.className = 'mobile-connect-code'; codeEl.style.userSelect = 'all';
+    const spoken = document.createElement('span'); spoken.className = 'sr-only';
+    const hint = line(SETUP_CODE_WHERE);
+    shown.append(codeEl, spoken);
+    const hide = () => {
+        clearTimeout(codeTimer); codeTimer = 0;
+        codeEl.textContent = ''; spoken.textContent = ''; shown.hidden = true;
+        reveal.textContent = SHOW_CODE; reveal.setAttribute('aria-expanded', 'false'); hint.textContent = SETUP_CODE_WHERE;
+    };
+    const show = () => {
+        codeEl.textContent = code; spoken.textContent = `Setup code: ${spellCode(code)}`; shown.hidden = false;
+        reveal.textContent = HIDE_CODE; reveal.setAttribute('aria-expanded', 'true'); hint.textContent = `${SETUP_CODE_WHERE} ${setupCodeHint(expires)}`;
+        clearTimeout(codeTimer); codeTimer = setTimeout(hide, CODE_SHOW_MS); // timeout-ok: the code leaves the screen by itself
+    };
+    box.replaceChildren(title, ' ', reveal, shown, hint);
 }
 
 async function checkAccess() {

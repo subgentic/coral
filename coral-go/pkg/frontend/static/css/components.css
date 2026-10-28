@@ -2842,6 +2842,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     text-align: left;
 }
 
+.mobile-connect-setup { margin: 12px 0 0; }
+.mobile-connect-code { display: inline-block; margin: 6px 0 2px; padding: 4px 10px; font-size: var(--fs-xl); letter-spacing: var(--ls-code); }
 .mobile-connect-hint {
     color: var(--text-secondary);
     font-size: var(--fs-base);

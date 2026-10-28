@@ -61,19 +61,21 @@ const BASE = require('./test_base').BASE;
                     if(window.__mode==='network-error')return new Response('{}',{status:503});
                     return new Response(JSON.stringify({primary:'192.168.1.50',port:8468}));
                 }
+                if(u==='/api/auth/setup-code/show'){window.__calls.push({url:u});return window.__noCode?new Response('{}',{status:404}):new Response(JSON.stringify({code:'ABCD-EFGH',expires_in:300}));}
                 if(u==='/api/system/api-key'){window.__calls.push({url:u});if(window.__keyStatus)return new Response('{"error":"dashboard_auth_required"}',{status:window.__keyStatus});return new Response(JSON.stringify({key:'test-key-not-a-credential'}));}
                 return real(url,opts);
             };
             const opener=document.createElement('button');opener.id='qr-test-opener';opener.textContent='Mobile QR';document.body.append(opener);opener.focus();
         })()`);
         await ev('window._showMobileConnectModal()');
-        assert.equal(await status(),'Mobile access is disabled. Enable it, or use Coral Hub, which needs no network access.');
+        assert.match(await status(), /Turning it on lets devices on your network reach Coral; they need your password or a setup code\. Or use Coral Hub, which needs no network access\./); // what Enable does, before it is pressed (#10149)
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b => b.textContent)`), ['Enable', 'Use Coral Hub instead', 'Cancel'], 'the Hub way is a named button');
         assert.deepEqual(await ev('window.__calls.map(c=>c.url)'),['/api/system/privacy']);
         await noQR(); await shot('mobile-qr-disabled');
         // Focus trap excludes controls hidden in the enabled-only details.
         await Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9,modifiers:8});
         await Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-        assert.equal(await ev('document.activeElement.textContent'),'Cancel');
+        assert.equal(await ev('document.activeElement.textContent'),'Use Coral Hub instead');
         await action('Cancel');
         assert.equal(await ev(`document.getElementById('mobile-connect-modal').style.display`),'none');
         assert.equal(await ev('document.activeElement.id'),'qr-test-opener');
@@ -91,6 +93,16 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('mobile-connect-details').hidden`),false);
         assert.match(await ev(`document.getElementById('mobile-connect-url').textContent`),/192.168.1.50:8468/);
         assert.equal(await ev(`document.querySelectorAll('#mobile-connect-qr img').length`),1);
+        // one panel (#10149): the address, where the phone types the setup code, the code behind a button, and the network line
+        await new Promise(r => setTimeout(r, 200)); // sleep-ok: the setup code is read after the details are drawn
+        assert.match(await ev(`document.getElementById('mobile-connect-title').textContent`), /Use on your phone/);
+        assert.match(await ev(`document.getElementById('mobile-connect-setup').textContent`), /phone asks for the setup code/);
+        assert.equal(await ev(`document.getElementById('mobile-connect-setup').textContent.includes('ABCD')`), false, 'the code is not on the screen until asked for');
+        await ev(`[...document.querySelectorAll('#mobile-connect-setup button')].find(b => b.textContent === 'Show setup code').click()`);
+        assert.equal(await ev(`document.querySelector('#mobile-connect-setup code').textContent`), 'ABCD-EFGH');
+        await ev(`[...document.querySelectorAll('#mobile-connect-setup button')].find(b => b.textContent === 'Hide setup code').click()`);
+        assert.equal(await ev(`document.getElementById('mobile-connect-setup').textContent.includes('ABCD')`), false, 'hidden again, and gone from the page');
+        assert.match(await ev(`document.getElementById('mobile-connect-network').textContent`), /same network as this computer/);
         await shot('mobile-qr-enabled');
         // Pending disable immediately withholds old QR and API key.
         await ev('window.__saved=false;window.__calls=[];window._showMobileConnectModal()');
