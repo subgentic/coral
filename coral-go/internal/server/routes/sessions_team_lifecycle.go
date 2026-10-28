@@ -225,6 +225,12 @@ func (h *SessionsHandler) ResurrectTeam(w http.ResponseWriter, r *http.Request) 
 		// Inject distilled knowledge if available
 		resurrectPrompt := InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), team.Name, m.AgentName, agentCfg.Prompt)
 
+		// A member stored before #10430 has no mode in its config: it comes back in the mode its previous session recorded, and only without one in the saved default (#10454).
+		if agentCfg.PermissionMode == "" && m.SessionID != nil && *m.SessionID != "" {
+			if prev, _ := h.ss.GetLiveSession(ctx, *m.SessionID); prev != nil && prev.PermissionMode != nil && agent.ValidPermissionMode(*prev.PermissionMode) {
+				agentCfg.PermissionMode = *prev.PermissionMode
+			}
+		}
 		if agentCfg.PermissionMode != "" && !agent.ValidPermissionMode(agentCfg.PermissionMode) {
 			log.Printf("[resurrect] corrupt stored permission mode for %s: %s", m.AgentName, agentCfg.PermissionMode)
 			launched = append(launched, map[string]any{"name": m.AgentName, "error": "invalid stored permission mode"})
