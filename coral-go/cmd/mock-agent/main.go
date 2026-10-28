@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"io"
 	"net/http"
 	"os"
@@ -237,7 +238,7 @@ func main() {
 func writeAtomic(path, content string) {
 	tmp := path + ".tmp"
 	if os.WriteFile(tmp, []byte(content), 0o600) == nil {
-		_ = os.Rename(tmp, path)
+		_ = fsreplace.Rename(tmp, path)
 	}
 }
 

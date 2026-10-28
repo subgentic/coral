@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -75,7 +76,7 @@ func rekeyStateFiles(coralDir, old, id string) {
 		}
 		_, werr := tmp.Write(out)
 		cerr := tmp.Close()
-		if werr != nil || cerr != nil || os.Chmod(tmp.Name(), fi.Mode().Perm()) != nil || os.Rename(tmp.Name(), f) != nil {
+		if werr != nil || cerr != nil || os.Chmod(tmp.Name(), fi.Mode().Perm()) != nil || fsreplace.Rename(tmp.Name(), f) != nil {
 			os.Remove(tmp.Name())
 		}
 	}

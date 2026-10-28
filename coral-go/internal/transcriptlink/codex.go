@@ -15,6 +15,7 @@ import (
 	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -200,7 +201,7 @@ func BindCodex(sessionID, threadID string) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(f.Name(), filepath.Join(dir, sessionID+".json"))
+	return fsreplace.Rename(f.Name(), filepath.Join(dir, sessionID+".json"))
 }
 
 // markerScanBytes caps how much of a rollout's head rolloutMarker reads: the marker is in the

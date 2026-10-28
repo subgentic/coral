@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/secrets"
@@ -400,7 +401,7 @@ func (fw *fileWriter) write(line string) {
 	if fw.f == nil || fw.size+int64(len(line)) > fw.max {
 		if fw.f != nil {
 			fw.f.Close()
-			os.Rename(fw.path, fw.path+".1")
+			fsreplace.Rename(fw.path, fw.path+".1")
 		}
 		// No following a symlink planted at the path, and 0600 even if the file was
 		// created with other permissions: it holds typed text.

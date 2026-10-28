@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/secfile"
 )
@@ -347,7 +348,7 @@ func (h *BoardHandler) writeCrossTeamRecord(kind string, rec crossTeamArtifactRe
 		// it: this receipt replaces it, so the row isn't lost for good (Security's C1 INFO).
 		if _, err := os.Lstat(final); err == nil {
 			if _, ok := h.crossTeamRecord(kind, rec.Board, rec.ID); !ok {
-				return os.Rename(tmp.Name(), final)
+				return fsreplace.Rename(tmp.Name(), final)
 			}
 		}
 		// A hard link fails if the name exists, so of two receipts at once only one wins.
@@ -371,7 +372,7 @@ func (h *BoardHandler) writeCrossTeamRecord(kind string, rec crossTeamArtifactRe
 		}
 		return f.Close()
 	}
-	return os.Rename(tmp.Name(), final)
+	return fsreplace.Rename(tmp.Name(), final)
 }
 
 // crossTeamRecords lists a board's records of one kind (nil when none).

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -95,7 +96,7 @@ func (d updatesDir) write(name string, data []byte) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp, filepath.Join(d.Dir, name))
+	return fsreplace.Rename(tmp, filepath.Join(d.Dir, name))
 }
 
 // remove deletes a state file; a file that is not there is fine.

@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/mediatype"
 )
@@ -320,7 +321,7 @@ func storeArtifactFile(coralDir, sessionID, name, mediaType, tmpPath, hexID stri
 		if err := os.Chmod(tmpPath, 0o600); err != nil {
 			return mine, false, err
 		}
-		if err := os.Rename(tmpPath, objectPath); err != nil {
+		if err := fsreplace.Rename(tmpPath, objectPath); err != nil {
 			return mine, false, err
 		}
 		st.added(size)

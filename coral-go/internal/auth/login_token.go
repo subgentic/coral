@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -139,7 +140,7 @@ func (ks *KeyStore) WriteLoginTokenFile(dir string) (string, error) {
 		os.Remove(tmp.Name())
 		return "", err
 	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
+	if err := fsreplace.Rename(tmp.Name(), path); err != nil {
 		os.Remove(tmp.Name())
 		return "", err
 	}

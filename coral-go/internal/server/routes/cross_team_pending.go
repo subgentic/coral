@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/fsreplace"
 )
 
 // A file that arrives from another Coral is held as pending until the message that names it arrives
@@ -77,7 +78,7 @@ func (h *BoardHandler) writePendingReceipt(src, relayID string, rec crossTeamArt
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), filepath.Join(dir, pendingKey(src, relayID)+"-"+rec.ID+".json"))
+	return fsreplace.Rename(tmp.Name(), filepath.Join(dir, pendingKey(src, relayID)+"-"+rec.ID+".json"))
 }
 
 // readPending reads one pending record; ok is false for anything that is not a well-formed one.
@@ -234,7 +235,7 @@ func (h *BoardHandler) noteAlsoReceived(first, later crossTeamArtifactRecord) {
 	if tmp.Close() != nil {
 		return
 	}
-	if err := os.Rename(tmp.Name(), filepath.Join(dir, first.ID+".json")); err != nil {
+	if err := fsreplace.Rename(tmp.Name(), filepath.Join(dir, first.ID+".json")); err != nil {
 		slog.Warn("cross-team artifact: could not record a later receipt", "board", first.Board, "id", first.ID, "error", err)
 	}
 }

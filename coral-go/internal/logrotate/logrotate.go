@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -116,10 +117,10 @@ func (r *File) rotate() {
 	r.f = nil
 	os.Remove(r.copyName(r.keep))
 	for i := r.keep - 1; i >= 1; i-- {
-		os.Rename(r.copyName(i), r.copyName(i+1))
+		fsreplace.Rename(r.copyName(i), r.copyName(i+1))
 	}
 	if !oversized || r.copyTail(r.copyName(1)) != nil {
-		os.Rename(r.path, r.copyName(1)) // whole (or the tail couldn't be written: keep it all)
+		fsreplace.Rename(r.path, r.copyName(1)) // whole (or the tail couldn't be written: keep it all)
 	} else {
 		os.Remove(r.path)
 	}

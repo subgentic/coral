@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/safego"
 )
@@ -52,7 +53,7 @@ func openRunFolder(dataDir string, runID int64) (*runFiles, error) {
 		if !fi.IsDir() {
 			return nil, fmt.Errorf("the run folder %s exists and isn't a folder", dir)
 		}
-		if err := os.Rename(dir, dir+".stale-"+strconv.FormatInt(time.Now().UnixNano(), 10)); err != nil {
+		if err := fsreplace.Rename(dir, dir+".stale-"+strconv.FormatInt(time.Now().UnixNano(), 10)); err != nil {
 			return nil, err
 		}
 	}

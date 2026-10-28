@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/secfile"
 )
@@ -359,7 +360,7 @@ func (u *fixtureUpdater) Apply(ctx context.Context, by string) (string, error) {
 	if err := tmp.Close(); err != nil {
 		return "", err
 	}
-	if err := os.Rename(name, filepath.Join(dir, fixtureMarker)); err != nil {
+	if err := fsreplace.Rename(name, filepath.Join(dir, fixtureMarker)); err != nil {
 		return "", err
 	}
 	u.mu.Lock()

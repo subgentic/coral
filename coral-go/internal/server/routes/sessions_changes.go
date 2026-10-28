@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/safefs"
 )
@@ -276,7 +277,7 @@ func writeChangesArtifact(artifactPath string, diff []byte) error {
 		tmp := artifactPath + ".link-tmp"
 		os.Remove(tmp)
 		if os.Link(obj, tmp) == nil {
-			if err := os.Rename(tmp, artifactPath); err == nil {
+			if err := fsreplace.Rename(tmp, artifactPath); err == nil {
 				return nil
 			}
 			os.Remove(tmp)
@@ -299,7 +300,7 @@ func writeChangesArtifact(artifactPath string, diff []byte) error {
 	if err := os.Chmod(tmpPath, 0o600); err != nil {
 		return err
 	}
-	return os.Rename(tmpPath, artifactPath)
+	return fsreplace.Rename(tmpPath, artifactPath)
 }
 
 // storeDiffObject stores diff once under <coral>/artifacts/diff-objects/<sha256> (found from

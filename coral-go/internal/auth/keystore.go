@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -200,7 +201,7 @@ func writeKeyFile(path, key string) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := fsreplace.Rename(tmp, path); err != nil {
 		return err
 	}
 	done = true
