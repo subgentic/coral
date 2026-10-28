@@ -6,7 +6,7 @@ import { defineFilters, text } from './filter_model.js';
 import { browserLocal } from './safe_storage.js';
 
 export const STATES = ['active', 'paused'];
-export const STATE_LABEL = { active: 'Active', paused: 'Paused' };
+export const STATE_LABEL = { active: 'Active', paused: 'Turned off' }; // the state key stays; the word is the job page's (#10475)
 export const RESULTS = ['passed', 'failed', 'running', 'never'];
 export const RESULT_LABEL = { passed: 'Passed', failed: 'Failed', running: 'Running', never: 'Never run' };
 export const RUNS = ['workflow', 'prompt'];

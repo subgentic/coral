@@ -39,8 +39,8 @@ const BASE = require('./test_base').BASE;
             check(a.length === 1 && /New job/.test(a[0].seen), `Jobs: the create button says New job in words (it shows ${JSON.stringify(a.map(x => x.seen))})`);
             check(a.every(x => x.h >= (mobile ? 44 : 0) && x.l >= 0 && x.r <= w), `Jobs: each create button is 44 px tall and on the screen ${JSON.stringify(a)}`);
             // (2) a paused job says Paused beside its name; the active one does not
-            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => ({ name: r.querySelector('.dt-primary').textContent.trim(), paused: [...r.querySelectorAll('.chip')].some(c => c.textContent.trim() === 'Paused' && c.getClientRects().length > 0) }))`);
-            check(rows.length === 2 && rows.find(r => r.name === 'weekly-cleanup').paused === true && rows.find(r => r.name === 'summarize-the-day').paused === false, `Jobs: only the paused job shows Paused (${JSON.stringify(rows)})`);
+            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => ({ name: r.querySelector('.dt-primary').textContent.trim(), paused: [...r.querySelectorAll('.chip')].some(c => c.textContent.trim() === 'Turned off' && c.getClientRects().length > 0) }))`);
+            check(rows.length === 2 && rows.find(r => r.name === 'weekly-cleanup').paused === true && rows.find(r => r.name === 'summarize-the-day').paused === false, `Jobs: only the turned-off job shows Turned off (${JSON.stringify(rows)})`);
             // workflows
             await ev(`window.openAutomationsFolder('workflows'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 2`, `${w}: the two workflows`, 10000);

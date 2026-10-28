@@ -72,14 +72,14 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody .dt-action').length`), 0, at + 'no state-changing button in a row: Run is on the workflow\'s page (UI/UX #8863)');
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search workflows', at + 'the search is named for the folder');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-action .btn')].map(b => b.textContent.replace('smart_toy', '').trim())`), ['Build with Agent', 'New workflow'], at + 'Build with Agent and New workflow are the create actions');
-            if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['All 3', 'Active 2', 'Paused 1'], at + 'the pills have the table\'s counts');
+            if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['All 3', 'Active 2', 'Turned off 1'], at + 'the pills have the table\'s counts');
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the table is on the scale');
             await themed('automations-workflows-table', w);
 
             // the toolbar: pills, Filters, search
             if (!mobile) {
-                await pill(/Paused/); await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 1`, at + 'Paused', 4000);
+                await pill(/Turned off/); await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 1`, at + 'Paused', 4000);
                 assert.deepEqual(await names(), ['old-deploy'], at + 'the Paused pill leaves the paused workflow');
                 await pill(/^All/); await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'All', 4000);
             }

@@ -56,7 +56,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.querySelectorAll('#automations-nav-list .sched-row').length`), 0, `${at}no job rows in the sidebar`);
             assert.deepEqual(await names(), ['nightly-build-job', 'summarize-the-day', 'weekly-cleanup'], `${at}by next run (20 h, 30 h), the paused job last`);
             // the Last run chip says its state in words (the old sidebar dot's name, which scheduler_status_dot pinned): the words are the chip's text, the dot is decoration
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => [r.querySelector('.dt-primary').textContent, [...r.querySelectorAll('.dt-chip')].map(c => c.textContent.trim()), r.querySelectorAll('.dt-chip .goal-dot[aria-hidden="true"]').length])`), [['nightly-build-job', ['Failed'], 1], ['summarize-the-day', ['Passed'], 1], ['weekly-cleanup', ['Paused'], 1]], `${at}each Last run chip is named by its words (failed, passed, Paused), its dot decorative`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => [r.querySelector('.dt-primary').textContent, [...r.querySelectorAll('.dt-chip')].map(c => c.textContent.trim()), r.querySelectorAll('.dt-chip .goal-dot[aria-hidden="true"]').length])`), [['nightly-build-job', ['Failed'], 1], ['summarize-the-day', ['Passed'], 1], ['weekly-cleanup', ['Turned off'], 1]], `${at}each Last run chip is named by its words (failed, passed, Turned off), its dot decorative`);
             await oneLinePerRow(ev, '#group-table-view tbody tr[data-key]', `${at}the jobs`, assert, { min: 3 }); // Goal #79: one line a row at both widths; a narrow list drops Schedule and Next
             const tips = await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => b.title).sort()`);
             assert.deepEqual(tips, ['nightly-build-job \u2014 Workflow nightly-build', 'summarize-the-day \u2014 Agent prompt (Claude)', 'weekly-cleanup \u2014 Agent prompt (Claude)'], `${at}what a job runs is its name's tooltip (and its page's), not a second line`);
@@ -67,7 +67,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(act.name, 'New job', `${at}the create action is named whole: ${JSON.stringify(act)}`);
             if (mobile) assert.ok(act.h >= 44 && act.text, `${at}on a phone it is 44 px tall and says its words, after a "+" (#10275: a bare "+" said nothing): ${JSON.stringify(act)}`);
             else assert.ok(act.text, `${at}at 1280 it has its words: ${JSON.stringify(act)}`);
-            if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['All 3', 'Active 2', 'Paused 1'], `${at}the pills have the table's counts`);
+            if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['All 3', 'Active 2', 'Turned off 1'], `${at}the pills have the table's counts`);
 
             // the Filters panel
             await ev(`document.querySelector('#group-table-view .list-bar-toggle').click(); true`); await settle(200);
@@ -78,7 +78,7 @@ const BASE = require('./test_base').BASE;
             await setField('automations-jobs-result', ''); await settle(300);
             await ev(`document.querySelector('#group-table-view .list-bar-toggle').click(); true`); await settle(200);
             if (!mobile) {
-                await pick(/Paused/); await settle(300);
+                await pick(/Turned off/); await settle(300);
                 assert.deepEqual(await names(), ['weekly-cleanup'], `${at}the Paused pill leaves the paused job`);
                 await pick(/^All/); await settle(300);
             }

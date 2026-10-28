@@ -11,7 +11,7 @@ import { registerGroupSource, openGroupTable, refreshGroupTable } from './sideba
 import { setHidden } from './dom_write.js';
 import { announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
-import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf } from './scheduler.js';
+import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf, offWord } from './scheduler.js';
 import { lastWords, lastChip, atWords, whenWords, failureWords, isExample } from './job_words.js';
 import { liveRuns, onLiveRuns, selectLiveJobRun } from './live_jobs.js';
 const DT = await importOnce('./data_table.js'); // a lazy module imports only what loads at startup (import_hygiene): these load with it
@@ -172,11 +172,11 @@ const nameButton = (i, what) => {
     if (!isExample(i.name, i.kind === 'job' ? i.job && i.job.description : i.kind === 'workflow' ? i.does : '')) return b;
     const w = DT.el('span', 'dt-name-example'); w.append(b, DT.tag('Example')); return w; // one added as an example is marked, so nobody takes it for their own (#10001)
 };
-/** A job's Last run; a paused job also says Paused beside it when its Next column (where the chip is) has gone, in a narrow list (#10275: a phone's Jobs list did not say which job was paused). */
+/** A job's Last run; a job that is turned off also says so beside it when its Next column (where the chip is) has gone, in a narrow list (#10275: a phone's Jobs list did not say which job was paused). */
 const jobLastCell = i => {
     const base = lastRunCell(i);
     if (i.enabled) return base;
-    const cell = DT.el('span', 'dt-title-cell'), chip = DT.chip('Paused');
+    const cell = DT.el('span', 'dt-title-cell'), chip = DT.chip(offWord(i.job));
     chip.classList.replace('dt-chip', 'dt-paused-name'); // not a .dt-chip: the Last run and Next columns' chips are what the table's own tests count
     cell.append(base, chip);
     return cell;
@@ -187,7 +187,7 @@ const scheduleWords = i => (i.kind === 'job' ? scheduleOf(i.job) : 'No schedule'
 const whatWords = i => (i.kind === 'job' ? runsWords(i) : i.kind === 'workflow' ? stepsWords(i) : '');
 function nextCell(i) {
     if (i.kind !== 'job') return 'Not scheduled';
-    const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip('Paused');
+    const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip(offWord(i.job));
     if (i.enabled && i.job.next_fire_at) { cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`; cell.append(DT.el('span', 'sr-only', `, next run ${atWords(i.job.next_fire_at)} your time`)); } // also as text: a tooltip is not read, and a touch screen has none (#9117)
     return cell;
 }
@@ -273,7 +273,7 @@ function folderTable(key) {
                     { key: 'schedule', label: 'Schedule', width: '12rem', dropAt: 36, sort: true, sortValue: i => scheduleOf(i.job), cell: i => scheduleOf(i.job) },
                     { key: 'last-run', label: 'Last run', width: '12rem', dropAt: 16, tone: 'tertiary', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: jobLastCell },
                     { key: 'next', label: 'Next', width: '7rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => (i.enabled ? i.job.next_fire_at : ''), cell: i => {
-                        const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip('Paused');
+                        const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip(offWord(i.job));
                         if (i.enabled && i.job.next_fire_at) { cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`; cell.append(DT.el('span', 'sr-only', `, next run ${atWords(i.job.next_fire_at)} your time`)); } // also as text (#9117)
                         return cell;
                     } },
