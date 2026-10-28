@@ -14,13 +14,17 @@ import (
 
 // A folder that is not a git repository has no changes to compare, but an agent still writes files there (#10256): the Files list is the folder's recently changed files, newest first.
 // The bounds are the file viewer's: inside the folder the session runs in, nothing in a dot folder, no credential file (sensitivePath, for everyone), no symlink, and for a strict
-// caller (the Hub, a proxy, curl) a folder the strict rules allow. Beyond those, a week, 100 files, four levels down and 5,000 entries looked at, so a huge folder costs a bounded walk.
+// caller (the Hub, a proxy, curl) a folder the strict rules allow. Beyond those, a week, 100 files, four levels down, 5,000 entries looked at (500 of any one folder, breadth first), and no dependency or build folder (node_modules, vendor, dist, build, .venv as a dot folder, venv, target), so a huge folder costs a bounded walk and does not hide the agent's own files.
 const (
 	recentPlainMaxFiles   = 100
 	recentPlainMaxVisited = 5000
 	recentPlainMaxDepth   = 4
 	recentPlainWindow     = 7 * 24 * time.Hour
+	recentPlainPerDir     = 500 // entries read in any one folder
 )
+
+// recentPlainSkipDirs are dependency and build folders: thousands of files a tool wrote, not the agent's. Never walked.
+var recentPlainSkipDirs = map[string]bool{"node_modules": true, "vendor": true, "dist": true, "build": true, "venv": true, "__pycache__": true, "target": true}
 
 // recentFilesInPlainFolder lists the files of dir changed in the last week, newest first, as the changed-files list's rows (status "??", no line counts, recorded_at the change time).
 func recentFilesInPlainFolder(dir string, strict bool) []store.ChangedFile {
@@ -33,30 +37,41 @@ func recentFilesInPlainFolder(dir string, strict bool) []store.ChangedFile {
 		rel string
 		at  time.Time
 	}
+	type pending struct {
+		abs, rel string
+		depth    int
+	}
 	var hits []found
 	visited := 0
-	var walk func(abs, rel string, depth int)
-	walk = func(abs, rel string, depth int) {
-		entries, err := os.ReadDir(abs)
+	// Breadth first, so the files near the top of the folder are looked at before anything deep, and at most recentPlainPerDir entries of any one folder: a huge folder (a thousand generated files) cannot
+	// spend the whole budget before its siblings are read.
+	queue := []pending{{realRoot, "", 1}}
+	for len(queue) > 0 && visited < recentPlainMaxVisited {
+		cur := queue[0]
+		queue = queue[1:]
+		entries, err := os.ReadDir(cur.abs)
 		if err != nil {
-			return
+			continue
+		}
+		if len(entries) > recentPlainPerDir {
+			entries = entries[:recentPlainPerDir]
 		}
 		for _, e := range entries {
 			if visited >= recentPlainMaxVisited {
-				return
+				break
 			}
 			visited++
 			name := e.Name()
-			if strings.HasPrefix(name, ".") || e.Type()&fs.ModeSymlink != 0 || sensitivePath(filepath.Join(abs, name)) {
+			if strings.HasPrefix(name, ".") || e.Type()&fs.ModeSymlink != 0 || sensitivePath(filepath.Join(cur.abs, name)) {
 				continue
 			}
 			childRel := name
-			if rel != "" {
-				childRel = rel + "/" + name
+			if cur.rel != "" {
+				childRel = cur.rel + "/" + name
 			}
 			if e.IsDir() {
-				if depth < recentPlainMaxDepth {
-					walk(filepath.Join(abs, name), childRel, depth+1)
+				if cur.depth < recentPlainMaxDepth && !recentPlainSkipDirs[strings.ToLower(name)] {
+					queue = append(queue, pending{filepath.Join(cur.abs, name), childRel, cur.depth + 1})
 				}
 				continue
 			}
@@ -70,7 +85,6 @@ func recentFilesInPlainFolder(dir string, strict bool) []store.ChangedFile {
 			hits = append(hits, found{childRel, info.ModTime()})
 		}
 	}
-	walk(realRoot, "", 1)
 	slices.SortFunc(hits, func(a, b found) int {
 		if c := b.at.Compare(a.at); c != 0 {
 			return c
