@@ -10,7 +10,7 @@ import { CHEVRON_DECO, _chevron, _collapseAttrs, _isGroupCollapsed, _teamHeaderA
 import { getFolderTags, renderFolderTagPills } from './folder_tags.js';
 import { pinPathForKey, emptyPins, notePinKeys } from './pinned_folders.js';
 import { localFirst } from './server_status.js';
-import { killAllItem, teamHealthBtn, _rowNameWithServer, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
+import { killAllItem, deleteTeamItem, teamHealthBtn, _rowNameWithServer, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
 import { _pinMatchesFilter } from './list_filter_match.js';
 
 // Team-first mode: one team as a card: its header, its menu and its agents.
@@ -78,6 +78,7 @@ function _renderTeamCard(boardName, boardSessions) {
                     Reset Team
                 </button>
                 ${killAllItem(boardName)}
+                ${deleteTeamItem(boardName)}
             </div>
         </div>`;
         const sleepingClass = boardIsSleeping ? ' team-sleeping' : '';
@@ -308,6 +309,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                         </button>
                         <hr class="overflow-menu-divider">
                         ${killAllItem(boardName)}
+                ${deleteTeamItem(boardName)}
                     </div>
                 </div>`;
                 html += `<li class="session-board-card session-team-group"${accentStyle}>

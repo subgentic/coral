@@ -21,7 +21,7 @@ import { setLiveViewMode, showTerminalView, showChatView } from './live_chat.js'
 import { switchAgenticTab } from './agentic_state.js';
 import { copyBranchName, showToast } from './utils.js';
 import { showJobModal, hideJobModal, reshowJobModal } from './job_form.js';
-import { selectBoardProject, postBoardMessage, deleteMessageBoardProject, toggleBoardPause, showExportBoardModal, toggleSelectMode } from './message_board.js';
+import { selectBoardProject, postBoardMessage, deleteMessageBoardProject, deleteTeam, toggleBoardPause, showExportBoardModal, toggleSelectMode } from './message_board.js';
 import { showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolderTag } from './folder_tags.js';
 import { pinFolder, unpinFolder, showOpenFolderModal, hideOpenFolderModal, submitOpenFolder } from './pinned_folders.js';
 import { checkForUpdates, dismissUpdateToast } from './update_check.js';
@@ -45,6 +45,7 @@ registerActions({
     'mb-export': () => showExportBoardModal(),
     'mb-pause': () => toggleBoardPause(),
     'mb-delete-board': () => deleteMessageBoardProject(),
+    'team-delete': el => { const b = el.dataset.board; if (b) deleteTeam(b); }, // the sidebar's team menu (#10318)
     'mb-post': () => postBoardMessage(),
     // Enter sends, Shift+Enter is a new line.
     'mb-post-key': (el, event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); postBoardMessage(); } },

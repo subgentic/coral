@@ -195,6 +195,7 @@
 2	group_cards.js	boardSleepIcon
 2	group_cards.js	copyBtn
 2	group_cards.js	countBadge
+2	group_cards.js	deleteTeamItem(boardName)
 2	group_cards.js	distillChip(boardName)
 2	group_cards.js	groupKebab
 2	group_cards.js	killAllItem(boardName)
@@ -219,7 +220,7 @@
 1	launch_core.js	failList
 1	launch_core.js	started
 1	list_card_parts.js	PIN_ICON
-2	list_card_parts.js	icon
+4	list_card_parts.js	icon
 1	list_card_parts.js	name
 1	list_card_parts.js	prefix
 1	list_card_parts.js	st.cls
