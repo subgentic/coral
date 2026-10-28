@@ -556,6 +556,7 @@ async function saveTab(tab, btn) {
 // The Files list is read again on Refresh and when the agent's reply ends (changed_files.js); the open text files are read with it. A file with no unsaved edits shows its new text where the reader was
 // (the scroll place is kept); one with unsaved edits keeps them and says the file changed, with a Reload that is the person's own click: an edit is never dropped, a file never overwritten silently.
 let _following = false;
+const FOLLOW_TABS_MAX = 8;
 const _scrollerOf = body => [body, ...body.querySelectorAll('*')].find(e => e.scrollHeight > e.clientHeight + 20 && getComputedStyle(e).overflowY !== 'visible') || body;
 
 async function _showFresh(tab) {
@@ -582,7 +583,8 @@ function _diskNote(tab) {
 /** Read the open text files again (called when the Files list was read). */
 export async function refreshOpenFiles() {
     if (_following || !agentName()) return;
-    const tabs = _tabs.filter(t => t.kind === 'file' && t.content !== null && !isImagePath(t.filepath) && !isMediaPath(t.filepath));
+    const tabs = _tabs.filter(t => t.kind === 'file' && t.content !== null && !isImagePath(t.filepath) && !isMediaPath(t.filepath))
+        .sort((a, b) => (b.id === _activeId) - (a.id === _activeId)).slice(0, FOLLOW_TABS_MAX); // the tab on screen first; a pile of open tabs costs at most this many reads per refresh
     if (!tabs.length) return;
     _following = true;
     try {
@@ -591,6 +593,7 @@ export async function refreshOpenFiles() {
             let data;
             try { data = await (await fetch(_fileUrl('file-content', tab.filepath), { cache: 'no-store' })).json(); } catch { continue; }
             if (!data || data.error || typeof data.content !== 'string' || !_tabs.includes(tab) || data.content === tab.savedContent) continue;
+            _captureEditor(); // anything typed while the read was out (the editor also keeps tab.content as it goes; this is the belt to that brace)
             if (_isDirty(tab)) { tab.diskText = data.content; _diskNote(tab); continue; }
             tab.content = tab.savedContent = data.content; tab.originalContent = null; tab.diskText = null;
             if (tab.id === _activeId) await _showFresh(tab);

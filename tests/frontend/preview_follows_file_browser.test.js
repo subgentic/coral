@@ -7,12 +7,13 @@ const BASE = require('./test_base').BASE;
 
 const LONG = n => Array.from({ length: 400 }, (_, i) => `line ${i} of ${n}`).join('\n');
 const DISK = `(() => {
-    window.__disk = { '/notes.txt': 'one\\nsecond line', '/long.txt': ${JSON.stringify(LONG('v1'))}, '/draft.txt': 'draft v1' };
+    window.__disk = { '/notes.txt': 'one\\nsecond line', '/long.txt': ${JSON.stringify(LONG('v1'))}, '/draft.txt': 'draft v1', '/slow.txt': 'slow v1' };
     const inner = window.fetch;
     const reply = content => Promise.resolve(new Response(JSON.stringify({ content }), { status: 200, headers: { 'content-type': 'application/json' } }));
     window.fetch = (url, opts) => {
         const u = new URL(String(url), location.origin);
         const f = window.__disk['/' + String(u.searchParams.get('filepath')).replace(/^[/]+/, '')];
+        if (f !== undefined && window.__hold && String(u.searchParams.get('filepath')).endsWith('slow.txt') && /\\/file-content$/.test(u.pathname) && !(opts && opts.method === 'PUT')) return new Promise(r => { window.__release = () => { window.__hold = false; r(reply(f)); }; }); // the read is slow: answered when released
         if (f !== undefined && /\\/file-content$/.test(u.pathname) && !(opts && opts.method === 'PUT')) return reply(f);
         if (/\\/api\\/sessions\\/live\\/[^/]+\\/files(\\?|$)/.test(u.pathname + u.search)) return Promise.resolve(new Response(JSON.stringify({ files: [], diff_mode: 'branch_point' }), { headers: { 'content-type': 'application/json' } }));
         return inner(url, opts);
@@ -67,6 +68,17 @@ const DISK = `(() => {
         await waitFor(`/draft v2 from the agent/.test((document.querySelector('#preview-pane .cm-content') || {}).innerText || '')`, 'Reload takes the disk text', 6000);
         assert.doesNotMatch(await ev(`document.querySelector('#preview-pane .cm-content').innerText`), /MY EDIT/, 'and only on that click');
         console.log('   ✓');
+        console.log('4. Typing while the read is still in flight is not lost');
+        await open('slow.txt', 'edit');
+        await waitFor(`/slow v1/.test((document.querySelector('#preview-pane .cm-content') || {}).innerText || '')`, 'the editor', 10000);
+        await ev(`window.__hold = true; window.__disk['/slow.txt'] = 'slow v2 from the agent'; import(${MOD} + 'changed_files.js').then(m => m.loadChangedFiles('ed-a', 'ed-a-id')); true`);
+        await waitFor(`typeof window.__release === 'function'`, 'the read to be in flight', 5000);
+        await ev(`document.querySelector('#preview-pane .cm-content').focus(); true`);
+        await client.Input.insertText({ text: ' TYPED DURING THE READ' });
+        await ev(`window.__release(); true`);
+        await waitFor(`/changed on disk/i.test((document.getElementById('preview-body') || {}).innerText || '')`, 'the note, not an overwrite', 6000);
+        assert.match(await ev(`document.querySelector('#preview-pane .cm-content').innerText`), /TYPED DURING THE READ/, 'what was typed while the read was out is kept');
+        console.log('   \u2713');
         console.log('PASS Open previews follow their file: new text, scroll kept, edits never dropped');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
