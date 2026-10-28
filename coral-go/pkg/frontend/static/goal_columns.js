@@ -18,7 +18,12 @@ export function goalColumns(ctx = {}, keys = ['state', 'goal', 'team', 'progress
         state: { key: 'state', label: 'State', sort: true, sortValue: W.stateWord, line: 2, width: '6.5rem', dropAt: 16,
             cell: g => g.noGoal ? '' : DT.chip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`) },
         goal: { key: 'goal', label: 'Goal', primary: true, width: 'grow', sort: true, sortValue: g => g.title, line: 1,
-            cell: g => { const b = DT.primaryButton(g.title || `Goal ${g.id}`); b.dataset.goalId = String(g.id); if (g.noGoal) b.classList.add('goals-no-goal'); return b; } }, // one line a row (Goal #79): the title alone; the outcome is in the goal's preview and page
+            cell: g => { const b = DT.primaryButton(g.title || `Goal ${g.id}`); b.dataset.goalId = String(g.id); if (g.noGoal) b.classList.add('goals-no-goal');
+                if (!ctx.closeReady || g.noGoal || !W.readyToClose(g)) return b;
+                // every task of an active goal is done: the row says so, quietly, with a Close that goes straight to the close dialog (#10604)
+                const w = DT.el('span', 'dt-title-cell'), note = DT.el('span', 'dt-title-snippet goals-ready-note', 'All tasks done: close the goal?'), c = DT.el('button', 'btn btn-small goals-ready-close', 'Close');
+                c.type = 'button'; c.setAttribute('aria-label', `Close the goal: ${g.title || g.id}`); c.addEventListener('click', e => { e.stopPropagation(); ctx.closeReady(g); });
+                w.append(b, note, c); return w; } }, // one line a row (Goal #79): the title alone; the outcome is in the goal's preview and page
         team: { key: 'team', label: 'Team', sort: true, sortValue: team, line: 2, width: '9rem', dropAt: 36,
             cell: g => ctx.openTeam ? DT.link(team(g), () => ctx.openTeam(g)) : team(g) },
         progress: { key: 'progress', label: ctx.progressLabel || 'Progress', sort: 'number', sortValue: g => total(g) ? done(g) / total(g) : 0, line: 2, tone: 'tertiary', width: '8rem', dropAt: 36,
