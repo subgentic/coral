@@ -23,6 +23,27 @@ function toggleTabletSidebar() {
     document.querySelector('.tablet-sidebar-toggle')?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 }
 window.toggleTabletSidebar = toggleTabletSidebar;
+
+// The sidebar is a complementary landmark named for the tab it shows (it said "Agents" on the Inbox, Automations, Analytics and Docs tabs, where it holds their folders), and a drawer that is shut (a narrow desktop window,
+// 768 to 1023 px) is inert: off screen, it is not in the accessibility tree or the Tab order (#10306 LOW, #10452).
+const TAB_NAMES = { agents: 'Agents', 'hub-inbox': 'Inbox', automations: 'Automations', tokens: 'Analytics', docs: 'Docs' };
+function syncSidebarLandmark() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+    const name = TAB_NAMES[document.body.getAttribute('data-nav-tab') || 'agents'];
+    if (name && sidebar.getAttribute('aria-label') !== name) sidebar.setAttribute('aria-label', name);
+    const drawer = typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches;
+    sidebar.inert = drawer && !sidebar.classList.contains('tablet-open');
+}
+if (typeof document.addEventListener === 'function') {
+    const start = () => {
+        syncSidebarLandmark();
+        new MutationObserver(syncSidebarLandmark).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
+        const sb = document.querySelector('.sidebar'); if (sb) new MutationObserver(syncSidebarLandmark).observe(sb, { attributes: true, attributeFilter: ['class'] });
+        window.matchMedia?.('(min-width: 768px) and (max-width: 1023px)').addEventListener?.('change', syncSidebarLandmark);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+}
 // Escape closes the drawer (#10306), and the focus goes back to the button that opened it; a click outside is the backdrop's.
 if (typeof document.addEventListener === 'function') document.addEventListener('keydown', e => {
     if (e.key !== 'Escape' || e.defaultPrevented || !document.querySelector('.sidebar.tablet-open')) return;
