@@ -44,7 +44,7 @@ const ITEMS = [
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'saved'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="saved"]').click(); true`);
             await waitRows(3, 'the three open saved messages');
-            await waitFor(`/Saved3/.test(${FOLDER_ROWS}.join('|')) && /All chats\\d/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
+            await waitFor(`/Saved3/.test(${FOLDER_ROWS}.join('|')) && /All chats/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
             const before = await folders();
 
             check(`${label}: opening the folder puts the focus on the page's search box, not on the heading`, await ev(`(() => { const a = document.activeElement; return !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));

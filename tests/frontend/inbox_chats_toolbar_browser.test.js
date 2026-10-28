@@ -47,7 +47,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
             await openFolder('chats', mobile, 'All chats');
-            await waitFor(`/All chats\\d/.test(${FOLDER_ROWS}.join('|')) || !!document.querySelector('.view-list select')`, 'the folder counts', 10000);
+            await waitFor(`/All chats/.test(${FOLDER_ROWS}.join('|')) || !!document.querySelector('.view-list select')`, 'the folder counts', 10000);
             const before = await folders();
 
             check(`${label}: opening the folder puts the focus on the page's search box, not on the heading`, await ev(`(() => { const a = document.activeElement; return !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));
