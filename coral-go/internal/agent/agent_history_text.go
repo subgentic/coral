@@ -11,8 +11,8 @@ import (
 )
 
 // HistoryIndexVersion is the version of the History parsers: a session indexed with an older one is read again once (its row has no first user message, #6207). Every scanner stamps it on the rows it
-// writes; store.GetHistoryMtimes is given it, so the next pass re-reads the files of older rows whatever their mtime. Version 1 was the guardian-aware Codex parser (#6081); version 4 keeps the launch prompt out of the first user message (#7756).
-const HistoryIndexVersion = 4
+// writes; store.GetHistoryMtimes is given it, so the next pass re-reads the files of older rows whatever their mtime. Version 1 was the guardian-aware Codex parser (#6081); version 4 keeps the launch prompt out of the first user message (#7756); version 5 keeps what Coral typed into the agent (a nudge, a task notice) out of it (#10163).
+const HistoryIndexVersion = 5
 
 // firstMessageLimit is how much of the first user message is kept.
 const firstMessageLimit = 200
@@ -74,7 +74,7 @@ func typedText(text string) (string, bool) {
 		}
 		text = t[:start]
 	}
-	if injectedUserText(text) {
+	if injectedUserText(text) || IsCoralDelivery(text) { // what Coral typed into the agent (a nudge, a task notice) is not what the person asked (#10163)
 		return "", false
 	}
 	return text, true

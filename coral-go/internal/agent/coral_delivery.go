@@ -1,4 +1,4 @@
-package jsonl
+package agent
 
 import (
 	"regexp"

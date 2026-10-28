@@ -113,7 +113,7 @@ func (t *goalTranscript) feed(messages []map[string]any) {
 				continue // a turn the server saw Coral deliver: not what a person asked (#10046)
 			}
 			c, _ := m["content"].(string)
-			if jsonl.IsCoralDelivery(c) {
+			if agent.IsCoralDelivery(c) {
 				continue // Coral's own nudge, task notice or health check typed into the agent (#10046)
 			}
 			if c = userRequestText(c); c != "" {
