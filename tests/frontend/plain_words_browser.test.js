@@ -33,7 +33,7 @@ const BASE = require('./test_base').BASE;
             await ev(`(() => { const i = document.getElementById('agent-search-input'); i.value = 'zzz-matches-nothing'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`!!document.querySelector('#live-sessions-list .empty-plain, #mobile-session-list .empty-plain')`, 'the empty list line', 6000);
             const none = await ev(`(document.querySelector('#live-sessions-list .empty-plain') || document.querySelector('#mobile-session-list .empty-plain') || {}).textContent`);
-            check(`${tag}: a search that matches no agent says what to do`, (none || '').trim() === 'No agents match. Clear the filters to see them all.', String(none));
+            check(`${tag}: a search that matches no agent says what to do`, /^No agents match zzz-matches-nothing\. Clear search$/.test((none || '').trim().replace(/\s+/g, ' ')), String(none));
             await ev(`(() => { const i = document.getElementById('agent-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             // the Archived folder, empty
             await ev(`Promise.all([import(${S} + 'nav.js')]).then(([n]) => n.go({ view: 'inbox-folder', folder: 'chats-archived' })).then(() => true)`);
