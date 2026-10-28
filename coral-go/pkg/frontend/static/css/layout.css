@@ -239,10 +239,10 @@ body.panel-dragging .sidebar {
 
 /* The sidebar's toolbar buttons are quiet .btn-icons (#9332): the height of the header's controls is the family's (36, 44 on touch), as --ctl-h is. */
 
-/* Collapsed icon rail (desktop only) */
+/* Collapsed icon rail (desktop only). Under 1024 px the sidebar is a drawer (mobile.css), whole when it is open: a remembered rail would make it a 56 px strip over the chat (#10306). */
 .sidebar-rail { display: none; }
 
-@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
+@media (min-width: 1024px) {
     .layout.sidebar-collapsed > .sidebar {
         width: 56px !important;
         min-width: 56px;
