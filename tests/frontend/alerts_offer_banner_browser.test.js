@@ -32,6 +32,7 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(r.covered, [], `${w}: the offer covers nothing on the page: ${JSON.stringify(r)}`);
             assert.equal(r.inFlow, true, `${w}: the offer is in the page's flow, so the page starts below it: ${JSON.stringify(r)}`);
             assert.equal(r.cut, false, `${w}: its sentence is not cut: ${JSON.stringify(r)}`);
+            await waitFor(`/Get an alert when an agent/.test((document.getElementById('notice-live') || {}).textContent || '')`, 'the offer said once through the notices live region', { timeout: 4000 }); // a strip drawn with its words is not reliably read out: the notices' own region says it (Security Reviewer, #10248)
             assert.equal(r.off, false, `${w}: it fits the width`);
             if (mobile) assert.ok(r.lines >= 2, `${w}: at 390 px the sentence wraps over lines: ${JSON.stringify(r)}`);
             if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/alerts-offer-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
