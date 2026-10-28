@@ -1,5 +1,6 @@
 import { serverColumns, serverOf, serverLabel, multipleServers, readInboxArtifacts } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
+import { state } from './state.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
@@ -10,6 +11,8 @@ import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { showToast } from './utils.js';
+/** An agent's file with no team says whose it is where the Team column would say "No team" (#10797): the name comes from the live list, and "No team" stays when the agent is not in it. */
+const placeOf = item => { const a = item.team === 'No team' && item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return a ? (a.display_name || a.name) : teamLabel(item.board_id, item.team); };
 const DT = await importOnce('./data_table.js');
 const { artifactTable, serverArtifactSort, tableSortOf } = await importOnce('./artifact_table.js');
 const { starControl } = await importOnce('./artifact_star.js');
@@ -333,7 +336,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;
                 },
-                ...(inbox ? { mail: item => ({ lead: { icon: 'description', square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), starred: !!item.starred, snippet: [teamLabel(item.board_id, item.team), taskText(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : teamLabel(item.board_id, item.team), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed
+                ...(inbox ? { mail: item => ({ lead: { icon: 'description', square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), starred: !!item.starred, snippet: [placeOf(item), taskText(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : placeOf(item), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed
                 updatedWidth: model.scope ? '' : '9rem', // the lists with a Goal column keep "yesterday 3:00 AM" whole (the narrow lists drop nothing here and keep 7.5 rem)
                 tagsDropAt: inbox ? 62 : 0, // the Inbox list is crowded (a team, a task): its Tags go first, before Team and Task
                 afterName: [...(inbox ? (model.filters.team
@@ -341,9 +344,9 @@ export function createArtifactsList({ inbox = false } = {}) {
                     : multipleServers() // several computers on this hub (#9408): the team by its own name, its computer in a column of its own, one line each; a narrow list drops both and the row's hover and preview name the computer
                         ? [{ key: 'team', label: 'Team', width: '8rem', dropAt: 52, tone: 'tertiary', cell: item => item.team || keyLabel(item.board_id) },
                             { key: 'server', label: 'Computer', width: '7.5rem', dropAt: 52, tone: 'tertiary', cell: item => serverLabel(serverOf(item)) }]
-                        : [{ key: 'team', label: 'Team', width: '8rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: item => teamLabel(item.board_id, item.team) }]) : []),
+                        : [{ key: 'team', label: 'Team', width: '8rem', dropAt: 52, nowrap: false, tone: 'tertiary', cell: item => placeOf(item) }]) : []),
                     ...(model.scope || by === 'goal' ? [] : [{ key: 'goal', label: 'Goal', width: inbox && multipleServers() ? '6.5rem' : '10rem', dropAt: 52, tone: 'tertiary', cell: goalCell }])], // the goal of the file's task, one line (ellipsis, the whole name on hover), a link to the goal (#9274): the Operator finds it the more useful column; the task is in the row's tooltip, its preview and, grouped by task, the group's head (#8617); the head says it where the list is grouped by task; an agent's own list has none // the team's words carry its computer ("alpha · Box Two"), so two same-named teams are told apart (#8774)
-                nameTitle: item => [readableName(item), inbox ? teamLabel(item.board_id, item.team) : '', taskText(item), originBadge(item)].filter(Boolean).join(' · '),
+                nameTitle: item => [readableName(item), inbox ? placeOf(item) : '', taskText(item), originBadge(item)].filter(Boolean).join(' · '),
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
             });
@@ -438,7 +441,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const received = item.source === 'received';
         const facts = [
             ['MIME', un ? '' : item.media_type || 'Unknown'], // the header says the type, the size and when (#7775): nothing here repeats it
-            ...(inbox ? (multipleServers() ? [['Team', item.team || keyLabel(item.board_id)], ['Computer', serverLabel(serverOf(item))]] : [['Team', teamLabel(item.board_id, item.team)]]) : []), ['Task', taskCell(item)], ...(item.goal_id && item.goal_title ? [['Goal', goalCell(item)]] : []), ['Producer', item.produced_by], // the Task fact is the same link as the column: a phone drops the column
+            ...(inbox ? (multipleServers() ? [['Team', item.team || keyLabel(item.board_id)], ['Computer', serverLabel(serverOf(item))]] : [['Team', placeOf(item)]]) : []), ['Task', taskCell(item)], ...(item.goal_id && item.goal_title ? [['Goal', goalCell(item)]] : []), ['Producer', item.produced_by], // the Task fact is the same link as the column: a phone drops the column
             ['Status', un ? 'Link not verified: this team has not uploaded this file, so Coral shows no size, type or preview' : ''],
             ['Sent to', item.source === 'shared' ? item.shared_to : ''], ['Sent by', item.source === 'shared' || received ? item.sent_by : ''],
             ['Received from', received ? item.received_from : ''], ['Board (claimed by the sender)', received ? item.from_board : ''],

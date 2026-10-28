@@ -12,9 +12,8 @@ import { routeHref } from './markdown.js';
  * opts.blocked: prefix the text with "Blocked: " (once) so a refusal is clear
  *   without relying on colour.
  * opts.action: {label, onClick} adds a button; clicking it dismisses the toast
- *   and runs onClick. A toast with an action has no timer and does not fade: it
- *   stays until it is used or dismissed (WCAG 2.2.1: a keyboard-only person is
- *   far from it, and nothing runs out under them). A plain toast keeps its timer.
+ *   and runs onClick. A toast with an action stays 30 s (until it is used or dismissed, and while focus is on it: nothing runs out under a keyboard-only person, WCAG 2.2.1);
+ *   a plain toast keeps its short timer. Either leaves when the page changes (a toast about one page is not shown on the next).
  *
  * opts.group = { key, text(n) }: toasts of one kind fold into one card ("Restarting 5 agents"): a toast of the same key that is still shown says text(n) for the nth and starts its time again,
  *   instead of a second card (UI/UX 170 consistency pass 2, item 4).
@@ -22,10 +21,14 @@ import { routeHref } from './markdown.js';
  * Returns the toast element. Text is set with textContent only.
  */
 /** How long a toast with no duration of its own stays (#6727): a short one 4 s; an error at least 8 s, and either longer by the length of its words (40 ms a character past 80, at most 20 s): a person has to be able to read what went wrong. */
+const ACTION_TOAST_MS = 30000;
 function toastMs(text, error) {
     const extra = Math.max(0, String(text || "").length - 80) * 40;
     return Math.min(20000, (error ? 8000 : 4000) + extra);
 }
+
+// A toast about one page is not shown on the next (#10797): a route change takes the older ones away.
+if (typeof document !== "undefined" && typeof document.addEventListener === "function") document.addEventListener("coral:route-changed", () => { for (const t of document.querySelectorAll("#toast-host .toast")) if (Date.now() - Number(t.dataset.at) > 1500) t.querySelector(".toast-close")?.click(); }); // one shown a moment ago is about the page that is opening (a job created, then its page)
 
 export function showToast(message, isError = false, duration, opts = {}) {
     const error = !!isError;
@@ -34,6 +37,7 @@ export function showToast(message, isError = false, duration, opts = {}) {
     if (folded && folded._fold) return folded._fold();
     const toast = document.createElement("div");
     toast.className = `toast ${error ? "error" : ""}`;
+    toast.dataset.at = String(Date.now());
 
     let text = String(message ?? "");
     if (opts.blocked && !/^Blocked:/.test(text)) text = `Blocked: ${text}`;
@@ -66,7 +70,8 @@ export function showToast(message, isError = false, duration, opts = {}) {
         });
         toast.appendChild(button);
         toast.classList.add("has-action");
-        duration = Infinity;
+        duration = ACTION_TOAST_MS; // it leaves after its action is used, or 30 s (#10797); focus on it holds the time
+        toast.addEventListener("focusin", () => { clearTimeout(timer); timer = 0; });
     }
     const close = document.createElement("button");
     close.type = "button";
