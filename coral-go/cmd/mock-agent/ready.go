@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -92,10 +93,13 @@ func applyControl(box *inputBox, line string) (handled, waiting bool) {
 		secs := 30.0
 		if f := strings.Fields(line); len(f) > 1 {
 			n, err := strconv.ParseFloat(f[1], 64)
-			if err != nil || n <= 0 || len(f) > 2 {
+			if err != nil || math.IsNaN(n) || math.IsInf(n, 0) || n <= 0 || len(f) > 2 {
 				return false, false
 			}
 			secs = n
+		}
+		if secs > 3600 {
+			secs = 3600 // an hour at most: a number that overflows a Duration is not a wait
 		}
 		box.busyFor = time.Duration(secs * float64(time.Second))
 		fmt.Printf("\r\n[mock-agent] working for %gs\r\n", secs)

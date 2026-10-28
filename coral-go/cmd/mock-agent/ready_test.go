@@ -224,6 +224,16 @@ func TestApplyControlBusy(t *testing.T) {
 	if h, _ := applyControl(b, "MOCK_BUSY soon"); h || b.busyFor != 0 {
 		t.Fatalf("a bad number is a message, not a control: handled=%v busyFor=%v", h, b.busyFor)
 	}
+	for _, bad := range []string{"MOCK_BUSY NaN", "MOCK_BUSY Inf", "MOCK_BUSY -Inf", "MOCK_BUSY +Inf", "MOCK_BUSY 0", "MOCK_BUSY -3"} {
+		b = &inputBox{}
+		if h, _ := applyControl(b, bad); h || b.busyFor != 0 {
+			t.Fatalf("%q is a message, not a control: handled=%v busyFor=%v", bad, h, b.busyFor)
+		}
+	}
+	b = &inputBox{}
+	if h, w := applyControl(b, "MOCK_BUSY 99999"); !h || !w || b.busyFor != time.Hour {
+		t.Fatalf("a long wait is held to an hour: handled=%v waiting=%v busyFor=%v", h, w, b.busyFor)
+	}
 }
 
 func TestMockExitControlEndsTheProcess(t *testing.T) {
