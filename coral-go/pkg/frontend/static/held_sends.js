@@ -5,6 +5,8 @@
 import { state } from './state.js';
 import { sessionServer, serverFetch } from './server_base.js';
 import { showToast } from './utils.js';
+import { browserLocal } from './safe_storage.js';
+import { storeKey } from './local_store.js';
 
 const sent = new Map();     // `${sid}|${id}` -> text, a send over the socket that has not been answered yet
 const queued = new Map();   // sid -> Map(held id -> { id: held id, text, composerId, sending }): the server's id for the message is what Cancel names
@@ -12,6 +14,19 @@ const byComposer = new Map(); // `${sid}|${composer frame id}` -> held id: the a
 const cancelling = new Set(); // `${sid}|${id}` whose cancel is under way: its refusal is the person's own doing, not an error
 const key = (sid, id) => `${sid}|${id}`;
 const WORDS = 40; // a long message stays on one line with its Cancel at the end
+const MINE_KEY = 'coral-held-mine';
+const MINE_MAX_AGE_MS = 24 * 3600 * 1000;
+/** The held message ids this browser sent (#10301): two devices on one Coral see the same queue, and each can cancel only what it sent. Kept in this browser, so a reload or another tab of it still owns them. */
+function readMine() {
+    try { const v = JSON.parse(browserLocal.get(storeKey(MINE_KEY)) || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; }
+}
+function isMine(id) { return Object.prototype.hasOwnProperty.call(readMine(), String(id)); }
+function rememberMine(id) {
+    const now = Date.now(), mine = readMine();
+    for (const k of Object.keys(mine)) if (now - mine[k] > MINE_MAX_AGE_MS) delete mine[k];
+    mine[String(id)] = now;
+    try { browserLocal.set(storeKey(MINE_KEY), JSON.stringify(mine)); } catch { /* storage unavailable: the lines show as another device's until it works */ }
+}
 const open = new Set();      // `${sid}|${held id}` of the queued lines the person has tapped open to read whole (#6794); a line leaves it when it is sent or cancelled
 
 /** The whole message on one line of words (what a tap on a clipped line shows). */
@@ -30,7 +45,8 @@ export function rememberSend(sid, id, text) { if (sid) sent.set(key(sid, id), St
 function put(sid, heldId, composerId, text) {
     if (!sid || heldId === undefined || heldId === null) return;
     if (!queued.has(sid)) queued.set(sid, new Map());
-    queued.get(sid).set(heldId, { id: heldId, composerId, text: String(text || ''), sending: false });
+    queued.get(sid).set(heldId, { id: heldId, composerId, text: String(text || ''), sending: false, mine: true });
+    rememberMine(heldId); // this window sent it
     if (composerId !== undefined && composerId !== null) byComposer.set(key(sid, composerId), heldId);
 }
 
@@ -65,16 +81,44 @@ function say(text) {
     paint();
 }
 
+const seenAnswer = new Map(); // sid -> `at` of the last answer this page has looked at (an answer it saw first is not announced when the page opens)
+const ownAnswer = new Map();  // sid -> `at` of an answer this browser gave: the server says "at" in its answer
+/** An answer this browser gave (the server's `at`): the note about another device is not for it. */
+export function noteOwnAnswer(sid, at) { if (sid && at) { ownAnswer.set(sid, at); seenAnswer.set(sid, at); } }
+
+/** The row says a prompt was answered lately (`last_answer: {label, at}`). When it was answered on another device, this one's card is gone with it and the region says what was picked and where (#10301). Nothing is said for a row first seen with its answer already in it, or for this browser's own answer. */
+export function syncAnswerFromRow(row) {
+    if (!row || !row.session_id) return;
+    const a = row.last_answer, sid = row.session_id;
+    const first = !seenAnswer.has(sid);
+    if (!a || !a.at) { if (first) seenAnswer.set(sid, 0); return; } // the row seen without an answer: one that comes after it is news
+    if (seenAnswer.get(sid) === a.at) return;
+    seenAnswer.set(sid, a.at);
+    if (first || ownAnswer.get(sid) === a.at) return;
+    if (state.currentSession && state.currentSession.session_id === sid) say(`Answered “${firstWords(a.label)}” from another device.`);
+}
+
+/** This browser's own answer was refused because the prompt is gone: when the row says another device answered it a moment ago, that is said instead of an error. True when it was. */
+export function answeredElsewhere(sid) {
+    const row = sessionOf(sid), a = row && row.last_answer;
+    if (!a || !a.at || ownAnswer.get(sid) === a.at) return false;
+    seenAnswer.set(sid, a.at);
+    say(`Answered “${firstWords(a.label)}” from another device.`);
+    return true;
+}
+
 /** Was this message's cancel the person's own (so its refusal is not an error)? */
 export function wasCancelled(sid, id) { return cancelling.delete(key(sid, id)); }
 
 /** The live row's own list (`held_messages: [{id, text}]`) is the truth for that agent when the server sends it. */
 export function syncQueuedFromRow(row) {
-    if (!row || !row.session_id || !Array.isArray(row.held_messages)) return;
+    if (!row || !row.session_id) return;
+    if (row.held_messages !== null && !Array.isArray(row.held_messages)) return; // not said at all: nothing is known; null is the server's "none held" (a cancel or a send on another screen empties the list)
+    const held = row.held_messages || [];
     const next = new Map();
     const had = queued.get(row.session_id);
-    for (const h of row.held_messages) if (h && typeof h.text === 'string' && h.text) next.set(h.id, { id: h.id, composerId: had && had.get(h.id) ? had.get(h.id).composerId : undefined, text: h.text, sending: !!h.sending });
-    const same = had && had.size === next.size && [...next].every(([id, v]) => had.get(id) && had.get(id).text === v.text && had.get(id).sending === v.sending);
+    for (const h of held) if (h && typeof h.text === 'string' && h.text) next.set(h.id, { id: h.id, composerId: had && had.get(h.id) ? had.get(h.id).composerId : undefined, text: h.text, sending: !!h.sending, mine: !!(had && had.get(h.id) && had.get(h.id).mine) || isMine(h.id) });
+    const same = had && had.size === next.size && [...next].every(([id, v]) => had.get(id) && had.get(id).text === v.text && had.get(id).sending === v.sending && had.get(id).mine === v.mine);
     if (same || (!had && !next.size)) return;
     if (next.size) queued.set(row.session_id, next); else queued.delete(row.session_id);
     paint();
@@ -116,7 +160,7 @@ export function paint() {
     if (!box) return;
     const sid = state.currentSession && state.currentSession.session_id;
     const items = sid && queued.get(sid) ? [...queued.get(sid).values()] : [];
-    const sig = sid + '|' + said + '|' + items.map(i => `${i.id}:${i.sending ? 1 : 0}:${open.has(key(sid, i.id)) ? 1 : 0}:${i.text}`).join('\u0001');
+    const sig = sid + '|' + said + '|' + items.map(i => `${i.id}:${i.sending ? 1 : 0}:${i.mine ? 1 : 0}:${open.has(key(sid, i.id)) ? 1 : 0}:${i.text}`).join('\u0001');
     if (sig === lastShown) return;
     lastShown = sig;
     const kids = [...box.children];
@@ -132,7 +176,7 @@ export function paint() {
     for (const i of items) {
         let el = rows.get(String(i.id));
         const clipped = [...wholeText(i.text)].length > WORDS, isOpen = clipped && open.has(key(sid, i.id));
-        const text = `${i.sending ? 'Sending: ' : ''}“${isOpen ? wholeText(i.text) : firstWords(i.text)}”`;
+        const text = `${i.sending ? 'Sending: ' : ''}${i.mine ? '' : 'Queued from another device: '}“${isOpen ? wholeText(i.text) : firstWords(i.text)}”`;
         if (!el) {
             el = document.createElement('div'); el.className = 'composer-queued-item'; el.dataset.key = String(i.id);
             const t = document.createElement('span'); t.className = 'composer-queued-text'; el.append(t);
@@ -150,8 +194,8 @@ export function paint() {
         if (clipped) t.setAttribute('aria-expanded', String(isOpen));
         else if (t.hasAttribute('role')) { t.removeAttribute('role'); t.removeAttribute('aria-expanded'); t.removeAttribute('tabindex'); }
         const cancel = el.querySelector('.composer-queued-cancel');
-        if (i.sending && cancel) cancel.remove(); // once it is being typed there is nothing left to cancel
-        if (!i.sending && !cancel) {
+        if ((i.sending || !i.mine) && cancel) cancel.remove(); // once it is being typed there is nothing left to cancel
+        if (!i.sending && i.mine && !cancel) { // only the device that sent it can cancel it
             const b = document.createElement('button'); b.type = 'button'; b.className = 'cni-link composer-queued-cancel'; b.textContent = 'Cancel';
             b.setAttribute('aria-label', `Cancel the queued message: ${firstWords(i.text)}`);
             b.addEventListener('click', () => cancelQueued(sid, i.id));

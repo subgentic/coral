@@ -492,6 +492,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"waiting_since":         waitingSince(state), // when the request began, for "waiting 4 min" (#6981)
 		"waiting_kind":          nilIf(!state.NeedsInput || state.WaitingKind == "", state.WaitingKind),
 		"asked_before_restart":  askedBefore,
+		"last_answer":           h.lastAnswerOf(agent.SessionID),                                                         // the prompt answered last, for a second screen's note (#10301)
 		"held_messages":         h.heldMessagesOf(agent.SessionID, naming.SessionName(agent.AgentType, agent.SessionID)), // a person's chat messages queued behind the agent's question (#6627)
 		"live_permission_mode":  h.liveMode(sid),
 		"working":               state.Working,
