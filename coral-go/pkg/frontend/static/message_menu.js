@@ -7,7 +7,6 @@ import { showToast, copyText } from './utils.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { sessionServer } from './server_base.js';
 
-export const MESSAGE_MENU_BUTTON = '<button type="button" class="btn btn-quiet btn-icon btn-xs chat-msg-menu-btn" title="Message actions" aria-label="Message actions" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-msg-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></button>';
 
 function item(menu, label, run, { disabled = false } = {}) {
     const b = document.createElement('button');
@@ -17,13 +16,15 @@ function item(menu, label, run, { disabled = false } = {}) {
     return b;
 }
 
-/** Another agent's box gets the text as its draft; that agent opens with it in the box. Nothing is sent. */
+/** Another agent's box gets the text added to its draft (after what is already typed there, a blank line between; an unsent message is never replaced); that agent opens with it in the box. Nothing is sent. */
 async function prefill(row, text) {
     const key = sessionKey(row);
-    if (key) saveSessionDraft(key, text);
+    const typed = (key && state.sessionInputText[key]) || '';
+    const draft = typed.trim() ? `${typed.replace(/\s+$/, '')}\n\n${text}` : text;
+    if (key) saveSessionDraft(key, draft);
     await window.selectLiveSession?.(row.name, row.agent_type, row.session_id, sessionServer(row), { focusChat: true });
     const box = document.getElementById('command-input');
-    if (box && !box.value) { box.value = text; box.dispatchEvent(new Event('input', { bubbles: true })); }
+    if (box && box.value !== draft) { box.value = draft; box.dispatchEvent(new Event('input', { bubbles: true })); }
     showToast(`The message is in ${resolveSessionIdentity(row)}'s box. Press Send to send it.`);
 }
 

@@ -8,12 +8,13 @@ import { thumbHtml, wireThumbs, sharedImageChips } from './chat_thumbs.js';
 import { splitSharedImages } from './shared_images.js';
 import { chatAgentAdapter } from './chat_agents.js';
 import { SAVE_BUTTON } from './saved_marks.js';
-import { MESSAGE_MENU_BUTTON } from './message_menu.js';
 import { messageTimeHtml } from './message_time.js';
 import { getToolIcon, renderToolCard, renderQuestionCard } from './chat_tool_cards.js';
 
 // Agent replies carry a copy button that copies the reply's markdown as the
 // agent wrote it (not the rendered text).
+// The button of a message the person sent: its menu (message_menu.js) loads when it is first opened, not at start (page weight).
+const MESSAGE_MENU_BUTTON = '<button type="button" class="btn btn-quiet btn-icon btn-xs chat-msg-menu-btn" title="Message actions" aria-label="Message actions" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-msg-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></button>';
 const COPY_BUTTON = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
 
 export const bubbleSource = new WeakMap();
