@@ -84,6 +84,7 @@ async function walk(ev, Input, { max = 250, within = null } = {}) {
             if (e.tagName === 'A' && !e.getAttribute('href')) continue;
             if (e.tabIndex < 0 && !e.matches('button, a[href], input, select, textarea, summary, [role=button], [role=tab], [role=menuitem], [role=option], [role=switch], [role=checkbox], [role=radio]')) continue; // a script-focusable container, not a control
             const c = e.closest(${JSON.stringify(COMPOSITE)}); if (c && reachedComposite.has(c)) continue;
+            const ma = e.closest('[data-message-actions]'); if (ma && e.matches('.chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn') && [...ma.querySelectorAll('.chat-copy-btn, .chat-save-btn, .chat-msg-menu-btn')].some(x => seen.has(x))) continue; // the chat's message buttons are one roving group: the Tab stop is reached, the arrows reach the rest (message_actions.js, chat_phone_a11y_browser pins it)
             const b = e.getBoundingClientRect(); if (!b.width || !b.height) continue;
             out.push(window.__kb.name(e)); }
         return out; })()`);

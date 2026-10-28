@@ -8,6 +8,7 @@ import { thumbHtml, wireThumbs, sharedImageChips } from './chat_thumbs.js';
 import { splitSharedImages } from './shared_images.js';
 import { chatAgentAdapter } from './chat_agents.js';
 import { SAVE_BUTTON } from './saved_marks.js';
+import { MESSAGE_MENU_BUTTON } from './message_menu.js';
 import { messageTimeHtml } from './message_time.js';
 import { getToolIcon, renderToolCard, renderQuestionCard } from './chat_tool_cards.js';
 
@@ -61,7 +62,7 @@ function renderOneMessage(msg, container, agentType) {
         // Images pasted in the dashboard lead the turn as "<path> coral://artifacts/<hex>" pairs (#5284): shown as artifact thumbnails, not as the text of a path and a link.
         const lead = splitSharedImages(unwrapPastedContent(msg.content));
         const bubble = makeBubble("chat-bubble human",
-            `<div class="role-label">You</div><div class="message-text prose">${renderMarkdown(lead.rest, undefined, 'chat')}</div>${attachmentChips(msg.attachments)}${sharedImageChips(lead.images)}${msg.key ? SAVE_BUTTON : ""}${messageTimeHtml(msg.timestamp)}`);
+            `<div class="role-label">You</div><div class="message-text prose">${renderMarkdown(lead.rest, undefined, 'chat')}</div>${attachmentChips(msg.attachments)}${sharedImageChips(lead.images)}${MESSAGE_MENU_BUTTON}${msg.key ? SAVE_BUTTON : ""}${messageTimeHtml(msg.timestamp)}`);
         if (msg.key) { bubble.dataset.msgKey = msg.key; bubble.dataset.said = msg.timestamp || ""; } // Save for Later finds the message again by this (#4510)
         wireThumbs(bubble);
         appendContent(container, bubble);

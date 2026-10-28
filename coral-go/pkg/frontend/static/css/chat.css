@@ -1570,3 +1570,10 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 
 /* An idle agent has nothing to stop: the chat view's Stop (the terminal's Esc key is another matter) is drawn only while the agent works, asks or is stuck (#7065). */
 #command-pane.chat-mode[data-can-stop="false"] .btn-esc { display: none; }
+
+/* The menu of a message the person sent (#10159): a three-dots button left of Save for later, shown on hover and focus, always on touch; the menu is one element placed beside it. */
+.chat-bubble button.chat-msg-menu-btn { position: absolute; top: 6px; right: 34px; margin: 0; opacity: 0; }
+.chat-bubble:hover .chat-msg-menu-btn, .chat-bubble .chat-msg-menu-btn:focus-visible, .chat-bubble .chat-msg-menu-btn[aria-expanded="true"] { opacity: 1; }
+.chat-prose.chat-messages .chat-bubble.human .chat-msg-menu-btn { top: 100%; margin-top: -2px; right: 20px; }
+@media (hover: none) { .chat-bubble button.chat-msg-menu-btn { opacity: 1; } }
+.chat-msg-menu-head { padding: 6px 12px 2px; color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
