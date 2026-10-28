@@ -169,6 +169,7 @@ const workflowResult = i => W.lastResult(i.run);
 /** A row's name button: the name is the one line; what the item is or runs is its tooltip (the page has it in full). */
 const nameButton = (i, what) => {
     const b = DT.primaryButton(i.name); if (what) b.title = `${i.name} \u2014 ${what}`;
+    if (i.kind === 'job' && !i.enabled && !isExample(i.name, i.job && i.job.description)) { const w = DT.el('span', 'dt-name-example'); const off = DT.chip(offWord(i.job)); off.classList.replace('dt-chip', 'dt-name-off'); w.append(b, off); return w; } // in the narrowest list (Last run gone) the state sits beside the name (#10475)
     if (!isExample(i.name, i.kind === 'job' ? i.job && i.job.description : i.kind === 'workflow' ? i.does : '')) return b;
     const w = DT.el('span', 'dt-name-example'); w.append(b, DT.tag('Example')); return w; // one added as an example is marked, so nobody takes it for their own (#10001)
 };
@@ -271,7 +272,7 @@ function folderTable(key) {
                 columns: [ // one line a row (Goal #79): what the job runs is the name's tooltip and its page's; a narrow list drops Schedule, then Next (dropAt, #8931)
                     { key: 'job', label: 'Job', primary: true, width: 'grow', sort: true, sortValue: i => i.name, cell: i => nameButton(i, runsWords(i)) },
                     { key: 'schedule', label: 'Schedule', width: '12rem', dropAt: 36, sort: true, sortValue: i => scheduleOf(i.job), cell: i => scheduleOf(i.job) },
-                    { key: 'last-run', label: 'Last run', width: '12rem', dropAt: 16, tone: 'tertiary', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: jobLastCell },
+                    { key: 'last-run', label: 'Last run', width: '12rem', dropAt: 20, tone: 'tertiary', sort: 'date', sortValue: i => i.run && i.run.started_at, cell: jobLastCell },
                     { key: 'next', label: 'Next', width: '7rem', dropAt: 28, tone: 'tertiary', sort: 'date', sortValue: i => (i.enabled ? i.job.next_fire_at : ''), cell: i => {
                         const cell = i.enabled ? DT.el('span', 'dt-time', nextOf(i.job)) : DT.chip(offWord(i.job));
                         if (i.enabled && i.job.next_fire_at) { cell.title = `Next run ${atWords(i.job.next_fire_at)} your time`; cell.append(DT.el('span', 'sr-only', `, next run ${atWords(i.job.next_fire_at)} your time`)); } // also as text (#9117)
