@@ -39,22 +39,48 @@ function loadDocText() {
     if (!docTextLoad) docTextLoad = Promise.all(docsList.map(async d => { const c = await fetchDocContent(d.name); if (c && c.content) { docRaw.set(d.name, String(c.content)); docText.set(d.name, String(c.content).toLowerCase()); } })).then(() => { docTextReady = true; });
     return docTextLoad;
 }
-// The search (#10093): the words may come in any order (every word must be in the topic's title or text), and the topics whose TITLE has them come first, then the ones with a word in the title, then the text-only hits.
+// The search (#10093): the words may come in any order (every word must be in the topic's title or text), and the topics are ranked by where the words sit (#10303): the title first, then a heading, then a step or a
+// paragraph, and a code line last (a search for "sleep" put a /bin/sleep line ahead of the page about putting agents to sleep). The snippet shows the best place a word is, not the first one.
 const queryWords = () => docsQuery.split(/\s+/).filter(Boolean);
+const docLines = new Map(); // topic name -> its lines with their kind: 2 a heading, 3 a step or paragraph, 4 code (a fenced block or an indented line)
+function linesOf(d) {
+    if (docLines.has(d.name)) return docLines.get(d.name);
+    const out = []; let fence = false;
+    for (const text of String(docRaw.get(d.name) || '').split('\n')) {
+        if (/^\s*(```|~~~)/.test(text)) { fence = !fence; continue; }
+        out.push({ text, low: text.toLowerCase(), noCode: text.toLowerCase().replace(/`[^`]*`/g, ' '), kind: fence || /^( {4}|\t)/.test(text) ? 4 : /^\s{0,3}#{1,6}\s/.test(text) ? 2 : 3 });
+    }
+    docLines.set(d.name, out);
+    return out;
+}
+/** The best place a word is in a topic's text: { kind, line } (the first line of the best kind), or null. A word only inside an inline code span counts as code. */
+function placeOf(d, word) {
+    let best = null;
+    for (const line of linesOf(d)) {
+        if (!line.low.includes(word)) continue;
+        const kind = line.kind === 3 && !line.noCode.includes(word) ? 4 : line.kind;
+        if (!best || kind < best.kind) { best = { kind, line }; if (kind === 2) break; }
+    }
+    return best;
+}
 function hitOf(d) {
     const words = queryWords(); if (!words.length) return { rank: 0 };
     const title = `${titleOf(d)} ${d.name}`.toLowerCase(), body = docText.get(d.name) || '';
     if (!words.every(w => title.includes(w) || body.includes(w))) return null;
-    return { rank: words.every(w => title.includes(w)) ? 0 : words.some(w => title.includes(w)) ? 1 : 2 };
+    if (words.every(w => title.includes(w))) return { rank: 0 };
+    // the weakest word decides: every word must be somewhere good for the topic to rank high (1 title, 2 heading, 3 step or paragraph, 4 code)
+    return { rank: Math.max(...words.map(w => (title.includes(w) ? 1 : (placeOf(d, w)?.kind ?? 4)))) };
 }
-/** What matched, for a hit that is in the topic's text and not all in its title: about a line of the text around the first word found, without the Markdown marks. '' for a title hit (its summary shows). */
+/** What matched, for a hit that is in the topic's text and not all in its title: the line of the best place a word is (a heading, else a step, else code), about a line of it around the word, without the Markdown marks. '' for a title hit (its summary shows). */
 function snippetOf(d) {
-    const words = queryWords(), raw = docRaw.get(d.name) || '', low = docText.get(d.name) || '';
-    if (!words.length || !raw || hitOf(d)?.rank === 0) return '';
-    const at = words.map(w => low.indexOf(w)).filter(i => i >= 0).sort((a, b) => a - b)[0];
-    if (at === undefined) return '';
+    const words = queryWords();
+    if (!words.length || !docRaw.get(d.name) || hitOf(d)?.rank === 0) return '';
+    let best = null;
+    for (const w of words) { const p = placeOf(d, w); if (p && (!best || p.kind < best.kind)) best = { ...p, word: w }; }
+    if (!best) return '';
+    const raw = best.line.text, at = Math.max(0, best.line.low.indexOf(best.word));
     const from = Math.max(0, at - 50), to = Math.min(raw.length, at + 110);
-    const text = raw.slice(from, to).replace(/[#>*`|_\[\]]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const text = raw.slice(from, to).replace(/^\s*#{1,6}\s+/, '').replace(/[#>*`|_\[\]]+/g, ' ').replace(/\s+/g, ' ').trim();
     return `${from > 0 ? '\u2026' : ''}${text}${to < raw.length ? '\u2026' : ''}`;
 }
 const matches = d => hitOf(d) !== null;
