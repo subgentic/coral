@@ -7,7 +7,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { settle } = require('./helpers/wait');
 
-const SHOWN = ['settings-theme', 'settings-renderer-select', 'settings-agent-type', 'settings-permission-mode', 'settings-show-summary', 'settings-group-by-team', 'settings-fit-pane-width', 'settings-notify-needs-input', 'settings-desktop-notify', 'settings-file-search-limit'];
+const SHOWN = ['settings-theme', 'settings-renderer-select', 'settings-agent-type', 'settings-permission-mode', 'settings-show-summary', 'settings-group-by-team', 'settings-fit-pane-width', 'settings-notify-needs-input', 'settings-desktop-notify', 'settings-alert-needs-input', 'settings-alert-reply', 'settings-alert-sound', 'settings-file-search-limit'];
 const MACHINE = ['settings-working-dir', 'settings-cli-path-claude', 'settings-remote-access-enabled', 'settings-api-key', 'settings-telemetry-enabled', 'settings-debug-input-log', 'settings-artifact-store-max', 'settings-terminal-font-size', 'settings-auto-resume'];
 
 (async () => {

@@ -14,10 +14,19 @@ const GENERAL_FIELDS = [
     { key: 'check_updates', type: 'toggle', id: 'settings-check-updates', label: 'Tell me when a new version is out', help: { text: '', more: 'A notice in this browser. Downloading and installing are under Updates.' } },
 ];
 
+/** The alert kinds wait for Desktop alerts to be on (the dialog redraws its rows on every change, so the rule lives in the field, not only in the fill). */
+const alertsOff = () => { const e = document.getElementById('settings-desktop-notify'); return !e || !e.checked; };
+
 const NOTIFICATIONS_FIELDS = [
-    { key: 'notify_needs_input', type: 'toggle', id: 'settings-notify-needs-input', label: 'Show notifications in Coral', help: 'Show a toast when an agent needs input.' },
+    { key: 'notify_needs_input', type: 'toggle', id: 'settings-notify-needs-input', label: 'Show notifications in Coral', help: 'A message in Coral when an agent needs input.' },
     { key: 'desktop_notify', type: 'toggle', id: 'settings-desktop-notify', label: 'Desktop alerts',
-        help: { text: '', more: 'This browser only: alert while this tab is in the background. Shows the agent and server names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
+        help: { text: 'An alert on this computer while this tab is in the background.', more: 'This browser only. Shows the agent and server names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
+    // Why the switch above did not turn on (#10068): a browser that blocks alerts, or a permission box that was dismissed. Filled by settings_fill.js.
+    { key: 'desktop_notify_blocked', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-desktop-blocked'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p); } },
+    // This browser's own choices about those alerts (not saved on the server); they apply while Desktop alerts is on.
+    { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', disabledWhen: () => alertsOff() },
+    { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', disabledWhen: () => alertsOff() },
+    { key: 'alert_sound', type: 'toggle', id: 'settings-alert-sound', label: 'Play a sound with alerts', help: "Your computer's own alert sound.", disabledWhen: () => alertsOff() },
 ];
 
 const FILES_FIELDS = [
