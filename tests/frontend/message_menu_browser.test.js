@@ -31,6 +31,8 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!document.getElementById('chat-msg-menu')?.hidden && document.getElementById('chat-msg-menu')?.getClientRects().length > 0`, `${w}: the menu opens by keyboard`, 4000);
             const items = await ev(`[...document.querySelectorAll('#chat-msg-menu [role=menuitem]')].map(b => b.textContent.trim())`);
             assert.equal(items[0], 'Copy', `${w}: Copy first: ${JSON.stringify(items)}`);
+            const canSave = await ev(`!!document.querySelector(${JSON.stringify(btn)}).closest('.chat-bubble').querySelector('.chat-save-btn')`);
+            assert.equal(items.some(x => /^(Save for later|Remove from saved)$/.test(x)), canSave, `${w}: Save for later is in the menu when the message has a save button (${canSave}): ${JSON.stringify(items)}`);
             assert.ok(items.every(x => x === 'Copy' || /^(Save for later|Remove from saved)$/.test(x)), `${w}: the menu is Copy and Save for later, nothing that sends it to another agent (the Operator, #10682): ${JSON.stringify(items)}`);
             await waitFor(`document.getAnimations().length === 0`, `${w}: the menu has finished opening`, 3000); // a shot of a menu mid-fade shows the reply through it
             await shot(`message-menu-${w}`);
