@@ -24,7 +24,9 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`document.querySelectorAll('.toast').forEach(t => { if (t.textContent.startsWith('Saved')) t.remove(); }); true`);
         await waitFor(`[...document.querySelectorAll('.toast')].every(e => e.getAnimations().length === 0) && document.querySelector('.toast').getClientRects().length > 0`, 'the card to settle', 5000);
         const measure = `(() => { const t = document.querySelector('.toast'), b = t.getBoundingClientRect(), bar = document.querySelector('header.top-bar').getBoundingClientRect(), banner = document.getElementById('local-auth-banner');
-            const edge = banner && banner.getClientRects().length ? Math.max(bar.bottom, banner.getBoundingClientRect().bottom) : bar.bottom;
+            // what the card sits under: the app bar, a visible banner, the phone's list title (#10052) and a text field above it (#10458): the card is the first thing below all of them
+            const above = [document.getElementById('local-auth-banner'), document.querySelector('.mobile-list-title'), ...document.querySelectorAll('input.field, input[type=search], input[type=text], select, textarea')].filter(e => e && e.getClientRects().length && !t.contains(e)).map(e => e.getBoundingClientRect().bottom).filter(v => v <= b.top + 1);
+            const edge = Math.max(bar.bottom, ...above);
             return { top: Math.round(b.top - edge), h: Math.round(b.height), w: Math.round(b.width), vw: innerWidth, one: t.querySelector('.toast-message').scrollHeight <= t.querySelector('.toast-message').clientHeight + 1 }; })()`;
         const compact = card => assert.ok(card.top >= 0 && card.top <= 16 && card.h <= 56 && card.w < card.vw - 80 && card.one, 'one compact line below the header and visible banner: ' + JSON.stringify(card));
         compact(await ev(measure));

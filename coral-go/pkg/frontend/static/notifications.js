@@ -202,6 +202,7 @@ function toastHost() {
 
 // On a phone the notices and the short toasts start below the top bar (the Agents picker, home, panel, settings) and below an open agent's header, never over them: css reads --notice-top, set here from the bar's own bottom edge on the column
 // itself (not on <html>, where the theme code treats every inline custom property as a theme colour) and kept current when the window changes.
+const TOAST_REACH = 56; // how far below its top a phone's one-line card reaches (px)
 function placeNotices() {
     const bar = document.querySelector("header.top-bar");
     const banner = document.getElementById("local-auth-banner");
@@ -210,7 +211,15 @@ function placeNotices() {
     const teamHead = document.getElementById("team-page-head"); // nor is a team page's header, its name and status ("Team demo is awake" sat over both, #10359)
     const bottomOf = e => (e && e.getClientRects().length ? Math.round(e.getBoundingClientRect().bottom) : 0);
     const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead));
-    const top = `${Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, headBottom, 0) + 8}px`;
+    let topPx = Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, headBottom, 0) + 8;
+    // A text field just under that line (the list's filter box) is not covered either (#10458): the column starts below it. Only a field the card would reach is looked at, so a form further down never moves it.
+    for (let i = 0; i < 3; i++) {
+        const notices = document.getElementById("notices");
+        const field = [...document.querySelectorAll("input.field, input[type=search], input[type=text], select, textarea")].map(e => ({ e, b: e.getBoundingClientRect() })).find(({ e, b }) => b.width > 0 && b.height > 0 && !(notices && notices.contains(e)) && getComputedStyle(e).visibility !== "hidden" && b.bottom > topPx && b.top < topPx + TOAST_REACH);
+        if (!field) break;
+        topPx = Math.round(field.b.bottom) + 8;
+    }
+    const top = `${topPx}px`;
     document.getElementById("notices")?.style.setProperty("--notice-top", top);
     // A page's pinned bar (its actions: Run, Edit, Done) is never under a toast: the column sits above the bar on the screen (UI/UX #7588 item 3; a phone's is at the top, where the bar is not).
     const pinned = [...document.querySelectorAll(".item-bar")].map(b => b.getBoundingClientRect()).find(r => r.height > 0 && r.bottom > window.innerHeight - 90 && r.top < window.innerHeight);
