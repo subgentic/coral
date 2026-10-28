@@ -64,6 +64,17 @@ func TestListOpenTaskStatesMatchesTheOldRead(t *testing.T) {
 				[]any{nil, "2026-10-28T00:00:00Z"}[rng.Intn(2)], []any{nil, "2026-10-29T00:00:00Z"}[rng.Intn(2)], []any{nil, "2026-10-30T00:00:00Z"}[rng.Intn(2)])
 			require.NoError(t, err)
 		}
+		if board != "empty" {
+			// a priority that is none of the four (the table's CHECK is the backstop, so it is written with the check switched off): the old ORDER BY gave it NULL, which sorts first
+			_, err := s.db.ExecContext(ctx, `PRAGMA ignore_check_constraints = ON`)
+			require.NoError(t, err)
+			for i, p := range []string{"urgent", "", "URGENT"} {
+				_, err := s.db.ExecContext(ctx, `INSERT INTO board_tasks(board_id, title, status, priority, created_by, created_at) VALUES (?, ?, 'pending', ?, 'Orch', '2026-10-01T00:00:00Z')`, board, fmt.Sprintf("odd priority %d", i), p)
+				require.NoError(t, err)
+			}
+			_, err = s.db.ExecContext(ctx, `PRAGMA ignore_check_constraints = OFF`)
+			require.NoError(t, err)
+		}
 		want, err := oldListOpenTaskStates(ctx, s, board)
 		require.NoError(t, err)
 		got, err := s.ListOpenTaskStates(ctx, board)
@@ -75,12 +86,42 @@ func TestListOpenTaskStatesMatchesTheOldRead(t *testing.T) {
 		if len(got) > 0 {
 			nonEmpty++
 			// the order itself: priority (critical first), then id
-			rank := map[string]int{"critical": 0, "high": 1, "medium": 2, "low": 3}
+			rank := map[string]int{"critical": 0, "high": 1, "medium": 2, "low": 3} // a priority that is none of them is rank -1: first
+			rankOf := func(p string) int {
+				if r, ok := rank[p]; ok {
+					return r
+				}
+				return -1
+			}
 			for i := 1; i < len(got); i++ {
-				a, b := rank[got[i-1].Priority], rank[got[i].Priority]
+				a, b := rankOf(got[i-1].Priority), rankOf(got[i].Priority)
 				assert.True(t, a < b || (a == b && got[i-1].ID < got[i].ID), "%s position %d: %v then %v", board, i, got[i-1], got[i])
 			}
 		}
 	}
 	assert.Equal(t, 2, nonEmpty)
+}
+
+// The three odd priorities really are on the board and first (so the test above cannot pass without them).
+func TestListOpenTaskStatesPutsAnUnknownPriorityFirst(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	_, err := s.db.ExecContext(ctx, `PRAGMA ignore_check_constraints = ON`)
+	require.NoError(t, err)
+	for _, row := range []struct{ prio string }{{"low"}, {"urgent"}, {"critical"}, {""}, {"high"}} {
+		_, err := s.db.ExecContext(ctx, `INSERT INTO board_tasks(board_id, title, status, priority, created_by, created_at) VALUES ('b', 't', 'pending', ?, 'Orch', '2026-10-01T00:00:00Z')`, row.prio)
+		require.NoError(t, err)
+	}
+	_, err = s.db.ExecContext(ctx, `PRAGMA ignore_check_constraints = OFF`)
+	require.NoError(t, err)
+	got, err := s.ListOpenTaskStates(ctx, "b")
+	require.NoError(t, err)
+	var order []string
+	for _, t := range got {
+		order = append(order, t.Priority)
+	}
+	assert.Equal(t, []string{"urgent", "", "critical", "high", "low"}, order, "unknown priorities first (the old CASE gave NULL), in id order, then critical, high, low")
+	want, err := oldListOpenTaskStates(ctx, s, "b")
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
 }
