@@ -171,7 +171,7 @@ func TestAuthPageFirstRunDetails(t *testing.T) {
 // the computer with coral open, or create a password here with the setup code. Strict local auth is untouched: this is words, and the page still takes nothing it did not before.
 func TestAuthPageSaysHowToGetInWhenThereIsNoPasswordYet(t *testing.T) {
 	remote := AuthPage(PageState{}) // another device, no password
-	for _, want := range []string{`id="how-in"`, "Two ways in", "coral open", "coral setup-code", "On the computer that runs Coral", "create a password", "coral open --print", "127.0.0.1", "works once, for 10 minutes"} {
+	for _, want := range []string{`id="how-in"`, "Two ways in", "coral open", "coral setup-code", "On the computer that runs Coral", "create a password", "coral open --print", "127.0.0.1", "works once, for 10 minutes", "do not post it where others can read it"} {
 		assert.Contains(t, remote, want, "another device: "+want)
 	}
 	locked := AuthPage(PageState{Local: true, Locked: true}) // a browser on this computer sent here by a locked page
