@@ -6,7 +6,7 @@ Task-oriented notes on the dashboard controls. Every statement was checked again
 
 ## Choose a model and thinking level
 
-**At launch and restart.** In **New agent** and **Restart**, the **Agent** section has **Model** and **Thinking** (`pkg/frontend/static/model_picker.js`, `internal/agentmodels/thinking.go`). Thinking (reasoning effort) offers Low, Medium, High, Extra high and Max for Claude Code and Antigravity (`agy` 1.4.7 `--help`, passed as `--effort`), and Minimal, Low, Medium, High and Extra high for Codex (passed as `-c model_reasoning_effort=<level>`), narrowed to the levels the chosen model takes. Pi and plain terminals have no Thinking select today.
+**At launch and restart.** In **New agent** and **Restart**, the **Agent** section has **Model** and **Thinking** . Thinking (reasoning effort) offers Low, Medium, High, Extra high and Max for Claude Code and Antigravity, and Minimal, Low, Medium, High and Extra high for Codex, narrowed to the levels the chosen model takes. Pi and plain terminals have no Thinking select today.
 
 - **Default** passes nothing, so the CLI uses its own default.
 - **Restart** opens on the level the agent was started with and keeps it unless you change it. Choose **Default** to clear it.
