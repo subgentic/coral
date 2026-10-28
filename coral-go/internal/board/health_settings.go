@@ -316,6 +316,12 @@ func (s *Store) SetHealthOn(ctx context.Context, project string, on bool) error 
 	return s.setHealthSettings(ctx, project, h)
 }
 
+// HasHealthSettings reports whether a team has stored a health setting. A team that never did keeps the default, off, even though a team made now starts with the check on (#10683).
+func (s *Store) HasHealthSettings(ctx context.Context, project string) bool {
+	v, err := s.boardSettingValue(ctx, project, settingHealth)
+	return err == nil && v != ""
+}
+
 const healthDefaultOffMarker = "migration:health_default_off"
 
 // migrateHealthDefaultOff keeps the teams that were running the health check when its default became OFF (#4962): a team that never

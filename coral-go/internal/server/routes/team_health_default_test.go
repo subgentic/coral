@@ -40,7 +40,7 @@ func TestLiveRowsCarryTheTeamsHealthCheckState(t *testing.T) {
 	h.addTeamHealth(httptest.NewRequest(http.MethodGet, "/api/sessions/live", nil), local)
 	assert.Equal(t, true, local[0]["team_health_on"])
 	assert.Equal(t, false, local[1]["team_health_on"])
-	assert.Equal(t, false, local[2]["team_health_on"], "a team with nothing stored has the new default: off")
+	assert.Equal(t, false, local[2]["team_health_on"], "a team with nothing stored is off: only a team made by a launch is stored on (#10683)")
 	assert.NotContains(t, local[3], "team_health_on", "an agent on no team has no field")
 	assert.NotContains(t, local[4], "team_health_on")
 
@@ -53,7 +53,8 @@ func TestLiveRowsCarryTheTeamsHealthCheckState(t *testing.T) {
 	}
 }
 
-// A team launched with the option on has its check on; without it (or false) the team keeps whatever it has, which for a new team is off.
+// #10683, the operator: a team this launch makes has its check on unless the request says off; a team that already exists keeps what it has (one that never stored a setting stays off), and a
+// relaunch never turns off a check the operator turned on, nor turns on one the operator turned off.
 func TestLaunchTeamHealthOption(t *testing.T) {
 	bs := healthTestStore(t)
 	ctx := context.Background()
@@ -62,16 +63,25 @@ func TestLaunchTeamHealthOption(t *testing.T) {
 	h := &SessionsHandler{bs: bs, cfg: cfg}
 	yes, no := true, false
 
-	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-off"})
-	assert.False(t, bs.GetHealthSettings(ctx, "new-off").On, "a team launched without the option has the check off")
-	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-false", HealthMonitor: &no})
-	assert.False(t, bs.GetHealthSettings(ctx, "new-false").On)
-	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-on", HealthMonitor: &yes})
+	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-default", newTeam: true})
+	assert.True(t, bs.GetHealthSettings(ctx, "new-default").On, "a team made by the launch has the check on")
+	assert.True(t, bs.HasHealthSettings(ctx, "new-default"), "and it is stored, not just a default")
+	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-false", newTeam: true, HealthMonitor: &no})
+	assert.False(t, bs.GetHealthSettings(ctx, "new-false").On, "the New project switch turned off: off")
+	assert.True(t, bs.HasHealthSettings(ctx, "new-false"), "and that choice is stored")
+	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-on", newTeam: true, HealthMonitor: &yes})
 	assert.True(t, bs.GetHealthSettings(ctx, "new-on").On, "the option turns it on")
+
+	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "old-never-stored"})
+	assert.False(t, bs.GetHealthSettings(ctx, "old-never-stored").On, "a team that exists and never stored a setting stays off")
+	assert.False(t, bs.HasHealthSettings(ctx, "old-never-stored"))
 
 	require.NoError(t, bs.SetHealthOn(ctx, "kept", true))
 	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "kept", HealthMonitor: &no})
 	assert.True(t, bs.GetHealthSettings(ctx, "kept").On, "a relaunch never turns off a check the operator turned on")
+	require.NoError(t, bs.SetHealthOn(ctx, "kept-off", false))
+	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "kept-off", newTeam: true})
+	assert.False(t, bs.GetHealthSettings(ctx, "kept-off").On, "nor turns on one the operator turned off")
 }
 
 // #5119: the icon blinked. A read of the health settings that fails for a tick (a busy database, a request that ended) used to read as every

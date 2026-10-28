@@ -63,9 +63,10 @@ type launchTeamRequest struct {
 	BaseBranch         string            `json:"base_branch"`
 	Agents             []launchTeamAgent `json:"agents"`
 	TeamKnowledgeIndex string            `json:"team_knowledge_index"`
-	// HealthMonitor true turns the team's health check on (#4962). The check is off for a new team; false or absent leaves the team's
-	// setting as it is, so a relaunch never turns off a check the operator turned on.
+	// HealthMonitor true turns the team's health check on (#4962). A team this request makes starts with the check on unless this says false (#10683, the operator); a team that already
+	// exists keeps its setting (and one that never stored a setting stays off), so a relaunch never turns off a check the operator turned on.
 	HealthMonitor *bool `json:"health_monitor"`
+	newTeam       bool  // this request made the board: set by the launch, not read from the request
 	WorkingMode   *struct {
 		Mode               string `json:"mode"`
 		DependencyGuidance bool   `json:"dependency_guidance"`
@@ -156,6 +157,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		}
 		body.BoardName = key
 		boardCreated = created
+		body.newTeam = created
 	}
 	h.restoreTeamTemplate(r.Context(), &body)
 
@@ -446,9 +448,17 @@ func (h *SessionsHandler) restoreTeamTemplate(ctx context.Context, body *launchT
 			log.Printf("[launch-team] restored working mode %q for team %s", wm.Mode, body.BoardName)
 		}
 	}
-	if body.HealthMonitor != nil && *body.HealthMonitor && h.bs != nil {
-		if err := h.bs.SetHealthOn(ctx, body.BoardName, true); err != nil {
-			log.Printf("[launch-team] failed to turn on the health check for team %s: %v", body.BoardName, err)
+	if h.bs != nil {
+		// On when asked; and for a team made by this launch that stored nothing yet, on unless the request says off (#10683).
+		on := body.HealthMonitor != nil && *body.HealthMonitor
+		if !on && body.newTeam && body.HealthMonitor == nil && !h.bs.HasHealthSettings(ctx, body.BoardName) {
+			on = true
+		}
+		explicitOff := body.newTeam && body.HealthMonitor != nil && !*body.HealthMonitor && !h.bs.HasHealthSettings(ctx, body.BoardName)
+		if on || explicitOff {
+			if err := h.bs.SetHealthOn(ctx, body.BoardName, on); err != nil {
+				log.Printf("[launch-team] failed to store the health check for team %s: %v", body.BoardName, err)
+			}
 		}
 	}
 	if len(body.WorkflowPresets) > 0 && h.bs != nil {
