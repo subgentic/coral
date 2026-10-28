@@ -212,12 +212,12 @@ function placeNotices() {
     const bottomOf = e => (e && e.getClientRects().length ? Math.round(e.getBoundingClientRect().bottom) : 0);
     const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead));
     let topPx = Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, headBottom, 0) + 8;
-    // A text field just under that line (the list's filter box) is not covered either (#10458): the column starts below it. Only a field the card would reach is looked at, so a form further down never moves it.
+    // A text field just under that line (the list's filter box), or a phone list's view picker (the button naming the folder: "Needs you", #10525), is not covered either (#10458): the column starts below it. Only a field the card would reach is looked at, so a form further down never moves it.
     const shown = document.getElementById("notices");
     const reach = shown && shown.getClientRects().length ? Math.max(shown.getBoundingClientRect().height, TOAST_REACH) : TOAST_REACH; // the column's own height: what it would cover from its new top
     for (let i = 0; i < 3; i++) {
         const notices = shown;
-        const field = [...document.querySelectorAll("input.field, input[type=search], input[type=text], select, textarea")].map(e => ({ e, b: e.getBoundingClientRect() })).find(({ e, b }) => b.width > 0 && b.height > 0 && !(notices && notices.contains(e)) && getComputedStyle(e).visibility !== "hidden" && b.bottom > topPx && b.top < topPx + reach);
+        const field = [...document.querySelectorAll("input.field, input[type=search], input[type=text], select, textarea, button.view-list-trigger")].map(e => ({ e, b: e.getBoundingClientRect() })).find(({ e, b }) => b.width > 0 && b.height > 0 && !(notices && notices.contains(e)) && getComputedStyle(e).visibility !== "hidden" && b.bottom > topPx && b.top < topPx + reach);
         if (!field) break;
         topPx = Math.round(field.b.bottom) + 8;
     }
