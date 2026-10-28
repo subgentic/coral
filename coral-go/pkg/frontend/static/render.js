@@ -59,8 +59,9 @@ export { buildSessionTooltip, commandPlaceholder, startingPlaceholder, deriveSes
 // The board chat (board_chat.js, about 21 KB) loads when an agent on a board is first shown, not at start (page weight): these are the same calls, answered once the file is in. Hiding and the
 // actions on its own markup need no load: with the file not loaded there is no chat panel to hide or to click.
 const boardChatNow = () => loadedModule('./board_chat.js');
-export const showBoardChatTab = (...args) => importOnce('./board_chat.js', 'the board chat').then(m => m.showBoardChatTab(...args)).catch(() => {});
-export const hideBoardChatTab = (...args) => boardChatNow()?.hideBoardChatTab(...args);
+let _boardChatWant = 0; // a hide, even one made before the file is in, wins over a show that is still waiting for it: the agent chosen last is the one on screen
+export const showBoardChatTab = (...args) => { const mine = ++_boardChatWant; return importOnce('./board_chat.js', 'the board chat').then(m => { if (mine === _boardChatWant) m.showBoardChatTab(...args); }).catch(() => {}); };
+export const hideBoardChatTab = (...args) => { _boardChatWant++; return boardChatNow()?.hideBoardChatTab(...args); };
 
 /* ── Helpers ────────────────────────────────────────────────────────── */
 
