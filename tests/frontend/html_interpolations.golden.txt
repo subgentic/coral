@@ -56,6 +56,7 @@
 1	board_export_render.js	renderMarkdown(e.content, undefined, 'board')
 1	board_export_render.js	subList
 1	board_export_render.js	tag
+1	board_system_lines.js	head
 1	board_system_lines.js	lines
 1	board_table.js	cls
 1	board_table.js	layoutChips(chips)

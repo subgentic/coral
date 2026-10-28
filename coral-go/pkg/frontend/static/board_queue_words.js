@@ -39,3 +39,17 @@ export function queueRunWords(contents) {
     }
     return parts.join(', ');
 }
+
+/** One queue line for a person (#10722): what happened and to which task, with the task's title and who it is for, never the line's own instruction to an agent ("run 'coral-board task claim 1' to start"). `head` is the words before the title, so the
+ *  caller can make "Task #7" a link; `rest` is what follows it. */
+export function queueLineWords(content) {
+    const e = queueEvent(content);
+    if (e.kind === 'ignore') return { id: '', head: 'Coral told the agents that tasks are waiting', rest: '' };
+    const verb = (KINDS.find(k => k[0] === e.kind) || [0, 'updated'])[1];
+    const raw = String(content || ''), { text } = bracketOf(raw);
+    const close = text.indexOf(']');
+    const title = close < 0 ? '' : text.slice(close + 1).split(/\s[\u2014-]\s/)[0].trim().slice(0, 120);
+    const who = (/^@(\S+)/.exec(raw) || [])[1];
+    const forWho = e.kind === 'created' && who && who !== 'notify-all' ? ` (for ${who})` : '';
+    return { id: e.id, head: e.id ? `Task #${e.id}` : 'A task', rest: ` ${verb}${e.by && e.kind !== 'created' ? ` by ${e.by}` : ''}${title ? `: ${title}` : ''}${forWho}` };
+}
