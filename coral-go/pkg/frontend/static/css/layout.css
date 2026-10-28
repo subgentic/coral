@@ -227,8 +227,8 @@ body.panel-dragging .sidebar {
 }
 
 .sidebar-search-input { width: 100%; }
-.sidebar-search-all { display: block; width: calc(100% - 16px); margin: 2px 8px 4px; text-align: left; justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the agent search's offer to search every chat (#10050): one quiet line under the header */
-.sidebar-search-all[hidden] { display: none; }
+.btn.sidebar-search-all { display: block; width: calc(100% - 16px); margin: 2px 8px 4px; text-align: left; justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the agent search's offer to search every chat (#10050): one quiet line under the header */
+.btn.sidebar-search-all[hidden] { display: none; }
 
 .sidebar-header {
     display: flex;
