@@ -20,7 +20,7 @@ const S = `(window.__coralStatic || '/static/')`;
                 const u = String(input && input.url ? input.url : input);
                 const json = o => Promise.resolve(new Response(JSON.stringify(o), { headers: { 'Content-Type': 'application/json' } }));
                 if (/\\/api\\/scheduled\\/jobs$/.test(u)) return json({ jobs: [job] });
-                if (/\\/api\\/scheduled\\/jobs\\/7\\/runs/.test(u)) { window.__runReads++; return json({ runs: [{ id: 11, status: 'pending', started_at: new Date().toISOString() }], total: 1 }); }
+                if (/\\/api\\/scheduled\\/jobs\\/7\\/runs/.test(u)) { window.__runReads++; return json({ runs: [{ id: 11, status: window.__status || 'pending', started_at: new Date().toISOString() }], total: 1 }); }
                 return real(input, init);
             };
             return true;
@@ -40,6 +40,13 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`[...document.querySelectorAll('#sched-still-waiting button')].find(b => b.textContent === 'Refresh').click(); true`);
         await waitFor(`window.__runReads > ${n}`, 'Refresh reads at once', 3000);
         await waitFor(`window.__delays.at(-1) === 3000 && !document.getElementById('sched-still-waiting')`, 'the fast pace again, the note gone', 6000);
+        // a run that has begun is "Still running.", not "waiting to start" (Security Reviewer's MUST)
+        await ev(`window.__status = 'running'; window.__skew += 130000; true`);
+        await ev(`[...document.querySelectorAll('#sched-still-waiting button')].forEach(b => b.click()); true`);
+        const m = await ev(`window.__runReads`);
+        await ev(`window.__skew += 130000; true`);
+        await waitFor(`window.__runReads > ${m} && !!document.getElementById('sched-still-waiting') && window.__delays.at(-1) === 30000`, 'the slow pace with a running run', 15000);
+        assert.match(await ev(`document.getElementById('sched-still-waiting').textContent`), /^Still running\. Refresh$/, 'a running run says Still running');
         console.log('\nPASS a pending run backs off to 30 s, says so, and Refresh brings the fast pace back');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
