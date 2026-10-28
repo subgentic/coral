@@ -2034,6 +2034,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     color: var(--text-secondary);
 }
 
+[data-theme="light"] .launch-type-card { border-color: var(--control-border); } /* the card is a control: its edge is 3:1 against the dialog, not the page's 1.4:1 hairline (#10209) */
 .launch-type-card:hover {
     border-color: var(--accent);
     background: var(--bg-hover);
