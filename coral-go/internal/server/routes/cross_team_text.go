@@ -18,7 +18,7 @@ import (
 const teamSettingsMessaging = "Team settings > Messaging"
 
 // settingsCoralHub is where a Coral is connected to Coral Hub.
-const settingsCoralHub = "Settings > Coral Hub"
+const settingsCoralHub = "Settings > Network and Hub"
 
 // settingsNetworkHub is where the local lock "Let Coral Hub change cross-team settings" is (#5572, Security's condition 8).
 const settingsNetworkHub = "Settings > Network and Hub"

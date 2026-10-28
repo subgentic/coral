@@ -160,7 +160,7 @@ func TestCloudStartupStepSkip(t *testing.T) {
 		var out bytes.Buffer
 		runCloudStartupStep(context.Background(), cfg, cloudConnectPrompt, &interruptRouter{}, strings.NewReader(in), &out)
 		assert.Contains(t, out.String(), "Skipped", label)
-		assert.Contains(t, out.String(), "Settings > Coral Hub", label)
+		assert.Contains(t, out.String(), "Settings > Network and Hub", label)
 		assert.Contains(t, out.String(), "coral cloud connect", label)
 		assert.Zero(t, f.connects, label+": nothing was started")
 		var puts []string

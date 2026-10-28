@@ -22,7 +22,7 @@ func readExistingKeyFile(name string) ([]byte, error) {
 		}
 		if errors.Is(err, secfile.ErrExposed) {
 			// How to recover: the dashboard's re-key (#3698), or by hand.
-			return nil, fmt.Errorf("%w: %w. To recover, use Settings > Coral Hub > Replace the secret key, or by hand: stop Coral, delete %s, start Coral, then connect to Coral Hub again and re-enter the API keys of your remote servers (the old ones can't be read without that key)",
+			return nil, fmt.Errorf("%w: %w. To recover, use Settings > Network and Hub > Replace the secret key, or by hand: stop Coral, delete %s, start Coral, then connect to Coral Hub again and re-enter the API keys of your remote servers (the old ones can't be read without that key)",
 				ErrKeyPermissions, err, name)
 		}
 		return nil, fmt.Errorf("%w: %w", ErrKeyPermissions, err)

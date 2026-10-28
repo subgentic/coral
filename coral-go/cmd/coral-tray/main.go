@@ -55,7 +55,7 @@ func main() {
 	// macOS requires Cocoa calls on the main thread
 	runtime.LockOSThread()
 
-	host := flag.String("host", "", "Host to bind to (default: this computer only, or every interface when Settings > Privacy allows remote access)")
+	host := flag.String("host", "", "Host to bind to (default: this computer only, or every interface when Settings > Network and Hub allows remote access)")
 	port := flag.Int("port", config.DefaultPort, "Port to bind to")
 	homeDir := flag.String("home", "", "Home directory for Coral")
 	foreground := flag.Bool("foreground", false, "Run in foreground (used internally)")
@@ -946,7 +946,7 @@ func waitForExit(pid int, limit time.Duration) {
 }
 
 // hostArgs is the --host the tray hands the server: none when the host was not asked for, so that the server's default
-// (this computer only, or every interface once Settings > Privacy allows remote access, #5124) applies.
+// (this computer only, or every interface once Settings > Network and Hub allows remote access, #5124) applies.
 func hostArgs(host string) []string {
 	if host == "" {
 		return nil

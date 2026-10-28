@@ -1,4 +1,4 @@
-// #4447: Settings > Storage shows how many terminal logs there are and how many belong to ended agents, and the Operator can delete those after a
+// #4447: Settings > Storage and cleanup shows how many terminal logs there are and how many belong to ended agents, and the Operator can delete those after a
 // confirmation. Never automatic; the confirmation is for the count and size shown (the server refuses a request whose numbers are not the current ones).
 //  - the line and the button: counts and sizes, the button names what it deletes, hidden when none belong to ended agents
 //  - the confirmation says what is lost (search) and what is kept (live, sleeping, archived); focus on Cancel; Cancel deletes nothing

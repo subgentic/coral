@@ -23,6 +23,6 @@ export async function checkReceivedCap({ inSettings = false } = {}) {
         const modal = document.getElementById('settings-modal');
         if (inSettings || (modal && getComputedStyle(modal).display !== 'none')) return;
         const gib = n => `${(n / 1024 ** 3).toFixed(1)} GiB`;
-        showToast(`Other teams’ files: ${gib(rec.bytes)} of ${gib(rec.max_bytes)}. New files are refused above this limit. Raise it in Settings > Storage.`, false, 15000);
+        showToast(`Other teams’ files: ${gib(rec.bytes)} of ${gib(rec.max_bytes)}. New files are refused above this limit. Raise it in Settings > Storage and cleanup.`, false, 15000);
     } catch { /* nothing to say */ } finally { asking = false; }
 }

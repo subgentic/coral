@@ -9,7 +9,7 @@ import (
 )
 
 // Deleting the received files no board lists (#4441, Security's #4440 INFO 2): since #4440 a received file waits for its message, and one whose
-// message never arrives stays stored and unlisted. They count toward the received-files cap and Settings > Storage lists them; the Operator may
+// message never arrives stays stored and unlisted. They count toward the received-files cap and Settings > Storage and cleanup lists them; the Operator may
 // delete them, by exact digest, with a confirmation. Never automatic, and never a file anything lists or links.
 
 const maxUnlistedDeleteIDs = 100

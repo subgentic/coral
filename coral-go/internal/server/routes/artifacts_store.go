@@ -40,7 +40,7 @@ func uploadsDir(coralDir, sessionID string) string {
 const ArtifactStoreMaxBytesSetting = "artifact_store_max_bytes"
 
 // defaultArtifactStoreMaxBytes is the cap when the Operator has set none: 20 GiB. Above it new uploads are refused, nothing is
-// deleted (#4602, the Orchestrator's decision 2); Settings > Storage shows the store from 80% of it.
+// deleted (#4602, the Orchestrator's decision 2); Settings > Storage and cleanup shows the store from 80% of it.
 const defaultArtifactStoreMaxBytes int64 = 20 << 30
 
 // artifactStoreRefuse is the cap when the setting can't be read: one byte, so the store takes nothing new
@@ -48,7 +48,7 @@ const defaultArtifactStoreMaxBytes int64 = 20 << 30
 const artifactStoreRefuse int64 = 1
 
 // ArtifactStoreAutoRaisedSetting is Coral's own record that it raised the store's limit at startup (RaiseArtifactStoreLimitIfOver): the
-// limit it wrote, in bytes. Settings > Storage shows a note while the saved limit is still that number, and says nothing once the Operator
+// limit it wrote, in bytes. Settings > Storage and cleanup shows a note while the saved limit is still that number, and says nothing once the Operator
 // has chosen another.
 const ArtifactStoreAutoRaisedSetting = "artifact_store_auto_raised"
 
@@ -77,7 +77,7 @@ func RaiseArtifactStoreLimitIfOver(ctx context.Context, ss *store.SessionStore, 
 	if err := ss.SetSetting(ctx, ArtifactStoreAutoRaisedSetting, strconv.FormatInt(limit, 10)); err != nil {
 		slog.Warn("artifact store: raised its limit but could not record it", "error", err)
 	}
-	slog.Info("artifact store: it already held more than 80% of the new 20 GiB default, so its limit was raised once to twice its size; change it in Settings > Storage",
+	slog.Info("artifact store: it already held more than 80% of the new 20 GiB default, so its limit was raised once to twice its size; change it in Settings > Storage and cleanup",
 		"used", humanBytes(used), "limit", humanBytes(limit))
 	return limit
 }
@@ -140,7 +140,7 @@ func (h *SessionsHandler) getArtifactStore(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	out["received"] = h.receivedStatus(isOperatorRequest(r)) // #4441: the total received from other Corals and boards, its cap and the one-time notice; the digests of the unlisted files only for the Operator (#4489)
-	// ?detail=1 (#3554): by age, by board, kept and retention, for Settings > Storage.
+	// ?detail=1 (#3554): by age, by board, kept and retention, for Settings > Storage and cleanup.
 	if r.URL.Query().Get("detail") == "1" {
 		if detail, err := h.storageDetail(r.Context()); err == nil {
 			out["detail"] = detail

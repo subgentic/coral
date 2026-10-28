@@ -1,4 +1,4 @@
-/* Connect to Coral Hub (the cloud connector): Settings > Coral Hub and the first-launch
+/* Connect to Coral Hub (the cloud connector): Settings > Network and Hub and the first-launch
  * screen (#3221) share this one implementation. Each renders into a container whose parts
  * carry data-cloud roles (status, code, link, usercode, connect, cancel, disconnect,
  * command-row, command, copy, ask-row (the Connect screen's question), mode-row, max-mode, mode-desc, auto-accept-row,
@@ -544,7 +544,7 @@ export function mountCloudConnect(root, { onState } = {}) {
     return p;
 }
 
-// Settings > Coral Hub.
+// Settings > Network and Hub.
 export function initCloudConnect() {
     const root = document.getElementById('settings-cloud');
     if (root && !root._cloudPanel) { const p = new CloudPanel(root); p.commandsInRow = true; root._cloudPanel = p; p.bind(); }

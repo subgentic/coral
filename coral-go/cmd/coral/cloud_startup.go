@@ -217,7 +217,7 @@ func runCloudStartupStep(ctx context.Context, cfg *config.Config, mode string, i
 		if ok { // somebody answered: the dashboard does not ask again (settings, and the Coral Hub card, still connect it)
 			c.rememberSkip(ctx)
 		}
-		fmt.Fprintln(out, "Skipped. This server runs on its own; to connect it later, use Settings > Coral Hub, or run: coral cloud connect")
+		fmt.Fprintln(out, "Skipped. This server runs on its own; to connect it later, use Settings > Network and Hub, or run: coral cloud connect")
 		return
 	}
 	step, cancel := context.WithCancel(ctx)

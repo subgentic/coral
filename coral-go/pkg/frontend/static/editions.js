@@ -6,7 +6,7 @@
      → Done. "Skip for now" keeps Coral local. "Run your own hub" (coral --hub) is the
      secondary option, with a short explainer. The server marks a new install
      welcome_pending; the answer is saved as welcome_choice, so another browser does not ask
-     again. Settings > About reopens it. It opens only when this build has a hub configured
+     again. Settings > Network and Hub reopens it. It opens only when this build has a hub configured
      and the server was started to offer it (a hub URL passed explicitly, or --cloud-connect
      prompt or auto: offer_at_launch, #3459); otherwise Coral Hub waits on the home screen and
      in Settings.

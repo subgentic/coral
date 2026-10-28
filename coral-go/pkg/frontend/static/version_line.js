@@ -1,5 +1,5 @@
 /* The running Coral's version at the bottom of the top-bar gear menu ("Coral v1.4.88"), as a small muted line that is not a menu item. It is the
- * version the server reports in GET /api/system/status (the one Settings > About and the update check use), never written into the page; an
+ * version the server reports in GET /api/system/status (the one Settings > Network and Hub and the update check use), never written into the page; an
  * answer with no version, or none at all, leaves the line out. The menu is built on its first open (#4500), so this runs then. */
 import { onBuilt } from './lazy_dom.js';
 import { fetchSystemStatus } from './system_status.js';

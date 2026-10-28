@@ -1,4 +1,4 @@
-// #4469 (UX's #4456 pass, Settings > Storage, items 9 to 14): against stubbed store numbers.
+// #4469 (UX's #4456 pass, Settings > Storage and cleanup, items 9 to 14): against stubbed store numbers.
 //  - each open starts from nothing: a failed or slow load leaves the limit fields empty and off (never the last open's numbers), says so, and Save writes neither limit
 //  - the artifact store's line has the received files' three states: below 80%, from 80% with what to do, at the limit that new uploads are refused (warning colour); "1 file"
 //  - the Prune confirmation uses the page's words (saved diffs, unlinked artifacts, stored diff copies), singular for one; Prune and Shrink by keyboard leave the focus on their own button

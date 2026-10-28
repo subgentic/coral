@@ -1,4 +1,4 @@
-// #3698: Settings > Coral Hub offers to replace a refused secret key, says what that discards,
+// #3698: Settings > Network and Hub offers to replace a refused secret key, says what that discards,
 // asks first, and only then posts {"confirm": true}. jsdom, no browser: node cloud_rekey.test.mjs
 import assert from 'node:assert';
 import path from 'node:path';

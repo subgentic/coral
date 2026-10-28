@@ -42,7 +42,7 @@ func newRefusals() []newRefusal {
 	tooLarge := func(what string, max int) string {
 		return what + " is at most " + itoa(max) + " bytes (this one is " + itoa(max+1) + "): shorten it; long text belongs in an artifact (coral-agent artifact upload) with its link in the text"
 	}
-	disk := "The disk Coral stores its data on is almost full, so this was not saved. Free some space (Settings > Storage shows what Coral uses) and try again."
+	disk := "The disk Coral stores its data on is almost full, so this was not saved. Free some space (Settings > Storage and cleanup shows what Coral uses) and try again."
 	return []newRefusal{
 		{"launch-team over 32 agents", "POST", "/api/sessions/launch-team", TierLaunch, 400, nil,
 			map[string]any{"error": "a team can have at most 32 agents per launch", "code": "too_many_agents", "max": 32}, "sessions_launch.go LaunchTeam"},
@@ -71,7 +71,7 @@ func newRefusals() []newRefusal {
 		{"32 MiB of panel HTML", "PUT", "/api/agent/ui/x", TierNever, 409, nil,
 			map[string]any{"error": "a session's panels can hold at most 32 MiB of HTML in all: remove one or make this one smaller", "message": "a session's panels can hold at most 32 MiB of HTML in all: remove one or make this one smaller", "code": "panel_html_limit"}, "agent_ui.go"},
 		{"agent upload, store full", "POST", "/api/agent/artifacts", TierNever, 413, nil,
-			map[string]any{"error": "the artifact store is full (20.0 GiB of 20.0 GiB): ask the Operator to delete old artifacts or raise the limit (Settings > Storage; artifact_store_max_bytes, 0 for none)", "message": "the artifact store is full (20.0 GiB of 20.0 GiB): ask the Operator to delete old artifacts or raise the limit (Settings > Storage; artifact_store_max_bytes, 0 for none)", "code": "artifact_quota", "limit": "store"}, "artifacts.go artifactRefusal"},
+			map[string]any{"error": "the artifact store is full (20.0 GiB of 20.0 GiB): ask the Operator to delete old artifacts or raise the limit (Settings > Storage and cleanup; artifact_store_max_bytes, 0 for none)", "message": "the artifact store is full (20.0 GiB of 20.0 GiB): ask the Operator to delete old artifacts or raise the limit (Settings > Storage and cleanup; artifact_store_max_bytes, 0 for none)", "code": "artifact_quota", "limit": "store"}, "artifacts.go artifactRefusal"},
 		{"agent upload, disk nearly full", "POST", "/api/agent/artifacts", TierNever, 507, nil,
 			map[string]any{"error": disk, "message": disk, "code": "disk_low", "free_bytes": 1, "not_sent": true}, "artifacts.go uploadAgentArtifact"},
 		{"cross-team file, disk nearly full", "POST", "/api/board/b/external-artifacts", TierInteract, 507, nil,

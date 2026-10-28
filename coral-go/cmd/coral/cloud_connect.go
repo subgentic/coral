@@ -350,7 +350,7 @@ func (c *cloudClient) connectFlow(ctx context.Context, ui connectUI) int {
 			return code
 		}
 	} else {
-		fmt.Fprintf(ui.out, "Coral Hub can view this server. To allow more, open Settings > Coral Hub in the dashboard on this computer.\n")
+		fmt.Fprintf(ui.out, "Coral Hub can view this server. To allow more, open Settings > Network and Hub in the dashboard on this computer.\n")
 	}
 	return 0
 }
@@ -412,7 +412,7 @@ The most Coral Hub may do on this server:
 			return code
 		}
 	}
-	fmt.Fprintf(ui.out, "Coral Hub access: %s. Change it any time in Settings > Coral Hub on this computer.\n", mode)
+	fmt.Fprintf(ui.out, "Coral Hub access: %s. Change it any time in Settings > Network and Hub on this computer.\n", mode)
 	return -1
 }
 

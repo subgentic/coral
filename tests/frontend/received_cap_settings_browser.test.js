@@ -1,4 +1,4 @@
-// #4441 (Security's #4438 SHOULD 2): Settings > Storage shows what other teams and Corals have sent this computer against the limit on it, the limit can be
+// #4441 (Security's #4438 SHOULD 2): Settings > Storage and cleanup shows what other teams and Corals have sent this computer against the limit on it, the limit can be
 // raised or cleared, and the Operator is told once at 80% of it.
 //  - the row: the total, the limit, a labelled number field described by its line, the default shown as 2 when nothing is saved
 //  - Save sends the limit only when it was changed (an untouched field never turns the default into a saved value), in whole bytes; 0 is no limit
@@ -88,7 +88,7 @@ const GIB = 1024 ** 3;
 
         console.log('3. The notice at 80%: a toast when Settings is closed, none on top of the dialog, shown once');
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`); // the saves above left their own
-        const TOAST = /Other teams’ files: 1\.7 GiB of 2\.0 GiB\. New files are refused above this limit\. Raise it in Settings > Storage\./;
+        const TOAST = /Other teams’ files: 1\.7 GiB of 2\.0 GiB\. New files are refused above this limit\. Raise it in Settings > Storage and cleanup\./;
         // With Settings open the line says it: remembered, no toast.
         await ev(`window.__puts.length = 0; window.__status = { ...window.__status, bytes: ${Math.round(1.7 * GIB)}, notice: true }; window.showSettingsModal('cleanup'); true`);
         await waitFor(`/ GiB| B/.test(document.getElementById('settings-received-size').textContent)`, 'Settings open', 8000);
