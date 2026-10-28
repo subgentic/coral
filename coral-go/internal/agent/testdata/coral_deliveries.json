@@ -1,0 +1,36 @@
+{
+ "_about": "What Coral types into an agent (a nudge, a task notice, a health check, a wait notice, a stop-hook block) and what a person types that only looks like one. Both sides read this file: Go's agent.IsCoralDelivery (coral_delivery_test.go) and the dashboard's isCoralNudge (tests/frontend/coral_notice_fixture.test.mjs). A new notice wording is added here once and both must agree.",
+ "notices": [
+  "You have 1 unread message on the message board. Run 'coral-board read' to see them.",
+  "You have 12 unread messages on the message board. Run 'coral-board read' to see them.",
+  "you have 3 UNREAD MESSAGES on the message board",
+  "  You have 1 unread message on the message board. Run 'coral-board read'.\n",
+  "@QA Engineer You have 1 unread message on the message board. Run 'coral-board read' to see them.",
+  "/plan You have 1 unread message on the message board.",
+  "You have tasks available. Run 'coral-board task list'.",
+  "You have a new task in Coral (#42: Fix the thing)",
+  "[Task #12 (high) available] do it",
+  "[New Task #9 (low)] @notify-all something",
+  "@notify-all [New Task #9 (low)] something",
+  "[Wait resolved] the commit landed",
+  "[Coral health check] Team health check for x: 2 unread messages",
+  "[Coral] No activity on #9841 for 20 minutes.",
+  "[Coral UI panel request p-1] open the file",
+  "Stop hook feedback:\nNew board messages",
+  "You have 1 unread message on the message board. Run 'coral-board read'.You have tasks available. Run 'coral-board task list'.",
+  "<pasted_content id=\"1\">You have 2 unread messages on the message board. Run 'coral-board read' to see them.</pasted_content id=\"1\">",
+  "<pasted_content>You have 2 unread messages on the message board.</pasted_content>"
+ ],
+ "not_notices": [
+  "",
+  "Build the dashboard",
+  "Review the unread messages in my inbox and summarise them",
+  "You have a great idea: use a map",
+  "You have to fix the bug in main.go",
+  "Please read [Task #12] and answer",
+  "Message number 14",
+  "What does the Stop hook do?",
+  "I got: Stop hook feedback: new messages, why?",
+  "<pasted_content id=\"1\">fix the failing test</pasted_content id=\"1\">"
+ ]
+}

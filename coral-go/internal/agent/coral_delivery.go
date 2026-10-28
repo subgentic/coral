@@ -32,7 +32,7 @@ var (
 		regexp.MustCompile(`(?i)^\[Coral\b[^\]]*\]`),
 		regexp.MustCompile(`(?i)^Stop hook feedback:`),
 	}
-	pastedRe        = regexp.MustCompile(`(?s)^<pasted_content[^>]*>(.*)</pasted_content>$`)
+	pastedRe        = regexp.MustCompile(`(?s)^<pasted_content(?:\s+id="[^"<>]*")?\s*>(.*)</pasted_content(?:\s+id="[^"<>]*")?\s*>$`) // Claude Code closes a paste with the id again, </pasted_content id="1"> (the dashboard's pasted_content.js reads both forms)
 	leadingSlashRe  = regexp.MustCompile(`^(?:/[a-zA-Z0-9_-]+\s*)+`)
 	healthPrefixRe  = regexp.MustCompile(`(?i)^\[Coral health check\]\s*`)
 	notifyPrefixRe  = regexp.MustCompile(`(?i)^@[^@\n\r]+?\s+(?:You have|\[Task #|\[New Task #|\[Wait resolved\]|\[Coral\b)`)
