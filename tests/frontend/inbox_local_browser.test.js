@@ -57,6 +57,7 @@ const hex = i => i.toString(16).padStart(20, '0');
 
         const open = async (w, mobile, waiting = ['qa-b-id']) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await ev(`try { localStorage.removeItem('coral-last-place'); } catch {} true`).catch(() => {}); // a fresh browser has no place to reopen (#10057): the scene starts at Home, not where the scene before left off
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
             await ev(`localStorage.removeItem('coral.inbox.tab'); true`); // a fresh browser: the Inbox opens on Needs you
