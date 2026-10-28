@@ -72,6 +72,7 @@ const BASE = require('./test_base').BASE;
             check(`${tag}: a cancel the server refuses leaves the line (and says so)`, l.shown && l.texts.length === 1 && (await ev(`[...document.querySelectorAll('.toast')].some(t => /Could not cancel/.test(t.textContent))`)), JSON.stringify(l));
             await emit('coral:terminal-input-ack', { sessionId: 'hq-id', id: 10 });
             const rowWith = list => ev(`import(${S} + 'session_header_updates.js').then(m => { const row = { ...(window.__qaState.liveSessions.find(s => s.session_id === 'hq-id')), held_messages: ${JSON.stringify(list)} }; m.updateWaitingIndicator(row); return true; })`);
+            await ev(`localStorage.setItem('coral-held-mine', JSON.stringify({ 21: Date.now(), 22: Date.now() })); true`); // what this browser sent (a reload keeps it): the row's lines are its own, with Cancel; another device's are in two_devices_browser
             await rowWith([{ id: 21, text: 'from the row' }]);
             l = await line();
             check(`${tag}: the live row's held_messages draw the same line (a reload or a second window)`, l.shown && l.texts.join() === '“from the row”' && l.head === 'Queued. Sends after you answer the question above:', JSON.stringify(l));
