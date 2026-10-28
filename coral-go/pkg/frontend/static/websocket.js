@@ -16,7 +16,8 @@ import { updateChangedFileCount } from './changed_files.js';
 import { showNotificationToast, showWorkflowNotification, showAlertNotification, escapeHtml, dbg } from './utils.js';
 import { serverWsBase, identityKey, sessionServer, isCloud } from './server_base.js';
 import { updateHeaderContext } from './header_context.js';
-import { notifyNeedsInput } from './desktop_notify.js';
+import { noteAttention, KIND_NEEDS_INPUT, KIND_REPLY } from './attention.js';
+import { deriveSessionState } from './session_state.js';
 import { isPopout, popoutAllowsToastFor, popoutUpdateFromSession, popoutHandleSessionsTick, formatTerminalLabel } from './popout.js';
 import { applySleepingView } from './sleeping_view.js';
 import { updateServersTabVisibility } from './servers_tab.js';
@@ -151,7 +152,7 @@ function _operatorIsTypingIn(s) {
 }
 
 /** Test hook: forget the seed so a harness can simulate a fresh page load. */
-export function _resetWaitingSeedForTests() { _waitingSeeded = false; state.prevWaitingState = {}; }
+export function _resetWaitingSeedForTests() { _waitingSeeded = false; state.prevWaitingState = {}; state.prevStateKey = {}; }
 
 /** Apply one message from /ws/coral. Exported for tests (window._coralHandleWsMessage). */
 /** A diff of changed, removed and removed-remote rows, merged into the list and handed on as a full update. */
@@ -224,7 +225,18 @@ function _raiseNeedsInputAlert(s, id) {
     showNotificationToast(label, detail, openSession);
     // Opt-in desktop alert while this tab is in the background; names only.
     const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
-    notifyNeedsInput({ agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession });
+    noteAttention(KIND_NEEDS_INPUT, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession });
+}
+
+/** An agent's turn just ended and it awaits its person: a count in the tab title and, when this browser wants them, a desktop alert; only while this tab is in the background (#10068). Names only. */
+function _raiseReplyAlert(s, id) {
+    const sessionName = s.name;
+    const agentType = s.agent_type;
+    const sessionId = s.session_id;
+    const sessionSrv = sessionServer(s);
+    const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv));
+    const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
+    noteAttention(KIND_REPLY, { agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession });
 }
 
 /** A Codex row whose request is the agent's own approval request (its PermissionRequest hook), which Codex's reviewer may settle by itself. */
@@ -259,6 +271,13 @@ function _toastNewlyWaiting(data) {
             if (_isCodexApprovalRequest(s)) _holdCodexApprovalAlert(s, id);
             else _raiseNeedsInputAlert(s, id);
         }
+        // The turn that was working has ended and the agent awaits its person (a reply, or a failure to look at): the same gates as the needs-input alert.
+        const stateKey = deriveSessionState(s);
+        if (notifyEnabled && _waitingSeeded && state.prevStateKey[id] === 'working' && stateKey === 'your_turn'
+            && popoutAllowsToastFor(s.session_id) && !_operatorIsTypingIn(s)) {
+            _raiseReplyAlert(s, id);
+        }
+        state.prevStateKey[id] = stateKey;
         state.prevWaitingState[id] = needsInputAttention(s);
         if (!needsInputAttention(s)) { clearTimeout(_codexHolds.get(id)); _codexHolds.delete(id); }
 
