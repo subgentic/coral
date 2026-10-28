@@ -169,6 +169,7 @@ export const SECURITY_FIELDS = [
         help: { text: 'Applies after restart.', more: 'Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.' },
         options: [{ value: 'disabled', label: 'Off (plaintext database)' }, { value: 'key_file', label: 'Local key file (~/.coral/.db_key)' }, { value: 'password', label: 'Password at startup' }] },
     { key: 'telemetry_enabled', type: 'toggle', id: 'settings-telemetry-enabled', label: 'Usage analytics', help: 'Anonymous product events only. No prompts, transcripts, or secrets are sent. Applies immediately.' },
+    { key: 'security_advanced', type: 'heading', id: 'settings-security-advanced', label: 'Advanced', fold: true },
     { key: 'install_id', type: 'custom', id: 'settings-install-id-group', label: 'Install ID', live: ['settings-telemetry-install-hint', 'settings-telemetry-install-status'], render: slot => { const el = document.getElementById('settings-telemetry-install-box'); if (el) slot.append(el); } },
     { key: 'debug_input_log', type: 'toggle', id: 'settings-debug-input-log', label: 'Record what Coral types (debug)', disabledWhen: () => { const e = document.getElementById('settings-debug-input-log'); return !!e && e.dataset.locked === '1'; }, live: ['settings-debug-input-log-status', { id: 'settings-debug-input-log-delete', describes: false }], help: { text: '', more: 'Saves everything Coral sends to agent terminals, including anything typed or pasted, such as passwords. For troubleshooting only: turn it off afterwards. Applies immediately.' } },
 ];
@@ -178,10 +179,10 @@ export const NETWORK_FIELDS = [
         help: { text: 'Lets other devices use Coral as you do (control agents, read files, change settings); unencrypted unless TLS is set up.', more: 'TLS is on when Coral was started with --tls-cert and --tls-key, or when you reach it through Coral Hub. A device needs your password or API key.' } },
     // the groups of this pane (#8491): a title drawn by settings_view (the sections are labelled by it) and the group's body, a part of the page its own module fills and shows or hides (the row and its title leave with it, settings_view.css)
     { key: 'net_setup_title', type: 'heading', id: 'net-setup-title', label: 'Setup code' }, live('net-group-setup'),
-    { key: 'net_status_title', type: 'heading', id: 'net-status-title', label: 'Status' }, live('about-section'),
     { key: 'net_hub_title', type: 'heading', id: 'net-hub-title', label: 'Coral Hub' }, live('net-group-hub'),
     { key: 'hub_mode', type: 'toggle', id: 'settings-hub-mode-enabled', labelId: 'settings-hub-mode-label', label: 'Manage other computers from this one', live: ['settings-hub-mode-status', 'settings-hub-mode-restart'],
         help: { text: 'Adds a Servers tab; whoever signs in here controls every computer you add.', more: "It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the servers you added." } },
+    { key: 'net_advanced', type: 'heading', id: 'net-advanced', label: 'Advanced', fold: true }, live('about-section'), // the status of this computer's Coral: behind Advanced (#10570)
 ];
 
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */

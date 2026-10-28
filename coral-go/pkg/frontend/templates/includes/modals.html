@@ -687,7 +687,7 @@
                     <div id="settings-setup-code-hint" class="settings-hint" role="status">To sign in from another device.</div>
                 </div>
                 </section>
-                <section class="net-group" id="about-section" aria-labelledby="net-status-title">
+                <section class="net-group" id="about-section" aria-label="Status">
                 <!-- Status: the version (Coral has no paid licence, #3221) and this machine's health from the feed (#3446); a hub-served page has no machine of its own, so it hides the group (UI audit #5589, finding 19) -->
                 <div class="net-body">
                     <div id="app-version-label" class="settings-version-label"></div>
@@ -718,7 +718,7 @@
                             <span class="sr-only" data-cloud="copy-code-said" role="status"></span>
                         </div>
                     </div>
-                    <div class="cloud-command-row" data-cloud="command-row" hidden><code data-cloud="command"></code><button type="button" class="btn btn-small" data-cloud="copy">Copy</button></div>
+                    <details class="disclosure cloud-advanced"><summary>Advanced: the command line</summary><div class="cloud-command-row" data-cloud="command-row" hidden><code data-cloud="command"></code><button type="button" class="btn btn-small" data-cloud="copy">Copy</button></div></details>
                     <div class="settings-cloud-rekey" id="settings-cloud-rekey-row" data-cloud="rekey-row" hidden>
                         <div id="settings-cloud-rekey-text" data-cloud="rekey-text" class="settings-hint settings-error" role="alert"></div>
                         <button type="button" id="settings-cloud-rekey" data-cloud="rekey" class="btn btn-small">Replace the secret key</button>

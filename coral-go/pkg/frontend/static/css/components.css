@@ -3735,6 +3735,8 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .net-level-row > select { width: 100%; }
 .net-level-text > label { display: block; }
 #settings-cloud .cloud-command-row { align-self: stretch; flex-wrap: nowrap; }
+#settings-cloud .cloud-advanced { align-self: stretch; }
+#settings-cloud .cloud-advanced:has(> .cloud-command-row[hidden]) { display: none; } /* nothing to show: the disclosure goes with its row (#10570) */
 #settings-cloud .cloud-command-row code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 #settings-cloud .cloud-command-row .btn { flex: none; margin: 0; }
 @container settingspane (max-width: 40rem) { .net-level-row { grid-template-columns: minmax(0, 1fr); } }
