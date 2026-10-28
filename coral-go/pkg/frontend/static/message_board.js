@@ -1,5 +1,4 @@
 import { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchProjects } from './board_fetch.js';
-import { doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, resetSelection, connectBoard, hideExportBoardModal } from './board_export.js';
 import { emptyState } from './dom_write.js';
 import { escapeAttr, escapeHtml, showView, OPERATOR_ID, showToast } from './utils.js';
 import { keyLabel, splitKey, hasBoardLabel, boardFetch, noteBoardLabel, inTeam } from './server_base.js';
@@ -13,19 +12,21 @@ import { openTask } from './task_navigation.js';
 import { launchBlockedReason } from './hub_access.js';
 import { registerActions, textOf, withId } from './actions.js';
 import { bs } from './board_state.js';
-import { attachMentionList, loadBoardSubscribers, subscribeDashboard } from './board_members.js';
-import { confirmDeleteBoardMessage, copyMessageLink, loadPausedState, loadSleepState } from './board_controls.js';
-import { clearNewPill, jumpToLatest } from './board_new_pill.js';
-import { focusMessageById, formatTime, isAtBottom, jumpToFirst, loadBoardMessages, loadEarlierMessages, openMessageActions, renderMessages } from './board_window.js';
-import { _pollNewMessages, startBoardPoll, stopBoardPoll } from './board_poll.js';
-import { replyToMessage } from './board_composer.js';
 import './goals_adapter.js'; // the Goals view (goals_view.js) is lazy and imports only what loads at startup (import_hygiene): its two small helpers load here (#7113)
 import './goal_words.js';
+// The board page's group (bundle_lazy.go): these load with it, and the page's other files import only what loads at startup
+const BX = await importOnce('./board_export.js'); // a part of the board page's group: loaded with it
+const { doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, resetSelection, connectBoard, hideExportBoardModal } = BX;
+const { attachMentionList, loadBoardSubscribers, subscribeDashboard } = await importOnce('./board_members.js');
+const { confirmDeleteBoardMessage, copyMessageLink, loadPausedState, loadSleepState, toggleBoardPause } = await importOnce('./board_controls.js');
+const { clearNewPill, jumpToLatest } = await importOnce('./board_new_pill.js');
+const { focusMessageById, formatTime, isAtBottom, jumpToFirst, loadBoardMessages, loadEarlierMessages, openMessageActions, renderMessages } = await importOnce('./board_window.js');
+const { _pollNewMessages, startBoardPoll, stopBoardPoll } = await importOnce('./board_poll.js');
+const { replyToMessage, postBoardMessage } = await importOnce('./board_composer.js');
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
-export { showExportBoardModal, doExportBoard, toggleSelectMode, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown } from './board_export.js';
 // the moved exports, still importable from here
-export { postBoardMessage } from './board_composer.js';
-export { toggleBoardPause } from './board_controls.js';
+export const { showExportBoardModal, toggleSelectMode } = BX;
+export { doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, postBoardMessage, toggleBoardPause };
 /* Message Board: project list, messages, subscribers, posting */
 
 // ── Sidebar rendering ────────────────────────────────────────────────────
@@ -266,11 +267,6 @@ export function deleteMessageBoardProject() {
 // What the export and select code needs of the open board (board_export.js).
 connectBoard({ project: () => bs.currentProject, messages: () => bs._allMessages, render: () => renderMessages(bs._allMessages), formatTime });
 
-export function initMessageBoard() {
-    loadBoardProjects();
-}
-
-export { loadBoardProjects };
 
 // The board's generated markup (#3645): data-on-* names, never code. Ids and names are checked
 // before use; a bad one does nothing. Deleting a message never asked first, and still doesn't.

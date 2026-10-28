@@ -8,7 +8,6 @@ import { showSidebarPane } from './sidebar.js';
 import { note, currentRoute } from './nav.js';
 import { liveRoute, keyRoute } from './routes.js';
 import { showView, viewChanges } from './utils.js';
-import { showMessageBoardProjects } from './message_board.js';
 import { syncMobileAgentList } from './mobile.js';
 import { sessionServer } from './server_base.js';
 import { refreshGroupTable } from './sidebar_groups.js';
@@ -63,7 +62,7 @@ export function switchNavTab(tab, opts = {}) {
 
     // Switch main view based on tab
     if (tab === 'board') {
-        showMessageBoardProjects();
+        importOnce('./message_board.js', 'the message board').then(m => m.showMessageBoardProjects());
     } else if (tab === 'automations') {
         document.getElementById('scheduler-view')?.removeAttribute('data-phone-item'); // a phone opens Automations on its list
         showView('scheduler-view');

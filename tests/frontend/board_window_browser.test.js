@@ -88,7 +88,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Page.navigate({ url: `${BASE}/board/${B}` });
         await loaded;
         await coralReady();
-        await waitFor(`(() => { const n = window.__coral.boardCounts(); return n.shown === 50 && n.total === 1000; })()`, 'the latest page');
+        await waitFor(`(() => { const n = window.__coral.boardCounts?.() || {}; return n.shown === 50 && n.total === 1000; })()`, 'the latest page');
         assert.equal(await ev(`${C}.querySelectorAll('.mb-load-earlier, .mb-message-count').length`), 0, 'no Load earlier button and no count line on load (#7762)');
         assert.equal(await ev(`${C}.querySelector('.mb-earlier-line')?.textContent || ''`), '', 'and no line at all while earlier messages are waiting and none is loading');
         await waitFor(`(() => { const c = ${C}; return c.scrollHeight > c.clientHeight * 2 && c.scrollHeight - c.scrollTop - c.clientHeight < 50; })()`, 'a scrolled board, at the bottom');

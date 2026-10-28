@@ -19,7 +19,6 @@ import { selectScheduledJob } from './scheduler.js';
 import { go } from './nav.js';
 import { closeAllTabs as closeAllPreviewTabs, openPreviewTab } from './preview_pane.js';
 import { hideServersModal } from './servers.js';
-import { cancelSelectMode, deleteMessageBoardProject, showExportBoardModal, showMessageBoardProjects, postBoardMessage, toggleSelectMode } from './message_board.js';
 import { hideFolderTagDropdown } from './folder_tags.js';
 import { showTeamAvailability } from './team_availability.js';
 /** The Automations tab on a folder (jobs or workflows), as a link to it would open it. */
@@ -59,7 +58,7 @@ const windowHooks = {
     executeMacro, deleteMacro, killSession, getTerminal, switchHistoryTab,
     loadAgentTasks, loadBoardTasks, renderBoardTaskList, loadChangedFiles, loadAgentEvents,
     selectScheduledJob, openAutomationsFolder, editScheduledJob, closeAllPreviewTabs, openPreviewTab, hideServersModal,
-    cancelSelectMode, deleteMessageBoardProject, showExportBoardModal, showMessageBoardProjects, postBoardMessage, toggleSelectMode,
+    ...Object.fromEntries(['cancelSelectMode', 'deleteMessageBoardProject', 'showExportBoardModal', 'showMessageBoardProjects', 'postBoardMessage', 'toggleSelectMode'].map(n => [n, (...args) => importOnce('./message_board.js').then(m => m[n](...args))])),
     hideFolderTagDropdown, buildSessionTooltip, showTeamAvailability, showTeamWorkingMode,
     triggerWorkflow, showWorkflowCreateModal, editWorkflow, saveWorkflow, workflowsBackToList,
     showTemplateBrowser, searchChats, showInfoModal, exportTeamTemplates, showResumeModal,

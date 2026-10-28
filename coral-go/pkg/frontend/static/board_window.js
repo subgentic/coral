@@ -1,11 +1,12 @@
 /* The board's windowed message list: loading a page, loading the earlier ones, rendering, prepending, trimming and the header (moved out of message_board.js, #8399; no behaviour change). */
+import { importOnce } from './import_once.js';
 import { fetchMessages, PAGE_SIZE, mergeMessages } from './board_fetch.js';
 import { isBusyStatus, busyRetryingText, machineOf, afterPause } from './overload.js';
 import { isCloud, keyLabel } from './server_base.js';
 import { nameSaveButton, aboutRow, BOARD_SAVE_BUTTON } from './saved_marks.js';
 import { renderTaskQueueRun, groupTaskQueueRuns } from './board_system_lines.js';
 import { getAgentColor, isOperatorId, OPERATOR_ID, escapeAttr, boardMessageColorStyle, escapeHtml, externalMessageBadge, replyWithHtml, hubUserBadge, askBadge, renderBoardMessageBody } from './utils.js';
-import { isSelectMode, isSelected } from './board_export.js';
+const { isSelectMode, isSelected } = await importOnce('./board_export.js'); // a part of the board page's group: loaded with it
 import { rowParts, toggleRow, revealRow, sameDay, dayDividerHtml, refreshReplies } from './board_table.js';
 import { messageTimeHtml } from './message_time.js';
 import { messageAttachmentAttrs, messageAttachmentsHtml } from './board_attachments.js';
@@ -15,7 +16,7 @@ import { scrollBehavior } from './motion.js';
 import { highlightBoard } from './board_search.js';
 import { emptyState } from './dom_write.js';
 import { bs } from './board_state.js';
-import { announceArrivals, clearNewPill, noteUnseenMessages } from './board_new_pill.js';
+const { announceArrivals, clearNewPill, noteUnseenMessages } = await importOnce('./board_new_pill.js'); // a part of the board page's group: loaded with it
 
 export async function loadBoardMessages(project) {
     const msgsEl = document.getElementById('mb-messages');

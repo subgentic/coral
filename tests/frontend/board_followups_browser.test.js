@@ -84,7 +84,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Page.navigate({ url: `${BASE}/board/${B}` });
         await loaded;
         await coralReady();
-        await waitFor(`window.__coral.boardCounts().shown > 0 && window.__coral.boardCounts().notLoaded > 0`, 'the latest page, with earlier messages behind it');
+        await waitFor(`!!window.__coral.boardCounts && window.__coral.boardCounts().shown > 0 && window.__coral.boardCounts().notLoaded > 0`, 'the latest page, with earlier messages behind it');
         await waitFor(`(() => { const c = ${C}; return c.scrollHeight > c.clientHeight * 2 && c.scrollHeight - c.scrollTop - c.clientHeight < 50; })()`, 'a scrolled board, at the bottom');
 
         await waitStable(`${C}.children.length + ':' + ${C}.scrollHeight`, 'the board to stop re-rendering after its start', 500);
