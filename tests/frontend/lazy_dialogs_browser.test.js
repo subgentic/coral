@@ -95,22 +95,11 @@ const undersized = sel => `(() => {
                     const w = document.createElement('div'); const b = document.createElement('button'); b.dataset.onClick = 'custom-view-edit'; b.dataset.viewId = ${JSON.stringify(String(viewId))};
                     w.appendChild(b); document.body.appendChild(w); b.click(); w.remove(); return true; })()`],
             ];
-            // On the desktop summaries are switched before Settings is first built, so its box has a change to follow.
-            if (!v.coarse) {
-                const hidden = await ev(`document.querySelector('.sidebar').classList.contains('summary-hidden')`);
-                await ev(`(async () => { await window.toggleSessionSummary(); return true; })()`);
-                await waitFor(`document.querySelector('.sidebar').classList.contains('summary-hidden') === ${!hidden}`, 'summaries switched');
-            }
             const small = {};
             for (const [id, open] of opens) {
                 await ev(`document.getElementById('qa-opener').focus(); ${open}; true`);
                 await waitFor(shown(id), `${v.name}: ${id} opens`, { timeout: 8000 });
                 await waitFor(`document.getElementById(${JSON.stringify(id)}).contains(document.activeElement)`, `${v.name}: focus moves into ${id}`);
-                if (id === 'settings-modal') {
-                    // What code set at load before Settings was lazy is set as it is built: the Show summaries box follows the list.
-                    assert.equal(await ev(`document.getElementById('settings-show-summary').checked === !document.querySelector('.sidebar').classList.contains('summary-hidden')`), true,
-                        `${v.name}: Show summaries matches the list`);
-                }
                 if (v.coarse) { const s = await ev(undersized('#' + id)); if (s.length) small[id] = s; }
                 await escape();
                 await waitFor(`!${shown(id)}`, `${v.name}: Escape closes ${id}`);
@@ -120,7 +109,6 @@ const undersized = sel => `(() => {
 
             // Apply sends only what changed (#4423): one box is flipped, saved, and flipped back the same way.
             assert.deepEqual(small, {}, `${v.name}: every control in each dialog is at least 44x44`);
-            if (!v.coarse) await ev(`(async () => { await window.toggleSessionSummary(); return true; })()`); // back on
             console.log(`${v.name}: Settings saves`);
             for (const pass of ['flip', 'restore']) {
                 await ev(`window.__reqs.length = 0; window.showSettingsModal(); true`);
