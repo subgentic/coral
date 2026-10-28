@@ -446,7 +446,7 @@ registerActions({
     'session-open': (el, event) => {
         const sid = textOf(el.dataset.sessionId) || '';
         const name = textOf(el.dataset.name), type = tokenOf(el.dataset.agentType);
-        if (name && type) window.selectLiveSession(name, type, sid, textOf(el.dataset.server) || '', { pointer: !!event && event.detail > 0 }); // a click puts the cursor in the composer (a mouse); Enter on the row leaves focus on it (#9794)
+        if (name && type) window.selectLiveSession(name, type, sid, textOf(el.dataset.server) || '', { pointer: !!event && event.detail > 0, focusChat: !!event && event.detail === 0 }); // a click puts the cursor in the composer; Enter on the row takes the keyboard to the chat too (the box, or the heading on a phone), not leaving it on the row for the next words to go into Search (#10410) (a mouse); Enter on the row leaves focus on it (#9794)
     },
     'history-open': el => { const sid = textOf(el.dataset.sessionId); if (sid) window.selectHistorySession(sid); },
     'history-page': el => { const n = idOf(el.dataset.page); if (n) window.loadHistoryPage(n); },
