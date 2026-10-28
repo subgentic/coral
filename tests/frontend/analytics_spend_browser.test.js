@@ -93,6 +93,15 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             assert.equal(shape['cost-spend'].kids, shape['cost-task-time'].kids, 'the same skeleton: ' + JSON.stringify(shape));
             assert.ok(shape['cost-spend'].gap && shape['cost-spend'].gap.endsWith('/true') && shape['cost-spend'].gap === shape['cost-task-time'].gap, 'the table follows the chart row with the same spacing: ' + JSON.stringify([shape['cost-spend'].gap, shape['cost-task-time'].gap]));
         });
+        await run('the tables explain their words behind an (i) (#10001): Who spends and By agent each have one, closed, and it opens to the glossary', async () => {
+            for (const [id, words] of [['cost-spend', ['Tokens', 'Share', 'Commits', 'Cache reads', 'Tool calls']], ['cost-task-time', ['Tasks done', 'Median time', 'Sent back']]]) {
+                const r = await ev(`(() => { const t = document.querySelector('#${id} .spend-who .spend-box-title'); const b = t && t.nextElementSibling; const box = b && b.nextElementSibling; return { btn: b && b.className, label: b && b.getAttribute('aria-label'), open: b && b.getAttribute('aria-expanded'), hidden: box && box.hidden, words: box ? [...box.querySelectorAll('dt')].map(d => d.textContent) : null }; })()`);
+                assert.equal(r.btn, 'settings-info-btn', id + ': an (i) after the title: ' + JSON.stringify(r)); assert.equal(r.open, 'false'); assert.equal(r.hidden, true, id + ': closed at first');
+                assert.deepEqual(r.words, words, id + ': the words of its table');
+                await ev(`document.querySelector('#${id} .spend-who .spend-box-title').nextElementSibling.click(); true`);
+                assert.equal(await ev(`document.querySelector('#${id} .spend-who .spend-box-title').nextElementSibling.nextElementSibling.hidden`), false, id + ': the (i) opens it');
+            }
+        });
         await run('Task time: six tiles, tasks done with Daily and Hourly, by agent; a measure the endpoint does not return is left out', async () => {
             const cards = await ev(`[...document.querySelectorAll('#cost-task-time .spend-card')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`);
             assert.equal(cards.length, 6, JSON.stringify(cards));

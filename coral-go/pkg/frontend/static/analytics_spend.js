@@ -9,6 +9,7 @@ import { boardFetch, identityKey, isCloud, noteBoardLabels, serverFetch, spendTe
 import { teamLabel } from './server_status.js';
 import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
+const { addTermsInfo } = await importOnce('./analytics_terms.js');
 
 const { dataTable } = await importOnce('./data_table.js'); // the shared table (#7743)
 const { phoneOneLine } = await importOnce('./analytics_views.js'); // a phone: one line a row (#8982)
@@ -188,7 +189,7 @@ function drawSpend() {
         card(fmtTokens(f.cacheReads) || '0', 'cache reads, not in the total', ''));
     const chartBox = el('section', 'spend-box'); chartBox.append(chart(data, f));
     const how = SHAPE_HOW('Tokens are input plus output. Cache writes and cache reads are shown beside, never hidden in the total. A commit counts once when it reaches main; its author is the agent, and one that matches no agent is Unattributed. A commit is credited to the author name its committer typed, so these are counts, not proof of who did the work. In a repository shared by several teams, Unattributed can include other teams\' commits. Review and orchestration tokens belong to the team, not to one commit. An agent with no token record is Not measured, not zero.');
-    const who = el('section', 'spend-who'); who.append(el('h4', 'spend-box-title', 'Who spends'));
+    const who = el('section', 'spend-who'); const whoTitle = el('h4', 'spend-box-title', 'Who spends'); who.append(whoTitle); addTermsInfo(whoTitle, ['tokens', 'portion', 'commits', 'cache', 'tools']);
     who.append(table(data));
     if (data.measured_agents != null && data.of_agents != null && data.measured_agents < data.of_agents) who.append(el('p', 'spend-note', `${data.measured_agents} of ${data.of_agents} agents measured.`));
     shape(body, { sub: `Team ${teamLabel(model.team)} · last ${f.windowWord} against the 7 days before`, headline: headline(f), cards, chart: chartBox, how, table: who });
@@ -238,7 +239,7 @@ function drawTime() {
     }
     const agents = Array.isArray(tt.agents) ? tt.agents : [];
     if (agents.length) {
-        sec = el('section', 'spend-who'); sec.append(el('h4', 'spend-box-title', 'By agent'));
+        sec = el('section', 'spend-who'); const byTitle = el('h4', 'spend-box-title', 'By agent'); sec.append(byTitle); addTermsInfo(byTitle, ['done', 'median', 'sentBack']);
         const rows = agents.slice().sort((x, y) => (y.done || 0) - (x.done || 0));
         sec.append(dataTable({ label: 'Task time by agent', fold: 'labeled', rows, rowKey: a => a.name || '', ...phoneOneLine([
             { key: 'name', label: 'Agent', tone: 'primary', cell: a => a.name || '' },
