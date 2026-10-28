@@ -41,6 +41,8 @@ type launchTeamAgent struct {
 	MCPServers   json.RawMessage        `json:"mcpServers"` // refused: not supported (#3644)
 	Hooks        map[string]interface{} `json:"hooks"`
 	Knowledge    string                 `json:"knowledge"`
+	// PermissionMode names Default and nothing else (#10362): a member whose form says Default sends no flag, which is the same request as "nothing chosen" (the saved default, or Auto); this says it.
+	PermissionMode string `json:"permission_mode"`
 	// ReviewsOnly and ReviewAreas (#8957): the member takes review tasks only, and which areas it reviews (empty: every area). Applied when the member subscribes to the team's board.
 	ReviewsOnly bool     `json:"reviews_only"`
 	ReviewAreas []string `json:"review_areas"`
@@ -101,6 +103,10 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	for _, a := range body.Agents {
 		if mcpGiven(a.MCPServers) {
 			errBadRequest(w, fmt.Sprintf("agent %q: %s", a.Name, errMCPNotSupported))
+			return
+		}
+		if a.PermissionMode != "" && a.PermissionMode != "default" {
+			errBadRequest(w, fmt.Sprintf("agent %q: permission_mode can only be \"default\"; any other mode is sent as the CLI's own flags", a.Name))
 			return
 		}
 		if a.ReviewsOnly || len(a.ReviewAreas) > 0 {
@@ -626,7 +632,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 		Model: effectiveModel, Thinking: effectiveThinking, Capabilities: def.Capabilities, Tools: def.Tools, Hooks: def.Hooks,
 		// The member's flags carry the mode as the expanded flags of its type (--sandbox workspace-write -a never for Codex's auto), which PermissionModeFromFlags does not read
 		// back (it never widens one type's flags into a mode), so the mode stored for it was the default and a team reset relaunched it with no permission flags (#5251).
-		PermissionMode: memberPermMode,
+		PermissionMode: explicitDefaultMemberMode(def.PermissionMode, memberPermMode, agentFlags),
 		AutoByDefault:  autoByDefault,
 	})
 	if err != nil {
@@ -702,3 +708,12 @@ func finishTeamLaunch(attempt *tracking.Attempt, launched []map[string]any, skip
 
 // maxLaunchTeamAgents is the most agents one launch-team request may start (#4602).
 const maxLaunchTeamAgents = 32
+
+// explicitDefaultMemberMode is the mode a member is launched with: the one its team's flags stand for, else "default" when the member asked for Default and has no permission flag of its own (those win, as
+// over every mode), else "" (the launch decides as before).
+func explicitDefaultMemberMode(requested, fromTeamFlags string, memberFlags []string) string {
+	if fromTeamFlags != "" || requested != "default" {
+		return fromTeamFlags
+	}
+	return explicitDefaultMode(requested, memberFlags)
+}

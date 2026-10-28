@@ -11,7 +11,7 @@ import { cliPathButton } from './prerequisites.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
-const { trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription } = await importOnce('./permission_flags.js');
+const { trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _findPersona, _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
 const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoices } = await importOnce('./agent_config_form.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, hideLaunchModal, showTeamLaunchFailures } = await importOnce('./launch_core.js');
@@ -712,6 +712,8 @@ async function launchTeam() {
         if (config.model) agent.model = config.model;
         if (config.thinking) agent.thinking = config.thinking; // #4969
         if (config.flags) agent.flags = config.flags.split(/\s+/).filter(Boolean);
+        // A member whose mode is Default says so (#10362): its form sends no flag for Default, the same request as "nothing chosen", which starts in the saved default or Auto.
+        if (config.permissionMode === 'default' && !(config.flags && _hasPermFlag(config.flags))) agent.permission_mode = 'default';
         agents.push(agent);
     }
 

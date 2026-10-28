@@ -533,6 +533,8 @@ as `/api/sessions/launch` applies (see above).
 }
 ```
 
+A member may carry `"permission_mode": "default"` (#10362): it starts in Default and Default is recorded for a restart or a team reset, whatever mode is saved, as on `POST /api/sessions/launch` (the only value; any other is 400, and the member's own permission flags win over it).
+
 **Response:**
 ```json
 {
