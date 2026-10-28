@@ -308,7 +308,12 @@ function _syncTeamBlock() {
     if (!go) return;
     const why = document.querySelector('#launch-step-team [data-blocks-launch]');
     go.disabled = !!why;
-    if (why) go.setAttribute('aria-describedby', 'team-recap'); else go.removeAttribute('aria-describedby'); // the line above the buttons says why (a member's own warning is on a page this step does not show, #9945)
+    // Launch team is described by the lines that say why it is off: the line above the buttons for a member's CLI (that warning is on a page this step does not show, #9945), and the tmux line itself when
+    // tmux is what is missing (the line above the buttons does not carry that one: it is in its own slot, #6046). Both, when both hold it.
+    const ids = [];
+    if (document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)')) ids.push('team-recap');
+    if (document.querySelector('#team-tmux-slot[data-blocks-launch]')) ids.push('team-tmux-slot');
+    if (why && ids.length) go.setAttribute('aria-describedby', ids.join(' ')); else go.removeAttribute('aria-describedby');
 }
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest && e.target.closest('#launch-step-team')) _syncTeamBlock(); });
 
