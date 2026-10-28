@@ -101,6 +101,10 @@ export async function maybePromptSetPassword() {
 
 /** Home's first control by keyboard: its New agent card, else the agent search box (a phone's too), else the menu button or the current top tab. */
 function pageControl() {
+    if (window.matchMedia?.('(pointer: coarse)').matches) { // a touch screen: the page's heading, not a box whose focus raises the on-screen keyboard (#10281)
+        const h = ['#welcome-screen h1', '#mobile-session-list h2', '#mobile-agent-list h2', '.main-content h1'].map(sel => [...document.querySelectorAll(sel)].find(x => x.getClientRects().length > 0)).find(Boolean);
+        if (h) { h.tabIndex = -1; return h; }
+    }
     for (const sel of ['#welcome-screen .welcome-launch[data-arg="agent"]', '#agent-search-input', '#mobile-agent-list .mobile-search-input', '#top-menu-btn', '.top-nav-tab.active']) {
         const e = [...document.querySelectorAll(sel)].find(x => x.getClientRects().length > 0);
         if (e) return e;
