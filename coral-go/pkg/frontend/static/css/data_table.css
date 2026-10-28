@@ -446,9 +446,11 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 @container dt (max-width: 20rem) { .dt-mail-line:has(> .dt-mail-team) { flex-wrap: wrap; } .dt-mail-line:has(> .dt-mail-team) > .dt-mail-title { max-width: 100%; flex-shrink: 1; } .dt-mail-team { flex: 1 0 100%; max-width: 100%; white-space: normal; overflow-wrap: anywhere; } } /* at large text the team has its own line and wraps whole instead of being cut (#9664) */
 /* At large text (a 390 px phone at 200% is about 12 rem wide) the mail row's title and first words do not share a line: the title, then the words under it, each cut by its own ellipsis; the time keeps its space (#9646). */
 @container dt (max-width: 20rem) {
-    .dt-mail-line:not(:has(> .dt-mail-team)) { flex-direction: column; gap: 2px; } /* a line with a team wraps instead (below): its team has its own line */
+    .dt-mail-line:not(:has(> .dt-mail-team)) { flex-direction: column; gap: 2px; position: relative; } /* a line with a team wraps instead (below): its team has its own line */
     .dt-mail-line:not(:has(> .dt-mail-team)) > .dt-mail-title { max-width: 100%; }
     .dt-mail-line:not(:has(> .dt-mail-team)) > .dt-mail-snippet { flex: none; }
+    .dt-mail-line:not(:has(> .dt-mail-team)) > .dt-mail-live { position: absolute; top: 0.45em; right: 0; } /* a live chat's dot stays on the title's line: as a third flex item in the column it fell below the row (#9804) */
+    .dt-mail-line:not(:has(> .dt-mail-team)):has(> .dt-mail-live) > .dt-mail-title { max-width: calc(100% - 1rem); }
 }
 
 /* A row not opened since it changed (#9687; UI/UX): an 8 px accent dot and the name at 600 (a read name is 500); the snippet and the time do not change with it. A desktop row shows the dot before the name, named for a screen reader. */
