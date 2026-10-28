@@ -3391,3 +3391,34 @@ func TestBoardStateFileNeedsAPlainName(t *testing.T) {
 	_, err = os.Stat(filepath.Join(cfg.CoralDir(), "board_state_claude-0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11.json"))
 	assert.NoError(t, err, "a normal session name still gets its state file")
 }
+
+// The goal line is refreshed at most every 30 minutes, so its age is said beside it (#10123): a live row carries summary_at, the time of the newest goal event, null without a goal.
+func TestSessionsList_RowCarriesWhenItsGoalWasWritten(t *testing.T) {
+	server, handler, terminal, _ := setupSessionsTestServer(t)
+	withGoal, noGoal := "00000000-0000-4000-8000-000000000101", "00000000-0000-4000-8000-000000000102"
+	terminal.addSession("claude-"+withGoal, "/tmp/test")
+	terminal.addSession("claude-"+noGoal, "/tmp/test2")
+	at := time.Now().Add(-25 * time.Minute).UTC().Format(store.ISOFormat)
+	for _, ev := range []store.AgentEvent{{AgentName: "worker", SessionID: &withGoal, EventType: "goal", Summary: "Old goal", CreatedAt: time.Now().Add(-3 * time.Hour).UTC().Format(store.ISOFormat)},
+		{AgentName: "worker", SessionID: &withGoal, EventType: "goal", Summary: "Build the thing", CreatedAt: at}} {
+		ev := ev
+		_, err := handler.ts.InsertAgentEvent(context.Background(), &ev)
+		require.NoError(t, err)
+	}
+	resp, err := http.Get(server.URL + "/api/sessions/live")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var rows []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&rows))
+	require.Len(t, rows, 2)
+	for _, r := range rows {
+		switch r["session_id"] {
+		case withGoal:
+			assert.Equal(t, "Build the thing", r["summary"])
+			assert.Equal(t, at, r["summary_at"], "the newest goal's time, not the first one's")
+		case noGoal:
+			assert.Contains(t, r, "summary_at", "the key is always there")
+			assert.Nil(t, r["summary_at"], "no goal, no age")
+		}
+	}
+}

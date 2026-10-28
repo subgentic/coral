@@ -278,6 +278,7 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 	trace.begin("db_reads")
 	var (
 		displayNames, icons, nameColors, latestGoals map[string]string
+		goalAt                                       map[string]string
 		displayErr, subsErr, goalsErr, unreadErr     error
 		gitState                                     map[string]*store.GitSnapshot
 		fileCounts                                   map[string]int
@@ -308,7 +309,14 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			}
 		},
 		func() { stateEvents, _ = h.ts.GetSessionStateEvents(ctx, sessionIDs) },
-		func() { latestGoals, goalsErr = h.ts.GetLatestGoals(ctx, sessionIDs) },
+		func() {
+			var rows map[string]store.LatestGoal
+			rows, goalsErr = h.ts.GetLatestGoalRows(ctx, sessionIDs)
+			latestGoals, goalAt = map[string]string{}, map[string]string{}
+			for id, g := range rows {
+				latestGoals[id], goalAt[id] = g.Summary, g.At
+			}
+		},
 	}
 	if h.tokenStore != nil && len(sessionIDs) > 0 {
 		reads = append(reads,
@@ -490,6 +498,7 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"tmux_session":          agent.TmuxSession,
 			"status":                statusVal,
 			"summary":               summaryVal,
+			"summary_at":            ptr.NullIfEmpty(goalAt[sid]),
 			"staleness_seconds":     listStaleness(staleness),
 			"working_directory":     agent.WorkingDir,
 			"display_name":          displayVal,
@@ -600,6 +609,7 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"tmux_session":          nil,
 			"status":                "Sleeping",
 			"summary":               nil,
+			"summary_at":            nil,
 			"staleness_seconds":     nil,
 			"working_directory":     ls.WorkingDir,
 			"display_name":          dn,

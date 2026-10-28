@@ -278,6 +278,7 @@ func newLiveIndex(allLive []store.LiveSession) liveIndex {
 // listData is the batch-read enrichment for the awake agents' rows (never nil maps).
 type listData struct {
 	displayNames, icons, nameColors, latestGoals map[string]string
+	goalAt                                       map[string]string // when each row's goal was written (#10123)
 	gitState                                     map[string]*store.GitSnapshot
 	fileCounts                                   map[string]int
 	latestEvents                                 map[string][2]string
@@ -326,7 +327,14 @@ func (h *SessionsHandler) readListData(ctx context.Context, trace *phaseTrace, a
 			}
 		},
 		func() { d.stateEvents, _ = h.ts.GetSessionStateEvents(ctx, sessionIDs) },
-		func() { d.latestGoals, goalsErr = h.ts.GetLatestGoals(ctx, sessionIDs) },
+		func() {
+			var rows map[string]store.LatestGoal
+			rows, goalsErr = h.ts.GetLatestGoalRows(ctx, sessionIDs)
+			d.latestGoals, d.goalAt = make(map[string]string, len(rows)), make(map[string]string, len(rows))
+			for id, g := range rows {
+				d.latestGoals[id], d.goalAt[id] = g.Summary, g.At
+			}
+		},
 	}
 	if h.tokenStore != nil && len(sessionIDs) > 0 {
 		reads = append(reads,
@@ -363,6 +371,7 @@ func (h *SessionsHandler) readListData(ctx context.Context, trace *phaseTrace, a
 	d.tokenUsage = orEmpty(d.tokenUsage)
 	d.latestTurnCtx = orEmpty(d.latestTurnCtx)
 	d.latestGoals = orEmpty(d.latestGoals)
+	d.goalAt = orEmpty(d.goalAt)
 	d.boardSubs = orEmpty(d.boardSubs)
 	d.unread = orEmpty(d.unread)
 	return &d, nil
@@ -472,6 +481,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"terminal":              h.terminalOfAgent(lv.launchPath[sid]), // where it really runs: tmux agents survive a quit, pty agents end with Coral
 		"status":                statusVal,
 		"summary":               summaryVal,
+		"summary_at":            ptr.NullIfEmpty(d.goalAt[sid]), // when the goal line was written: it is refreshed at most every 30 minutes (#10123)
 		"staleness_seconds":     listStaleness(staleness),
 		"created_at":            lv.createdAt[sid], // when this agent was started (a fixed time, so a row does not change between lists): the empty chat's "Waiting for the CLI to start" counts from it (#6058)
 		"working_directory":     agent.WorkingDir,
@@ -593,6 +603,7 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"terminal":              h.terminalOfAgent(ptr.Value(ls.Backend)),
 			"status":                "Sleeping",
 			"summary":               nil,
+			"summary_at":            nil,
 			"staleness_seconds":     nil,
 			"working_directory":     ls.WorkingDir,
 			"display_name":          dn,
