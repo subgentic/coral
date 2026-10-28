@@ -265,6 +265,9 @@ func agentHistoryRows(sessions []store.SessionListItem) []map[string]any {
 			"display_name":       s.DisplayName,
 			"type":               "agent",
 		}
+		if s.BoardName != "" {
+			row["board_name"] = s.BoardName // the team of a live agent's chat (#10592)
+		}
 		if s.Snippet != "" { // a search's hit: one line of the chat's text around the matched words (#10137)
 			row["snippet"] = s.Snippet
 		}

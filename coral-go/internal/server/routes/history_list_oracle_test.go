@@ -368,6 +368,9 @@ func (h *HistoryHandler) listSessionsBefore4713(w http.ResponseWriter, r *http.R
 				"display_name":       s.DisplayName,
 				"type":               "agent",
 			}
+			if s.BoardName != "" {
+				m["board_name"] = s.BoardName // #10592: the team of a live agent's chat, the one field added since
+			}
 			agentSessions = append(agentSessions, m)
 		}
 	}
