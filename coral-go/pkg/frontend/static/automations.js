@@ -41,7 +41,11 @@ const setFilters = (key, next) => { filters.set(key, next); AF.saveFilters(key, 
 // ── The folders' items ───────────────────────────────────────────────────
 const workflowNames = () => new Map(W.workflowList().map(w => [Number(w.id), String(w.name || '')]));
 const nameOfWorkflow = id => workflowNames().get(Number(id)) || '';
-const allJobs = () => jobList().map(j => AF.jobItem(j, nameOfWorkflow));
+const allJobs = () => {
+    const items = jobList().map(j => AF.jobItem(j, nameOfWorkflow));
+    const seeded = i => isExample(i.name, i.job && i.job.description);
+    return [...items.filter(i => !seeded(i)), ...items.filter(seeded)]; // what a person made comes first, the seeded example after it (#10378)
+};
 const usedBy = id => jobList().filter(j => Number(j.workflow_id) === Number(id)).length;
 const allWorkflows = () => W.workflowList().map(w => AF.workflowItem(w, usedBy(w.id)));
 /** The runs with no job of their own (an API one-off: POST /api/tasks/run) that are going now: a row of Running now that opens the run's agent. */

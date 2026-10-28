@@ -236,6 +236,7 @@ export function setBackLink(id, kind, group) {
     if (!el) return;
     el.hidden = !group;
     if (!group) return;
+    el.setAttribute('data-on-click', 'sgroup-open'); // a caller (a job's run) may have pointed it somewhere else for one visit
     el.dataset.kind = kind; el.dataset.group = group.key;
     el.textContent = `\u2190 ${group.label}`;
 }

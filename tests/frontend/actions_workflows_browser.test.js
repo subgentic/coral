@@ -174,7 +174,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await click('#scheduler-view [data-on-click="job-toggle"]');
         check('Pause/Resume toggles it', await sent('POST /api/scheduled/jobs/5/toggle', 'the toggle'));
         // #9293: Run now is the primary of an enabled job, Pause sits in More, and Run now runs the job once
-        check('Run now is the primary of an enabled job and Pause is in More', await ev(`(() => { const bar = document.querySelector('#scheduler-view .sched-actions'); const run = bar.querySelector('[data-on-click="job-run-now"]'); const t = bar.querySelector('.sched-more-menu [data-on-click="job-toggle"]'); return !!run && run.classList.contains('btn-primary') && !!t && t.textContent.trim() === 'Pause' && !bar.querySelector(':scope > [data-on-click="job-toggle"]'); })()`));
+        check('Run now is the primary of an enabled job and Turn off is in More', await ev(`(() => { const bar = document.querySelector('#scheduler-view .sched-actions'); const run = bar.querySelector('[data-on-click="job-run-now"]'); const t = bar.querySelector('.sched-more-menu [data-on-click="job-toggle"]'); return !!run && run.classList.contains('btn-primary') && !!t && t.textContent.trim() === 'Turn off' && !bar.querySelector(':scope > [data-on-click="job-toggle"]'); })()`));
         await clear();
         await click('#scheduler-view [data-on-click="job-run-now"]');
         check('Run now asks the server to run the job once', await sent('POST /api/scheduled/jobs/5/run', 'the run'));
