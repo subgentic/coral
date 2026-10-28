@@ -40,26 +40,60 @@ function loadDocText() {
     return docTextLoad;
 }
 // The search (#10093, #10484): small words are dropped (how, do, I, to, the, on, my, use ... say nothing about which topic), the words may come in any order, a topic with ANY of the remaining words is a hit, and the
-// topics are ranked: "How do I...?" first, then the topics whose TITLE has all the words, then some of them, then the text-only hits; within a rank the topic with more of the words comes first.
+// topics are ranked: "How do I...?" first, then the topics whose TITLE has all the words, then some of them, then the text-only hits by where a word sits (below); within a rank the topic with more of the words comes first.
 const SMALL_WORDS = new Set(['a', 'an', 'the', 'on', 'my', 'use', 'to', 'of', 'in', 'for', 'do', 'does', 'i', 'is', 'it', 'and', 'or', 'how', 'can', 'with', 'me', 'we', 'you', 'your', 'this', 'that', 'at', 'by', 'be', 'are', 'what', 'where', 'when', 'which', 'from', 'as', 'if', 'so']);
 const queryWords = () => { const all = docsQuery.split(/\s+/).filter(Boolean), kept = all.filter(w => !SMALL_WORDS.has(w)); return kept.length ? kept : all; }; // a search of nothing but small words ("how do i") still searches them
+// Where the words sit (#10303, Beta #10259): a topic's lines carry a kind, and a hit is ranked by the best place one of its found words is: the title, then a heading, then a step or a paragraph, and a code line last (a search for "sleep"
+// put a /bin/sleep line ahead of the page about putting agents to sleep). A query word the topic does not have is not counted, so it does not push the topic down to code (#10484's any-word match). The snippet shows the best place, not the first.
+const docLines = new Map(); // topic name -> its lines with their kind: 2 a heading, 3 a step or paragraph, 4 code (a fenced block or an indented line)
+function linesOf(d) {
+    if (docLines.has(d.name)) return docLines.get(d.name);
+    const out = []; let fence = false;
+    for (const text of String(docRaw.get(d.name) || '').split('\n')) {
+        if (/^\s*(```|~~~)/.test(text)) { fence = !fence; continue; }
+        out.push({ text, low: text.toLowerCase(), noCode: text.toLowerCase().replace(/`[^`]*`/g, ' '), kind: fence || /^( {4}|\t)/.test(text) ? 4 : /^\s{0,3}#{1,6}\s/.test(text) ? 2 : 3 });
+    }
+    docLines.set(d.name, out);
+    return out;
+}
+/** The best place a word is in a topic's text: { kind, line } (the first line of the best kind), or null. A word only inside an inline code span counts as code. */
+function placeOf(d, word) {
+    let best = null;
+    for (const line of linesOf(d)) {
+        if (!line.low.includes(word)) continue;
+        const kind = line.kind === 3 && !line.noCode.includes(word) ? 4 : line.kind;
+        if (!best || kind < best.kind) { best = { kind, line }; if (kind === 2) break; }
+    }
+    return best;
+}
 function hitOf(d) {
     const words = queryWords(); if (!words.length) return { rank: 0, titleAll: true };
     const title = `${titleOf(d)} ${d.name}`.toLowerCase(), body = docText.get(d.name) || '';
     const found = words.filter(w => title.includes(w) || body.includes(w));
     if (!found.length) return null;
-    const titleAll = words.every(w => title.includes(w)), base = d.name === 'how-do-i' ? -1 : titleAll ? 0 : words.some(w => title.includes(w)) ? 1 : 2;
+    const titleAll = words.every(w => title.includes(w));
+    // where the best of the words found sits: 1 the title, 2 a heading, 3 a step or paragraph, 4 code (#10303); a word the topic does not have counts for nothing here and a little against it below
+    const place = Math.min(...found.map(w => (title.includes(w) ? 1 : (placeOf(d, w)?.kind ?? 4))));
+    const base = d.name === 'how-do-i' ? -1 : titleAll ? 0 : place;
     return { rank: base + (words.length - found.length) / 100, titleAll };
 }
-/** The sentence of a topic's text that has the most of the query's words (the first, when two have as many), without the Markdown marks, cut to about 180 characters around the first word found; '' when no word is in the text. */
+/** The sentence of a topic's text to show for a hit: in the best place a word is (a heading, else a step or paragraph, else code, #10303; the line with more of the words first), the sentence of that line that has the most of the query's words (the first, when two have as many), without the Markdown marks, cut to about 180 characters around the first word found; '' when no word is in the text. */
 function hitSentence(name) {
     const words = queryWords(), raw = docRaw.get(name) || '';
     if (!words.length || !raw) return '';
-    let best = '', most = 0;
-    for (const part of raw.split(/(?<=[.!?])\s+|\n+/)) {
+    let line = null, kind = 9, most = 0;
+    for (const l of linesOf({ name })) {
+        const n = words.filter(w => l.low.includes(w)).length;
+        if (!n) continue;
+        const k = l.kind === 3 && !words.some(w => l.noCode.includes(w)) ? 4 : l.kind; // a word only inside an inline code span counts as code
+        if (k < kind || (k === kind && n > most)) { line = l; kind = k; most = n; }
+    }
+    if (!line) return '';
+    let best = '', bestN = 0;
+    for (const part of line.text.split(/(?<=[.!?])\s+/)) {
         const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/[`*_|\[\]]+/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
         const n = words.filter(w => low.includes(w)).length;
-        if (n > most) { most = n; best = text; }
+        if (n > bestN) { bestN = n; best = text; }
     }
     if (best.length <= 180) return best;
     const at = Math.max(0, Math.min(...words.map(w => best.toLowerCase().indexOf(w)).filter(i => i >= 0)) - 60);
