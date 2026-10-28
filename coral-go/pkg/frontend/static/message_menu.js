@@ -30,6 +30,7 @@ export async function openMessageMenu(btn) {
     if (save) item(menu, save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', () => save.click());
     const r = btn.getBoundingClientRect();
     openMenu(btn);
+    menu.style.bottom = ''; menu.style.translate = ''; // placed here (fixed, top and left): openMenu's "above its button" (bottom: calc(100% + 4px)) and nudge, left on it, stretched the box between top and bottom: 10 px, the items hanging out (#10780)
     menu.style.position = 'fixed'; menu.style.zIndex = '3000';
     const h = menu.getBoundingClientRect().height, w = menu.getBoundingClientRect().width;
     menu.style.left = `${Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8))}px`;
