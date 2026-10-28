@@ -1,0 +1,28 @@
+package testguard
+
+import (
+	"flag"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// InTest reports whether this process is a test binary, without importing the testing package: testing.Testing() would link the whole testing package into every shipped binary that imports
+// testguard (or anything that asks it), and the package-init scrub in env.go has to ask before testing.Init has registered its flags. So it looks at what go test leaves: the binary is named
+// "<package>.test" (".test.exe" on Windows), it is started with -test.* flags, or the test flags are already registered. A shipped binary has none of these (#9980). A test binary built with
+// "go test -c -o other-name" and run by hand with no flags is not recognised: the guards then do nothing there, as they do in a shipped binary.
+func InTest() bool { return inTest(os.Args, flag.Lookup("test.v") != nil) }
+
+func inTest(args []string, testFlagsRegistered bool) bool {
+	if len(args) > 0 {
+		if b := filepath.Base(args[0]); strings.HasSuffix(b, ".test") || strings.HasSuffix(b, ".test.exe") {
+			return true
+		}
+		for _, a := range args[1:] {
+			if strings.HasPrefix(a, "-test.") {
+				return true
+			}
+		}
+	}
+	return testFlagsRegistered
+}

@@ -16,7 +16,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"testing"
 )
 
 // protectedDirs are the real ~/.coral directories, resolved from the passwd
@@ -47,7 +46,7 @@ var protectedDirs = sync.OnceValue(func() []string {
 
 // enabled reports whether the guard applies. It is a variable so the guard's
 // own tests can exercise the non-test path.
-var enabled = testing.Testing
+var enabled = InTest
 
 // CheckDataPath panics if this is a test binary and path is, or is inside,
 // the user's real ~/.coral directory. Outside tests it does nothing.

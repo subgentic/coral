@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"testing"
 )
 
 // agentShellVars and agentShellPrefixes name what Coral puts in an agent's shell: its
@@ -30,7 +29,7 @@ const scrubbedMarker = "TESTGUARD_AGENT_ENV_SCRUBBED"
 // any test runs. Shipped binaries are untouched. Tests that need one set it themselves
 // (t.Setenv, or a child process's Env).
 func init() {
-	if !testing.Testing() || os.Getenv(scrubbedMarker) == "1" {
+	if !InTest() || os.Getenv(scrubbedMarker) == "1" {
 		return
 	}
 	scrubAgentShellEnv()
