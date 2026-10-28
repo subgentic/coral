@@ -136,6 +136,9 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	if *hubURL != config.TierDefaultCloudURL {
+		fmt.Fprintf(stderr, "coral machine launch: warning: %s is not this build's Coral Hub (%s): the Hub key is sent there.\n", *hubURL, config.TierDefaultCloudURL)
+	}
 	hub := newMachineHub(*hubURL, key, license.EULAVersion)
 
 	deps := machinelaunch.Deps{
