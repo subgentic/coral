@@ -22,9 +22,9 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
 
     const DOCK_ICONS = {
         // Shown while docked at the bottom: switch to a full-height column.
-        bottom: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg>',
+        bottom: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg>',
         // Shown while docked as a column: switch back to the bottom.
-        column: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 9h13"/></svg>',
+        column: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 9h13"/></svg>',
     };
 
     // A maximised preview shows these in the tab bar (a toggle, #4931): maximise = the pane takes the whole centre, Chat hidden behind it; restore = the old split.

@@ -8,14 +8,14 @@
                         <div id="session-summary" class="summary-line summary-inline" style="display:none">
                             <span class="goal-label">Goal</span>
                             <span class="summary-text"></span>
-                            <button class="btn btn-quiet btn-icon btn-xs goal-action-btn" data-on-click="goal-refresh" title="Ask agent to update goal" aria-label="Refresh goal"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg></button>
-                            <button class="btn btn-quiet btn-icon btn-xs goal-action-btn" data-on-click="goal-edit" title="Edit goal" aria-label="Edit goal"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg></button>
+                            <button class="btn btn-quiet btn-icon btn-xs goal-action-btn" data-on-click="goal-refresh" title="Ask agent to update goal" aria-label="Refresh goal"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg></button>
+                            <button class="btn btn-quiet btn-icon btn-xs goal-action-btn" data-on-click="goal-edit" title="Edit goal" aria-label="Edit goal"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg></button>
                         </div>
                         <span id="session-branch" class="chip chip-tag branch-chip" style="display:none">
-                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v5a3 3 0 0 0 3 3h1"/><circle cx="6" cy="3" r="1.5"/><circle cx="11" cy="11" r="1.5"/></svg>
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v5a3 3 0 0 0 3 3h1"/><circle cx="6" cy="3" r="1.5"/><circle cx="11" cy="11" r="1.5"/></svg>
                             <span class="branch-text"></span>
                             <span class="branch-git-state"></span>
-                            <button class="btn btn-quiet btn-icon btn-xs copy-branch-btn" data-on-click="copy-branch" title="Copy branch name" aria-label="Copy branch name"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M5 11H3.5A1.5 1.5 0 0 1 2 9.5V3.5A1.5 1.5 0 0 1 3.5 2h6A1.5 1.5 0 0 1 11 3.5V5"/></svg></button>
+                            <button class="btn btn-quiet btn-icon btn-xs copy-branch-btn" data-on-click="copy-branch" title="Copy branch name" aria-label="Copy branch name"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M5 11H3.5A1.5 1.5 0 0 1 2 9.5V3.5A1.5 1.5 0 0 1 3.5 2h6A1.5 1.5 0 0 1 11 3.5V5"/></svg></button>
                         </span>
                         <span id="session-type-badge" class="chip chip-caps" style="display:none">claude</span>
                         <div class="session-title-actions">
@@ -49,13 +49,13 @@
                                 <div class="terminal-header-actions">
                                     </span>
                                     <span class="terminal-branch" id="terminal-header-branch" hidden>
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v5a3 3 0 0 0 3 3h1"/><circle cx="6" cy="3" r="1.5"/><circle cx="11" cy="11" r="1.5"/></svg>
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v5a3 3 0 0 0 3 3h1"/><circle cx="6" cy="3" r="1.5"/><circle cx="11" cy="11" r="1.5"/></svg>
                                         <span class="terminal-branch-text" tabindex="0" role="button" aria-expanded="false"></span>
                                         <span class="branch-git-state"></span>
                                     </span>
                                     <!-- Find in conversation (chat view only) -->
                                     <button class="btn btn-quiet btn-icon btn-xs terminal-header-btn" id="chat-find-btn" type="button" data-on-click="chat-find-toggle" title="Find in conversation (Ctrl/Cmd+F)" aria-label="Find in conversation">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
                                     </button>
                                     <!-- Terminal view, while it shows a pane wider than this window: scale the font to fit (#3455, xterm_renderer.js) -->
                                     <button class="btn btn-quiet btn-icon btn-xs terminal-header-btn terminal-fit-width-btn" id="terminal-fit-width-btn" type="button" aria-pressed="false" title="Fit the terminal to the screen width" aria-label="Fit the terminal to the screen width" hidden>
@@ -67,12 +67,12 @@
                                     </button>
                                     <!-- Dashboard: "Open Agent Tab" opens this agent in its own tab (href set on selection). Hidden in popout mode. -->
                                     <a class="btn btn-quiet btn-icon btn-xs terminal-header-btn" id="terminal-open-window-link" target="_blank" rel="noopener noreferrer" title="Open this agent in its own window" aria-label="Open this agent in its own window" hidden>
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
                                     </a>
                                     <!-- Popout: back to the full dashboard (noopener new tab). -->
                                     <!-- Side panel expand/collapse control -->
                                     <button class="btn btn-quiet btn-icon btn-xs terminal-header-btn session-panel-toggle-btn" id="popout-panel-toggle-btn" type="button" data-on-click="agentic-panel-toggle" title="Files, tasks and notes" aria-label="Files, tasks and notes" aria-pressed="false">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/></svg>
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/></svg>
                                     </button>
                                     <!-- View toggle: raw terminal vs. rendered chat transcript, the last of the header's actions, at the far right after Search and Pop out (#9927, the operator) -->
                                     <div class="live-view-toggle" role="group" aria-label="Center view">
