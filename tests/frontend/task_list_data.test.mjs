@@ -1,6 +1,6 @@
 // task_list_data.js: the dock task list's pure parts: the review flag, a row's state words, the sort clicks and the shown order (#8386).
 import assert from 'node:assert/strict';
-import { reviewRequested, taskStatus, defaultSort, nextSort, filterAndSortTasks } from '../../coral-go/pkg/frontend/static/task_list_data.js';
+import { canSendBack, reviewRequested, taskStatus, defaultSort, nextSort, filterAndSortTasks } from '../../coral-go/pkg/frontend/static/task_list_data.js';
 
 assert.equal(reviewRequested(null), false);
 assert.equal(reviewRequested({}), false);
@@ -49,4 +49,9 @@ const src = [T(1, 'pending', { _source: 'subagent' }), T(2, 'pending', { _source
 assert.equal(ids(filterAndSortTasks(src, nextSort(nextSort(defaultSort(), 'type'), 'type'))), '2,1', 'type: board before subagent when ascending');
 assert.deepEqual(filterAndSortTasks(list, defaultSort()).length, 5);
 assert.equal(list[0].id, 1, 'the list the caller passed is not reordered');
+// "Not yet: send back" (#10337): offered for a task with an agent, and not to a Hub viewer whose access for the board's machine is below Interact
+assert.equal(canSendBack({ assigned_to: 'Worker' }, ''), true, 'a task with an agent, no Hub limit');
+assert.equal(canSendBack({ assigned_to: 'Worker' }, 'View only through Coral Hub'), false, 'a view-only Hub viewer does not get it');
+assert.equal(canSendBack({ assigned_to: '' }, ''), false, 'no agent to tell');
+assert.equal(canSendBack(null, ''), false);
 console.log('task_list_data: ok');
