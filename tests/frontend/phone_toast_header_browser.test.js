@@ -20,6 +20,10 @@ const { connect } = require('./agent_view_harness');
             await toast('Copied to the clipboard', false);
             let m = await rects();
             if (!m.toast || m.toast.top < m.bar.bottom) problems.push(`${w}: with no agent open the toast is below the top bar: ${JSON.stringify(m)}`);
+            // and below the list's own title (Live Sessions), which it covered (#10052)
+            const title = await ev(`(() => { const e = document.querySelector('.mobile-list-title'); if (!e || !e.getClientRects().length) return null; const b = e.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom) }; })()`);
+            if (!title) problems.push(`${w}: the phone list's title is on screen with no agent open`);
+            else if (m.toast.top < title.bottom) problems.push(`${w}: the toast starts below the list title: ${JSON.stringify([m.toast, title])}`);
             await ev(`document.querySelectorAll('#toast-host > .toast').forEach(t => t.remove()); true`);
             // an agent open: below its header
             await ev(`T.state.liveSessions = ${JSON.stringify([base])}; T.render.renderLiveSessions(T.state.liveSessions); window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
