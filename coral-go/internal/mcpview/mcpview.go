@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -94,17 +93,19 @@ func scopeOrder(s string) int {
 	return 2
 }
 
-// readFile reads a regular file of at most maxFileBytes; a missing file, a folder or one too large is "nothing configured here", never an error to show.
+// readFile reads a regular file of at most maxFileBytes; a missing file, a folder, a FIFO or device, or one too large is "nothing configured here", never an error to show. The file is OPENED
+// first (without blocking, where the system has that) and the opened file is what is checked, so a file swapped for a FIFO between a check and an open (an agent can write its own folder) cannot
+// block this request.
 func readFile(path string) []byte {
-	info, err := os.Stat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Size() > maxFileBytes {
-		return nil
-	}
-	f, err := os.Open(path)
+	f, err := openNoBlock(path)
 	if err != nil {
 		return nil
 	}
 	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Size() > maxFileBytes {
+		return nil
+	}
 	b, err := io.ReadAll(io.LimitReader(f, maxFileBytes+1))
 	if err != nil || len(b) > maxFileBytes {
 		return nil
