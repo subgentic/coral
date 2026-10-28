@@ -289,10 +289,21 @@ async function previewAndRun(body, verb) {
     requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
 }
 
+/** What the two buttons do, in a line beside them (#10481, Beta): Shrink keeps every code change; Prune deletes what the two fields above say, and asks first. */
+const PRUNE_SAYS = { diffs: 'saved diffs', objects: 'unlinked artifacts', all: 'saved diffs and unlinked artifacts' };
+function syncStorageSays() {
+    const says = document.getElementById('settings-storage-says'); if (!says) return;
+    const days = Math.max(1, Math.floor(Number(document.getElementById('settings-prune-days')?.value) || 14));
+    const kind = document.getElementById('settings-prune-kind')?.value || 'diffs';
+    says.textContent = `Shrink keeps every code change. Prune deletes ${PRUNE_SAYS[kind] || PRUNE_SAYS.diffs} older than ${days} day${days === 1 ? '' : 's'}. Each asks first.`;
+}
+
 export function wireStorageActions() {
     const shrink = document.getElementById('settings-storage-shrink');
     if (!shrink || shrink.dataset.wired) return;
     shrink.dataset.wired = '1';
+    syncStorageSays();
+    for (const id of ['settings-prune-days', 'settings-prune-kind']) document.getElementById(id)?.addEventListener('input', syncStorageSays);
     shrink.addEventListener('click', () => previewAndRun({ shrink: true }, 'Shrink'));
     document.getElementById('settings-storage-prune')?.addEventListener('click', () => {
         const days = Math.max(1, Math.floor(Number(document.getElementById('settings-prune-days').value) || 14));
