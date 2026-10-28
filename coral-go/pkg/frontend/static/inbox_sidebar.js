@@ -756,6 +756,7 @@ function closePage(openTable = true, focusBack = false) {
 // ── The tab ──────────────────────────────────────────────────────────────
 let _mounted = false;
 let _wasShown = false; // the Inbox tab is on screen: cleared when another tab is (below), so the next show is a reopen
+let _asked = false; // a folder was named for the next show (rememberGroup): the reopen rule does not move it to Needs you
 let _autoFrom = ''; // the folder that was open before Needs you was opened for the person (#10205): it is the remembered one, and comes back when nothing waits again
 /** Called by switchNavTab('hub-inbox') (where the dashboard builds its own Inbox): the lists are read again and the group last on screen opens as a table (a phone shows the list). */
 export async function showInbox({ folder = '', quiet = false } = {}) {
@@ -771,11 +772,12 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     }
     $('inbox-local').hidden = false;
     if (folder && groupMeta(folder)) { closePage(false); page = null; $('inbox-page') && ($('inbox-page').hidden = true); group = folder; } // a link to a folder: the folder, not the page that was open
+    else if (_asked) _autoFrom = ''; // the folder the person asked for stays
     else if (!_wasShown && !page && !nativeInbox()) { // a reopen: with something waiting for the person, Needs you first, not the folder last on screen (#10205); with nothing waiting again, the folder that was open before it
         if (countOf('needs') > 0) { if (group !== 'needs') { _autoFrom = group; group = 'needs'; auto = true; } else if (_autoFrom) auto = true; }
         else if (_autoFrom && group === 'needs') { group = _autoFrom; _autoFrom = ''; }
     }
-    _wasShown = true;
+    _wasShown = true; _asked = false;
     setGroup(group, { auto });
     renderInboxNav(true);
     CH.loadChatCounts(() => renderInboxNav(true));
@@ -802,7 +804,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
 }
 
 /** The group the Inbox opens on the next time it is shown, with nothing drawn (the Saved button names it before it switches to the tab, so the last group is not on screen first). */
-export function rememberGroup(name) { if (groupMeta(name)) { group = name; browserLocal.set(GROUP_KEY, name); } }
+export function rememberGroup(name) { if (groupMeta(name)) { group = name; _asked = true; browserLocal.set(GROUP_KEY, name); } } // a folder asked for by name (Saved, Back to Saved) is the one the next show opens on, with something waiting or not
 
 /** A group wanted on screen from elsewhere (the Saved button of the top bar): its table opens. */
 export async function openInboxGroup(name) {
