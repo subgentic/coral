@@ -282,6 +282,7 @@
 1	render.js	c.desc
 1	render.js	c.icon
 1	render.js	c.label
+1	render.js	emptyListHtml(unfilteredCount)
 1	render.js	unfilteredCount ? '' : PHONE_WELCOME
 1	sandbox_frame.js	DOC_CSP
 1	sandbox_frame.js	content

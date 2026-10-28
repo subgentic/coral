@@ -209,6 +209,10 @@ body.panel-dragging .sidebar {
     position: relative;
 }
 
+.sidebar-search-clear { position: absolute; right: 0.125rem; top: 50%; transform: translateY(-50%); }
+.sidebar-search-clear[hidden] { display: none; }
+.sidebar-search:has(.sidebar-search-clear:not([hidden])) .sidebar-search-input { padding-right: 1.75rem; }
+
 .sidebar-search-icon {
     position: absolute;
     width: 0.875rem; /* rem, with the input's padding below: at 200% text the icon and the padding grow together, and the icon no longer sits on the placeholder (#7065) */
