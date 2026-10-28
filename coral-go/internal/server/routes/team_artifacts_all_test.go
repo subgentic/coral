@@ -190,3 +190,41 @@ func TestAllTeamArtifactsCursorsDoNotCrossRoutes(t *testing.T) {
 	// and a caller cannot send the marker itself
 	getAllTeamArtifacts(t, srv, "?_scope=all", http.StatusBadRequest)
 }
+
+// #10312: the Inbox's Artifacts folder and an agent's own Artifacts tab list the same files. A file an agent with no team uploaded (a pasted screenshot) is in the agent's tab, so it is in the folder too,
+// under "No team"; a file a team already lists is not repeated; the Team filter takes "No team".
+func TestAllTeamArtifactsListsTheFilesOfAgentsWithoutATeam(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	coralDir := t.TempDir()
+	h.SetTaskArtifactWriter(coralDir, nil)
+	r := chi.NewRouter()
+	r.Get("/api/team-artifacts", h.ListAllTeamArtifacts)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	empty := getAllTeamArtifacts(t, srv, "", http.StatusOK)
+	require.Zero(t, empty.All, "nothing yet")
+
+	writeUpload(t, coralDir, "solo-1", "pasted screen", "screen.png", "2026-10-09T10:00:00Z")
+	got := getAllTeamArtifacts(t, srv, "", http.StatusOK)
+	require.Equal(t, 1, got.All, "the standalone agent's file is in the folder")
+	require.Equal(t, []string{"screen.png"}, names(got.Artifacts))
+	require.Equal(t, "No team", got.Artifacts[0].Team)
+	require.Equal(t, []teamArtifactTeamRef{{Team: "No team", All: 1}}, got.Teams)
+
+	subscribeSession(t, h, "alpha", "Alice", "00000000-0000-4000-8000-0000000000a1")
+	completeWithArtifacts(t, h, "alpha", "A one", []board.TaskArtifact{{Name: "alpha-1.md", Content: "text"}})
+	writeUpload(t, coralDir, "00000000-0000-4000-8000-0000000000a1", "alice's upload", "alice.md", "2026-10-09T11:00:00Z")
+	both := getAllTeamArtifacts(t, srv, "", http.StatusOK)
+	require.ElementsMatch(t, []string{"screen.png", "alpha-1.md", "alice.md"}, names(both.Artifacts), "each file once: a team member's upload is its team's, not the no-team list's")
+	for _, a := range both.Artifacts {
+		if a.Name == "alice.md" {
+			require.Equal(t, "alpha", a.BoardID, "a team agent's file stays with its team")
+		}
+	}
+
+	only := getAllTeamArtifacts(t, srv, "?team=No+team", http.StatusOK)
+	require.Equal(t, []string{"screen.png"}, names(only.Artifacts), "the Team filter takes No team")
+	notThem := getAllTeamArtifacts(t, srv, "?team=alpha", http.StatusOK)
+	require.NotContains(t, names(notThem.Artifacts), "screen.png", "a team's filter leaves the no-team files out")
+}

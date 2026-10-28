@@ -3178,6 +3178,9 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
     min-height: 120px;
 }
 .artifact-viewer-text { white-space: pre-wrap; }
+/* A picture opens taller (#10312): the body is at least most of the dialog, the picture in the middle of it, and as tall as the dialog lets it be, not a strip as high as the file. */
+.artifact-viewer.is-image .artifact-viewer-body { min-height: min(70vh, 640px); display: flex; align-items: center; justify-content: center; }
+.artifact-viewer.is-image .image-pane-frame img { max-height: calc(88vh - 9rem); }
 .board-artifact-image { cursor: zoom-in; }
 /* An image in a post fits its column; it never makes the feed scroll sideways (#3607). */
 .mb-message-body img { max-width: 100%; height: auto; }

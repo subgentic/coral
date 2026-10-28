@@ -52,6 +52,7 @@ function _build() {
     d.innerHTML = `<div class="modal-content dlg-flow artifact-viewer-content">
         <div class="artifact-viewer-header">
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
+            <a class="btn artifact-viewer-newtab" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
             <a class="btn artifact-viewer-download" rel="noopener noreferrer" download>Download</a>
         </div>
         <div class="artifact-viewer-readers" hidden></div>
@@ -106,6 +107,9 @@ export function openArtifactViewer(hex, opts = {}) {
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = opts.filename || 'Artifact';
     const dl = d.querySelector('.artifact-viewer-download');
+    const newTab = d.querySelector('.artifact-viewer-newtab');
+    newTab.hidden = true; newTab.removeAttribute('href'); // its address comes with the kind (typeKnown): a manifest's own bytes are a list, not what to open
+    d.classList.remove('is-image');
     dl.href = url;
     dl.hidden = false; // a manifest may have hidden it (below): this artifact is not that one
     // No address until the artifact's kind is known (#9941): a manifest's own link would save its .json, and an early click on this one would. typeKnown (below) gives it its address.
@@ -124,7 +128,7 @@ export function openArtifactViewer(hex, opts = {}) {
     _details.clear();
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) _details.add(readersBlock(hex, opts.server, _details)); }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
-    renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, filename: opts.filename, mediaType: opts.mediaType }, {
+    Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
         renderContent: (el, content, path) => { renderArtifactText(el, content, path); _comments.docRendered(content, true); },
@@ -139,6 +143,7 @@ export function openArtifactViewer(hex, opts = {}) {
         typeKnown: (entries) => { // the kind is known: Download gets its address (#9941)
             if (gen !== _gen) return;
             dl.removeAttribute('aria-disabled');
+            if (!entries && !isCloud()) { newTab.href = url; newTab.hidden = false; } // through Coral Hub a link can't navigate to /api/remote/...: the bytes are saved, not opened (above)
             if (!entries) return void (dl.href = url); // any other artifact: its own bytes, under the stored name
             // a manifest: Download saves its file, not the JSON list (#9925); with several files there is none here (each row has its own)
             const target = manifestDownload(entries, opts.server);
@@ -146,7 +151,7 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    });
+    })).then(() => { if (gen === _gen) d.classList.toggle('is-image', !!body.querySelector('.image-panes')); }, () => {}); // a picture opens taller (css), not as a strip of its own height
     return true;
 }
 
