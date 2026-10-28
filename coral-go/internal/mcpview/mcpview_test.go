@@ -136,7 +136,7 @@ func TestOtherCLIsAreNotReadAndSaySo(t *testing.T) {
 func TestNamesAreCleanedAndTheListIsBounded(t *testing.T) {
 	home := t.TempDir()
 	var b strings.Builder
-	b.WriteString(`{"mcpServers": {"evil\u001b[31m‮ name": {"command":"c"}, "` + strings.Repeat("n", 500) + `": {"command":"c"}, "": {"command":"c"}`)
+	b.WriteString(`{"mcpServers": {"evil\u001b[31m\u202e name": {"command":"c"}, "` + strings.Repeat("n", 500) + `": {"command":"c"}, "": {"command":"c"}`)
 	for i := 0; i < 150; i++ {
 		b.WriteString(`, "s` + strings.Repeat("0", 3-len(itoa(i))) + itoa(i) + `": {"command":"c"}`)
 	}
@@ -148,7 +148,7 @@ func TestNamesAreCleanedAndTheListIsBounded(t *testing.T) {
 	for _, s := range res.Servers {
 		assert.LessOrEqual(t, len([]rune(s.Name)), maxNameRunes)
 		assert.NotContains(t, s.Name, "\x1b")
-		assert.NotContains(t, s.Name, "‮")
+		assert.NotContains(t, s.Name, "\u202e")
 		assert.NotEmpty(t, s.Name, "a nameless entry is dropped")
 	}
 }
