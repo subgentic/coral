@@ -8,7 +8,7 @@ const BASE = require('./test_base').BASE;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
-    const NAMES = ['my-daily-motivation', 'agent-step-blank'];
+    const NAMES = ['my-daily-motivation', 'agent-step-blank', 'agent-step-codex-default'];
     const fresh = async () => {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.then(() => true)`);
@@ -36,6 +36,15 @@ const BASE = require('./test_base').BASE;
         await ev(`document.getElementById('wf-modal-save').click(); true`);
         await waitFor(`document.getElementById('wf-create-modal').style.display === 'none'`, 'the blank workflow saved and the dialog closed', 8000);
 
+        // Settings' default agent is Codex, which cannot run a non-interactive step yet: the step still gets Claude, and the save goes through
+        await fresh();
+        await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.settings = { ...state.settings, default_agent_type: 'codex' }; return true; })()`);
+        await ev(`(() => { const n = document.getElementById('wf-input-name'); n.focus(); return true; })()`); await Input.insertText({ text: 'agent-step-codex-default' });
+        await ev(`(() => { const s = document.querySelector('.wf-step-type-select'); s.value = 'agent'; s.dispatchEvent(new Event('change', { bubbles: true })); const n = document.querySelector('.wf-step-name-input'); n.focus(); n.select(); return true; })()`); await Input.insertText({ text: 'say-hello' });
+        await ev(`document.querySelector('.wf-step-content').focus(); true`); await Input.insertText({ text: 'Say hello in one sentence.' });
+        await ev(`document.getElementById('wf-modal-save').click(); true`);
+        await waitFor(`document.getElementById('wf-create-modal').style.display === 'none'`, 'the workflow saved with Codex as the Settings default', 8000);
+
         const saved = await list();
         for (const name of NAMES) {
             const w = saved.find(x => x.name === name);
@@ -43,7 +52,7 @@ const BASE = require('./test_base').BASE;
             const detail = await ev(`fetch('/api/workflows/' + ${w.id}).then(r => r.json()).then(j => JSON.stringify(j))`).then(JSON.parse);
             const agentStep = (detail.steps || []).find(s => s.type === 'agent');
             assert.ok(agentStep, `${name} has an agent step`);
-            assert.equal(agentStep.agent && agentStep.agent.agent_type, 'claude', `${name}: the agent step has an agent_type (the default, Claude)`);
+            assert.equal(agentStep.agent && agentStep.agent.agent_type, 'claude', `${name}: the agent step has an agent_type: Claude (the only CLI a print step can run), whatever Settings' default is`);
         }
         console.log('PASS a workflow with an agent step is saved from the form, from the template and from a blank one');
     } finally { await cleanup().catch(() => {}); await client.close(); }
