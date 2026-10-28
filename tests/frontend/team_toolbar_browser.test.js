@@ -10,7 +10,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
 const TEAM = `qa-toolbar-${Date.now() % 100000}`;
 // what each tab's row must hold: the pills, the Filters icon, More, and the action's words
-const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['Board', { pills: false, filters: true, more: true }], ['Tasks', { pills: true, filters: true, action: 'New task' }],
+const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['Board', { pills: false, filters: true, more: true }], ['Tasks', { pills: true, many: true, filters: true, action: 'New task' }],
     ['Agents', { pills: true, filters: false }], ['Artifacts', { pills: false, filters: true, more: true }], ['Knowledge', { pills: false, filters: false, action: 'Distill knowledge' }]];
 
 (async () => {
@@ -46,7 +46,7 @@ const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['
                     assert.equal(t.filters, want.filters, `${tab}: the Filters icon ${want.filters ? 'is' : 'is not'} there`);
                     assert.equal(t.more, !!want.more, `${tab}: More ${want.more ? 'is' : 'is not'} there`);
                     assert.equal(t.action, want.action || '', `${tab}: the action`);
-                    if (want.pills) assert.ok(mobile ? t.select && !t.pills : t.pills && !t.select, `${tab}: ${mobile ? 'a phone has the compact select' : 'the pills are on the line'} (${JSON.stringify({ pills: t.pills, select: t.select })})`);
+                    if (want.pills) assert.ok(mobile || want.many ? t.select && !t.pills : t.pills && !t.select, `${tab}: ${mobile ? 'a phone has the compact select' : want.many ? 'seven pills with counts need 62 rem: the compact select stands in at 1280 (#9861)' : 'the pills are on the line'} (${JSON.stringify({ pills: t.pills, select: t.select })})`);
                     else assert.ok(!t.pills && !t.select, `${tab}: no pills`);
                     assert.ok(t.last, `${tab}: the action is the last control at the right`);
                     if (tab === 'Goals') { // the tasks that serve no goal are the table's last row, not a line under the toolbar
