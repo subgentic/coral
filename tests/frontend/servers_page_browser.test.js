@@ -106,7 +106,7 @@ const SERVERS = [
             assert.equal(p.remove, true, at + 'Remove is the danger button');
             assert.equal(p.small, false, at + 'the normal button size');
             assert.ok(p.barBottomGap <= 1, at + 'the bar is at the foot of the page: ' + p.barBottomGap);
-            assert.equal(p.facts.URL, 'http://192.168.1.50:8420'); assert.match(p.facts['Last contact'] || '', /\S/, at + 'last contact, as it is not online'); assert.equal(p.facts.Agents, '3 agents'); // the three live sessions seeded for LAN box (one waits for the person, one only by its hook: the Needs you column counts the first)
+            assert.equal(p.facts.URL, 'http://192.168.1.50:8420'); assert.match(p.facts['Last seen'] || '', /\S/, at + 'last seen, as it is not online (#9798: was Last contact)'); assert.equal(p.facts['Last contact'], undefined, at + 'one word for the one fact'); assert.equal(p.facts.Agents, '3 agents'); // the three live sessions seeded for LAN box (one waits for the person, one only by its hook: the Needs you column counts the first)
             assert.match(p.error || '', /Is Coral running on that machine/, at + 'what to do about it');
             assert.match(await ev(`(document.querySelector('.servers-row-warn') || {}).textContent || ''`), /key crosses the network unencrypted/, at + 'the server\'s own page keeps the warning in words (the sentence a narrow row only has as its name and title)');
             assert.equal(p.table, false, at + 'the table is not on the page');

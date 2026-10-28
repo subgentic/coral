@@ -265,7 +265,7 @@
 1	registered_server_view.js	cls
 1	registered_server_view.js	factHtml('Agents', escHtml(agentsText(agents)))
 1	registered_server_view.js	factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${badge ? ' ' + badge : ''}`)
-1	registered_server_view.js	factHtml('Last contact', escHtml(contact))
+1	registered_server_view.js	factHtml('Last seen', escHtml(contact))
 1	registered_server_view.js	factHtml('URL', escHtml(s.url || ''))
 1	registered_server_view.js	formHtml()
 1	registered_server_view.js	m.cls

@@ -43,10 +43,10 @@ const { pathToFileURL } = require('url');
     assert.ok(strip.includes('Unreachable') && strip.includes('Key rejected'));
     assert.deepStrictEqual(m.localFirst([['@ws1/a', 1], ['b', 2], ['@ws2/c', 3], ['d', 4]]).map(e => e[0]), ['b', 'd', '@ws1/a', '@ws2/c']);
 
-    // Hover text: status, address, agent count, last contact, error when down.
+    // Hover text: status, address, agent count, last seen, error when down.
     const down = m.serverHoverText('ws2');
-    assert.ok(/^Cloud: Unreachable/.test(down) && /agents?/.test(down) && /Last contact:/.test(down), 'one wording, Last contact, online or not (#3152): ' + down);
-    assert.ok(!/Last seen/.test(down));
+    assert.ok(/^Cloud: Unreachable/.test(down) && /agents?/.test(down) && /Last seen:/.test(down), 'one wording, Last seen (the list column\'s word, #9798; Last contact before), online or not (#3152): ' + down);
+    assert.ok(!/Last contact/.test(down)); // one word for the one fact (the guard was against Last seen, #3152; the list column's word won, #9798)
     assert.ok(/This server \(the hub\)/.test(m.serverHoverText('local')));
 
     // Cloud Hub update notice (#3059): only available/required show anything, the

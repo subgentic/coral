@@ -182,7 +182,7 @@ function pageHtml(s) {
             ${factHtml('URL', escHtml(s.url || ''))}
             ${factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${badge ? ' ' + badge : ''}`)}
             ${factHtml('Agents', escHtml(agentsText(agents)))}
-            ${factHtml('Last contact', escHtml(contact))}
+            ${factHtml('Last seen', escHtml(contact))}
         </dl>
         ${warningHtml(s.warning)}
         ${below ? `<div class="servers-row-hint server-below-minimum">${escHtml(below)}</div>` : ''}
