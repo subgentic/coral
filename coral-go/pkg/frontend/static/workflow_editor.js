@@ -160,6 +160,10 @@ function workflowFields() {
             setup: sel => sel.addEventListener('change', () => applyTemplate(sel.value)),
         },
         { key: 'name', type: 'text', id: 'wf-input-name', label: 'Name', required: true, requiredMessage: 'Give the workflow a name.', placeholder: 'lint-and-fix', help: 'Letters, numbers, hyphens and underscores.', attrs: { pattern: '[a-zA-Z0-9_-]+' } },
+        {
+            key: 'name_note', type: 'notice',
+            render: slot => { slot.id = 'wf-name-note'; slot.classList.add('settings-hint'); slot.hidden = true; },
+        },
         stepsField(),
         { key: 'extras', type: 'heading', fold: true, id: 'wf-more', label: 'More options' },
         { key: 'description', type: 'text', id: 'wf-input-desc', label: 'Description', placeholder: 'Run linter, fix issues, verify fix' },
@@ -219,11 +223,29 @@ function openModal(title, submit) {
 }
 
 /** Fill the form from a template (the name only when the person has not typed one); the blank choice puts the example step back. */
+let templateName = ''; // the name the last template filled in: a name that is still it, or empty, is the template's to replace; one the person typed or changed stays
 function applyTemplate(id) {
     const v = workflowView(), t = templateById(id);
-    if (!t) { v.set('steps', [EXAMPLE_STEP]); document.querySelector('#wf-steps-editor .wf-step-content').placeholder = EXAMPLE_COMMAND; return; }
-    v.set('name', t.name); v.set('description', t.description); v.set('steps', t.steps.map(s => ({ ...s })));
+    const nameEl = document.getElementById('wf-input-name'), typed = nameEl ? nameEl.value.trim() : '';
+    const mine = !typed || typed === templateName; // not the person's own
+    if (!t) {
+        if (mine && nameEl) v.set('name', '');
+        templateName = '';
+        v.set('steps', [EXAMPLE_STEP]);
+        const content = document.querySelector('#wf-steps-editor .wf-step-content');
+        if (content) content.placeholder = EXAMPLE_COMMAND; // the editor is rebuilt by set(steps): it may not be there yet
+        return;
+    }
+    if (mine) { v.set('name', t.name); templateName = t.name; }
+    v.set('description', t.description); v.set('steps', t.steps.map(s => ({ ...s })));
     v.fold(true); // the description it filled is shown
+}
+
+/** The line under Name on a copy: the name is only a suggestion (#10277's review). Empty text hides it. */
+function showNameNote(text) {
+    const note = document.getElementById('wf-name-note');
+    if (!note) return;
+    note.textContent = text; note.hidden = !text;
 }
 
 /** The template row is for a new workflow: not for Edit, and not for a duplicate (it already is a copy of one). */
@@ -240,7 +262,7 @@ export function showWorkflowCreateModal(onClose) {
     v.set('steps', [EXAMPLE_STEP]); // the example step, to fill in
     document.querySelector('#wf-steps-editor .wf-step-content').placeholder = EXAMPLE_COMMAND;
     document.getElementById('wf-build-hint').hidden = false;
-    showTemplateRow(true); v.set('template', TEMPLATE_NONE);
+    showTemplateRow(true); v.set('template', TEMPLATE_NONE); templateName = ''; showNameNote('');
     v.fold(false);
     openModal('New workflow', 'Create workflow');
     document.getElementById('wf-input-name').focus();
@@ -252,7 +274,7 @@ export async function editWorkflow(id) {
     const v = workflowView();
     editingWorkflowId = id; returnTo = null;
     document.getElementById('wf-build-hint').hidden = true; // a workflow that exists is changed with Edit with Agent on its page
-    showTemplateRow(false);
+    showTemplateRow(false); showNameNote('');
     v.reset();
     for (const [k, val] of Object.entries({ name: wf.name || '', steps: wf.steps || [], description: wf.description || '', repo_path: wf.repo_path || '', max_duration_s: wf.max_duration_s || DEFAULT_LIMIT_S })) v.set(k, val);
     // Nothing a workflow already has is hidden: More options opens when it holds something other than the defaults.
@@ -267,10 +289,11 @@ export async function duplicateWorkflow(id) {
     const v = workflowView();
     editingWorkflowId = null; returnTo = null;
     document.getElementById('wf-build-hint').hidden = true;
-    showTemplateRow(false);
+    showTemplateRow(false); templateName = '';
     v.reset();
     for (const [k, val] of Object.entries({ name: `${wf.name || 'workflow'}-copy`, steps: (wf.steps || []).map(s => ({ ...s })), description: wf.description || '', repo_path: wf.repo_path || '', max_duration_s: wf.max_duration_s || DEFAULT_LIMIT_S })) v.set(k, val);
     v.fold(!!(wf.description || wf.repo_path || (wf.max_duration_s && wf.max_duration_s !== DEFAULT_LIMIT_S)));
+    showNameNote(`A suggested name for the copy of "${wf.name || 'workflow'}": change it if you like.`);
     openModal('New workflow', 'Create workflow');
     document.getElementById('wf-input-name').focus();
 }
