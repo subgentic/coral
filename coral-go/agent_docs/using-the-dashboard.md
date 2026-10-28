@@ -17,6 +17,8 @@ Task-oriented notes on the dashboard controls. Every statement was checked again
 
 Click the model chip to pick a model, or the thinking chip to pick a level. The model menu lists the models the agent's CLI offers; the thinking menu lists only the levels that model takes.
 
+![The agent's header: the name and team, the git branch, search and pop-out, and the Chat/Terminal switch at the right](docs-img/agent-header.png)
+
 The agent's header does not repeat the model (the chips, the **Details** disclosure and the agent row's hover tip carry it), and it has no folder line: the folder's full path is the hover and keyboard-focus tip on the agent's name (Escape puts it away) and is also in **Details**. The Chat/Terminal switch sits at the right with the actions. It shows the git branch, cut short with an ellipsis when it is long (a worktree's branch can be 60 characters or more): hover it, move to it with Tab, or tap it and the whole name opens in place under the header, without moving any button. On a narrow header the branch is left out.
 
 - **Claude Code switches live.** Coral types the CLI's own `/model` and `/effort` into the agent's terminal once the agent is between turns. The chip you used says `Switching to …` until the transcript confirms it, and shows the CLI's message if it refused. You can keep typing the whole time.
@@ -28,6 +30,8 @@ A second change while one is still pending is refused with a message. The API be
 ## See the model and thinking level of an agent
 
 The agent list is one line per agent: its name and what it is doing. The provider, model and thinking level are not on that line; **hover** or **focus** an agent row and its card has **Model** and **Thinking** rows (for example `Claude · Opus 5.5` and `High`), and the open agent's **Details** disclosure has them with the context use. For Claude and Codex they are read from the CLI's own transcript, so they are what the newest turn used. Before an agent's first reply the level is the one it was *started* with, and the card says so (`High (as started)`).
+
+![An agent row's hover card: state, goal, status, branch, model, thinking level and context](docs-img/agent-hover-card.png)
 
 - **Only what is on record.** A plain terminal has none of the three, and Pi reports no thinking level, so there is none to show. Antigravity keeps showing the level it was started with. An agent started with no level shows none until its first reply.
 - **Changing them** is done from the chips beside the Send button (see above), not from the list.
@@ -62,6 +66,8 @@ A separate switch, **Team health checks** in Settings > Agents, is on by default
 ## Filter and sort the agent list
 
 The ☰ **Display options** button under the search box opens a panel in place (not a pop-up).
+
+![The Display options panel under the search box: State, Board and Sort, and the agent count](docs-img/display-options.png)
 
 - **State** (Needs input, Working, Idle, Asleep), **Board**, **Machine** (when other machines are connected) and **Sort** (List order, Name, Recent activity, Cost), then the count ("4 of 10 agents") and **Clear filters**.
 - **Show server** and **Group by server** are two more switches in the panel, shown when two or more machines are connected.
