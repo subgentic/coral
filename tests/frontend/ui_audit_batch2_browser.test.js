@@ -32,7 +32,8 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(vis('#team-template-menu')), false, 'the template actions are behind the More menu');
         await ev(`document.getElementById('team-template-more').click(); true`);
         await waitFor(vis('#team-template-menu'), 'the template actions after More opens');
-        for (const sel of ['[data-on-click="m-show-team-wizard-modal"]', '[data-on-click="m-import-team-templates"]', '[data-on-click="m-import-team-from-folder"]', '[data-on-click="m-save-team-template"]']) assert.ok(await ev(vis('#team-template-menu ' + sel)), sel + ' is reached through More');
+        assert.ok(await ev(vis('#team-describe')), 'Describe your team is beside the templates, not behind More (#10314)');
+        for (const sel of ['[data-on-click="m-import-team-templates"]', '[data-on-click="m-import-team-from-folder"]', '[data-on-click="m-save-team-template"]']) assert.ok(await ev(vis('#team-template-menu ' + sel)), sel + ' is reached through More');
         assert.equal(await ev(`document.getElementById('team-agents-list').getAttribute('aria-label')`), 'Team members', 'the members list is named');
         await ev(`window.hideLaunchModal(); true`);
 
