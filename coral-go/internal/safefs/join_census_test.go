@@ -198,6 +198,7 @@ var joinSites = map[string]joinEntry{
 	"internal/server/routes/artifact_prune_diffs.go\tSessionsHandler.closedDiffs":            {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
 	"internal/server/routes/artifact_prune_diffs.go\ttaskDiffDirs":                           {3, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
 	"internal/server/routes/artifact_prune_routes.go\tSessionsHandler.keepArtifactRoute":     {1, joinID, "an object id is checked with objectNameRe (64 hex digits) or a session id with IsSafeID before the join (#5305)"},
+	"internal/server/routes/artifact_star.go\tSessionsHandler.starArtifactRoute":             {1, joinID, "the object id is checked with objectNameRe (64 hex digits) before the join, which only asks whether the object exists (#9819)"},
 	"internal/server/routes/artifact_prune_scan.go\tSessionsHandler.objectCandidates":        {1, joinID, "an object id is checked with objectNameRe (64 hex digits) or a session id with IsSafeID before the join (#5305)"},
 	"internal/server/routes/artifact_prune_diffs.go\tSessionsHandler.sweepDiffObjects":       {2, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
 	"internal/server/routes/artifact_prune_diffs.go\tdiffObjectInodes":                       {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
