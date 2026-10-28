@@ -114,6 +114,8 @@ export function build({ id, label, sections, current, onPick, drawer = false }) 
     const nav = el('nav', 'view-list-nav'); nav.setAttribute('aria-label', label);
     const select = drawer ? null : el('select', 'field view-list-select'); if (select) select.setAttribute('aria-label', label);
     root.append(nav); if (select) root.append(select);
+    const hint = el('p', 'sr-only', 'Use the arrow keys to move between the views, Home and End for the first and last.'); hint.id = `view-list-hint-${id}`; // the list is one Tab stop: a screen reader says how it moves (#10420)
+    nav.setAttribute('aria-describedby', hint.id); root.append(hint);
     const closeDrawer = drawer ? wireDrawer(root, nav) : () => {};
     wireKeys(nav);
     // a picked view hides with the panel: the focus goes back to the button, not to the page's top
