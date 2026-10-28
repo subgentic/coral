@@ -45,9 +45,14 @@ export function showToast(message, isError = false, duration, opts = {}) {
     toast.appendChild(body);
 
     let timer = 0;
+    // The keyboard goes back to where it came from when a toast it is on goes away (dismissed, or timed out); it does not drop to the page, where the next Tab starts at the top (#10247).
+    let from = null;
+    toast.addEventListener("focusin", (e) => { if (e.relatedTarget && !toast.contains(e.relatedTarget)) from = e.relatedTarget; });
     const dismiss = () => {
         clearTimeout(timer);
+        const held = toast.contains(document.activeElement);
         toast.remove();
+        if (held && from && from.isConnected) from.focus();
     };
     const action = opts.action;
     if (action && action.label && typeof action.onClick === "function") {
