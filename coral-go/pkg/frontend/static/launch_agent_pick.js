@@ -66,4 +66,12 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
     }
     sync();
     group.dataset.probed = '1';
+    // a later check of a CLI (Check again, or after Set path and Save) draws its tile's mark again from the fresh answer, not from the one taken when the dialog opened (#10161)
+    const onChecked = e => {
+        if (!group.isConnected) { document.removeEventListener('cli-checked', onChecked); return; }
+        const type = (ALIAS[e.detail.type] || e.detail.type), label = labels.get(type); if (!label) return;
+        label.querySelector('.launch-agent-missing').textContent = e.detail.found ? '' : ' not installed';
+        label.classList.toggle('has-mark', !e.detail.found);
+    };
+    document.addEventListener('cli-checked', onChecked);
 }
