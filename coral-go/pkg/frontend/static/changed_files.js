@@ -290,6 +290,27 @@ let _followTimer = null;
 let _filesStale = false; // the agent changed files while the Files panel was not showing: the next look reads the list
 const filesPanelShowing = () => { const p = document.getElementById('agentic-panel-files'); return !!p && p.classList.contains('active') && p.getClientRects().length > 0; };
 const FOLLOW_DELAY_MS = 300;
+// The follow's read: the route's refresh, not its cached list (the server keeps a list for 30 s or more, and the change that moved the count may be inside it). The refresh computes the diff, so it is
+// one at a time with at least about 2 s between two (a reply and its edits come as a burst), and a request that comes while one runs is one more after it, not one each. A view-only viewer on a Hub
+// has no refresh to call: it reads the list (#10268).
+const MIN_REFRESH_GAP_MS = 2000;
+let _refreshBusy = false, _refreshQueued = false, _refreshAt = 0;
+async function followRead() {
+    const cur = state.currentSession;
+    if (cur && cur.hubReadOnly) { loadChangedFiles(cur.name, cur.session_id); return; }
+    if (_refreshBusy) { _refreshQueued = true; return; }
+    _refreshBusy = true;
+    try {
+        const wait = _refreshAt + MIN_REFRESH_GAP_MS - Date.now();
+        if (wait > 0) await new Promise(r => setTimeout(r, wait));
+        _refreshAt = Date.now();
+        await refreshChangedFiles();
+    } finally {
+        _refreshBusy = false;
+        if (_refreshQueued) { _refreshQueued = false; followRead(); }
+    }
+}
+
 export function followChangedFiles(s) {
     if (!s || !state.currentSession || state.currentSession.type !== 'live') return;
     // Two counts say that files changed: the agent's own Write/Edit tool calls (changed_file_count) and the repository's uncommitted files (git_state.dirty, what the header chip shows), which also moves for a file the person
@@ -304,7 +325,7 @@ export function followChangedFiles(s) {
         const cur = state.currentSession;
         if (!cur || cur.type !== 'live' || (cur.session_id || cur.name) !== id) return;
         if (!filesPanelShowing()) { _filesStale = true; return; } // nobody is looking: it is read when the panel opens (switchAgenticTab), not at every reply
-        refreshChangedFiles(); // the route's refresh, not its cached list: the server keeps a list for 30 s or more, and the change that moved the count may be inside it
+        followRead();
     }, FOLLOW_DELAY_MS);
 }
 
