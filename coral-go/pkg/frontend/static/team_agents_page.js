@@ -31,7 +31,9 @@ let itemStatus = null; // the agent page's own live region while that page is on
 const say = (t) => { const s = itemStatus && itemStatus.isConnected && !itemStatus.closest('[hidden]') ? itemStatus : root && root.querySelector('.team-agents-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
-const statusWord = (a) => WORD[a.availability] || 'No signal yet';
+// One status per agent (#10603, the Beta tester): an agent that is idle with a task already in progress is working on it, not "Task assigned, idle" beside "#1 in progress".
+const startedTask = (a) => (a.tasks || []).find(t => t.status === 'in_progress');
+const statusWord = (a) => (a.availability === 'task_idle' && startedTask(a) ? `Working on #${Number(startedTask(a).id)}` : WORD[a.availability] || 'No signal yet');
 const providerOf = (a) => PROVIDER[a.agent_type] || (a.agent_type ? a.agent_type.charAt(0).toUpperCase() + a.agent_type.slice(1) : 'Claude');
 const canRemind = (a) => a.availability !== 'offline' && (a.agent_type !== 'terminal' || a.reminder); // a reminder to an ended agent does nothing (#8271) // a terminal is not an agent: a reminder to it does nothing (UI audit #5589)
 // A task nobody has picked up says what it waits on (#10200): the agent it is for, not just "pending".
