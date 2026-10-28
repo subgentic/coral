@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/term"
@@ -241,6 +243,9 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 	}
 	defer f.Close()
 	fmt.Print("[mock-agent] raw input ready\r\n")
+	if d := startDelay(); d > 0 { // a CLI that takes its time to come up (#10299): no first event and no input box until then
+		time.Sleep(d)
+	}
 
 	events <- func() {
 		hooks.fire("SessionStart", map[string]any{"source": "startup"})
@@ -281,4 +286,13 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 			return
 		}
 	}
+}
+
+// startDelay is MOCK_AGENT_START_DELAY, in seconds: how long the mock takes to emit its first hook event and draw its input box, as a real CLI does (15 to 60 s on a slow start, #10299). 0 when unset or not a number.
+func startDelay() time.Duration {
+	v, err := strconv.ParseFloat(os.Getenv("MOCK_AGENT_START_DELAY"), 64)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return time.Duration(v * float64(time.Second))
 }

@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Ready mode (#10010) is one switch for what a person trying Coral with the mock needs: the raw-input box and hooks (a folder of its own), the idle profile, and the transcript. Off, nothing changes.
@@ -230,5 +231,14 @@ func TestStuckEnterLeavesTheTextInTheBox(t *testing.T) {
 	b.feed([]byte("hello\r"), func(s string) { got = append(got, s) })
 	if len(got) != 0 || b.display() != "hello" {
 		t.Errorf("an Enter submitted %v, box shows %q", got, b.display())
+	}
+}
+
+func TestStartDelay(t *testing.T) {
+	for in, want := range map[string]time.Duration{"": 0, "x": 0, "-3": 0, "0": 0, "12": 12 * time.Second, "0.5": 500 * time.Millisecond} {
+		t.Setenv("MOCK_AGENT_START_DELAY", in)
+		if got := startDelay(); got != want {
+			t.Errorf("MOCK_AGENT_START_DELAY=%q: %v, want %v", in, got, want)
+		}
 	}
 }
