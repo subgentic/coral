@@ -39,6 +39,8 @@ type Mac struct {
 	// Prefixes and Appdirs are the Homebrew prefixes and the appdirs to look in (default: install.MacOptions, which adds $HOMEBREW_PREFIX and ~/Applications); a test names its own.
 	Prefixes []string
 	Appdirs  []string
+	// CoralVersion is the running Coral version: Homebrew's records of another version are not this install's (install.Options.Version, #10561).
+	CoralVersion string
 	// DataDir is Coral's data folder: the relaunch after an update opens the window again only if it was open (windowmark).
 	DataDir string
 	// Self is this program's pid, excluded when looking for Coral processes in the install (it runs from inside it).
@@ -89,10 +91,12 @@ func (m *Mac) Install() (string, error) {
 // options are where the Homebrew check looks: the Prefixes a test names, else the places a Finder-launched Coral looks (install.MacOptions).
 func (m *Mac) options() instpkg.Options {
 	if m.Prefixes != nil {
-		return instpkg.Options{Prefixes: m.Prefixes, Appdirs: m.Appdirs}
+		return instpkg.Options{Prefixes: m.Prefixes, Appdirs: m.Appdirs, Version: m.CoralVersion}
 	}
 	home, _ := os.UserHomeDir()
-	return instpkg.MacOptions(home, os.Getenv("HOMEBREW_PREFIX"))
+	o := instpkg.MacOptions(home, os.Getenv("HOMEBREW_PREFIX"))
+	o.Version = m.CoralVersion
+	return o
 }
 
 // Unsupported: a Homebrew install (the one shared classifier, internal/updater/install: the Caskroom link or the cask's recorded metadata; the owner and the writability of the app cannot
