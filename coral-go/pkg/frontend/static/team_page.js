@@ -5,7 +5,7 @@ import { openTask } from './task_navigation.js';
  * and Agents, Knowledge and Settings are today's panels of the right dock moved in, until their own builds (stage 3 of #7453). Lazy: loaded by openTeamPage (lazy_panels.js). */
 import { state } from './state.js';
 import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam } from './server_base.js';
-import { wakingSince, stopWaking } from './team_waking.js';
+const { wakingSince, stopWaking } = await importOnce('./team_waking.js'); // lazy like this file (the Wake action loads it too)
 import { showView } from './utils.js';
 import { note, go } from './nav.js';
 import { keyRoute, TEAM_TABS } from './routes.js';
@@ -217,7 +217,7 @@ function drawStatus(data) {
     // Just woken from here: how many have reported so far, until all have (or two minutes pass), not only "waiting" (#10052).
     const wakingNow = unknown > 0 && !n && wakingSince(S.team) > 0;
     if (!unknown) stopWaking(S.team);
-    const text = wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have reported.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. Agents report in when they start.` : 'All well';
+    const text = wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
