@@ -3460,6 +3460,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-shell { display: flex; flex: 1; min-width: 0; min-height: 0; }
 .settings-nav { width: 13.5rem; flex: none; border-right: 1px solid var(--border); padding: .6rem; overflow-y: auto; background: var(--bg-tertiary); }
 .settings-nav .settings-group-pick { display: none; }
+.settings-back { display: none; } /* a narrow dialog's way back from a section to the list of sections (#10000) */
 .info-grid.settings-grid .settings-row > dt, .settings-row > dt label { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .settings-tabs { display: flex; flex-direction: column; gap: 2px; }
 .settings-tab { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; background: none; border: 0; border-radius: var(--radius-md); color: var(--sidebar-row-color); font: inherit; font-size: var(--sidebar-row-size); padding: .5rem .7rem; min-height: 2.25rem; cursor: pointer; }
@@ -3578,11 +3579,20 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .sd-modal-content .launch-modal-step > .modal-actions .btn { min-height: 44px; }
 }
 @container settings (max-width: 50rem) {
+    /* A narrow Settings (a phone, a small window, large text) is two screens (#10000): a list of its sections, each a row with a chevron, and one section with a way back. The dialog's data-screen says which (settings_nav.js); a section asked for opens straight on it. The old dropdown read as a form field. */
     .settings-nav { width: auto; flex: none; border-right: 0; border-bottom: 1px solid var(--border); padding: .6rem 1rem; overflow: visible; }
     .settings-shell { flex-direction: column; }
-    .settings-tabs { display: none; }
-    .settings-nav .settings-group-pick { display: block; }
-    .settings-group-pick select { width: 100%; min-height: 44px; }
+    .settings-nav .settings-group-pick { display: none; }
+    #settings-modal[data-screen="sections"] .settings-nav { flex: 1 1 auto; min-height: 0; border-bottom: 0; padding: 0; overflow-y: auto; }
+    #settings-modal[data-screen="sections"] .settings-panes { display: none; }
+    #settings-modal[data-screen="pane"] .settings-nav { display: none; }
+    .settings-tabs { gap: 0; }
+    .settings-tab { min-height: 3.25rem; padding: 0 1rem; border-radius: 0; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+    .settings-tab::after { content: ''; flex: none; margin-left: auto; width: .5rem; height: .5rem; border-top: 2px solid var(--text-secondary); border-right: 2px solid var(--text-secondary); transform: rotate(45deg); }
+    .settings-tab .sd-dot { margin-left: auto; margin-right: .6rem; }
+    .settings-tab:has(.sd-dot:not([hidden]))::after { margin-left: 0; }
+    .settings-tab[aria-selected="true"] { background: none; box-shadow: none; font-weight: var(--fw-regular); }
+    #settings-modal[data-screen="pane"] .settings-back { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; margin: -.4rem 0 .4rem -.6rem; }
     .settings-panes { padding: .8rem 1rem 1.2rem; }
     /* the (i) stays a 1.5rem circle at every size (#6042, #6750); its 44 px touch target is the invisible ::after below */
     .settings-row > dt > label { flex: 0 1 auto; min-width: 0; } /* the label wraps so its (i) button stays beside it, not on a row of its own (#5057) */
