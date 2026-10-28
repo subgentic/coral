@@ -413,6 +413,7 @@ registerActions({
     'agent-filters-clear': () => { setListFilters(_NO_LIST_FILTERS); redrawLiveList(); },
     'kebab-close': (el, event) => { event.stopPropagation(); window.closeSidebarKebabs(); },
     'kebab-toggle': (el, event) => { event.stopPropagation(); window.toggleSidebarKebab(el, event); },
+    'team-menu-more': (el, event) => { event.stopPropagation(); const more = document.getElementById(el.getAttribute('aria-controls')); if (!more) return; more.hidden = !more.hidden; el.setAttribute('aria-expanded', String(!more.hidden)); }, // the team menu's six first, the rest under More: the menu stays open (#10549)
     'agent-info': withAgent('showInfoDirect'),
     'agent-kill': withAgent('killSessionDirect'),
     'agent-restart': withAgent('restartDirect'),
