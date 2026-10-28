@@ -47,7 +47,7 @@ const HEX = c => c.repeat(64);
         console.log('1. Desktop: a row is one control and overlaps nothing');
         const overlap = await ev(`(() => { const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top; const bad = [];
             for (const row of document.querySelectorAll('${ROWS}')) { const nameBtn = row.querySelector('.dt-primary').getBoundingClientRect(); const cells = [...row.querySelectorAll('td')]; const created = cells[cells.length - 2].getBoundingClientRect();
-                if (hit(nameBtn, created)) bad.push('the name over Created'); if (row.querySelectorAll('button, a[href]').length !== 2 + row.querySelectorAll('[data-task-link], [data-goal-link]').length) bad.push('not exactly the name, the Task link when the file has a task, and the Details link'); }
+                if (hit(nameBtn, created)) bad.push('the name over Created'); if (row.querySelectorAll('button:not(.dt-star), a[href]').length !== 2 + row.querySelectorAll('[data-task-link], [data-goal-link]').length) bad.push('not exactly the name, the Task link when the file has a task, and the Details link'); }
             return bad; })()`);
         assert.deepEqual(overlap, [], 'nothing overprints: ' + overlap.join(', '));
         await shot('team-artifacts-ux-desktop');

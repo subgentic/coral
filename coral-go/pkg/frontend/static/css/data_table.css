@@ -454,3 +454,15 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* A row not opened since it changed (#9687; UI/UX): an 8 px accent dot and the name at 600 (a read name is 500); the snippet and the time do not change with it. A desktop row shows the dot before the name, named for a screen reader. */
 .dt-row.dt-unread:not(.dt-mailed) .dt-primary { font-weight: var(--fw-strong); }
 .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: "" / "Unread"; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
+
+/* The star on an artifact row (#9834): the filled one is always there, the empty one only while the row is hovered or has the keyboard, and not at all on touch (the star is in the item). */
+.dt-star { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-inline-start: 6px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--table-secondary-color); cursor: pointer; vertical-align: middle; }
+.dt-star .material-icons, .dt-star.material-icons { font-size: var(--fs-lg); }
+.dt-star-on { color: var(--text-primary); }
+
+.dt-star:not(.dt-star-on) { opacity: 0; color: var(--text-muted); }
+.dt-row:hover .dt-star, .dt-row:focus-within .dt-star, .dt-star:focus-visible { opacity: 1; }
+.dt-star:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dt-star:hover { color: var(--accent); }
+.dt-mail-star { width: auto; height: auto; margin-inline-start: 4px; font-size: var(--fs-lg); flex: none; align-self: center; cursor: default; }
+@media (pointer: coarse), (max-width: 767px) { .dt-star:not(.dt-star-on) { display: none; } .dt-star.dt-star-on { pointer-events: none; } }
