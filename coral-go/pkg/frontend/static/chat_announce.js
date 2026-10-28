@@ -4,8 +4,9 @@ const QUIET_MS = 2500;
 const pending = new Map(); // session_id -> { who, text }
 let timer = 0, flip = false;
 
-const words = (t, max = 120) => {
-    const s = String(t || '').replace(/[`*_#>]/g, '').replace(/\s+/g, ' ').trim();
+/** The start of a reply as it is spoken: Markdown marks go, the person's and the agent's own underscores inside a word (retry_count, task_runner.py) stay, as in a board row (#10597). Exported for its test. */
+export const words = (t, max = 120) => {
+    const s = String(t || '').replace(/[`*#>]/g, '').replace(/(^|[\s(])_+(?=\S)/g, '$1').replace(/(\S)_+(?=[\s).,;:!?]|$)/g, '$1').replace(/\s+/g, ' ').trim();
     if (s.length <= max) return s;
     const cut = s.lastIndexOf(' ', max);
     return s.slice(0, cut > max / 2 ? cut : max) + '…';
