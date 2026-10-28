@@ -85,6 +85,7 @@ export async function upgradeShortArtifactRefs(root, server, after) {
             a.className = 'mb-artifact-ref';
             a.textContent = f.worded ? text.slice(f.start, f.end) : `artifact ${id.slice(0, 8)}`; // a worded id keeps the digits it was written with
             a.title = `coral://artifacts/${id}`;
+            if (f.worded) a.setAttribute('aria-label', `Open artifact ${a.textContent}`); // the visible words are only the digits: the name says what the link is and contains them
             frag.append(a);
             at = f.end;
             changed = true;

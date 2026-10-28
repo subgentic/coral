@@ -49,6 +49,8 @@ const worded = root.querySelector('#e a');
 assert.ok(worded, 'a worded id that resolves is a link');
 assert.equal(worded.textContent, 'b801aafb', 'with the digits it was written with');
 assert.equal(worded.getAttribute('href'), `coral://artifacts/${A}`);
+assert.equal(worded.getAttribute('aria-label'), 'Open artifact b801aafb', 'a screen reader hears what the link opens, with the digits that are shown');
+assert.equal(root.querySelector('#a a.mb-artifact-ref').getAttribute('aria-label'), null, 'a full-form link keeps its visible name')
 assert.equal(root.querySelector('#e').textContent, 'see shot b801aafb and artifact 5c0de1a2 too', 'the sentence reads as written');
 assert.equal(root.querySelectorAll('#e a').length, 1, 'the one that matches none stays text');
 assert.equal(root.querySelector('#b').textContent, 'unknown coral://artifacts/0123abcd…fff stays', 'one that matches none stays the text it was');
