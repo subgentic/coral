@@ -53,9 +53,11 @@ type BoardSettings struct {
 	// message this board through Coral Hub (#3489). Empty: none. Needs CrossTeamMessaging.
 	CrossTeamServers []string `json:"cross_team_servers"`
 	// CrossTeamArtifacts lets this board send and receive artifacts with its cross-team messages
-	// (coral-board send --attach, #4379). Off by default; only the Operator on this computer may
-	// turn it on (never through Coral Hub). Needs CrossTeamMessaging. Received files are not
-	// scanned, and artifact bytes are not redacted.
+	// (coral-board send --attach, #4379). On by default for a board that never set it (#5916: a kill
+	// switch; what admits a team from another Coral is the explicit Coral Hub team link), an explicit
+	// off stays off, and two boards of one computer still need the explicit on (ExplicitFilesOn). The
+	// Operator on this computer, or Coral Hub's owner through the cross-team routes (#5572), may change
+	// it. Needs CrossTeamMessaging. Received files are not scanned, and artifact bytes are not redacted.
 	CrossTeamArtifacts bool `json:"cross_team_artifacts"`
 	// CrossTeamAllowed is who may message this board, by stable id (#5508): the only thing that admits a sender once the allowlist is in force. Empty: nobody.
 	CrossTeamAllowed []AllowedSender `json:"cross_team_allowed"`
