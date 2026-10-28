@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
                 return { lines, compare: !!row.querySelector('.perm-mode-compare'), all: row.textContent.replace(/\\s+/g, ' ') }; })()`);
             assert.equal(r.compare, false, `${w}: no second line comparing the three modes under the select: ${JSON.stringify(r.lines)}`);
             assert.ok(r.lines.some(l => /Auto/.test(l)), `${w}: the chosen mode's line is there: ${JSON.stringify(r.lines)}`);
-            assert.match(r.all, /Default asks before acting; Auto acts on its own; Not set uses Auto\./, `${w}: the contrast is one click away, in the row's More`);
+            assert.match(r.all, /Default asks before acting; Auto acts on its own; Not set starts a new agent in Auto and a new team member in Default\./, `${w}: the contrast is one click away, in the row's More`);
         }
         console.log('PASS Settings > Agents: the permission meaning is said once, the contrast is behind More, at 1280 and 390');
     } finally { await client.close(); await guard.restore?.(); }

@@ -119,3 +119,42 @@ func TestATeamMemberWhoPickedDefaultStartsInDefaultWhateverIsSaved(t *testing.T)
 		assert.Equal(t, http.StatusBadRequest, code, "%s: %s", mode, body)
 	}
 }
+
+// #10380: a stopped team's member who picked Default is resurrected in Default, whatever is saved: the resurrect named no mode, so it fell to the saved default (Auto).
+func TestAResurrectedMemberWhoPickedDefaultStaysInDefault(t *testing.T) {
+	url, _, h := teamServerH(t)
+	ctx := context.Background()
+	require.NoError(t, h.ss.SetSetting(ctx, "default_permission_mode", "auto"))
+	b, _ := json.Marshal(map[string]any{"board_name": "resdefault", "new_board": true, "working_dir": t.TempDir(), "agent_type": at.Claude,
+		"agents": []map[string]any{{"name": "D", "agent_type": "claude", "permission_mode": "default"}, {"name": "N", "agent_type": "claude"}}})
+	resp, err := http.Post(url+"/api/sessions/launch-team", "application/json", bytes.NewReader(b))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var launched struct {
+		BoardID string `json:"board_id"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&launched))
+	require.NotEmpty(t, launched.BoardID)
+	status, body := apiPost(t, url+"/api/sessions/live/team/"+launched.BoardID+"/kill")
+	require.Equal(t, http.StatusOK, status, body)
+
+	status, body = apiPost(t, url+"/api/teams/detail/"+launched.BoardID+"/resurrect")
+	require.Equal(t, http.StatusOK, status, body)
+	var res struct {
+		Agents []map[string]any `json:"agents"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(body), &res), body)
+	modes := map[string]string{}
+	for _, a := range res.Agents {
+		id, _ := a["session_id"].(string)
+		require.NotEmpty(t, id, body)
+		ls, err := h.ss.GetLiveSession(ctx, id)
+		require.NoError(t, err)
+		require.NotNil(t, ls)
+		require.NotNil(t, ls.PermissionMode)
+		modes[a["name"].(string)] = *ls.PermissionMode
+	}
+	assert.Equal(t, "default", modes["D"], "the member who picked Default: %s", body)
+	assert.Equal(t, "auto", modes["N"], "a member with nothing chosen still gets the saved default")
+}

@@ -207,6 +207,8 @@ func (h *SessionsHandler) ResurrectTeam(w http.ResponseWriter, r *http.Request) 
 			Model        string                 `json:"model"`
 			Tools        []string               `json:"tools"`
 			Hooks        map[string]interface{} `json:"hooks"`
+			// "default" is the only value a launch stores here (#10362): a member who picked Default comes back in Default, not in the saved default (#10380)
+			PermissionMode string `json:"permission_mode"`
 		}
 		if err := json.Unmarshal([]byte(m.AgentConfigJSON), &agentCfg); err != nil {
 			log.Printf("[resurrect] failed to parse agent config for %s: %v", m.AgentName, err)
@@ -225,6 +227,7 @@ func (h *SessionsHandler) ResurrectTeam(w http.ResponseWriter, r *http.Request) 
 		result, err := h.launchSession(ctx, launchSpec{
 			WorkDir: workingDir, AgentType: agentType, DisplayName: m.AgentName, Prompt: resurrectPrompt, BoardName: team.Name,
 			Model: agentCfg.Model, Capabilities: agentCfg.Capabilities, Tools: agentCfg.Tools, Hooks: agentCfg.Hooks,
+			PermissionMode: explicitDefaultMode(agentCfg.PermissionMode, nil),
 		})
 		if err != nil {
 			log.Printf("[resurrect] failed to launch %s: %v", m.AgentName, err)
