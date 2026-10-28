@@ -322,7 +322,8 @@ function _renderSleepingSummary(sleepingAgents, groupName, isCompact, teamDefaul
     // Agents Coral put to sleep when it stopped (sleep_reason coral_stopped) are said so, with a Wake button for exactly those (#10057): a returning person sees what happened, not a bare "2 sleeping agents".
     const restarted = sleepingAgents.filter(s => s.sleep_reason === 'coral_stopped'), k = restarted.length;
     const plural = n => `${n} agent${n !== 1 ? 's' : ''}`;
-    const label = k === 0 ? `${count} sleeping agent${count !== 1 ? 's' : ''}` : k === count ? `${plural(count)} asleep after Coral restarted` : `${count} sleeping agents, ${k} after Coral restarted`;
+    const sleeping = `${count} sleeping agent${count !== 1 ? 's' : ''}`; // the same count and word as the team page's Sleeping chip (#10246); what came back asleep is said after it
+    const label = k === 0 ? sleeping : k === count ? `${sleeping}, ${count === 1 ? '' : 'all '}after Coral restarted` : `${sleeping}, ${k} after Coral restarted`;
     const wakeName = `Wake ${plural(k)} that went to sleep when Coral restarted`, wakeIds = restarted.map(s => s.session_id).join(',');
     const wake = k ? `<button type="button" class="btn btn-small sleeping-wake" data-on-click="wake-restarted" data-ids="${escapeAttr(wakeIds)}" aria-label="${escapeAttr(wakeName)}">Wake</button>` : '';
     const summaryName = `${label} in ${keyLabel(groupName)}`; // each folder's summary has its own name
