@@ -9,6 +9,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 7px 20px 7px 12px;
+    border-top: env(safe-area-inset-top, 0px) solid var(--topbar-bg); /* edge to edge (viewport-fit=cover): the bar's own colour fills the notch's band, whatever padding a phone layout gives it (#10095) */
     background: var(--topbar-bg);
     border-bottom: 1px solid var(--topbar-border);
     position: relative;
