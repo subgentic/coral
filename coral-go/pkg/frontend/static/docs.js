@@ -24,12 +24,13 @@ let selectedDoc = null;
 let wantedDoc = null; // a /docs/<name> page opened before the list loaded (#3532)
 let docsQuery = '';   // the sidebar search's text, lower case
 
-// ── Groups (#7443): Getting started and API ───────────────────────────
-// The list the server sends has no groups; these topics are the ones a new reader starts with, every other topic is the API.
-const GETTING_STARTED = new Set(['README', 'quickstart', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting']);
+// ── Groups (#7443, #10093): Getting started and For developers ────────────────
+// The list the server sends has no groups; these topics are the ones a new reader starts with, in this order ("How do I...?" first, then Quickstart); every other topic, the API reference included, is for developers.
+const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
+const GETTING_STARTED = new Set(GETTING_STARTED_ORDER);
 const DOC_GROUPS = [
-    { key: 'getting-started', label: 'Getting started', has: d => GETTING_STARTED.has(d.name) },
-    { key: 'api', label: 'API', has: d => !GETTING_STARTED.has(d.name) },
+    { key: 'getting-started', label: 'Getting started', has: d => GETTING_STARTED.has(d.name), order: d => GETTING_STARTED_ORDER.indexOf(d.name) },
+    { key: 'api', label: 'For developers', has: d => !GETTING_STARTED.has(d.name) },
 ];
 const titleOf = d => d.title || d.name;
 // The search reads the topics' text too (#9965: "add a member" found nothing because only titles were searched): each topic's text is read once, on the first search, and kept lower case.
@@ -58,7 +59,8 @@ function snippetOf(d) {
 }
 const matches = d => hitOf(d) !== null;
 const ranked = ds => (docsQuery ? [...ds].sort((a, b) => hitOf(a).rank - hitOf(b).rank) : ds);
-const docGroups = () => DOC_GROUPS.map(g => ({ ...g, docs: ranked(docsList.filter(matches).filter(g.has)) })).filter(g => g.docs.length);
+const inGroupOrder = (g, ds) => (g.order ? [...ds].sort((a, b) => g.order(a) - g.order(b)) : ds); // a group with an order keeps it (the search puts title hits first within it)
+const docGroups = () => DOC_GROUPS.map(g => ({ ...g, docs: ranked(inGroupOrder(g, docsList.filter(matches).filter(g.has))) })).filter(g => g.docs.length);
 const groupOfDoc = name => { const d = docsList.find(x => x.name === name); const g = d && DOC_GROUPS.find(x => x.has(d)); return g ? { key: g.key, label: g.label } : null; };
 
 export function filterDocs(value) {
