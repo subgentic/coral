@@ -44,10 +44,16 @@ func (s *machineStubProvider) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-type machineStubHub struct{ labels []string }
+type machineStubHub struct {
+	labels     []string
+	credential string // "" is the default one
+}
 
 func (h *machineStubHub) Mint(_ context.Context, label string) (string, error) {
 	h.labels = append(h.labels, label)
+	if h.credential != "" {
+		return h.credential, nil
+	}
 	return "chb_COMMANDCREDENTIAL0123", nil
 }
 
@@ -71,7 +77,7 @@ func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProv
 		return p, nil
 	}
 	newMachineHub = func(baseURL, key, terms string) machinelaunch.Minter { return h }
-	machineUserData = func(credential, maxMode, version string, agents []string) (string, error) {
+	machineUserData = func(credential, maxMode, version, hubURL string, agents []string) (string, error) {
 		return "#cloud-config\n# " + credential + " " + maxMode + " " + version + " " + strings.Join(agents, ",") + "\n", nil
 	}
 	t.Cleanup(func() { newMachineProvider, newMachineHub, machineUserData = oldP, oldH, oldU })
@@ -111,6 +117,8 @@ func TestMachineLaunchRefusesBadUsageAndUnsafeFilesBeforeAnyCall(t *testing.T) {
 		"both from stdin":   {"launch", "--provider", "digitalocean", "--token-file", "-", "--hub-key-file", "-"},
 		"bad max mode":      append(append([]string{}, base...), "--max-mode", "root"),
 		"bad agent":         append(append([]string{}, base...), "--agents", "evil;rm"),
+		"unpinned agent":    append(append([]string{}, base...), "--agents", "claude"),
+		"unpinned agy":      append(append([]string{}, base...), "--agents", "agy@unpinned"),
 		"loose token file":  {"launch", "--provider", "digitalocean", "--token-file", loose, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"},
 		"unknown provider":  append(append([]string{}, base[:2]...), append([]string{"nope"}, base[3:]...)...),
 		"stray argument":    append(append([]string{}, base...), "extra"),
@@ -162,6 +170,31 @@ func TestMachineLaunchWarnsWhenTheHubIsNotThisBuildsDefault(t *testing.T) {
 		}
 		if strings.Contains(errb.String(), "COMMANDKEY") {
 			t.Fatalf("the warning holds the key: %s", errb.String())
+		}
+	}
+}
+
+// TestMachineLaunchBuildsTheRealUserDataWithTheCredentialOnce runs the command with the real user-data builder: the credential is in the user-data exactly once, the provider token and the Hub key never, and a pinned
+// agy installer and the npm CLIs are accepted.
+func TestMachineLaunchBuildsTheRealUserDataWithTheCredentialOnce(t *testing.T) {
+	tf, kf, p, h := machineFixture(t)
+	machineUserData = func(credential, maxMode, version, hubURL string, agents []string) (string, error) {
+		return machinelaunch.BuildUserData(machinelaunch.UserDataSpec{Credential: credential, MaxMode: maxMode, CoralVersion: version, HubURL: hubURL, Agents: agents})
+	}
+	h.credential = "chb_REALCREDENTIAL0123456789"
+	var out, errb bytes.Buffer
+	pin := "agy@sha256:" + strings.Repeat("ab", 32)
+	code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3",
+		"--agents", "claude@2.1.0," + pin, "--yes"}, strings.NewReader(""), &out, &errb)
+	if code != 0 {
+		t.Fatalf("exit %d: %s / %s", code, out.String(), errb.String())
+	}
+	if n := strings.Count(p.spec.UserData, "chb_REALCREDENTIAL0123456789"); n != 1 {
+		t.Fatalf("the credential is in the user-data %d times", n)
+	}
+	for _, secret := range []string{"COMMANDTOKEN", "COMMANDKEY"} {
+		if strings.Contains(p.spec.UserData, secret) {
+			t.Fatalf("the user-data holds %s", secret)
 		}
 	}
 }
