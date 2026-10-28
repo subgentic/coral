@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
 import { keyLabel, noteBoardLabels } from './server_base.js';
-import { compactFigure, compactDuration, formatCost, noDataWords } from './format.js';
+import { compactFigure, compactDuration, formatCost, noDataWords, costDigits } from './format.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { loadStyles } from './lazy_styles.js';
@@ -421,7 +421,7 @@ const _tables = {};
 const _numCol = (key, label, get, show, extra) => ({ key, label, numeric: true, sort: 'number', firstDir: 'desc', sortValue: get, cell: r => show(get(r)), ...extra });
 const _tokCol = (key, label, extra) => _numCol(key, label, r => r[key] || 0, compactFigure, extra);
 const _cacheCols = () => [_tokCol('cache_read_tokens', 'Cache read', { narrowHide: true }), _tokCol('cache_write_tokens', 'Cache write', { narrowHide: true })]; // the two that wait when the table's box is narrow
-const _costCol = () => _numCol('cost_usd', 'Cost', r => r.cost_usd || 0, c => formatCost(c, { zeroAsTwo: true }), { foldFirst: true }); // the figure the page is opened for: on a phone it follows the name (#5056)
+const _costCol = (rows = []) => { const digits = costDigits(rows.map(r => r.cost_usd || 0)); return _numCol('cost_usd', 'Cost', r => r.cost_usd || 0, c => formatCost(c, { zeroAsTwo: true, digits }), { foldFirst: true }); }; // digits: two rows that round to the same cents show more (#10740); // the figure the page is opened for: on a phone it follows the name (#5056)
 const _shareCol = () => _numCol('cost_pct', 'Share', r => r.cost_pct || 0, v => `${Math.round(v * 100)}%`, { foldFirst: true });
 // Team's and branch's Share: the share of the whole table (not of the filtered rows), drawn as a bar with its figure.
 const _shareBarCol = total => _numCol('cost_pct', 'Share', r => r.cost_usd || 0, () => '', { foldFirst: true, cell: r => {
@@ -570,7 +570,7 @@ function _renderProviderTable(rows) {
         _textCol('provider', 'agent_type', 'Provider', r => r.agent_type || '', { cell: _swatched('provider', r => r.agent_type || '') }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
-        _costCol(), _shareCol(),
+        _costCol(rows), _shareCol(),
     ], filtered, null, _seriesOpts('provider'));
 }
 
@@ -586,7 +586,7 @@ function _renderModelTable(rows) {
         _textCol('model', 'model', 'Model', r => r.model || '', { title: r => r.model_id || '' }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
-        _costCol(), _shareCol(),
+        _costCol(rows), _shareCol(),
     ], filtered, null, _seriesOpts('model'));
 }
 
@@ -607,7 +607,7 @@ function _renderThinkingTable(rows) {
         _numCol('requests', 'Calls', r => r.requests || 0, v => (v ? String(v) : '–')),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _numCol('thinking_tokens', 'Thinking', r => r.thinking_tokens, v => (v === null ? '–' : compactFigure(v)), { sortValue: r => r.thinking_tokens || 0 }),
-        _costCol(), _shareCol(),
+        _costCol(rows), _shareCol(),
     ], filtered, null, { quiet: r => !r.level_key }); // the usage with no thinking level recorded (#4969) is not a level: quieter than the rows that are
 }
 
@@ -632,7 +632,7 @@ function _renderAgentTable(rows) {
     };
     _drawTable(container, 'agent', [
         _textCol('agent', 'agent_name', 'Agent', nameOf, { cell: _swatched('agent', nameCell) }),
-        _costCol(), // right after the name: eleven columns do not all fit a desktop page, and Cost is the figure the page is opened for (#7719)
+        _costCol(rows), // right after the name: eleven columns do not all fit a desktop page, and Cost is the figure the page is opened for (#7719)
         _textCol('agent', 'board_name', 'Team', r => r.board_name || '', { cell: r => (r.board_name ? keyLabel(r.board_name) : '—'), tone: 'secondary' }), // the key's label (#3536)
         _textCol('agent', 'folder', 'Folder', r => r.folder || '', { cell: r => r.folder || '—', title: r => r.working_dir || r.folder || '', tone: 'secondary' }),
         { key: 'first_seen', label: 'Launched', sort: true, sortValue: r => start(r) || '', cell: r => _formatTime(start(r)), tone: 'secondary' },
@@ -681,7 +681,7 @@ function _renderTaskTable(tasks) {
         { key: 'claimed_at', label: 'Start time', sort: true, sortValue: t => t.claimed_at || '', cell: t => (t.claimed_at ? _formatTime(t.claimed_at) : '—'), tone: 'secondary' },
         _numCol('duration', 'Duration', span, () => '', { cell: t => _formatDuration(t.claimed_at, t.completed_at) }),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
-        _costCol(),
+        _costCol(tasks),
     ], filtered, 'No task costs in this range yet. They appear once an agent has worked on a board task.', { rowKey: t => t.id, open: t => _showCostTaskDetail(t.id), rowName: t => t.title || '' });
 }
 
@@ -862,7 +862,7 @@ function _renderTeamTable(teams) {
         _textCol('team', 'board_name', 'Team', t => t.board_name || '', { cell: _swatched('team', t => (t.board_name ? keyLabel(t.board_name) : '(no team)')) }), // keyLabel is the team's name: the rows' board_label was handed to it when they arrived (#10936)
         _numCol('num_agents', 'Agents', t => t.num_agents || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
-        _costCol(), _shareBarCol(total),
+        _costCol(teams), _shareBarCol(total),
     ], filtered, null, _seriesOpts('team'));
 }
 
@@ -897,6 +897,6 @@ function _renderBranchTable(branches) {
         _numCol('pr_number', 'PR', b => b.pr_number || 0, () => '', { cell: b => _prCell(b.pr_number, b.remote_url) }),
         _numCol('num_agents', 'Agents', b => b.num_agents || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
-        _costCol(), _shareBarCol(total),
+        _costCol(branches), _shareBarCol(total),
     ], filtered);
 }

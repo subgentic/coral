@@ -97,13 +97,21 @@ export function formatDuration(value, { unit = 'ms', shape = 'clock', whole = 'f
 /** A cost in dollars as text, in the three ways the views write it (#4638):
  *   default: "$12.35", and four decimals below a cent ("$0.0042"; zero is "$0.0000");
  *   zeroAsTwo: zero is "$0.00";  nullAsZero: none is "$0.00" (else it is an error, as before);
+ *   digits: the decimals from a cent up (2; costDigits says when a column needs more);
  *   subCent 'lt': below a cent (above zero) is "<$0.01";  precise: up to four decimals with up to two trailing zeros trimmed ("$1.5", "$0.0042"). */
-export function formatCost(c, { zeroAsTwo = false, nullAsZero = false, subCent = 'four', precise = false } = {}) {
+export function formatCost(c, { zeroAsTwo = false, nullAsZero = false, subCent = 'four', precise = false, digits = 2 } = {}) {
     if (nullAsZero && c == null) return '$0.00';
     if (zeroAsTwo && c === 0) return '$0.00';
     if (precise) return '$' + c.toFixed(4).replace(/0{1,2}$/, '');
     if (subCent === 'lt') return c > 0 && c < 0.01 ? '<$0.01' : '$' + c.toFixed(2);
-    return c < 0.01 ? '$' + c.toFixed(4) : '$' + c.toFixed(2);
+    return c < 0.01 ? '$' + c.toFixed(4) : '$' + c.toFixed(digits);
+}
+
+/** The decimals a column of costs needs so that two different costs never read the same: two (cents) unless some pair rounds to the same cents, then three, then four (#10740). */
+export function costDigits(values) {
+    const v = [...new Set(values.filter(x => x >= 0.01))];
+    for (const d of [2, 3]) if (new Set(v.map(x => x.toFixed(d))).size === v.length) return d;
+    return 4;
 }
 
 /** A count and its singular/plural word; localized counts retain the settings view's numeric coercion. */
