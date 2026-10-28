@@ -229,7 +229,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     function statusLine() {
         if (model.error) return model.error;
         if (model.loading || pendingBoard) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
-        if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : model.scope ? 'Nothing shared yet. Files this agent shares appear here.' : 'No artifacts yet. Files your agents share show up here.';
+        if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : model.scope ? 'Nothing shared yet. Files this agent shares appear here.' : hooks.emptyText?.() || 'No artifacts yet. Files your agents share show up here.';
         const c = model.counts;
         return c && c.matched > model.items.length ? `Showing ${model.items.length} of ${c.matched}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
     }
@@ -477,7 +477,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
     }
 
-    /** Show the team's artifacts in `host`; with `scope` ({ session, server, standalone, name }) one agent's (standalone: it has no team, its list has no search). hooks: onCount(n). */
+    /** Show the team's artifacts in `host`; with `scope` ({ session, server, standalone, name }) one agent's (standalone: it has no team, its list has no search). hooks: onCount(n), emptyText() (the empty list's line, the team page says where its files land). */
     let external = false; // the Inbox folder draws this list's bar itself, on the folder toolbar (inbox_toolbar.js): useBar
     function initModel(project, scope, key) {
         clearPendingBoard(); retryLabels = false;

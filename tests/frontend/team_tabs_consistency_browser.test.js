@@ -47,7 +47,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             });
             await S.run(`${label}: item 5, Artifacts and Knowledge draw the one empty line (14/400, an optional 12/400 hint, no box)`, async () => {
                 await goTab(ev, settle, 'Artifacts'); await waitFor(`!!document.querySelector('[role=tabpanel]:not([hidden]) .empty-state-line')`, 'the Artifacts empty line', 8000);
-                const art = await empty(); assert.deepEqual([art.text, art.size, art.weight, art.boxed], ['No artifacts yet. Files your agents share show up here.', '14px', '400', false], 'Artifacts: ' + JSON.stringify(art)); await shot(`${label}-artifacts-empty`);
+                const art = await empty(); assert.deepEqual([art.text, art.size, art.weight, art.boxed], ['Files land in /tmp/Orchestrator; files agents share appear here.' /* the team's folder (#10055) */, '14px', '400', false], 'Artifacts: ' + JSON.stringify(art)); await shot(`${label}-artifacts-empty`);
                 await goTab(ev, settle, 'Knowledge'); await waitFor(`!!document.querySelector('[role=tabpanel]:not([hidden]) .empty-state-line')`, 'the Knowledge empty line', 8000);
                 const kn = await empty(); assert.deepEqual([kn.text, kn.size, kn.weight, kn.boxed], ['No knowledge yet.', '14px', '400', false], 'Knowledge: ' + JSON.stringify(kn));
                 assert.deepEqual(kn.hint && kn.hint.slice(1), ['12px', '400'], 'its hint is 12/400: ' + JSON.stringify(kn.hint)); await shot(`${label}-knowledge-empty`);
