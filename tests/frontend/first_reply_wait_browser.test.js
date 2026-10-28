@@ -29,7 +29,7 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual([s.label, s.time, s.live, s.stillShown, s.role, s.liveRole], ['Working', '', 'Working', false, null, 'status'], dev + ': at 1 s only the label; the one status is its own element: ' + JSON.stringify(s));
             s = await at(6); assert.equal(s.time, ' · 6 s', dev + ': digits from 5 s'); assert.equal(s.timeHidden, 'true', 'the digits are not read'); assert.equal(s.live, 'Working'); assert.equal(s.stillShown, false);
             s = await at(29); assert.deepEqual([s.live, s.stillShown], ['Working', false], dev + ': nothing yet at 29 s');
-            s = await at(30); assert.deepEqual([s.live, s.stillShown, s.link], ['Still working, 30 seconds', true, 'BUTTON:Open the terminal'], dev + ': at 30 s the line, the link and one status: ' + JSON.stringify(s));
+            s = await at(30); assert.deepEqual([s.live, s.stillShown, s.link], ['Still working, 30 seconds', true, 'BUTTON:See live output'], dev + ': at 30 s the line, the link and one status: ' + JSON.stringify(s));
             if (mobile) assert.ok(s.linkBox[1] >= 44, dev + ': the link is a 44 px target ' + JSON.stringify(s.linkBox));
             s = await at(45); assert.equal(s.live, 'Still working, 30 seconds', dev + ': not announced again at 45 s'); assert.equal(s.time, ' · 45 s');
             s = await at(60); assert.deepEqual([s.live, s.time], ['Still working, 1 minute', ' · 1 min 00 s'], dev + ': once a minute');

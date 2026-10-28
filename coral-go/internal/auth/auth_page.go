@@ -203,7 +203,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
       <label class="check"><input type="checkbox" id="keep"><span>Keep me signed in on this browser<small>For 30 days. Leave it off on a shared computer.</small></span></label>
       <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
     </form>
-    <p class="note">Your password manager can save it. There is no email: if you forget it, run coral reset-password on this computer.</p>
+    <p class="note">Your password manager can save it. Forgot it? Run coral reset-password in a terminal on this computer.</p>
 {{template "hubquiet" .}}
     <div class="linkrow linkcol">{{if eq .HubSignin "unpaired"}}<button type="button" class="link" id="hub-link-open">Link this computer to Coral Hub and sign in</button>{{end}}<button type="button" class="link" id="show-key">Use an API key instead</button></div>
   </section>

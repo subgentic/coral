@@ -228,7 +228,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     function statusLine() {
         if (model.error) return model.error;
         if (model.loading || pendingBoard) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
-        if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : 'No artifacts yet.';
+        if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : 'No artifacts yet. Files your agents share show up here.';
         const c = model.counts;
         return c && c.matched > model.items.length ? `Showing ${model.items.length} of ${c.matched}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
     }
