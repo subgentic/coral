@@ -684,7 +684,7 @@ function _renderSpendChart(buckets) {
     _watchSpendChart(container);
 
     if (buckets.length < 2) {
-        emptyState(container, 'Not enough data', 'empty-state');
+        emptyState(container, 'Not enough data yet. It appears once an agent has used tokens; try a longer range.', 'empty-state'); // says what makes it appear (Beta Tester, #9955)
         return;
     }
 
