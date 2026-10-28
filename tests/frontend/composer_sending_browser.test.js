@@ -116,7 +116,7 @@ const HOLD = `(() => {
         await waitFor(`${REGION}.textContent === 'Message not sent, your text is back in the box' || !document.getElementById('composer-error').hidden`, 'the failure is said', 3000);
         assert.equal(await ev(`${REGION} === window.__sendRegion`), true, 'the same element again');
         assert.equal(await ev(`document.getElementById('composer-error').hidden`), false, 'the reason is shown');
-        assert.match(await ev(`document.getElementById('composer-error').textContent`), /wasn't submitted/);
+        assert.match(await ev(`document.getElementById('composer-error').textContent`), /input box but was not sent/); // plain words, with Open terminal and Restart beside them (#10336)
         assert.deepEqual(await sentToasts(), ['Sent: first message'], 'no Sent for it');
 
         console.log('An agent not ready: the same');

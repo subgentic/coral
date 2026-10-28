@@ -237,7 +237,8 @@
                             <!-- A failed send, said where the user typed (#3218); Restart when the agent's terminal is gone -->
                             <div id="composer-error" class="composer-error" hidden>
                                 <span class="composer-error-text" role="alert"></span>
-                                <button class="btn btn-primary btn-small composer-error-restart" type="button" hidden>Restart</button>
+                                <button class="btn btn-small composer-error-terminal" type="button" data-on-click="terminal-view-open" title="Shows what the agent is showing" hidden>Open terminal</button>
+                                <button class="btn btn-primary btn-small composer-error-restart" type="button" title="Stops the agent and starts it again" hidden>Restart</button>
                                 <button class="composer-error-dismiss" type="button" aria-label="Dismiss">×</button>
                             </div>
                         </div>

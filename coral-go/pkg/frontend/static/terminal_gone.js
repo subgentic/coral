@@ -99,12 +99,23 @@ let _composerGone = false;
 let _hooksReview = false; // the error under the composer is Codex's hooks question: answering it clears the error and says to send again (#6200)
 
 /** Say a send error under the composer. restart: offer Restart (the terminal is gone). */
-export function showComposerError(message, { restart = false } = {}) {
+/** The errors that used to send a person to the terminal with no way there (#10336): plain words for what happened, then what the two buttons do. '' for any other error. */
+const TERMINAL_HELP = ' Open terminal shows what the agent is showing; Restart stops the agent and starts it again.';
+function terminalErrorWords(message, code) {
+    const m = String(message || '');
+    if (code === 'not_confirmed' || /did not confirm|didn't confirm/i.test(m)) return `The agent did not confirm your message, so it may not have arrived.${TERMINAL_HELP}`;
+    if (code === 'not_submitted' || /wasn't submitted|not submitted/i.test(m)) return `Your message is in the agent's input box but was not sent. Send it again, or use the buttons.${TERMINAL_HELP}`;
+    if (/prompt is still open/i.test(m)) return `Your answer was sent, but the agent still shows the question.${TERMINAL_HELP}`;
+    return '';
+}
+
+export function showComposerError(message, { restart = false, terminal = false } = {}) {
     const box = document.getElementById('composer-error');
     if (!box) return;
     box.querySelector('.composer-error-text').textContent = message;
     _hooksReview = false; // reportSendError sets it again for the hooks question
     box.querySelector('.composer-error-restart').hidden = !restart || isPopout(); // no destructive actions in the popout
+    const open = box.querySelector('.composer-error-terminal'); if (open) open.hidden = !terminal;
     box.hidden = false;
     _composerGone = restart;
 }
@@ -137,7 +148,9 @@ export function reportSendError(session, message, code, exited = false) {
         showComposerError(TERMINAL_GONE_TEXT, { restart: true });
         return;
     }
-    showComposerError(message);
+    const words = terminalErrorWords(message, code);
+    if (words) showComposerError(words, { restart: true, terminal: true });
+    else showComposerError(message);
     _hooksReview = code === 'codex_hooks_review_pending'; // set after the error is shown (showing it keeps the flag as it was)
 }
 
@@ -178,7 +191,7 @@ export function nextInputId() { return _nextInputId++; }
 export function awaitSocketAccept(session, ids) {
     return new Promise(resolve => {
         const p = { sid: session && session.session_id, resolve, ids: new Set(ids) };
-        p.timer = setTimeout(() => { if (_settle(p, false)) showComposerError(NO_ANSWER_TEXT); }, SOCKET_ACK_TIMEOUT_MS);
+        p.timer = setTimeout(() => { if (_settle(p, false)) showComposerError(terminalErrorWords(NO_ANSWER_TEXT, 'not_confirmed'), { restart: true, terminal: true }); }, SOCKET_ACK_TIMEOUT_MS);
         _socketSends.add(p);
     });
 }
@@ -207,7 +220,7 @@ document.addEventListener('coral:terminal-input-held', e => {
     for (const p of [..._socketSends]) {
         if ((sessionId && p.sid !== sessionId) || !p.ids.has(id)) continue;
         clearTimeout(p.timer);
-        p.timer = setTimeout(() => { if (_settle(p, false)) showComposerError(NO_ANSWER_TEXT); }, HELD_ACK_TIMEOUT_MS);
+        p.timer = setTimeout(() => { if (_settle(p, false)) showComposerError(terminalErrorWords(NO_ANSWER_TEXT, 'not_confirmed'), { restart: true, terminal: true }); }, HELD_ACK_TIMEOUT_MS);
     }
     if (note) showToast(note);
 });
