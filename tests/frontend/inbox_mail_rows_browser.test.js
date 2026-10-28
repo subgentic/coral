@@ -1,5 +1,5 @@
 // The phone Inbox's rows read like mail (#9545, UI/UX's spec #9529): a 44 px leading target around a 32 px avatar, the title and the first words of what it says on one line, the time at the right, 56 px a row
-// (Needs you, a list of agents: the ask is a second line, 64 px, the title bold, an amber dot). Tasks: a state glyph in a square, the title, the state. No unread marker anywhere else (a read state exists only for Needs you).
+// (Needs you, a list of agents: the agent and what it asks on one line, 56 px, the title bold, an amber dot; one line since #9986, it was a second line at 64 px). Tasks: a state glyph in a square, the title, the state. No unread marker anywhere else (a read state exists only for Needs you).
 // A desktop keeps its table. 390 and 412 px with touch, isolated dev server, the Inbox's census world and two waiting agents.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -24,7 +24,7 @@ const AGENTS = [
             time: q('.dt-mail-time').textContent, bold: getComputedStyle(q('.dt-mail-title')).fontWeight, dot: !!q('.dt-mail-dot'), sameLine: Math.abs(r(q('.dt-mail-title')).top - r(q('.dt-mail-snippet')).top) < 4, timeRight: Math.round(box.right - r(q('.dt-mail-time')).right), open: !!q('button.dt-mail-open') }; }))()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true]]) {
+        for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true], [360, 780, true]]) {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
@@ -35,6 +35,11 @@ const AGENTS = [
             await waitFor(`document.querySelectorAll('${T} .dt-table tbody tr').length === 2 && document.querySelector('${T}').getClientRects().length > 0`, at + 'the two waiting agents', 10000);
             if (!mobile) {
                 assert.equal(await ev(`document.querySelectorAll('${T} tr.dt-mailed').length`), 0, at + 'a desktop keeps its table');
+                // #9986 (coral-hub's comparison): at a mouse every control of the Inbox is 24 px at least (the row's name button was 18 px in its 36 px row); a native checkbox is the browser's own control
+                const small = await ev(`[...document.querySelectorAll('#inbox-view button, #inbox-view select, #inbox-view input:not([type=checkbox]):not([type=hidden]), #inbox-view a[href]')].filter(e => e.getClientRects().length && !e.closest('[hidden]') && getComputedStyle(e).visibility !== 'hidden').map(e => { const r = e.getBoundingClientRect(); return [e.tagName, (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 24), Math.round(r.width), Math.round(r.height)]; }).filter(x => x[2] < 24 || x[3] < 24)`);
+                const smallIn = () => ev(`[...document.querySelectorAll('#inbox-view button, #inbox-view select, #inbox-view input:not([type=checkbox]):not([type=hidden]), #inbox-view a[href]')].filter(e => e.getClientRects().length && !e.closest('[hidden]') && getComputedStyle(e).visibility !== 'hidden').map(e => { const r = e.getBoundingClientRect(); return [e.tagName, (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 24), Math.round(r.width), Math.round(r.height)]; }).filter(x => x[2] < 24 || x[3] < 24)`);
+                assert.deepEqual(small, [], at + 'every Inbox control is 24 px at least at a mouse: ' + JSON.stringify(small));
+                for (const folder of ['tasks', 'saved']) { await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('${folder}')).then(() => true)`); await new Promise(r => setTimeout(r, 600)); /* sleep-ok: the folder's table is drawn */ const sm = await smallIn(); assert.deepEqual(sm, [], at + folder + ': every control is 24 px at least at a mouse: ' + JSON.stringify(sm)); }
                 console.log('PASS ' + at + 'no mail rows on a desktop');
                 continue;
             }
@@ -44,12 +49,12 @@ const AGENTS = [
             for (const x of r) {
                 assert.ok(x.leadW >= 44 && x.lead >= 44 && x.avatar === 32, at + 'a 44 px target around a 32 px avatar ' + JSON.stringify(x));
                 assert.ok(x.open && x.dot && x.bold >= 600, at + 'a button, the amber dot, the title bold ' + JSON.stringify(x));
-                assert.ok(x.h === 64 && x.ask, at + 'Needs you is two lines, exactly 64 px (with its dot) ' + JSON.stringify(x));
+                assert.ok(x.h === 56 && x.sameLine && !x.ask && x.snippet.trim(), at + 'Needs you is one line, 56 px like Tasks and Saved: the agent, then what it asks (#9986, the operator: Gmail-like one-line rows) ' + JSON.stringify(x));
                 assert.ok(x.timeRight <= 16 && /ago|min|\d/.test(x.time), at + 'the time is at the right ' + JSON.stringify(x));
             }
-            assert.ok(r.some(x => /^Wants to run: go test/.test(x.ask)) && r.some(x => x.ask && x.title === 'Agent Two'), at + 'the ask is the second line, the state when there is none ' + JSON.stringify(r));
+            assert.ok(r.some(x => /Wants to run: go test/.test(x.snippet)) && r.some(x => x.snippet.trim() && x.title === 'Agent Two'), at + 'the ask follows the name on its line, the state when there is none ' + JSON.stringify(r));
             await ev(`document.querySelectorAll('${T} tr.dt-mailed .dt-primary').forEach((b, i) => b.setAttribute('data-axp', String(i))); true`);
-            for (let i = 0; i < r.length; i++) { const ax = await axName(client, `[data-axp="${i}"]`), x = await ev(`document.querySelector('[data-axp="${i}"] .dt-mail-ask').textContent`); assert.ok(ax && ax.name.includes(`, ${x}`), at + `a Needs you row's button says what the agent asks, as Chrome computes it (#9747): "${ax && ax.name}" lacks "${x}"`); }
+            for (let i = 0; i < r.length; i++) { const ax = await axName(client, `[data-axp="${i}"]`), x = await ev(`document.querySelector('[data-axp="${i}"] .dt-mail-snippet').textContent.trim()`); assert.ok(ax && ax.name.includes(`, ${x}`), at + `a Needs you row's button says what the agent asks, as Chrome computes it (#9747): "${ax && ax.name}" lacks "${x}"`); }
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
             // the marker's `since` is in the future: every seeded task counts as read, so the plain row is measured
             const readAs = since => ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: ${since}, items: {} })); true`);
