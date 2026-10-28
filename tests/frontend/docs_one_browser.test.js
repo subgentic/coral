@@ -121,7 +121,7 @@ const BASE = require('./test_base').BASE;
             // the search narrows the topics
             await ev(`(() => { const i = document.querySelector('${pane('docs')} .sidebar-search-input'); i.value = 'quickstart'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('${pane('docs')} li .row-btn').length > 0 && document.querySelectorAll('${pane('docs')} li .row-btn').length < ${counts[0] + counts[1]}`, at + 'the search narrows the list', 5000);
-            assert.ok(await ev(`[...document.querySelectorAll('${pane('docs')} li .row-btn')].every(b => /quickstart/i.test(b.textContent))`), at + 'only matching topics');
+            assert.ok(await ev(`[...document.querySelectorAll('${pane('docs')} li .row-btn')].some(b => /quickstart/i.test(b.textContent))`), at + 'the topics whose title matches are there (the search reads the topics\' text too, so others that mention it may follow, #9965)');
             await ev(`(() => { const i = document.querySelector('${pane('docs')} .sidebar-search-input'); i.value = 'zzzzzz'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`!!document.querySelector('${pane('docs')} .empty-state')`, at + 'no match says so', 5000);
             await ev(`(() => { const i = document.querySelector('${pane('docs')} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
