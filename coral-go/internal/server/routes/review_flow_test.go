@@ -404,7 +404,7 @@ func TestAvailabilityHintSkipsParkedTasks(t *testing.T) {
 		}
 		return tk
 	}
-	hint := func(tasks []board.Task) string { return strings.Join(availabilityHealthReport(tasks), "\n") }
+	hint := func(tasks []board.Task) string { return strings.Join(availabilityHealthReport(tasks, tasks), "\n") }
 	open := []board.Task{mk(1, false), mk(2, false), mk(3, false)}
 	withParked := []board.Task{mk(1, false), mk(2, false), mk(3, true), mk(4, true)}
 	assert.Contains(t, hint(open), "3 unassigned tasks", "three open unassigned tasks are counted")

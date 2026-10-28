@@ -360,6 +360,66 @@ func openStatesPriority(p string) int {
 	return -1
 }
 
+// reviewParentsSQL is the tasks in a review with their workflows: tasksUnderReviewSQL's rows plus the workflow, whose rounds name the review tasks.
+const reviewParentsSQL = `SELECT t.id, t.status, t.assigned_to, t.created_at, w.data FROM board_tasks t JOIN task_workflows w ON w.task_id = t.id
+	 WHERE t.board_id = ? AND t.status IN ('review_pending', 'in_progress') AND (t.status = 'review_pending' OR CASE WHEN json_valid(w.data) THEN json_extract(w.data, '$.completion_review') END IS NOT NULL)`
+
+// ListReviewStates returns what the health report's open-review lines read (#9779), with each task's Workflow and nothing else of it but id, status, assignee and creation time: the tasks waiting
+// in review_pending or submitted for their review, and the review tasks still pending or in progress that those tasks' rounds name. ListOpenTaskStates carries no workflows and has no review_pending,
+// and finding the review tasks by their workflows' review_of cost one lookup per open task on every poll (0.9 ms of a board with 1,600 open tasks); the rounds of the few tasks in review name
+// them directly, as DelegateReview and the review pool record every review task they make in a round.
+func (s *Store) ListReviewStates(ctx context.Context, project string) ([]Task, error) {
+	var rows []struct {
+		ID         int64   `db:"id"`
+		Status     string  `db:"status"`
+		AssignedTo *string `db:"assigned_to"`
+		CreatedAt  string  `db:"created_at"`
+		Data       string  `db:"data"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, reviewParentsSQL, project); err != nil {
+		return nil, err
+	}
+	tasks := make([]Task, 0, len(rows))
+	var reviewIDs []int64
+	seen := map[int64]bool{}
+	for _, r := range rows {
+		w, _ := decodeWorkflow(r.Data, true) // an unreadable workflow is a zero one, as hydrateWorkflows leaves it
+		tasks = append(tasks, Task{ID: r.ID, Status: r.Status, AssignedTo: r.AssignedTo, CreatedAt: r.CreatedAt, Workflow: w})
+		for _, round := range w.ReviewRounds {
+			for _, rv := range round.Reviewers {
+				if rv.ReviewTaskID > 0 && !seen[rv.ReviewTaskID] {
+					seen[rv.ReviewTaskID] = true
+					reviewIDs = append(reviewIDs, rv.ReviewTaskID)
+				}
+			}
+		}
+	}
+	err := forEachIDChunk(reviewIDs, func(ph string, args []any) error {
+		var reviews []struct {
+			ID         int64   `db:"id"`
+			Status     string  `db:"status"`
+			AssignedTo *string `db:"assigned_to"`
+			CreatedAt  string  `db:"created_at"`
+			Data       string  `db:"data"`
+		}
+		if err := s.reader().SelectContext(ctx, &reviews, `SELECT t.id, t.status, t.assigned_to, t.created_at, COALESCE(w.data, '') AS data FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id
+			 WHERE t.board_id = ? AND t.status IN ('pending', 'in_progress') AND t.id IN (`+ph+`)`, append([]any{project}, args...)...); err != nil {
+			return err
+		}
+		for _, r := range reviews {
+			w, _ := decodeWorkflow(r.Data, r.Data != "")
+			if w.ReviewOf > 0 {
+				tasks = append(tasks, Task{ID: r.ID, Status: r.Status, AssignedTo: r.AssignedTo, CreatedAt: r.CreatedAt, Workflow: w})
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return tasks, nil
+}
+
 // The status test is two parts on purpose: IN (...) gives the (board_id, status) index both its columns, so only the board's review_pending and in_progress tasks are looked at; the
 // same test as one OR (status = 'review_pending' OR (status = 'in_progress' AND ...)) made SQLite walk every task of the board, completed ones included, on every poll of the board
 // status (#9471: 4.6 s of the 12.5 s of CPU the status read used in a 20 s profile, for a result of nothing).

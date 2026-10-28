@@ -75,6 +75,7 @@ type boardStatusSnapshot struct {
 	subs              []board.Subscriber
 	bySession         map[string]board.Subscriber // a subscriber by its session name
 	tasks             []board.Task                // the board's open tasks
+	reviews           []board.Task                // the tasks in a review, with their workflows (the health report's open-review lines)
 	underReview       map[int64]string            // task id -> assignee, for tasks waiting on their completion review
 	live              map[string]bool             // session ids with a live terminal
 	events            map[string][]store.AgentEvent
@@ -148,7 +149,7 @@ func (h *SessionsHandler) teamAvailabilityUncached(w http.ResponseWriter, r *htt
 		exists, _ = h.bs.BoardExists(ctx, name)
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	out := map[string]any{"board": name, "team": name, "exists": exists, "working_mode": mode, "agents": agents, "summary": availabilitySummary(agents), "unassigned_tasks": boardTasksAssignedTo(snap.tasks, ""), "health_report": availabilityHealthReport(snap.tasks)}
+	out := map[string]any{"board": name, "team": name, "exists": exists, "working_mode": mode, "agents": agents, "summary": availabilitySummary(agents), "unassigned_tasks": boardTasksAssignedTo(snap.tasks, ""), "health_report": availabilityHealthReport(snap.tasks, snap.reviews)}
 	// The validator is of the status without its clock: a poll that finds nothing changed gets a 304 with no body, though observed_at moved on (#9337).
 	if tag := httputil.JSONValidator(out); tag != "" {
 		w.Header().Set("ETag", tag)
@@ -180,6 +181,9 @@ func (h *SessionsHandler) loadBoardStatus(r *http.Request, trace *phaseTrace, na
 	}
 	// Only open tasks matter here; see ListOpenTasks for why not ListTasks.
 	if snap.tasks, err = h.bs.ListOpenTaskStates(ctx, name); err != nil {
+		return nil, internal(err)
+	}
+	if snap.reviews, err = h.bs.ListReviewStates(ctx, name); err != nil {
 		return nil, internal(err)
 	}
 	if snap.underReview, err = h.bs.TasksUnderReview(ctx, name); err != nil {
@@ -378,9 +382,9 @@ func latestStatusActivity(raw string) string {
 	return ""
 }
 
-func availabilityHealthReport(tasks []board.Task) []string {
+func availabilityHealthReport(tasks, reviews []board.Task) []string {
 	var report []string
-	report = append(report, openReviewLines(tasks, time.Now())...)
+	report = append(report, openReviewLines(reviews, time.Now())...)
 	assigned := map[string]int{}
 	parallel := 0
 	for _, t := range tasks {
