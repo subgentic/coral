@@ -140,19 +140,22 @@ function _syncTeamGate() {
     if (!recap) return;
     recap.classList.toggle('launch-recap-warn', !!reason && step !== 'team' && step !== 'members');
     recap.classList.toggle('launch-recap-error', !!reason && (step === 'team' || step === 'members')); // steps 1 and 2: one red line naming the first thing wrong (step 1: the field errors are under the fields)
-    recap.replaceChildren();
+    const line = document.createDocumentFragment(); // built apart: a polite live region that is rewritten with the same words is said again, so an unchanged line is left alone (#10693)
+    const put = hasButton => { const same = document.createElement('div'); same.append(line.cloneNode(true)); if (!hasButton && same.innerHTML === recap.innerHTML) return; recap.replaceChildren(line); };
     if (reason) {
-        recap.append(reason);
+        line.append(reason);
         const blocked = step === 'start' ? (document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)')?.textContent || '').trim().match(/^(claude|codex|agy|antigravity|gemini|pi)\b/i) : null; // a member's CLI blocks Launch team: the fix is one tap away, on this line (#10013)
         const setPath = blocked && cliPathButton(blocked[1].toLowerCase(), () => document.querySelectorAll('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot) button:not(.cli-set-path)').forEach(b => b.click()), () => !!document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)')); // when Settings closes: every blocked member's own Check again (a team has one warning per member), again while it is still blocked
-        if (setPath) recap.append(' ', setPath);
+        if (setPath) line.append(' ', setPath);
+        put(!!setPath);
         return;
     }
-    if (step === 'team') return;
+    if (step === 'team') { put(false); return; }
     const name = (document.getElementById('team-board-name')?.value || '').trim(), dir = (document.getElementById('launch-team-dir')?.value || '').trim(), n = teamRows().length;
     const b = document.createElement('b'); b.textContent = name || 'unnamed';
-    recap.append(b, `: ${n} ${n === 1 ? 'member' : 'members'}`);
-    if (dir) { recap.append(', '); const d = document.createElement('b'); d.textContent = dir; recap.append(d); }
+    line.append(b, `: ${n} ${n === 1 ? 'member' : 'members'}`);
+    if (dir) { line.append(', '); const d = document.createElement('b'); d.textContent = dir; line.append(d); }
+    put(false);
 }
 document.addEventListener('team-step-shown', _syncTeamGate);
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest?.('#launch-step-team')) _syncTeamGate(); }); // a CLI check that answers while step 3 shows
