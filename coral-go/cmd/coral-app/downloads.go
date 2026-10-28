@@ -19,11 +19,22 @@ const downloadInterceptScript = `(function () {
 		try { var u = new URL(a.href, location.href); return u.protocol === 'blob:' || u.origin === location.origin; } catch (e) { return false; }
 	}
 	function isDownload(a) { return !!a && a.tagName === 'A' && a.hasAttribute('download') && !!a.href && readable(a) && typeof window._coralSaveFile === 'function'; }
-	function nameOf(a) {
+	// The file's name: the link's own download="name", else the server's Content-Disposition (an artifact's Download has an empty download attribute and its address ends in a hash, #9894), else the address's last part.
+	function dispositionName(h) {
+		if (!h) return '';
+		var m = /filename\*\s*=\s*utf-8''([^;]+)/i.exec(h);
+		if (m) { try { return decodeURIComponent(m[1].trim()); } catch (e) {} }
+		m = /filename\s*=\s*"((?:[^"\\]|\\.)*)"/i.exec(h) || /filename\s*=\s*([^;]+)/i.exec(h);
+		return m ? m[1].trim().replace(/\\(.)/g, '$1') : '';
+	}
+	function nameOf(a, header) {
 		var n = a.getAttribute('download');
+		if (n) return n;
+		n = dispositionName(header);
 		if (n) return n;
 		try { return decodeURIComponent(new URL(a.href, location.href).pathname.split('/').pop()) || 'download'; } catch (e) { return 'download'; }
 	}
+	var MAX_BYTES = 100 * 1024 * 1024; // the native refuses more; the page does not read it into memory first
 	function base64Of(blob) {
 		return new Promise(function (resolve, reject) {
 			var r = new FileReader();
@@ -34,9 +45,14 @@ const downloadInterceptScript = `(function () {
 	}
 	function tell(detail) { window.dispatchEvent(new CustomEvent('coral:native-download', { detail: detail })); }
 	function save(a) {
-		var url = a.href, name = nameOf(a);
+		var url = a.href, name = nameOf(a, '');
 		var made = blobs[url]; // taken now: the page revokes the address right after its click
-		(made ? Promise.resolve(made) : fetch(url, { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('Download failed (' + r.status + ')'); return r.blob(); }))
+		(made ? Promise.resolve(made) : fetch(url, { credentials: 'same-origin', cache: 'no-store' }).then(function (r) {
+			if (!r.ok) throw new Error('Download failed (' + r.status + ')');
+			name = nameOf(a, r.headers && r.headers.get ? r.headers.get('Content-Disposition') : '');
+			return r.blob();
+		}))
+			.then(function (blob) { if (blob.size > MAX_BYTES) throw new Error('that file is too large to save from the app'); return blob; })
 			.then(base64Of)
 			.then(function (b64) { return window._coralSaveFile(name, b64); })
 			.then(function (path) { tell({ name: name, path: String(path || '') }); })
