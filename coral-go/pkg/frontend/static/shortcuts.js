@@ -12,6 +12,9 @@ export const SHORTCUTS = [
 ];
 
 const typing = t => !!t && t instanceof Element && !!t.closest('input, textarea, select, [contenteditable="true"], .xterm, [role="dialog"], .modal');
+// The chat's message box is the one field Alt+N works in (#10253: a person typing a message could not reach New agent from the keyboard) where Alt+N types nothing: not on a Mac, where Option+N is the tilde dead key
+const onMac = () => /Mac|iPhone|iPad/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
+const inMessageBox = t => t instanceof Element && t.id === 'command-input';
 const dialogOpen = () => [...document.querySelectorAll('.modal-overlay, [role="dialog"]')].some(d => d.getClientRects().length > 0 && getComputedStyle(d).display !== 'none');
 
 export async function showShortcuts() {
@@ -29,8 +32,8 @@ export function newAgentShortcut() {
 export function wireShortcuts() {
     document.addEventListener('keydown', e => {
         if (e.defaultPrevented || e.isComposing) return;
-        if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'KeyN') { // from the page and the sidebar only: Option+N is the tilde dead key on a Mac, and a terminal has its own meta-n
-            if (typing(e.target) || dialogOpen()) return;
+        if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'KeyN') { // from the page, the sidebar and the chat's message box (not on a Mac): Option+N is the tilde dead key there, and a terminal has its own meta-n
+            if (dialogOpen() || (typing(e.target) && !(inMessageBox(e.target) && !onMac()))) return;
             e.preventDefault(); newAgentShortcut(); return;
         }
         if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target) && !dialogOpen()) { e.preventDefault(); showShortcuts(); }

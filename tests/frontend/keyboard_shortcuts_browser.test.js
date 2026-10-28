@@ -34,6 +34,17 @@ const BASE = require('./test_base').BASE;
         await ev(`(() => { const x = document.createElement('div'); x.className = 'xterm'; x.id = 'qa-xterm'; const t = document.createElement('textarea'); x.append(t); document.body.append(x); t.focus(); return document.activeElement === t; })()`); await altN();
         assert.equal(await newAgentOpen(), false, 'Alt+N in a terminal does not open New agent');
         await ev(`document.getElementById('qa-xterm').remove(); true`);
+        // #10253 (the desktop tester: a person typing a message cannot reach New agent from the keyboard): the chat's message box is the one field Alt+N works in, where Alt+N is not a typing key (Windows, Linux); on a Mac Option+N is the tilde dead key, so there it is a tilde
+        const closeNewAgent = async () => { await ev(`(window.hideLaunchModal || (() => {}))(); true`); await settle(300); };
+        const platform = p => ev(`Object.defineProperty(navigator, 'platform', { configurable: true, get: () => ${JSON.stringify(p)} }); try { Object.defineProperty(navigator, 'userAgentData', { configurable: true, get: () => undefined }); } catch (e) {} true`); // the machine this runs on may be a Mac
+        await platform('Linux x86_64');
+        await ev(`(() => { const t = document.createElement('textarea'); t.id = 'command-input'; document.body.append(t); t.focus(); return document.activeElement === t; })()`); await altN();
+        await waitFor(`(() => { const d = document.getElementById('launch-step-agent'); return !!d && getComputedStyle(d).display !== 'none' && d.getClientRects().length > 0; })()`, 'Alt+N in the message box opens New agent (not a Mac)', { timeout: 6000 });
+        await closeNewAgent();
+        assert.equal(await newAgentOpen(), false, 'New agent is closed again');
+        await platform('MacIntel'); await ev(`document.getElementById('command-input').focus(); true`); await altN();
+        assert.equal(await newAgentOpen(), false, 'on a Mac Option+N in the message box stays a tilde: it does not open New agent');
+        await ev(`document.getElementById('command-input').remove(); delete navigator.platform; true`);
         // Alt+N opens New agent
         await ev(`document.activeElement && document.activeElement.blur(); true`);
         await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'n', code: 'KeyN', windowsVirtualKeyCode: 78, modifiers: 1 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'n', code: 'KeyN', windowsVirtualKeyCode: 78, modifiers: 1 });
