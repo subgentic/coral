@@ -20,7 +20,7 @@ const S = `(window.__coralStatic || '/static/')`;
                 const u = String(input && input.url ? input.url : input);
                 const json = o => Promise.resolve(new Response(JSON.stringify(o), { headers: { 'Content-Type': 'application/json' } }));
                 if (/\\/api\\/scheduled\\/jobs$/.test(u)) return json({ jobs: [job] });
-                if (/\\/api\\/scheduled\\/jobs\\/7\\/runs/.test(u)) { window.__runReads++; return json({ runs: window.__runs, total: window.__runs.length }); }
+                if (/\\/api\\/scheduled\\/jobs\\/7\\/runs/.test(u)) { window.__runReads++; if (window.__runsFail) return Promise.reject(new TypeError('Failed to fetch')); return json({ runs: window.__runs, total: window.__runs.length }); }
                 return real(input, init);
             };
             return true;
@@ -30,6 +30,16 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`window.__runs = [{ id: 11, status: 'failed', started_at: new Date().toISOString(), finished_at: new Date().toISOString() }]; true`);
         await waitFor(`/Failed/.test(document.getElementById('scheduler-detail')?.textContent || '') && !/Waiting to start/.test(document.getElementById('scheduler-detail')?.textContent || '')`, 'the page follows the run to Failed without being reopened', 9000);
         console.log('PASS the job page follows a run from Waiting to start to Failed');
+        // the watch survives a read that fails: the page keeps what it shows, reads again, and follows the run when the server answers (QA Reviewer 2)
+        await ev(`window.__runs = [{ id: 12, status: 'pending', started_at: new Date().toISOString() }]; Promise.resolve(window.__reopen = true); true`);
+        await ev(`import(${S} + 'scheduler.js').then(m => m.selectScheduledJob(7)).then(() => true)`);
+        await waitFor(`/Waiting to start/.test(document.getElementById('scheduler-detail')?.textContent || '')`, 'a pending run again', 8000);
+        await ev(`window.__runsFail = true; window.__failedReads = window.__runReads; true`);
+        await waitFor(`window.__runReads - window.__failedReads >= 2`, 'two reads while the server is down: it keeps reading', 12000);
+        assert.match(await ev(`document.getElementById('scheduler-detail').textContent`), /Waiting to start/, 'the page keeps the run it showed while the read fails');
+        await ev(`window.__runsFail = false; window.__runs = [{ id: 12, status: 'failed', started_at: new Date().toISOString(), finished_at: new Date().toISOString() }]; true`);
+        await waitFor(`/Failed/.test(document.getElementById('scheduler-detail')?.textContent || '') && !/Waiting to start/.test(document.getElementById('scheduler-detail')?.textContent || '')`, 'and follows the run once the server answers', 9000);
+        console.log('PASS the watch survives a failed read');
         // 2. the Repository path of a new Agent-prompt job: no home folder
         const repoAfterOpening = async setting => {
             await ev(`import(${S} + 'state.js').then(m => { m.state.settings = { ...(m.state.settings || {}), default_working_dir: ${JSON.stringify(setting)} }; return true; })`);

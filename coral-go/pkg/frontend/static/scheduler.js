@@ -63,7 +63,7 @@ async function fetchJobRuns(jobId) {
         return { runs: data.runs || [], total: data.total };
     } catch (e) {
         console.error('Failed to fetch runs:', e);
-        return { runs: [], total: 0 };
+        return { runs: [], total: 0, failed: true };
     }
 }
 
@@ -86,11 +86,12 @@ async function loadWorkflowsById() {
 }
 
 /** The job page's runs and its detail, read again and drawn (a run that was pending or running is read again every 3 s until it has ended, so the page does not keep saying "Waiting to start" for a run the sidebar already lists as Failed, #9958). */
-async function reloadJobDetail(job) {
+async function reloadJobDetail(job, { refresh = false } = {}) {
     const jobId = job.id;
     const [jobRuns, , workflowPage] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null,
         job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw new Error('Unable to load workflow runs'); return r.json(); }).then(data => ({ runs: data.runs || [], total: data.total })).catch(() => null) : null]);
     if (selectedJobId !== jobId) return;
+    if (refresh && jobRuns.failed) { watchJobRuns(job, [{ status: 'pending' }]); return; } // a read that failed while watching: keep what is drawn and read again (an empty answer would have been drawn as no runs and ended the watch)
     renderJobDetail(job, jobRuns.runs, workflowPage && workflowPage.runs, jobRuns.total, workflowPage && workflowPage.total);
     watchJobRuns(job, jobRuns.runs);
 }
@@ -99,8 +100,11 @@ function watchJobRuns(job, runs) {
     clearTimeout(_runsWatch); _runsWatch = null;
     if (!(runs || []).some(r => r.status === 'pending' || r.status === 'running')) return;
     _runsWatch = setTimeout(() => {
+        if (selectedJobId !== job.id) return; // another job, or none: the watch ends
         const shown = document.getElementById('scheduler-view');
-        if (selectedJobId === job.id && shown && shown.getClientRects().length > 0) reloadJobDetail(job).catch(() => {});
+        // Hidden (another tab is on screen): read nothing, but keep watching, so coming back to this job shows where its run got to (#9965, QA Reviewer 2).
+        if (!shown || shown.getClientRects().length === 0) { watchJobRuns(job, runs); return; }
+        reloadJobDetail(job, { refresh: true }).catch(() => watchJobRuns(job, runs));
     }, 3000);
 }
 
