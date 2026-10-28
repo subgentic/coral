@@ -9,6 +9,7 @@ import { serverFetch, isCloud, nativeInbox } from './server_base.js';
  *   loadChatCounts(redraw)      the counts, read again (after a flag, on the Inbox's own refresh)
  * Text of a chat (its title, the agent's name, a tag) is written by an agent or a person: it is only ever textContent. */
 import { importOnce } from './import_once.js';
+import { state } from './state.js';
 const DT = await importOnce('./data_table.js');
 const IR = await importOnce('./inbox_read.js'); // which chats and boards the person has opened since they changed (#9687)
 const readKey = s => `${s.server}:${s.session_id}`, readKind = s => (isGroup(s) ? 'board' : 'chat');
@@ -203,6 +204,8 @@ export async function setChatFlag(sessionId, flag, value, server = null) {
         const r = await read(`/api/sessions/history/${encodeURIComponent(sessionId)}/flags`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [flag]: value }) });
         if (!r || !r.ok) throw new Error('not saved');
     } catch { (await importOnce('./utils.js')).showToast?.('The chat could not be changed', true); return false; }
+    const cached = (state.historySessionsList || []).find(x => x.session_id === sessionId && (!server || (x.server || 'local') === server));
+    if (cached) cached[flag] = value; // the chat's own page reads its star from this list: one star state everywhere (#10391)
     for (const L of lists.values()) { // an unread chat starred or archived moves between the folders' numbers: in memory, no request (#9703)
         const row = L.rows.find(r => r.session_id === sessionId && (!server || r.server === server));
         if (row) { if (IR.isUnread(readKind(row), readKey(row), stampOf(row)) && (flag === 'starred' || flag === 'archived')) bump([`chats-${flag}`], value ? 1 : -1); break; }

@@ -424,7 +424,8 @@ export async function toggleChatFlag(flag) {
     const entry = state.historySessionsList.find(x => x.session_id === cur.name && sessionServer(x) === sessionServer(cur));
     if (!entry) return;
     const m = await importOnce('./mailbox_chats.js');
-    if (await m.setChatFlag(cur.name, flag, !entry[flag], sessionServer(cur))) { entry[flag] = !entry[flag]; drawChatFlags(entry); }
+    const next = !entry[flag]; // setChatFlag sets the cached entry itself (one star state everywhere, #10391): the value is read before it
+    if (await m.setChatFlag(cur.name, flag, next, sessionServer(cur))) { entry[flag] = next; drawChatFlags(entry); }
 }
 
 export async function selectHistorySession(sessionId, locator = null, entry = null) {
