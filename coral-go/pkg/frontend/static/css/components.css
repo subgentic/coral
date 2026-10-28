@@ -3482,7 +3482,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .settings-tab[hidden] { display: none; }
 .settings-tab .material-icons { font-size: var(--icon-size); flex: none; }
-.menu-item-state { display: block; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-muted); }
+.menu-item-state { display: block; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-primary); } /* muted was 4.1:1 and secondary 4.4:1 on the hovered row (4.5 needed): the team start menu's state words */
 .team-start-lead { margin: 0 0 10px; color: var(--text-secondary); }
 .settings-panes { flex: 1; min-width: 0; overflow: auto; padding: 1.1rem 1.6rem 1.5rem; container: settingspane / inline-size; }
 .settings-pane[hidden] { display: none; }
