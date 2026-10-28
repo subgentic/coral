@@ -11,7 +11,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 
 /** The pills of a tab as one group of buttons, and the same choice as a compact select (shown instead of the group when the line is narrow). */
 function pillElements(p) {
-    const group = el('div', 'goals-chips goals-chips-row team-tb-pills'); group.setAttribute('role', 'group'); group.setAttribute('aria-label', p.label);
+    const group = el('div', `goals-chips goals-chips-row team-tb-pills${p.items.length > 5 ? ' team-tb-pills-many' : ''}`); // more than five pills (Tasks has seven, each with its count) need more room before they stand in for the select (team_page.css, #9861) group.setAttribute('role', 'group'); group.setAttribute('aria-label', p.label);
     const select = el('select', 'field list-bar-select team-tb-select'); select.setAttribute('aria-label', p.label);
     for (const it of p.items) {
         const text = `${it.label} ${it.count}`;
