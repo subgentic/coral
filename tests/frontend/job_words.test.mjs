@@ -52,5 +52,5 @@ console.log('PASS job_words');
 
 // When a scheduled job runs (#10515): the scheduler runs jobs only while Coral is running, and catches a slot missed while it was off up once at start (internal/background/scheduler.go lookbackStart).
 assert.match(w.RUNS_WHILE_OPEN, /^only while Coral is running on this computer\./);
-assert.match(w.RUNS_WHILE_OPEN, /missed while Coral was off happens once when it starts again/);
+assert.match(w.RUNS_WHILE_OPEN, /missed while Coral was off happens once when it starts again, if it was due in the last day\.$/);
 console.log('job_words: when it runs ok');

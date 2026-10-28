@@ -128,7 +128,7 @@ export function reasonWords(run) {
 }
 
 /** When a scheduled job can run, true to the scheduler (internal/background/scheduler.go): only while Coral is running, and a slot missed while it was off (since the job's last run, at most a day, never before it was last edited or resumed) is caught up once when it starts. */
-export const RUNS_WHILE_OPEN = 'only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again.'; // after "Runs": the form says it whole, the job's page as the Runs row
+export const RUNS_WHILE_OPEN = 'only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again, if it was due in the last day.'; // after "Runs": the form says it whole, the job's page as the Runs row
 
 /** What a run's exit_reason says that its status does not (#6907): a run whose agent ended while Coral was stopped is "completed" without Coral having seen its result, and one interrupted by a restart never
  *  launched its agent. The sentence for the status cell's hover and the row's details; '' for any other reason. */

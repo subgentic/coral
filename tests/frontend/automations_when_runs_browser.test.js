@@ -28,13 +28,13 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#group-table-view tbody tr .dt-primary').click(); true`);
         await waitFor(`!!document.querySelector('#scheduler-detail .sched-facts')`, 'the job page', 8000);
         const row = await ev(`(() => { const dt = [...document.querySelectorAll('#scheduler-detail .sched-facts dt')].find(d => d.textContent.trim() === 'Runs'); return dt ? dt.nextElementSibling.textContent.trim() : null; })()`);
-        assert.equal(row, 'Only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again.', 'the job page says when it runs');
+        assert.equal(row, 'Only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again, if it was due in the last day.', 'the job page says when it runs');
         // the New job form
         await ev(`document.querySelector('#scheduler-detail .back-link, #scheduler-detail .sched-back')?.click(); true`);
         await ev(`(window.openJobForm || window.showJobModal || (() => {}))(); true`);
         await ev(`document.querySelector('[data-on-click="job-new"]')?.click(); true`);
         await waitFor(`!!document.querySelector('.sched-when-note')`, 'the form\'s note', 8000);
-        assert.equal(await ev(`document.querySelector('.sched-when-note').textContent.trim()`), 'Runs only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again.', 'the form says when it runs');
+        assert.equal(await ev(`document.querySelector('.sched-when-note').textContent.trim()`), 'Runs only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again, if it was due in the last day.', 'the form says when it runs');
         // the first choice (#10515 point 3): what the job does, in a verb
         assert.deepEqual(await ev(`[...document.querySelectorAll('.job-type-btn')].map(b => b.lastChild.textContent.trim())`), ['Run a prompt', 'Run a workflow'], 'the choice reads Run a prompt / Run a workflow');
         console.log('PASS automations_when_runs');
