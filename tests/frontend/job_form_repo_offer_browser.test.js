@@ -45,6 +45,7 @@ const BASE = require('./test_base').BASE;
         const asked = await ev(`document.getElementById('confirm-modal-message').textContent`);
         assert.match(asked, /git init in \/work\/plain/, 'the dialog names the folder: ' + asked);
         assert.match(asked, /one empty first commit/, 'and what Coral will do');
+        assert.match(asked, /Then the job is created\./, 'and that the job is created after it (#10783)');
         await ev(`window.__refusal = ''; document.getElementById('confirm-modal-yes').click(); true`); // the server will take the folder now
         await waitFor(`window.__inits.length === 1`, 'the folder is made a repository', 5000);
         assert.deepEqual(await ev(`window.__inits[0]`), { repo_path: '/work/plain' });
