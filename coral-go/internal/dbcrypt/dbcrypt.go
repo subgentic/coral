@@ -113,7 +113,7 @@ func writeMigrationState(path, phase string, paths []string) error {
 // so an isolated subprocess test can terminate at a swap boundary. Only a test binary reads
 // the variable: a shipped Coral never aborts its migration because of it (#3825 G).
 func migrationFaultInjection(phase string) {
-	if testguard.InTest() && os.Getenv("CORAL_DBCRYPT_TEST_EXIT_PHASE") == phase {
+	if testguard.InTestRun() && os.Getenv("CORAL_DBCRYPT_TEST_EXIT_PHASE") == phase {
 		os.Exit(91)
 	}
 }
