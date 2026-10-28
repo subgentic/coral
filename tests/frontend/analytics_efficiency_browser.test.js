@@ -38,7 +38,7 @@ const TT = { metric: 'task_time', range: '24h', min_sample: 10, total: { n: 260 
                 await open('per-commit');
                 await waitFor(`!!document.querySelector('#cost-spend-section .eff-switch')`, 'the switch', 8000);
                 const s = await ev(`(() => { const sec = document.getElementById('cost-spend-section'); const btns = [...sec.querySelectorAll('.eff-seg-btn')]; return { labels: btns.map(b => b.textContent), on: (btns.find(b => b.getAttribute('aria-pressed') === 'true') || {}).textContent, seg: getComputedStyle(sec.querySelector('.eff-seg')).display, pick: getComputedStyle(sec.querySelector('.eff-pick')).display }; })()`);
-                assert.deepEqual(s.labels, ['All', 'Provider', 'Model', 'Thinking level', 'Team', 'Agent', 'Branch', 'Task']); assert.equal(s.on, 'Model'); // the metric starts grouped by Model (#9236)
+                assert.deepEqual(s.labels, ['All', 'Provider', 'Model', 'Thinking level', 'Team', 'Agent', 'Branch', 'Task']); assert.equal(s.on, 'All'); // each page starts on All (#10482; it began on Model, #9236): the grouping is a choice made on that page
                 assert.equal(mobile ? s.seg : s.pick, 'none', mobile ? 'a phone has the select, not the buttons' : 'a desktop has the buttons, not the select'); assert.notEqual(mobile ? s.pick : s.seg, 'none');
             });
             await run(`${label}: grouped by Model: the cards, the bars with the average line, the table, few tagged and hatched`, async () => {
