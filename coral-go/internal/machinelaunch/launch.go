@@ -2,10 +2,13 @@ package machinelaunch
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"time"
 )
 
@@ -43,6 +46,9 @@ var ErrDeclined = errors.New("not confirmed: nothing was created")
 var nameShape = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,62})$`)
 
 const defaultWait = 5 * time.Minute
+
+// placeholderCredential stands in for the credential while the user-data is only being checked.
+const placeholderCredential = "chb_placeholder-not-a-credential"
 
 // Launch makes one machine (the joint note's slice 2): it checks the provider token, shows what it will cost and asks, mints a one-time credential labelled with the machine's name, creates the instance
 // with that credential in its user-data, waits for the INSTANCE (the Hub's side is not read: the key cannot list anything and the machine lands pending until the person keeps it), and tells the person
@@ -93,6 +99,14 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		fmt.Fprintln(d.Out, summary)
 	}
 
+	// The user-data is tried with a placeholder first: a builder that fails must not have burned a credential.
+	if _, err := d.UserData(placeholderCredential); err != nil {
+		return nil, err
+	}
+	launchTag, err := newLaunchTag()
+	if err != nil {
+		return nil, err
+	}
 	credential, err := d.Hub.Mint(ctx, o.Name) // minted only now: it lives five minutes from here
 	if err != nil {
 		return nil, err
@@ -101,10 +115,11 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	inst, err := p.Create(ctx, Spec{Name: o.Name, Region: o.Region, Size: o.Size, Image: o.Image, Tags: []string{Tag}, UserData: userData, SSHKeys: o.SSHKeys})
+	inst, err := p.Create(ctx, Spec{Name: o.Name, Region: o.Region, Size: o.Size, Image: o.Image, Tags: []string{Tag, launchTag}, UserData: userData, SSHKeys: o.SSHKeys})
 	userData, credential = "", "" // not kept past the call
 	if err != nil {
-		return nil, fmt.Errorf("could not create the machine: %w", err)
+		// A create that failed on the way (transport error, timeout, Ctrl-C) may still have made the machine: one with this launch's tag and name is deleted.
+		return nil, fmt.Errorf("could not create the machine: %w%s", err, cleanupAfterFailedCreate(p, launchTag, d.Out))
 	}
 	fmt.Fprintf(d.Out, "Created %s (%s); waiting for it to run ...\n", inst.Name, inst.ID)
 
@@ -134,4 +149,35 @@ func cleanup(p Provider, id string, out io.Writer) string {
 		fmt.Fprintf(out, "Could not delete machine %s: delete it yourself at %s, it costs money while it exists.\n", id, p.Name())
 		return fmt.Sprintf("; it could NOT be deleted (id %s): delete it yourself at %s", id, p.Name())
 	}
+}
+
+// newLaunchTag is the tag only this launch's instance carries ("coral-launch-" and 12 hex digits): what a clean-up after a failed Create finds it by, never its name.
+func newLaunchTag() (string, error) {
+	var b [6]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", fmt.Errorf("could not make a launch tag: %w", err)
+	}
+	return "coral-launch-" + hex.EncodeToString(b[:]), nil
+}
+
+// cleanupAfterFailedCreate deletes an instance a failed Create may have made: only one that carries this launch's own tag (and the tool's), by its id, never one matched by name. A provider that cannot list says nothing.
+func cleanupAfterFailedCreate(p Provider, launchTag string, out io.Writer) string {
+	l, ok := p.(Lister)
+	if !ok {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	all, err := l.List(ctx)
+	if err != nil {
+		fmt.Fprintf(out, "Could not check whether %s made a machine for this launch: look for one tagged %s at %s, it costs money while it exists.\n", p.Name(), launchTag, p.Name())
+		return fmt.Sprintf("; could not check whether a machine was made: look for tag %s at %s", launchTag, p.Name())
+	}
+	note := ""
+	for _, in := range all {
+		if slices.Contains(in.Tags, launchTag) && slices.Contains(in.Tags, Tag) {
+			note += cleanup(p, in.ID, out)
+		}
+	}
+	return note
 }

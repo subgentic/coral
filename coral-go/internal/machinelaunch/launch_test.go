@@ -23,6 +23,8 @@ type stubProvider struct {
 	deleteErr  error
 	waitBlocks bool
 	spec       Spec
+	listed     []Instance
+	listErr    error
 }
 
 func (s *stubProvider) Name() string { return "stubcloud" }
@@ -94,7 +96,7 @@ func TestLaunchHappyPathOrderLabelAndOutput(t *testing.T) {
 	if len(h.labels) != 1 || h.labels[0] != "coral-1" {
 		t.Fatalf("the credential's label is the machine's name: %v", h.labels)
 	}
-	if len(p.spec.Tags) != 1 || p.spec.Tags[0] != Tag || !strings.Contains(p.spec.UserData, launchTestCredential) {
+	if len(p.spec.Tags) != 2 || p.spec.Tags[0] != Tag || !strings.Contains(p.spec.UserData, launchTestCredential) {
 		t.Fatalf("spec: %+v", p.spec)
 	}
 	for _, secret := range []string{launchTestToken, launchTestCredential} {
@@ -199,5 +201,94 @@ func TestLaunchEarlyFailuresCreateNothing(t *testing.T) {
 	o, d, _ := setup(p, &stubHub{})
 	if _, err := Launch(context.Background(), o, d); err == nil || strings.Contains(strings.Join(p.calls, ","), "delete") {
 		t.Errorf("a failed create has nothing to delete: %v %v", err, p.calls)
+	}
+}
+
+// listingProvider is a stub that can also list, as the DigitalOcean provider does.
+type listingProvider struct{ *stubProvider }
+
+func (l listingProvider) List(context.Context) ([]Instance, error) {
+	l.calls = append(l.calls, "list")
+	return l.listed, l.listErr
+}
+
+func TestLaunchUserDataFailureNeverMintsACredential(t *testing.T) {
+	p, h := &stubProvider{}, &stubHub{}
+	o, d, _ := setup(p, h)
+	d.UserData = func(string) (string, error) { return "", errors.New("no builder yet") }
+	if _, err := Launch(context.Background(), o, d); err == nil || len(h.labels) != 0 || strings.Contains(strings.Join(p.calls, ","), "create") {
+		t.Fatalf("err %v, mints %v, calls %v", err, h.labels, p.calls)
+	}
+}
+
+func TestLaunchUserDataIsCheckedWithAPlaceholderThenBuiltWithTheCredential(t *testing.T) {
+	p, h := &stubProvider{}, &stubHub{}
+	o, d, _ := setup(p, h)
+	var seen []string
+	d.UserData = func(c string) (string, error) { seen = append(seen, c); return "#cloud-config " + c, nil }
+	if _, err := Launch(context.Background(), o, d); err != nil || len(seen) != 2 || seen[0] != placeholderCredential || seen[1] != launchTestCredential {
+		t.Fatalf("%v %v", err, seen)
+	}
+	if strings.Contains(p.spec.UserData, placeholderCredential) {
+		t.Fatalf("the placeholder reached the instance: %s", p.spec.UserData)
+	}
+}
+
+func TestLaunchFailedCreateDeletesOnlyTheInstanceCarryingThisLaunchsTag(t *testing.T) {
+	base := &stubProvider{createErr: errors.New("connection reset")}
+	p := listingProvider{base}
+	base.listed = nil // filled once the launch's tag is known: the stub's Create saw the spec
+	h := &stubHub{}
+	o, d, out := setup(base, h)
+	d.Provider = &tagEchoProvider{listingProvider: p}
+	_, err := Launch(context.Background(), o, d)
+	got := strings.Join(base.calls, ",")
+	if err == nil || !strings.Contains(got, "delete:mine") || strings.Contains(got, "delete:same-name") || strings.Contains(got, "delete:other-launch") {
+		t.Fatalf("err %v, calls %s", err, got)
+	}
+	if !strings.Contains(err.Error(), "deleted") || !strings.Contains(out.String(), "was deleted") {
+		t.Fatalf("the person is told: %v %s", err, out.String())
+	}
+}
+
+// tagEchoProvider lists, after a failed Create, a machine with this launch's tag, one with the same name but not the tag, and one from another launch.
+type tagEchoProvider struct{ listingProvider }
+
+func (t *tagEchoProvider) List(context.Context) ([]Instance, error) {
+	t.stubProvider.calls = append(t.stubProvider.calls, "list")
+	tag := t.stubProvider.spec.Tags[1]
+	return []Instance{
+		{ID: "mine", Name: "coral-1", Tags: []string{Tag, tag}},
+		{ID: "same-name", Name: "coral-1", Tags: []string{Tag}},
+		{ID: "other-launch", Name: "x", Tags: []string{Tag, "coral-launch-aaaaaaaaaaaa"}},
+	}, nil
+}
+
+func TestLaunchFailedCreateWithAListFailureSaysWhereToLook(t *testing.T) {
+	base := &stubProvider{createErr: errors.New("timeout")}
+	base.listErr = errors.New("down")
+	o, d, out := setup(base, &stubHub{})
+	d.Provider = listingProvider{base}
+	_, err := Launch(context.Background(), o, d)
+	if err == nil || !strings.Contains(err.Error(), "tag coral-launch-") || !strings.Contains(out.String(), "costs money") {
+		t.Fatalf("%v %s", err, out.String())
+	}
+	if strings.Contains(strings.Join(base.calls, ","), "delete") {
+		t.Fatalf("nothing is deleted without a list: %v", base.calls)
+	}
+}
+
+func TestLaunchEveryInstanceCarriesAUniqueLaunchTag(t *testing.T) {
+	tags := map[string]bool{}
+	for i := 0; i < 5; i++ {
+		p := &stubProvider{}
+		o, d, _ := setup(p, &stubHub{})
+		if _, err := Launch(context.Background(), o, d); err != nil || len(p.spec.Tags) != 2 || p.spec.Tags[0] != Tag || !strings.HasPrefix(p.spec.Tags[1], "coral-launch-") {
+			t.Fatalf("%v %v", err, p.spec.Tags)
+		}
+		tags[p.spec.Tags[1]] = true
+	}
+	if len(tags) != 5 {
+		t.Fatalf("tags repeat: %v", tags)
 	}
 }
