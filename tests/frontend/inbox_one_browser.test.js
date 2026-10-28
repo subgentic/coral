@@ -158,7 +158,7 @@ const AGENTS = (waiting) => waiting ? [
             // a row reads who said what: the sender 14/600, the message after it in the secondary colour; Done is drawn on the row's hover or keyboard focus only (a desktop here has a pointer)
             await mouseTo(2, 2);
             const look = await ev(`(() => { const who = document.querySelector('#group-table-view .dt-saved-who'), text = document.querySelector('#group-table-view .dt-saved-text'), btn = document.querySelector('#group-table-view tbody .dt-hover-action'); const cs = e => getComputedStyle(e); return { who: [cs(who).fontSize, cs(who).fontWeight, who.textContent], textColor: cs(text).color !== cs(who).color, textWeight: cs(text).fontWeight, rest: cs(btn).opacity }; })()`);
-            assert.deepEqual([look.who, look.textColor, look.textWeight, look.rest], [['14px', '600', 'Agent One'], true, '400', '0'], at + 'sender 14/600, the message secondary, Done hidden at rest ' + JSON.stringify(look));
+            assert.deepEqual([look.who, look.textColor, look.textWeight, look.rest], [['13px', '500', 'Agent One'], true, '400', '0'], at + 'sender 13/500 (a name), the message secondary, Done hidden at rest ' + JSON.stringify(look));
             await ev(`document.querySelector('#group-table-view tbody .dt-hover-action').focus(); true`);
             await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'Done shows when the keyboard is on it', 3000); // the button's own transition settles
             await ev(`document.activeElement.blur(); true`);
