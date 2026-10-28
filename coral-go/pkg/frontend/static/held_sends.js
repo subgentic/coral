@@ -130,7 +130,7 @@ export function syncQueuedFromRow(row) {
 function sessionOf(sid) { return (state.liveSessions || []).find(s => s && s.session_id === sid) || (state.currentSession && state.currentSession.session_id === sid ? state.currentSession : null); }
 
 /** Ask the server to drop one held message (DELETE .../held/{held id}). Its refusal comes by the composer's frame id: that one is the person's own doing, not an error. */
-async function cancelQueued(sid, heldId) {
+async function cancelQueued(sid, heldId, quiet = false) {
     const s = sessionOf(sid);
     if (!s) return;
     const e = queued.get(sid) && queued.get(sid).get(heldId);
@@ -143,10 +143,23 @@ async function cancelQueued(sid, heldId) {
         const text = e ? e.text : '';
         if (e && e.composerId !== undefined) noteDone(sid, e.composerId); else { const m = queued.get(sid); if (m) { m.delete(heldId); if (!m.size) queued.delete(sid); } paint(); }
         setTimeout(() => cancelling.delete(own), 10000); // the refusal that follows is read as the person's own; the mark is not kept
+        if (quiet) return r.ok ? text : null; // Stop gives all the texts back together, and says it itself
         if (r.ok) { giveBack(sid, text); say('Cancelled. The message is back in the box.'); } // its text comes back
         else say('It was sent already, so it could not be cancelled.'); // a 404 says it is gone already (typed or refused): nothing comes back
     } catch (err) { cancelling.delete(own); showToast('Could not cancel the queued message. Check the connection.', true); }
 }
+
+/** Stop (#10673): this device's held messages are dropped before the agent's question is dismissed (or they would be typed to an agent that was told to stop), and their texts go back into the box together. Returns how many came back. */
+export async function cancelHeldForStop(sid) {
+    const mine = queued.get(sid) ? [...queued.get(sid).values()].filter(i => i.mine && !i.sending) : [];
+    const texts = [];
+    for (const i of mine) { const text = await cancelQueued(sid, i.id, true); if (text) texts.push(text); }
+    if (texts.length) giveBack(sid, texts.join('\n'));
+    return texts.length;
+}
+
+/** Whether this device holds messages for the agent that Stop would drop. */
+export function hasHeldForStop(sid) { return !!queued.get(sid) && [...queued.get(sid).values()].some(i => i.mine && !i.sending); }
 
 /** A cancelled message's text goes back into the composer's box when the box is empty (otherwise it stays in the person's draft store, as a refused send's does). */
 function giveBack(sid, text) {
