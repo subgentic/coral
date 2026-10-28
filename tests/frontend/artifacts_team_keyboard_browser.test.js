@@ -49,7 +49,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         assert.ok(controls.every(c => c.shown && c.tab >= 0 && c.name), 'every control is shown, focusable and named: ' + JSON.stringify(controls.filter(c => !(c.shown && c.tab >= 0 && c.name))));
         const bar = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view .list-bar-search, #agentic-panel-artifacts-view .list-bar-toggle, #agentic-panel-artifacts-view .list-bar-more-btn')].map(e => e.getAttribute('aria-label') || e.placeholder)`);
         assert.deepEqual(bar, ['More artifact actions'], 'an agent with no team has the More icon in its header and no Refresh (its list has no search or filters)');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('${ROW}')].map(r => r.querySelectorAll('button').length - r.querySelectorAll('[data-task-link], [data-goal-link]').length)`), [2, 2, 2], 'a row is two buttons, its name and its Details link, and a third when the file has a task: its Task link (#8617)');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('${ROW}')].map(r => r.querySelectorAll('button').length - r.querySelectorAll('[data-task-link], [data-goal-link]').length)`), [3, 3, 3], 'a row is three buttons, its name, its star and its Details link, and a fourth when the file has a task: its Task link (#8617, the star #9834)');
 
         console.log('2. A row\'s Details link opens the sheet by Enter; Escape closes it with the focus back on the link');
         await ev(`document.querySelector('${ROW} .artifact-details').focus(); true`);

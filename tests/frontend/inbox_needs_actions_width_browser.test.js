@@ -1,5 +1,5 @@
 // Needs you's review rows keep all their actions whole whatever width was saved for the Actions column (#9845, QA Engineer's gap 1): the real wiring, the Inbox's Needs you table with a read review artifact (Open, Mark unread, Mark reviewed)
-// and a narrow width kept in this browser for the review column. The column is fixed (inbox_sidebar.js: fixed: true), so the kept width is ignored: it is its 19 rem and every button is inside its cell and inside the table. 1280 px, the team through the real board API,
+// and a narrow width kept in this browser for the review column. The column is fixed (inbox_sidebar.js: fixed: true), so the kept width is ignored: it is its 21 rem (a read row's three buttons and its star) and every button is inside its cell and inside the table. 1280 px, the team through the real board API,
 // the artifact list stubbed as the server answers. Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -33,8 +33,8 @@ const BASE = require('./test_base').BASE;
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw
         const m = await ev(`(() => { const r = ${row('Review file 02.txt')}, td = r.querySelector('td[data-key="review"]'), th = document.querySelector('#group-table-view th[data-key="review"]'), box = document.querySelector('#group-table-view .dt-box').getBoundingClientRect(), bs = [...td.querySelectorAll('.inbox-review-actions button')].map(b => ({ label: b.getAttribute('aria-label'), r: Math.round(b.getBoundingClientRect().right), w: Math.round(b.getBoundingClientRect().width) }));
             return { buttons: bs.map(b => b.label), lastRight: Math.max(...bs.map(b => b.r)), tdRight: Math.round(td.getBoundingClientRect().right), boxRight: Math.round(box.right), thW: Math.round(th.getBoundingClientRect().width), handle: !!th.querySelector('.dt-resize'), clipped: td.scrollWidth > td.clientWidth + 1, kept: localStorage.getItem('coral-dt-widths:Needs you') }; })()`);
-        assert.deepEqual(m.buttons, ['Open Review file 02.txt', 'Mark unread: Review file 02.txt', 'Mark reviewed: Review file 02.txt'], 'a read review row has its three actions: ' + JSON.stringify(m));
-        assert.ok(Math.abs(m.thW - 304) <= 3 && !m.handle, 'the Actions column is its declared 19 rem (not the 150 px kept for it) and has no handle: ' + JSON.stringify(m));
+        assert.deepEqual(m.buttons, ['Star Review file 02.txt', 'Open Review file 02.txt', 'Mark unread: Review file 02.txt', 'Mark reviewed: Review file 02.txt'], 'a read review row has its star and its three actions (the star #9834): ' + JSON.stringify(m));
+        assert.ok(Math.abs(m.thW - 336) <= 3 && !m.handle, 'the Actions column is its declared 21 rem (19 and 2 for the star, #9834; not the 150 px kept for it) and has no handle: ' + JSON.stringify(m));
         assert.ok(m.lastRight <= m.tdRight + 1 && m.lastRight <= m.boxRight && !m.clipped, 'all three buttons are whole, inside the cell and inside the table: ' + JSON.stringify(m));
         console.log('PASS Needs you keeps a read review row\'s three actions whole whatever width was kept for them');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await ev(`localStorage.removeItem('coral-dt-widths:Needs you'); true`).catch(() => {}); await client.close(); }
