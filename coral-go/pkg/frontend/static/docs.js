@@ -181,7 +181,7 @@ function renderDocNav() {
     const stop = shown.some(d => d.name === selectedDoc) ? selectedDoc : (shown[0] || {}).name;
     const row = d => `<li class="session-list-item${escapeAttr(selectedDoc === d.name ? ' active' : '')}"><button type="button" class="row-btn" tabindex="${Number(d.name === stop ? 0 : -1)}"${selectedDoc === d.name ? ' aria-current="true"' : ''} data-on-click="doc-open" data-doc="${escapeAttr(d.name)}" data-on-keydown="doc-open-key">${esc(titleOf(d))}</button></li>`;
     list.innerHTML = groups.map(g => groupHeaderHtml('docs', g.key, g.label, g.docs.length) + (isGroupFolded('docs', g.key) ? '' : g.docs.map(row).join(''))).join('')
-        || (docsList.length ? `<li class="empty-state empty-state-tight">${docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches the search.'}</li>` : '');
+        || (docsList.length ? `<li class="empty-state empty-state-tight">${docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches. Try other words, or clear the search.'}</li>` : '');
     syncPaneGroupToggle('docs');
     refreshGroupTable('docs');
 }

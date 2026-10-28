@@ -21,7 +21,7 @@ const BASE = require('./test_base').BASE;
         await search('quickstart'); // a title word still matches at once
         await waitFor(`[...document.querySelectorAll('#docs-nav-list [data-doc]')].some(b => b.dataset.doc === 'quickstart')`, 'a title match', 5000);
         await search('zzqxnotaword');
-        await waitFor(`/No topic matches the search/.test(document.getElementById('docs-nav-list').textContent)`, 'a word that is nowhere says so', 15000);
+        await waitFor(`/No topic matches\. Try other words, or clear the search\./.test(document.getElementById('docs-nav-list').textContent)`, 'a word that is nowhere says so', 15000);
         console.log('PASS the Docs search finds a word in a topic\'s text');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

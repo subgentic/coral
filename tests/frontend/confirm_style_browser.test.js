@@ -10,7 +10,7 @@ const CASES = [ // key, title, message, options, class, the button's words
     ['danger-kill-run', 'Kill run', 'Stop run #12? Its steps stop where they are and the run cannot be resumed.', { label: 'Kill run', danger: true }, 'btn-danger', 'Kill run'],
     ['danger-paste', 'Paste 3 lines?', 'This terminal isn\u2019t in paste mode, so each line is sent as if typed and runs on its own.', { label: 'Paste and run', danger: true }, 'btn-danger', 'Paste and run'],
     ['primary-sleep-agent', 'Sleep agent', 'Put "Backend Dev" to sleep?', { danger: false, label: 'Sleep agent' }, 'btn-primary', 'Sleep agent'],
-    ['primary-archive', 'Archive agent', 'Archive "Backend Dev"? Archived agents are not woken with their team or by Wake All.', { danger: false, label: 'Archive' }, 'btn-primary', 'Archive'],
+    ['primary-archive', 'Archive agent', 'Archive "Backend Dev"? It stays out of the way until you unarchive it.', { danger: false, label: 'Archive' }, 'btn-primary', 'Archive'],
     ['primary-sleep-team', 'Sleep team', 'Put all agents on "coral-go-team" to sleep?', { danger: false, label: 'Sleep team' }, 'btn-primary', 'Sleep team'],
     ['primary-unnamed', 'Anything', 'A call that names no choice.', undefined, 'btn-primary', 'Confirm'], // census-guarded: no real caller leaves it out, and the fallback is not a Yes (#9413)
 ];

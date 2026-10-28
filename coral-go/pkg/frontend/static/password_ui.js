@@ -127,7 +127,7 @@ export function showSetPasswordModal({ local = false } = {}) {
     const confirm = passwordField({ id: 'set-password-confirm', label: 'Confirm password', autocomplete: 'new-password', name: 'confirm-password' });
     const err = el('p', 'pw-error'); err.id = 'set-password-error'; err.setAttribute('role', 'alert'); err.hidden = true;
     form.append(usernameStub(), pw.root, meter.root, confirm.root, err);
-    body.append(form, el('p', 'pw-note', 'There is no email: if you forget it, run coral reset-password on this computer.'));
+    body.append(form, el('p', 'pw-note', 'Forgot it? Run coral reset-password in a terminal on this computer.'));
     const foot = el('div', 'modal-actions modal-footer');
     const later = el('button', 'btn', 'Not now'); later.type = 'button'; later.id = 'set-password-later';
     const save = el('button', 'btn btn-primary', 'Set password'); save.type = 'submit'; save.setAttribute('form', 'set-password-form'); save.id = 'set-password-save';
