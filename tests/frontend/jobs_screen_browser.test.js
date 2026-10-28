@@ -103,10 +103,10 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.equal(await ev(vis('#scheduler-detail .sched-delete')), false, `${at}: Delete is not on the page until More opens`);
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`);
             assert.equal(await ev(vis('#scheduler-detail .sched-delete')), true);
-            // #9293: an enabled job's primary is Run now; Pause is one of More's items, and More lists Pause before Delete
+            // #9293: an enabled job's primary is Run now and Turn off is beside it in the main row (#10475); More holds Delete
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-actions > .btn-primary')?.textContent.trim()`), 'Run now', `${at}: Run now is the primary`);
-            assert.equal(await ev(`document.querySelectorAll('#scheduler-detail .sched-actions > [data-on-click="job-toggle"]').length`), 0, `${at}: no Pause on the bar`);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].map(b => b.textContent.trim())`), ['Turn off', 'Delete'], `${at}: More holds Turn off and Delete`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-actions > [data-on-click="job-toggle"]')].map(b => b.textContent.trim())`), ['Turn off'], `${at}: Turn off stays in the main row while the job is on (#10475)`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].map(b => b.textContent.trim())`), ['Delete'], `${at}: More holds only Delete`);
             assert.equal(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].every(b => { const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight; })`), true, `${at}: every item of More is on the screen (the menu opens above the pinned bar)`);
             await shot(`jobs-page-more-${w}`);
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`);
