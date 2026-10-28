@@ -1,5 +1,6 @@
 /* The sidebar kebab menus and the top bar settings menu (moved out of app.js, #5082; no behaviour change). */
 import { markBlockedControls } from './hub_blocked_controls.js';
+import { MENU_KEYS, menuMove } from './menu_keys.js';
 import { openRowMenu } from './session_rows.js';
 import { browserLocal } from './safe_storage.js';
 import { ensureBuilt, onBuilt } from './lazy_dom.js';
@@ -62,6 +63,8 @@ export function toggleTopBarSettings(event) {
     if (!menu) return;
     const isOpen = menu.style.display !== 'none';
     menu.style.display = isOpen ? 'none' : '';
+    for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem'); // the items are menu items to a screen reader (#10374)
+    document.querySelector('[aria-controls="top-bar-settings-menu"]')?.setAttribute('aria-expanded', String(!isOpen));
     if (!isOpen && event && event.detail === 0) [...menu.querySelectorAll('.overflow-menu-item')].find(i => i.getClientRects().length)?.focus({ preventScroll: true }); // opened from the keyboard (a click with no pointer), the focus goes into the menu (#6038)
     // Sync group-by-team checkmark
     const check = document.getElementById('group-by-team-check-top');
@@ -77,7 +80,21 @@ export function closeTopBarSettings({ restoreFocus = false } = {}) {
     if (!menu) return;
     const hadFocus = menu.contains(document.activeElement);
     menu.style.display = 'none';
+    document.querySelector('[aria-controls="top-bar-settings-menu"]')?.setAttribute('aria-expanded', 'false');
     if (restoreFocus && hadFocus) document.querySelector('[aria-controls="top-bar-settings-menu"]')?.focus({ preventScroll: true });
 }
 // Escape in the open Settings menu closes it and the focus goes back to its button (#6038): on the menu itself, so no listener is added to the document at startup.
-onBuilt('top-bar-settings-menu', menu => menu.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); closeTopBarSettings({ restoreFocus: true }); } }));
+onBuilt('top-bar-settings-menu', menu => menu.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); closeTopBarSettings({ restoreFocus: true }); return; }
+    if (!MENU_KEYS.has(e.key)) return; // the arrows, Home and End move among the items, as a menu's do (#10374)
+    const items = [...menu.querySelectorAll('.overflow-menu-item')].filter(i => i.getClientRects().length > 0);
+    const to = menuMove(e.key, items.length, items.indexOf(document.activeElement));
+    if (to >= 0) { e.preventDefault(); items[to]?.focus(); }
+}));
+// The menu closes when the keyboard leaves it (Tab past its last item, or Shift+Tab off its first): an open menu left behind on screen, still marked expanded, is not what a person tabbing on meant (#10374).
+document.addEventListener('focusin', e => {
+    const menu = document.getElementById('top-bar-settings-menu');
+    if (!menu || menu.style.display === 'none') return;
+    const wrap = menu.closest('.top-bar-settings-wrapper');
+    if (wrap && e.target instanceof Element && !wrap.contains(e.target)) closeTopBarSettings();
+});
