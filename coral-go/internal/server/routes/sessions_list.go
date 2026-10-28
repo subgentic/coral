@@ -100,6 +100,7 @@ func (h *SessionsHandler) orderLiveRows(ctx context.Context, rows []map[string]a
 		}
 		return id(rows[i]) < id(rows[j])
 	})
+	numberUnnamedDuplicates(rows, h.cfg.CoralRoot)
 }
 
 // addTeamHealth gives each row of a team its team's health check state, "team_health_on" (#4962): the on/off icon beside the team's
