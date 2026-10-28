@@ -23,6 +23,7 @@ import { h } from './cloud.js';
 import { formatLastSeen, updateNotice, RELEASES_URL, DOWNLOAD_URL, serverVersion, serverAgentCount, belowMinimumText } from './server_status.js';
 import { accessChanged } from './hub_access.js';
 import { state } from './state.js';
+import { note } from './nav.js';
 import { sessionServer } from './server_base.js';
 import { needsInputAttention } from './display_activity_hint.js';
 const { MODES, MODE_INFO, accessChoice, effectiveMode, launchNote, effectiveNote, invalidateServerAccess, serverAccess } = await importOnce('./server_access.js');
@@ -70,7 +71,8 @@ export const serverView = {
         loaded = true; loadError = ''; syncRelaunchReads(servers, render);
     },
     fail: error => { loadError = error; },
-    expand: id => { openPage(id); },
+    expand: id => { openPage(id, true); },
+    collapse: () => { if (openId !== null) closePage(true); },
     render,
 };
 
@@ -140,8 +142,8 @@ function sortValue(s, key) {
 
 
 /** A machine's page opens in place of the list; Back (or the machine going away) returns to the list with the keyboard on that machine's row. */
-function openPage(id) { openId = id; moreOpen = null; focusNext = 'page'; render(); }
-function closePage() { const was = openId; openId = null; renaming = null; confirming = null; moreOpen = null; focusNext = 'row'; backTo = was; render(); }
+function openPage(id, inAddress) { openId = id; moreOpen = null; focusNext = 'page'; if (!inAddress) note({ view: 'servers', id }); render(); } // a click puts the machine in the address; a deep link or Back already has it
+function closePage(inAddress) { const was = openId; if (!inAddress) note({ view: 'servers' }); openId = null; renaming = null; confirming = null; moreOpen = null; focusNext = 'row'; backTo = was; render(); }
 let backTo = null;
 
 /** The rename form (a name field, Save and Cancel), in the page's heading. */
@@ -154,8 +156,9 @@ function renameForm(s) {
 
 /** The name cell of a row: the row's one button, which opens the machine's page (no chevron: nothing expands in place), the health dot and the relaunch badge. */
 function nameCell(s, live, online) {
+    const un = updateNotice(live), warning = un && un.level === 'required' ? un.label : s.needs_relink === true ? 'owner not confirmed' : ''; // the button's name says the state once, and a warning (the #9683 rule: Open <name>, <state word>[, warning: <sentence>])
     return h('div', { className: 'cs-title' },
-        h('button', { type: 'button', className: 'cs-toggle cs-open', 'aria-label': `Open ${s.label || 'this server'}`, onclick: () => openPage(s.id) },
+        h('button', { type: 'button', className: 'cs-toggle cs-open', 'aria-label': `Open ${s.label || 'this server'}, ${online ? 'online' : 'offline'}${warning ? `, warning: ${warning}` : ''}`, onclick: () => openPage(s.id) },
             h('span', { className: 'cs-dot ' + (online ? 'online' : 'offline'), 'aria-hidden': 'true' }),
             h('span', { className: 'cs-name', text: s.label || 'Unnamed server' })),
         // The machine's health (#3446): the hub relays it while the machine is connected; without it (offline, held, reconnecting) the dot says unknown, never a stale ok.
@@ -244,7 +247,7 @@ function machinePage(s) {
     const n = needsCount(s);
     const fact = (label, ...value) => [h('dt', { text: label }), h('dd', {}, ...value)];
     const page = h('section', { className: 'servers-page cs-page', id: rowId(s.id), tabindex: '-1', 'data-id': s.id, 'aria-labelledby': 'cs-page-name' },
-        h('button', { type: 'button', className: 'back-link', id: 'servers-back', text: '← Servers', onclick: closePage }),
+        h('button', { type: 'button', className: 'back-link', id: 'servers-back', text: '← Servers', onclick: () => closePage() }),
         renaming === s.id ? renameForm(s)
             : h('h3', { className: 'servers-page-name cs-page-name', id: 'cs-page-name' }, h('span', { className: 'cs-dot ' + (online ? 'online' : 'offline'), 'aria-hidden': 'true' }), s.label || 'Unnamed server',
                 healthDot(online ? live.machine_health : null, s.label || 'Server'), relaunchBadge(h, s.id)),
