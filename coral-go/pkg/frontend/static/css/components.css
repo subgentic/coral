@@ -4039,3 +4039,30 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .form-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); }
 .form-check-compact { gap: 6px; padding: 2px 0; cursor: pointer; white-space: nowrap; }
 .form-textarea-readonly { width: 100%; height: 260px; padding: 12px; box-sizing: border-box; font-family: var(--font-mono); font-size: var(--fs-base); resize: vertical; color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+
+/* The Link team dialog (#9888, to the operator-approved pictures): a list of this team's links, then the form card that makes one. */
+dialog.team-link-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: 90vh; color: var(--text-primary); }
+dialog.team-link-dialog:not([open]) { display: none; }
+dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
+.team-link-title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-sm); }
+.team-link-dialog .modal-body { overflow-y: auto; }
+.team-link-dialog .team-link-team { color: var(--text-secondary); font-size: var(--fs-base); }
+.team-link-dialog .team-link-body { display: flex; flex-direction: column; gap: var(--space-sm); }
+.team-link-h { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.team-link-group { margin: var(--space-sm) 0 0; font-size: var(--fs-sm); font-weight: var(--fw-strong); letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--text-secondary); }
+.team-link-list { list-style: none; margin: 0; padding: 0; }
+.team-link-row { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-sm) 0; border-top: 1px solid var(--border); }
+.team-link-avatar { flex: none; }
+.team-link-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.team-link-name { font-weight: var(--fw-medium); }
+.team-link-where, .team-link-hint, .team-link-note, .team-link-sentence { color: var(--text-secondary); font-size: var(--fs-base); margin: 0; }
+.team-link-state { flex: none; font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.team-link-state.is-active { color: var(--success); }
+.team-link-state.is-warn { color: var(--warning); }
+.team-link-error { color: var(--error); margin: 0; }
+.team-link-card { display: flex; flex-direction: column; gap: var(--space-xs); margin-top: var(--space-md); padding: var(--card-pad); border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-secondary); }
+.team-link-form { display: flex; flex-direction: column; gap: var(--space-xs); }
+.team-link-form select { min-height: var(--control-touch-height); }
+.team-link-revoke, .team-link-link, .team-link-back, .team-link-go, .team-link-manage { min-height: var(--control-touch-height); align-self: flex-start; }
+.team-link-confirm-actions { display: flex; gap: var(--space-sm); }
+@media (max-width: 480px) { .team-link-row { flex-wrap: wrap; } .team-link-text { flex-basis: calc(100% - 3rem); } .team-link-state { margin-left: auto; } }

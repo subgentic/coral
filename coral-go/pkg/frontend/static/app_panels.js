@@ -1,6 +1,6 @@
 /* Lazy dashboard panel adapters shared by navigation, routes, and actions. */
 
-import { lazyFns, loadTeamPage, loadTeamSettings, loadWorkflows, loadCostDashboard, loadDocs, loadThemeConfig, loadModals, loadSettingsDialog, loadResumeDialog, loadDefaultPromptsDialog } from './lazy_panels.js';
+import { lazyFns, loadTeamPage, loadTeamSettings, loadTeamLinkDialog, loadWorkflows, loadCostDashboard, loadDocs, loadThemeConfig, loadModals, loadSettingsDialog, loadResumeDialog, loadDefaultPromptsDialog } from './lazy_panels.js';
 
 export const {
     selectWorkflow, selectWorkflowRun, killWorkflowRun, deleteWorkflow,
@@ -14,6 +14,7 @@ export const { showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged }
 export const { openTeamPage, applyTeamRoute, exitTeamPage } = lazyFns(loadTeamPage, ['openTeamPage', 'applyTeamRoute', 'exitTeamPage']);
 
 export const { showTeamWorkingModeWorkspace } = lazyFns(loadTeamSettings, ['showTeamWorkingModeWorkspace']);
+export const { showTeamLinkDialog } = lazyFns(loadTeamLinkDialog, ['showTeamLinkDialog']);
 
 export const stopCostDashboard = () => { loadCostDashboard.module?.stopCostDashboard(); };
 
