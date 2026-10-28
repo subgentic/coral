@@ -88,6 +88,9 @@ func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
 	if humanInputCaller(r) { // only a person's message is the funnel's (an agent's tool or a script is automation)
 		h.notePersonMessage(r.Context(), body.SessionID, tracking.MessageViaComposerHTTP, sentAt)
 	}
+	if humanInputCaller(r) {
+		h.watchForExit(name, body.AgentType, body.SessionID) // the CLI may have quit on that very message: Ended within seconds, not "Working" until the reconciler's grace (#10295)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "command": body.Command})
 }
 
