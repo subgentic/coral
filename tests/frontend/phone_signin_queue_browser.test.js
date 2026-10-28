@@ -42,7 +42,7 @@ const SIGNED_OUT = `(() => { const R = window.fetch; window.fetch = async functi
         const two = await queue(1);
         assert.ok(two.items.every(h => h <= 48), `each queued message is one line (${JSON.stringify(two.items)})`);
         assert.ok(two.h <= 140, `two queued messages with their count take little of the screen (${two.h} px)`);
-        assert.equal(two.line, '2 queued', `with more than one, the count is a line of text in the list, not generated content (${JSON.stringify([two.line, two.before])})`);
+        assert.equal(two.line, '2 waiting for the agent', `with more than one, the count is a line of text in the list, not generated content (${JSON.stringify([two.line, two.before])})`);
         assert.ok(two.lineShown && (two.before === 'none' || two.before === 'normal'), `the count line is shown and nothing is drawn by ::before (${JSON.stringify(two)})`);
         assert.equal(one.line, '', 'one queued message has no count line');
         await ev(`document.documentElement.style.fontSize = '32px'; true`); await sleep(400); // sleep-ok: layout settles after the text size changes
