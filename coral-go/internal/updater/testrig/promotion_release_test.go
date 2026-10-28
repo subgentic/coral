@@ -71,7 +71,7 @@ func TestJunkPromotionReleasesAreSkippedAndTheRealOneIsTaken(t *testing.T) {
 }
 
 func TestOnlyJunkIsARefusalThatBacksOffAnHour(t *testing.T) {
-	r := newRig(t)
+	r := newAPIRig(t)
 	rel := r.publish(Spec{Version: "1.4.131", Sequence: 5})
 	r.gh.ListBody = nil
 	// drop the real promotion from the list: only junk is left
@@ -122,7 +122,7 @@ func TestAPromotionOfAPreReleaseOrAnExpiredOneStillGoesThroughTheRules(t *testin
 
 // The manifest is read from the promotion release and never from the product release: a product release carrying a promote.json (the old place) is not looked at.
 func TestAManifestOnTheProductReleaseIsNotTheOldWayAnyMore(t *testing.T) {
-	r := newRig(t)
+	r := newAPIRig(t)
 	rel := r.publish(Spec{Version: "1.4.131", Sequence: 5})
 	r.gh.ListBody = []byte(`[{"tag_name":"v1.4.131","draft":false,"prerelease":false,"assets":[{"name":"promote.json"},{"name":"promote.json.sigstore.json"},{"name":"SHA256SUMS.txt"}]}]`)
 	_ = rel

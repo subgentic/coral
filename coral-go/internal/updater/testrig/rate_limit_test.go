@@ -23,7 +23,7 @@ func nextAttempt(t *testing.T, res stage.Result) time.Time {
 
 // GitHub's limit on anonymous requests (#9704): a 403 whose x-ratelimit-remaining is 0 makes the check wait until x-ratelimit-reset, once, and not ask again before it; after it the check goes on as usual.
 func TestCheckWaitsUntilTheRateLimitIsOver(t *testing.T) {
-	r := newRig(t)
+	r := newAPIRig(t)
 	r.publish(Spec{Version: "1.4.131", Sequence: 7})
 	t0 := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
 	now := t0
@@ -80,7 +80,7 @@ func TestRateLimitAnswersAndTheirWaits(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			r := newRig(t)
+			r := newAPIRig(t)
 			r.cfg.Now = time.Now
 			r.gh.Status["list"] = c.status
 			r.gh.Headers = map[string]map[string]string{"list": c.headers}
@@ -101,7 +101,7 @@ func TestRateLimitAnswersAndTheirWaits(t *testing.T) {
 // A clock ahead of GitHub's sees every reset as already past: the floor doubles with each rate limit in a row (1, 2, 4 minutes, ... at most a day), so it does not ask every minute for good; another kind of
 // failure in between starts the count again.
 func TestTheFloorOfTheWaitDoublesWithEachRateLimitInARow(t *testing.T) {
-	r := newRig(t)
+	r := newAPIRig(t)
 	now := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
 	r.cfg.Now = func() time.Time { return now }
 	r.gh.Status["list"] = 403

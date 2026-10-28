@@ -120,7 +120,7 @@ func TestEveryTamperedReleaseIsRefusedAtItsOwnStageAndStagesNothing(t *testing.T
 // A replayed promotion: an old manifest (a lower sequence) for a newer version is refused once a higher sequence has been accepted; so is a version that
 // an earlier manifest revoked, and a downgrade is never offered.
 func TestReplayedRevokedAndDowngradedPromotionsAreRefused(t *testing.T) {
-	r := newRig(t)
+	r := newAPIRig(t)
 	r.publish(Spec{Version: "1.4.131", Sequence: 5, Revoked: []string{"1.4.133"}})
 	require.Equal(t, stage.ResultStaged, r.check().Result)
 	// the sequence floor moves when a release is installed and healthy (State.Accept), never at staging (a rollback must not leave it ahead of what runs):
@@ -190,7 +190,7 @@ func TestTheNetworksWaysToBeWrongAreRefusedAndStageNothing(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			r := newRig(t)
+			r := newAPIRig(t)
 			rel := r.publish(Spec{Version: "1.4.131"})
 			c.set(r, rel)
 			res := r.check()
