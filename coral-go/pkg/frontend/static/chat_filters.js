@@ -15,7 +15,7 @@ export function setTagNames(map) { tagNames = map instanceof Map ? map : new Map
 
 const model = defineFilters({
     server: serverFilter,
-    q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
+    q: { type: 'text', max: 200 }, // no chip: the search box shows the words, and a chip of them was the same words twice (#10484)
     cli: { type: 'choice', values: CLIS.map(c => c[0]), chip: v => `CLI: ${CLI_LABEL[v]}` },
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     tagId: { type: 'custom', empty: '', clean: v => (/^[1-9]\d{0,11}$/.test(String(v)) ? String(v) : ''), filtered: v => !!v, chip: v => `Tag: ${tagNames.get(v) || 'Tag'}`, clear: f => ({ ...f, tagId: '' }) }, // the key is tagId: the icon scanner reads a quoted lower-case word that is an icon's name as an icon
