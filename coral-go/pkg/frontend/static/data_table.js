@@ -262,7 +262,7 @@ export function dataTable(cfg) {
     function sizeColumn(c, node) {
         const ATTR = { min: 'data-dt-min', max: 'data-dt-max', w: 'data-dt-w' };
         const set = (name, v) => { node.style.setProperty(`--dt-${name}`, v); node.setAttribute(ATTR[name], ''); }; // custom properties, read by data_table.css only while the table is not folded: a folded (phone) row lays its cells out its own way
-        if (c.min) set('min', `${c.min}ch`);
+        if (c.min) set('min', `min(${c.min}ch, 40cqw)`); // never more than 40% of the table's box (of the screen where it is not a container): the dock's Tasks table (State, Task, Who) was wider than its box with the name at 24 characters, on a 390 px phone and at 200% text in the 680 px dock (#9917)
         if (c.max) set('max', `${c.max}ch`);
         if (c.fixed && c.width && /rem$/.test(c.width)) { set('min', c.width); set('max', 'none'); set('w', c.width); }
         if (c.share) { set('w', `${Math.round(90 * c.share / shareTotal)}%`); if (!c.max) set('max', '0'); } // a share column is bounded (max-width 0 with its min-width above it): in an auto layout its no-wrap text otherwise sets the column to the width of the text and the table scrolls sideways (UI Accessibility, #9856)

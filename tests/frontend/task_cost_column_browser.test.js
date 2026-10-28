@@ -25,8 +25,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 widths: Object.fromEntries([...list.querySelectorAll('thead th')].filter(h => h.getClientRects().length).map(h => [h.dataset.key, Math.round(h.getBoundingClientRect().width)])), chip: Math.round(list.querySelector('.board-task-status-wrap').getBoundingClientRect().width) }; })()`);
         const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
         await ev(`document.querySelector('#board-task-bar .list-bar-toggle') && document.querySelector('#board-task-bar .list-bar-menu:not([hidden])') && document.querySelector('#board-task-bar .list-bar-toggle').click(); true`); // the filter menu out of the way
-        await shot('tasks-dock-680-columns');
         let m = await measure();
+        assert.deepEqual(m.heads, ['state', 'task'], 'no task has a doer yet: the Agent column is not drawn, a column with nothing in it is not (#9846): ' + JSON.stringify(m));
+        await ev(`(async () => { const B = ${JSON.stringify(ctx.TBOARD)}, post = (p, b) => fetch('/api/board/' + B + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+            const l = await (await fetch('/api/board/' + B + '/tasks')).json(); const t = (l.tasks || l).find(x => x.title === 'gamma open 0'); await post('/tasks/claim', { subscriber_id: 'worker', task_id: t.id });
+            const tasks = await import((window.__coralStatic || '/static/') + 'tasks.js'); await tasks.loadBoardTasks(B); return true; })()`); // one open task is taken: the Agent column has a doer to say
+        await waitFor(`[...document.querySelectorAll('#board-task-list thead th')].some(h => h.dataset.key === 'who' && h.getClientRects().length)`, 'the Agent column once a task has a doer', 10000);
+        await shot('tasks-dock-680-columns');
+        m = await measure();
         assert.ok(m.list >= 560 && m.list < 790, 'the dock is the width in question: ' + m.list);
         assert.equal(m.folded, false, 'the wide dock is unfolded');
         assert.deepEqual(m.heads, ['state', 'task', 'who'], '680 px: the heads are Status, Task and Agent: ' + JSON.stringify(m));

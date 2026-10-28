@@ -96,7 +96,8 @@ const ADD = `(() => {
         assert.ok((await rows()).every(r => r.mark === null), 'no verification icon in phone rows');
         const phone = await ev(`(() => { const dock = document.getElementById('agentic-state').getBoundingClientRect();
             const over = [...document.querySelectorAll('#board-task-list .board-task-item')].filter(b => b.getBoundingClientRect().right > dock.right + 1 || b.getBoundingClientRect().left < dock.left - 1).length;
-            return { over, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+            const r0 = document.querySelector('#board-task-list .board-task-item').getBoundingClientRect(), box = document.querySelector('#board-task-list .dt-box');
+            return { over, page: document.documentElement.scrollWidth - document.documentElement.clientWidth, dock: [Math.round(dock.left), Math.round(dock.right)], row: [Math.round(r0.left), Math.round(r0.right)], box: box && [box.scrollWidth, box.clientWidth], kids: [...document.querySelector('#board-task-list .board-task-item').children].map(c => c.dataset.key + ':' + Math.round(c.getBoundingClientRect().width)) }; })()`);
         assert.equal(phone.over, 0, 'no row is cut off: ' + JSON.stringify(phone));
         assert.ok(phone.page <= 0, 'no sideways scroll: ' + JSON.stringify(phone));
         await shot('verify-list-phone');
