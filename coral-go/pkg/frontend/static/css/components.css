@@ -2224,6 +2224,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .team-wizard-error {
+    min-height: 5.5rem;
+    box-sizing: border-box;
     padding: 12px 14px;
     border-radius: var(--radius-ml);
     border: 1px solid rgba(255, 107, 107, 0.3);
@@ -2233,33 +2235,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     line-height: var(--lh-body);
 }
 
-.team-wizard-success {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 40px 24px;
-    text-align: center;
-}
-
-.team-wizard-success-icon {
-    font-size: var(--glyph-lg);
-    color: var(--success);
-}
-
-.team-wizard-success strong {
-    font-size: var(--icon-size);
-}
-
-.team-wizard-success p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: var(--fs-lg);
-}
-
-.team-wizard-success .btn {
-    margin-top: 12px;
-}
+.team-wizard-error-quiet { visibility: hidden; }
 
 .generated-team-banner { margin: 12px 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
 

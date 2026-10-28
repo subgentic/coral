@@ -374,7 +374,7 @@
                 <label for="team-wizard-directive">Describe your team
                     <textarea id="team-wizard-directive" rows="7" placeholder="For example: Build a launch plan for a developer tool aimed at small engineering teams. I want an orchestrator, a product strategist, a marketer and a copywriter."></textarea>
                 </label>
-                <div id="team-wizard-error" class="team-wizard-error" style="display:none"></div>
+                <div id="team-wizard-error" class="team-wizard-error team-wizard-error-quiet" role="alert"></div><!-- its room is always kept (hidden while empty): an error appearing must not move Generate and Try a sample (#10517) -->
             </div>
             <div class="modal-actions modal-footer">
                 <button class="btn" data-on-click="m-hide-team-wizard-modal">Cancel</button>

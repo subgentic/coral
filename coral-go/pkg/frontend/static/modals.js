@@ -21,7 +21,7 @@ const boardLaunches = await importOnce('./board_launches.js');
 const launchDialog = await importOnce('./launch_dialog.js');
 const { _applyACFPresetFor, _moveTeamAgent } = teamDialogs;
 const { toggleMenu } = await importOnce('./menu_button.js');
-const { _reviewGeneratedTeam } = await importOnce('./team_wizard.js'); // loads the wizard and its window hooks (#5174)
+await importOnce('./team_wizard.js'); // loads the wizard and its window hooks (#5174)
 const { _selectAgentPreset } = personaIo;
 export const { showLaunchModal, launchSession } = launchDialog;
 export const { showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal } = boardLaunches;
@@ -45,7 +45,6 @@ window._hideMobileConnectModal = (...args) => importOnce('./mobile_connect.js').
 // exist before this module loads.)
 const teamRow = el => el.closest('.team-agent-row');
 registerActions({
-    'team-generated-review': () => _reviewGeneratedTeam(),
     'info-copy': el => {
         const cmd = textOf(el.dataset.cmd, 8192);
         if (!cmd) return;

@@ -1,24 +1,20 @@
 /* The AI team wizard (moved out of team_dialogs.js as it was, #5174; no behaviour change): the dialog, the generate job and its poll, and the generated draft handed to the Agent Team form. */
 import { importOnce } from './import_once.js';
 import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
-import { showToast, escapeHtml } from './utils.js';
+import { showToast } from './utils.js';
 import { pollEvery } from './overload.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _showLaunchStep } = await importOnce('./launch_core.js');
 const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { _initTeamForm, _addTeamAgent } = await importOnce('./team_dialogs.js');
 const { markGeneratedTeam } = await importOnce('./team_templates_ui.js');
+const { showTeamStep } = await importOnce('./team_steps.js');
 
 function _setTeamWizardError(message = '') {
     const errorEl = document.getElementById('team-wizard-error');
     if (!errorEl) return;
-    if (message) {
-        errorEl.textContent = message;
-        errorEl.style.display = 'block';
-        return;
-    }
-    errorEl.textContent = '';
-    errorEl.style.display = 'none';
+    errorEl.textContent = message || '';
+    errorEl.classList.toggle('team-wizard-error-quiet', !message); // the room stays: the buttons below do not move when it fills (#10517)
 }
 
 /** "1 member" / "3 members": a team's agents are its members everywhere else in the New team flow (#10314). */
@@ -31,19 +27,9 @@ function _plainGenerateError(message) {
     return /try again|pick a template/i.test(m) ? m : `${m.replace(/\s*\.?$/, '.')} Try again, or pick a template instead.`;
 }
 
-let _wizardBodyOriginalHTML = null;
-
 function showTeamWizardModal() {
     const modal = document.getElementById('team-wizard-modal');
     if (!modal) return;
-
-    // Restore wizard body if it was replaced by success state
-    const body = modal.querySelector('.team-wizard-body');
-    if (body && _wizardBodyOriginalHTML && body.querySelector('.team-wizard-success')) {
-        body.innerHTML = _wizardBodyOriginalHTML;
-    } else if (body && !_wizardBodyOriginalHTML) {
-        _wizardBodyOriginalHTML = body.innerHTML;
-    }
 
     const directiveEl = document.getElementById('team-wizard-directive');
     const generateBtn = document.getElementById('team-wizard-generate-btn');
@@ -96,6 +82,18 @@ function _normalizeGeneratedTeamPayload(payload) {
     };
 }
 
+/** "Drafted: 3 members" above the member list until the person edits one (#10517: a draft could not be told from no draft when its names matched the template's). */
+function showDraftedNote(n) {
+    const list = document.getElementById('team-agents-list'), panel = document.getElementById('team-panel-members');
+    if (!list || !panel) return;
+    let note = document.getElementById('team-drafted-note');
+    if (!note) { note = document.createElement('p'); note.id = 'team-drafted-note'; note.className = 'notice notice-info team-drafted-note'; note.setAttribute('role', 'status'); list.before(note); }
+    note.textContent = `Drafted: ${_membersWords(n)}. Change anything below before you launch.`;
+    note.hidden = false;
+    const done = (e) => { if (e.target && e.target.closest && e.target.closest('#team-drafted-note')) return; if (e.type === 'click' && !(e.target.closest && e.target.closest('#team-agents-list, .team-add-agent-btn, #team-add-orchestrator, #team-set-all'))) return; note.hidden = true; panel.removeEventListener('input', done, true); panel.removeEventListener('click', done, true); };
+    panel.addEventListener('input', done, true); panel.addEventListener('click', done, true);
+}
+
 function _populateGeneratedTeamDraft(team) {
     launch.skipDefaultTeamAgents = true;
     // Open the launch modal directly to the team step, skipping the chooser.
@@ -144,7 +142,9 @@ function _populateGeneratedTeamDraft(team) {
             agent.model,
         );
     }
-    markGeneratedTeam(team.agents.length); // the template choice says where the members came from, not Blank team (#9911)
+    showDraftedNote(team.agents.length);
+    markGeneratedTeam(team.agents.length);
+    showTeamStep('members'); // the drafted members are what is on screen: the name and the folder are one Back away (#10517) // the template choice says where the members came from, not Blank team (#9911)
 }
 
 let _activeGenerateJobId = null;
@@ -242,20 +242,7 @@ function _handleGenerateResult(payload) {
         _pendingGeneratedTeam = team;
 
         if (_isWizardOpen()) {
-            // Show success state inline in wizard
-            const body = document.querySelector('.team-wizard-body');
-            if (body) {
-                body.innerHTML = `
-                    <div class="team-wizard-success">
-                        <span class="material-icons team-wizard-success-icon" aria-hidden="true">check_circle</span>
-                        <strong>Team generated!</strong>
-                        <p>${_membersWords(team.agents.length)} drafted for "${escapeHtml(team.name)}"</p>
-                        <button class="btn btn-primary" data-on-click="team-generated-review">Review Team</button>
-                    </div>
-                `;
-            }
-            const generateBtn = document.getElementById('team-wizard-generate-btn');
-            if (generateBtn) generateBtn.style.display = 'none';
+            _reviewGeneratedTeam(); // straight to the drafted members: Review Team was the one thing to press (#10517)
         } else {
             // Wizard was closed — show a notification toast with action
             showToast(`AI team "${team.name}" is ready (${team.agents.length} agents)`, false);
@@ -291,40 +278,22 @@ function _reviewGeneratedTeam() {
     _populateGeneratedTeamDraft(team);
 }
 
+/** The sample's three members: names no template uses, so a draft is told apart from the template it replaced (#10517). */
+const SAMPLE_AGENTS = [
+            { name: 'Sample Orchestrator', prompt: 'You are the orchestrator. Break down the task, assign work to the team via the message board, and track progress.', capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'], deny: [] }, agent_type: 'claude', model: '' },
+            { name: 'Sample Builder', prompt: 'You are a developer. Implement features, write code, and fix bugs. Wait for instructions from the Orchestrator.', capabilities: { allow: ['file_read', 'file_write', 'shell'], deny: [] }, agent_type: 'claude', model: '' },
+            { name: 'Sample Reviewer', prompt: 'You are a QA engineer. Review code, write tests, and verify work. Wait for instructions from the Orchestrator.', capabilities: { allow: ['file_read', 'file_write', 'shell'], deny: [] }, agent_type: 'claude', model: '' },
+];
+
 async function testTeamWizard() {
-    const generateBtn = document.getElementById('team-wizard-generate-btn');
-    const testBtn = document.getElementById('team-wizard-test-btn');
-    if (generateBtn) generateBtn.disabled = true;
-    if (testBtn) { testBtn.disabled = true; testBtn.textContent = 'Testing...'; }
-
-    // Simulate a brief delay so loading state is visible
-    await new Promise(r => setTimeout(r, 1500));
-
     const sampleTeam = {
-        name: 'test-coding-team',
+        name: 'sample-team',
         flags: '',
-        agents: [
-            { name: 'Orchestrator', prompt: 'You are the orchestrator. Break down the task, assign work to the team via the message board, and track progress.', capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'], deny: [] }, agent_type: 'claude', model: '' },
-            { name: 'Developer', prompt: 'You are a developer. Implement features, write code, and fix bugs. Wait for instructions from the Orchestrator.', capabilities: { allow: ['file_read', 'file_write', 'shell'], deny: [] }, agent_type: 'claude', model: '' },
-            { name: 'QA Engineer', prompt: 'You are a QA engineer. Review code, write tests, and verify work. Wait for instructions from the Orchestrator.', capabilities: { allow: ['file_read', 'file_write', 'shell'], deny: [] }, agent_type: 'claude', model: '' },
-        ],
+        agents: SAMPLE_AGENTS,
     };
 
     _pendingGeneratedTeam = sampleTeam;
-
-    const body = document.querySelector('.team-wizard-body');
-    if (body) {
-        body.innerHTML = `
-            <div class="team-wizard-success">
-                <span class="material-icons team-wizard-success-icon" aria-hidden="true">check_circle</span>
-                <strong>Team generated!</strong>
-                <p>${_membersWords(sampleTeam.agents.length)} drafted for "${escapeHtml(sampleTeam.name)}"</p>
-                <button class="btn btn-primary" data-on-click="team-generated-review">Review Team</button>
-            </div>
-        `;
-    }
-    if (generateBtn) generateBtn.style.display = 'none';
-    if (testBtn) testBtn.style.display = 'none';
+    _reviewGeneratedTeam(); // the sample goes straight to the Members step, as a generated draft does (#10517)
 }
 window.testTeamWizard = testTeamWizard;
 
