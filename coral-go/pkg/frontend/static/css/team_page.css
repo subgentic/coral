@@ -189,6 +189,7 @@
 /* the agent's Artifacts tab (the dock panel): the team's table in a narrow panel, and the document as a sheet over the panel itself (the chat beside it stays) */
 #agentic-panel-artifacts, #agentic-panel-saved { position: relative; } /* the document is a sheet over the panel (the Saved tab's message as well) */
 #agentic-panel-artifacts-view { container: artifactsview / inline-size; } /* named: an unnamed @container query below would otherwise read the nearest container, the tables' own box (teamtable) */
+#agentic-panel-artifacts-view .empty-state-line { padding: var(--space-sm) var(--space-md); } /* the dock's one line sits in from the panel edge, as Notes does (#10055) */
 .dock-detail-pane { position: absolute; inset: 0; z-index: 5; width: auto; border-left: 0; }
 .team-artifacts-plain-head { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 8px 12px; }
 .team-artifacts-error { color: var(--error-text); } /* a failed load is red, not the grey of the other lines (UX #4469) */

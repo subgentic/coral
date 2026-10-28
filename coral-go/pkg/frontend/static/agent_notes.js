@@ -63,6 +63,7 @@ function renderNotes() {
     const add = el('button', _notes.length ? 'btn btn-small note-add-small' : 'note-add', _notes.length ? 'Add a note' : 'Add notes'); // with a note on the page, the normal small button
     add.type = 'button'; add.setAttribute('aria-label', 'Add a note');
     add.addEventListener('click', () => startEdit('new'));
+    if (!_notes.length) items.push(el('p', 'empty-state-line', 'Private notes for you about this chat.'));
     items.push(add);
     for (const note of _notes) {
         const card = el('div', 'note-card'); card.setAttribute('role', 'group');

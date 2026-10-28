@@ -229,7 +229,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     function statusLine() {
         if (model.error) return model.error;
         if (model.loading || pendingBoard) return inbox ? 'Loading artifacts…' : model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
-        if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : 'No artifacts yet. Files your agents share show up here.';
+        if (!model.items.length) return F.isFiltered(model.filters) ? 'No artifacts match this search.' : model.scope ? 'Nothing shared yet. Files this agent shares appear here.' : 'No artifacts yet. Files your agents share show up here.';
         const c = model.counts;
         return c && c.matched > model.items.length ? `Showing ${model.items.length} of ${c.matched}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
     }
@@ -303,7 +303,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' empty-state-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
-        if (!model.error && !model.loading && !model.items.length && !F.isFiltered(model.filters)) status.append(el('span', 'empty-state-hint', 'An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact.')); // inside the line's own element: one block, the family's gap
+        if (!model.error && !model.loading && !model.items.length && !F.isFiltered(model.filters) && !model.scope) status.append(el('span', 'empty-state-hint', 'An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact.')); // inside the line's own element: one block, the family's gap
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
             // A label timeout needs another board-list read, not only the same artifact answer. Do not await a possibly offline list: the fresh artifact read has its own bounded label wait.
             if (retryLabels) importOnce('./board_fetch.js').then(m => m.fetchProjects()).catch(() => {});
