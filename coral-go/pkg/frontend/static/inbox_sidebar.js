@@ -1,6 +1,6 @@
 import { multipleServers, serverColumns, serverMatches, syncServerField } from './inbox_servers.js';
 import { keepMenuOnScreen } from './menu_fit.js';
-import { needsInputAttention } from './display_activity_hint.js';
+import { needsYou, askedRow } from './asked_before_restart.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
  * Three groups, the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds), Tasks (the open tasks assigned to the Operator) and Saved (the
@@ -88,7 +88,7 @@ function openItemRoute(kind, team, id, rowKey) {
 let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the item on screen, or null
 
 // ── Needs you ────────────────────────────────────────────────────────────
-const waitingSessions = () => (state.liveSessions || []).filter(needsInputAttention);
+const waitingSessions = () => (state.liveSessions || []).filter(needsYou).map(askedRow); // an agent that asked something before Coral restarted is listed with its words (#10368)
 const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
 const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : resolveSessionIdentity(s);
 const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
@@ -884,3 +884,4 @@ registerActions({
     'inbox-phone-back': () => closePage(true, true),
     'inbox-back': () => { const was = page, g = was ? 'saved' : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
 });
+document.addEventListener('coral:asked-dismissed', () => renderInboxNav(true)); // a question asked before Coral restarted leaves the Needs you list (#10368)

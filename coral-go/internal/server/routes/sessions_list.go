@@ -460,6 +460,8 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 	if !skipExpensive {
 		displayHint, displayHintAt = h.displayActivityHint(agent.AgentType, agent.TmuxSession, sid, state, d.stateEvents[sid], time.Now())
 	}
+	// what a sleeping agent had open when it went away: {text, kind, at}, nil for any other (#10368)
+	askedBefore := askedBeforeRestart(d.stateEvents[sid], lv.sleeping[sid], lv.archived[sid])
 	entry := map[string]any{
 		"name":                  agent.AgentName,
 		"agent_type":            agent.AgentType,
@@ -487,6 +489,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"waiting_summary":       waitingLineIf(state.NeedsInput, waitingSource(state.WaitingWants, state.WaitingSummary)),
 		"waiting_since":         waitingSince(state), // when the request began, for "waiting 4 min" (#6981)
 		"waiting_kind":          nilIf(!state.NeedsInput || state.WaitingKind == "", state.WaitingKind),
+		"asked_before_restart":  askedBefore,
 		"held_messages":         h.heldMessagesOf(agent.SessionID, naming.SessionName(agent.AgentType, agent.SessionID)), // a person's chat messages queued behind the agent's question (#6627)
 		"live_permission_mode":  h.liveMode(sid),
 		"working":               state.Working,
@@ -553,6 +556,16 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 // sleepingRows are placeholder rows for sleeping sessions without an active terminal (not already in liveSIDs).
 func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map[string]bool, boardSubs map[string]*board.Subscriber) []map[string]any {
 	var sessions []map[string]any
+	var asleepIDs []string // the events of the ones that may have asked something when they went away (#10368)
+	for _, ls := range allLive {
+		if ls.IsSleeping == 1 && ls.IsArchived != 1 && !liveSIDs[ls.SessionID] {
+			asleepIDs = append(asleepIDs, ls.SessionID)
+		}
+	}
+	var asleepEvents map[string][]store.AgentEvent
+	if len(asleepIDs) > 0 && h.ts != nil {
+		asleepEvents, _ = h.ts.GetSessionStateEvents(context.Background(), asleepIDs)
+	}
 	for _, ls := range allLive {
 		if ls.IsSleeping != 1 || liveSIDs[ls.SessionID] {
 			continue
@@ -591,6 +604,7 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"waiting_summary":       nil,
 			"waiting_since":         nil,
 			"waiting_kind":          nil,
+			"asked_before_restart":  askedBeforeRestart(asleepEvents[ls.SessionID], true, ls.IsArchived == 1),
 			"working":               false,
 			"stuck":                 false,
 			"changed_file_count":    0,
