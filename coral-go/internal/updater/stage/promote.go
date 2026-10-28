@@ -81,7 +81,7 @@ func (e *noneVerified) Error() string {
 // release named promote-<tag>-<n> carrying both assets, at most maxPromoteCandidates of them; it is skipped (and counted) unless its manifest verifies against the pinned promote identity,
 // names the tag and the sequence its release names. It returns errNoPromotion when none is listed, and a *noneVerified when there were candidates and none verified.
 func (c *checker) findPromotion(ctx context.Context, onlyTag string) (p *promotion, junk int, err error) {
-	list, err := c.releaseList(ctx)
+	list, err := c.releaseList(ctx, onlyTag)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -170,9 +170,33 @@ func (c *checker) findPromotion(ctx context.Context, onlyTag string) (p *promoti
 	return p, junk, nil
 }
 
+// errFeedNothingNewer says the releases feed names product releases and none is newer than the installed version: there is nothing to look for, and the API's list is not asked (#9716).
+var errFeedNothingNewer = errors.New("the releases feed names no release newer than the installed one")
+
+// productTagRe is a product release's tag, vX.Y.Z (the shape of promoteTagRe's tag): a prerelease (-rc, -beta) or anything else is not one, because the updater never offers a prerelease (a rehearsal's
+// manifest is skipped, findPromotion), so one in the feed is not "a newer release".
+var productTagRe = regexp.MustCompile(`^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,4}$`)
+
+// feedNothingNewer is true when the feed names at least one product release and none is newer than installed. A feed with no product tag cannot say, and an installed version that is not X.Y.Z (a prerelease build)
+// cannot be compared: both are "unknown", and the API's list is asked as it always was. The feed only decides whether to ask; what is installed still comes from a verified manifest.
+func feedNothingNewer(list []listedRelease, installed string) bool {
+	saw := false
+	for _, r := range list {
+		if !productTagRe.MatchString(r.TagName) {
+			continue
+		}
+		saw = true
+		cmp, err := verify.CompareVersions(strings.TrimPrefix(r.TagName, "v"), installed)
+		if err != nil || cmp > 0 {
+			return false
+		}
+	}
+	return saw
+}
+
 // releaseList is the newest releases: from the releases feed (no API request, #9704), and from the API's list when the feed cannot say (it did not answer, is not a feed, or names no promotion). A
 // rate-limit answer from the feed is not worked around: the check waits for it like for the API's (the caller reads the *verify.StatusError).
-func (c *checker) releaseList(ctx context.Context) ([]listedRelease, error) {
+func (c *checker) releaseList(ctx context.Context, onlyTag string) ([]listedRelease, error) {
 	if c.cfg.FeedURL != "" {
 		list, err := c.listFromFeed(ctx)
 		var se *verify.StatusError
@@ -182,6 +206,9 @@ func (c *checker) releaseList(ctx context.Context) ([]listedRelease, error) {
 		case err != nil:
 			log.Printf("[update] the releases feed could not be used (%v): asking the API's list", err)
 		default:
+			if onlyTag == "" && feedNothingNewer(list, c.cfg.Installed) {
+				return nil, errFeedNothingNewer // most checks end here: no API request at all
+			}
 			for _, r := range list {
 				if promoteTagRe.MatchString(r.TagName) {
 					return list, nil
