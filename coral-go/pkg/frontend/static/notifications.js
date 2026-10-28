@@ -204,7 +204,7 @@ export function showWorkflowNotification(title, message, level = 'info', duratio
                 <span class="notification-toast-title">${icon} ${title ? `<strong>${escapeHtml(title)}</strong>` : 'Notification'}</span>
                 <button class="notification-toast-close">✕</button>
             </div>
-            ${message ? `<span class="notification-toast-detail">${escapeHtml(message)}</span>` : ''}
+            ${message ? `<span class="notification-toast-detail">${escapeHtml(plainResult(message)?.words || message)}</span>` : ''}
         </div>`;
     toast.querySelector(".notification-toast-close").addEventListener("click", () => toast.remove());
     document.body.appendChild(toast);
@@ -234,6 +234,18 @@ export function notificationLinkTarget(url) {
 
 let _alertHostSeq = 0;
 
+/** An agent's result as the CLI prints it ({"type":"result","is_error":false,"result":"...","usage":{...}}) said in plain words: its text, or an error's reason; the raw JSON goes behind Details (#10119). null for any other message. */
+function plainResult(message) {
+    const t = String(message || '').trim();
+    if (!t.startsWith('{')) return null;
+    let o;
+    try { o = JSON.parse(t); } catch { return null; }
+    if (!o || typeof o !== 'object' || Array.isArray(o) || !(o.type === 'result' || 'is_error' in o)) return null;
+    const text = typeof o.result === 'string' ? o.result.trim() : '';
+    const words = o.is_error ? (text || (typeof o.error === 'string' ? o.error.trim() : '') || 'The agent reported an error.') : (text || 'The agent finished and said nothing.');
+    return { words, raw: JSON.stringify(o, null, 2) };
+}
+
 export function showAlertNotification(title, message, level = 'info', link = null) {
     const icons = { success: '✅', warning: '⚠️', error: '❌', info: '💬' };
     const icon = icons[level] || icons.info;
@@ -253,10 +265,12 @@ export function showAlertNotification(title, message, level = 'info', link = nul
         })()
         : target ? `<a href="#" class="alert-notification-link">${escapeHtml(label)}</a>`
         : `<span class="alert-notification-link blocked-link" title="Link not opened">${escapeHtml(label)}</span>`;
+    const plain = plainResult(message);
     overlay.innerHTML = `<div class="alert-notification">
             <div class="alert-notification-icon">${icon}</div>
             <div class="alert-notification-title">${title ? escapeHtml(title) : 'Notification'}</div>
-            ${message ? `<div class="alert-notification-message">${escapeHtml(message)}</div>` : ''}
+            ${message ? `<div class="alert-notification-message">${escapeHtml(plain ? plain.words : message)}</div>` : ''}
+            ${plain ? `<details class="alert-notification-details"><summary>Details</summary><pre>${escapeHtml(plain.raw)}</pre></details>` : ''}
             ${linkHtml}
             <button class="alert-notification-ok btn btn-primary">OK</button>
         </div>`;
@@ -280,7 +294,7 @@ export function showAlertNotification(title, message, level = 'info', link = nul
         });
     }
     document.body.appendChild(overlay);
-    announceNotice([title || 'Notification', message].filter(Boolean).join(': '), level === 'error' || level === 'warning');
+    announceNotice([title || 'Notification', plain ? plain.words : message].filter(Boolean).join(': '), level === 'error' || level === 'warning');
 }
 
 export function showNotificationToast(agentLabel, detail, onClick) {
