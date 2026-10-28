@@ -109,7 +109,13 @@ func (t *goalTranscript) feed(messages []map[string]any) {
 	for _, m := range messages {
 		switch m["type"] {
 		case "user":
+			if m["coral_notice"] == true {
+				continue // a turn the server saw Coral deliver: not what a person asked (#10046)
+			}
 			c, _ := m["content"].(string)
+			if jsonl.IsCoralDelivery(c) {
+				continue // Coral's own nudge, task notice or health check typed into the agent (#10046)
+			}
 			if c = userRequestText(c); c != "" {
 				t.prevRequest, t.lastRequest = t.lastRequest, truncateRunes(c, 1500)
 			}

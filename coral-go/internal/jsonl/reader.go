@@ -416,7 +416,7 @@ func (r *SessionReader) FirstUserPrompt(sessionID, workingDirectory, agentType s
 				continue
 			}
 			content, _ := message["content"].(string)
-			if content = strings.TrimSpace(content); content != "" {
+			if content = strings.TrimSpace(content); content != "" && !IsCoralDelivery(content) { // what Coral typed into the agent (a nudge, a task notice) is not what it was asked (#10046)
 				c.prompt = content
 				return c.prompt
 			}

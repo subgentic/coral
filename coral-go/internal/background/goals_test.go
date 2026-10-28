@@ -487,3 +487,25 @@ func TestGoalGenerator_AtMostOneManualRunAMinute(t *testing.T) {
 	assert.True(t, f.gen.states[other].force, "the floor is per session")
 	f.gen.mu.Unlock()
 }
+
+// #10046: Coral's own nudges are user turns in the transcript but not requests: the goal is made from what a person asked, never from "You have 1 unread message on the message board".
+func TestGoalIgnoresWhatCoralTypedIntoTheAgent(t *testing.T) {
+	nudge := map[string]any{"type": "user", "content": "You have 1 unread message on the message board. Run 'coral-board read' to see them."}
+	task := map[string]any{"type": "user", "content": "[Task #7 (high) available] build it"}
+	msgs := []map[string]any{
+		{"type": "user", "content": "Build the dashboard"},
+		{"type": "assistant", "text": "On it."},
+		nudge, task,
+		{"type": "assistant", "text": "Read the board."},
+		{"type": "user", "content": "Now add dark mode", "coral_notice": false},
+		nudge,
+		{"type": "user", "content": "A notice the server flagged", "coral_notice": true},
+	}
+	in := condenseForGoal(msgs)
+	assert.Equal(t, "Now add dark mode", in.Request, "the nudges and the flagged turn are not requests")
+	assert.Equal(t, "Build the dashboard", in.Earlier)
+
+	only := condenseForGoal([]map[string]any{nudge, {"type": "assistant", "text": "Reading."}, task})
+	assert.Equal(t, "", only.Request, "an agent nobody has asked anything has no request, so no goal is made from a nudge")
+	assert.True(t, only.HasAssistant)
+}
