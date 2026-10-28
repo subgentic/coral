@@ -10,7 +10,7 @@ import { CHEVRON_DECO, _chevron, _collapseAttrs, _isGroupCollapsed, _teamHeaderA
 import { getFolderTags, renderFolderTagPills } from './folder_tags.js';
 import { pinPathForKey, emptyPins, notePinKeys } from './pinned_folders.js';
 import { localFirst } from './server_status.js';
-import { killAllItem, teamHealthBtn, _rowNameWithServer, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
+import { killAllItem, deleteTeamItem, teamHealthBtn, _rowNameWithServer, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
 import { _pinMatchesFilter } from './list_filter_match.js';
 
 // Team-first mode: one team as a card: its header, its menu and its agents.
@@ -47,6 +47,7 @@ function _renderTeamCard(boardName, boardSessions) {
                     Reset Team
                 </button>
                 ${killAllItem(boardName)}
+                ${deleteTeamItem(boardName)}
                 <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}-more">More</button>
                 <div id="${escapeAttr(kebabId('team', boardName))}-more" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(keyLabel(boardName))}" hidden>
                 <button class="menu-item overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
@@ -286,6 +287,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                         </button>
                 <hr class="overflow-menu-divider">
                         ${killAllItem(boardName)}
+                ${deleteTeamItem(boardName)}
                 <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}-more">More</button>
                 <div id="${escapeAttr(kebabId('team', boardName))}-more" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(keyLabel(boardName))}" hidden>
                 <button class="menu-item overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>

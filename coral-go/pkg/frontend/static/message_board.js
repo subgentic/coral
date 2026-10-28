@@ -229,11 +229,13 @@ function runningAgentsOn(project) {
     return (state.liveSessions || []).filter(a => inTeam(a, project) && !a.sleeping && !a.archived).map(a => agentWords(a, a.display_name || a.name).role);
 }
 
-export function deleteMessageBoardProject() {
-    const blocked = bs.currentProject ? launchBlockedReason(splitKey(bs.currentProject).server) : '';
+export function deleteMessageBoardProject() { deleteTeam(bs.currentProject); }
+
+/** Delete team: the in-page dialog (which agents still run, or the words that say what goes), then the DELETE. From the team page's More menu and from the sidebar's team menu (#10318). */
+export function deleteTeam(project) {
+    const blocked = project ? launchBlockedReason(splitKey(project).server) : '';
     if (blocked) { showToast(blocked, true); return; }
-    if (!bs.currentProject) return;
-    const project = bs.currentProject;
+    if (!project) return;
     // A board with agents running is not deleted (#5043): they would stay live in a group named with the raw board id. Said here, before asking; the server
     // says it again for an agent this page's list does not show yet.
     const running = runningAgentsOn(project);
@@ -250,7 +252,8 @@ export function deleteMessageBoardProject() {
                 return;
             }
             if (document.getElementById('team-page-view')?.getClientRects().length) { window.exitTeamPage?.({ force: true }); window.switchNavTab?.('agents'); } // deleted from its team page: back to Agents, not the board list
-            else showMessageBoardProjects();
+            else if (document.getElementById('messageboard-view')?.getClientRects().length) showMessageBoardProjects();
+            // deleted from the sidebar's team menu: the page stays where it is; the live feed takes the group away
         } catch (e) {
             console.error('Failed to delete project:', e);
             showToast('Could not reach Coral to delete the board.', true);
