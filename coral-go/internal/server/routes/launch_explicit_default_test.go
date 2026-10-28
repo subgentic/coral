@@ -208,3 +208,63 @@ func TestAResurrectedMemberKeepsTheModeItStartedIn(t *testing.T) {
 		})
 	}
 }
+
+// #10454 (Security Reviewer Windows, on #10430): a member stored before #10430 has no mode in its config. It comes back in the mode its previous session recorded (a team launched in Plan stays in
+// Plan), and only when that session recorded none, in the saved default. The stored config here is stripped of the mode and flags, as the older launch-team wrote it.
+func TestAMemberStoredBeforeTheModeWasKeptComesBackInItsPreviousSessionsMode(t *testing.T) {
+	url, _, h := teamServerH(t)
+	ctx := context.Background()
+	require.NoError(t, h.ss.SetSetting(ctx, "default_permission_mode", "auto"))
+	for _, tc := range []struct {
+		name       string
+		teamFlags  []string
+		forgetPrev bool // the previous session's row is gone
+		want       string
+	}{
+		{"plan", []string{"--permission-mode", "plan"}, false, "plan"},
+		{"acceptedits", []string{"--permission-mode", "acceptEdits"}, false, "acceptEdits"},
+		{"nothing recorded", []string{"--permission-mode", "plan"}, true, "auto"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			board := "legacy" + strings.ReplaceAll(tc.name, " ", "")
+			b, _ := json.Marshal(map[string]any{"board_name": board, "new_board": true, "working_dir": t.TempDir(), "agent_type": at.Claude, "flags": tc.teamFlags, "agents": []map[string]any{{"name": "A", "agent_type": "claude"}}})
+			resp, err := http.Post(url+"/api/sessions/launch-team", "application/json", bytes.NewReader(b))
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			var launched struct {
+				BoardID string           `json:"board_id"`
+				Agents  []map[string]any `json:"agents"`
+			}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&launched))
+			require.Len(t, launched.Agents, 1)
+			prev, _ := launched.Agents[0]["session_id"].(string)
+			ls, err := h.ss.GetLiveSession(ctx, prev)
+			require.NoError(t, err)
+			require.NotNil(t, ls.PermissionMode, "the previous session recorded its mode")
+
+			// the member as the older launch-team stored it: no mode, no flags
+			_, err = h.db.ExecContext(ctx, `UPDATE team_members SET agent_config_json = json_remove(agent_config_json, '$.permission_mode', '$.flags')`)
+			require.NoError(t, err)
+			if tc.forgetPrev {
+				_, err = h.db.ExecContext(ctx, `UPDATE live_sessions SET permission_mode = NULL WHERE session_id = ?`, prev)
+				require.NoError(t, err)
+			}
+			status, body := apiPost(t, url+"/api/sessions/live/team/"+launched.BoardID+"/kill")
+			require.Equal(t, http.StatusOK, status, body)
+			status, body = apiPost(t, url+"/api/teams/detail/"+launched.BoardID+"/resurrect")
+			require.Equal(t, http.StatusOK, status, body)
+			var res struct {
+				Agents []map[string]any `json:"agents"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(body), &res), body)
+			require.Len(t, res.Agents, 1, body)
+			id, _ := res.Agents[0]["session_id"].(string)
+			require.NotEmpty(t, id, body)
+			now, err := h.ss.GetLiveSession(ctx, id)
+			require.NoError(t, err)
+			require.NotNil(t, now.PermissionMode)
+			assert.Equal(t, tc.want, *now.PermissionMode, "the resurrected member's mode")
+		})
+	}
+}
