@@ -208,7 +208,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         <button type="button" class="back-link sched-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
         ${failBanner}
         <div class="sched-header">
-            <h2>${escapeHtml(job.name)}${isExample(job.description) ? ' <span class="chip chip-tag dt-tag">Example</span>' : ''}</h2>
+            <h2>${escapeHtml(job.name)}${isExample(job.name, job.description) ? ' <span class="chip chip-tag dt-tag">Example</span>' : ''}</h2>
         </div>
         <p class="item-meta sched-status-line">${escapeHtml(status)}</p>
         ${savedLine}

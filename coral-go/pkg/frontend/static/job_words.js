@@ -197,5 +197,6 @@ export function deleteJobWords(job, runCount) {
     return runCount > 0 ? `Delete ${name} and its ${runCount} run${runCount === 1 ? '' : 's'}? This cannot be undone.` : `Delete ${name}? It has no runs yet.`;
 }
 
-/** A job or workflow Coral added as an example (its description starts with "Example"): the folders and the page mark it, and Settings can remove them (#10001). */
-export const isExample = description => /^Example\b/.test(String(description || ''));
+/** The two items Coral seeds (store.SeedDemoWorkflow): a workflow and the job that runs it, by their exact names, with a description that starts "Example". Only these are marked and removed; a person's own job described "Example report for Acme" is theirs (#10001, QA Reviewer 2). */
+const SEEDED_EXAMPLES = new Set(['morning-motivation', 'daily-motivation']);
+export const isExample = (name, description) => SEEDED_EXAMPLES.has(String(name || '')) && /^Example\b/.test(String(description || ''));

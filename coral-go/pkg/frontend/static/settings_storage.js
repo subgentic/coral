@@ -95,7 +95,7 @@ export async function loadExamples() {
     if (!out || !button) return;
     const find = async () => {
         const [jobs, workflows] = await Promise.all([requestJson('GET', '/api/scheduled/jobs'), requestJson('GET', '/api/workflows')]);
-        return { jobs: (jobs.jobs || []).filter(j => isExample(j.description)), workflows: (workflows.workflows || []).filter(w => isExample(w.description)) };
+        return { jobs: (jobs.jobs || []).filter(j => isExample(j.name, j.description)), workflows: (workflows.workflows || []).filter(w => isExample(w.name, w.description)) };
     };
     try {
         const found = await find();

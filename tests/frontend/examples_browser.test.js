@@ -15,6 +15,7 @@ const S = `(window.__coralStatic || '/static/')`;
         const STUB = `(() => {
             const real = window.fetch; window.__deleted = [];
             window.__jobs = [{ id: 7, name: 'morning-motivation', description: 'Example (switched off): would run the daily-motivation workflow every weekday at 9am.', job_type: 'workflow', workflow_id: 3, cron_expr: '0 9 * * 1-5', timezone: 'Local', enabled: 0 },
+                { id: 9, name: 'my-report', description: 'Example report for Acme', job_type: 'prompt', cron_expr: '0 3 * * *', timezone: 'Local', enabled: 1, repo_path: '/tmp/x', prompt: 'Write the report' },
                 { id: 8, name: 'my-nightly', description: 'Mine', job_type: 'prompt', cron_expr: '0 2 * * *', timezone: 'Local', enabled: 1, repo_path: '/tmp/x', prompt: 'Run the tests' }];
             window.__workflows = [{ id: 3, name: 'daily-motivation', description: 'Example: generates a motivational message', steps: [], enabled: 1 }, { id: 4, name: 'my-flow', description: 'Mine', steps: [], enabled: 1 }];
             window.fetch = (input, init = {}) => {
@@ -30,9 +31,9 @@ const S = `(window.__coralStatic || '/static/')`;
         })()`;
         await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'the two jobs', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'the three jobs', 10000);
         const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => [r.querySelector('.dt-primary')?.textContent.trim(), !!r.querySelector('.dt-name-example .dt-tag')])`);
-        assert.deepEqual(rows.sort(), [['morning-motivation', true], ['my-nightly', false]], 'the example is tagged, the person\'s own is not: ' + JSON.stringify(rows));
+        assert.deepEqual(rows.sort(), [['morning-motivation', true], ['my-nightly', false], ['my-report', false]], 'the seeded example is tagged; the person\'s own jobs are not, even one described Example report for Acme: ' + JSON.stringify(rows));
         await shot('examples-jobs');
         // the job's page
         await ev(`document.querySelector('#group-table-view tbody .dt-primary').click(); true`);
@@ -51,7 +52,7 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.deepEqual(await ev(`window.__deleted`), [], 'nothing is deleted before the person agrees');
         await ev(`document.getElementById('confirm-modal-yes').click(); true`);
         await waitFor(`window.__deleted.length === 2`, 'the two deletes', 8000);
-        assert.deepEqual((await ev(`window.__deleted`)).sort(), ['/api/scheduled/jobs/7', '/api/workflows/3'], 'only the examples');
+        assert.deepEqual((await ev(`window.__deleted`)).sort(), ['/api/scheduled/jobs/7', '/api/workflows/3'], 'only the seeded examples: the own job my-report described Example report for Acme survives');
         await waitFor(`document.getElementById('settings-examples-remove').hidden`, 'the button goes when none are left', 8000);
         console.log('\nPASS examples are tagged, and Remove examples deletes only them after asking');
     } finally { await client.close(); }
