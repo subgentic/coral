@@ -154,7 +154,7 @@ function scheduleField() {
                 days.append(d);
             }
             const at = el('div', 'sched-line'); at.dataset.for = 'daily weekly';
-            const atLab = el('label', 'sched-line-label', 'At'); const time = el('input', 'field field-dense sched-time'); time.type = 'time'; time.id = 'job-modal-at'; time.value = pickerState.at;
+            const atLab = el('label', 'sched-line-label', 'At'); const time = el('input', 'field field-dense sched-time'); time.type = 'time'; time.id = 'job-modal-at'; atLab.htmlFor = time.id; time.value = pickerState.at;
             time.addEventListener('input', pickerChanged);
             at.append(atLab, time);
             const row = el('div', 'sched-custom-row'); row.id = 'sched-custom-row'; row.dataset.for = 'cron'; row.hidden = true;
