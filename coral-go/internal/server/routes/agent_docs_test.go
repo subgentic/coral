@@ -226,3 +226,19 @@ func TestNewcomerPagesHaveNoSourcePathsOrAgentFlags(t *testing.T) {
 		}
 	}
 }
+
+// #10093 v2 (Beta tester): the steps name the real controls. The row menu has Sleep, Archive and Kill Session (no "Remove Agent"), and the phone dialog is "Use on your phone" with Enable, a QR once it is on, and Use Coral Hub instead.
+func TestHowDoIStepsNameTheRealControls(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", "how-do-i.md"))
+	require.NoError(t, err)
+	text := strings.ReplaceAll(string(b), "\r\n", "\n")
+	assert.NotContains(t, text, "Remove Agent", "the row menu has no Remove Agent")
+	for _, want := range []string{"**Sleep**", "**Archive**", "**Kill Session**", "**Use on your phone**", "**Enable**", "**Use Coral Hub instead**"} {
+		assert.Contains(t, text, want)
+	}
+	rows, err := os.ReadFile(filepath.Join("..", "..", "..", "pkg", "frontend", "static", "session_rows.js"))
+	require.NoError(t, err)
+	for _, item := range []string{"Sleep", "Archive", "Kill Session"} {
+		assert.Contains(t, string(rows), "\n                "+item+"\n", "the row menu really has "+item)
+	}
+}
