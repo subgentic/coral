@@ -79,9 +79,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
         // ── Folder tags: the folder name arrives as written ────────────────
         const folder = await spy(['removeFolderTag', 'addFolderTag', 'createAndAddFolderTag'], `
-            const ft = await import(${MOD} + 'folder_tags.js');
             const anchor = document.createElement('div'); document.body.appendChild(anchor);
-            await ft.showFolderTagDropdown(${JSON.stringify(HOSTILE)}, anchor); anchor.remove();
+            await window.showFolderTagDropdown(${JSON.stringify(HOSTILE)}, anchor); anchor.remove();
             const dd = document.getElementById('folder-tag-dropdown');
             const input = dd.querySelector('[data-on-keydown="folder-tag-new-key"]');
             input.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));

@@ -52,7 +52,7 @@ const S = `(window.__coralStatic || '/static/')`;
 
             // a workflow with 25 runs
             await ev(`window.openAutomationsFolder('workflows'); true`);
-            await ev(`import(${S} + 'workflows.js').then(m => m.selectWorkflow(1)).then(() => true)`);
+            await ev(`Promise.resolve(window.selectWorkflow(1)).then(() => true)`);
             const W = '#wf-run-table';
             await waitFor(`document.querySelectorAll('${W} tbody tr:not(.dt-group)').length === 10`, `${tag}: the first 10 workflow runs`, 8000);
             assert.deepEqual(await foot(W), { text: 'Showing the newest 10 of 25 runs', more: 'Show older runs' }, `${tag}: the workflow page says there are more`);

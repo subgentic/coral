@@ -41,7 +41,7 @@ const SUMMARY = {
         console.log('   ✓ shown, hidden, escaped');
 
         console.log('2. By Model: a Provider and a Model column, one row per model and provider');
-        await ev(`(async () => { const m = await import(${MOD} + 'cost_dashboard.js'); m.showCostDashboard(); return true; })()`);
+        await ev(`(async () => { await window.showCostDashboard(); return true; })()`);
         await waitFor(`document.querySelectorAll('#cost-by-model tbody tr').length === 5`, 'the table');
         const table = () => ev(`(() => ({ head: [...document.querySelectorAll('#cost-by-model thead th:not(.dt-check)')].map(th => th.textContent.replace(/[▲▼↑↓↕]/g, '').trim().replace(/\\s*filter_list|\\s*filter_alt/g, '')), rows: [...document.querySelectorAll('#cost-by-model tbody tr')].map(tr => [tr.querySelectorAll('td:not(.dt-check)')[0].textContent.trim(), tr.querySelectorAll('td:not(.dt-check)')[1].textContent.trim(), tr.querySelectorAll('td:not(.dt-check)')[1].getAttribute('title')]) }))()`);
         let t = await table();
@@ -77,7 +77,7 @@ const SUMMARY = {
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await require('./helpers/wait').bind(ev).coralReady('startup');
-        await ev(`(async () => { const m = await import(${MOD} + 'cost_dashboard.js'); m.showCostDashboard(); return true; })()`);
+        await ev(`(async () => { await window.showCostDashboard(); return true; })()`);
         await waitFor(`document.querySelectorAll('#cost-by-model tbody tr').length === 5`, 'the table on a phone');
         const phone = await ev(`(() => { const c = document.getElementById('cost-by-model'); const t = c.querySelector('table'); return { over: document.documentElement.scrollWidth - document.documentElement.clientWidth, boxScrolls: c.scrollWidth > c.clientWidth + 1, boxOverflowX: getComputedStyle(c).overflowX, cut: t.getBoundingClientRect().right > c.getBoundingClientRect().right + 1 && !['auto', 'scroll'].includes(getComputedStyle(c).overflowX) }; })()`);
         assert.equal(phone.over, 0, 'no sideways scroll on the page: ' + JSON.stringify(phone));

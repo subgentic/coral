@@ -66,7 +66,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
             const cron = await ev(`(() => { const c = document.getElementById('cron-preview'); return { role: c.getAttribute('role'), described: (document.getElementById('job-modal-cron').getAttribute('aria-describedby') || '').split(' ').includes('cron-preview') }; })()`);
             assert.equal(cron.role, 'status', `${tag}: the Valid / Invalid cron line is a status`);
             assert.ok(cron.described, `${tag}: the cron field is described by it`);
-            await ev(`import(${S} + 'job_form.js').then(m => m.hideJobModal()).then(() => true)`);
+            await ev(`Promise.resolve(window.hideJobModal()).then(() => true)`);
             console.log(`   ✓ ${tag}`);
         }
         console.log('PASS Workflows and Jobs: editor errors said and the field marked, cron status described');
