@@ -28,7 +28,7 @@ async function axName(client, selector) {
     const { nodes } = await Accessibility.getPartialAXTree({ backendNodeId: node.backendNodeId, fetchRelatives: false });
     const self = nodes.find(n => n.backendDOMNodeId === node.backendNodeId);
     if (!self || self.ignored) return null;
-    return { name: (self.name && self.name.value) || '', role: (self.role && self.role.value) || '' };
+    return { name: (self.name && self.name.value) || '', role: (self.role && self.role.value) || '', description: (self.description && self.description.value) || '' }; // description: aria-describedby or aria-description, what a screen reader says after the name
 }
 
 module.exports = { axNodes, axName };
