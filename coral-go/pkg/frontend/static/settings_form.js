@@ -22,6 +22,8 @@ export async function refreshUnsavedNote() {
     if (!dirty && formAtOpen() !== null) { dirty = databaseEncryptionChanged(); }
     if (!dirty && formAtOpen() !== null) { try { dirty = await importOnce('./terminal_backend.js').then(tb => tb.hasUnsavedBackendChange(), () => false); } catch { dirty = false; } }
     if (note.hidden === dirty) note.hidden = !dirty;
+    const away = document.getElementById('settings-cancel-btn'), word = dirty ? 'Cancel' : 'Close'; // nothing to cancel until something is changed: on a page with nothing to edit it is plain Close (Beta Tester, #9955)
+    if (away && away.textContent !== word) away.textContent = word;
     // A note, not a live region (#6656): while there are unsaved changes the Save button is described by it, so it is read when the person reaches Save, where it matters, and not announced on every edit.
     const save = document.getElementById('settings-save-btn');
     if (save) { if (dirty) { if (save.getAttribute('aria-describedby') !== 'settings-unsaved') save.setAttribute('aria-describedby', 'settings-unsaved'); } else if (save.hasAttribute('aria-describedby')) save.removeAttribute('aria-describedby'); }

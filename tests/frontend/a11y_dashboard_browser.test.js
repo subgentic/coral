@@ -147,11 +147,11 @@ const contrast = (a, b) => {
             `({ active: document.activeElement && (document.activeElement.id || document.activeElement.tagName) })`);
         console.log('   ✓ Escape: focus back on the menu button (the opener sat in that menu, now closed)');
 
-        // A visible opener gets focus back itself: open from the nav's Agents button, close with Cancel.
+        // A visible opener gets focus back itself: open from the nav's Agents button, close with the footer's button (Close while nothing is changed, #9955).
         await ev(`(() => { document.getElementById('nav-tab-agents').focus(); showSettingsModal(); return true; })()`);
         await waitFor(dialogShown, 'the Settings dialog again', 5000);
         await waitFor(`document.getElementById('settings-modal').contains(document.activeElement)`, 'focus inside on the second open', 3000);
-        await ev(`(() => { [...document.querySelectorAll('#settings-modal button')].find(b => (/hideSettingsModal\(\)/.test(b.getAttribute('onclick') || '') || b.getAttribute('data-on-click') === 'm-hide-settings-modal') && b.textContent.trim() === 'Cancel').click(); return true; })()`);
+        await ev(`(() => { document.getElementById('settings-cancel-btn').click(); return true; })()`);
         await waitFor(dialogHidden, 'Cancel closes the dialog', 3000);
         await waitFor(`document.activeElement && document.activeElement.id === 'nav-tab-agents'`, 'focus back on the opener after Cancel', 3000,
             `({ active: document.activeElement && (document.activeElement.id || document.activeElement.tagName) })`);
