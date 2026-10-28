@@ -34,6 +34,9 @@ const BASE = require('./test_base').BASE;
             const canSave = await ev(`!!document.querySelector(${JSON.stringify(btn)}).closest('.chat-bubble').querySelector('.chat-save-btn')`);
             assert.equal(items.some(x => /^(Save for later|Remove from saved)$/.test(x)), canSave, `${w}: Save for later is in the menu when the message has a save button (${canSave}): ${JSON.stringify(items)}`);
             assert.ok(items.every(x => x === 'Copy' || /^(Save for later|Remove from saved)$/.test(x)), `${w}: the menu is Copy and Save for later, nothing that sends it to another agent (the Operator, #10682): ${JSON.stringify(items)}`);
+            // the box holds its items (#10780): a menu 10 px tall left Copy and Save for later hanging below it with nothing behind them
+            const box = await ev(`(() => { const m = document.getElementById('chat-msg-menu'), r = m.getBoundingClientRect(), items = [...m.querySelectorAll('[role=menuitem]')].map(i => i.getBoundingClientRect()); return { top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height), itemsTop: Math.round(Math.min(...items.map(i => i.top))), itemsBottom: Math.round(Math.max(...items.map(i => i.bottom))), n: items.length, inline: m.getAttribute('style') }; })()`);
+            assert.ok(box.itemsTop >= box.top - 1 && box.itemsBottom <= box.bottom + 1, `${w}: the menu's box holds its items: ${JSON.stringify(box)}`);
             // the menu a person's own message opens is as solid as a reply's (#10768): a surface of the shared menu colour, in both themes, not the page showing through
             for (const theme of ['dark', 'light']) {
                 await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
