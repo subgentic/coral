@@ -216,7 +216,7 @@ function detailCell(s, live, online, isBusy, helpId) {
     const infoId = `${rowId(s.id)}-access-details`;
     const infoOpen = accessDetails.has(s.id);
     const info = h('div', { className: 'cs-access-details' },
-        h('button', { type: 'button', className: 'btn btn-small cs-access-info', 'aria-label': `Access details for ${s.label || 'this server'}`, 'aria-expanded': String(infoOpen), 'aria-controls': infoId,
+        h('button', { type: 'button', className: 'btn btn-small btn-quiet cs-access-info', 'aria-label': `Access details for ${s.label || 'this server'}`, 'aria-expanded': String(infoOpen), 'aria-controls': infoId,
             onclick: () => { if (accessDetails.has(s.id)) accessDetails.delete(s.id); else accessDetails.add(s.id); render(); } },
             h('span', { className: 'material-icons', 'aria-hidden': 'true', text: 'info' }), 'Access details'),
         h('div', { id: infoId, className: 'cs-access-matrix', hidden: !infoOpen },
@@ -230,11 +230,9 @@ function detailCell(s, live, online, isBusy, helpId) {
             h('span', { text: update.text + ' ' }),
             h('a', { href: RELEASES_URL, target: '_blank', rel: 'noopener noreferrer', text: 'Download the latest Coral' }))
         : null;
-    // The row shows the status and the version; the details add only what it does not: when an offline machine was last heard from.
-    const meta = online ? null : h('div', { className: 'cs-meta cs-lastseen', text: `Last contact ${formatLastSeen(s.last_seen)}` });
     return h('div', { className: 'cs-detail-cell' },
         s.needs_relink === true ? h('div', { className: 'cs-note cs-relink-note', id: relinkId(s), hidden: !relinkOpen.has(s.id), text: relinkHelp(s.label) }) : null,
-        h('div', { className: 'cs-main' }, meta, belowMinimumText(live) ? h('div', { className: 'cs-meta server-below-minimum', text: belowMinimumText(live) }) : null,
+        h('div', { className: 'cs-main' }, belowMinimumText(live) ? h('div', { className: 'cs-meta server-below-minimum', text: belowMinimumText(live) }) : null,
             online ? healthCard(live.machine_health, { title: 'Health', online: true, waitingText: 'No health reading yet.' }) : null, effEl, helpEl, info),
         confirming === s.id ? h('div', { className: 'cs-note', id: revokeNoteId(s), text: `Revoke ${s.label || 'this server'}? It disconnects this computer from Coral Hub. Its token stops working; to connect it again you must enroll it again.` }) : null,
         updateNote);
@@ -250,8 +248,7 @@ function machinePage(s) {
     const page = h('section', { className: 'servers-page cs-page', id: rowId(s.id), tabindex: '-1', 'data-id': s.id, 'aria-labelledby': 'cs-page-name' },
         h('button', { type: 'button', className: 'back-link', id: 'servers-back', text: '← Servers', onclick: () => closePage() }),
         renaming === s.id ? renameForm(s)
-            : h('h3', { className: 'servers-page-name cs-page-name', id: 'cs-page-name' }, h('span', { className: 'cs-dot ' + (online ? 'online' : 'offline'), 'aria-hidden': 'true' }), s.label || 'Unnamed server',
-                healthDot(online ? live.machine_health : null, s.label || 'Server'), relaunchBadge(h, s.id)),
+            : h('h3', { className: 'servers-page-name cs-page-name', id: 'cs-page-name' }, h('span', { className: 'cs-dot ' + (online ? 'online' : 'offline'), 'aria-hidden': 'true' }), s.label || 'Unnamed server', relaunchBadge(h, s.id)), // the dot and the Status row say it once: no hollow health circle after the name (the Health card below has the reading, #9798)
         h('dl', { className: 'facts servers-facts cs-facts' },
             ...fact('Status', online ? 'Online' : 'Offline'),
             ...fact('Coral', h('span', { text: version || '—' }), upd ? ' ' : null, upd),
