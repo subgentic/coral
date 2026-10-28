@@ -228,7 +228,7 @@ ${_archiveItem}            <hr class="overflow-menu-divider">
 
 export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefaultDir) {
     const dotClass = getDotClass(s);
-    const isActive = !state.selectedTeam && state.currentSession && state.currentSession.type === "live" && state.currentSession.session_id === s.session_id;
+    const isActive = !state.selectedTeam && !state.atWelcome && state.currentSession && state.currentSession.type === "live" && state.currentSession.session_id === s.session_id;
 
     // Spec: remove agent type from the default row layout
     const typeTag = "";
