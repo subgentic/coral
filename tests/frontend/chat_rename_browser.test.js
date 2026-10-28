@@ -34,6 +34,7 @@ const BASE = require('./test_base').BASE;
         };
         await ev(`document.querySelector('#group-table-view button[data-flag="edit"]').click(); true`);
         await waitFor(`document.getElementById('prompt-modal').style.display === 'flex'`, 'the name dialog', 6000);
+        assert.match(await ev(`document.getElementById('prompt-modal-label').textContent`), /past chat, kept on this computer; it is not the agent's name/, 'the help says where the name is kept and what it names');
         assert.equal(await ev(`document.getElementById('prompt-modal-input').value`), 'fix the importer crash', 'the dialog starts from the title shown');
         await rename('Importer crash review');
         await waitFor(`window.__flags.length === 1`, 'the flags request', 6000);

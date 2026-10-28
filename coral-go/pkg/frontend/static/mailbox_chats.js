@@ -203,7 +203,7 @@ const name = (s) => (isGroup(s) ? (s.title || String(s.session_id).replace(/^boa
 
 /** Ask for a past chat's name and save it (#10390): it is the chat's title over the first message and the notes' title; an empty name takes it off. entry: the chat's row; after() runs once it is saved. */
 export async function renameChat(entry, after) {
-    (await importOnce('./prompt_modals.js')).showPromptModal('Rename chat', 'Name (empty: the automatic title)', entry.chat_title || historyLabel(entry), async name => {
+    (await importOnce('./prompt_modals.js')).showPromptModal('Rename chat', 'Name for this past chat, kept on this computer; it is not the agent\'s name. Empty: the automatic title', entry.chat_title || historyLabel(entry), async name => {
         if (name !== (entry.chat_title || '') && await setChatFlag(entry.session_id, 'title', name, entry.server || null)) after?.();
     }, { allowEmpty: true, maxLength: 120 });
 }
