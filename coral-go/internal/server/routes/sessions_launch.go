@@ -42,9 +42,15 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		Tools           []string               `json:"tools"`
 		MCPServers      json.RawMessage        `json:"mcpServers"` // refused: not supported (#3644)
 		Hooks           map[string]interface{} `json:"hooks"`
+		// PermissionMode names Default and nothing else (#10362): the form sends no flag for Default, which is the same request as "nothing chosen", and nothing chosen starts in the saved default or Auto.
+		PermissionMode string `json:"permission_mode"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
+		return
+	}
+	if body.PermissionMode != "" && body.PermissionMode != "default" {
+		errBadRequest(w, `permission_mode can only be "default"; any other mode is sent as the CLI's own flags`)
 		return
 	}
 	if mcpGiven(body.MCPServers) {
@@ -174,7 +180,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	result, err := h.launchSession(lctx, launchSpec{
 		WorkDir: body.WorkingDir, AgentType: body.AgentType, DisplayName: body.DisplayName, ResumeSessionID: body.ResumeSessionID,
 		Flags: launchFlags, Prompt: body.Prompt, BoardName: body.BoardName, BoardServer: body.BoardServer, Backend: body.Backend,
-		BoardType: body.BoardType, Model: effectiveModel, Thinking: effectiveThinking, Capabilities: body.Capabilities, Tools: body.Tools, Hooks: body.Hooks,
+		BoardType: body.BoardType, Model: effectiveModel, Thinking: effectiveThinking, Capabilities: body.Capabilities, Tools: body.Tools, Hooks: body.Hooks, PermissionMode: explicitDefaultMode(body.PermissionMode, launchFlags),
 		AutoByDefault: !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
 	})
 	if err != nil {
@@ -255,4 +261,15 @@ func defaultThinkingFromSettings(settings map[string]string, agentType, requeste
 		return d
 	}
 	return ""
+}
+
+// explicitDefaultMode is "default" when the request asked for it and its flags carry no permission flag of their own (the person's flags win over every mode, as ever), else "" (the launch decides as before).
+func explicitDefaultMode(requested string, flags []string) string {
+	if requested != "default" {
+		return ""
+	}
+	if own, _ := agent.SplitPermissionFlags(flags); len(own) > 0 {
+		return ""
+	}
+	return "default"
 }
