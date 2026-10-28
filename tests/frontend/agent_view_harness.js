@@ -9,6 +9,12 @@ const { isNavigationError } = require('./helpers/wait');
 async function connect() {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
     const { Page, Runtime, Emulation, Network } = client;
+    // A look pass (#9804): LOOK_THEME=light|dark and LOOK_FONT=32px make every page this suite opens come up in that theme and at that root font size, so the pictures a suite saves (CORAL_SCREENSHOT_DIR) show the screen in light or at 200% text. Off unless set; the suite's own assertions are for 100% and are not meant to pass at 200%.
+    if (process.env.LOOK_THEME || process.env.LOOK_FONT) {
+        const theme = JSON.stringify(process.env.LOOK_THEME || ''), font = JSON.stringify(process.env.LOOK_FONT || '');
+        await Page.enable();
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const t = ${theme}, f = ${font}; try { if (t) localStorage.setItem('coral-theme', t); } catch (e) {} if (f) { const put = () => { if (document.getElementById('__look_font')) return; const st = document.createElement('style'); st.id = '__look_font'; st.textContent = 'html{font-size:' + f + ' !important}'; (document.head || document.documentElement).append(st); }; if (document.documentElement) put(); else new MutationObserver((m, o) => { if (document.documentElement) { put(); o.disconnect(); } }).observe(document, { childList: true }); document.addEventListener('DOMContentLoaded', put); } })();` });
+    }
     // Static files that failed to load (#3466): a module the page couldn't fetch fails every later
     // import() of it too, so a "Failed to fetch dynamically imported module" says nothing about why.
     // Record each /static/ request that failed or answered >= 400, and add them to that error.
