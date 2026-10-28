@@ -68,7 +68,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
             if (url.pathname === '/api/sessions/launch') return Promise.resolve(new Response(JSON.stringify({ session_id: 'resumed-id', name: 'resumed' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
             return R(u, o); }; return true; })()`);
         await resume('ran-here');
-        await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); window.__resumedListed = false; const m = await import((window.__coralStatic || '/static/') + 'resume_dialog.js'); await m.resumeLaunchNew(); setTimeout(() => { window.__resumedListed = true; }, 1500); })(); true`);
+        await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); window.__resumedListed = false; await window.resumeLaunchNew(); setTimeout(() => { window.__resumedListed = true; }, 1500); })(); true`);
         await waitFor(`window.__selected.length === 1`, 'the resumed agent opened', 12000);
         assert.deepEqual(await ev(`window.__selected[0]`), ['resumed', 'claude', 'resumed-id', 'local']);
         assert.equal(await ev(`!!window.__chatShown`), true, 'in its chat');
