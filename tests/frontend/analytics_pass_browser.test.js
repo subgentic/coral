@@ -15,6 +15,7 @@ const BASE = require('./test_base').BASE;
             if (url.includes('/api/call-metrics/summary')) return json({ rows: [], hours: 336 }); // the server keeps calls 14 days
             if (url.includes('/api/token-usage/by-team')) return json({ teams: [] });
             if (url.includes('/api/token-usage/by-branch')) return json({ branches: [] });
+            if (url.includes('/api/token-usage/timeseries')) return json({ buckets: Array.from({ length: 12 }, (_, i) => ({ bucket: '2026-10-27T' + String(i).padStart(2, '0') + ':00:00Z', cost_usd: 1 + i % 3, cumulative_cost: i + 1 })) });
             if (url.includes('/api/token-usage/')) return json({});
             return R(u, o); }; return true; })()`);
     const open = async totals => {
@@ -35,8 +36,23 @@ const BASE = require('./test_base').BASE;
         // 2. Total cost is the first card, with today and this month beside it (whatever the range)
         assert.equal(await ev(`document.querySelector('#cost-summary-cards .cost-card .cost-card-label').textContent.trim()`), 'Total cost', 'Total cost comes first');
         await waitFor(`document.getElementById('cost-calendar-cost').textContent !== ''`, 'today and this month', 8000);
-        assert.equal(await ev(`document.getElementById('cost-calendar-cost').textContent`), 'Today $1.50 \u00b7 This month $7.00');
+        assert.equal(await ev(`document.getElementById('cost-calendar-cost').innerText.replace(/\\s+/g, ' ').trim()`), 'Today $1.50 This month $7.00');
+        assert.equal(await ev(`document.querySelectorAll('#cost-calendar-cost span').length`), 2, 'a line each: Today, This month');
         assert.equal(await ev(`document.getElementById('cost-total-cost').textContent`), '$4.00', 'and the card still shows the range\'s cost');
+        // the line does not run into the sparkline, at the three widths the cards wrap at (#10521, review)
+        for (const [w, h, mobile] of [[1280, 900, false], [1024, 800, false], [390, 844, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
+            await open({ input_tokens: 10, output_tokens: 20, cost_usd: 4, num_requests: 3 });
+            await waitFor(`document.getElementById('cost-calendar-cost').textContent !== '' && !!document.querySelector('#cost-spark-cost svg')`, `${w}: today, this month and the sparkline`, 10000);
+            const g = await ev(`(() => { const c = document.querySelector('.cost-card-highlight'), cal = document.getElementById('cost-calendar-cost').getBoundingClientRect(), sp = document.querySelector('#cost-spark-cost svg').getBoundingClientRect(), box = c.getBoundingClientRect(); const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top; return { overlap: hit(cal, sp), calInside: cal.left >= box.left && cal.right <= box.right && cal.bottom <= box.bottom + 1, spInside: sp.bottom <= box.bottom + 1 }; })()`);
+            assert.equal(g.overlap, false, `${w}: Today and This month do not touch the sparkline ${JSON.stringify(g)}`);
+            assert.ok(g.calInside && g.spInside, `${w}: both are inside the card ${JSON.stringify(g)}`);
+        }
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        // the note never sits beside a total: money or tokens counted with no request recorded
+        await open({ input_tokens: 10, output_tokens: 20, cost_usd: 4, num_requests: 0 });
+        await waitFor(`document.getElementById('cost-total-cost').textContent === '$4.00'`, 'the cost', 8000);
+        assert.equal(await ev(`document.getElementById('cost-counts-note').hidden`), true, 'a cost with no request count has no "Nothing counted" note');
         // 3. an empty range says to try a longer one, except the longest
         await open({ input_tokens: 0, output_tokens: 0, cost_usd: 0, num_requests: 0 });
         const empty = () => ev(`document.getElementById('cost-dashboard-view').textContent`);

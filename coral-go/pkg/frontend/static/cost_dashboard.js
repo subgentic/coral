@@ -308,8 +308,8 @@ async function _refreshCalendarCost() {
     try {
         const [day, month] = await Promise.all([since.today, since.month].map(s => fetch(`/api/token-usage/summary?since=${encodeURIComponent(s)}`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))));
         const cost = d => formatCost((d && d.totals && d.totals.cost_usd) || 0, { zeroAsTwo: true });
-        el.textContent = day && month ? `Today ${cost(day)} \u00b7 This month ${cost(month)}` : '';
-    } catch { el.textContent = ''; }
+        el.replaceChildren(...(day && month ? [`Today ${cost(day)}`, `This month ${cost(month)}`] : []).map(t => Object.assign(document.createElement('span'), { textContent: t })));
+    } catch { el.replaceChildren(); }
 }
 
 export async function _refreshCostDashboard({ force = false } = {}) {
@@ -346,7 +346,8 @@ export async function _refreshCostDashboard({ force = false } = {}) {
             _setText('cost-total-requests', String(t.num_requests || 0)); // the calls recorded: the figure By agent's Requests column adds up to
             _setText('cost-total-cost', formatCost(t.cost_usd || 0, { zeroAsTwo: true }));
             const none = document.getElementById('cost-counts-note'); // nothing in this range: say what is counted, never a bare 0 (#10521)
-            if (none) { none.textContent = (t.num_requests || 0) === 0 ? COUNTS_NOTE : ''; none.hidden = (t.num_requests || 0) !== 0; }
+            const nothing = !(t.num_requests > 0 || t.cost_usd > 0 || t.input_tokens > 0 || t.output_tokens > 0); // nothing at all: a total of money or tokens beside the note would contradict it
+            if (none) { none.textContent = nothing ? COUNTS_NOTE : ''; none.hidden = !nothing; }
 
             // By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them).
             _renderProviderTable(providerRows(data.by_agent_type));

@@ -31,8 +31,10 @@
         <div class="cost-card cost-card-highlight">
             <div class="cost-card-label">Total cost</div>
             <div class="cost-card-value" id="cost-total-cost">$0.00</div>
-            <div class="cost-card-change" id="cost-change-cost"></div>
-            <div class="cost-card-calendar" id="cost-calendar-cost"></div><!-- today and this month, whatever the range: the two figures a person asks first (#10521) -->
+            <div class="cost-card-sub"><!-- one row of the card's grid: the change against the period before, then today and this month, whatever the range (the two figures a person asks first, #10521); the sparkline is the row after, never under them -->
+                <div class="cost-card-change" id="cost-change-cost"></div>
+                <div class="cost-card-calendar" id="cost-calendar-cost"></div>
+            </div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-cost"></div>
         </div>
         <div class="cost-card">

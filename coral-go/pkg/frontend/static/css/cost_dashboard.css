@@ -381,6 +381,7 @@
 }
 .cost-card-change { margin-top: 2px; font-size: var(--fs-base); line-height: var(--lh-label); color: var(--text-muted); }
 .cost-card-change:empty { display: none; }
+.cost-card-calendar span { display: block; } /* Today and This month are a line each: the card is narrow, so a joined line wrapped into the sparkline */
 .cost-card-calendar { margin-top: 2px; font-size: var(--fs-base); line-height: var(--lh-label); color: var(--text-secondary); }
 .cost-card-calendar:empty { display: none; }
 .viz-fill { stroke: var(--bg-primary); stroke-width: 2; stroke-linejoin: round; }
