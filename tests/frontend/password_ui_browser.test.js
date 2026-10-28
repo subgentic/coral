@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
             out.shown = $('set-password-new').type;
             document.querySelector('#set-password-modal .pw-toggle').click();
             out.hiddenAgain = $('set-password-new').type;
-            out.meterEmpty = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).display; out.notNowNote = document.querySelector('#set-password-modal .pw-not-now')?.textContent || '';
+            out.meterEmpty = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).display; out.notNowNote = document.querySelector('#set-password-modal .pw-not-now')?.textContent || ''; { const n = document.querySelector('#set-password-modal .pw-not-now'), l = document.querySelector('#set-password-modal label'); out.noteGap = Math.round(l.getBoundingClientRect().top - n.getBoundingClientRect().bottom); out.notNowInView = $('set-password-later').getBoundingClientRect().bottom <= innerHeight; }
             type('set-password-new', 'a');
             out.meterTyped = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).display;
             out.weak = { level: document.querySelector('#set-password-modal .pw-strength').getAttribute('data-level'), disabled: $('set-password-save').disabled };
@@ -153,7 +153,8 @@ const BASE = require('./test_base').BASE;
         assert.doesNotMatch(out.lead1 + out.lead2, /nothing changed|now asks browsers/);
         assert.deepEqual(out.weak, { level: 'weak', disabled: false }, 'the meter advises and never blocks');
         assert.equal(out.meterEmpty, 'none', 'no empty strength bar before anything is typed (#9971)'); assert.notEqual(out.meterTyped, 'none', 'the bar shows once something is typed');
-        assert.match(out.notNowNote, /^Not now\. The Coral app, the tray and coral open still open Coral here, and nothing else can reach it\. A password lets you sign in from any browser and from other devices: set one later in Settings, Security and privacy\.$/, 'the prompt says what Not now leaves you with');
+        assert.equal(out.notNowNote, 'Not now: the Coral app, the tray and the coral open command still let you in here, and nothing else can reach Coral. A password adds sign-in from any browser and from other devices (Settings, Security and privacy).', 'the prompt says what Not now leaves you with, in words that read');
+        assert.ok(out.noteGap >= 8, 'room between that line and the Password label (' + out.noteGap + ' px)'); assert.equal(out.notNowInView, true, 'Not now is within the screen')
         assert.equal(out.emptyErr, 'Enter a password.'); assert.equal(out.callsAfterEmpty, 0);
         assert.match(out.mismatchErr, /do not match/); assert.equal(out.callsAfterMismatch, 0, 'nothing is sent for a mismatch');
         assert.deepEqual(out.setCall, { url: '/api/auth/password/set', body: { password: '  a b  ' } }, 'sent exactly as typed, spaces kept');
