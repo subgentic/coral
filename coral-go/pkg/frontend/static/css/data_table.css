@@ -361,6 +361,10 @@
 @media (max-width: 760px), (pointer: coarse) { .artifact-table .artifact-details { width: 44px; height: 44px; } } /* a row is 36 px at a mouse and its target 44 px on touch (#9734) */
 .artifact-table .artifact-details:focus-visible { outline-offset: -3px; } /* the 3 px ring sits inside the icon: the cell clips what is outside it, and the icon is the cell's height (QA Reviewer 2's note on #9734) */
 .artifact-table .artifact-details::after { content: none; }
+/* The Details button is quiet, like the reply's copy icon (#10433, the Operator: a solid blue disc on every row): a muted outline glyph, the accent on the row's hover, the button's hover or focus, and while its panel is open (its row is aria-current) */
+.artifact-details { color: var(--text-muted); }
+.artifact-details .artifact-details-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.dt-box tbody tr:hover .artifact-details, .dt-box .artifact-details:hover, .dt-box .artifact-details:focus-visible, .dt-box tbody tr[aria-current="true"] .artifact-details { color: var(--accent); }
 @container (max-width: 62rem) { .dt-one-line [data-drop-at="62"] { display: none; } } /* the Inbox artifact list's Tags go first */
 @container (max-width: 52rem) { .dt-one-line [data-drop-at="52"] { display: none; } }
 @container (max-width: 36rem) { .dt-one-line [data-drop-at="36"] { display: none; } }
