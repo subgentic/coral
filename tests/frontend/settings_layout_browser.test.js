@@ -56,7 +56,7 @@ const AGENT_PARTS = {
             const moved = await ev(`[...document.querySelectorAll('#settings-pane-network *')].filter(e => { const o = getComputedStyle(e).order; return o !== '0'; }).map(e => e.id || e.className)`);
             assert.deepEqual(moved, [], `at ${w}px no row is re-ordered: ${JSON.stringify(moved)}`);
         }
-        console.log('4. Security has Log terminal input; Notifications first row; the needless lines are gone');
+        console.log('4. Security has the input log switch; Notifications first row; the needless lines are gone');
         assert.equal(await paneOf('settings-debug-input-log'), 'security');
         await open('security');
         assert.equal(await ev(`/Keep secret\\./.test(document.getElementById('settings-pane-security').textContent)`), false, '"Keep secret." is gone');
