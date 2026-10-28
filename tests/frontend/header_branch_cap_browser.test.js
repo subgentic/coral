@@ -36,7 +36,7 @@ const SHORT = 'fix/header';
         const btns = [...h.querySelectorAll('button')].filter(vis).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; });
         const br = document.getElementById('terminal-header-branch'); const brShown = vis(br);
         const tr = t.getBoundingClientRect();
-        return { model: (e => !!e && e.checkVisibility())(document.getElementById('terminal-header-model')), headerText: h.textContent.replace(/\\s+/g, ' '), over: document.documentElement.scrollWidth - innerWidth, btnOut: btns.filter(b => b[0] < 0 || b[1] > innerWidth + 0.5).length, btns: btns.length, brShown,
+        return { tight: h.hasAttribute('data-tight'), model: (e => !!e && e.checkVisibility())(document.getElementById('terminal-header-model')), headerText: h.textContent.replace(/\\s+/g, ' '), over: document.documentElement.scrollWidth - innerWidth, btnOut: btns.filter(b => b[0] < 0 || b[1] > innerWidth + 0.5).length, btns: btns.length, brShown,
             capped: brShown && t.scrollWidth > t.clientWidth + 1, textW: Math.round(tr.width), fullName: t.textContent, chipFull: br.dataset.full, focusable: t.tabIndex === 0, role: t.getAttribute('role'), label: t.getAttribute('aria-label'),
             headerH: Math.round(hr.height), x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 }; })()`);
     const pop = () => ev(`(() => { const br = document.getElementById('terminal-header-branch'); const c = getComputedStyle(br, '::after'); return { content: c.content, position: c.position, width: parseFloat(c.width), left: c.left, right: c.right,
@@ -48,7 +48,7 @@ const SHORT = 'fix/header';
             console.log(dev);
             await open(w, mobile);
             let g = await geo();
-            check(`${dev}: the model line is drawn in the agent header only where it has room (above 1100 px; below it the Details disclosure has it, #9686)`, g.model === (w > 1100), JSON.stringify([g.model, g.headerText.slice(0, 120)]));
+            check(`${dev}: the model line is drawn in the agent header only where it has room (a viewport above 1100 px and a header over 44 rem; otherwise the Details disclosure has it, #9686, #9784)`, g.model === (w > 1100 && !g.tight), JSON.stringify([g.model, g.headerText.slice(0, 120)]));
             check(`${dev}: the 70-character branch pushes nothing off screen (no sideways scroll, every header button inside the window)`, g.over <= 0 && g.btnOut === 0 && g.btns > 0, JSON.stringify([g.over, g.btnOut, g.btns]));
             const narrowHdr = await ev(`document.querySelector('#live-session-view .terminal-header').hasAttribute('data-narrow')`);
             if (g.brShown && narrowHdr) { check(`${dev}: a header too narrow for a branch squeezes it as before and takes it out of the Tab order (nothing to focus)`, (await ev(`document.querySelector('#terminal-header-branch .terminal-branch-text').tabIndex`)) === -1 && g.over <= 0, JSON.stringify([g.textW, g.over])); await shot(`header-branch-${dev.replace(' ', '-')}-closed`); continue; }

@@ -2,10 +2,12 @@
 // model, the branch and the held-message lines are not on the row (the hover tip and the agent's page have them); the one chip is "Needs input" for an agent that asks, else "Message held" for an agent whose
 // paste was held, else none. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const base = o => Object.assign({ name: 'coral-go', display_name: '', agent_type: 'claude', summary: 'Ship the release plan', model: 'claude-opus-5-5', branch: 'feat/long-branch-name', repo_name: 'coral', working_directory: '/work/coral-project', context_pct: 10, working: false, waiting_for_input: false, not_started: false, stuck: false, sleeping: false, awaiting_user: false, done: false, board_project: '', board_unread: 0 }, o);
     const ROWS = [
         base({ session_id: 'o1', display_name: 'Worker', working: true }),
@@ -23,7 +25,7 @@ const { connect } = require('./agent_view_harness');
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(ROWS)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
             await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 7`, `${label}: the rows`, 6000);
-            const rows = await ev(`[...document.querySelectorAll('${root} .session-group-item')].map(li => { const r = li.getBoundingClientRect(), name = li.querySelector('.session-label'); return { id: li.dataset.sessionId, h: Math.round(r.height), weight: name ? getComputedStyle(name).fontWeight : null, nameLines: name ? Math.round(name.getBoundingClientRect().height / parseFloat(getComputedStyle(name).lineHeight || '16')) : 0, chips: [...li.querySelectorAll('.chip')].filter(c => c.getClientRects().length).map(c => c.textContent.trim()), label: li.getAttribute('aria-label') || '', chipPx: (c => c ? parseFloat(getComputedStyle(c).fontSize) : 0)(li.querySelector('.session-state-pill')), chipColor: (c => c ? getComputedStyle(c).color : '')(li.querySelector('.session-state-pill')), extra: ['.session-goal', '.session-model', '.session-worktree-line', '.session-line2', '.session-held-line', '.session-mobile-meta', '.session-mobile-banner-row', '.session-ctx-pill'].filter(s => li.querySelector(s)), dot: !!li.querySelector('.session-dot') }; })`);
+            const rows = await ev(`[...document.querySelectorAll('${root} .session-group-item')].map(li => { const r = li.getBoundingClientRect(), name = li.querySelector('.session-label'); return { id: li.dataset.sessionId, h: Math.round(r.height), weight: name ? getComputedStyle(name).fontWeight : null, nameLines: name ? Math.round(name.getBoundingClientRect().height / parseFloat(getComputedStyle(name).lineHeight || '16')) : 0, chips: [...li.querySelectorAll('.chip')].filter(c => c.getClientRects().length).map(c => c.textContent.trim()), label: li.getAttribute('aria-label') || '', dotDrawn: (d => !!d && getComputedStyle(d).visibility === 'visible' && d.getBoundingClientRect().width >= 6)(li.querySelector('.session-dot')), dotBg: (d => d ? getComputedStyle(d).backgroundColor : '')(li.querySelector('.session-dot')), chipPx: (c => c ? parseFloat(getComputedStyle(c).fontSize) : 0)(li.querySelector('.session-state-pill')), chipColor: (c => c ? getComputedStyle(c).color : '')(li.querySelector('.session-state-pill')), extra: ['.session-goal', '.session-model', '.session-worktree-line', '.session-line2', '.session-held-line', '.session-mobile-meta', '.session-mobile-banner-row', '.session-ctx-pill'].filter(s => li.querySelector(s)), dot: !!li.querySelector('.session-dot') }; })`);
             const by = id => rows.find(r => r.id === id);
             for (const r of rows) {
                 assert.ok(r.h >= rowH[0] && r.h <= rowH[1], `${label}: ${r.id} is one line, ${rowH[0]} to ${rowH[1]} px (${r.h}) ${JSON.stringify(r)}`);
@@ -31,6 +33,7 @@ const { connect } = require('./agent_view_harness');
                 assert.ok(r.dot && r.chips.length <= 1, `${label}: ${r.id} is a dot, a name and at most one chip ${JSON.stringify(r)}`);
                 assert.ok(Number(r.weight) === 500, `${label}: the name is 13/500, nothing bolder (${r.weight})`);
             }
+            assert.ok(by('o5').dotDrawn && by('o5').dotBg && by('o5').dotBg !== 'rgba(0, 0, 0, 0)', `${label}: an idle agent draws its grey dot (a row with no dot has no state, #9784) ${JSON.stringify(by('o5'))}`);
             assert.deepEqual(by('o1').chips.concat(by('o5').chips), [], `${label}: a working agent and an idle one have no chip`);
             assert.match(by('o2').chips[0] || '', /Needs input/, `${label}: an agent that asks has the Needs input chip`);
             if (mobile) assert.equal(by('o2').chipPx, 13, `${label}: the phone's chip is 13 px (the one thing that says an agent waits), the row still one line ${JSON.stringify(by('o2'))}`);
@@ -41,6 +44,7 @@ const { connect } = require('./agent_view_harness');
             assert.match(by('o6').chips.join(), /^Stuck$/, `${label}: a stuck agent has the Stuck chip: a state that asks something of a person is a word on the row (UI/UX, #9700) ${JSON.stringify(by('o6'))}`);
             assert.ok(by('o6').chipColor && by('o6').chipColor === by('o2').chipColor && by('o7').chipColor === by('o2').chipColor, `${label}: Stuck and Check terminal are the same amber as Needs input ${JSON.stringify([by('o2').chipColor, by('o6').chipColor, by('o7').chipColor])}`);
             assert.match(by('o7').chips.join(), /^Check terminal$/, `${label}: an agent with nothing yet has the Check terminal chip ${JSON.stringify(by('o7'))}`);
+            await shot(`agent-rows-${label}`);
             console.log(`PASS ${label}: one line, a dot, a name, at most one chip`);
             if (mobile) { // a phone's header has no room: one tap on Details shows the folder, branch and model
                 await ev(`window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
@@ -49,6 +53,7 @@ const { connect } = require('./agent_view_harness');
                 assert.equal(sum.text, 'Details'); assert.equal(sum.open, false, 'closed until asked'); assert.ok(sum.h >= 44, `a 44 px target ${JSON.stringify(sum)}`);
                 await ev(`document.querySelector('#agent-phone-details > summary').click(); true`);
                 const dd = await ev(`[...document.querySelectorAll('#agent-phone-details .facts-row')].filter(r => !r.hidden).map(r => r.querySelector('dt').textContent + ': ' + r.querySelector('dd').textContent)`);
+                await shot('agent-details-390');
                 assert.ok(dd.some(x => /^Context: ctx 10%/.test(x)) && dd.some(x => /^Folder: .*coral-project/.test(x)) && dd.some(x => /^Branch: .*long-branch-name/.test(x)) && dd.some(x => /^Model: .*Opus/.test(x)), `Details has the folder, the branch and the model ${JSON.stringify(dd)}`);
                 console.log('PASS 390: Details shows the folder, branch and model');
             }
@@ -56,9 +61,19 @@ const { connect } = require('./agent_view_harness');
                 await ev(`window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
                 await waitFor(`!document.getElementById('terminal-header-model')?.hidden && !document.getElementById('terminal-header-folder')?.hidden && !document.getElementById('terminal-header-branch')?.hidden`, 'the header: model, folder and branch', 8000);
                 const hd = await ev(`({ model: document.querySelector('#terminal-header-model .terminal-folder-text').textContent, folder: document.querySelector('#terminal-header-folder .terminal-folder-text').textContent, folderTip: document.getElementById('terminal-header-folder').title, branch: document.querySelector('#terminal-header-branch .terminal-branch-text').textContent })`);
+                await shot('agent-header-model-1280');
                 assert.match(hd.model, /Opus/, `the header names the model ${JSON.stringify(hd)}`); assert.match(hd.model, /ctx 10%/, `and the context use (the row's pill moved here) ${JSON.stringify(hd)}`);
                 assert.ok(hd.folder.includes('coral-project') && hd.folderTip === '/work/coral-project', `and the folder, with its full path on hover ${JSON.stringify(hd)}`);
                 assert.ok(hd.branch.includes('long-branch-name'), `and the branch beside it ${JSON.stringify(hd)}`);
+                // the header is what the pane leaves it: with the side panel open it is under 44 rem and the model line gives way to Details (it was squeezed to nothing); with the panel closed the model line is drawn (#9784, UI/UX look check)
+                const geo = () => ev(`(() => { const h = document.querySelector('#live-session-view .terminal-header'), m = document.getElementById('terminal-header-model'), d = document.getElementById('agent-phone-details'); return { tight: h.hasAttribute('data-tight'), headerW: Math.round(h.clientWidth), modelW: m && m.getClientRects().length ? Math.round(m.getBoundingClientRect().width) : 0, modelText: m ? m.textContent : '', detailsShown: !!d && !d.hidden && d.getClientRects().length > 0 }; })()`);
+                const open = await geo();
+                assert.ok(open.tight && open.modelW === 0 && open.detailsShown, `a tight header (side panel open): no squeezed model line, Details has it ${JSON.stringify(open)}`);
+                await ev(`document.getElementById('panel-toggle-btn').click(); true`);
+                await waitFor(`!document.querySelector('#live-session-view .terminal-header').hasAttribute('data-tight')`, 'a roomy header with the side panel closed', 6000);
+                const roomy = await geo();
+                assert.ok(roomy.modelW >= 90 && /Opus/.test(roomy.modelText) && !roomy.detailsShown, `a roomy header draws the model line (Opus, at least 90 px) and no Details ${JSON.stringify(roomy)}`);
+                await shot('agent-header-model-roomy-1280');
                 console.log('PASS 1280: the header has the branch, the folder and the model');
                 await Emulation.setDeviceMetricsOverride({ width: 1024, height: 800, deviceScaleFactor: 1, mobile: false }); // a header this narrow (the side panel takes half) has no room for the model line: Details has it
                 await waitFor(`getComputedStyle(document.getElementById('terminal-header-model')).display === 'none' && !document.getElementById('agent-phone-details').hidden && document.getElementById('agent-phone-details').getClientRects().length > 0`, '1024: the header model line gives way to Details', 6000);
