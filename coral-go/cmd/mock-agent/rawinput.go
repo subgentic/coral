@@ -122,8 +122,12 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 		i++
 		if b.promptOpen {
 			switch c {
-			case '\r':
-				fmt.Print("\r\n[mock-agent] PROMPT ANSWERED by an Enter (option 1)\r\n")
+			case '\r', '1', '2', '3', '4', '5', '6', '7', '8', '9': // Enter takes the marked option; a digit takes that option, as the CLI's menus do (the dashboard's answer buttons send the digit)
+				if c == '\r' {
+					fmt.Print("\r\n[mock-agent] PROMPT ANSWERED by an Enter (option 1)\r\n")
+				} else {
+					fmt.Printf("\r\n[mock-agent] PROMPT ANSWERED by a digit (option %c)\r\n", c)
+				}
 				b.promptOpen = false
 				if b.question {
 					b.question = false
