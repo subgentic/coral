@@ -14,7 +14,11 @@ let observer = null;
 let refreshTimer = null;
 let loadingOlder = false;
 
-function container() { return document.getElementById('live-history-messages'); }
+// The live chat's messages, or the past chat's in the Inbox when that is the one on screen (#10533, the Desktop tester: Ctrl/Cmd+F did nothing in a past chat).
+function container() {
+    for (const id of ['live-history-messages', 'history-messages']) { const c = document.getElementById(id); if (c && c.offsetParent !== null) return c; }
+    return document.getElementById('live-history-messages');
+}
 
 function chatVisible() {
     const c = container();
@@ -101,7 +105,7 @@ function updateCount(query) {
     if (!query) count.textContent = '';
     else if (!ranges.length) count.textContent = 'No results';
     else count.textContent = `${current + 1} of ${ranges.length}${ranges.length >= MAX_MATCHES ? '+' : ''}`;
-    older.hidden = !query || !chatHasOlder();
+    older.hidden = !query || container()?.id !== 'live-history-messages' || !chatHasOlder(); // a past chat is loaded whole: only the live chat has older pages to fetch
     older.disabled = loadingOlder;
     older.textContent = loadingOlder ? 'Loading…' : 'Search older';
     bar.classList.toggle('no-results', !!query && !ranges.length);
@@ -170,6 +174,7 @@ async function loadAllOlder() {
             refreshTimer = setTimeout(() => runSearch(false), 250);
         });
     }
+    observer.disconnect(); // the box that is on screen now, not the one that was
     observer.observe(container(), { childList: true, subtree: true, characterData: true });
     runSearch(true);
     return true;
