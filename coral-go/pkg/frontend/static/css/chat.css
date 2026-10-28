@@ -1324,6 +1324,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 .chat-bubble .message-text .code-block > pre,
 .chat-prose.chat-messages .chat-bubble .message-text .code-block > pre {
     margin: 0;
+    padding-top: 38px; /* the buttons sit above the first line, not over its end (#10533, Orchestrator at 390) */
 }
 .code-block .code-copy-btn {
     position: absolute;
@@ -1374,9 +1375,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     color: var(--text-secondary);
     pointer-events: none;
 }
-.chat-bubble .message-text .code-block > pre, .chat-prose.chat-messages .chat-bubble .message-text .code-block > pre { padding-top: 38px; } /* the buttons sit above the first line, not over its end (#10533, Orchestrator at 390) */
 @media (max-width: 767px), (pointer: coarse) { .chat-bubble .message-text .code-block > pre, .chat-prose.chat-messages .chat-bubble .message-text .code-block > pre { padding-top: 56px; } .code-block .code-wrap-btn { right: 56px; height: 44px; min-width: 44px; } .code-block .code-scroll-hint { right: 112px; height: 44px; } } /* a touch screen's buttons are 44 px high, side by side without overlap */
-.code-block .code-copy-btn.copied { width: auto; padding: 0 8px; gap: 4px; }
 .code-block .code-copy-btn.copied::after { content: "Copied"; font-size: var(--fs-sm); }
 .code-block.code-wrapped > pre, .code-block.code-wrapped > pre code { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
 .code-block .code-copy-btn .material-icons {
@@ -1393,6 +1392,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 }
 .code-block .code-copy-btn.copied {
     color: var(--success, var(--accent));
+    width: auto; padding: 0 8px; gap: 4px; /* wide enough for its word */
 }
 @media (hover: none) {
     .code-block .code-copy-btn {
