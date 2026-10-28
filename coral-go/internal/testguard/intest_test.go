@@ -30,6 +30,7 @@ func TestInTest(t *testing.T) {
 		})
 	}
 	assert.True(t, InTest(), "a test binary says so")
+	assert.True(t, InTestRun(), "and its test flags are registered while a test runs")
 }
 
 // #9980: the testing package is not linked into the binaries Coral ships. testguard and what asks it whether this is a test must not import it (testing.Testing() would): a shipped binary carries
@@ -50,4 +51,17 @@ func TestShippedBinariesDoNotLinkTesting(t *testing.T) {
 			assert.NotEqual(t, "testing", dep, "cmd/%s links the testing package: a production file imports it (internal/testguard.InTest is the check that does not)", pkg)
 		}
 	}
+}
+
+// #10014: a shipped binary whose launcher gives it a -test.* argument counts as a test for the package-init scrub (InTest, which has to answer before the flags exist) but is NOT a test run: its test flags
+// are not registered, so what acts on a test-only environment variable (dbcrypt's migration fault injection) stays off. The probe is a plain main package run with such an argument.
+func TestAShippedBinaryGivenTestFlagsIsNotATestRun(t *testing.T) {
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("no go command to run the probe")
+	}
+	cmd := exec.Command(goBin, "run", "./testdata/probe", "-test.timeout=1m")
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Equal(t, "InTest=true InTestRun=false\n", string(out))
 }
