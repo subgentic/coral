@@ -1,9 +1,9 @@
 // The words of Settings > Agents > CLI paths > Verify (#10083): a CLI the person does not use is "Not installed" in a neutral colour, not a red failure; a path Coral refuses says why and what to do.
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { cliVerifyWords } = await import(path.resolve(here, '../../coral-go/pkg/frontend/static/cli_verify_words.js'));
+const { cliVerifyWords } = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/cli_verify_words.js')).href);
 
 // found: the version, green
 assert.deepEqual(cliVerifyWords({ ok: true, data: { found: true, version: '2.1.0' }, typed: '', type: 'claude' }), { text: '2.1.0', cls: 'cli-verify-ok', hint: '' });
