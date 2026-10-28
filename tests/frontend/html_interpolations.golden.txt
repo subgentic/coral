@@ -108,10 +108,10 @@
 1	chat_bubbles.js	editors.map((ed, i) => `<button type="button" class="menu-item" role="menuitem" data-action="editor" data-edit
 2	chat_bubbles.js	line > 0 ? ` (line ${line})` : ""
 1	chat_messages.js	COPY_BUTTON
-1	chat_messages.js	MESSAGE_MENU_BUTTON
 1	chat_messages.js	attachmentChips(msg.attachments)
 1	chat_messages.js	chips.join("")
 2	chat_messages.js	getToolIcon(view.icon)
+1	chat_messages.js	messageMenuButton(lead.rest)
 2	chat_messages.js	messageTimeHtml(msg.timestamp)
 2	chat_messages.js	msg.key ? SAVE_BUTTON : ""
 3	chat_messages.js	outputHtml
