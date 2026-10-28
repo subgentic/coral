@@ -127,6 +127,7 @@ const mailCell = (m, label, open, pick, showTeam = false) => { // open: the row 
     line.append(el('span', 'dt-mail-title', m.title || ''));
     if (showTeam && m.team) line.append(el('span', 'dt-mail-team', ` - ${m.team}`)); // who is asking: the team (with its computer when a hub has several) after the title in the tertiary colour
     line.append(' ', el('span', 'dt-mail-snippet', m.snippet || '')); // a space between the words: the row reads as words, not run together
+    if (m.live) { const dot = el('span', 'dt-mail-live'); dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', m.live); dot.title = m.live; line.append(dot); } // a live chat's state: a dot after the title (names stay in one column), its word the label (Active now) (#9740)
     text.append(line);
     if (m.ask) { text.classList.add('dt-mail-two'); const ask = el('span', 'dt-mail-ask', m.ask); ask.title = m.ask; text.append(ask); } // the whole ask is the line's title, so a cut one can be read (#9495)
     const side = el('span', 'dt-mail-side'); side.append(el('span', 'dt-mail-time', m.time || ''));
