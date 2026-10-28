@@ -47,6 +47,12 @@ const { connect } = require('./agent_view_harness');
             assert.ok(by('o6').chipColor && by('o6').chipColor === by('o2').chipColor && by('o7').chipColor === by('o2').chipColor, `${label}: Stuck and Check terminal are the same amber as Needs input ${JSON.stringify([by('o2').chipColor, by('o6').chipColor, by('o7').chipColor])}`);
             assert.match(by('o7').chips.join(), /^Check terminal$/, `${label}: an agent with nothing yet has the Check terminal chip ${JSON.stringify(by('o7'))}`);
             await shot(`agent-rows-${label}`);
+            if (!mobile) { // at 200% text the held chip wraps under its name instead of squeezing it (the look pass, #9804: "Held" was drawn as "H.")
+                await ev(`document.documentElement.style.fontSize = '32px'; true`); await new Promise(r => setTimeout(r, 500)); // sleep-ok: the layout settles at the new size
+                const h = await ev(`(() => { const li = document.querySelector('${root} .session-group-item[data-session-id="o3"]'), l = li.querySelector('.session-label'), c = li.querySelector('.session-held-chip'); return { whole: l.scrollWidth <= l.clientWidth + 1, text: l.textContent.trim(), labelW: Math.round(l.getBoundingClientRect().width), chipBelow: c.getBoundingClientRect().top >= l.getBoundingClientRect().bottom - 1 }; })()`);
+                await ev(`document.documentElement.style.fontSize = ''; true`);
+                assert.ok(h.whole && h.chipBelow, `${label}: at 200% text the name is whole and the held chip is under it: ${JSON.stringify(h)}`);
+            }
             console.log(`PASS ${label}: one line, a dot, a name, at most one chip`);
             if (mobile) { // a phone's header has no room: one tap on Details shows the folder, branch and model
                 await ev(`window.selectLiveSession('coral-go', 'claude', 'o1'); true`);

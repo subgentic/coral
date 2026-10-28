@@ -1747,6 +1747,14 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     .session-name-row .session-attention-pill { order: 2; margin-left: var(--row-dot-block, 16px); }
 }
 
+/* A held-message chip (Message held) wraps under the name in a narrow row as Needs input does: in one nowrap row the name was squeezed to "H." beside it at 200% text (the look pass, #9804). */
+.session-info:has(.session-name-row .session-held-chip) { container-type: inline-size; }
+@container (max-width: 14rem) {
+    .session-name-row:has(.session-held-chip) { flex-wrap: wrap; }
+    .session-name-row:has(.session-held-chip) .session-label { flex: 1 1 calc(100% - 40px); }
+    .session-name-row .session-held-chip { order: 2; margin-left: var(--row-dot-block, 16px); }
+}
+
 /* A phone's Details disclosure (#9686): the folder, branch, model and thinking level of the open agent; a desktop's header has them. */
 .agent-phone-details { display: none; }
 /* A header this narrow (a window up to 1100 px, whose side panel takes half of it, or a phone) has no room for the model line beside the name: the Details disclosure has it instead (#9686; the folded model chip's 8 px margin and 4 px gap were the 12 px that overflowed the header at 1024). */
