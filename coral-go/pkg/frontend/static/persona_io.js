@@ -145,8 +145,11 @@ export async function applyTeamTemplateFile(data) {
     if (!entries.length) { showToast(problems[0], "error"); return; }
     try { await _upsertSavedTeamTemplates(entries); } catch { showToast("Could not save the imported templates", "error"); return; }
     showToast(problems.length ? `Imported ${entries.length} template(s); skipped ${problems.length}: ${problems[0]}` : `Imported ${entries.length} template(s)`);
-    if (entries.some(t => String(t.flags || '').trim() || (t.agents || []).some(a => String(a.flags || '').trim()))) {
-        showToast("This template sets command-line flags. Check them before you launch: they are run as given.", "error"); // one warning for the whole file, from a file someone else may have made
+    const flagTexts = entries.flatMap(t => [String(t.flags || ''), ...(t.agents || []).map(a => String(a.flags || ''))]).filter(f => f.trim());
+    if (flagTexts.length) {
+        // Flags that change what the agent may do without asking are named: a file someone else made may turn the prompts off (#10540). One warning for the whole file.
+        const risky = [...new Set(flagTexts.join(' ').match(/--[a-z-]*(?:permission|bypass|sandbox|approval|yolo|full-auto)[a-z-]*/gi) || [])].slice(0, 3);
+        showToast(`This template sets command-line flags${risky.length ? `, including ${risky.join(', ')}, which change what the agent may do without asking` : ''}. Check them before you launch: they are run as given.`, "error");
     }
     _renderTeamTemplateSelector();
 }
