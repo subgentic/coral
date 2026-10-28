@@ -61,6 +61,8 @@ type SessionsHandler struct {
 	holds personHolds
 	// answers is each agent's last answered prompt, for the live row's last_answer: a second device that shows the card says who got there first (#10301).
 	answers promptAnswers
+	// sends is each agent's person-typed messages not yet in its transcript, for the live row's pending_sends: a second screen shows them as sent (#10467).
+	sends pendingSends
 	// modelSwitches tracks the live model and thinking-level switches in progress (#4969, model_switch.go).
 	modelSwitches modelSwitchTracker
 	// inOldTmux reports an agent session still running in Coral's private tmux server, for a
