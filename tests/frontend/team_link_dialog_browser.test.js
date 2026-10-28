@@ -41,12 +41,12 @@ const ALLOWED = [/^GET \/api\/sessions\/live$/, /^GET \/api\/relay\/links$/, /^P
                     window.__paths = window.__paths || []; window.__paths.push(m + ' ' + path);
                     if (!hubby) return real(url, opt);
                     window.__calls.push(m + ' ' + path + (opt.body ? ' ' + opt.body : ''));
-                    if (path === '/api/account') return json(200, { team_link_dialog: window.__flag === true, ...(window.__owner === false ? { owner: false } : {}) });
+                    if (path === '/api/account') return json(200, { team_link_dialog: window.__flag === true });
                     if (path === '/api/sessions/live') return window.__live === 'fail' ? json(500, {}) : json(200, ${JSON.stringify(LIVE)});
                     if (path === '/api/relay/links' && m === 'GET') return json(200, { links: window.__links, relay_artifacts_available: true, relay_artifacts_enabled: true });
                     if (path === '/api/relay/links' && m === 'POST') return json(window.__post.status, window.__post.status === 200 ? { ok: true } : { error: window.__post.code || 'not_found' });
                     if (/^\\/api\\/relay\\/links\\/\\d+$/.test(path) && m === 'DELETE') { window.__links = window.__links.filter(l => String(l.id) !== path.split('/').pop()); return json(200, { ok: true }); }
-                    if (path === '/api/servers') return json(200, { servers: ${JSON.stringify(SERVERS)} });
+                    if (path === '/api/servers') return json(200, { servers: window.__localRow ? [...${JSON.stringify(SERVERS)}, { id: 'local', label: 'Here', online: false, effective_mode: 'launch' }] : ${JSON.stringify(SERVERS)} });
                     if (/^\\/api\\/remote\\/[\\w-]+\\/api\\/board\\/projects$/.test(path)) return json(200, ${JSON.stringify(PROJECTS)});
                     return json(404, {});
                 };
@@ -57,9 +57,9 @@ const ALLOWED = [/^GET \/api\/sessions\/live$/, /^GET \/api\/relay\/links$/, /^P
             await waitFor(`document.querySelectorAll('.session-board-card').length >= 1`, 'the team card', 10000);
             const menu = () => ev(`[...document.querySelectorAll('.session-board-card .sidebar-kebab-menu button[data-on-click]')].map(b => b.dataset.onClick)`);
             assert.ok(!(await menu()).includes('team-link'), `${label}: no Link team item while the account says nothing`);
-            await ev(`(async () => { window.__flag = true; window.__owner = false; const m = await import((window.__coralStatic || '/static/') + 'team_link_flag.js'); await m.initTeamLinkFlag(); return true; })()`);
-            assert.ok(!(await menu()).includes('team-link'), `${label}: a viewer the account says is not the owner gets no Link team item, whatever the switch says`);
-            await ev(`(async () => { window.__owner = undefined; const m = await import((window.__coralStatic || '/static/') + 'team_link_flag.js'); await m.initTeamLinkFlag(); return true; })()`);
+            await ev(`(async () => { window.__flag = true; window.__localRow = false; const m = await import((window.__coralStatic || '/static/') + 'team_link_flag.js'); await m.initTeamLinkFlag(); return true; })()`);
+            assert.ok(!(await menu()).includes('team-link'), `${label}: the switch is on but this team's computer is not one of the viewer's own (a share grantee): no Link team item`);
+            await ev(`(async () => { window.__localRow = true; const m = await import((window.__coralStatic || '/static/') + 'team_link_flag.js'); await m.initTeamLinkFlag(); return true; })()`);
             await waitFor(`[...document.querySelectorAll('.session-board-card .sidebar-kebab-menu button[data-on-click]')].some(b => b.dataset.onClick === 'team-link')`, 'the Link team item', 6000);
             const order = await menu();
             assert.ok(order.indexOf('team-link') === order.indexOf('team-working-mode') + 1, `${label}: Link team... is right after Team settings: ${order}`);
