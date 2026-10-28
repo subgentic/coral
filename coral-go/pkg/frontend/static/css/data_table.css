@@ -365,6 +365,7 @@
 .artifact-details { color: var(--text-muted); }
 .artifact-details .artifact-details-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
 .dt-box tbody tr:hover .artifact-details, .dt-box .artifact-details:hover, .dt-box .artifact-details:focus-visible, .dt-box tbody tr[aria-current="true"] .artifact-details { color: var(--accent); }
+.dt-box .artifact-details:hover { text-decoration: none; } /* the link's underline would be a bar under the glyph */
 @container (max-width: 62rem) { .dt-one-line [data-drop-at="62"] { display: none; } } /* the Inbox artifact list's Tags go first */
 @container (max-width: 52rem) { .dt-one-line [data-drop-at="52"] { display: none; } }
 @container (max-width: 36rem) { .dt-one-line [data-drop-at="36"] { display: none; } }
