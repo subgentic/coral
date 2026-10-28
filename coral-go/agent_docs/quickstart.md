@@ -244,7 +244,7 @@ URL alone does not trigger the offer. `--cloud-connect off` suppresses it;
 
 ## 4. Launch your first agent
 
-Home asks **What do you want to work on?** with **New agent**, **New team** and **Open folder** (elsewhere, **+ New agent**). Choose **New agent**, enter an existing
+Home asks **What do you want to work on?** with **New agent**, **New project** and **Open folder** (elsewhere, **+ New agent**). Choose **New agent**, enter an existing
 project folder on the computer running Coral and choose **Next**. Step 2 is the
 persona (optional); step 3 has the **Agent** tab, where you choose your installed
 CLI, then choose **Launch** (it is available from every step once a folder is set). In **Chat**, type a task and press Enter
@@ -268,7 +268,7 @@ $ curl -H "Authorization: Bearer $(coral api-key)" -s -X POST http://127.0.0.1:8
 
 ### Or start a team
 
-Choose **New team** on Home. The dialog opens on the **Default team (3 members)**: an Orchestrator, a Lead Developer and a QA Engineer, already in **Members** and each removable; **Blank team** in the same list starts with none. Name the team, choose the folder it works in, and launch it. The agents share a message board and split the work; see [Teams](teams.md).
+Choose **New project** on Home. The dialog opens on the **Default team (3 members)**: an Orchestrator, a Lead Developer and a QA Engineer, already in **Members** and each removable; **Blank team** in the same list starts with none. Name the team, choose the folder it works in, and launch it. The agents share a message board and split the work; see [Teams](teams.md).
 
 ### If your first agent is waiting for input
 

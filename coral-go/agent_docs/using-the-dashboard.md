@@ -54,7 +54,7 @@ A team's health check is **off by default**. When it is on, Coral checks in on t
 ![Two teams in the agent list: the health icon is on, beside each team's info button](docs-img/team-health.png)
 
 - **The icon** sits beside the team's info button in the agent list: a plain, dimmed outline while the check is off, an accent icon on a tinted pill while it is on. It is named "Team health monitor: off" or "on". Click it to open the team's settings on the **Health check** tab. There is no icon where the list carries no state (Coral Hub).
-- **Turn it on** in the Health check tab of Team settings (**Send a health check to this team**). It is off for a new team; the New team dialog has no option for it.
+- **Turn it on** in the Health check tab of Team settings (**Send a health check to this team**). It is off for a new team; the New project dialog has no option for it.
 - **Also in that tab:** how often, who receives it, whether to post a short line when nothing needs attention, and each automatic rule (nudge an idle agent to claim its work, ask a quiet agent for a status, report a held delivery). Those rules act only while the check is on. Handing a review to the default reviewers works whether or not it is on.
 
 A separate switch, **Team health checks** in Settings > Agents, is on by default and is read when Coral starts: turning it off stops the background monitor for every team, and each team's Health check tab then says it needs that switch, with a link to Settings. See [Teams](teams.md#board-health-monitor-setting).
@@ -74,7 +74,7 @@ A team's page has the tabs **Goals**, **Board**, **Tasks**, **Agents**, **Artifa
 
 ## Sectioned dialogs
 
-**Restart**, **New agent**, **New team** and a team's agent dialog share one layout: a list of sections on the left (a selector at the top on a phone or at large text), one section at a time on the right, and a footer with the buttons that is always in view.
+**Restart**, **New agent**, **New project** and a team's agent dialog share one layout: a list of sections on the left (a selector at the top on a phone or at large text), one section at a time on the right, and a footer with the buttons that is always in view.
 
 ![The New agent dialog on its Agent section](docs-img/dialog-sections.png)
 

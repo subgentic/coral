@@ -266,3 +266,48 @@ func TestHowDoIAnswersThreeMoreQuestions(t *testing.T) {
 		assert.Contains(t, src, want, "the dashboard has the control the answer names: "+want)
 	}
 }
+
+// #10605 and #10595: the launch choice is New project, not New team: no shipped agent doc names the old button.
+func TestAgentDocsNameNewProjectNotNewTeam(t *testing.T) {
+	entries, err := os.ReadDir(filepath.Join("..", "..", "..", "agent_docs"))
+	require.NoError(t, err)
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", e.Name()))
+		require.NoError(t, err)
+		assert.NotContains(t, string(b), "New team", e.Name()+" names the old button: it is New project")
+	}
+}
+
+// #10595 (Desktop Docs pass): How do I...? says how to stop a reply that is still running, with the controls as the dashboard has them, and ends with where to go when still stuck.
+func TestHowDoIStopsAReplyAndEndsWithWhereToGo(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", "how-do-i.md"))
+	require.NoError(t, err)
+	text := strings.ReplaceAll(string(b), "\r\n", "\n")
+	assert.Contains(t, text, "**Stop a reply that is still running:**")
+	for _, want := range []string{"**Stop**", "**Escape**", "**Stop the agent**"} {
+		assert.Contains(t, text, want)
+	}
+	front := filepath.Join("..", "..", "..", "pkg", "frontend")
+	read := func(rel string) string {
+		b, err := os.ReadFile(filepath.Join(front, rel))
+		require.NoError(t, err, rel)
+		return string(b)
+	}
+	assert.Contains(t, read("static/css/chat.css"), `content: "Stop"`, "the Esc button really says Stop while the agent works")
+	assert.Contains(t, read("static/agent_keys.js"), "'Stop the agent'", "a phone's Send button is really named Stop the agent")
+	assert.Contains(t, read("static/agent_keys.js"), "Escape in the empty box", "and Escape in the empty box really stops")
+	idx := strings.LastIndex(text, "## Still stuck?")
+	require.GreaterOrEqual(t, idx, 0, "the page ends with Still stuck?")
+	tail := text[idx:]
+	assert.NotContains(t, tail[len("## Still stuck?"):], "\n## ", "and it is the last section")
+	for _, link := range []string{"(troubleshooting.md)", "(https://github.com/subgentic/coral)", "[Forum]("} {
+		assert.Contains(t, tail, link)
+	}
+	welcome := read("templates/index.html")
+	forum := regexp.MustCompile(`\[Forum\]\((https://[^)]+)\)`).FindStringSubmatch(tail)
+	require.Len(t, forum, 2)
+	assert.Contains(t, welcome, `href="`+forum[1]+`"`, "the Forum link is the one the dashboard's welcome page has")
+}
