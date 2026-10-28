@@ -578,7 +578,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             : '';
         const html = `<span class="changed-files-count">${files.length} file${files.length !== 1 ? 's' : ''} changed</span>
             ${stats}
-            ${modeSelect}${compareNote}${files.length > 0 ? '<span class="changed-files-count files-compare-note files-legend">New files are green, deleted ones red, the rest changed.</span>' : ''}`; // what the colours mean, said once under the header (#10386, Beta)
+            ${modeSelect}${compareNote}`;
         // The list is redrawn on every poll: the header is written only when it says something new, so its select and counts are not replaced under a person's pointer or a layout pass (#7671).
         if (titleEl._html !== html) { titleEl.innerHTML = html; titleEl._html = html; }
     }
@@ -596,6 +596,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
 
     const starred = new Set(_getStarredFiles());
     const heldMore = list.contains(document.activeElement) && document.activeElement.classList.contains('file-more-btn') ? document.activeElement.dataset.path : ''; // the list is drawn again on every poll: the row's More button that had the keyboard gets it back (#7652)
+    // What the colours mean, said once as the list's own first line, so the header keeps its height when the first file arrives (#10386, Beta; #10054)
     list.innerHTML = files.map((f) => {
         const { dir, name } = splitPath(f.filepath);
         const statusCls = getStatusClass(f.status);
@@ -635,6 +636,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}${shareBtn}</div>
         </div>`;
     }).join('');
+    list.insertAdjacentHTML('afterbegin', '<div class="files-legend">New files are green, deleted ones red, the rest changed.</div>');
     if (heldMore) [...list.querySelectorAll('.file-more-btn')].find(b => b.dataset.path === heldMore)?.focus({ preventScroll: true });
 }
 
