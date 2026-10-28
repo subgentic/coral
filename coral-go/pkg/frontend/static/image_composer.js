@@ -72,13 +72,11 @@ export function initImageDrop() {
         dragCounter = 0;
         overlay.style.display = "none";
 
-        const files = [...(e.dataTransfer?.files || [])].filter(f =>
-            f.type.startsWith("image/")
-        );
-        if (files.length === 0) {
-            showToast("No image files found in drop", true);
-            return;
-        }
+        const dropped = [...(e.dataTransfer?.files || [])];
+        const files = dropped.filter(f => f.type.startsWith("image/"));
+        // A file that is not an image is not attached: say what to do instead of nothing (#10147).
+        if (files.length < dropped.length || dropped.length === 0) showToast(NOT_IMAGES, files.length === 0);
+        if (files.length === 0) return;
 
         for (const file of files) {
             await uploadAndInsertImage(file);
@@ -249,6 +247,8 @@ export async function uploadAndInsertImage(file, session = state.currentSession)
         if (state.currentSession?.session_id === sid) renderAttachments(targetSession);
     }
 }
+
+const NOT_IMAGES = "Only images can be attached here; mention a project file with @";
 
 // An attachment is named by its place in the strip ("Image 2"), not by its file's name: the name is a generated id that says nothing; it stays in the tooltip.
 const imageName = (i, n) => (n > 1 ? `Image ${i + 1}` : 'Image');
