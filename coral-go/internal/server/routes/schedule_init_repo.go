@@ -36,8 +36,20 @@ func jobFolderErrorFor(ctx context.Context, dir string, noWorktree bool) string 
 	if !noWorktree {
 		return jobFolderError(ctx, dir)
 	}
-	if _, err := canonicalizeRepoPath(dir); err != nil {
+	resolved, err := canonicalizeRepoPath(dir)
+	if err != nil {
 		return "repo_path is not an existing directory: " + dir
+	}
+	return homeOrRootRefusal(resolved) // runs that work in the folder itself, an agent with the person's permissions: never in the home folder or the root of the disk (#10534)
+}
+
+// homeOrRootError is what init-repo and a job that runs without a worktree both say for the home folder and the root of the disk (#10276, #10534).
+const homeOrRootError = "Pick a project folder, not the home folder or the root of the disk: a repository there would hold everything in it."
+
+// homeOrRootRefusal is homeOrRootError for the home folder or the root of the disk (dir is resolved), else "".
+func homeOrRootRefusal(dir string) string {
+	if home, herr := os.UserHomeDir(); (herr == nil && sameDir(dir, home)) || filepath.Dir(dir) == dir {
+		return homeOrRootError
 	}
 	return ""
 }
@@ -57,8 +69,8 @@ func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "repo_path is not an existing directory: "+body.RepoPath)
 		return
 	}
-	if home, herr := os.UserHomeDir(); (herr == nil && sameDir(dir, home)) || filepath.Dir(dir) == dir {
-		errBadRequest(w, "Pick a project folder, not the home folder or the root of the disk: a repository there would hold everything in it.")
+	if msg := homeOrRootRefusal(dir); msg != "" {
+		errBadRequest(w, msg)
 		return
 	}
 	if !gitutil.Available() {
@@ -83,7 +95,7 @@ func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 			args = append(args, "-c", key+"="+fallback)
 		}
 	}
-	args = append(args, "commit", "--allow-empty", "--no-verify", "-m", "Initial commit")
+	args = append(args, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "--no-verify", "-m", "Initial commit") // never a signing prompt or a failed signature on Coral's own placeholder commit (#10534)
 	if out, err := gitutil.Command(ctx, dir, args...).CombinedOutput(); err != nil {
 		errBadRequest(w, "the first commit failed: "+strings.TrimSpace(string(out)))
 		return
