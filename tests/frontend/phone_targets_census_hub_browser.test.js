@@ -1,3 +1,4 @@
+// cdp-timeout: 300 (a scene-walking census: 65 to 115 s alone, past the runner's 120 s on a loaded machine, #9968)
 // The phone touch-target census through Coral Hub (#6130): cloud mode under the hub's CSP, a stubbed two-computer Hub (the one hub_history_board_nav_browser uses), at 390 px with touch: every visible control on
 // the Hub's screens (nav menu, Chats and a chat with its tabs, boards and a board, Servers, Inbox, Docs, the account menu, Settings, Launch) is at least 44 x 44 px (helpers/phone_targets.js). The dashboard on this
 // computer's own screens are phone_targets_census_browser's. PHONE_TARGETS_REPORT=<file> writes the report to that file instead of failing.

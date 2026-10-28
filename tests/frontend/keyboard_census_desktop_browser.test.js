@@ -1,3 +1,4 @@
+// cdp-timeout: 300 (a scene-walking census: 65 to 115 s alone, past the runner's 120 s on a loaded machine, #9968)
 // The keyboard-only census on a desktop (#6188): at 1280 px, on each main screen of this computer's own dashboard, a real Tab walk (helpers/keyboard_census.js) reaches every visible control, each stop shows
 // that it has focus, the order has no tabindex above 0, and each dialog takes focus in, keeps Tab and Shift+Tab inside, closes on Escape and gives focus back to what opened it. The scenes are the desktop
 // contrast census's; ALLOW_KEYBOARD is empty. KEYBOARD_REPORT=<file> writes the findings to that file instead of failing.

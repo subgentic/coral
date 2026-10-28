@@ -91,6 +91,7 @@ import { fileURLToPath } from 'node:url';
 import { classifySuites, problems } from './suites.mjs';
 import { loadDurations, orderLongestFirst, partsByDuration } from './suite_order.mjs';
 import { failingOutput } from './failing_output.mjs';
+import { suiteTimeoutS } from './suite_timeout.mjs';
 import { pruneOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS } from './helpers/run_folders.mjs';
 import { sqliteAvailable, sqliteExec } from './helpers/sqlite.js';
 import { redactEvidence as redactEvidenceText } from './helpers/redact_evidence.mjs';
@@ -779,13 +780,14 @@ async function runAttempt(t, shard) {
   let before = null;
   try { before = serverSnapshot(shard.data); } catch (e) { console.log(`  [runner] could not read the shard's shared state before ${t}: ${e.message.split('\n')[0]}`); }
   const started = Date.now();
+  const limitS = suiteTimeoutS(here, t, timeoutS); // the suite's own `// cdp-timeout: N` if larger than --timeout (#9968)
   return await new Promise(resolve => {
     // helpers/keep_page_visible.js keeps each suite's pages visible (a hidden page runs no animation frames, #3707).
     const p = spawn('node', ['--require', path.join(here, 'helpers', 'keep_page_visible.js'), t], { cwd: here, env: shard.env, detached: DETACH });
     track(p);
     let out = ''; p.stdout.on('data', d => out += d); p.stderr.on('data', d => out += d);
     let timedOut = false;
-    const timer = setTimeout(async () => { timedOut = true; try { await Promise.race([captureTimeoutEvidence(shard, t), sleep(45000)]); } catch { /* the capture never keeps the kill from happening, and never holds it more than 45 s */ } killTree(p); }, timeoutS * 1000);
+    const timer = setTimeout(async () => { timedOut = true; try { await Promise.race([captureTimeoutEvidence(shard, t), sleep(45000)]); } catch { /* the capture never keeps the kill from happening, and never holds it more than 45 s */ } killTree(p); }, limitS * 1000);
     let closed = false;
     p.on('close', () => { closed = true; });
     p.on('error', e => { clearTimeout(timer); untrack(p); resolve({ status: 'fail', code: 'spawn', secs: '0.0', shard: shard.n, log: shard.log, out: `[runner] could not start the suite: ${e.message}` }); });
@@ -817,7 +819,7 @@ async function runAttempt(t, shard) {
           }
         } catch (e) { leaks = [`could not read the shared state after the suite: ${e.message.split('\n')[0]}`]; }
       }
-      resolve({ status, code: timedOut ? 'timeout' : code, secs, shard: shard.n, log: shard.log, leaks, rows, restored, cleaned, out: timedOut ? `${out}\n[runner] TIMEOUT: killed after ${timeoutS}s` : out });
+      resolve({ status, code: timedOut ? 'timeout' : code, secs, shard: shard.n, log: shard.log, leaks, rows, restored, cleaned, out: timedOut ? `${out}\n[runner] TIMEOUT: killed after ${limitS}s` : out });
     });
   });
 }
