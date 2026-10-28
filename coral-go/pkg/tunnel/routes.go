@@ -461,6 +461,8 @@ var routeTable = cat(
 	// File writes on the host are launch-tier (operator decision): they change what
 	// runs next on that machine as surely as starting an agent does.
 	rules(http.MethodPut, TierLaunch, "/api/sessions/live/{name}/file-content"),
+	// Sharing one of those files makes an artifact of it (#10269): Launch too, a write on that machine.
+	rules(http.MethodPost, TierLaunch, "/api/sessions/live/{name}/share-file"),
 	rules(http.MethodPost, TierLaunch, "/api/upload"),
 )
 

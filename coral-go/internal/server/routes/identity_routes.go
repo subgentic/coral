@@ -246,6 +246,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/sessions/live/{name}/auto-accept/enable":               "turn on auto-accept for an agent",
 	"POST /api/sessions/live/{name}/auto-accept/disable":              "turn off auto-accept for an agent",
 	"PUT /api/sessions/live/{name}/file-content":                      "write a file in an agent's working folder",
+	"POST /api/sessions/live/{name}/share-file":                       "share a file of an agent's working folder as an artifact",
 	"POST /api/sessions/live/team/{boardName}/kill":                   "stop a team",
 	"POST /api/sessions/live/team/{boardName}/reset":                  "reset a team",
 	"POST /api/sessions/live/team/{boardName}/sleep":                  "put a team to sleep",

@@ -86,6 +86,7 @@ var routeQueries = map[string]string{
 	"POST /api/board/{}/tasks/{}/publish":         "subscriber_id",
 	"POST /api/board/{}/tasks/{}/reminder":        "subscriber_id",
 	"POST /api/sessions/live/{}/notes":            "session_id",
+	"POST /api/sessions/live/{}/share-file":       "filepath*,session_id",
 	"POST /api/sessions/live/{}/tasks":            "session_id",
 	"PUT /api/sessions/live/{}/file-content":      "filepath*,session_id",
 }
