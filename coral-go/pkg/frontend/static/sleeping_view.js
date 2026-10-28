@@ -6,6 +6,7 @@
 
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
+import { resolveSessionIdentity } from './session_state.js';
 
 const lastState = new Map(); // session_id -> the words its state last had, to say a change once (#6213)
 let stateFlip = false;
@@ -49,8 +50,12 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
     const text = document.getElementById('sleeping-composer-text');
     // Its CLI exited (#6058): said once, with the agent's name, and "before answering" when a message of the person's is still waiting.
     const ended = sleeping && !archived && !gone && !!row && row.sleep_reason === 'agent_exited';
-    const who = (cur && (cur.display_name || cur.name)) || 'This agent';
-    const endedText = !!(cur && state.lastSendAt && state.lastSendAt.has(cur.session_id)) ? `${who} stopped before answering` : `${who} has ended`;
+    // The agent by the name its row shows (its role or name), not its folder (#10439: "home stopped before answering"); a message it never answered stays in the chat, marked, and its Working clock stops.
+    const who = (row && resolveSessionIdentity(row)) || (cur && (cur.display_name || cur.name)) || 'This agent';
+    const endedText = `${who} has ended`;
+    if (ended && cur && state.lastSendAt && state.lastSendAt.has(cur.session_id)) importOnce('./pending_messages.js').then(m => m.markUnanswered(cur.session_id)).catch(() => {});
+    const hint = document.getElementById('sleeping-composer-hint');
+    if (hint) { const words = ended ? 'Wake continues this conversation; Restart starts a fresh session with new settings.' : ''; if (hint.textContent !== words) hint.textContent = words; hint.hidden = !ended; }
     if (text) {
         const next = archived ? 'This agent is archived' : gone ? "This agent's terminal is gone" : ended ? endedText : 'This agent is sleeping';
         if (text.textContent !== next) text.textContent = next; // a status line: written only when it changes, so it is announced once
