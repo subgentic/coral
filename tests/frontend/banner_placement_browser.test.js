@@ -22,9 +22,9 @@ const { connect } = require('./agent_view_harness');
             await ev(`(() => { function N() {} Object.defineProperty(N, 'permission', { get: () => 'default' }); N.requestPermission = async () => 'granted'; window.Notification = N; localStorage.clear(); return true; })()`);
             await ev(`import(${MOD} + 'alerts_offer.js').then(m => m.offerAlertsAfterLaunch())`);
             await ev(`import(${MOD} + 'utils.js').then(m => m.showNotificationToast('alpha', 'Wants to run something', () => {}))`);
-            await waitFor(`document.querySelectorAll('#notices .toast, #notices .notification-toast').length >= 2`, 'both banners');
+            await waitFor(`document.querySelectorAll('#notices .toast, #notices .notification-toast, #alerts-offer-banner').length >= 2`, 'both banners');
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the banners slide in for 0.3 s; their place is read once they have stopped
-            const banners = await rects('#notices .toast, #notices .notification-toast');
+            const banners = await rects('#notices .toast, #notices .notification-toast, #alerts-offer-banner'); // the alerts offer is a strip in the page's flow now (#10248), the needs-input toast still floats
             const send = await rects('[data-on-click="cmd-send"]');
             const head = await rects('#live-session-view .terminal-header');
             const bar = await rects('header.top-bar');
