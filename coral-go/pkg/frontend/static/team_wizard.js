@@ -111,10 +111,13 @@ function _populateGeneratedTeamDraft(team) {
         banner.id = 'generated-team-banner';
         banner.className = 'notice notice-info generated-team-banner';
         banner.innerHTML = '<span class="material-icons" aria-hidden="true">auto_awesome</span> Your AI-generated team is ready — review and edit before launching.';
-        const h3 = stepEl.querySelector('h3');
-        if (h3) h3.after(banner);
+        const sub = document.getElementById('team-stage-sub'); // under the step line, on a row of its own: beside the title it wrapped "New project" (#10660)
+        if (sub) sub.after(banner); else stepEl.prepend(banner);
     }
-    if (banner) banner.style.display = 'flex';
+    if (banner) {
+        banner.style.display = 'flex';
+        clearTimeout(banner._hide); banner._hide = setTimeout(() => { banner.style.display = 'none'; }, 8000); // display-ok: a passing notice goes by itself; the Members note says the same and stays
+    }
 
     const teamNameEl = document.getElementById('team-board-name');
     const teamFlagsEl = document.getElementById('team-flags');
