@@ -404,6 +404,7 @@
 .dt-box.dt-mail-on tr.dt-mailed { display: flex; align-items: stretch; flex-wrap: nowrap; padding: 0 0 0 4px; min-height: 56px; }
 .dt-box.dt-mail-on tr.dt-mailed > td.dt-mail-cell { display: flex; }
 .dt-box.dt-mail-on.dt-compact.dt-fold-column.dt-folded .dt-row.dt-mailed { min-height: 56px; border-bottom: 0; box-shadow: inset 0 -1px 0 var(--table-border); } /* the compact folded row's own 60 px (--table-fold-row-h) is not a mail row's: a task is the pitch of a chat, 56, its divider drawn inside the row so it adds no pixel (#9764) */
+@media (forced-colors: active) { .dt-box.dt-mail-on.dt-compact.dt-fold-column.dt-folded .dt-row.dt-mailed { border-bottom: 1px solid CanvasText; box-shadow: none; } } /* a shadow is not drawn in forced colors: the divider is a border again there (the row is 57 px, the pitch is not pinned in that mode) */
 .dt-box.dt-mail-on.dt-mail-on .dt-check, .dt-box.dt-mail-on.dt-folded.dt-selecting .dt-check { display: none; }
 .dt-box .dt-mail-open.dt-primary:has(.dt-mail-two) { padding-block: 12px; min-height: 64px; }
 .dt-box.dt-mail-on tr.dt-mailed, .dt-box.dt-mail-on td.dt-mail-cell { height: auto; overflow: visible; }
