@@ -1,31 +1,14 @@
-/* A small menu on a message the person sent (#10159, Desktop tester #10082): Copy, Save for later, and Send to another agent. Sending to another agent never sends: it puts the text in that agent's message box (its saved
- * draft, then the box when that agent is open) and says so; the person reads it and presses Send. One menu element for the page, placed beside the button that opened it, role="menu" with role="menuitem" items
- * (menu_button.js does the keys: arrows, Home and End, Escape back to the button). The text is the bubble's own words, set with textContent; an agent's name is the row's own identity. */
-import { state, sessionKey, saveSessionDraft } from './state.js';
+/* A small menu on a message in the chat, the person's own or an agent's reply (#10159, #10540): Copy, and Save for later. One menu element for the page, placed beside the button that opened it, role="menu" with role="menuitem" items
+ * (menu_button.js does the keys: arrows, Home and End, Escape back to the button). The text is the bubble's own words, set with textContent. */
 import { importOnce } from './import_once.js';
 import { showToast, copyText } from './utils.js';
-import { resolveSessionIdentity } from './session_state.js';
-import { sessionServer } from './server_base.js';
 
-
-function item(menu, label, run, { disabled = false } = {}) {
+function item(menu, label, run) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'menu-item'; b.setAttribute('role', 'menuitem'); b.textContent = label;
-    if (disabled) b.disabled = true; else b.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); run(); });
+    b.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); run(); });
     menu.append(b);
     return b;
-}
-
-/** Another agent's box gets the text added to its draft (after what is already typed there, a blank line between; an unsent message is never replaced); that agent opens with it in the box. Nothing is sent. */
-async function prefill(row, text) {
-    const key = sessionKey(row);
-    const typed = (key && state.sessionInputText[key]) || '';
-    const draft = typed.trim() ? `${typed.replace(/\s+$/, '')}\n\n${text}` : text;
-    if (key) saveSessionDraft(key, draft);
-    await window.selectLiveSession?.(row.name, row.agent_type, row.session_id, sessionServer(row), { focusChat: true });
-    const box = document.getElementById('command-input');
-    if (box && box.value !== draft) { box.value = draft; box.dispatchEvent(new Event('input', { bubbles: true })); }
-    showToast(`Added to ${resolveSessionIdentity(row)}'s message box. Not sent.`);
 }
 
 /** Open the menu for the message button `btn` (its bubble holds the text). */
@@ -45,11 +28,6 @@ export async function openMessageMenu(btn) {
     item(menu, 'Copy', async () => { if (!(await copyText(text))) showToast('Could not copy', true); });
     const save = bubble.querySelector('.chat-save-btn');
     if (save) item(menu, save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', () => save.click());
-    const head = document.createElement('div'); head.className = 'chat-msg-menu-head'; head.setAttribute('role', 'presentation'); head.textContent = 'Send to another agent'; menu.append(head);
-    const cur = state.currentSession || {};
-    const others = (state.liveSessions || []).filter(s => s.session_id && (s.session_id !== cur.session_id || sessionServer(s) !== sessionServer(cur)) && !s.archived && s.agent_type !== 'terminal');
-    if (!others.length) item(menu, 'No other agents', () => {}, { disabled: true });
-    for (const s of others) item(menu, resolveSessionIdentity(s), () => prefill(s, text));
     const r = btn.getBoundingClientRect();
     openMenu(btn);
     menu.style.position = 'fixed'; menu.style.zIndex = '3000';

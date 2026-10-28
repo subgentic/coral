@@ -1,5 +1,5 @@
-// A message the person sent has a small menu (#10159, Desktop tester #10082): Copy, Save for later and Send to another agent. Sending to another agent puts the text in that agent's message box and never sends it; the
-// menu opens by keyboard (Enter on the button, arrows, Escape back to the button) and the button is there on a phone at 390. A real chat of two mocked agents; the send route is watched.
+// A message the person sent, and an agent's reply, each have a small menu (#10159, #10540): Copy and Save for later, and nothing else (Send to another agent was taken out, #10682, the Operator). The menu opens by keyboard (Enter on
+// the button, Escape back to the button) and the button is there on a phone at 390. A real chat of mocked agents.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -17,7 +17,7 @@ const BASE = require('./test_base').BASE;
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`(() => { const real = window.fetch; window.__sends = []; window.fetch = (u, o = {}) => { if (/\\/api\\/sessions\\/live\\/[^/]+\\/send$/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'POST') { window.__sends.push(String(u)); return new Promise(() => {}); } return real(u, o); };
                 window.__m.add('qa', 'A', 6, { sleeping: false, session_id: 'qa-sid' }); window.__m.add('fe', 'B', 2, { sleeping: false, session_id: 'fe-sid' });
-                { const list = Object.values(window.__m.agents).map(a => window.__m.entry(a)); list.push({ ...list[0], session_id: 'qa2-sid', display_name: 'qa second' }); window._coralSetLiveSessions(list); } localStorage.setItem('coral-live-view-mode', 'chat'); return true; })()`); // a second agent in the same folder, with the same session name (#10416)
+                { const list = Object.values(window.__m.agents).map(a => window.__m.entry(a)); window._coralSetLiveSessions(list); } localStorage.setItem('coral-live-view-mode', 'chat'); return true; })()`);
             await ev(`window.selectLiveSession('qa', 'claude', 'qa-sid', 'local'); true`); // by its real session id, as the list opens it
             await waitFor(`window.__rendered && window.__rendered().length >= 3`, `${w}: the chat`, 15000);
             const bubbleText = await ev(`(() => { const b = document.querySelector('#live-history-messages .chat-bubble.human'); return b ? b.querySelector('.message-text').innerText.trim() : null; })()`);
@@ -31,28 +31,13 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!document.getElementById('chat-msg-menu')?.hidden && document.getElementById('chat-msg-menu')?.getClientRects().length > 0`, `${w}: the menu opens by keyboard`, 4000);
             const items = await ev(`[...document.querySelectorAll('#chat-msg-menu [role=menuitem]')].map(b => b.textContent.trim())`);
             assert.equal(items[0], 'Copy', `${w}: Copy first: ${JSON.stringify(items)}`);
-            assert.ok(items.includes('FE Alpha') || items.some(x => /fe/i.test(x)), `${w}: the other agent is a choice: ${JSON.stringify(items)}`);
-            assert.ok(items.some(x => /qa second/.test(x)), `${w}: an agent in the same folder is a choice too: ${JSON.stringify(items)}`);
-            assert.ok(!items.some(x => /^qa$/i.test(x)), `${w}: the agent that is open is not offered: ${JSON.stringify(items)}`);
-            assert.equal(await ev(`document.getElementById('chat-msg-menu').querySelector('[role=menuitem]') === document.activeElement`), true, `${w}: the first item has the focus`);
+            assert.ok(items.every(x => x === 'Copy' || /^(Save for later|Remove from saved)$/.test(x)), `${w}: the menu is Copy and Save for later, nothing that sends it to another agent (the Operator, #10682): ${JSON.stringify(items)}`);
+            await waitFor(`document.getAnimations().length === 0`, `${w}: the menu has finished opening`, 3000); // a shot of a menu mid-fade shows the reply through it
             await shot(`message-menu-${w}`);
             // Escape gives the focus back to the button
             await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
             await waitFor(`document.getElementById('chat-msg-menu').hidden`, `${w}: Escape closes it`, 3000);
             assert.equal(await ev(`document.activeElement === document.querySelector(${JSON.stringify(btn)})`), true, `${w}: and the focus is back on the button`);
-            // the other agent already has an unsent draft: the message is added after it, a blank line between; it is not replaced (#10159)
-            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { const row = m.state.liveSessions.find(s => s.session_id === 'fe-sid'); m.saveSessionDraft(m.sessionKey(row), 'half typed'); return true; })`);
-            // pick the other agent: its box holds the text, nothing was sent
-            await ev(`document.querySelector(${JSON.stringify(btn)}).click(); true`);
-            await waitFor(`!document.getElementById('chat-msg-menu').hidden`, `${w}: the menu opens by click`, 3000);
-            await ev(`[...document.querySelectorAll('#chat-msg-menu [role=menuitem]')].find(b => /fe/i.test(b.textContent)).click(); true`);
-            await waitFor(`T.state.currentSession && T.state.currentSession.session_id === 'fe-sid'`, `${w}: the other agent opens`, 8000);
-            await waitFor(`document.getElementById('command-input').value === ${JSON.stringify('half typed\n\n' + bubbleText)}`, `${w}: its box holds its draft, a blank line, then the message`, 5000);
-            assert.match(await ev(`[...document.querySelectorAll('.toast')].map(t => t.textContent).join('|')`), /Added to .*message box\. Not sent\./, `${w}: the toast says where it went and that it was not sent`);
-            assert.deepEqual(await ev(`window.__sends`), [], `${w}: nothing was sent`);
-            // an agent's reply has the same menu (#10540): Copy (the reply as the agent wrote it), the agents to send it to, on a solid background
-            await ev(`window.selectLiveSession('qa', 'claude', 'qa-sid', 'local'); true`); // back to the first agent (the menu above opened the other one)
-            await waitFor(`T.state.currentSession && T.state.currentSession.session_id === 'qa-sid' && window.__rendered && window.__rendered().length >= 3`, `${w}: the first agent's chat again`, 8000);
             const rbtn = `#live-history-messages .chat-bubble.assistant .chat-msg-menu-btn`;
             assert.equal(await ev(`!!document.querySelector(${JSON.stringify(rbtn)})`), true, `${w}: a reply has the menu button`);
             if (mobile) assert.ok(await ev(`(() => { const b = document.querySelector(${JSON.stringify(rbtn)}); const r = b.getBoundingClientRect(); return getComputedStyle(b).opacity === '1' && r.width >= 20 && r.right <= innerWidth; })()`), `${w}: the reply's button is shown and on screen`);
@@ -63,8 +48,8 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!document.getElementById('chat-msg-menu').hidden && document.getElementById('chat-msg-menu').getClientRects().length > 0`, `${w}: the reply's menu opens`, 4000);
             const rItems = await ev(`[...document.querySelectorAll('#chat-msg-menu [role=menuitem]')].map(b => b.textContent.trim())`);
             assert.equal(rItems[0], 'Copy', `${w}: a reply's menu starts with Copy: ${JSON.stringify(rItems)}`);
-            assert.ok(rItems.some(x => /fe/i.test(x)) && rItems.some(x => /qa second/.test(x)) && !rItems.some(x => /^qa$/i.test(x)), `${w}: and offers the other agents: ${JSON.stringify(rItems)}`);
-            assert.equal(await ev(`document.querySelector('#chat-msg-menu .chat-msg-menu-head').textContent`), 'Send to another agent', `${w}: under its own heading`);
+            assert.ok(rItems.every(x => x === 'Copy' || /^(Save for later|Remove from saved)$/.test(x)), `${w}: a reply's menu is Copy and Save for later only: ${JSON.stringify(rItems)}`);
+            assert.equal(await ev(`document.querySelectorAll('#chat-msg-menu .chat-msg-menu-head, #chat-msg-menu [role=group]').length`), 0, `${w}: no heading or team groups`);
             const bg = await ev(`(() => { const c = getComputedStyle(document.getElementById('chat-msg-menu')); return { bg: c.backgroundColor, opacity: c.opacity }; })()`);
             assert.ok(/^rgb\(/.test(bg.bg) && bg.opacity === '1', `${w}: the menu's background is solid (the reply's words do not show through): ${JSON.stringify(bg)}`);
             await ev(`document.querySelector('#chat-msg-menu [role=menuitem]').click(); true`);
@@ -72,6 +57,6 @@ const BASE = require('./test_base').BASE;
             const want = await ev(`import((window.__coralStatic || '/static/') + 'chat_messages.js').then(m => m.bubbleSource.get(document.querySelector(${JSON.stringify(rbtn)}).closest('.chat-bubble')).trim())`);
             assert.equal(await ev(`window.__copied`), want, `${w}: it copies the reply as the agent wrote it`);
         }
-        console.log('\nPASS a sent message has a menu: Copy, Save, and Send to another agent that fills the other box and sends nothing');
+        console.log('\nPASS the message menu is Copy and Save for later');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
