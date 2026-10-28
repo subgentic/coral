@@ -573,7 +573,8 @@
                 <div class="settings-shell">
                     <nav class="settings-nav" aria-label="Settings groups">
                         <div class="settings-group-pick"><select id="settings-group-select" class="settings-select" aria-label="Settings group"></select></div>
-                        <div class="settings-tabs" id="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Settings groups"></div>
+                        <p class="sr-only" id="settings-tabs-hint">Use the arrow keys to move between the groups; Tab goes on to the group's settings.</p>
+                        <div class="settings-tabs" id="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Settings groups" aria-describedby="settings-tabs-hint"></div>
                     </nav>
                     <div class="settings-panes">
                     <section class="settings-pane" id="settings-pane-general" data-group="general" data-icon="tune" data-title="General" role="tabpanel" aria-labelledby="settings-tab-general" tabindex="-1">
