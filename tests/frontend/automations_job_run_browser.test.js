@@ -1,0 +1,50 @@
+// The Automations pages on a phone, from the Mobile Beta Tester's pass (#10476): a run a job started links back to its job and says "Run by job <name>" (not a way back to the workflow); the pages are
+// drawn from the real modules with the server's answers stubbed in the page. At 390 px (a phone) and 1280 px. Drives Chrome over CDP through agent_view_harness.js.
+const assert = require('node:assert/strict');
+const { connect } = require('./agent_view_harness');
+
+const WF = { id: 7, name: 'nightly-build', description: '', enabled: true, steps: [{ name: 'Build', type: 'shell', command: 'make' }], max_duration_s: 300, created_at: '2026-10-27T10:00:00Z' };
+const JOB = { id: 5, name: 'Every night', description: '', enabled: true, workflow_id: 7, cron_expr: '0 2 * * *', timezone: 'UTC', next_fire_at: '2026-10-29T02:00:00Z', created_at: '2026-10-27T10:00:00Z', last_run: null };
+const RUN = { id: 31, workflow_id: 7, workflow_name: 'nightly-build', trigger_type: 'job', trigger_context: JSON.stringify({ scheduled_job_id: 5, scheduled_run_id: 9 }), status: 'completed', started_at: '2026-10-28T02:00:00Z', finished_at: '2026-10-28T02:00:03Z', steps: [{ name: 'Build', type: 'shell', status: 'completed', exit_code: 0, output_tail: 'ok' }] };
+const STUB = `(() => {
+    const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
+    const inner = window.fetch;
+    window.fetch = (url, opts = {}) => {
+        const u = String(url && url.url || url).replace(/^https?:\\/\\/[^/]+/, '').split('?')[0], m = (opts.method || 'GET').toUpperCase();
+        if (m === 'GET' && u === '/api/workflows') return json({ workflows: [${JSON.stringify(WF)}] });
+        if (m === 'GET' && u === '/api/workflows/7') return json(${JSON.stringify(WF)});
+        if (m === 'GET' && u === '/api/workflows/7/runs') return json({ runs: [${JSON.stringify(RUN)}], total: 1 });
+        if (m === 'GET' && u === '/api/workflows/runs/31') return json(${JSON.stringify(RUN)});
+        if (m === 'GET' && u === '/api/scheduled/jobs') return json({ jobs: [${JSON.stringify(JOB)}] });
+        if (m === 'GET' && /^\\/api\\/scheduled\\/jobs\\/5\\/runs/.test(u)) return json({ runs: [], total: 0 });
+        return inner(url, opts);
+    };
+})()`;
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const problems = [];
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [w, h, mobile] of [[390, 844, true], [1280, 900, false]]) {
+            const tag = `${w} px`;
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+            await ev(STUB + '; true');
+            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await ev(`window.openAutomationsFolder('jobs'); true`);
+            await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-primary')].some(c => c.textContent.includes('Every night'))`, `${tag}: the job row`, 10000);
+            // (1) a run a job started: it says which job and the way back is that job
+            await ev(`window.selectWorkflowRun(31); true`);
+            await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title')`, `${tag}: the run page`, 10000);
+            const run = await ev(`(() => ({ back: (document.getElementById('wf-run-back') || {}).textContent || '', meta: (document.querySelector('#wf-run-detail .wf-run-meta') || {}).textContent || '', phoneBack: [...document.querySelectorAll('#wf-run-detail .wf-phone-back')].map(b => b.textContent.trim()) }))()`);
+            if (!/Every night/.test(run.back)) problems.push(`${tag}: the run's way back is its job, not the workflow (it says "${run.back.trim()}")`);
+            if (!/Run by job Every night/.test(run.meta.replace(/\s+/g, ' '))) problems.push(`${tag}: the run says Run by job <name> (it says "${run.meta.replace(/\s+/g, ' ').trim().slice(0, 80)}")`);
+            if (!/Jobs/.test(run.phoneBack.join(' '))) problems.push(`${tag}: the phone's way back says Jobs (${JSON.stringify(run.phoneBack)})`);
+            await ev(`document.getElementById('wf-run-back').click(); true`);
+            await waitFor(`!!document.querySelector('#scheduler-view .sched-title, #scheduler-detail h2')`, `${tag}: the job's page opens from the run's way back`, 10000);
+        }
+    } finally { await client.close(); }
+    assert.deepEqual(problems, [], 'the Automations pages on a phone:\n  ' + problems.join('\n  '));
+    console.log('PASS a job\'s run page links back to its job');
+})().catch(e => { console.error(e); process.exit(1); });
