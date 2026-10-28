@@ -125,6 +125,9 @@ async function device(name) {
         await B.ev(`import(${S} + 'chat_prompt_empty.js').then(m => m.sendPromptAnswer(null, 2, 'Green', 'select', ''))`);
         assert.equal(await composerError(B), '', 'B: no error under the box');
         assert.match((await queue(B)).note, /Answered “Blue” from another device\./);
+        // Words the server could not check come as an empty label: the answer is still said to have happened.
+        await both(d => d.ev(`window.__push({ waiting_for_input: false, last_answer: { label: '', at: 333 } })`));
+        await B.waitFor(`/Answered from another device\\./.test(document.getElementById('composer-queued').textContent)`, 'B: the note without words', 4000);
         console.log('   ✓ a tap on a question another device answered is not an error');
         console.log('\nAll two-device checks passed');
     } finally {

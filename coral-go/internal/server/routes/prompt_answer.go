@@ -754,7 +754,9 @@ func (h *SessionsHandler) lastAnswerOf(sessionID string) any {
 	if !ok || time.Since(time.UnixMilli(v.at)) > answeredNoteFor {
 		return nil
 	}
-	label := []rune(v.label)
+	// The option's words are the agent's own text: through the same cleaning and redaction as a waiting line before they reach a row (and so the Hub), and none when they cannot be checked (#10301, Security).
+	line, _ := waitingLine(v.label).(string)
+	label := []rune(line)
 	if len(label) > 80 {
 		label = append(label[:80], '…')
 	}
