@@ -324,7 +324,7 @@ export function drawOverviewPanel(host, { phone }) {
     if (st.error) { const e = el('p', 'empty-state', st.error); e.setAttribute('role', 'status'); host.append(e); return; }
     if (!st.data) return;
     const { buckets, interval, sinceMs, untilMs } = st.data;
-    if (!buckets.length || !st.ranked.length) { const e = el('p', 'empty-state', 'No data in this range yet. It appears once an agent has used tokens; try a longer range.'); e.setAttribute('role', 'status'); host.append(e); return; } // not a bare heading (Beta Tester, #9955): the same sentence as the tables below
+    if (!buckets.length || !st.ranked.length) { const e = el('p', 'empty-state', 'No data in this range yet. It appears once an agent has done some work; try a longer range.'); e.setAttribute('role', 'status'); host.append(e); return; } // not a bare heading (Beta Tester, #9955): the same sentence as the tables below
     const times = axis(sinceMs, untilMs, interval);
     const lines = buildSeries(buckets, assignLines(st.ranked, null), times, 'cost_usd', false);
     const card = el('div', 'viz-card');

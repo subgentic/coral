@@ -17,7 +17,7 @@ const { syncEfficiency } = await importOnce('./analytics_efficiency.js'); // the
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
-const NO_DATA = 'No data in this range yet. It appears once an agent has used tokens; try a longer range.';
+const NO_DATA = 'No data in this range yet. It appears once an agent has done some work; try a longer range.';
 
 function _formatTime(isoStr) {
     if (!isoStr) return '\u2014';
@@ -694,7 +694,7 @@ function _renderSpendChart(buckets) {
     _watchSpendChart(container);
 
     if (buckets.length < 2) {
-        emptyState(container, 'Not enough data yet. It appears once an agent has used tokens; try a longer range.', 'empty-state'); // says what makes it appear (Beta Tester, #9955)
+        emptyState(container, 'Not enough data yet. It appears once an agent has done some work; try a longer range.', 'empty-state'); // says what makes it appear (Beta Tester, #9955)
         return;
     }
 
