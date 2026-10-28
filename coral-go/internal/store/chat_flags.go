@@ -12,7 +12,8 @@ func activeChatSQL(id, source string) string {
 	return fmt.Sprintf(`EXISTS(SELECT 1 FROM live_sessions ls WHERE ls.session_id = %s AND ls.agent_type = %s AND ls.status = 'active' AND ls.is_sleeping = 0 AND ls.is_archived = 0 AND ls.pid > 0)`, id, source)
 }
 func notesChatSQL(id string) string {
-	return `EXISTS(SELECT 1 FROM session_meta sm WHERE sm.session_id = ` + id + ` AND (COALESCE(sm.notes_md,'') <> '' OR COALESCE(sm.auto_summary,'') <> ''))`
+	return `(EXISTS(SELECT 1 FROM session_meta sm WHERE sm.session_id = ` + id + ` AND (COALESCE(sm.notes_md,'') <> '' OR COALESCE(sm.auto_summary,'') <> ''))` +
+		` OR EXISTS(SELECT 1 FROM agent_notes an WHERE an.session_id = ` + id + ` AND TRIM(an.content) <> ''))` // a note written in the agent's Notes tab counts too (#10315)
 }
 
 type ChatFlags struct {

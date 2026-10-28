@@ -61,7 +61,7 @@ func (h *SessionsHandler) List(w http.ResponseWriter, r *http.Request) {
 // list in the order it is given, so an agent's place, and its team's (the earliest of its agents'), came from where discovery
 // happened to put it, and a feed diff adds a new session last. The order is list_at, then the id; a restarted or resumed agent keeps
 // the list_at of the session it replaces (store.ReplaceLiveSession), so it stays where it was, and a new agent or team comes last.
-// Awake agents come first, then sleeping, then archived ones, as before. A row with no live record goes last in its kind. If the times cannot be read the rows stay as they were.
+// Archived agents come last; awake and sleeping ones keep their place among each other (#10315). A row with no live record goes last in its kind. If the times cannot be read the rows stay as they were.
 func (h *SessionsHandler) orderLiveRows(ctx context.Context, rows []map[string]any) {
 	if h.ss == nil || len(rows) == 0 {
 		return
@@ -76,12 +76,10 @@ func (h *SessionsHandler) orderLiveRows(ctx context.Context, rows []map[string]a
 			row["list_at"] = t
 		}
 	}
-	// Awake agents first, then sleeping ones, then archived ones, as the list always had them; each kind by place.
+	// Archived agents last; every other agent, awake or asleep, by place: an agent that sleeps, or comes back after a restart, keeps its place among the others, in its folder and in its team (#10315: a2 came above
+	// a1 when a1 slept or woke later, and a team's members changed order after a restart, because the awake were listed before the sleeping).
 	kind := func(row map[string]any) int {
 		if archived, _ := row["archived"].(bool); archived {
-			return 2
-		}
-		if sleeping, _ := row["sleeping"].(bool); sleeping {
 			return 1
 		}
 		return 0

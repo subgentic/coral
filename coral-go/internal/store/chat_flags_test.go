@@ -134,3 +134,35 @@ func TestArchivedAgentIsInTheArchivedChatFolder(t *testing.T) {
 	assert.Empty(t, folder(true))
 	assert.Len(t, folder(false), 2)
 }
+
+// #10315 (Beta #10305): With notes showed 0 while an agent's chat had a note: the folder counted only the history notes and auto summaries (session_meta), not a note written in the agent's own Notes tab
+// (agent_notes). A chat with such a note is in With notes, in its count and in its list; a blank note, and a note of another session, are not.
+func TestAnAgentNoteMakesItsChatAChatWithNotes(t *testing.T) {
+	db := openTestDB(t)
+	s := NewSessionStore(db)
+	ts := NewTaskStore(db)
+	ctx := context.Background()
+	stamp := "2026-10-25T20:00:00Z"
+	for _, id := range []string{"agent-note", "history-note", "blank-note", "none"} {
+		require.NoError(t, s.UpsertSessionIndex(ctx, &SessionIndex{SessionID: id, SourceType: "claude", SourceFile: "/fixture/" + id, FirstTimestamp: &stamp, LastTimestamp: &stamp, MessageCount: 2}))
+	}
+	note := func(agent, sid, content string) {
+		_, err := ts.CreateAgentNote(ctx, agent, content, &sid)
+		require.NoError(t, err)
+	}
+	note("a", "agent-note", "remember the PLUM migration")
+	note("b", "blank-note", "   ")
+	note("c", "some-other-session", "a note of another chat")
+	require.NoError(t, s.SaveSessionNotes(ctx, "history-note", "notes"))
+
+	r, err := s.ListSessionsPaged(ctx, SessionListParams{WithNotes: true, Page: 1, PageSize: 50})
+	require.NoError(t, err)
+	var got []string
+	for _, v := range r.Sessions {
+		got = append(got, v.SessionID)
+	}
+	assert.ElementsMatch(t, []string{"agent-note", "history-note"}, got, "the list")
+	counts, err := s.CountChatFolders(ctx, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 2, counts.Notes, "and its count, the same")
+}
