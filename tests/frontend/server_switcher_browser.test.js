@@ -162,13 +162,13 @@ const SETTINGS_PRELOAD = `(() => {
                     op: Number(getComputedStyle(icon(m3)).opacity), opName: Number(getComputedStyle(m3.querySelector('.server-group-name')).opacity) },
                 m2op: Number(getComputedStyle(icon(m2)).opacity),
                 // Agent state is untouched: every agent row still has its state dot, with a tooltip.
-                agents: [...L.querySelectorAll('li[data-session-id]')].filter(r => r.getBoundingClientRect().width > 0).map(r => ({ id: r.dataset.sessionId, dot: !!r.querySelector('.session-dot'), title: r.querySelector('.session-dot')?.getAttribute('title') || '' })) };
+                agents: [...L.querySelectorAll('li[data-session-id]')].filter(r => r.getBoundingClientRect().width > 0).map(r => ({ id: r.dataset.sessionId, dot: !!r.querySelector('.session-dot'), title: r.querySelector('.session-dot')?.getAttribute('title') || '', label: r.getAttribute('aria-label') || '' })) };
         })()`);
         assert.equal(lay.dots, 0, 'no status dot on a server header'); assert.equal(lay.icons, lay.n, 'every server header has the computer icon');
         assert.ok(lay.headerLeft < lay.rowMin, `server headers sit left of every team and agent row (icon ${lay.headerLeft} < rows ${lay.rowMin})`);
         assert.ok(lay.m3.down && lay.m3.op < lay.m2op && lay.m3.opName < 1, `the offline server is dimmed (${JSON.stringify(lay.m3)})`);
         assert.equal(lay.m3.title, 'Old Laptop: Unreachable'); assert.match(lay.m3.aria, /^Server Old Laptop: Unreachable, 2 agents$/); // aria-expanded says open or collapsed; the name does not repeat it (#4272)
-        assert.ok(lay.agents.length >= 4 && lay.agents.every(a => a.dot && a.title), `agent state dots kept under server headers (${JSON.stringify(lay.agents)})`);
+        assert.ok(lay.agents.length >= 4 && lay.agents.every(a => a.dot && !a.title && /^.+, .+/.test(a.label)), `agent state dots kept under server headers: the dot has no native title any more (#9822), the row's name says the state (${JSON.stringify(lay.agents)})`);
         console.log(`   ✓ grouped: headers outermost (icon at ${lay.headerLeft}px, rows from ${lay.rowMin}px), computer icon, no dots, offline dimmed + tooltip + aria; ${lay.agents.length} agent rows keep their state dot`);
         const m2rows = ['solo-m2-id', 'team-m2-id'];
         assert.ok(m2rows.every(id => v.rows.includes(id)), 'm2 agents listed while expanded');
