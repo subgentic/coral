@@ -61,7 +61,7 @@ const BASE = require('./test_base').BASE;
                     if(window.__mode==='network-error')return new Response('{}',{status:503});
                     return new Response(JSON.stringify({primary:'192.168.1.50',port:8468}));
                 }
-                if(u==='/api/auth/setup-code/show'){window.__calls.push({url:u});return window.__noCode?new Response('{}',{status:404}):new Response(JSON.stringify({code:'ABCD-EFGH',expires_in:300}));}
+                if(u==='/api/auth/setup-code/show'){window.__calls.push({url:u});return window.__showStatus?new Response('{}',{status:window.__showStatus}):new Response(JSON.stringify({code:'ABCD-EFGH',expires_in:300}));}
                 if(u==='/api/system/api-key'){window.__calls.push({url:u});if(window.__keyStatus)return new Response('{"error":"dashboard_auth_required"}',{status:window.__keyStatus});return new Response(JSON.stringify({key:'test-key-not-a-credential'}));}
                 return real(url,opts);
             };
@@ -104,6 +104,15 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('mobile-connect-setup').textContent.includes('ABCD')`), false, 'hidden again, and gone from the page');
         assert.match(await ev(`document.getElementById('mobile-connect-network').textContent`), /same network as this computer/);
         await shot('mobile-qr-enabled');
+        // the setup-code read refused: 409 password_set means no code is open (the phone uses the password); 401/403 means it can only be shown on this computer
+        for (const [st, want, not] of [[409, /signs in with your password/, /only be shown on this computer/], [403, /only be shown on this computer/, /signs in with your password/]]) {
+            await ev(`window.__showStatus=${st};window.__saved=true;window.__effective=true;window.__mode='normal';window._showMobileConnectModal()`);
+            await new Promise(r => setTimeout(r, 300)); // sleep-ok: the setup code is read after the details are drawn
+            const words = await ev(`document.getElementById('mobile-connect-setup').textContent`);
+            assert.match(words, want, `a ${st} answer`);
+            assert.doesNotMatch(words, not, `a ${st} answer is not the other message`);
+        }
+        await ev('window.__showStatus=0');
         // Pending disable immediately withholds old QR and API key.
         await ev('window.__saved=false;window.__calls=[];window._showMobileConnectModal()');
         assert.match(await status(),/finish disabling/);await noQR();

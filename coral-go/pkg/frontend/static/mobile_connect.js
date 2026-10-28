@@ -154,7 +154,7 @@ async function renderSetupCode(gen, signal) {
     try {
         const r = await fetch('/api/auth/setup-code/show', { signal, cache: 'no-store' });
         if (r.ok) { const d = await r.json(); if (d && typeof d.code === 'string' && d.code) { code = d.code; expires = d.expires_in; } }
-        else unreadable = true; // refused (a dashboard opened through Coral Hub or from another computer) or not there: not the same as "no code is open"
+        else if (r.status !== 409) unreadable = true; // 409 password_set: no code is open, the phone uses the password; 401/403 (Coral Hub, another computer, not signed in) or anything else: not readable here
     } catch (e) { if (e && e.name === 'AbortError') return; unreadable = true; }
     if (!current(gen)) return;
     const line = text => { const p = document.createElement('p'); p.className = 'text-secondary-sm'; p.textContent = text; return p; };
