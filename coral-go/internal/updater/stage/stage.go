@@ -67,8 +67,8 @@ type Config struct {
 	Pins      verify.Pins
 	Verifier  verify.BundleVerifier
 	Fetcher   *verify.Fetcher
-	// ReleasesURL (the list a promotion is found in, #6393) and DownloadBase default to GitHub's.
-	ReleasesURL, DownloadBase string
+	// ReleasesURL (the list a promotion is found in, #6393), FeedURL (the releases feed asked first, #9712) and DownloadBase default to GitHub's.
+	ReleasesURL, FeedURL, DownloadBase string
 	// Asset names the package for this platform in the sums file.
 	Asset func(version string) string
 	Now   func() time.Time
@@ -90,6 +90,9 @@ func (c *Config) now() time.Time {
 func (c *Config) defaults() {
 	if c.ReleasesURL == "" {
 		c.ReleasesURL = ReleasesList
+		if c.FeedURL == "" {
+			c.FeedURL = ReleasesFeed // GitHub's own list is asked for its feed first; a config with its own list (a test's) has no feed unless it names one
+		}
 	}
 	if c.DownloadBase == "" {
 		c.DownloadBase = DownloadBase

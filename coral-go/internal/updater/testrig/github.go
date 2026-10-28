@@ -21,9 +21,9 @@ type FakeGitHub struct {
 	releases map[string]*Release      // by tag
 	promos   map[string]*promoRelease // by promotion release tag
 	order    []string                 // tags of every release, products and promotions, in the order they were published
-	// ListBody, when set, is what the list answers instead of the real one (a test's junk or oversize list).
-	ListBody []byte
-	latest   string
+	// ListBody, when set, is what the list answers instead of the real one (a test's junk or oversize list); FeedBody is the same for the Atom feed (its status key is "feed").
+	ListBody, FeedBody []byte
+	latest             string
 	// Mutate may change a file's bytes on its way out (the path is "<tag>/<file>" or "latest/<file>"); nil leaves them.
 	Mutate func(path string, body []byte) []byte
 	// Status answers a path with this status and no body.
@@ -127,12 +127,34 @@ func (g *FakeGitHub) listJSON() []byte {
 	return b
 }
 
+// feedXML is the Atom feed github.com serves for the releases: the newest ten, newest first, no drafts, each entry's alternate link to /<repo>/releases/tag/<tag> (what the updater reads; the
+// rest is what the real feed carries: ids, titles, dates and release notes as escaped HTML).
+func (g *FakeGitHub) feedXML() []byte {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-US">` + "\n")
+	fmt.Fprintf(&b, `  <id>tag:github.com,2008:https://github.com/%s/releases</id>`+"\n", FakeRepo)
+	fmt.Fprintf(&b, `  <link type="text/html" rel="alternate" href="%s/%s/releases"/>`+"\n", g.srv.URL, FakeRepo)
+	b.WriteString("  <title>Release notes from the fake repository</title>\n")
+	n := 0
+	for i := len(g.order) - 1; i >= 0 && n < 10; i-- {
+		tag := g.order[i]
+		if p, ok := g.promos[tag]; ok && p.draft {
+			continue // a draft is not in the feed
+		}
+		n++
+		fmt.Fprintf(&b, "  <entry>\n    <id>tag:github.com,2008:Repository/1/%s</id>\n    <updated>2026-10-27T12:00:00Z</updated>\n    <link rel=\"alternate\" type=\"text/html\" href=\"%s/%s/releases/tag/%s\"/>\n    <title>%s</title>\n    <content type=\"html\">&lt;p&gt;notes&lt;/p&gt;</content>\n  </entry>\n", tag, g.srv.URL, FakeRepo, tag, tag)
+	}
+	b.WriteString("</feed>\n")
+	return []byte(b.String())
+}
+
 // URL is the address of the server.
 func (g *FakeGitHub) URL() string { return g.srv.URL }
 
 // Config is what the updater's stage.Config needs to use this server instead of github.com: the base URLs, and a fetcher that allows its host over http.
 func (g *FakeGitHub) Config(c *stage.Config) {
 	c.ReleasesURL = g.srv.URL + "/repos/" + FakeRepo + "/releases?per_page=30"
+	c.FeedURL = g.srv.URL + "/" + FakeRepo + "/releases.atom"
 	c.DownloadBase = g.srv.URL + "/" + FakeRepo + "/releases/download/"
 	c.Fetcher = &verify.Fetcher{Scheme: "http", Allow: func(host string) bool { return host == "127.0.0.1" }}
 }
@@ -185,6 +207,22 @@ func (g *FakeGitHub) serve(w http.ResponseWriter, req *http.Request) {
 			body = g.Mutate("list", append([]byte(nil), body...))
 		}
 		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+		return
+	}
+	if p == FakeRepo+"/releases.atom" {
+		if code, ok := g.Status["feed"]; ok {
+			for k, v := range g.Headers["feed"] {
+				w.Header().Set(k, v)
+			}
+			w.WriteHeader(code)
+			return
+		}
+		body := g.feedXML()
+		if g.FeedBody != nil {
+			body = g.FeedBody
+		}
+		w.Header().Set("Content-Type", "application/atom+xml; charset=utf-8")
 		_, _ = w.Write(body)
 		return
 	}

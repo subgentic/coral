@@ -35,9 +35,13 @@ type listedRelease struct {
 	Assets  []struct {
 		Name string `json:"name"`
 	} `json:"assets"`
+	fromFeed bool // named by the releases feed, which lists no assets: the download says whether they are there
 }
 
 func (r listedRelease) hasPromotionAssets() bool {
+	if r.fromFeed {
+		return true
+	}
 	var m, b bool
 	for _, a := range r.Assets {
 		switch a.Name {
@@ -77,16 +81,9 @@ func (e *noneVerified) Error() string {
 // release named promote-<tag>-<n> carrying both assets, at most maxPromoteCandidates of them; it is skipped (and counted) unless its manifest verifies against the pinned promote identity,
 // names the tag and the sequence its release names. It returns errNoPromotion when none is listed, and a *noneVerified when there were candidates and none verified.
 func (c *checker) findPromotion(ctx context.Context, onlyTag string) (p *promotion, junk int, err error) {
-	raw, err := c.cfg.Fetcher.Get(ctx, c.cfg.ReleasesURL, maxListBytes)
+	list, err := c.releaseList(ctx)
 	if err != nil {
 		return nil, 0, err
-	}
-	var list []listedRelease
-	if json.Unmarshal(raw, &list) != nil {
-		return nil, 0, errors.New("the list of releases is not a list")
-	}
-	if len(list) > 100 {
-		list = list[:100] // a page is 30: anything more is not read
 	}
 	looked := 0
 	var rehearsal *promotion
@@ -171,4 +168,38 @@ func (c *checker) findPromotion(ctx context.Context, onlyTag string) (p *promoti
 		log.Printf("[update] %d promotion release(s) listed did not verify and were skipped", junk)
 	}
 	return p, junk, nil
+}
+
+// releaseList is the newest releases: from the releases feed (no API request, #9704), and from the API's list when the feed cannot say (it did not answer, is not a feed, or names no promotion). A
+// rate-limit answer from the feed is not worked around: the check waits for it like for the API's (the caller reads the *verify.StatusError).
+func (c *checker) releaseList(ctx context.Context) ([]listedRelease, error) {
+	if c.cfg.FeedURL != "" {
+		list, err := c.listFromFeed(ctx)
+		var se *verify.StatusError
+		switch {
+		case errors.As(err, &se) && se.RateLimited:
+			return nil, err
+		case err != nil:
+			log.Printf("[update] the releases feed could not be used (%v): asking the API's list", err)
+		default:
+			for _, r := range list {
+				if promoteTagRe.MatchString(r.TagName) {
+					return list, nil
+				}
+			}
+			// no promotion among the feed's newest releases: the API's list goes further back (30)
+		}
+	}
+	raw, err := c.cfg.Fetcher.Get(ctx, c.cfg.ReleasesURL, maxListBytes)
+	if err != nil {
+		return nil, err
+	}
+	var list []listedRelease
+	if json.Unmarshal(raw, &list) != nil {
+		return nil, errors.New("the list of releases is not a list")
+	}
+	if len(list) > 100 {
+		list = list[:100] // a page is 30: anything more is not read
+	}
+	return list, nil
 }
