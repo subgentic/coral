@@ -798,9 +798,9 @@ body:has(.model-chip-menu:not([hidden])) .chat-jump-latest-btn { visibility: hid
 
 /* Sent but not yet in the transcript: dimmed bubble with a "Queued" label */
 .chat-bubble.human.pending {
-    opacity: 0.6;
-    border: 1px dashed var(--border-light);
+    border: 1px dashed var(--border-light); /* not dimmed with opacity: 60% put its text at 3.72:1 and the label at 2.25:1 in light (#10636); the dashed edge and the quieter text say it is not in the transcript yet */
 }
+.chat-bubble.human.pending .message-text { color: var(--text-secondary); }
 .chat-bubble.human.pending .pending-label {
     font-size: var(--fs-base);
     color: var(--text-secondary);
