@@ -1724,6 +1724,16 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .worktree-dock-item { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .worktree-dock-text { min-width: 0; flex: 1 1 12rem; overflow-wrap: anywhere; }
 
+/* A chat row at a mouse is one line: the agent, the title, the time (look check #9773 item 3; a phone keeps its two lines, the title wrapping beside its badge). The facts line stops being a box so its parts sit in the row, in that order. */
+@media (min-width: 768px) {
+    #history-sessions-list li:not(.session-group-header) > .row-btn { flex-direction: row; align-items: center; gap: 8px; }
+    #history-sessions-list .row-btn .chat-row-facts { display: contents; }
+    #history-sessions-list .row-btn .chat-row-facts .sidebar-agent-name { order: -1; flex: 0 1 auto; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+    #history-sessions-list .row-btn .chat-row-title { flex: 1 1 0; }
+    #history-sessions-list .row-btn .chat-row-facts .sidebar-branch, #history-sessions-list .row-btn .chat-row-facts .session-time, #history-sessions-list .row-btn .chat-row-facts .session-meta { order: 1; flex: none; white-space: nowrap; color: var(--text-secondary); font-size: var(--fs-base); }
+    #history-sessions-list .row-btn .chat-row-facts .chat-sep { display: none; }
+}
+
 /* Chats (#7157): the empty pane's hint is a small grey line, not the page's biggest heading; the copy-branch icon is a 44 px target on a phone; and a long chat title wraps to two lines with the badge under it. */
 #chats-empty-view { align-items: flex-start; justify-content: flex-start; text-align: left; } /* the empty line starts where a table does (#7443) */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
