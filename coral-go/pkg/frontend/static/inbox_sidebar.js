@@ -354,11 +354,12 @@ const BOARD_ITEM = 'board:';
 const boardSection = () => (isPhoneLayout() && boardList.length ? [{ title: 'Boards', items: boardList.map(b => ({ key: BOARD_ITEM + b.key, label: b.label })) }] : []);
 /** What the folder list shows as current: on a phone an open board is its own entry of the Boards group (the folder it belongs to elsewhere is Board history). */
 const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_ITEM + page.project : pageGroup());
+const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared' }; // one line each (#10074)
 const folderSections = () => (nativeInbox() ? [{ title: 'Needs attention', items: GROUPS.map(g => ({ key: g.key, label: g.label })) }, ...CH.chatSections(), ...boardSection()] : [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
     { key: 'goals', label: 'Goals', count: countOf('goals') },
     { key: 'saved', label: 'Saved', count: countOf('saved') }] },
-    { title: 'Files', items: [{ key: 'artifacts', label: 'Artifacts', count: countOf('artifacts') }] }, ...CH.chatSections(), ...boardSection()]).map(section => ({ ...section, items: section.items.map(item => ({ ...item, icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
+    { title: 'Files', items: [{ key: 'artifacts', label: 'Artifacts', count: countOf('artifacts') }] }, ...CH.chatSections(), ...boardSection()]).map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
 let _navKey = null, _folders = null, _poll = 0;
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
 function pickFolder(key) {

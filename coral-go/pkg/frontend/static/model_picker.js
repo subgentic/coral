@@ -195,10 +195,11 @@ export function wireModelPicker(container) {
 const LEVEL_NAMES = { minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
 
 /** The markup of the Thinking select (after the Model label's row). */
+const THINKING_TIP = 'How hard the agent thinks before it answers. More is slower and uses more tokens; Default lets the CLI choose.'; // one line (#10074)
 export function thinkingPickerHtml() {
     // A div, not a label: New Agent draws the levels as a segmented control beside the select (segmented.js), buttons that a label would swallow (#7391).
-    return `<div class="acf-thinking-wrap" hidden><span class="acf-thinking-label" id="acf-thinking-label">Thinking <span class="launch-optional">optional</span></span>`
-        + `<select class="acf-thinking" aria-label="Thinking level"></select>`
+    return `<div class="acf-thinking-wrap" hidden><span class="acf-thinking-label" id="acf-thinking-label" title="${escapeAttr(THINKING_TIP)}">Thinking <span class="launch-optional">optional</span></span>`
+        + `<select class="acf-thinking" aria-label="Thinking level" title="${escapeAttr(THINKING_TIP)}"></select>`
         + `<span class="acf-thinking-note" role="status"></span><span class="acf-thinking-ran" role="status"></span></div>`;
 }
 
