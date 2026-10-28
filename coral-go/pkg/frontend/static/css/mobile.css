@@ -1254,6 +1254,7 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     html.kb-open #local-auth-banner,
     html.kb-open #terminal-statusbar,
+    html.kb-open .agent-phone-details,
     html.kb-open #command-pane:not(.chat-mode) .command-pane-toolbar,
     html.kb-open #command-pane:not(.chat-mode) #model-chip-note { display: none !important; }
     html.kb-open #command-pane:not(.chat-mode) #command-input { height: var(--control-touch-height, 44px) !important; min-height: var(--control-touch-height, 44px) !important; max-height: var(--control-touch-height, 44px) !important; }

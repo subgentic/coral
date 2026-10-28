@@ -33,8 +33,10 @@ const TEAM = `qa-ended-${Date.now() % 100000}`;
             assert.ok(r.chips.some(c => /^Ended\b.*2/.test(c)) && !r.chips.some(c => /Offline/.test(c)), `${tag}: the filter chip is Ended 2: ` + JSON.stringify(r.chips));
             const chipClass = await ev(`(() => { const c = n => { const row = [...document.querySelectorAll('tr.dt-row')].find(x => x.innerText.includes(n)); const chip = row && row.querySelector('.dt-chip'); return chip ? chip.className : ''; }; return { queued: c('Queued One'), asker: c('Asker'), ended: c('Gone One') }; })()`);
             assert.ok(/goal-state-blocked/.test(chipClass.asker) && !/goal-state-blocked/.test(chipClass.queued) && chipClass.queued === chipClass.ended, `${tag}: amber is for the agent that needs input; Queued is the quiet chip like Ended: ` + JSON.stringify(chipClass));
-            assert.match(r.gone, /Ended/, `${tag}: an ended agent's status says Ended: ` + r.gone);
             if (process.env.SHOT_DIR) require('node:fs').writeFileSync(`${process.env.SHOT_DIR}/ended-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); // a picture for a review, when asked for
+            // where the Status column has given way (a phone) the state is the dot by the name, which a screen reader reads as Ended (the one-line row, #9713)
+            const dotName = await ev(`(() => { const row = [...document.querySelectorAll('tr.dt-row')].find(x => /Gone One/.test(x.innerText)); const d = row && row.querySelector('.team-agent-dot'); return d ? d.getAttribute('aria-label') : ''; })()`);
+            assert.match(r.gone + ' ' + dotName, /Ended/, `${tag}: an ended agent's status says Ended (its text or its dot's name): ` + r.gone + ' / ' + dotName);
             console.log(`PASS ${tag}: ended agents are not "need attention", are named Ended, and the tab counts them in words`);
         }
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }

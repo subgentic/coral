@@ -36,7 +36,7 @@ const SHORT = 'fix/header';
         const btns = [...h.querySelectorAll('button')].filter(vis).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; });
         const br = document.getElementById('terminal-header-branch'); const brShown = vis(br);
         const tr = t.getBoundingClientRect();
-        return { model: !!document.getElementById('terminal-header-model'), headerText: h.textContent.replace(/\\s+/g, ' '), over: document.documentElement.scrollWidth - innerWidth, btnOut: btns.filter(b => b[0] < 0 || b[1] > innerWidth + 0.5).length, btns: btns.length, brShown,
+        return { model: (e => !!e && e.checkVisibility())(document.getElementById('terminal-header-model')), headerText: h.textContent.replace(/\\s+/g, ' '), over: document.documentElement.scrollWidth - innerWidth, btnOut: btns.filter(b => b[0] < 0 || b[1] > innerWidth + 0.5).length, btns: btns.length, brShown,
             capped: brShown && t.scrollWidth > t.clientWidth + 1, textW: Math.round(tr.width), fullName: t.textContent, chipFull: br.dataset.full, focusable: t.tabIndex === 0, role: t.getAttribute('role'), label: t.getAttribute('aria-label'),
             headerH: Math.round(hr.height), x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 }; })()`);
     const pop = () => ev(`(() => { const br = document.getElementById('terminal-header-branch'); const c = getComputedStyle(br, '::after'); return { content: c.content, position: c.position, width: parseFloat(c.width), left: c.left, right: c.right,
@@ -48,7 +48,7 @@ const SHORT = 'fix/header';
             console.log(dev);
             await open(w, mobile);
             let g = await geo();
-            check(`${dev}: no model in the agent header (no #terminal-header-model, its text is not in the header)`, !g.model && !/Opus|Claude · /.test(g.headerText), JSON.stringify([g.model, g.headerText.slice(0, 120)]));
+            check(`${dev}: the model line is drawn in the agent header only where it has room (above 1100 px; below it the Details disclosure has it, #9686)`, g.model === (w > 1100), JSON.stringify([g.model, g.headerText.slice(0, 120)]));
             check(`${dev}: the 70-character branch pushes nothing off screen (no sideways scroll, every header button inside the window)`, g.over <= 0 && g.btnOut === 0 && g.btns > 0, JSON.stringify([g.over, g.btnOut, g.btns]));
             const narrowHdr = await ev(`document.querySelector('#live-session-view .terminal-header').hasAttribute('data-narrow')`);
             if (g.brShown && narrowHdr) { check(`${dev}: a header too narrow for a branch squeezes it as before and takes it out of the Tab order (nothing to focus)`, (await ev(`document.querySelector('#terminal-header-branch .terminal-branch-text').tabIndex`)) === -1 && g.over <= 0, JSON.stringify([g.textW, g.over])); await shot(`header-branch-${dev.replace(' ', '-')}-closed`); continue; }
@@ -130,7 +130,7 @@ const SHORT = 'fix/header';
             await waitFor(`getComputedStyle(document.getElementById('history-session-branch')).display !== 'none'`, 'the history branch', 8000);
             await sleep(300); // sleep-ok: a layout or colour transition settling; there is no event for it
             const h = await ev(`(() => { const c = document.getElementById('history-session-branch'); const t = c.querySelector('.branch-text'); const r = t.getBoundingClientRect(); const cs = getComputedStyle(c, '::after');
-                return { capped: t.scrollWidth > t.clientWidth + 1, w: Math.round(r.width), full: t.textContent, chipFull: c.dataset.full, over: document.documentElement.scrollWidth - innerWidth, model: !!document.getElementById('terminal-header-model'), x: r.left + r.width / 2, y: r.top + r.height / 2, content: cs.content }; })()`);
+                return { capped: t.scrollWidth > t.clientWidth + 1, w: Math.round(r.width), full: t.textContent, chipFull: c.dataset.full, over: document.documentElement.scrollWidth - innerWidth, model: (e => !!e && e.checkVisibility())(document.getElementById('terminal-header-model')), x: r.left + r.width / 2, y: r.top + r.height / 2, content: cs.content }; })()`);
             check(`history ${w}: the branch is capped (${h.w} px), no model in the header, nothing overflows sideways`, h.capped && h.chipFull === LONG && !h.model && h.over <= 0, JSON.stringify(h));
             await ev(`document.querySelector('#history-session-branch .branch-text').click(); true`);
             const o = await ev(`(() => { const c = document.getElementById('history-session-branch'); const cs = getComputedStyle(c, '::after'); const r = c.getBoundingClientRect(); return { content: cs.content, w: parseFloat(cs.width), left: r.left }; })()`);
