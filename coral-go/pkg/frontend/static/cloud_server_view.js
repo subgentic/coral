@@ -22,6 +22,9 @@ import { importOnce } from './import_once.js';
 import { h } from './cloud.js';
 import { formatLastSeen, updateNotice, RELEASES_URL, DOWNLOAD_URL, serverVersion, serverAgentCount, belowMinimumText } from './server_status.js';
 import { accessChanged } from './hub_access.js';
+import { state } from './state.js';
+import { sessionServer } from './server_base.js';
+import { needsInputAttention } from './display_activity_hint.js';
 const { MODES, MODE_INFO, accessChoice, effectiveMode, launchNote, effectiveNote, invalidateServerAccess, serverAccess } = await importOnce('./server_access.js');
 const rank = m => MODES.indexOf(m);
 import { announceNotice } from './notifications.js';
@@ -115,6 +118,12 @@ function cmpVersion(a, b) {
     for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
     return 0;
 }
+
+/** Agents of a machine waiting for their person: the Inbox's own test (needsInputAttention) over the live list, per server (UI/UX's Needs you column, #9680): no new route. */
+const needsCount = s => (state.liveSessions || []).filter(x => x && needsInputAttention(x) && sessionServer(x) === s.id).length;
+/** Last seen: "now" while the machine is online, else when the hub last heard from it. */
+const seenWords = s => (s.online === true ? 'now' : formatLastSeen(s.last_seen));
+const seenValue = s => (s.online === true ? Number.MAX_SAFE_INTEGER : (Date.parse(s.last_seen) || 0));
 
 function effectiveOf(s) { return rank(s.effective_mode) >= 0 ? s.effective_mode : effectiveMode(s); }
 
@@ -235,6 +244,8 @@ function serversTable(shown) {
         status: s => (s.online === true ? 'Online' : 'Offline'),
         version: s => { const v = serverVersion(live(s)), upd = updateBadge(live(s)), f = document.createDocumentFragment(); f.append(h('span', { text: v ? v : '—' })); if (upd) f.append(' ', upd); return f; },
         agents: s => String(serverAgentCount(live(s))),
+        needs: s => { const n = needsCount(s); if (!n) return ''; const e = h('span', { className: 'cs-needs', text: String(n) }); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; },
+        seen: s => seenWords(s),
         access: s => accessPicker(s, busy.has(s.id), `${rowId(s.id)}-access-help`),
         actions: s => h('div', { className: 'cs-actions' }, rowActions(s, busy.has(s.id))),
     };
@@ -243,8 +254,10 @@ function serversTable(shown) {
         columns: [
             { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: s => sortValue(s, 'name'), cell: cellOf.name },
             { key: 'status', label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
+            { key: 'agents', label: 'Agents', line: 2, width: '4.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
+            { key: 'needs', label: 'Needs you', line: 2, width: '5.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: cellOf.needs },
+            { key: 'seen', label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
             { key: 'version', label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
-            { key: 'agents', label: 'Agents', line: 2, align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
             { key: 'access', label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
             { key: 'actions', label: 'Actions', line: 1, cell: cellOf.actions },
         ],
