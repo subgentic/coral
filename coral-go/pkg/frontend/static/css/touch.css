@@ -205,3 +205,12 @@ svg[width="48"][height="48"] { width: 3rem; height: 3rem; }
 @media (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     body:has(#command-input:focus) #live-session-view .terminal-header, body:has(#command-input:focus) .agent-phone-details { display: none; }
 }
+
+/* A phone turned sideways: a dialog's header and footer are slim, so its body keeps the height (#10388, Mobile pass 30: at 844 x 390 they took more than a third of the screen, leaving Settings two controls at a time). The buttons stay 44 px. */
+@media (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .modal-content:has(.modal-body) .modal-header, .modal-header { padding: 8px 20px 6px; }
+    .modal-content:has(.modal-body) .modal-footer, .modal-footer { padding: 6px 20px; margin-top: 0; }
+    .sd-modal-content .modal-footer.modal-actions, .sd-modal-content .launch-modal-step > .modal-actions, .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { padding: 6px 20px; }
+    .sd-step-header { padding: 8px 20px 6px; }
+    .sd-step-header .sd-sub { margin-top: 0; }
+}
