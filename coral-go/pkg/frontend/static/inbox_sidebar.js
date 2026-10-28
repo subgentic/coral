@@ -747,9 +747,11 @@ function closePage(openTable = true, focusBack = false) {
 // ── The tab ──────────────────────────────────────────────────────────────
 let _mounted = false;
 /** Called by switchNavTab('hub-inbox') (where the dashboard builds its own Inbox): the lists are read again and the group last on screen opens as a table (a phone shows the list). */
+let _wasShown = false; // the Inbox tab is on screen: cleared when another tab is (below), so the next show is a reopen
 export async function showInbox({ folder = '', quiet = false } = {}) {
     if (!_mounted) {
         _mounted = true;
+        new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') _wasShown = false; }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
         $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
         if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
         onInboxHooks({ needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
@@ -758,6 +760,8 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     }
     $('inbox-local').hidden = false;
     if (folder && groupMeta(folder)) { closePage(false); page = null; $('inbox-page') && ($('inbox-page').hidden = true); group = folder; } // a link to a folder: the folder, not the page that was open
+    else if (!_wasShown && !page && !nativeInbox() && countOf('needs') > 0) group = 'needs'; // a reopen with something waiting for the person: Needs you first, not the folder last on screen (#10205); with nothing waiting the remembered folder stays
+    _wasShown = true;
     setGroup(group);
     renderInboxNav(true);
     CH.loadChatCounts(() => renderInboxNav(true));
