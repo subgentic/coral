@@ -108,11 +108,14 @@ const GIB = 1024 ** 3;
             return { shrink: t('settings-storage-shrink'), prune: t('settings-storage-prune'), kindBottom: Math.round(document.getElementById('settings-prune-kind').getBoundingClientRect().bottom), labelAbove: lab.bottom <= inp.top + 4 || lab.right <= inp.left + 4 }; })()`);
         assert.ok(Math.abs(row.shrink - row.prune) <= 2, 'Shrink and Prune side by side: ' + JSON.stringify(row)); assert.ok(row.shrink >= row.kindBottom - 2 && row.labelAbove, '"Older than" is a labelled field and the buttons are on one row under their fields: ' + JSON.stringify(row));
         // #10481 (Beta): what the buttons do is said beside them, and Prune's line follows the two fields above it; the received files' limit says what they are in its own line
-        const says = () => ev(`document.getElementById('settings-storage-says').textContent`);
-        assert.match(await says(), /Shrink keeps every code change\. Prune deletes saved diffs older than \d+ days?\. Each asks first\./, 'a line says what Shrink and Prune do: ' + await says());
+        const says = () => ev(`document.getElementById('settings-storage-prune').title`);
+        assert.equal(await ev(`document.getElementById('settings-storage-says')`), null, 'no more words on the page: the group is at its word budget');
+        assert.match(await ev(`document.getElementById('settings-storage-shrink').title`), /^Keeps every code change/, 'Shrink\'s tooltip says what it does');
+        assert.match(await says(), /^Deletes saved diffs older than \d+ days?\. Asks first\./, 'Prune\'s tooltip says what it deletes: ' + await says());
         await ev(`(() => { const d = document.getElementById('settings-prune-days'), k = document.getElementById('settings-prune-kind'); d.value = '30'; d.dispatchEvent(new Event('input', { bubbles: true })); k.value = 'all'; k.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-        assert.match(await says(), /Prune deletes saved diffs and unlinked artifacts older than 30 days\./, 'the line follows the fields: ' + await says());
-        assert.match(await ev(`document.getElementById('settings-received-max').closest('.sv-row, .settings-row').textContent`), /files sent to this computer by other teams and Corals/, 'the received files limit says what received files are');
+        assert.match(await says(), /^Deletes saved diffs and unlinked artifacts older than 30 days\./, 'the tooltip follows the fields: ' + await says());
+        // what received files are is in the limit's (i): the group is at its word budget, so the visible line stays as it was
+        assert.match(await ev(`document.getElementById('settings-received-max').closest('.sv-row, .settings-row').textContent`), /Received files limit/, 'the received files limit is named');
         const feel = await ev(`(() => { const b = id => document.getElementById(id); const bot = id => Math.round(b(id).getBoundingClientRect().bottom); return { pruneDanger: b('settings-storage-prune').classList.contains('btn-danger'), shrinkDanger: b('settings-storage-shrink').classList.contains('btn-danger'), small: b('settings-storage-prune').classList.contains('btn-small') || b('settings-storage-shrink').classList.contains('btn-small'), pruneBottom: bot('settings-storage-prune'), shrinkBottom: bot('settings-storage-shrink'), fieldBottom: bot('settings-prune-kind'), pairs: document.querySelectorAll('#settings-pane-cleanup select[id$="-kind"]').length }; })()`);
         assert.deepEqual([feel.pruneDanger, feel.shrinkDanger, feel.small, feel.pairs], [true, false, false, 1], 'Prune is the danger button, Shrink is not, both the normal size, and there is one What to prune: ' + JSON.stringify(feel));
         await shot('storage-ux-controls');

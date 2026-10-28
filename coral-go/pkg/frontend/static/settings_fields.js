@@ -128,7 +128,7 @@ export const CLEANUP_FIELDS = [
     { key: 'artifact_store_max', type: 'number', id: 'settings-artifact-store-max', label: 'Artifact store limit', unit: 'GiB', min: 0, step: 1, compact: true, live: ['settings-artifact-store-size', { id: 'settings-storage-breakdown', wide: true }],
         help: { text: 'The most space stored artifacts may take.', more: "Above it, agents' new uploads are refused until you delete some (Team Artifacts > Delete). 0 means no limit. Saved task and session diffs aren't counted." } },
     { key: 'received_max', type: 'number', id: 'settings-received-max', label: 'Received files limit', unit: 'GiB', min: 0, step: 1, compact: true, live: ['settings-received-size', 'settings-received-unlisted'],
-        help: { text: 'The most space files sent to this computer by other teams and Corals may take.', more: "Above it, new received files are refused; nothing is deleted, and your agents' own uploads are not affected. The default is 2; 0 means no limit." } },
+        help: { text: 'The most space received files may take.', more: "Files sent to this computer by other teams and Corals. Above it, new received files are refused; nothing is deleted, and your agents' own uploads are not affected. The default is 2; 0 means no limit." } },
     { key: 'free_space', type: 'heading', label: 'Free space' },
     { key: 'prune_days', type: 'number', id: 'settings-prune-days', label: 'Older than', unit: 'days', min: 1, max: 3650, step: 1, default: 14, compact: true,
         help: { text: '', more: 'Prune deletes saved diffs of finished tasks and stopped sessions, and artifacts nothing links, older than the days you choose. Shrink rewrites saved diffs of finished tasks without secrets, dot-files, binaries and big files (the code changes stay). Kept artifacts and anything still linked are never touched. Each shows what it would do first.' } },
@@ -175,9 +175,9 @@ export const SECURITY_FIELDS = [
 ];
 
 export const NETWORK_FIELDS = [
-    { key: 'net_use_title', type: 'heading', id: 'net-use-title', label: 'Use from my phone or another computer' }, // the first group (#10481, Beta): how to reach Coral from elsewhere; the health card (Status) and Coral Hub follow
+    { key: 'net_use_title', type: 'heading', id: 'net-use-title', label: 'Use from other devices' }, // the first group (#10481, Beta): how to reach Coral from elsewhere; the health card (Status) and Coral Hub follow
     { key: 'remote_access', type: 'toggle', id: 'settings-remote-access-enabled', labelId: 'net-access-title', label: 'Remote access', live: ['settings-remote-access-status', 'net-remote-note'],
-        help: { text: 'Lets other devices use Coral as you do (control agents, read files, change settings); unencrypted unless TLS is set up.', more: 'TLS is on when Coral was started with --tls-cert and --tls-key, or when you reach it through Coral Hub. A device needs your password or API key.' } },
+        help: { text: 'Lets other devices use Coral as you do; unencrypted unless TLS is set up.', more: 'They can control agents, read files and change settings. TLS is on when Coral was started with --tls-cert and --tls-key, or when you reach it through Coral Hub. A device needs your password or API key.' } },
     // the groups of this pane (#8491): a title drawn by settings_view (the sections are labelled by it) and the group's body, a part of the page its own module fills and shows or hides (the row and its title leave with it, settings_view.css)
     { key: 'net_setup_title', type: 'heading', id: 'net-setup-title', label: 'Setup code' }, live('net-group-setup'),
     { key: 'net_status_title', type: 'heading', id: 'net-status-title', label: 'Status' }, live('about-section'),
