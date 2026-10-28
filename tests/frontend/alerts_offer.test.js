@@ -19,30 +19,34 @@ const { JSDOM } = require('jsdom');
     Object.defineProperty(globalThis, 'Notification', { value: FakeNotification, configurable: true, writable: true });
     const m = await import(pathToFileURL(path.join(dir, 'alerts_offer.js')).href);
     const toasts = () => [...document.querySelectorAll('.toast')].map(t => t.querySelector('.toast-message').textContent);
+    const offers = () => [...document.querySelectorAll('#alerts-offer-banner .alerts-offer-text')].map(t => t.textContent); // the offer is a strip in the page's flow (#10248), the answers are toasts
+    const turnOn = () => document.querySelector('#alerts-offer-banner .btn:not(.btn-icon)').click();
 
     // first agent, nothing asked yet: one toast, with one button, and no permission box (a browser ignores one that is not from a click)
     assert.strictEqual(m.offerAlertsAfterLaunch(), true);
-    assert.strictEqual(toasts().length, 1);
-    assert.match(toasts()[0], /alert when an agent needs you or finishes a reply/);
+    assert.strictEqual(offers().length, 1);
+    assert.match(offers()[0], /alert when an agent needs you or finishes a reply/);
+    assert.strictEqual(toasts().length, 0, 'the offer is not a toast over the page');
     assert.strictEqual(asked, 0, 'the box is not shown by the offer itself');
     assert.strictEqual(dom.window.localStorage.getItem(m.ALERTS_OFFERED_KEY), '1', 'offered once per browser');
 
     // the second agent: nothing more, whatever the person did with the first toast
     assert.strictEqual(m.offerAlertsAfterLaunch(), false);
-    assert.strictEqual(toasts().length, 1);
+    assert.strictEqual(offers().length, 1);
 
     // the button is the click that asks: allowed turns alerts on and says where to change it
-    document.querySelector('.toast-action').click();
+    turnOn();
     await new Promise(r => setTimeout(r, 20));
+    assert.strictEqual(offers().length, 0, 'the button takes the offer away');
     assert.strictEqual(asked, 1);
     assert.strictEqual(dom.window.localStorage.getItem('coral-desktop-notify'), '1');
     assert.ok(toasts().some(t => /Alerts are on\. Change them in Settings > Notifications\./.test(t)), JSON.stringify(toasts()));
 
     // refused: says alerts stay off and where to try again
     dom.window.localStorage.clear(); perm = 'default'; answer = 'denied'; asked = 0;
-    document.querySelectorAll('.toast').forEach(t => t.remove());
+    document.querySelectorAll('.toast, #alerts-offer-banner').forEach(t => t.remove());
     m.offerAlertsAfterLaunch();
-    document.querySelector('.toast-action').click();
+    turnOn();
     await new Promise(r => setTimeout(r, 20));
     assert.ok(toasts().some(t => /Alerts stay off: your browser did not allow them/.test(t)), JSON.stringify(toasts()));
     assert.strictEqual(dom.window.localStorage.getItem('coral-desktop-notify'), null);
@@ -52,10 +56,10 @@ const { JSDOM } = require('jsdom');
         ['blocked', () => { perm = 'denied'; }],
         ['granted but not opted in', () => { perm = 'granted'; }],
     ]) {
-        dom.window.localStorage.clear(); perm = 'default'; document.querySelectorAll('.toast').forEach(t => t.remove());
+        dom.window.localStorage.clear(); perm = 'default'; document.querySelectorAll('.toast, #alerts-offer-banner').forEach(t => t.remove());
         setup();
         assert.strictEqual(m.offerAlertsAfterLaunch(), false, label);
-        assert.strictEqual(toasts().length, 0, label);
+        assert.strictEqual(toasts().length + offers().length, 0, label);
     }
     dom.window.localStorage.clear(); perm = 'granted'; dom.window.localStorage.setItem('coral-desktop-notify', '1');
     assert.strictEqual(m.offerAlertsAfterLaunch(), false, 'already on');

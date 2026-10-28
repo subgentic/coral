@@ -1337,7 +1337,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     padding: 0;
     line-height: 1;
     flex-shrink: 0;
-    min-width: 24px; /* a target the size of the smallest a pointer should have (WCAG 2.5.8): the × alone was 10 px */
+    min-width: 24px; /* a target the size of the smallest a pointer should have (WCAG 2.5.8): the x alone was 10 px */
     min-height: 24px;
 }
 
@@ -3195,6 +3195,10 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 /* The built-in terminal default (#6064) is news, not a warning: notice-info (the accent), not the warning tone. */
 .default-notice-link { background: none; border: 0; padding: 0; font: inherit; color: var(--link-text); text-decoration: underline; cursor: pointer; }
 .leftover-tmux-text { flex: 1; min-width: 0; }
+.alerts-offer-banner { flex: none; flex-wrap: wrap; gap: 8px 12px; } /* the alerts offer (#10248): a strip in the flow; its sentence wraps and the buttons go under it when the line is short */
+.alerts-offer-banner[hidden] { display: none; }
+.alerts-offer-text { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.alerts-offer-banner .btn-icon { margin-left: auto; } /* the x stays at the right edge, on the buttons' row */
 .local-auth-banner { flex: none; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */ /* #4291 */
 .local-auth-banner[hidden] { display: none; }
 .local-auth-banner .material-icons { flex: none; color: var(--error); font-size: var(--fs-2xl); }
