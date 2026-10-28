@@ -509,5 +509,3 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
 .dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */
 .dt-mail-cell > .inbox-answers:empty { display: none; } /* no choices read (yet): no padded empty line under the row, which made it 64 px, not the one line of 56 */
-.inbox-nav-head { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 4px 12px 10px; }
-.inbox-nav-hint { margin: 0; color: var(--text-secondary); font-size: var(--fs-md); }
