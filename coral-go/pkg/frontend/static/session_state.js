@@ -92,6 +92,19 @@ export function formatShortTime(isoStr) {
     return `${dd}/${mm}/${yy}`;
 }
 
+/** How old a goal line is, "25 min ago": the generator refreshes a goal at most every 30 minutes, so a goal can be stale and the card says how much (#10123). '' when there is no usable time. */
+export function goalAgeWords(at, nowMs = Date.now()) {
+    const t = Date.parse(at || '');
+    if (!Number.isFinite(t)) return '';
+    const minutes = Math.max(0, Math.floor((nowMs - t) / 60000));
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+}
+
 function formatStaleness(seconds) {
     if (seconds === null || seconds === undefined) return "Unknown";
     if (seconds < 5) return "Just now";
@@ -226,7 +239,7 @@ export function buildSessionTooltip(s, opts = {}) {
         ...(opts.nameCut ? [{ label: 'Name', text: resolveSessionIdentity(s) }] : []), // the row cut its name to its width and has no native title any more (it covered the next row, #9822): the whole name is here, when it was cut
         { label: 'State', text: stateLabel, cls: `tt-state-${stateLabel.toLowerCase().replace(/ /g, '-')}` },
         { label: 'Last action', text: lastAction },
-        ...(goal ? [{ label: 'Goal', text: goal }] : []),
+        ...(goal ? [{ label: goalAgeWords(s.summary_at) ? `Goal, ${goalAgeWords(s.summary_at)}` : 'Goal', text: goal }] : []), // the goal is refreshed at most every 30 minutes: its age is said (#10123)
         ...(status ? [{ label: 'Status', text: status }] : []),
         ...(instructions ? [{ label: 'Instructions', text: instructions, title: String(s.prompt).trim().slice(0, 500) }] : []), // its standing instructions, one line (#10285)
         ...(branch ? [{ label: 'Branch', text: branch }] : []),
