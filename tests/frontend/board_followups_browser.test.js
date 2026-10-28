@@ -151,6 +151,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`document.querySelector('.mb-new-pill button').focus(); true`);
         await key('Enter', 'Enter', 13);
         await waitFor(`${C}.scrollHeight - ${C}.scrollTop - ${C}.clientHeight < 50`, 'the board at the bottom');
+        await ev(framesJs(3)); // the jump scrolls once more on the settled layout in the next frame (#10088): that frame has to have run before the test scrolls up by hand, or it takes the board to the bottom again
         p = await pill();
         assert.equal(p.shown, false, 'gone at the bottom');
         // the singular, and gone by scrolling to the bottom by hand
