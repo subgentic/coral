@@ -441,7 +441,7 @@ function _syncViewedSession(data) {
                 setCommandPlaceholder(cmdInput, ph); syncSendStarting(starting); // view only and asleep keep their words (#5856)
             }
             updateSessionStatus(s.status);
-            updateSessionSummary(s.summary);
+            updateSessionSummary(s.summary, s.summary_at);
             updateSessionBranch(s.branch, s.repo_name, s.git_state);
             updateSessionFolder(s.working_directory || "");
             updateSessionModel(s);
