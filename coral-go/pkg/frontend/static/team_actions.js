@@ -184,7 +184,7 @@ export async function shareAgentTeam(boardName) {
         <div class="modal-content dlg-form">
             <div class="modal-header">
                 <h3>Export Team: ${escapeHtml(keyLabel(boardName))}</h3>
-                <p style="color:var(--text-secondary);font-size:var(--fs-md);margin:6px 0 0">${tmpl.agents.length} agents</p>
+                <p style="color:var(--text-secondary);font-size:var(--fs-md);margin:6px 0 0">${tmpl.agents.length} agent${tmpl.agents.length === 1 ? '' : 's'}. This file starts the same team on any Coral: in New team, choose Import a template. Copy it or download it.</p>
             </div>
             <div class="modal-body">
                 <textarea readonly class="form-textarea-readonly">${escapeHtml(jsonStr)}</textarea>
