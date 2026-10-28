@@ -79,6 +79,7 @@ export async function loadMessageSearchIndex() {
         const d = await requestJson('GET', '/api/system/message-search-index');
         if (!d.available) out.textContent = 'Not in this build: a search reads every message.';
         else if (d.setting === 'off') out.textContent = 'Off (CORAL_BOARD_SEARCH_INDEX=off): a search reads every message.';
+        else if (d.state === 'low_disk') out.textContent = 'On, but not built: the disk is nearly full. A search reads every message. Coral tries again when it starts.';
         else if (d.state === 'ready') out.textContent = `On and ready. It takes ${_gib(d.size_bytes)} of disk.`;
         else if (d.state === 'building') out.textContent = 'On, building in the background: a search reads every message until it is ready.';
         else out.textContent = 'On: it is built when Coral next starts.';

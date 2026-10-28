@@ -24,6 +24,7 @@ import (
 
 // Store provides message board operations with its own SQLite database.
 type Store struct {
+	dbPath                  string // the board file's path (the disk the message search index is built on)
 	db                      *sqlx.DB
 	readDB                  *sqlx.DB
 	sessionsDB              *sqlx.DB                            // optional reference to the main sessions DB for cross-DB queries
@@ -141,7 +142,7 @@ func newStore(dbPath, key string, schemaDone bool) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 
-	s := &Store{db: db, completionCheckRunner: NewLocalRegisteredCheckRunner(os.Getenv("CORAL_CHECK_WORKDIR")), completionChecksEnabled: completionChecksEnabledFromEnv()}
+	s := &Store{dbPath: dbPath, db: db, completionCheckRunner: NewLocalRegisteredCheckRunner(os.Getenv("CORAL_CHECK_WORKDIR")), completionChecksEnabled: completionChecksEnabledFromEnv()}
 	if !schemaDone {
 		if err := s.ensureSchema(context.Background()); err != nil {
 			db.Close()

@@ -45,6 +45,12 @@ func realUsage(dir string) (uint64, uint64, error) {
 	return u.Free, u.Total, nil
 }
 
+// FreeBytes is the free space of dir's volume, for a caller that needs a size and not the threshold (the message search index's build, #9706).
+func FreeBytes(dir string) (uint64, error) {
+	free, _, err := realUsage(dir)
+	return free, err
+}
+
 // New is a guard for dir's volume.
 func New(dir string) *Guard { return &Guard{dir: dir, usage: realUsage, now: time.Now} }
 
