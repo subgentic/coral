@@ -21,7 +21,6 @@ import { popoutRetry } from './popout.js';
 import { setLiveViewMode, showTerminalView, showChatView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { copyBranchName, showToast } from './utils.js';
-import { selectBoardProject, postBoardMessage, deleteMessageBoardProject, toggleBoardPause, showExportBoardModal, toggleSelectMode } from './message_board.js';
 import { showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolderTag } from './folder_tags.js';
 import { pinFolder, unpinFolder, showOpenFolderModal, hideOpenFolderModal, submitOpenFolder } from './pinned_folders.js';
 import { checkForUpdates, dismissUpdateToast } from './update_check.js';
@@ -44,17 +43,18 @@ import { MENU_KEYS, menuMove } from './menu_keys.js';
 const jobForm = () => importOnce('./job_form.js', 'the job form');
 const showJobModal = (...args) => jobForm().then(m => m.showJobModal(...args)).catch(() => {}); // a failed load already said so (importOnce's toast): the click is not silent and nothing is left unhandled
 // hiding or showing again a form that was never opened has nothing to do, so these do not load it (#10218 review)
+const boardPage = () => loadedModule('./message_board.js'); // the board's own buttons exist only on its page, which loaded it
 const hideJobModal = (...args) => loadedModule('./job_form.js')?.hideJobModal(...args);
 const reshowJobModal = (...args) => loadedModule('./job_form.js')?.reshowJobModal(...args);
 
 registerActions({
-    'mb-select-mode': () => toggleSelectMode(),
-    'mb-export': () => showExportBoardModal(),
-    'mb-pause': () => toggleBoardPause(),
-    'mb-delete-board': () => deleteMessageBoardProject(),
-    'mb-post': () => postBoardMessage(),
+    'mb-select-mode': () => boardPage()?.toggleSelectMode(),
+    'mb-export': () => boardPage()?.showExportBoardModal(),
+    'mb-pause': () => boardPage()?.toggleBoardPause(),
+    'mb-delete-board': () => boardPage()?.deleteMessageBoardProject(),
+    'mb-post': () => boardPage()?.postBoardMessage(),
     // Enter sends, Shift+Enter is a new line.
-    'mb-post-key': (el, event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); postBoardMessage(); } },
+    'mb-post-key': (el, event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); boardPage()?.postBoardMessage(); } },
 });
 
 registerActions({
@@ -293,7 +293,7 @@ Object.assign(window, {
     wakePendingAgents: () => importOnce('./terminal_backend.js').then(m => m.wakePendingAgents()),
     dismissAutoWake: () => importOnce('./terminal_backend.js').then(m => m.dismissAutoWake()),
     // message_board
-    selectBoardProject,
+    selectBoardProject: (...args) => importOnce('./message_board.js', 'the message board').then(m => m.selectBoardProject(...args)),
     // workflows
     selectWorkflow, selectWorkflowRun,
     // cost_dashboard

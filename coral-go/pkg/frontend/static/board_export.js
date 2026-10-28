@@ -1,10 +1,11 @@
 /* Exporting the board: the Export dialog and file, and select-and-export (moved out of message_board.js, #5174; no behaviour change besides where the board's open project, its messages and its redraw come from: the board hands them over once,
  * connectBoard, and the select-mode state lives here). */
+import { importOnce } from './import_once.js';
 import { escapeHtml, escapeAttr, showToast } from './utils.js';
 import { keyLabel, splitKey, sessionServer, boardFetch } from './server_base.js';
 import { attachDialogFocus } from './dialog_focus.js';
 import { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchSubscribers } from './board_fetch.js';
-import { parseAgentHistory, renderExportHTML, renderExportMarkdown } from './board_export_render.js';
+const { parseAgentHistory, renderExportHTML, renderExportMarkdown } = await importOnce('./board_export_render.js'); // a part of the board page's group: loaded with it
 
 let _selectMode = false;
 let _selectedIds = new Set();

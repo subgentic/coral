@@ -1,12 +1,13 @@
 /* The board's poll: new messages while a board is open (moved out of message_board.js, #8399; no behaviour change). */
+import { importOnce } from './import_once.js';
 import { fetchMessages, PAGE_SIZE, mergeMessages } from './board_fetch.js';
-import { isSelectMode } from './board_export.js';
+const { isSelectMode } = await importOnce('./board_export.js'); // a part of the board page's group: loaded with it
 import { applyAskUpdates, refreshAsk } from './board_table.js';
 import { pollEvery } from './overload.js';
 import { platform } from './platform/detect.js';
 import { bs } from './board_state.js';
-import { ROW, appendNewMessages, isAtBottom, renderMessages, updateBoardHeader } from './board_window.js';
-import { loadBoardSubscribers } from './board_members.js';
+const { ROW, appendNewMessages, isAtBottom, renderMessages, updateBoardHeader } = await importOnce('./board_window.js'); // a part of the board page's group: loaded with it
+const { loadBoardSubscribers } = await importOnce('./board_members.js'); // a part of the board page's group: loaded with it
 
 let pollTimer = null;
 

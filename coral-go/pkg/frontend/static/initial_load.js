@@ -13,7 +13,6 @@ import { initTabCustomize } from './tab_customize.js';
 import { initDockTabs } from './dock_tabs.js';
 import { initScheduler } from './scheduler.js';
 import { initLiveJobs } from './live_jobs.js';
-import { initMessageBoard } from './message_board.js';
 import { loadAllFolderTags } from './folder_tags.js';
 import { loadPinnedFolders } from './pinned_folders.js';
 import { initMobile } from './mobile.js';
@@ -69,7 +68,6 @@ export function loadInitialData(popout) {
         else markReady('history');
         initScheduler();
         initLiveJobs();
-        initMessageBoard();
     }
     if (popout) markReady('history'); // a popout has no history list
     initMobile();

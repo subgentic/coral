@@ -1,10 +1,11 @@
 /* The board's pause, sleep, per-message delete and copy-link controls (moved out of message_board.js, #8399; no behaviour change). */
+import { importOnce } from './import_once.js';
 import { build, keyRoute } from './routes.js';
 import { showToast } from './utils.js';
 import { boardFetch, pathId, teamFetch } from './server_base.js';
 import { paintPauseButton } from './board_pause_button.js';
 import { bs } from './board_state.js';
-import { renderMessages } from './board_window.js';
+const { renderMessages } = await importOnce('./board_window.js'); // a part of the board page's group: loaded with it
 
 let isSleeping = false;
 

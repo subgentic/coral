@@ -4,7 +4,6 @@ import { isPhoneLayout } from './phone_layout.js';
 import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
-import { loadBoardProjects } from './message_board.js';
 import { recordRecentDir, getRecentDirs } from './browser.js';
 import { teamForm, showTeamWorktree, showTeamWorkers } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
@@ -765,7 +764,6 @@ async function launchTeam() {
                 hideLaunchModal();
                 if (launched.length - failed.length > 0) importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first agents are when alerts make sense: once per browser (#10068)
                 setTimeout(loadLiveSessions, 2000);
-                setTimeout(loadBoardProjects, 4000);
                 const boardId = result.board_id || boardName; // the id the server made (a repeated name gets its own, "Create another"), not the label that was typed
                 const seen = _refreshAfterLaunch(server, { boardName: boardId });
                 // The team opens the way a single agent does (#5989): its board with the Team view beside it, and the goal, if one was typed, as the Operator's first message to the lead. On a remote this waits for the hub to see the team.

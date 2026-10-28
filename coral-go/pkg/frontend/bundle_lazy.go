@@ -42,6 +42,7 @@ type LazyGroup struct {
 // (the folder list, the toolbar) stay files of their own, so the Inbox's first visit does not load Automations.
 var LazyGroups = []LazyGroup{
 	{Main: "automations.js", Members: []string{"workflow_run_html.js", "workflow_agent.js", "time_limit.js", "workflow_templates.js", "workflow_editor.js", "workflows.js", "automation_filters.js"}},
+	{Main: "message_board.js", Members: []string{"board_export_render.js", "board_export.js", "board_new_pill.js", "board_window.js", "board_members.js", "board_poll.js", "board_controls.js", "board_composer.js"}},
 	{Main: "cost_dashboard.js", Members: []string{"cost_data.js", "analytics_views.js", "analytics_series.js", "analytics_agent.js", "analytics_terms.js", "analytics_spend.js", "analytics_efficiency.js"}},
 }
 

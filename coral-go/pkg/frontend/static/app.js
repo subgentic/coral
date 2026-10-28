@@ -55,7 +55,14 @@ import { buildWelcome } from './utils.js';
 import './preview_pane.js';
 import './scheduler.js';
 import './live_jobs.js';
-import './message_board.js';
+// What the message board page (message_board.js, a lazy group) and the team's board chat (board_chat.js) share: lazy modules import only what loads at startup (import_hygiene)
+import './board_state.js';
+import './board_table.js';
+import './board_system_lines.js';
+import './board_attachments.js';
+import './board_artifacts.js';
+import './board_pause_button.js';
+import './growing_textarea.js';
 import './folder_tags.js';
 import './pinned_folders.js';
 import './mobile.js';

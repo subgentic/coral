@@ -1,10 +1,11 @@
 /* The board's composer: Reply and posting (moved out of message_board.js, #8399; no behaviour change). */
+import { importOnce } from './import_once.js';
 import { blockedReason } from './hub_access.js';
 import { splitKey, boardFetch } from './server_base.js';
 import { showToast, OPERATOR_ID } from './utils.js';
 import { isOutcomeUnknown, OUTCOME_UNKNOWN_LINE } from './outcome_unknown.js';
 import { bs } from './board_state.js';
-import { _pollNewMessages } from './board_poll.js';
+const { _pollNewMessages } = await importOnce('./board_poll.js'); // a part of the board page's group: loaded with it
 
 /** Reply: "@Sender " goes at the start of the composer's text and the focus to it; the post carries reply_to while the text still starts with the name. */
 export function replyToMessage(id, name) {
