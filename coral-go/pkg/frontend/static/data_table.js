@@ -312,7 +312,7 @@ export function dataTable(cfg) {
             if (c.sort) {
                 const on = st.sort && st.sort.key === c.key;
                 th.setAttribute('aria-sort', on ? (st.sort.dir === 'desc' ? 'descending' : 'ascending') : 'none');
-                const b = button('dt-sort', null, () => sortBy(c)); b.dataset.key = c.key; b.setAttribute('aria-label', `${c.label}, ${cfg.label}`); // named for its column and its table: "Cost" is not six buttons that read the same (#6432)
+                const b = button('dt-sort', null, () => sortBy(c)); b.dataset.key = c.key; b.setAttribute('aria-label', /, \d+$/.test(String(cfg.label || '')) ? c.label : `${c.label}, ${cfg.label}`); // named for its column and its table: "Cost" is not six buttons that read the same (#6432); a list that is the page's one table (its name ends in its count, "Needs you, 1") says the column alone, not its own name and count on every header (#10374)
                 b.append(el('span', null, c.label), el('span', 'dt-arrow', on ? (st.sort.dir === 'desc' ? '↓' : '↑') : '↕')); b.lastChild.setAttribute('aria-hidden', 'true');
                 th.append(b);
             } else th.append(el('span', c.hideLabel ? 'sr-only' : 'dt-head-text', c.label)); // hideLabel: a column that is only an action has no head text on screen, its name is for a reader
