@@ -475,6 +475,7 @@ func (s *Server) buildRouter() chi.Router {
 	s.registerSystem(r, h)
 	s.registerBoard(r, h)
 	s.registerStatic(r)
+	r.NotFound(s.notFoundPage) // a page that is not here has a way back (#10281)
 	if err := routes.ValidateGuardedRoutes(r, s.cfg.HubMode); err != nil {
 		panic(err) // an Operator-only route the guard could never match (#3670)
 	}
