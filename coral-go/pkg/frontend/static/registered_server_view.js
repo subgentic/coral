@@ -11,7 +11,7 @@ import { rememberFocus } from './dom_morph.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { sessionServer } from './server_base.js';
-import { needsInputAttention } from './display_activity_hint.js';
+import { needsYou } from './asked_before_restart.js';
 import { showToast } from './utils.js';
 import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
 import {
@@ -118,7 +118,7 @@ function tagsCell(s) {
 const versionWords = (s, live) => (isLocal(s) ? (state.localVersion ? `Coral ${state.localVersion}` : '') : (serverVersion(live) ? `Coral ${serverVersion(live)}` : ''));
 
 /** Agents of a server waiting for their person (the Inbox's Needs you, counted from the live list per server: no new route). */
-const needsCount = s => (state.liveSessions || []).filter(x => x && needsInputAttention(x) && sessionServer(x) === (isLocal(s) ? 'local' : s.id)).length; // the Inbox's own test (inbox_sidebar.js waitingSessions): a session the screen says is working is not waiting for the person
+const needsCount = s => (state.liveSessions || []).filter(x => x && needsYou(x) && sessionServer(x) === (isLocal(s) ? 'local' : s.id)).length; // the Inbox's own test (inbox_sidebar.js waitingSessions): a session the screen says is working is not waiting for the person
 const isOnline = (s, live) => (live.status || s.status) === 'online';
 /** Last seen: "now" while the server is online, else when it last answered (the words the server's page uses). */
 const seenWords = (s, live) => (isLocal(s) || isOnline(s, live) ? 'now' : formatLastSeen(s.last_seen));
