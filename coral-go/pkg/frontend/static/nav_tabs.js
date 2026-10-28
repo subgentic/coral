@@ -177,7 +177,13 @@ function layoutSelect() {
     const words = cur ? cur.label : (hiddenOn ? (hiddenOn.dataset.label || hiddenOn.textContent).trim() : '');
     label.textContent = words;
     const top = document.getElementById('top-menu-label'); if (top) top.textContent = words;
-    const hamburger = document.getElementById('top-menu-btn'); if (hamburger) hamburger.setAttribute('aria-label', words ? `${words}, menu` : 'Menu'); // its name has the words it shows: the open view first (#9116)
+    const hamburger = document.getElementById('top-menu-btn');
+    if (hamburger) {
+        // What waits for the person is the Inbox tab's own name ("Inbox, 3 waiting for input", set by inbox_tab.js): the closed bar shows a dot for it and the button's name says it in the same words (#9829)
+        const waits = ((document.getElementById('nav-tab-hub-inbox') || {}).getAttribute?.('aria-label') || '').replace(/^Inbox, /, '');
+        hamburger.setAttribute('aria-label', (words ? `${words}, menu` : 'Menu') + (waits ? `, ${waits}` : '')); // its name has the words it shows: the open view first (#9116)
+        if (hamburger.hasAttribute('data-waiting') !== !!waits) hamburger.toggleAttribute('data-waiting', !!waits);
+    }
     if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || _menuFor.id === 'top-menu-btn' && !window.matchMedia('(max-width: 639px)').matches)) closeMenu();
 }
 

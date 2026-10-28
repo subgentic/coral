@@ -81,7 +81,8 @@
 @media (max-width: 639px) {
     .nav-select, .top-bar-actions > .top-bar-btn:not(.hub-indicator), .top-bar-actions .top-bar-settings-wrapper, .top-bar-actions .cloud-account-wrapper { display: none !important; }
     .top-menu-btn { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; margin: 0 8px; justify-content: flex-start; text-align: left; } /* the menu button is a .btn that names the view; here only where it sits */
-    .top-menu-btn .material-icons { font-size: var(--glyph-sm); flex-shrink: 0; }
+    .top-menu-btn .material-icons { font-size: var(--glyph-sm); flex-shrink: 0; position: relative; }
+    .top-menu-btn[data-waiting] .material-icons::after { content: ""; position: absolute; top: -2px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--warning); box-shadow: 0 0 0 2px var(--topbar-bg); } /* something waits for the person: the Needs input amber on the icon's corner, no number (#9829); the button's name says what waits */
     .top-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
