@@ -1634,3 +1634,15 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 .chat-standing { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.5rem; font-size: var(--fs-md); }
 .chat-standing[hidden] { display: none; }
 .chat-standing-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A phone turned sideways (#10388, Mobile pass 30): the chat has about 180 px, and the question card (kicker, question, a button a row, Open terminal) was 222 px, so the composer hid its choices. The kicker and the question share a line, the answers are one
+   row of 44 px buttons, and the card is under 130 px. */
+@media (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .chat-needs-input { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; padding: 8px 12px 6px; margin: 4px auto 10px; }
+    .chat-needs-input > * { flex: 0 0 100%; min-width: 0; }
+    .chat-needs-input > .cni-head, .chat-needs-input > .cni-question { flex: 0 1 auto; margin: 0 0 6px; }
+    .chat-needs-input > .cni-question { font-size: var(--fs-lg); }
+    .chat-needs-input .cni-options { margin: 0 0 6px; }
+    .chat-needs-input .cni-options.cni-options-stacked { flex-direction: row; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+    .chat-needs-input .cni-options.cni-options-stacked .cni-answer:not(.btn):not(.cni-link) { flex: 1 1 8rem; width: auto; }
+}
