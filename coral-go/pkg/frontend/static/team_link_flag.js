@@ -10,7 +10,7 @@ export async function initTeamLinkFlag() {
     let value = false;
     try {
         const r = await fetch('/api/account', { headers: { Accept: 'application/json' } });
-        if (r.ok) { const d = await r.json(); value = !!d && d.team_link_dialog === true; }
+        if (r.ok) { const d = await r.json(); value = !!d && d.team_link_dialog === true && d.owner !== false; } // the relay routes are the owner's: a viewer the account marks as not the owner (owner: false) gets no item
     } catch { /* no answer: no item */ }
     if (value !== on) { on = value; try { redrawLiveList(); } catch { /* the list is not up yet: it reads the flag when it draws */ } }
     return on;
