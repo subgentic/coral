@@ -256,8 +256,8 @@ function _syncPanelToggle() {
     if (!btn || !panel) return;
     const open = _isPhone() ? panel.classList.contains('mobile-panel-overlay') : !panel.classList.contains('collapsed');
     btn.setAttribute('aria-pressed', open ? 'true' : 'false');
-    btn.setAttribute('aria-label', open ? 'Hide side panel' : 'Show side panel');
-    btn.title = open ? 'Hide side panel' : 'Show side panel';
+    btn.setAttribute('aria-label', open ? 'Hide files, tasks and notes' : 'Show files, tasks and notes');
+    btn.title = open ? 'Hide files, tasks and notes' : 'Show files, tasks and notes';
 }
 
 function _renderIdentity(rec) {
