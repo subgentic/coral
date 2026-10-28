@@ -3,7 +3,7 @@
 import { isPhoneLayout } from './phone_layout.js';
 import { keepMenuOnScreen } from './menu_fit.js';
 import { state } from './state.js';
-import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent } from './utils.js';
+import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent, focusPageHeading } from './utils.js';
 import { announceNotice } from './notifications.js';
 import { registerActions, withId, uuidOf } from './actions.js';
 import { pollEvery } from './overload.js';
@@ -145,6 +145,7 @@ export async function selectScheduledJob(jobId) {
 
     await reloadJobDetail(job);
     if (selectedJobId !== jobId) return;
+    focusPageHeading(document.querySelector('#scheduler-detail .sched-header h2')); // the keyboard lands on the job's name
     if (isPhoneLayout()) { document.getElementById('scheduler-view')?.setAttribute('data-phone-item', ''); document.getElementById('scheduler-detail')?.scrollIntoView({ block: 'start' }); } // a phone shows the job's page as its own screen (#7443); the list is the screen before it (#6139)
 }
 

@@ -1,6 +1,6 @@
 /* Workflows: the workflows' list data, a workflow's page, a run's page, and CRUD. The folder (its table, toolbar and way back) is Automations' (automations.js, Goal #74); this module is the pages. */
 
-import { escapeHtml as esc, escapeAttr as escAttr, showView, showToast } from './utils.js';
+import { escapeHtml as esc, escapeAttr as escAttr, showView, showToast, focusPageHeading } from './utils.js';
 import { registerActions, withId, textOf } from './actions.js';
 import { apiFetch } from './api.js';
 import { selectLiveSession } from './sessions.js';
@@ -149,6 +149,7 @@ export async function selectWorkflow(id) {
     const first = await fetchWorkflowRuns(id) || { runs: [], total: 0 };
     runsPage = { workflowId: id, rows: first.runs, total: first.total, busy: false };
     renderWorkflowDetail(wf, first.runs);
+    focusPageHeading(document.getElementById('wf-title')); // the keyboard lands on the workflow's name (#10496)
 }
 
 /** A run's result for the runs table and the last-run line: "Passed", "Failed: step 2 (Test)", with the one-line reason from the server underneath. Step numbers come from 1 (#6530). */
@@ -254,7 +255,9 @@ export async function selectWorkflowRun(runId, { workflowId } = {}) {
     document.getElementById('wf-run-detail-container').style.display = '';
     syncPhonePage();
 
+    shownRun = null; // a run opened again is drawn first, not said to have changed
     renderRunDetail(run);
+    focusPageHeading(document.querySelector('#wf-run-detail .wf-run-title')); // the keyboard lands on the run's title (#10496)
 
     // Poll if running
     if (run.status === 'running' || run.status === 'pending') {

@@ -162,6 +162,15 @@ export async function refusedTooLarge(resp) {
     try { return (await resp.clone().json()).code === 'hub_reply_too_large'; } catch { return false; }
 }
 
+/** A page that opens by a key or a click puts the keyboard on its heading (the control that opened it is gone or behind it): a heading is not a tab stop, so it takes tabindex -1. A person typing in a box keeps it (#10496). */
+export function focusPageHeading(heading) {
+    if (!heading) return;
+    const a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.getClientRects().length) return;
+    if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+    heading.focus({ preventScroll: true });
+}
+
 /** Moves a list row's highlight and its aria-current together (#7006): a row is an li holding a .row-btn, and the button, the thing a screen reader lands on, says it is the current one. */
 export function setRowCurrent(li, on) {
     li.classList.toggle('active', on);
