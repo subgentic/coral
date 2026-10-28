@@ -1015,12 +1015,12 @@ func TestPinnedLaunchPermissionMode_StoredModeNotOverwrittenByRestartExtraFlags(
 	assert.NotContains(t, cmd, "--dangerously-skip-permissions", "subsequent restart must stay default")
 }
 
-// 5. Old sessions migration: row with PermissionMode=nil takes current default setting.
+// 5. Old sessions: a row with PermissionMode=nil and no permission flags restarts in Default whatever the saved default is, never in a wider saved mode, and the answer says its mode was not recorded (#10297).
 func TestPinnedLaunchPermissionMode_OldSessionFallback(t *testing.T) {
 	rig := setupAgyTestRig(t)
 	ctx := context.Background()
 
-	// Case A: when setting is bypass, old session takes current default (bypass)
+	// Case A: when setting is bypass, an old session still restarts in Default (never the wider saved mode)
 	sid1 := "11111111-aaaa-bbbb-cccc-000000000001"
 	name1 := naming.SessionName(at.Agy, sid1)
 	require.NoError(t, rig.term.CreateSession(ctx, name1, rig.workdir))
@@ -1040,9 +1040,10 @@ func TestPinnedLaunchPermissionMode_OldSessionFallback(t *testing.T) {
 	restartRec1 := httptest.NewRecorder()
 	rig.router.ServeHTTP(restartRec1, restartReq1)
 	require.Equal(t, http.StatusOK, restartRec1.Code, restartRec1.Body.String())
-	assert.Contains(t, lastSentCommand(rig.term), "--dangerously-skip-permissions")
+	assert.NotContains(t, lastSentCommand(rig.term), "--dangerously-skip-permissions", "an old row is never widened to the saved bypass")
+	assert.Contains(t, restartRec1.Body.String(), "Its mode was not recorded: restarted in Default")
 
-	// Case B: when setting is default, old session takes current default (default)
+	// Case B: when the setting is default, the same: Default, and the same note
 	sid2 := "11111111-aaaa-bbbb-cccc-000000000002"
 	name2 := naming.SessionName(at.Agy, sid2)
 	require.NoError(t, rig.term.CreateSession(ctx, name2, rig.workdir))
@@ -1068,6 +1069,7 @@ func TestPinnedLaunchPermissionMode_OldSessionFallback(t *testing.T) {
 	rig.router.ServeHTTP(restartRec2, restartReq2)
 	require.Equal(t, http.StatusOK, restartRec2.Code, restartRec2.Body.String())
 	assert.NotContains(t, lastSentCommand(rig.term), "--dangerously-skip-permissions")
+	assert.Contains(t, restartRec2.Body.String(), "Its mode was not recorded: restarted in Default")
 }
 
 // 6. Corrupt stored values fail closed (both corrupt capabilities and corrupt permission mode).
