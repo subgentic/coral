@@ -15,7 +15,7 @@
 /* ── The table ── */
 .mb-table { padding: 0 0 0.75rem; }
 #mb-messages.mb-table { max-width: none; } /* the table fills the pane like the other team tabs (#8504); the 840px cap of #mb-messages is the Chat view's line length */
-.mb-table .mb-message { display: block; margin: 0; padding: 0; border-radius: 0; border-bottom: 1px solid var(--border); }
+.mb-table .mb-message { display: block; margin: 0 !important; padding: 0 !important; border-radius: 0; border-bottom: 1px solid var(--border); } /* !important: a phone's chat bubble has 8 px of margin and padding (mobile.css), which made a table row 61 px with a 69 px pitch, not one 44 px line (#9728) */
 .mb-table .mb-queue-run { margin: 0; padding: 0.5rem 0.875rem; border-bottom: 1px solid var(--border); }
 
 /* The row's own header is the chat's: the table shows only the Select checkbox from it (the head says who and when, the actions are under the open message). */
@@ -36,6 +36,8 @@
 .mb-row-tags { display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; min-width: 0; max-width: 22rem; overflow: hidden; }
 /* The row says one thing besides the sender, the words and the time: an OPEN question (#9686). The mentions, the task, the reply mark, the "+N" and an answered question are with the open message (.mb-row-tags-open). */
 .mb-row-tags > :not(.mb-ask-badge), .mb-row-tags > .mb-ask-badge.is-answered { display: none; }
+/* An open question wants an answer: the warning amber, the colour of every state that asks something of a person (Needs input, the phone's dot), never the blue of links (UI/UX #9728). */
+.mb-row-tags .mb-ask-badge:not(.is-answered), .mb-row-tags-open .mb-ask-badge:not(.is-answered) { border: 0; background: var(--bg-tertiary); color: var(--warning); box-shadow: inset 0 0 0 1px var(--border); }
 .mb-row-toggle .message-time { margin: 0; opacity: 1; font-size: var(--fs-base); color: var(--text-secondary); text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* The tags: quiet marks, never louder text. */
