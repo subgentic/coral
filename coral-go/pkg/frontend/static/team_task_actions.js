@@ -186,18 +186,21 @@ export async function editForm(task, ctx) {
 /** The completion form: a message, the outcome, the required outputs the task names and the evidence to attach. submit() sends it. */
 export function completeForm(task, ctx) {
     const required = _taskRequiredOutputs(task);
-    const section = el('section', 'task-completion-form'); section.setAttribute('aria-label', 'Complete task');
-    const revision = el('p', 'task-completion-revision'); revision.append('Submitting the task as revision ', Object.assign(el('strong'), { textContent: String(Number(task.revision || 1)) }), '.');
+    const section = el('section', 'task-completion-form'); section.setAttribute('aria-label', 'Mark as done');
+    const heading = el('h3', 'task-completion-title', 'Mark as done'); // plain words: no revision, no verification (#10337); the revision the page saw still goes with the request
     const box = el('div', 'task-confirm-inline');
-    const message = el('textarea'); message.id = 'task-complete-message'; message.rows = 3; message.placeholder = 'What was completed and how was it verified?';
+    const message = el('textarea'); message.id = 'task-complete-message'; message.rows = 3; message.placeholder = 'What changed, and where to find it';
     const outcome = el('select'); outcome.id = 'task-complete-outcome'; outcome.append(option('success', 'Success', true), option('failed', 'Failed', false));
-    box.append(labelled('Completion message', message, 'task-complete-message'), labelled('Outcome', outcome, 'task-complete-outcome'));
+    const links = el('p', 'task-completion-links'); links.hidden = true; // the task's results, when it has any: look before you mark it done
+    importOnce('./team_task_artifacts.js').then(m => m.taskResultLinks(ctx.project, task)).then(found => { if (found && found.length) { links.hidden = false; links.append('Results so far: ', ...found); } }).catch(() => {});
+    box.append(links, labelled('What was finished?', message, 'task-complete-message'), labelled('Outcome', outcome, 'task-complete-outcome'));
     if (required.length) {
         const req = el('section', 'task-completion-required'); req.setAttribute('aria-label', 'Required outputs');
         const ul = el('ul'); for (const o of required) ul.append(el('li', null, o));
         req.append(el('strong', null, 'Required outputs'), ul, el('p', null, 'Provide each named output below or in the manifest before completing.'));
         box.append(req);
-    } else box.append(el('p', 'task-completion-hint', 'Add a concise outcome and message. Evidence is optional unless the task specifies required outputs.'));
+    }
+    if (task.assigned_to && !required.length) box.append(el('p', 'task-completion-hint', `Not finished? Write what is missing here, then press Not yet: send back to tell ${task.assigned_to}.`));
     const details = el('details', 'task-completion-evidence'); if (required.length) details.open = true;
     details.append(el('summary', null, required.length ? 'Evidence and artifacts (required)' : 'Add evidence or artifact metadata (optional)'));
     const name = Object.assign(input('task-artifact-name'), { placeholder: 'build or test_report' });
@@ -206,13 +209,13 @@ export function completeForm(task, ctx) {
     const file = el('input'); file.type = 'file'; file.id = 'task-artifacts-file'; file.accept = 'application/json,.json';
     details.append(nameLabel,
         labelled('Artifact URL or reference', Object.assign(input('task-artifact-uri'), { placeholder: 'Durable URL or artifact reference' }), 'task-artifact-uri'),
-        labelled('Revision', Object.assign(input('task-artifact-revision'), { placeholder: 'Commit or build version' }), 'task-artifact-revision'),
+        labelled('Commit or build', Object.assign(input('task-artifact-revision'), { placeholder: 'For example a commit id' }), 'task-artifact-revision'),
         labelled('Artifact content', content, 'task-artifact-content'),
         labelled('Attach an artifact manifest', file, 'task-artifacts-file'));
     const error = el('div', 'modal-error'); error.id = 'task-complete-error'; error.hidden = true; error.setAttribute('role', 'alert');
     const refresh = btn('btn task-completion-refresh', 'Refresh task before retrying', () => ctx.reload()); refresh.id = 'task-complete-refresh'; refresh.hidden = true;
     box.append(details, error, refresh);
-    section.append(revision, box);
+    section.append(heading, box);
 
     async function submit() {
         try {
@@ -240,7 +243,18 @@ export function completeForm(task, ctx) {
             showToast(e.message || 'Failed to complete task', true);
         }
     }
-    return { node: section, focus: () => { message.focus({ preventScroll: true }); message.scrollIntoView({ block: 'center' }); }, submit }; // the box is brought into view above the pinned bar, not left under it on a phone (#10064)
+    /** "Not yet: send back": what is missing, written in the box, goes to the agent that has the task as an Operator message on the board; the task stays open. With nothing written it just goes back. */
+    async function sendBack() {
+        const text = message.value.trim();
+        if (!text || !task.assigned_to) { ctx.redraw(task, 'view'); return; }
+        try {
+            const resp = await boardFetch(ctx.project, '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', as: 'Operator', content: `@${task.assigned_to} Not done yet (task #${Number(task.id)}): ${text}` }) });
+            if (!resp.ok) throw await failure(resp);
+            showToast(`Sent back to ${task.assigned_to}`);
+            ctx.redraw(task, 'view');
+        } catch (e) { error.textContent = e.message || 'Could not send it back'; error.hidden = false; showToast(e.message || 'Could not send it back', true); }
+    }
+    return { node: section, sendBack, focus: () => { message.focus({ preventScroll: true }); message.scrollIntoView({ block: 'center' }); }, submit }; // the box is brought into view above the pinned bar, not left under it on a phone (#10064)
 }
 
 /** Reviews keep their lifecycle; only task text changes in this form. */
