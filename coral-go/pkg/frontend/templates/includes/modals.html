@@ -318,7 +318,7 @@
             <p class="open-folder-help">Adds this folder to your list. Start an agent or a terminal in it with one click from its menu; it stays there until you remove it.</p>
             <label for="open-folder-dir">Folder</label>
             <div class="dir-input-row">
-                <input type="text" id="open-folder-dir" placeholder="/path/to/project" autocomplete="off" data-on-keydown="m-open-folder-key">
+                <input type="text" id="open-folder-dir" placeholder="/path/to/project" autocomplete="off" data-on-keydown="m-open-folder-key" data-on-input="m-open-folder-edit" data-on-change="m-open-folder-edit">
                 <button class="btn" type="button" id="open-folder-browse" data-on-click="m-toggle-browser" data-browser="open-folder-dir open-folder-browser open-folder-browser-list open-folder-browser-path">Browse</button>
             </div>
             <div id="open-folder-browser" class="dir-browser" style="display:none">
