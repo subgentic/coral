@@ -133,6 +133,8 @@
     --card-pad-roomy: 28px;
     --card-radius: var(--radius-lg);
     --card-border: 1px solid var(--border);
+    --card-fill: var(--bg-secondary); /* the surface of a card, a tile and a panel (the Analytics tiles, Cumulative spend, a table box); the light theme makes it white (#10694) */
+    --card-shadow: none;
 
     /* Design Tokens — Toolbar (Goal #88, spec item 4): every toolbar row takes one gap and one padding: the Inbox list bar's. Bare: a row inside a pane that has its own side padding; dense: a pop-out window */
     --toolbar-gap: 8px;
@@ -277,6 +279,9 @@
     --bg-hover:     #d8dbe0;
     --viz-1: #2a78d6; --viz-2: #e56634; --viz-3: #249f70; --viz-4: #b8822b; --viz-5: #cc7092; --viz-6: #008300; --viz-7: #6250d6; --viz-other: #7d7f86; /* light: every line is 3:1 or more against the page (#7932) */
     --bg-elevated:  #e8eaed;
+    --card-fill:    #ffffff; /* white is 1.09:1 on the page, so a card is also set off by a soft shadow and its edge */
+    --card-shadow:  0 1px 2px rgba(31, 35, 40, 0.10), 0 1px 3px rgba(31, 35, 40, 0.06);
+    --table-surface: #ffffff; /* a table box (data_table.css --table-bg) */
 
     /* Borders */
     --border:       #c9cdd3;
