@@ -10,7 +10,7 @@ import './hub_access.js';
 import { sessionServer, noteBoardLabels, sessionTeamKey } from './server_base.js';
 import './sleeping_view.js';
 import './knowledge_distill.js';
-import './utils.js';
+import { escapeHtml } from './utils.js';
 import { registerActions, idOf, tokenOf, textOf } from './actions.js';
 import './live_chat.js';
 import './tags.js';
@@ -33,8 +33,8 @@ import { followServerOrder } from './list_order.js';
 import { _isServerCollapsed, _openServerDetails } from './server_rows.js';
 import { _attachDragListeners, _renderArchivedSection, _within, syncDisplayMenu, isGroupedByServer } from './session_rows.js';
 import './confirm_dialog.js';
-import { getAgentFilter, setAgentFilter, getListFilters } from './agent_filter.js';
-import { isFiltered as _listFiltered } from './agent_list_filters.js';
+import { getAgentFilter, setAgentFilter, getListFilters, setListFilters } from './agent_filter.js';
+import { isFiltered as _listFiltered, EMPTY as _NO_LIST_FILTERS } from './agent_list_filters.js';
 import { syncAgentListBars } from './agent_list_bar.js';
 import { syncGroupToggle } from './group_collapse.js';
 import { browserLocal } from './safe_storage.js';
@@ -135,7 +135,8 @@ export function filterLiveAgents(value) {
 
 /** The line under the agent search that offers the same words as a search of every chat (#10050): shown while there is something typed, naming it. */
 function syncSearchAllChats(value) {
-    const q = (value || '').trim(), b = document.getElementById('agent-search-all-chats');
+    const q = (value || '').trim(), b = document.getElementById('agent-search-all-chats'), x = document.getElementById('agent-search-clear');
+    if (x) x.hidden = !q; // a visible clear while the box holds words (#10357)
     if (!b) return;
     const text = q ? `Search all chats for \u201c${q.length > 40 ? q.slice(0, 40) + '\u2026' : q}\u201d` : '';
     if (b.textContent !== text) b.textContent = text;
@@ -271,6 +272,14 @@ function _refreshTeamBadges(sessions) {
     }
 }
 
+/** The list with nothing in it because of what is typed or chosen: it says which, and has the button that undoes it (#10357: it said "Clear the filters" with none set, while words from another page sat in the search box). */
+function emptyListHtml(unfilteredCount) {
+    if (!unfilteredCount) return 'No live sessions';
+    const words = (document.getElementById('agent-search-input')?.value || '').trim();
+    if (words) return `No agents match ${escapeHtml(words.length > 40 ? words.slice(0, 40) + '\u2026' : words)}. <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-search-clear">Clear search</button>`;
+    return 'No agents match these filters. <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-filters-clear">Clear filters</button>';
+}
+
 function _renderLiveSessions(sessions) {
     // Single-agent popout: the sidebar is chrome. Never render rows there —
     // they would carry session ids and destructive kebab actions into the DOM.
@@ -309,7 +318,7 @@ function _renderLiveSessions(sessions) {
 
     if (!sessions.length && !archived.length && !pinsShown) {
         // Coral Hub with no machine connected: say what to do (the same list is the phone's Agents page), not just that there is nothing
-        list.innerHTML = (!unfilteredCount && hubEmptyListHtml(machineState())) || `<li class="empty-state empty-state-tight empty-plain">${unfilteredCount ? 'No agents match. Clear the filters to see them all.' : 'No live sessions'}</li>${unfilteredCount ? '' : PHONE_WELCOME}`;
+        list.innerHTML = (!unfilteredCount && hubEmptyListHtml(machineState())) || `<li class="empty-state empty-state-tight empty-plain">${emptyListHtml(unfilteredCount)}</li>${unfilteredCount ? '' : PHONE_WELCOME}`;
         syncGroupToggle(); // no groups drawn: the header toggle goes
         return;
     }
@@ -400,6 +409,8 @@ function _wireListKeyboard(container) {
 
 
 registerActions({
+    'agent-search-clear': () => { const i = document.getElementById('agent-search-input'); if (i) { i.value = ''; i.focus(); } filterLiveAgents(''); },
+    'agent-filters-clear': () => { setListFilters(_NO_LIST_FILTERS); redrawLiveList(); },
     'kebab-close': (el, event) => { event.stopPropagation(); window.closeSidebarKebabs(); },
     'kebab-toggle': (el, event) => { event.stopPropagation(); window.toggleSidebarKebab(el, event); },
     'agent-info': withAgent('showInfoDirect'),
