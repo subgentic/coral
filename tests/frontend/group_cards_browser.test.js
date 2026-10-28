@@ -69,6 +69,7 @@ const SESSIONS = [
             assert.deepEqual(a.actions.map(x => x.split(':')[0]), ['folder-launch-default', 'folder-add-agent', 'folder-add-terminal', ...a.actions.map(x => x.split(':')[0]).filter(x => /pin/.test(x)), 'folder-tag', 'group-move', 'group-move', 'group-kill'], JSON.stringify(a.actions));
             assert.ok(a.actions.includes('folder-launch-default:/tmp/folder-a') && a.actions.includes('group-kill:folder-a'), JSON.stringify(a.actions));
             assert.equal(a.copy, '/tmp/folder-a', 'Copy path copies the folder');
+            assert.equal(await ev(`(document.querySelector('li.session-group-header[data-group-name="folder-a"] [data-on-click="folder-add-terminal"] .menu-item-hint') || {}).textContent || ''`), 'Opens a shell in this folder', 'the folder menu\'s Add Terminal has its one-line hint, as Add Agent has (#10164)');
         });
         await run('the header folds a card and a second click opens it again; the fold is kept', async () => {
             const hdr = `document.querySelector('li.session-team-group .group-chevron')`;

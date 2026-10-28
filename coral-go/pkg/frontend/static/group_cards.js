@@ -155,7 +155,7 @@ function _renderFolderGroup(groupName, groupSessions) {
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
-                    Add Terminal
+                    <span class="menu-item-text">Add Terminal<span class="menu-item-hint">Opens a shell in this folder</span></span>
                 </button>
                 <hr class="overflow-menu-divider">
                 ${_pinMenuItem(groupName, groupDirRaw)}
@@ -211,7 +211,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
-                    Add Terminal
+                    <span class="menu-item-text">Add Terminal<span class="menu-item-hint">Opens a shell in this folder</span></span>
                 </button>
                 <hr class="overflow-menu-divider">
                 ${_pinMenuItem(groupName, groupDirRaw)}
