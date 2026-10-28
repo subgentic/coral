@@ -97,14 +97,14 @@ export function chatOpened(s) {
     IR.markRead(readKind(s), readKey(s), stampOf(s) || Date.now());
 }
 
-/** A folder's list read before its chats were all indexed (after a restart the index fills in for a while) stays at the total it had, while the counts read moves on: the header said 2 over a list of 1 (#10197). An unfiltered list whose total is not the folder's count is read again, once for each count it differs from (a count that stays different, as with a computer that does not answer, does not read again and again). */
+/** A folder's list read before its chats were all indexed (after a restart the index fills in for a while) stays at the total it had, while the counts read moves on: the header said 2 over a list of 1 (#10197). An unfiltered list whose total is not the folder's count is marked to be read again (its rows stay on screen until the new read lands, #10230), once for each count it differs from (a count that stays different, as with a computer that does not answer, does not read again and again). */
 const rereadFor = new Map(); // list key -> the folder count it was last read again for
 function dropStaleLists() {
     for (const [k, L] of [...lists]) {
         const [, folder, q, extra] = k.split('|');
         const n = q === '' && extra === '{}' && !L.busy && L.page > 0 && !L.error ? folderCount(folder) : undefined;
         if (n === undefined || L.total === n || rereadFor.get(k) === n) continue;
-        rereadFor.set(k, n); lists.delete(k);
+        rereadFor.set(k, n); L.refresh = true; /* read again on the next draw, the rows stay on screen until it lands (#10230) */
     }
 }
 
@@ -128,27 +128,41 @@ export async function loadChatCounts(redraw) {
 // ── a folder's rows: read a page at a time, from the first, again when the folder or the search changes ──
 const lists = new Map(); // folder key + search + filters -> { rows, page, total, done, busy, error }
 const listOf = (key, q, extra = '') => { const k = `${inboxSources().join(",")}|${key}|${q}|${extra}`; if (!lists.has(k)) lists.set(k, { rows: [], page: 0, total: null, done: false, busy: false, error: '' }); return lists.get(k); };
+/** One page of a folder from each online computer: its rows (each with its server) and the folders' total. */
+async function readPage(page, folder, q, extra) {
+    const { server: selected, ...query } = extra;
+    const p = new URLSearchParams({ ...query, ...folder.params, page: String(page), page_size: String(PAGE) }); // the folder's own rule wins over a filter
+    if (q) p.set('q', q);
+    const sources = inboxSources().filter(server => (!selected || server === selected) && (!p.has('tag_ids') || server === 'local'));
+    if (!inboxSources().length) throw new Error('No computers online.'); // a Hub with none linked or none online: say so, not "No chats"
+    const replies = await Promise.all(sources.map(async server => {
+        const r = await serverFetch(server, `/api/sessions/history?${p}`);
+        if (!r.ok) throw new Error('Chats could not be read');
+        const d = await r.json(); return { ...d, sessions: (d.sessions || []).map(row => ({ ...row, server })) };
+    }));
+    const rows = replies.flatMap(d => d.sessions);
+    return { rows, total: replies.reduce((sum, d) => sum + (Number(d.total) || d.sessions.length), 0) };
+}
+const byNewest = rows => rows.sort((a, b) => stampOf(b).localeCompare(stampOf(a)));
+const REFRESH_PAGES = 4; // a list read again keeps up to this many of its pages (200 chats), the rest load as the person scrolls
 async function readMore(key, folder, q, extra, redraw) {
     const L = listOf(key, q, JSON.stringify(extra));
-    if (L.busy || L.done) return;
+    if (L.busy || (L.done && !L.refresh)) return;
     L.busy = true; // no redraw here: the spec is being built inside a draw, and a nested draw would close the table it is drawing (the empty line already says Loading)
     try {
-        const { server: selected, ...query } = extra;
-        const p = new URLSearchParams({ ...query, ...folder.params, page: String(L.page + 1), page_size: String(PAGE) }); // the folder's own rule wins over a filter
-        if (q) p.set('q', q);
-        const sources = inboxSources().filter(server => (!selected || server === selected) && (!p.has('tag_ids') || server === 'local'));
-        if (!inboxSources().length) throw new Error('No computers online.'); // a Hub with none linked or none online: say so, not "No chats"
-        const replies = await Promise.all(sources.map(async server => {
-            const r = await serverFetch(server, `/api/sessions/history?${p}`);
-            if (!r.ok) throw new Error('Chats could not be read');
-            const d = await r.json(); return { ...d, sessions: (d.sessions || []).map(row => ({ ...row, server })) };
-        }));
-        const rows = replies.flatMap(d => d.sessions);
-        const d = { total: replies.reduce((sum, d) => sum + (Number(d.total) || d.sessions.length), 0) };
-        L.rows = L.rows.concat(rows).sort((a,b) => stampOf(b).localeCompare(stampOf(a))); L.page += 1; L.total = Number.isFinite(d.total) ? d.total : L.rows.length; L.error = '';
-        L.done = !rows.length || L.rows.length >= L.total;
-        if (L.page > 1 && rows.length) importOnce('./notifications.js').then(m => m.announceNotice(`${rows.length} more chats loaded`)).catch(() => {}); // heard once: the rows came in below the footer the person was on (#8022)
-    } catch (e) { L.error = e.message || 'Chats could not be read'; L.done = true; }
+        if (L.refresh) { // read again because the folder's count moved (#10230): the rows on screen stay until the new ones are in, the same pages come back at once
+            const pages = Math.min(L.page, REFRESH_PAGES);
+            let rows = [], total = 0;
+            for (let page = 1; page <= pages; page++) { const got = await readPage(page, folder, q, extra); rows = rows.concat(got.rows); total = got.total; if (!got.rows.length) break; }
+            L.rows = byNewest(rows); L.page = pages; L.total = Number.isFinite(total) ? total : rows.length; L.error = ''; L.refresh = false;
+            L.done = !rows.length || L.rows.length >= L.total;
+        } else {
+            const got = await readPage(L.page + 1, folder, q, extra), rows = got.rows;
+            L.rows = byNewest(L.rows.concat(rows)); L.page += 1; L.total = Number.isFinite(got.total) ? got.total : L.rows.length; L.error = '';
+            L.done = !rows.length || L.rows.length >= L.total;
+            if (L.page > 1 && rows.length) importOnce('./notifications.js').then(m => m.announceNotice(`${rows.length} more chats loaded`)).catch(() => {}); // heard once: the rows came in below the footer the person was on (#8022)
+        }
+    } catch (e) { L.refresh = false; L.error = e.message || 'Chats could not be read'; L.done = true; }
     L.busy = false; redraw();
 }
 /** Forget what was read (a chat was starred or archived): the folders are read again from their first page. */
@@ -196,7 +210,7 @@ export function chatsSpec(key, ctx) {
     const q = (ctx.query || '').trim();
     const extra = { ...(ctx.params || {}), ...(multipleServers() && ctx.server ? { server: ctx.server } : {}) }, filtered = !!q || Object.keys(extra).length > 0;
     const L = listOf(key, q, JSON.stringify(extra));
-    if (!L.page && !L.busy && !L.done) readMore(key, folder, q, extra, ctx.redraw);
+    if ((!L.page && !L.busy && !L.done) || (L.refresh && !L.busy)) readMore(key, folder, q, extra, ctx.redraw);
     const rows = L.rows;
     return { title: folder.title, noun: ['chat', 'chats'], rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : 'No chats here.') },
         signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec, IR.isUnread(readKind(s), readKey(s), stampOf(s))])]),

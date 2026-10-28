@@ -32,21 +32,29 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
                 window.fetch = (u, o) => { const url = new URL(String(u), location.href), json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                     const rows = ${JSON.stringify(ROWS)}.slice(0, window.__n);
                     if (url.pathname === '/api/sessions/history/counts') return json(Object.assign({}, ${JSON.stringify(COUNTS)}, { all: window.__stuck ? 5 : window.__n }));
-                    if (url.pathname === '/api/sessions/history') { window.__hist.push(Object.fromEntries(url.searchParams)); return json({ sessions: rows, total: rows.length, page: 1, page_size: 50 }); }
+                    if (url.pathname === '/api/sessions/history') { window.__hist.push(Object.fromEntries(url.searchParams)); if (window.__slow) return new Promise(res => setTimeout(() => res(json({ sessions: rows, total: rows.length, page: 1, page_size: 50 })), window.__slow)); return json({ sessions: rows, total: rows.length, page: 1, page_size: 50 }); }
                     return R(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3`, 'the folders', 10000);
             await openFolder('chats', mobile, 'All chats');
             const reads = () => ev(`window.__hist.filter(p => p.type === 'agent' && !p.date_from).length`);
             check(`${label}: the first read shows the one chat that was indexed`, (await rowsShown()) === 1, String(await rowsShown()));
-            await ev(`window.__n = 2; true`);
+            await ev(`window.__n = 2; window.__slow = 1200; window.__sawLoading = false; window.__sawRows = []; new MutationObserver(() => { window.__sawRows.push(document.querySelectorAll('button.dt-primary, button.dt-person').length); if (/Loading chats/.test(document.body.innerText)) window.__sawLoading = true; }).observe(document.body, { childList: true, subtree: true, characterData: true }); true`);
+            const before = await reads();
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); const g = await import((window.__coralStatic || '/static/') + 'sidebar_groups.js'); await m.loadChatCounts(() => g.refreshGroupTable('hub-inbox')); return true; })()`);
+            await settle(400);
+            check(`${label}: while the list is read again the old chat stays on screen, with no "Loading chats"`, (await rowsShown()) === 1 && !(await ev(`window.__sawLoading`)), `${await rowsShown()} ${await ev('window.__sawLoading')}`);
             await waitFor(`document.querySelectorAll('button.dt-primary, button.dt-person').length === 2`, 'the list read again with the second chat', 8000).catch(() => {});
             check(`${label}: after the counts say 2 the list shows 2 chats, not 1`, (await rowsShown()) === 2, String(await rowsShown()));
+            check(`${label}: it was never empty and never said "Loading chats" on the way`, !(await ev(`window.__sawLoading`)) && !(await ev(`window.__sawRows.includes(0)`)), JSON.stringify(await ev(`window.__sawRows`)));
+            check(`${label}: the re-read was one read`, (await reads()) === before + 1, `${before} then ${await reads()}`);
+            await ev(`window.__slow = 0; true`);
             // a count that stays different from the list's total reads it once, not at every counts read
-            await ev(`window.__stuck = true; (async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); for (let i = 0; i < 4; i++) await m.loadChatCounts(() => {}); })(); true`);
+            const beforeStuck = await reads();
+            await ev(`window.__stuck = true; (async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); const g = await import((window.__coralStatic || '/static/') + 'sidebar_groups.js'); for (let i = 0; i < 4; i++) { await m.loadChatCounts(() => g.refreshGroupTable('hub-inbox')); await new Promise(r => setTimeout(r, 90)); } })(); true`);
             await settle(1500); const afterStuck = await reads();
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); for (let i = 0; i < 4; i++) await m.loadChatCounts(() => {}); return true; })()`);
+            check(`${label}: a count that stays different reads the list once, however many counts reads there are`, afterStuck === beforeStuck + 1, `${beforeStuck} then ${afterStuck}`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); const g = await import((window.__coralStatic || '/static/') + 'sidebar_groups.js'); for (let i = 0; i < 4; i++) { await m.loadChatCounts(() => g.refreshGroupTable('hub-inbox')); await new Promise(r => setTimeout(r, 90)); } return true; })()`);
             await settle(1500);
             check(`${label}: a count that stays different does not read the list again and again`, (await reads()) === afterStuck, `${afterStuck} then ${await reads()}`);
         }
