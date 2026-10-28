@@ -2,7 +2,7 @@
 //  - a path opens its page (title, the list's mark), at 1280 and on a phone (where a page is the screen after the list);
 //  - choosing a page writes its path; Back and Forward move between the pages; Overview is /analytics;
 //  - an agent's page (By agent > Details) is under /analytics/agent; leaving the tab and coming back keeps the page and its path;
-//  - a phone's Back to the list is /analytics, and /analytics on a phone is the list.
+//  - a phone's Back to the list is /analytics, and /analytics on a phone opens Overview (#10064) with the list one Back away.
 // Drives Chrome over CDP through agent_view_harness.js, stubbed API.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -81,7 +81,10 @@ const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking 
         assert.equal(await path(), '/analytics', 'phone: the list is /analytics');
         await Page.navigate({ url: BASE + '/analytics' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
-        await waitFor(`document.getElementById('mobile-analytics-list').getClientRects().length > 0 && document.getElementById('cost-page').getClientRects().length === 0`, '/analytics on a phone is the list', 10000);
-        console.log('PASS analytics pages have their own paths: open, choose, Back and Forward, tab return, reload, phone list');
+        // /analytics on a phone opens on Overview itself (#10064); the way back is the list
+        await waitFor(`document.getElementById('cost-view-title') && document.getElementById('cost-view-title').textContent === 'Overview' && document.getElementById('cost-page').getClientRects().length > 0`, '/analytics on a phone opens Overview', 10000);
+        await ev(`document.querySelector('.cost-phone-back').click(); true`);
+        await waitFor(`document.getElementById('mobile-analytics-list').getClientRects().length > 0 && document.getElementById('cost-page').getClientRects().length === 0`, 'its way back is the list', 6000);
+        console.log('PASS analytics pages have their own paths: open, choose, Back and Forward, tab return, reload, phone Overview and its list');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
