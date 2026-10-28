@@ -24,12 +24,17 @@ function fitWords() {
     const row = strip();
     if (!row) return;
     const on = row.hasAttribute('data-words');
-    if (!WIDE.matches) { if (on) row.removeAttribute('data-words'); return; }
+    if (!WIDE.matches) { if (on) row.removeAttribute('data-words'); if (row.hasAttribute('data-active-word')) row.removeAttribute('data-active-word'); return; }
     const tabs = [...row.querySelectorAll('.agentic-tab')].filter(shown).filter(b => !b.classList.contains('tab-more'));
     if (tabs.length === 0) return;
     if (!on) row.setAttribute('data-words', '');
     const top = tabs[0].offsetTop;
-    if (tabs.some(b => b.offsetTop !== top || b.scrollWidth > b.clientWidth + 1) || row.scrollWidth > row.clientWidth) row.removeAttribute('data-words'); // not all on one line, or a word clipped in its tab: icons alone
+    const crowded = () => tabs.some(b => b.offsetTop !== top || b.scrollWidth > b.clientWidth + 1) || row.scrollWidth > row.clientWidth;
+    if (!crowded()) { if (row.hasAttribute('data-active-word')) row.removeAttribute('data-active-word'); return; }
+    row.removeAttribute('data-words'); // not all on one line, or a word clipped in its tab: icons alone
+    // ...but the open tab still says its word when that fits, whichever tab is open (#9999: eight icons and a newcomer guessing which one is Artifacts): each tab is tried as the open one
+    const fits = tabs.every(b => { b.setAttribute('data-probe', ''); const ok = !crowded(); b.removeAttribute('data-probe'); return ok; });
+    if (fits !== row.hasAttribute('data-active-word')) { if (fits) row.setAttribute('data-active-word', ''); else row.removeAttribute('data-active-word'); }
 }
 
 let lastShape = '';

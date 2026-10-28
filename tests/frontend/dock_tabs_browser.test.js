@@ -71,7 +71,22 @@ const { settle } = require('./helpers/wait');
         await ev(`document.getElementById('agentic-state').style.width = '300px'; window.dispatchEvent(new Event('resize')); true`);
         await waitFor(`!document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words give way when they do not fit', 4000);
         r = await row();
-        assert.ok(r.shown.every(([, w]) => w === null) && r.tops.length === 1 && !r.clipped, 'icons alone, one line: ' + JSON.stringify(r));
+        // #9999 (the beta tester: eight icon-only tabs, a newcomer guessed which was Artifacts): the words are off, but the open tab says its own word when that fits, whichever tab is open; the others stay icons
+        let sawWord = false;
+        for (const w of [300, 340, 380, 420, 460]) {
+            await ev(`document.getElementById('agentic-state').style.width = '${w}px'; window.dispatchEvent(new Event('resize')); true`); await settle(ev, 400); // sleep-ok: the row is measured again
+            for (const tab of ['files', 'artifacts', 'tasks']) {
+                await ev(`document.getElementById('agentic-tab-${tab}').click(); true`); await settle(ev, 300); // sleep-ok: the tab switches
+                r = await row();
+                if (r.words) continue; // every word fits: the 1280 case above
+                const said = r.shown.filter(([, x]) => x !== null);
+                assert.ok(r.tops.length === 1 && !r.clipped && said.length <= 1 && (said.length === 0 || said[0][0] === tab), `${w} px: icons, and at most the open tab (${tab}) with its word, one line, nothing clipped: ` + JSON.stringify(r));
+                if (said.length === 1) { if (!sawWord) await shot('dock-tabs-open-word'); sawWord = true; }
+            }
+        }
+        assert.ok(sawWord, 'at some width where the words do not all fit, the open tab says its word');
+        await ev(`document.getElementById('agentic-tab-files').click(); true`); await settle(ev, 300); r = await row(); // sleep-ok: back to Files
+        await ev(`document.getElementById('agentic-state').style.width = '300px'; window.dispatchEvent(new Event('resize')); true`); await settle(ev, 400); r = await row(); // sleep-ok: back to the narrow panel
         assert.ok(await ev(`[...document.querySelectorAll('${ROW} .agentic-tab')].filter(b => getComputedStyle(b).display !== 'none' && !b.classList.contains('tab-more')).every(b => b.getAttribute('aria-label') && b.title)`), 'each keeps its name as aria-label and title');
         await shot('dock-tabs-narrow'); ok('words fall back to icons with the names kept');
         await ev(`document.getElementById('agentic-state').style.width = ''; true`);
