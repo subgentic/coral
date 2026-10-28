@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const SETS = {
-    claude: ['Yes', "Yes, and don't ask again for: npm test:*", 'Yes, allow all edits during this session (shift+tab)', 'No'],
+    claude: ['Yes', "Yes, and don't ask again for: npm test:*", 'Yes, allow all edits during this session (shift+tab)', 'Yes, allow reading from src/ from this project', 'No'],
     codex: ['Yes, proceed (y)', "Yes, and don't ask again for commands that start with `touch` (p)", 'No, and tell Codex what to do differently (esc)'],
     antigravity: ['Yes, run command', "Yes, and always allow in this conversation for commands that start with 'printf'", 'Yes, and always allow access to the folder', 'No, cancel'],
 };
