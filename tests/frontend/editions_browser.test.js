@@ -381,6 +381,13 @@ async function run() {
             await load();
             await showHome(mobile);
             check(`${label}: still hidden after reload`, (await home()).hidden);
+            // a hidden strip can be shown again (#10572): a button under the cards, and the footer links say they open outside Coral
+            const links = await ev(`(() => { const nav = document.querySelector('#welcome-screen .welcome-links'); const vis = e => !!e && e.getClientRects().length > 0; return { ext: [...nav.querySelectorAll('a[target="_blank"]')].map(a => ({ name: a.textContent.replace(/\\s+/g, ' ').trim(), icon: !!a.querySelector('.material-icons[aria-hidden="true"]') && [...a.querySelectorAll('.material-icons')].some(i => /open_in_new/.test(i.textContent)) })), show: vis(nav.querySelector('[data-editions="show-home"]')) }; })()`);
+            check(`${label}: each footer link that leaves Coral says so (an open-in-new mark and "opens in a new tab" in its name)`, links.ext.length === 3 && links.ext.every(l => l.icon && /opens in a new tab/i.test(l.name)), JSON.stringify(links.ext));
+            check(`${label}: with the strip hidden, a Show Coral Hub button is under the cards`, links.show, JSON.stringify(links));
+            await click('#welcome-screen [data-editions="show-home"]');
+            await until(`(async () => !document.getElementById('editions-home').hidden && (await (await fetch('/api/settings')).json()).settings.home_editions_hidden === 'False')()`, 'the section shown again and saved');
+            check(`${label}: Show Coral Hub brings the strip back and saves it`, !(await home()).hidden && (await settings()).home_editions_hidden === 'False');
         }
         check('no page exceptions', exceptions.length === 0, JSON.stringify(exceptions));
     } finally {
