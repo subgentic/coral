@@ -40,6 +40,15 @@ const BOARD = 'kb-up-' + Date.now().toString(36);
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the list scrolls
         l = await list();
         check(l.atEnd, `after a send the list is at the newest message, the person's own: ${JSON.stringify(l)}`);
+        // a send from scrolled up (the person read older messages, then replied): their own message is still the newest, and in view
+        await ev(`document.getElementById('mb-messages').scrollTop = 0; true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the scroll settles
+        await ev(`(() => { const i = document.getElementById('mb-post-input'); i.focus(); i.value = 'Second own message sent while scrolled up'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+        await new Promise(r => setTimeout(r, 300)); // sleep-ok: the composer follows its text
+        await ev(`document.querySelector('#mb-board .mb-post-send-btn').click(); true`);
+        await waitFor(`[...document.querySelectorAll('#mb-messages .mb-message')].some(m => /Second own message sent while scrolled up/.test(m.textContent))`, 'the second sent message in the list', 10000);
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: the list scrolls
+        l = await list();
+        check(l.atEnd, `after a send from scrolled up the list is at the person's own message, not left where it was: ${JSON.stringify(l)}`);
         // scrolled up: a message that arrives is a pill, and the list does not move; the pill takes the person to it
         await ev(`document.getElementById('mb-messages').scrollTop = 0; true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the scroll settles
         await post('/messages', { subscriber_id: 'Boss', content: 'A newer message that arrives while the person reads older ones' });
