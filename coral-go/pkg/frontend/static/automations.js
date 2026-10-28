@@ -165,7 +165,7 @@ const workflowResult = i => W.lastResult(i.run);
 /** A row's name button: the name is the one line; what the item is or runs is its tooltip (the page has it in full). */
 const nameButton = (i, what) => {
     const b = DT.primaryButton(i.name); if (what) b.title = `${i.name} \u2014 ${what}`;
-    if (!isExample(i.kind === 'job' ? i.job && i.job.description : i.kind === 'workflow' ? i.does : '')) return b;
+    if (!isExample(i.name, i.kind === 'job' ? i.job && i.job.description : i.kind === 'workflow' ? i.does : '')) return b;
     const w = DT.el('span', 'dt-name-example'); w.append(b, DT.tag('Example')); return w; // one added as an example is marked, so nobody takes it for their own (#10001)
 };
 /** A job's Last run; a paused job also says Paused beside it when its Next column (where the chip is) has gone, in a narrow list (#10275: a phone's Jobs list did not say which job was paused). */
