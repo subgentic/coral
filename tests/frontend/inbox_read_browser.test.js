@@ -45,7 +45,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelectorAll('${T} tbody tr.dt-row').length === 3 && document.getElementById('inbox-page').hidden`, at + 'back to the list', 10000);
             r = await rows();
             assert.equal(r.filter(x => x.unread).length, 2, at + 'the opened task is read when the list is drawn again, the other two are still unread ' + JSON.stringify(r));
-            assert.ok(r.some(x => !x.unread && x.weight === (mobile ? '500' : '400')), at + 'a read name is ' + (mobile ? '500' : 'the table\'s own') + ' ' + JSON.stringify(r));
+            assert.ok(r.some(x => !x.unread && x.weight === '400'), at + 'a read task title is 400, at a mouse and on a phone: a task is a row\'s own title, not a name, so it stays 13/400 and 600 is only the unread row (#9758, the operator\'s table-title rule; it was 500 on the phone) ' + JSON.stringify(r));
             await shot(`inbox-read-read-${w}`);
             console.log('PASS ' + at + 'the read marker');
         }
