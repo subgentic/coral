@@ -31,6 +31,7 @@ const TEAM = `qa-board-name-${Date.now() % 100000}`;
                 // an empty board's line (no board here is empty: the seeded team has a message), read from the sources that write it
                 const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend'), read = p => require('node:fs').readFileSync(require('node:path').join(root, p), 'utf8');
                 for (const p of ['static/board_window.js', 'static/board_chat.js', 'templates/includes/views/message_board.html']) { const t = read(p); assert.ok(t.includes('No messages on the board yet') && !/No messages yet/.test(t), p + ' says the board'); }
+                assert.ok(read('static/board_chat.js').includes('Agents post here as they work.'), 'an empty board says who fills it (#9971)');
             });
         }
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }

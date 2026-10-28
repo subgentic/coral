@@ -337,7 +337,7 @@ async function _loadEarlierBoardChat() {
 function _emptyBoardLine() {
     const subs = (_boardSubscribers[_activeBoardChat] || []).filter(s => !isOperatorId(s.subscriber_id));
     const lead = subs.find(s => (s.job_title || s.subscriber_id) === 'Orchestrator') || subs[0];
-    return lead ? `Tell @${lead.job_title || lead.subscriber_id} what to build` : 'No messages on the board yet';
+    return lead ? `No messages on the board yet. Agents post here as they work. Tell @${lead.job_title || lead.subscriber_id} what to build below, or open an agent to see it start.` : 'No messages on the board yet. Agents post here as they work.';
 }
 
 function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
