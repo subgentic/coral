@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { removeBoards } = require('./helpers/board_cleanup');
 const GOALS = [
     { id: 1, board_id: 'team-a', title: 'Ship the importer with a title long enough to need room', outcome: 'Importer is live in production for every customer and the old path is removed', state: 'active', driver: 'Orchestrator', updated_at: '2026-10-20T10:00:00Z', rollup: { done: 2, active: 1, blocked: 0, queued: 1 } },
     { id: 2, board_id: 'team-a', title: 'Cut the cold start', outcome: 'Start under 2 s on a cold machine', state: 'blocked', driver: 'Backend Dev', updated_at: '2026-10-22T10:00:00Z', rollup: { done: 0, active: 0, blocked: 2, queued: 0 } },
@@ -48,5 +49,5 @@ const GOALS = [
             }
         }
         console.log('PASS one line rows: the Inbox Goals and Needs you and the team Goals and Agents keep every row on one line at 1280 and 390');
-    } finally { await client.close(); }
+    } finally { await removeBoards(ev, [B]); await client.close(); } // the suite's board goes with it (#9869: it left rows behind on a Windows run)
 })().catch(e => { console.error(e); process.exitCode = 1; });

@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { guardSettings } = require('./helpers/settings_guard');
 
 const uid = n => '0000' + String(n).padStart(4, '0') + '-0000-4000-8000-000000000000';
 const SESSIONS = Array.from({ length: 6 }, (_, i) => {
@@ -14,6 +15,7 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await guardSettings(); // the display switches this suite flips are put back (#9869: it left a setting changed on a Windows run)
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await ev(`document.querySelectorAll('.notification-toast, .toast').forEach(e => e.remove()); true`); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -102,5 +104,5 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
             await panel(false);
         }
         console.log('PASS agent list header: no summary line, the dot only for a real filter');
-    } finally { await client.close(); }
+    } finally { await guard.restore(); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
