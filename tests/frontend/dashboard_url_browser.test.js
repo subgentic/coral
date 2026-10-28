@@ -39,6 +39,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         check('a plain dashboard load is /agents, with no query', (await here()) === '/agents', await here());
         await ev(`switchNavTab('history'); true`);
         await settled();
+        // the Inbox loads on first use: the address is /chats until it is in, so wait for the Inbox's address (a slow runner, Windows, read /chats when two reads 100 ms apart agreed)
+        for (const end = Date.now() + 8000; Date.now() < end && (await here()) !== '/inbox/chats/all'; await sleep(100)) { /* loading */ }
         check('switching to Chats is /inbox/chats/all (the Inbox\'s All chats, #8652), with no ?page=1&page_size=50', (await here()) === '/inbox/chats/all', await here());
         await ev(`switchNavTab('agents'); true`);
         check('and back to Agents is /agents', (await here()) === '/agents', await here());

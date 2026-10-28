@@ -125,7 +125,7 @@ const SCEN = [
         }
         const want = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'));
         assert.deepEqual(Object.keys(hashes), Object.keys(want.hashes), 'the same scenarios');
-        for (const k of Object.keys(want.hashes)) if (hashes[k] !== want.hashes[k]) assert.fail(`${k}: changed.\n  now:  ${lines[k]}\n  was:  ${want.lines[k]}`);
+        for (const k of Object.keys(want.hashes)) if (hashes[k] !== want.hashes[k]) assert.fail(`${k}: changed.\n  now:  ${lines[k]}\n  was:  ${want.lines[k]}\n  controls now: ${trace[k].controls.map(c => c[0] + ':' + c[1]).join(' ')}`);
         console.log(`PASS settings modal trace: ${Object.keys(want.hashes).length} scenarios identical`);
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
