@@ -24,7 +24,8 @@ assert.equal(CF.clean({ tagId: '12' }).tagId, '12'); assert.equal(CF.clean({ tag
 assert.deepEqual(CF.clean({ from: '2026-10-20', to: '2026-10-01' }), { ...CF.EMPTY, from: '2026-10-01', to: '2026-10-20' }, 'a reversed range is put the right way round');
 
 CF.setTagNames(new Map([['7', 'Release']]));
-assert.deepEqual(CF.chips({ ...CF.EMPTY, q: 'x', cli: 'agy', agent: 'QA', tagId: '7', from: '2026-10-01', to: '2026-10-20' }).map(c => c.label), ['Search: x', 'CLI: Antigravity', 'Agent: QA', 'Tag: Release', 'Dates: 2026-10-01 to 2026-10-20']);
+assert.deepEqual(CF.chips({ ...CF.EMPTY, q: 'x', cli: 'agy', agent: 'QA', tagId: '7', from: '2026-10-01', to: '2026-10-20' }).map(c => c.label), ['CLI: Antigravity', 'Agent: QA', 'Tag: Release', 'Dates: 2026-10-01 to 2026-10-20']);
+assert.deepEqual(CF.chips({ ...CF.EMPTY, q: 'x' }), [], 'the search box shows the words: no chip of them (#10484)');
 assert.deepEqual(CF.chips({ ...CF.EMPTY, from: '2026-10-01' }).map(c => c.label), ['From 2026-10-01']);
 assert.deepEqual(CF.chips({ ...CF.EMPTY, to: '2026-10-20' }).map(c => c.label), ['Until 2026-10-20']);
 assert.deepEqual(CF.chips({ ...CF.EMPTY, tagId: '99' }).map(c => c.label), ['Tag: Tag'], 'a tag it does not know reads Tag');
