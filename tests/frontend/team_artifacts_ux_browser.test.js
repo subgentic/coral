@@ -51,6 +51,11 @@ const HEX = c => c.repeat(64);
             return bad; })()`);
         assert.deepEqual(overlap, [], 'nothing overprints: ' + overlap.join(', '));
         await shot('team-artifacts-ux-desktop');
+        // the 28 px Details icon in a 36 px row (#9734): its focus ring stays inside the row's cell, not clipped by it
+        await ev(`document.querySelector('${ROWS} .artifact-details').focus(); true`); await sleep(400); // sleep-ok: the ring's transition (base.css) ends before it is measured
+        const ring = await ev(`(() => { const b = document.querySelector('${ROWS} .artifact-details'); const cs = getComputedStyle(b), edge = parseFloat(cs.outlineWidth) + parseFloat(cs.outlineOffset), r = b.getBoundingClientRect(), td = b.closest('td').getBoundingClientRect(); return { focusVisible: b.matches(':focus-visible'), over: Math.max(td.top - (r.top - edge), (r.bottom + edge) - td.bottom), w: cs.outlineWidth, o: cs.outlineOffset, h: Math.round(td.height) }; })()`);
+        assert.ok(ring.focusVisible && ring.over <= 0, 'the Details icon\'s focus ring is whole inside its cell: ' + JSON.stringify(ring));
+        await shot('team-artifacts-ux-details-focus');
 
         console.log('2. A singular count');
         await ev(`window.__items = [window.__items[0]]; true`);
