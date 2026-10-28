@@ -76,6 +76,16 @@ export function runProgressHtml(run, steps) {
         </div>` : '';
 }
 
+/** What a step's output says: an agent step's output is the CLI's result object ({"is_error":false,"result":"..."}), so the person reads its reply text, not the JSON cut at the edge; any other output as it is. */
+export function stepOutputWords(tail) {
+    const t = String(tail || '');
+    const trimmed = t.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try { const o = JSON.parse(trimmed); if (o && typeof o.result === 'string' && o.result.trim()) return o.result.trim(); } catch { /* not a result object: the output as it is */ }
+    }
+    return t;
+}
+
 /** One step of the timeline: its mark, name, type, exit code, agent link, timing, output, error tail and files. `count` is how many steps the run has. */
 export function runStepHtml(run, s, i, count) {
         const icon = statusIconChar(s.status);
@@ -102,17 +112,18 @@ export function runStepHtml(run, s, i, count) {
 
         // Output section — auto-expanded for failed steps
         let outputHtml = '';
-        if (s.output_tail) {
+        const shown = stepOutputWords(s.output_tail);
+        if (shown) {
             const outputId = `wf-step-output-${run.id}-${i}`;
             const autoExpand = isFailed ? ' wf-expanded' : '';
-            const first = String(s.output_tail).split('\n').map(l => l.trim()).find(Boolean) || ''; // a closed step says what its output began with (#7156)
+            const first = shown.split('\n').map(l => l.trim()).find(Boolean) || ''; // a closed step says what its output began with (#7156)
             const peek = first ? `<span class="wf-run-step-peek">${esc(first.length > 120 ? first.slice(0, 119) + '…' : first)}</span>` : '';
             outputHtml = `
                 <button type="button" class="wf-run-step-output-toggle" aria-expanded="${escAttr(isFailed)}" aria-controls="${escAttr(outputId)}" aria-label="${escAttr('Output of ' + (s.name || 'step ' + (i + 1)))}" data-on-click="wf-output-toggle">
                     <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">terminal</span> Output${peek}
                     <span class="material-icons wf-toggle-arrow" style="font-size:var(--fs-lg)" aria-hidden="true">expand_more</span>
                 </button>
-                <div id="${escAttr(outputId)}" class="wf-run-step-output${autoExpand}">${esc(s.output_tail)}</div>`;
+                <div id="${escAttr(outputId)}" class="wf-run-step-output${autoExpand}">${esc(shown)}</div>`;
         }
         // Why a step failed: the end of its stderr, always shown (stderr.txt is still in the file list).
         if (isFailed && s.error_tail && s.error_tail.trim()) {
