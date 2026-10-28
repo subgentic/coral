@@ -1,6 +1,7 @@
 // The Inbox's Goals folder (#7776, the mailbox mock): the open goals of every team as the team page's goal row plus a Team column, on data_table; a quiet count in the sidebar; the search narrows it; a click opens the goal on its
 // team's page. Real boards on the isolated dev server (two teams, removed again). Desktop and a phone.
 const assert = require('node:assert/strict');
+const { SIZING } = require('./helpers/table_sizing');
 const { connect } = require('./agent_view_harness');
 const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
@@ -33,6 +34,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
             rows: rows.map(r => ({ goal: r.querySelector('.dt-primary').textContent, team: r.querySelector('td[data-key="team"]').textContent.trim(), chip: r.querySelector('.goal-chip').textContent, progress: r.querySelector('td[data-key="progress"]').textContent.replace(/\\s+/g, ' ').trim() })),
             sidebar: [...document.querySelectorAll('.view-list-item')].map(${ROW_WORDS}).filter(t => /^(Needs you|Tasks|Goals|Saved)/.test(t)), goalsSoon: !!document.querySelector('.view-list-item[data-key="goals"].view-list-soon, .view-list-item[data-key="goals"][aria-disabled="true"]') }; })()`);
         assert.equal(d.title, 'Goals'); assert.deepEqual(d.heads, ['State', 'Goal', 'Team', 'Progress', 'Updated'], 'the team page\'s goal row plus a Team column');
+        for (const bw of [1280, 1024]) { // the table's default sizes (#9856): the goal's title is at least 24 characters and nothing scrolls sideways, at 1280 and at 1024
+            await Emulation.setDeviceMetricsOverride({ width: bw, height: 800, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
+            const z = await ev(SIZING('#group-table-view .dt-box', 'goal'));
+            assert.ok(z && !z.scroll && z.name >= z.ch24 - 1, `${bw}: the goal title is at least 24 characters and the table does not scroll sideways: ` + JSON.stringify(z));
+        }
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: back to the suite's width
         const mine = d.rows.filter(r => [A, B].includes(r.team));
         assert.deepEqual(mine.map(r => r.goal).sort(), ['Explore goals', 'Plan the notes', 'Ship the mailbox'], 'the open goals of both teams ' + JSON.stringify(d.rows));
         assert.match(mine.find(r => r.goal === 'Ship the mailbox').progress, /0 of 3 done/, 'progress words'); assert.match(mine.find(r => r.goal === 'Plan the notes').progress, /No tasks yet/);
