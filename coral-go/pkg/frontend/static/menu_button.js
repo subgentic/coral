@@ -3,6 +3,7 @@
  * to the button (and is not the dialog's Escape); Tab, a click elsewhere or a choice closes it. It opens below the button, or above it when there is not room below inside the dialog's body: a menu
  * is never cut off by the footer. Only one is open at a time. */
 import { menuMove } from './menu_keys.js';
+import { keepMenuOnScreen } from './menu_fit.js';
 
 let current = null; // { toggle, menu }
 
@@ -23,6 +24,7 @@ function place(toggle, menu) {
     const box = toggle.closest('.settings-modal-body, .modal-content') || document.body;
     const room = box.getBoundingClientRect().bottom - toggle.getBoundingClientRect().bottom;
     if (menu.getBoundingClientRect().height > room - 8) menu.classList.add('team-menu-up');
+    keepMenuOnScreen(menu, toggle);
 }
 
 export function openMenu(toggle, { focusFirst = true } = {}) {

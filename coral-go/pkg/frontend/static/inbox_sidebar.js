@@ -1,4 +1,5 @@
 import { multipleServers, serverColumns, serverMatches, syncServerField } from './inbox_servers.js';
+import { keepMenuOnScreen } from './menu_fit.js';
 import { needsInputAttention } from './display_activity_hint.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
@@ -704,7 +705,7 @@ function openSavedPage(id) {
     const wrap = el('div', 'wf-more'), toggle = el('button', 'btn btn-small', 'More'), menu = el('div', 'menu wf-more-menu'), rm = el('button', 'menu-item menu-item-danger', 'Remove from saved');
     toggle.type = 'button'; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-label', `More for ${f.which}`);
     menu.hidden = true; menu.id = 'inbox-saved-more'; menu.setAttribute('role', 'menu'); toggle.setAttribute('aria-controls', menu.id); rm.setAttribute('role', 'menuitem'); rm.type = 'button'; rm.setAttribute('aria-label', `Remove from saved: ${f.which}`);
-    const openMenu = () => { closeMore(false); openMore = { wrap, menu, toggle }; menu.hidden = false; toggle.setAttribute('aria-expanded', 'true'); rm.focus(); };
+    const openMenu = () => { closeMore(false); openMore = { wrap, menu, toggle }; menu.hidden = false; toggle.setAttribute('aria-expanded', 'true'); keepMenuOnScreen(menu, toggle); rm.focus(); };
     toggle.addEventListener('click', () => { if (openMore && openMore.wrap === wrap) closeMore(true); else openMenu(); });
     wrap.addEventListener('keydown', e => {
         const isOpen = !!openMore && openMore.wrap === wrap;
