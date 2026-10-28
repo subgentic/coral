@@ -101,6 +101,7 @@
 .sched-limit-fields > * { margin-top: 4px; }
 .sched-limit-fields input, .sched-limit-fields select { margin-top: 0; }
 .sched-preview { margin: 0 0 8px; }
+.sched-when-note { margin: 0 0 8px; color: var(--text-secondary); font-size: var(--fs-md); } /* when it runs, true to the scheduler (#10515) */
 .sched-preview-bad { color: var(--error-text, var(--error)); }
 /* A phone: the dialog already has a 16 px edge (its own padding); the body's own 24 px made the fields start 41 px in */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {

@@ -9,7 +9,7 @@ import { registerActions, withId, uuidOf } from './actions.js';
 import { pollEvery } from './overload.js';
 import { compactDuration } from './format.js';
 import { runFailure } from './run_failure.js';
-import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords, isExample, jobDescription } from './job_words.js';
+import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords, isExample, jobDescription, RUNS_WHILE_OPEN } from './job_words.js';
 import { foldWayBack } from './sidebar_groups.js';
 import { note } from './nav.js';
 import { importOnce } from './import_once.js';
@@ -219,6 +219,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         ${job.description ? `<p class="sched-desc">${escapeHtml(jobDescription(job))}</p>` : ''}
         <dl class="facts sched-facts">
             <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${escapeHtml(zoneNote(job.timezone))}</dd>
+            <dt>Runs</dt><dd>${escapeHtml(RUNS_WHILE_OPEN[0].toUpperCase() + RUNS_WHILE_OPEN.slice(1))}</dd>
             ${job.enabled
                 ? (job.next_fire_at ? `<dt>Next</dt><dd title="${escapeAttr(awayWords(job.next_fire_at))}">${escapeHtml(atWords(job.next_fire_at))} your time</dd>` : '<dt>Next</dt><dd>not scheduled</dd>')
                 : `<dt>${job.paused_reason ? 'Paused' : 'Turned off'}</dt><dd>${job.paused_reason ? `${escapeHtml(job.paused_reason)}. Fix the cause, then turn it on to resume.` : 'Turn it on to run it on schedule.'}</dd>`}

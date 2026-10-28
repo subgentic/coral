@@ -5,7 +5,7 @@ import { mountSettingsView } from './settings_view.js';
 import { ensureBuilt } from './lazy_dom.js';
 import { escapeHtml, showToast } from './utils.js';
 import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
-import { cronWords, atWords, localZone, zoneNote } from './job_words.js';
+import { cronWords, atWords, localZone, zoneNote, RUNS_WHILE_OPEN } from './job_words.js';
 import { importOnce } from './import_once.js';
 import { joinBrowse } from './dir_row.js';
 const { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } = await importOnce('./cron_picker.js'); // this form loads on first use (#10218), and so do the pieces only it uses
@@ -167,7 +167,8 @@ function scheduleField() {
             help.append('Five fields: minute, hour, day of month, month, day of week. ', code, ' is every day at 02:00.');
             row.append(lab, help);
             const preview = el('div', 'sched-preview'); preview.id = 'cron-preview'; preview.setAttribute('role', 'status');
-            slot.append(modes, every, days, at, row, preview);
+            const whenNote = el('p', 'sched-when-note', `Runs ${RUNS_WHILE_OPEN}`);
+            slot.append(modes, every, days, at, row, preview, whenNote);
             for (const p of slot.querySelectorAll('[data-for]')) p.hidden = !p.dataset.for.split(' ').includes(pickerState.mode);
             return {
                 get: () => input.value.trim(),
