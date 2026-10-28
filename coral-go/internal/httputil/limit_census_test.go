@@ -29,6 +29,7 @@ var tooManyRequestsSites = map[string]struct {
 	"internal/cloud/signin.go":                          {1, "client side: the Hub sign-in check reads Coral Hub's busy 429 as transient, like no answer (#3966)"},
 	"internal/tracking/posthog.go":                      {2, "client side: retries the analytics service's 429 (and says so in a comment)"},
 	"cmd/coral/cloud_connect.go":                        {1, "client side: the CLI reads Coral Hub's 429"},
+	"internal/machinelaunch/digitalocean.go":            {2, "client side: the provider reads DigitalOcean's 429 (a message with its Retry-After, and a transient answer a poll rides out), never writes one (#9973)"},
 	"cmd/coral-board/send.go":                           {1, "client side: coral-board reads a relayed send's 429 to suggest a retry (#3489)"},
 	"pkg/tunnel/control.go":                             {1, "relay protocol, not HTTP to the dashboard: the hub's one-a-second limit on the connector's local mode messages, answered to the connector, which falls back to a reconnect (#5918)"},
 	"pkg/tunnel/inbound.go":                             {1, "relay protocol, not HTTP to the dashboard: the hub's per-tunnel in-flight cap answer to a connector, which Coral passes on marked (#3489; moved from relay.go into the shared table of connector-opened kinds, #3966)"},

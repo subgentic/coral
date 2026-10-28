@@ -297,14 +297,14 @@ func TestAnAnswerIsBoundedAndAMalformedOneIsRefused(t *testing.T) {
 
 func TestErrorMessagesAreCleanedAndTheTokenIsRemovedFromEveryOne(t *testing.T) {
 	_, d := newStub(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
-		writeJSON(w, 422, map[string]any{"id": "unprocessable", "message": "bad\x1b[31m request " + testToken + " ‮ " + strings.Repeat("x", 500)})
+		writeJSON(w, 422, map[string]any{"id": "unprocessable", "message": "bad\x1b[31m request " + testToken + " \u202e " + strings.Repeat("x", 500)})
 	})
 	err := d.Delete(t.Context(), "5")
 	require.Error(t, err)
 	msg := err.Error()
 	assert.NotContains(t, msg, testToken)
 	assert.NotContains(t, msg, "\x1b")
-	assert.NotContains(t, msg, "‮")
+	assert.NotContains(t, msg, "\u202e")
 	assert.LessOrEqual(t, len(msg), 320, "a provider message is cut")
 	// a connection that fails names no token either
 	d2, _ := NewDigitalOcean(testToken, WithBaseURL("http://127.0.0.1:1"))

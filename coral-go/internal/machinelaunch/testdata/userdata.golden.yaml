@@ -1,0 +1,104 @@
+#cloud-config
+# A Coral machine, made by `coral machine launch`. It holds one secret: the Coral Hub one-time credential in the last step, single use and short-lived.
+# Nothing here opens an inbound port: the machine connects out to Coral Hub.
+users:
+  - name: coral
+    gecos: Coral
+    shell: /bin/bash
+    lock_passwd: true # no password and no sudo, and no ssh key is added
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - tmux
+  - ufw
+write_files:
+  - path: /etc/systemd/system/coral.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Coral
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      User=coral
+      Group=coral
+      Environment=HOME=/home/coral
+      WorkingDirectory=/home/coral
+      ExecStart=/usr/local/bin/coral --cloud-url https://app.coralhub.dev --cloud-max-mode launch --no-browser --host 127.0.0.1
+      Restart=on-failure
+      RestartSec=10
+      NoNewPrivileges=true
+      PrivateTmp=true
+      ProtectSystem=full
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /usr/local/sbin/coral-machine-setup
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/sh
+      # Installs the Coral release, checked against its SHA256SUMS.txt. Stops at the first failure: set -eu.
+      set -eu
+
+      # The Coral release for this machine, verified before it is installed.
+      case "$(uname -m)" in
+        x86_64) arch=amd64 ;;
+        aarch64) arch=arm64 ;;
+        *) echo "coral-machine-setup: no Coral release for $(uname -m)" >&2; exit 1 ;;
+      esac
+      version=2.0.3
+      tarball=coral-linux-${arch}-${version}.tar.gz
+      base=https://github.com/subgentic/coral/releases/download/v${version}
+      work=$(mktemp -d)
+      trap 'rm -rf "$work"' EXIT
+      cd "$work"
+      curl -fsSL --proto '=https' --tlsv1.2 -o "$tarball" "$base/$tarball"
+      curl -fsSL --proto '=https' --tlsv1.2 -o SHA256SUMS.txt "$base/SHA256SUMS.txt"
+      grep -E "^[0-9a-f]{64} [ *]${tarball}\$" SHA256SUMS.txt > expected.sum
+      [ "$(wc -l < expected.sum)" -eq 1 ] || { echo "coral-machine-setup: SHA256SUMS.txt does not list $tarball exactly once" >&2; exit 1; }
+      sha256sum -c expected.sum
+      tar -xzf "$tarball" -C /usr/local/bin/
+      test -x /usr/local/bin/coral
+  - path: /usr/local/sbin/coral-machine-agents
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/sh
+      # Installs the agent CLIs (after Coral is running). Stops at the first failure: set -eu.
+      set -eu
+      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm
+      # claude 2.0.0
+      npm install -g @anthropic-ai/claude-code@2.0.0
+      # codex 0.1.0
+      npm install -g @openai/codex@0.1.0
+      # agy: the vendor's installer takes no version, so the script is fetched to a file, checked against the SHA-256 it was pinned to, and only then run, as the coral user.
+      installer=$(mktemp)
+      curl -fsSL --proto '=https' --tlsv1.2 -o "$installer" 'https://antigravity.google/cli/install.sh'
+      echo 'abababababababababababababababababababababababababababababababab  '"$installer" | sha256sum -c -
+      chmod 0644 "$installer"
+      runuser -u coral -- bash "$installer"
+      rm -f "$installer"
+runcmd:
+  - [ ufw, default, deny, incoming ]
+  - [ ufw, default, allow, outgoing ]
+  - [ ufw, --force, enable ]
+  - |
+    (
+      set -eu
+      /usr/local/sbin/coral-machine-setup
+      install -d -m 0755 -o root -g root /run/coral
+      install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d
+      (umask 077; printf '%s' 'chb_TESTCREDENTIAL0123456789abcdefghij' > /run/coral/bootstrap.d/credential)
+      chown coral:coral /run/coral/bootstrap.d/credential
+      chmod 0600 /run/coral/bootstrap.d/credential
+      systemctl daemon-reload
+      systemctl enable --now coral.service
+    )
+  - |
+    # after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)
+    if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents; fi
