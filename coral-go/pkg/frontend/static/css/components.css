@@ -773,6 +773,9 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     padding: 16px 4px 24px 0;
     border-top: 1px solid var(--border);
 }
+/* The Terminal page: its footer's -24 px bottom margin (the bleed into the dialog's padding) put the footer's box 24 px below the page's scroll area, so the page scrolled though everything fitted (#9878). The page takes the 24 px itself (a negative margin at its own bottom) and the footer has none, so the content and the area are the same height. */
+#launch-step-terminal { margin-bottom: -24px; }
+#launch-step-terminal > .modal-actions { bottom: 0; margin-bottom: 0; }
 
 /* ── Info Grid (modal detail view) ─────────────────────────── */
 
