@@ -16,7 +16,7 @@ import { showToast } from './utils.js';
 import { OWNER_LABEL_NOTE } from './owner_label.js'; // beside a thumbnail that cannot load because the computer has not confirmed its owner (#6108)
 
 
-const SIZE = 48; // px, fixed: the chat does not reflow when the image arrives
+const THUMB_W = 160, THUMB_H = 120; // px, fixed: the chat does not reflow when the image arrives; the whole picture fits inside (object-fit: contain), a wide screenshot is not cropped to a strip (#10311)
 
 /** The thumbnail's markup for an attachment ({ref, file}): hidden until the image has loaded. */
 export function thumbHtml(att) {
@@ -31,7 +31,7 @@ export function thumbHtml(att) {
     // Named for what it does (it does not remove the attachment): the message keeps its image; the copy shared on Coral Hub and in this chat goes (#6137). Shown on hover or focus on a desktop; on a phone it is in the opened image's toolbar.
     const unshare = artifact && !isCloud() ? `<button type="button" class="chat-attachment-unshare" data-on-click="chat-thumb-unshare" data-artifact="${escapeAttr(artifact)}" aria-label="Remove shared copy of ${escapeAttr(label)}" title="Remove shared copy" hidden><span class="material-icons" aria-hidden="true">delete</span></button>` : '';
     return `<button type="button" class="chat-attachment-thumb" data-on-click="chat-thumb-open" data-artifact="${escapeAttr(artifact)}" data-ref="${escapeAttr(ref)}" data-upload="${escapeAttr(artifact || ref ? '' : file)}" ` +
-        `aria-label="Open ${escapeAttr(label)}" hidden><img alt="${escapeAttr(file || label)}" width="${SIZE}" height="${SIZE}" decoding="async"></button>${unshare}`;
+        `aria-label="Open ${escapeAttr(label)}" hidden><img alt="${escapeAttr(file || label)}" width="${THUMB_W}" height="${THUMB_H}" decoding="async"></button>${unshare}`;
 }
 
 // The images pasted in the dashboard (#5284): a chip with the file's name and a thumbnail from the artifact, which Coral Hub serves too; a link that is gone (removed, retention, the owner's switch)
