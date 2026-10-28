@@ -436,6 +436,7 @@
     .command-pane .command-pane-body > .composer-hint { flex: 0 0 100%; min-width: 0; box-sizing: border-box; } /* a line above the box (the hooks question, held messages: #6409, #6473) is a row of its own, not a column beside the box */
     .composer-hint.composer-waiting { gap: 0 12px; } /* no blank line between the sentence's row and the controls' */
     .composer-waiting > button, .composer-waiting-detail summary { min-height: 44px; } /* #7727: What waits, Send now and Show terminal are 44 px high and wrap as a row under the sentence */
+    .task-completion-form input:not([type="file"]), .task-completion-form select, .task-completion-form textarea { font-size: var(--fs-xl); } /* 16 px so a phone does not zoom in on focus (#10064) */
     .command-pane .command-pane-body > .command-editor { min-width: 0; }
     .command-pane .command-pane-body .image-attachment-remove { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
     .command-pane .command-pane-body .image-attachment img { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); } /* the thumbnail is as tall as its remove button */
