@@ -256,7 +256,7 @@ function serversTable(shown) {
             { key: 'status', label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
             { key: 'agents', label: 'Agents', line: 2, width: '4.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
             { key: 'needs', label: 'Needs you', line: 2, width: '5.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: cellOf.needs },
-            { key: 'seen', label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
+            { key: 'seen', label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
             { key: 'version', label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
             { key: 'access', label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
             { key: 'actions', label: 'Actions', line: 1, cell: cellOf.actions },
