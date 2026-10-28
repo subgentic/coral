@@ -59,6 +59,8 @@ export function _updatePermModeDescription(selectEl, unset = false) {
         warn.textContent = WORKERS_REFUSED[selectEl.value] || WORKERS_REFUSED_ANY;
         warn.hidden = unset || selectEl.value === 'default' || selectEl.value === ''; // nothing saved refuses nothing
     }
+    const type = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value;
+    for (const o of selectEl.options) o.title = permissionDescription(type, o.value); // each option's tip is the CLI's own words, refreshed with the agent type (#10074)
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc') || selectEl.closest('.settings-row, .sv-row')?.querySelector('.perm-mode-desc'); // Settings' line is in the label, not beside the select
     if (!hint) return;
     hint.textContent = permissionDescription(selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value, selectEl.value);
