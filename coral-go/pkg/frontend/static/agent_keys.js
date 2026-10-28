@@ -72,6 +72,18 @@ function closeStrip(words, { forQuestion = false } = {}) {
     if (words) say(words);
 }
 
+/** Whether the agent can be stopped from the box now: it works, the box is empty, for a person who may send (any layout, #10085). */
+function stopNowWanted({ working, text, pictures, viewOnly }) {
+    return !!working && !viewOnly && !String(text || '').trim() && !pictures;
+}
+let stopNow = false;
+let escHeldUntil = 0;
+/** A desktop's chat has its Stop in the toolbar (the ■): it turns red and says Stop while stopNow, and Escape in the empty box presses it. */
+function paintStopNow(want) {
+    stopNow = want;
+    setAttr($('command-pane'), 'data-stop-now', String(want));
+}
+
 function paintStop(want) {
     const btn = $('mobile-send-btn');
     if (!btn) return;
@@ -112,6 +124,7 @@ export function syncAgentKeys(row) {
     }
     const { text, pictures } = inputState();
     paintStop(stopWanted({ working: key === 'working', text, pictures, viewOnly, phone: isPhoneLayout() }));
+    paintStopNow(stopNowWanted({ working: key === 'working', text, pictures, viewOnly }));
 }
 
 registerActions({
@@ -158,3 +171,13 @@ if (typeof document !== 'undefined') {
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true }); else wire();
 }
+
+// Escape in the empty message box stops a working agent: what the CLI itself does; a typed message, an open menu or a mention list keep their own Escape.
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    if (!e.target || e.target.id !== 'command-input' || !stopNow) return;
+    e.preventDefault();
+    if (Date.now() < escHeldUntil) return; // one is enough: a second interrupt quits the CLI
+    escHeldUntil = Date.now() + STOP_AGAIN_MS;
+    sendRawKeys(['Escape'], { silent: true });
+});

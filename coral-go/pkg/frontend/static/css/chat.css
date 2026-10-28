@@ -1267,6 +1267,9 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 #command-pane.chat-mode .btn-esc .esc-label-chat {
     display: inline;
 }
+/* While the agent works and the box is empty the chat's Stop is the one red control, named: the quiet grey square was not seen (#10085). */
+#command-pane.chat-mode[data-stop-now="true"] .btn-esc { background: var(--danger); border-color: var(--danger); color: var(--text-on-accent); }
+#command-pane.chat-mode[data-stop-now="true"] .btn-esc .esc-label-chat::after { content: "Stop"; margin-left: 2px; font-weight: var(--fw-strong); }
 
 /* Chat mode: the composer card narrows to the transcript's reading column */
 @media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
