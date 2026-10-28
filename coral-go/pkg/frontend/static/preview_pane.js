@@ -157,8 +157,10 @@ function _renderToolbar(tab) {
         const link = src && (src.externalURL || mf !== undefined) && mf !== false
             ? `<a class="team-artifacts-action" href="${escapeAttr(dlHref)}" ${src.externalURL ? 'target="_blank" rel="noopener noreferrer"' : `download="${escapeAttr(dlName)}" data-artifact-download="${escapeAttr(dlHref)}" data-artifact-name="${escapeAttr(dlName)}"`}>${src.externalURL ? 'Open link' : 'Download'}</a>`
             : '';
+        const kept = [...bar.children].filter(n => n.classList.contains('ac-toggle') || n.classList.contains('artifact-tags')); // the Comments toggle and the tag editor were appended after the first draw (_render): a redraw (the kind became known, #9941) must not drop them
         bar.innerHTML = `<span class="preview-toolbar-path" title="${escapeAttr(tab.options.filename || tab.filepath)}">${escapeHtml(tab.options.filename || 'Artifact preview')}</span>
             <div class="inline-preview-actions">${link}</div>`;
+        bar.append(...kept);
         wireDownloads(bar);
         return;
     }
