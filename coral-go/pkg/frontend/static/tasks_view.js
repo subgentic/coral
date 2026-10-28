@@ -55,17 +55,17 @@ function scrollToTaskArtifacts(id) {
 export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priority', 'updated']) {
     const all = {
         state: { key: 'state', label: 'State', cell: (t) => DT.chip(taskWord(t), statusClass(taskWord(t))), sort: true, sortValue: (t) => STATE_RANK[taskWord(t)] ?? 9, line: 1 },
-        task: { key: 'task', label: 'Task', primary: true, width: 'grow', sort: true, sortValue: (t) => t.title, line: 1,
+        task: { key: 'task', label: 'Task', primary: true, width: 'grow', min: 24, share: 2, sort: true, sortValue: (t) => t.title, line: 1,
             cell: (t) => { const c = DT.el('span', 'dt-title-cell'); const b = DT.primaryButton(t.title, ctx.hideTaskId ? `Open task #${t.id}: ${t.title}, ${taskWord(t)}` : `Open task #${t.id}: ${t.title}`); b.dataset.taskId = String(t.id); if (ctx.hideTaskId) c.title = `Task #${t.id}`; else c.append(DT.el('span', 'dt-id', `#${t.id}`)); c.append(b); return c; } }, // a goal's column does not lead with the number (#8784): it is the row's hover title and the button's name; its button's name also ends with the state a sighted row shows as a chip, as the dock's rows do (#8952)
-        who: { key: 'who', label: 'Who', sort: true, sortValue: (t) => doerOf(t) || '', line: 1, width: '6rem', cell: (t) => whoCell(t) },
-        goal: { key: 'goal', label: 'Goal', sort: true, sortValue: (t) => (t.goal_id ? ctx.goalTitleOf(t.goal_id) : ''), line: 0,
+        who: { key: 'who', label: 'Who', sort: true, sortValue: (t) => doerOf(t) || '', line: 1, width: '6rem', max: 12, cell: (t) => whoCell(t) },
+        goal: { key: 'goal', label: 'Goal', min: 16, share: 1, drop: 4, sort: true, sortValue: (t) => (t.goal_id ? ctx.goalTitleOf(t.goal_id) : ''), line: 0,
             cell: (t) => { if (!t.goal_id) return ctx.noGoal || 'No goal'; const l = DT.link(ctx.goalTitleOf(t.goal_id), () => ctx.openGoal?.(t.goal_id)); l.dataset.goalLink = String(t.goal_id); return l; } },
-        team: { key: 'team', label: 'Team', sort: true, sortValue: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || ''), line: 0, cell: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || '') },
-        priority: { key: 'priority', label: 'Priority', tone: 'tertiary', sort: true, sortValue: (t) => PRIORITY_RANK[String(t.priority || '').toLowerCase()] ?? 3, line: 0, when: (t) => String(t.priority || '').toLowerCase() === 'high', cell: (t) => priorityWord(t.priority) },
+        team: { key: 'team', label: 'Team', max: 14, drop: 1, sort: true, sortValue: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || ''), line: 0, cell: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || '') },
+        priority: { key: 'priority', label: 'Priority', tone: 'tertiary', max: 9, drop: 3, sort: true, sortValue: (t) => PRIORITY_RANK[String(t.priority || '').toLowerCase()] ?? 3, line: 0, when: (t) => String(t.priority || '').toLowerCase() === 'high', cell: (t) => priorityWord(t.priority) },
         // How many artifacts the task's results reference (the server's artifact_count, #8575): a quiet "3 files" that opens the task page at its Artifacts. Not through Coral Hub: the team's artifacts are the owner's alone there.
-        files: { key: 'files', label: 'Files', tone: 'tertiary', line: 0, when: (t) => Number(t.artifact_count) > 0 && !isCloud(),
+        files: { key: 'files', label: 'Files', tone: 'tertiary', max: 8, drop: 2, line: 0, when: (t) => Number(t.artifact_count) > 0 && !isCloud(),
             cell: (t, _ctx, row) => (Number(t.artifact_count) > 0 && !isCloud() ? filesButton(t, row) : '') },
-        updated: { key: 'updated', label: 'Updated', tone: 'tertiary', align: 'end', sort: 'date', sortValue: (t) => t.updated_at || t.created_at || '', line: 0, firstDir: 'desc', cell: (t) => DT.timeCell(t.updated_at || t.created_at) },
+        updated: { key: 'updated', label: 'Updated', tone: 'tertiary', align: 'end', max: 12, sort: 'date', sortValue: (t) => t.updated_at || t.created_at || '', line: 0, firstDir: 'desc', cell: (t) => DT.timeCell(t.updated_at || t.created_at) },
     };
     return keys.map(k => all[k]);
 }
