@@ -147,11 +147,12 @@ function closePage(inAddress) { const was = openId; if (!inAddress) note({ view:
 let backTo = null;
 
 /** The rename form (a name field, Save and Cancel), in the page's heading. */
+function cancelRename(s) { renaming = null; render(); focusRow(s.id, '.cs-rename-btn'); } // Escape and Cancel close the field and the keyboard goes back to Rename (#9783)
 function renameForm(s) {
-    return h('form', { className: 'cs-actions cs-rename', onsubmit: e => { e.preventDefault(); const v = e.target.elements.label.value.trim(); renaming = null; if (v && v !== s.label) call(s.id, 'PATCH', { label: v }); else render(); } },
+    return h('form', { className: 'cs-actions cs-rename', onkeydown: e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelRename(s); } }, onsubmit: e => { e.preventDefault(); const v = e.target.elements.label.value.trim(); renaming = null; if (v && v !== s.label) call(s.id, 'PATCH', { label: v }); else render(); } },
         h('input', { name: 'label', type: 'text', value: s.label || '', maxLength: 100, 'aria-label': 'Server name', autocomplete: 'off' }),
         h('button', { type: 'submit', className: 'btn btn-small btn-primary', text: 'Save' }),
-        h('button', { type: 'button', className: 'btn btn-small', text: 'Cancel', onclick: () => { renaming = null; render(); } }));
+        h('button', { type: 'button', className: 'btn btn-small', text: 'Cancel', onclick: () => cancelRename(s) }));
 }
 
 /** The name cell of a row: the row's one button, which opens the machine's page (no chevron: nothing expands in place), the health dot and the relaunch badge. */
