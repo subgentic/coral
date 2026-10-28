@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -369,11 +371,12 @@ func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []str
 		return res, ok, err
 	}
 	w := " WHERE " + strings.Join(where, " AND ")
-	var n, bytes int64
-	if err := s.reader().QueryRowxContext(ctx, "SELECT COUNT(*), COALESCE(SUM(LENGTH(CAST(m.content AS BLOB))), 0) FROM board_messages m"+w, args...).Scan(&n, &bytes); err != nil {
+	// The rows cap first, from the index (the count reads no text): a board past it is answered by the Go scan, and the text is not read for it.
+	var n int64
+	if err := s.reader().QueryRowxContext(ctx, "SELECT COUNT(*) FROM board_messages m"+w, args...).Scan(&n); err != nil {
 		return nil, false, err
 	}
-	if n > int64(messageScanRows) || bytes > int64(messageScanBytes) {
+	if n > int64(messageScanRows) {
 		return nil, false, nil
 	}
 	// Where LIKE and Go's match differ, Go answers: a NUL byte (LIKE stops reading a text at it), and for a needle with an i or k, U+0130
@@ -382,14 +385,35 @@ func (s *Store) queryTextInSQL(ctx context.Context, q *MessageQuery, where []str
 	if strings.ContainsAny(q.Text, "ik") {
 		odd += " OR instr(m.content, char(304)) > 0 OR instr(m.content, char(8490)) > 0"
 	}
-	var differs int
-	if err := s.reader().QueryRowxContext(ctx, "SELECT EXISTS(SELECT 1 FROM board_messages m"+w+" AND ("+odd+"))", args...).Scan(&differs); err != nil || differs != 0 {
+	// One pass over the messages' text, not three: the bytes (the scan cap), whether any message is odd and the ids that match, each from the same read of each message (#9744: the three separate passes made a plain
+	// search twice as slow as v2.0.1 on messages of 800 bytes, where a message's text is on overflow pages and every pass is a seek and a read of it). The ids come back as one list of at most messageScanRows.
+	likeArgs := append([]any{"%" + likeEscaper.Replace(q.Text) + "%"}, args...)
+	var bytes int64
+	var anyOdd int
+	var idList string
+	if err := s.reader().QueryRowxContext(ctx, `SELECT COALESCE(SUM(len), 0), COALESCE(MAX(odd), 0), COALESCE(group_concat(CASE WHEN hit THEN id END, ','), '') FROM (
+		SELECT m.id AS id, LENGTH(CAST(m.content AS BLOB)) AS len, (`+odd+`) AS odd, (m.content LIKE ? ESCAPE '\') AS hit FROM board_messages m`+w+` ORDER BY m.id)`, likeArgs...).Scan(&bytes, &anyOdd, &idList); err != nil {
 		return nil, false, err
 	}
-	likeArgs := append(append([]any{}, args...), "%"+likeEscaper.Replace(q.Text)+"%")
+	if bytes > int64(messageScanBytes) || anyOdd != 0 {
+		return nil, false, nil
+	}
 	var ids []int64
-	if err := s.reader().SelectContext(ctx, &ids, "SELECT m.id FROM board_messages m"+w+` AND m.content LIKE ? ESCAPE '\' ORDER BY m.id `+dir, likeArgs...); err != nil {
-		return nil, false, err
+	if idList != "" {
+		parts := strings.Split(idList, ",")
+		ids = make([]int64, 0, len(parts))
+		for _, part := range parts {
+			id, err := strconv.ParseInt(part, 10, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("a message id in the search's list: %w", err)
+			}
+			ids = append(ids, id)
+		}
+		if dir == "DESC" { // the query's order, whatever the order the database concatenated them in
+			sort.Slice(ids, func(i, j int) bool { return ids[i] > ids[j] })
+		} else {
+			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+		}
 	}
 	res, err := s.pageOfIDs(ctx, q, ids)
 	if err != nil {
