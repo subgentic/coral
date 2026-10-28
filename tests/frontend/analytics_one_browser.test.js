@@ -27,6 +27,7 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
 const TASKS = [{ id: 86091, title: 'Named agent task', status: 'completed', assigned_to: 'Backend Dev', priority: 'high', cost_usd: 1.25 },
     { id: 86092, title: 'Unassigned task', status: 'completed', assigned_to: null, priority: 'low', cost_usd: 0.5 }];
 const VIEWS = ['Overview', 'Tokens per commit', 'Task time', 'Tool and API calls']; // one entry per metric (#9236)
+const LISTED = ['Overview', 'Tokens per commit', 'Task time', 'Advanced']; // Tool and API calls is under Advanced (#10521)
 const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking level': 'Thinking level', 'By team': 'Team', 'By agent': 'Agent', 'By branch': 'Branch', 'By task': 'Task' }; // the groupings are Overview's Group by (#9236), not sidebar entries
 const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o) => { const url = String(u && u.url || u); window.__costReq = (window.__costReq || []).concat(url);
@@ -56,7 +57,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
     const SCALE = '[11, 12, 13, 14, 17, 20]';
     const openTab = async () => {
         await ev(`window.switchNavTab('tokens'); true`);
-        await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} li .row-btn').length === ${VIEWS.length}`, 'the Analytics pane with its views', 10000);
+        await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} li .row-btn').length === ${LISTED.length}`, 'the Analytics pane with its views', 10000);
     };
     const choose = async label => {
         const g = GROUP_OF[label];
@@ -65,6 +66,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             await waitFor(`document.getElementById('cost-view-title').textContent === 'Overview' && document.querySelector('#cost-group-bar .eff-seg-btn[aria-pressed="true"]').textContent === ${JSON.stringify(g)}`, 'Overview grouped by ' + g, 6000);
             return;
         }
+        if (label === 'Tool and API calls') await ev(`(() => { const b = [...document.querySelectorAll('${pane} li .row-btn')]; if (!b.some(x => x.textContent.trim() === 'Tool and API calls')) b.find(x => x.textContent.trim() === 'Advanced').click(); return true; })()`);
         await ev(`[...document.querySelectorAll('${pane} li .row-btn')].find(b => b.textContent.trim() === ${JSON.stringify(label)}).click(); true`);
         await waitFor(`document.getElementById('cost-view-title').textContent === ${JSON.stringify(label)}`, 'the ' + label + ' view', 6000);
     };
@@ -77,7 +79,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
 
             await openTab();
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} li .row-btn')].map(b => b.textContent.trim())`), VIEWS, at + 'the list is the views, in order');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} li .row-btn')].map(b => b.textContent.trim())`), LISTED, at + 'the list is the views, in order, with Advanced last');
             assert.equal(await ev(`document.querySelector('${pane} li .row-btn[aria-current="true"]').textContent.trim()`), 'Overview', at + 'Overview is the one open');
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search views', at + 'the search is named for the tab');
             assert.equal(await ev(`!!document.querySelector('${pane} [data-display-button]')`), false, at + 'no Display options here: the time range is in the page header (#7666)');
@@ -181,7 +183,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'zzz'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`!!document.querySelector('${pane} .empty-state')`, at + 'no match says so', 5000);
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('${pane} li .row-btn').length === ${VIEWS.length}`, at + 'cleared', 5000);
+            await waitFor(`document.querySelectorAll('${pane} li .row-btn').length >= ${LISTED.length}`, at + 'cleared', 5000);
 
             // every text on the scale, in every view
             if (w === 1280) {
