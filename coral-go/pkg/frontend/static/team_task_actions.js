@@ -7,14 +7,15 @@
  *   ctx: { project, redraw(task, mode), reload(message), back() } */
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
-import { boardFetch, pathId } from './server_base.js';
+import { boardFetch, pathId, splitKey } from './server_base.js';
 import { showToast } from './utils.js';
+import { blockedReason } from './hub_access.js';
 const { el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const { readOpenGoals, readGoal, fillGoalSelect, showGoalInvalid, chooseGoalLabel } = await importOnce('./task_goals.js');
 const { _renderDepPicker, _getSelectedDeps } = await importOnce('./task_dep_picker.js');
 const { _taskRequiredOutputs, nudgeBoardTask, remindBoardTask, stopBoardTaskReminder } = await importOnce('./task_reminders.js');
 const { loadBoardTasks } = await importOnce('./task_list.js');
-const { reviewRequested } = await importOnce('./task_list_data.js');
+const { reviewRequested, canSendBack } = await importOnce('./task_list_data.js');
 
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
@@ -200,7 +201,8 @@ export function completeForm(task, ctx) {
         req.append(el('strong', null, 'Required outputs'), ul, el('p', null, 'Provide each named output below or in the manifest before completing.'));
         box.append(req);
     }
-    if (task.assigned_to && !required.length) box.append(el('p', 'task-completion-hint', `Not finished? Write what is missing here, then press Not yet: send back to tell ${task.assigned_to}.`));
+    const hubWhy = blockedReason(splitKey(ctx.project).server, 'interact'); // a Hub viewer below Interact cannot post to the board: no send back for them (#10337)
+    if (canSendBack(task, hubWhy) && !required.length) box.append(el('p', 'task-completion-hint', `Not finished? Write what is missing here, then press Not yet: send back to tell ${task.assigned_to}.`));
     const details = el('details', 'task-completion-evidence'); if (required.length) details.open = true;
     details.append(el('summary', null, required.length ? 'Evidence and artifacts (required)' : 'Add evidence or artifact metadata (optional)'));
     const name = Object.assign(input('task-artifact-name'), { placeholder: 'build or test_report' });
@@ -254,7 +256,7 @@ export function completeForm(task, ctx) {
             ctx.redraw(task, 'view');
         } catch (e) { error.textContent = e.message || 'Could not send it back'; error.hidden = false; showToast(e.message || 'Could not send it back', true); }
     }
-    return { node: section, sendBack, focus: () => { message.focus({ preventScroll: true }); message.scrollIntoView({ block: 'center' }); }, submit }; // the box is brought into view above the pinned bar, not left under it on a phone (#10064)
+    return { node: section, sendBack, canSendBack: canSendBack(task, hubWhy), focus: () => { message.focus({ preventScroll: true }); message.scrollIntoView({ block: 'center' }); }, submit }; // the box is brought into view above the pinned bar, not left under it on a phone (#10064)
 }
 
 /** Reviews keep their lifecycle; only task text changes in this form. */
