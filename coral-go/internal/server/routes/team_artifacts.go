@@ -36,6 +36,8 @@ type teamArtifact struct {
 	Name      string `json:"name"`
 	MediaType string `json:"media_type,omitempty"`
 	Size      *int64 `json:"size"`
+	// Starred: the Operator starred this stored object on this computer (#9819); false for a row with no stored object.
+	Starred   bool   `json:"starred"`
 	CreatedAt string `json:"created_at"`
 	TaskID    int64  `json:"task_id"`
 	TaskTitle string `json:"task_title"`
@@ -177,8 +179,13 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 	}
 	page := items[offset:end]
 	dir := h.artifactObjectDir()
+	starred, serr := h.bs.StarredArtifactIDs(r.Context()) // a bookmark: an unreadable set leaves the rows unstarred
+	if serr != nil {
+		starred = map[string]bool{}
+	}
 	for i := range page {
 		enrichTeamArtifact(&page[i], dir)
+		page[i].Starred = page[i].managed != "" && starred[page[i].managed]
 		if digestLikeName.MatchString(page[i].Name) || strings.TrimSpace(page[i].Name) == "" {
 			if page[i].TaskID == 0 {
 				page[i].Name = "Uploaded artifact"

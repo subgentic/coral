@@ -131,6 +131,7 @@ func (h *SessionsHandler) deleteArtifactCore(w http.ResponseWriter, r *http.Requ
 	}
 	if h.db != nil { // an explicit delete also drops the Operator's keep mark (#3554)
 		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_keep WHERE hex = ?", id)
+		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", id) // and its star (#9819)
 	}
 	h.dropArtifactComments(r.Context(), id) // and the comments on it (#5176)
 	slog.Info("[artifacts] deleted by the Operator", "digest", id, "bytes", freed, "upload_records", removed)

@@ -4,6 +4,7 @@ DELETE /api/artifacts/{id} launch
 DELETE /api/artifacts/{id}/comments/lock never
 DELETE /api/artifacts/{id}/comments/{cid} never
 DELETE /api/artifacts/{id}/keep never
+DELETE /api/artifacts/{id}/star interact
 DELETE /api/auth/sessions/{id} never
 DELETE /api/board/remotes never
 DELETE /api/board/{project} launch
@@ -401,6 +402,7 @@ POST /api/worktrees/remove never
 PUT /api/agent/ui/{id} never
 PUT /api/artifacts/{id}/comments/lock never
 PUT /api/artifacts/{id}/keep never
+PUT /api/artifacts/{id}/star interact
 PUT /api/auth/hub-origins never
 PUT /api/auth/hub-signin never
 PUT /api/board/{project}/artifacts/{id}/tags never

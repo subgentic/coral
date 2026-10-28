@@ -156,6 +156,7 @@ func (h *SessionsHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 		freed += f
 		if h.db != nil {
 			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_keep WHERE hex = ?", m.Digest)
+			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", m.Digest) // and its star (#9819)
 		}
 		h.dropArtifactComments(r.Context(), m.Digest)
 	}

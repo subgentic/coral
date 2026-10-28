@@ -27,10 +27,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "task", "goal", "tag", "since", "until", "sort", "cursor"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -60,6 +60,7 @@ type teamArtifactQuery struct {
 	by       []string // lower-cased
 	boards   []string // lower-cased
 	kept     *bool
+	starred  *bool
 	tags     []string // any of these tags (#8583), normalised
 	goal     int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
 	task     int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
@@ -215,6 +216,17 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			return nil, taErr("kept must be true or false")
 		}
 	}
+	if v, ok, serr := taSingle("starred", vals["starred"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		switch v {
+		case "true", "false":
+			b := v == "true"
+			q.starred = &b
+		default:
+			return nil, taErr("starred must be true or false")
+		}
+	}
 	if v, ok, serr := taSingle("task", vals["task"]); serr != nil {
 		return nil, serr
 	} else if ok {
@@ -262,7 +274,7 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	}
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
-	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.task, q.goal, q.tags, q.since, q.until, q.sortName, vals.Get("session_id"))
+	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.sortName, vals.Get("session_id"))
 	if scope := vals.Get(crossTeamScopeParam); scope != "" { // the cross-team list: its cursors are its own (a team route's is refused there) and tied to the teams asked for
 		fmt.Fprintf(fp, "|%s|%v", scope, vals["team"])
 	}
@@ -364,7 +376,7 @@ func parseArtifactTime(s string) (time.Time, bool) {
 }
 
 // cheapMatch applies the filters that need no file system: origin, by, board, kept and the time range.
-func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool) bool {
+func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string]bool) bool {
 	if len(q.origins) > 0 {
 		o, ok := teamArtifactOrigin(it), false
 		for _, w := range q.origins {
@@ -400,6 +412,12 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool) bo
 	if q.kept != nil {
 		isKept := it.managed != "" && kept[it.managed]
 		if isKept != *q.kept {
+			return false
+		}
+	}
+	if q.starred != nil {
+		isStarred := it.managed != "" && starred[it.managed]
+		if isStarred != *q.starred {
 			return false
 		}
 	}
@@ -632,6 +650,13 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 			return nil, err
 		}
 	}
+	starred, err := h.bs.StarredArtifactIDs(r.Context()) // a small set: read for every list, the rows say whether they are starred
+	if err != nil {
+		if q.starred != nil {
+			return nil, err // the Starred view cannot be answered without it
+		}
+		starred = map[string]bool{} // a star is a bookmark: the list still answers, its rows unstarred
+	}
 	dir := h.artifactObjectDir()
 	tunneled := cloud.Tunneled(r)
 	if tunneled {
@@ -642,7 +667,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	counts := teamTagCounts(items) // over the whole list, as the Tag filter offers its words (after redaction for a Hub viewer)
 	var set []teamArtifact
 	for _, it := range items {
-		if q.cheapMatch(it, kept) {
+		if q.cheapMatch(it, kept, starred) {
 			set = append(set, it)
 		}
 	}
@@ -689,6 +714,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 				redactItemForTunnel(&sel.page[i])
 			}
 		}
+	}
+	for i := range sel.page {
+		sel.page[i].Starred = sel.page[i].managed != "" && starred[sel.page[i].managed]
 	}
 	if sel.page == nil {
 		sel.page = []teamArtifact{}
