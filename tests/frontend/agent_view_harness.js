@@ -13,7 +13,7 @@ async function connect() {
     if (process.env.LOOK_THEME || process.env.LOOK_FONT) {
         const theme = JSON.stringify(process.env.LOOK_THEME || ''), font = JSON.stringify(process.env.LOOK_FONT || '');
         await Page.enable();
-        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const t = ${theme}, f = ${font}; try { if (t) localStorage.setItem('coral-theme', t); } catch (e) {} if (f) { const put = () => { if (document.getElementById('__look_font')) return; const st = document.createElement('style'); st.id = '__look_font'; st.textContent = 'html{font-size:' + f + ' !important}'; (document.head || document.documentElement).append(st); }; if (document.documentElement) put(); else new MutationObserver((m, o) => { if (document.documentElement) { put(); o.disconnect(); } }).observe(document, { childList: true }); document.addEventListener('DOMContentLoaded', put); } })();` });
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const t = ${theme}, f = ${font}; try { if (t) localStorage.setItem('coral-theme', t); } catch (e) {} if (f) { const put = () => { if (document.documentElement) document.documentElement.style.setProperty('font-size', f, 'important'); }; /* the element's own style: a page's CSP (the Hub's) blocks an injected style element */ if (document.documentElement) put(); else new MutationObserver((m, o) => { if (document.documentElement) { put(); o.disconnect(); } }).observe(document, { childList: true }); document.addEventListener('DOMContentLoaded', put); } })();` });
     }
     // Static files that failed to load (#3466): a module the page couldn't fetch fails every later
     // import() of it too, so a "Failed to fetch dynamically imported module" says nothing about why.
