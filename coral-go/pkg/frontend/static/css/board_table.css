@@ -37,7 +37,7 @@
 /* The row says one thing besides the sender, the words and the time: an OPEN question (#9686). The mentions, the task, the reply mark, the "+N" and an answered question are with the open message (.mb-row-tags-open). */
 .mb-row-tags > :not(.mb-ask-badge), .mb-row-tags > .mb-ask-badge.is-answered { display: none; }
 /* An open question wants an answer: the warning amber, the colour of every state that asks something of a person (Needs input, the phone's dot), never the blue of links (UI/UX #9728). */
-.mb-row-tags .mb-ask-badge:not(.is-answered), .mb-row-tags-open .mb-ask-badge:not(.is-answered) { border: 0; background: var(--warning); color: rgb(var(--black-rgb)); box-shadow: none; } /* the amber fill with dark text, as the Needs input chip (UI/UX, Orchestrator 00:43) */
+.mb-row-tags .mb-ask-badge:not(.is-answered), .mb-row-tags-open .mb-ask-badge:not(.is-answered) { border: 0; background: var(--bg-tertiary); color: var(--warning); box-shadow: inset 0 0 0 1px var(--border); }
 .mb-row-toggle .message-time { margin: 0; opacity: 1; font-size: var(--fs-base); color: var(--text-secondary); text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* The tags: quiet marks, never louder text. */
