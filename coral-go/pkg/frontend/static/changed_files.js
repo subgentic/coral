@@ -469,17 +469,26 @@ export async function refreshChangedFiles() {
     const countEl = document.getElementById('files-bar-count');
     if (!list) return;
 
-    if (_notGit) { // no comparison to choose and no count to give (#6072)
+    // Not a git folder (#6072): there is no comparison to choose and no count of changes to give. The folder's recently changed files, newest first, stand in (#10256); with none, the panel says so.
+    const plain = _notGit && _currentFiles.length > 0;
+    if (_notGit && !plain) {
         const shell = state.currentSession && state.currentSession.agent_type === 'terminal'; // a terminal has no changes to list: no talk of git for a shell (#10077)
         if (titleEl) { titleEl.textContent = shell ? 'No changes to list' : 'Not a git folder'; titleEl._html = ''; }
         if (countEl) countEl.textContent = '';
-        list.innerHTML = `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'Changes show once the folder is a git repository.'}</div>`;
+        list.innerHTML = `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'No files changed here this week. Changes show once the folder is a git repository, and an agent can also share a file with you as an artifact.'}</div>`;
         return;
     }
 
-    const files = _currentFiles.slice().sort((a, b) => a.filepath.localeCompare(b.filepath));
+    const files = plain
+        ? _currentFiles.slice().sort((a, b) => String(b.recorded_at || '').localeCompare(String(a.recorded_at || '')) || a.filepath.localeCompare(b.filepath))
+        : _currentFiles.slice().sort((a, b) => a.filepath.localeCompare(b.filepath));
+    if (plain) {
+        const html = `<span class="changed-files-count">${files.length} recent file${files.length !== 1 ? 's' : ''}</span><span class="changed-files-count files-compare-note">Not a git folder: files changed this week</span>`;
+        if (titleEl && titleEl._html !== html) { titleEl.innerHTML = html; titleEl._html = html; }
+        if (countEl) countEl.textContent = String(files.length);
+    }
 
-    if (titleEl) {
+    if (titleEl && !plain) {
         const diffMode = _getGitDiffMode();
         const options = _diffModes.map(m =>
             `<option value="${escapeAttr(m)}"${m === diffMode ? ' selected' : ''}>${escapeHtml(_diffModeLabels[m])}</option>`
@@ -500,7 +509,7 @@ export async function refreshChangedFiles() {
         // The list is redrawn on every poll: the header is written only when it says something new, so its select and counts are not replaced under a person's pointer or a layout pass (#7671).
         if (titleEl._html !== html) { titleEl.innerHTML = html; titleEl._html = html; }
     }
-    if (countEl) {
+    if (countEl && !plain) {
         countEl.textContent = files.length > 0 ? String(files.length) : '';
     }
 
@@ -528,17 +537,18 @@ export async function refreshChangedFiles() {
             ? `<span class="file-agents">${escapeHtml(f.agents.map(a => a.name).join(', '))}</span>`
             : '';
         const rowName = splitPath(f.filepath).name;
+        const rowTitle = plain ? f.filepath : `${f.filepath} (${statusLabel})`;
         const starLabel = `${isStarred ? 'Unstar' : 'Star'} ${rowName}`, copyLabel = `Copy path of ${rowName}`, previewLabel = `Preview ${rowName}`, editLabel = `Edit ${rowName}`;
         const starBtn = `<button class="btn btn-quiet btn-icon btn-xs file-star-btn ${escapeAttr(isStarred ? 'starred' : '')}" data-filepath="${escapeAttr(f.filepath)}" data-on-click="file-star" data-path="${escapeAttr(f.filepath)}" title="${escapeAttr(isStarred ? 'Unstar' : 'Star')}" aria-label="${escapeAttr(starLabel)}">${isStarred ? '★' : '☆'}</button>`;
         const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-copy" data-path="${escapeAttr(f.filepath)}" title="Copy path" aria-label="${escapeAttr(copyLabel)}"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
-        const previewBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(f.filepath)}" data-diff="1" title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
-        const editBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(f.filepath)}" data-diff="1" title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
+        const previewBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
+        const editBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
 
         // Clicking the row opens its diff in the preview pane; the buttons
         // copy the path, preview the file, and open it in the editor.
-        return `<div class="file-item ${statusCls}${agentOnlyCls}${escapeAttr(_actionsOpenFor === f.filepath ? ' actions-open' : '')}" title="${escapeHtml(f.filepath)} (${escapeAttr(statusLabel)})"
+        return `<div class="file-item ${statusCls}${agentOnlyCls}${escapeAttr(_actionsOpenFor === f.filepath ? ' actions-open' : '')}" title="${escapeAttr(rowTitle)}"
                      data-filepath="${escapeAttr(f.filepath)}"
-                     data-on-click="file-open" data-path="${escapeAttr(f.filepath)}" data-diff="1">
+                     data-on-click="file-open" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'}>
             ${starBtn}
             <span class="file-type-icon">${fileIconHtml(name)}</span>
             <div class="file-path-wrap">
