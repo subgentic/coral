@@ -146,8 +146,8 @@ type GroupedBucket struct {
 
 // UsageGroups are the GroupBy values: the SQL that names a row's group (over usageRelation's columns, alias u), and what an empty value is called.
 var usageGroupExpr = map[string]string{
-	"team":     `COALESCE(NULLIF(COALESCE(NULLIF(u.board_name, ''), ls.board_name, ''), ''), '(no team)')`, // the board a row names, else its session's (By team's rule)
-	"agent":    `COALESCE(NULLIF(u.agent_name, ''), '(unknown)')`,
+	"team":     `COALESCE(NULLIF(COALESCE(NULLIF(u.board_name, ''), ls.board_name, ''), ''), '(no team)')`,                // the board a row names, else its session's (By team's rule)
+	"agent":    `COALESCE(NULLIF(ls.display_name, ''), NULLIF(u.agent_name, ''), NULLIF(ls.agent_name, ''), '(unknown)')`, // the By agent table's name for the row (GetUsageSummaryByAgentBoardUntil), so a chart line matches its row (#10272)
 	"provider": `COALESCE(NULLIF(u.agent_type, ''), 'unknown')`,
 	"model":    `COALESCE(NULLIF(u.model, ''), 'unknown')`,
 }

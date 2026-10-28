@@ -146,3 +146,31 @@ func TestGetSessionTurns_CarriesTokensAndModel(t *testing.T) {
 	require.Len(t, turns, 2)
 	assert.Equal(t, TurnCost{CostUSD: 1, InputTokens: 100, OutputTokens: 10, CacheReadTokens: 1000, CacheWriteTokens: 5, Model: "opus", RecordedAt: "2026-01-01T10:05:00Z"}, turns[0])
 }
+
+// #10272: the By agent chart names a series as the table names its row: the agent's current display name, else the name recorded with its usage, else its folder; only an agent
+// with none of them is "(unknown)". A renamed agent's chart line and table row used to disagree, and an unnamed one was "(unknown)" beside a table row with its folder.
+func TestAgentSeriesAreNamedAsTheTableNamesThem(t *testing.T) {
+	db := openTestDB(t)
+	s := NewTokenUsageStore(db)
+	ctx := context.Background()
+	_, err := db.Exec(`INSERT INTO live_sessions (session_id, agent_type, agent_name, working_dir, created_at, display_name) VALUES
+		('unnamed', 'claude', 'a2', '/w/a2', '2026-01-01T00:00:00Z', ''),
+		('renamed', 'claude', 'coral-go', '/w/coral-go', '2026-01-01T00:00:00Z', 'Debugger')`)
+	require.NoError(t, err)
+	for _, u := range []*TokenUsage{
+		{SessionID: "unnamed", AgentType: "claude", InputTokens: 1, RecordedAt: "2026-01-01T10:00:00Z"},
+		{SessionID: "renamed", AgentName: "Agent", AgentType: "claude", InputTokens: 1, RecordedAt: "2026-01-01T10:00:00Z"},
+		{SessionID: "orphan", AgentType: "claude", InputTokens: 1, RecordedAt: "2026-01-01T10:00:00Z"},
+	} {
+		require.NoError(t, s.RecordUsage(ctx, u))
+	}
+	b, err := s.GetUsageTimeSeriesGrouped(ctx, TimeSeriesQuery{Interval: "1d", GroupBy: "agent"})
+	require.NoError(t, err)
+	var keys []string
+	for _, bk := range b {
+		for _, sr := range bk.Series {
+			keys = append(keys, sr.Key)
+		}
+	}
+	assert.ElementsMatch(t, []string{"a2", "Debugger", "(unknown)"}, keys)
+}

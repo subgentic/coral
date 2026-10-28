@@ -341,7 +341,7 @@ export async function _refreshCostDashboard({ force = false } = {}) {
             _renderThinkingTable(thinkingRows(data.by_thinking));
 
             // Render per-agent (session) breakdown
-            _renderAgentTable(agentRows(data.by_agent));
+            _renderAgentTable(agentRows(data.by_agent, state.liveSessions));
         }
 
         // Render time-series chart and sparklines
@@ -607,6 +607,7 @@ function _renderAgentTable(rows) {
         { key: 'first_seen', label: 'Launched', sort: true, sortValue: r => start(r) || '', cell: r => _formatTime(start(r)), tone: 'secondary' },
         _numCol('duration', 'Duration', span, () => '', { cell: r => _formatDuration(start(r), end(r)) }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
+        _numCol('context_pct', 'Context used', r => (r.context_pct == null ? -1 : r.context_pct), () => '', { cell: r => (r.context_pct == null ? '–' : `${r.context_pct}%`), title: r => (r.context_pct == null ? 'Only a running agent has a context used' : `${r.context_pct}% of its model\'s context window`) }), // a running agent's, next to its cost (#10272)
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         { key: 'details', label: 'Details', tone: 'secondary', cell: r => { const b = dtLink('Charts', () => agentDetail.openAgent(r, document.getElementById('cost-time-range')?.value || 'day')); b.setAttribute('aria-label', `Charts for ${r.display_name || r.agent_name || 'agent'}`); return b; } }, // one agent over the range (#7930)
     ], filtered, NO_DATA, _seriesOpts('agent'));

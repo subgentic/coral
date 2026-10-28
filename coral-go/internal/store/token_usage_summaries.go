@@ -132,11 +132,10 @@ func (s *TokenUsageStore) GetUsageSummaryByAgentBoardUntil(ctx context.Context, 
 	if until == "" { // no end: the summary does not look at when in its window a row was recorded
 		rel, args = usageCoarseRelation(ctx, s.db.Reader(), since)
 	}
-	// Prefer the session's current display name so renames show; unnamed
-	// agents come back empty and the UI labels them "Agent". The folder is
-	// reported separately so those rows can still be told apart.
+	// Prefer the session's current display name so renames show, then the name recorded with its usage, then its folder (#10272); only an agent with none of them
+	// comes back empty. The folder is also reported separately so same-named rows can be told apart. The time series (usageGroupExpr) names its agents the same way.
 	query := `SELECT t.session_id,
-	          COALESCE(NULLIF(ls.display_name, ''), MAX(t.agent_name), '') as agent_name,
+	          COALESCE(NULLIF(ls.display_name, ''), NULLIF(MAX(t.agent_name), ''), NULLIF(ls.agent_name, ''), '') as agent_name,
 	          t.agent_type, COALESCE(NULLIF(t.board_name, ''), ls.board_name) as board_name,
 	          COALESCE(ls.agent_name, '') as folder,
 	          COALESCE(ls.working_dir, '') as working_dir,
