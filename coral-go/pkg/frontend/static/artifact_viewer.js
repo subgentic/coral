@@ -7,7 +7,7 @@
 import { isPhoneLayout } from './phone_layout.js';
 import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside } from './utils.js';
 import { serverUrl, artifactPath, isCloud } from './server_base.js';
-import { renderArtifact } from './artifact_preview.js';
+import { renderArtifact, manifestDownload } from './artifact_preview.js';
 import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
 import { trapTab } from './dialog_focus.js';
 import { importOnce } from './import_once.js';
@@ -107,6 +107,7 @@ export function openArtifactViewer(hex, opts = {}) {
     title.textContent = opts.filename || 'Artifact';
     const dl = d.querySelector('.artifact-viewer-download');
     dl.href = url;
+    dl.hidden = false; // a manifest may have hidden it (below): this artifact is not that one
     // An empty download attribute keeps the stored file's own name (Content-Disposition), not the link's label.
     dl.setAttribute('download', '');
     // Through Coral Hub a link can't navigate to /api/remote/...: the bytes are fetched and saved (artifact_download.js).
@@ -129,9 +130,15 @@ export function openArtifactViewer(hex, opts = {}) {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');
             if (m) openArtifactViewer(m[1], { server: opts.server, filename: entry.name, mediaType: entry.media_type });
         },
-        setMeta: ({ title: t, filename }) => {
+        setMeta: ({ title: t, filename, entries }) => {
             if (gen !== _gen) return;
             if (t || filename) title.textContent = t || filename;
+            if (entries) { // a manifest: Download saves its file, not the JSON list (#9925); with several files there is none here (each row has its own)
+                const target = manifestDownload(entries, opts.server);
+                if (!target) { dl.hidden = true; return; }
+                dl.href = target.url; dl.setAttribute('download', target.name);
+                dl.onclick = isCloud() ? (e) => { e.preventDefault(); downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
+            }
         },
     });
     return true;

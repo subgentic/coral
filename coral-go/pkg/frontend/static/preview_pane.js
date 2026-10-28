@@ -9,7 +9,7 @@ import { loadCodeMirror, showVendorLoading, showVendorLoadError } from './vendor
 import './draggable.js';
 import './xterm_renderer.js';
 import { toggleStarFile, isFileStarred } from './changed_files.js';
-import { renderArtifact, resolveArtifactSource } from './artifact_preview.js';
+import { renderArtifact, resolveArtifactSource, manifestDownload } from './artifact_preview.js';
 import { serverUrl, currentServer, isCloud } from './server_base.js';
 import { fetchImageSrc } from './image_source.js';
 import { wireDownloads } from './artifact_download.js';
@@ -151,8 +151,11 @@ function _renderToolbar(tab) {
         const src = resolveArtifactSource(tab.filepath, tab.options);
         // The managed-artifact url is server-relative; point it at the viewed server (the hub path) for the link/download.
         const dlUrl = src ? (src.externalURL ? src.url : serverUrl(src.url, src.server)) : '';
-        const link = src
-            ? `<a class="team-artifacts-action" href="${escapeAttr(dlUrl)}" ${src.externalURL ? 'target="_blank" rel="noopener noreferrer"' : `download="${escapeAttr(tab.options.filename || '')}" data-artifact-download="${escapeAttr(dlUrl)}" data-artifact-name="${escapeAttr(tab.options.filename || '')}"`}>${src.externalURL ? 'Open link' : 'Download'}</a>`
+        // A manifest (a JSON list of files): Download is its one file by its own name, not the .json (#9925); with several files the toolbar has none (each row has its own).
+        const mf = tab.manifestDownload;
+        const dlHref = mf ? mf.url : dlUrl, dlName = mf ? mf.name : (tab.options.filename || '');
+        const link = src && mf !== false
+            ? `<a class="team-artifacts-action" href="${escapeAttr(dlHref)}" ${src.externalURL ? 'target="_blank" rel="noopener noreferrer"' : `download="${escapeAttr(dlName)}" data-artifact-download="${escapeAttr(dlHref)}" data-artifact-name="${escapeAttr(dlName)}"`}>${src.externalURL ? 'Open link' : 'Download'}</a>`
             : '';
         bar.innerHTML = `<span class="preview-toolbar-path" title="${escapeAttr(tab.options.filename || tab.filepath)}">${escapeHtml(tab.options.filename || 'Artifact preview')}</span>
             <div class="inline-preview-actions">${link}</div>`;
@@ -428,7 +431,7 @@ async function _render(tab) {
                 if (comments && current()) comments.docRendered(content, true); // text the comments apply to (#5311)
             },
             openEntry: (entry) => openArtifactTab(entry.uri, { filename: entry.name, mediaType: entry.media_type }),
-            setMeta: ({ title }) => { tab.title = title; _renderTabs(); },
+            setMeta: ({ title, entries }) => { tab.title = title; if (entries) { tab.manifestDownload = manifestDownload(entries, tab.options?.server) || false; _renderToolbar(tab); } _renderTabs(); }, // a manifest: the toolbar's Download is its one file, or none (#9925)
         });
         return;
     }

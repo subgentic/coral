@@ -79,6 +79,14 @@ function _parseManifest(content) {
     return { entries, raw: content };
 }
 
+/** What a Download should save for an artifact that is a manifest (#9925): the manifest is a JSON list of files, so its Download saved a .json where the person wanted the file. One entry: that file, by its own name.
+ *  Several: none (each row has its own Download, and the toolbar's Download JSON is the manifest itself), so null. */
+export function manifestDownload(entries, server = contextServer()) {
+    if (!Array.isArray(entries) || entries.length !== 1) return null;
+    const m = CORAL_ARTIFACT_URI_RE.exec(entries[0].uri || '');
+    return m ? { url: serverUrl(artifactPath(m[1]), server), name: entries[0].name } : null;
+}
+
 function _entryType(entry) {
     if (entry.media_type) return entry.media_type;
     const name = entry.name.toLowerCase();
@@ -173,7 +181,7 @@ export function resolveArtifactSource(uri, options = {}) {
 /**
  * Render an artifact into `body`.
  * ctx: { signal, isStale(), renderContent(body, content, path), openEntry({name, uri, media_type}),
- *        setMeta({ title, filename }) }
+ *        setMeta({ title, filename, entries? }) }  (entries: the files of a manifest, so a Download can name the file and not the manifest, #9925)
  */
 export async function renderArtifact(body, uri, options, ctx) {
     const source = resolveArtifactSource(uri, options);
@@ -240,7 +248,7 @@ export async function renderArtifact(body, uri, options, ctx) {
             }
             const manifest = isJSON ? _parseManifest(content) : null;
             if (manifest) {
-                ctx.setMeta({ title: 'Artifact manifest', filename: filename || 'manifest.json' });
+                ctx.setMeta({ title: 'Artifact manifest', filename: filename || 'manifest.json', entries: manifest.entries });
                 _renderManifest(body, manifest, filename || 'manifest.json', ctx);
             } else if (!isMarkdown && isJSON && renderJSONReport(body, content, filename)) {
                 // Recognized reports keep their original bytes in the raw view.
