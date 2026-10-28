@@ -28,7 +28,6 @@
     --control-border: #7a7a85;
     /* What a dialog's text fields and its inset cards are filled with (#5036): a dark wash on the dark panels, the field colour of the page on the light ones. */
     --field-fill:   rgba(0, 0, 0, 0.18);
-    --inset-fill:   rgba(0, 0, 0, 0.08);
 
     /* Text */
     --text-primary:   #f0f0f2;
@@ -62,8 +61,6 @@
     --accent-color:   var(--accent);
     --border-color:   var(--border);
     --error-color:    var(--error);
-    --fg:             var(--text-primary);
-    --fg-muted:       var(--text-muted);
     --working:     #61afef;
     --working-rgb: 97, 175, 239;
 
@@ -160,7 +157,6 @@
     --fs-2xl:  1.25rem;    /* 20px: a page title, an item page title, a big figure (Goal #84) */
     --glyph-sm: 1.5rem;    /* 24px: a decorative icon glyph, not a text step */
     --glyph-md: 2.5rem;    /* 40px */
-    --glyph-lg: 3rem;      /* 48px */
     --fs-display: 2rem;    /* 32px: the welcome title only */
     /* Weights: three. 700 only on the 20 px and 32 px titles (Goal #84) */
     --ls-caps: 0.05em;    /* tracking of an uppercase label, a badge, a group head (was 0.3px to 0.12em in nine places) */
@@ -210,7 +206,6 @@
     --chat-prose-size: var(--fs-lg);
 
     /* Accent variants */
-    --accent-light: #79c0ff;
     --accent-secondary: color-mix(in srgb, var(--accent) 55%, white);
     --terminal-name-color: #b8b8be;
     --text-on-accent: #fff;
@@ -288,7 +283,6 @@
     --border-light: #b0b6be;
     --control-border: #767b83;
     --field-fill:   var(--bg-primary);
-    --inset-fill:   rgba(0, 0, 0, 0.03);
 
     /* Text */
     --text-primary:   #1f2328;
@@ -296,7 +290,6 @@
     --text-muted:     #5f6770; /* at least 4.5:1 on the light panels (WCAG AA); was #8b949e, 2.6-3.1:1 */
     /* The sidebar goal line: the light hover and selected tiles are dark enough that secondary
        (4.2-4.4:1) misses AA there; a fifth of primary keeps it >= 4.9:1 on every row (#4209). */
-    --text-goal:      color-mix(in srgb, var(--text-secondary) 80%, var(--text-primary));
 
     /* Accent / Brand */
     --accent:     #0969da;
@@ -370,7 +363,6 @@
     --color-tool-default:    #8b949e;
 
     /* Accent variants */
-    --accent-light: #0550ae;
     --accent-secondary: color-mix(in srgb, var(--accent) 75%, black);
     --terminal-name-color: #6e7781;
     --text-on-accent: #fff;
@@ -456,8 +448,6 @@
     --fx-yellow-rgb:     255, 193, 7;
     --fx-gold-rgb:       227, 179, 65;
     --fx-lilac-rgb:      210, 168, 255;
-    --fx-violet-rgb:     163, 113, 247;
-    --fx-blue-rgb:       31, 111, 235;
     --fx-red:            #e5534b;
     --fx-red-hot:        #e5484d;
     --fx-green:          #3fb950;
