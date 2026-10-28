@@ -99,6 +99,15 @@ export async function maybePromptSetPassword() {
     showSetPasswordModal({ local: st.local === true });
 }
 
+/** Home's first control by keyboard: its New agent card (or first button), else the agent search box (a phone's too), else the menu button or the current top tab. */
+function pageControl() {
+    for (const sel of ['#welcome-screen button:not([disabled]), #welcome-screen a[href]', '#agent-search-input', '#mobile-agent-list .mobile-search-input', '#top-menu-btn', '.top-nav-tab.active']) {
+        const e = [...document.querySelectorAll(sel)].find(x => x.getClientRects().length > 0);
+        if (e) return e;
+    }
+    return null;
+}
+
 export function showSetPasswordModal({ local = false } = {}) {
     const existing = document.getElementById('set-password-modal'); // two callers can race (startup, Settings): one prompt
     if (existing) return existing;
@@ -147,7 +156,8 @@ export function showSetPasswordModal({ local = false } = {}) {
         window.removeEventListener('focus', recheck);
         clearInterval(recheckTimer);
         modal.remove();
-        if (opener && opener.focus && opener.isConnected) opener.focus();
+        const back = opener && opener !== document.body && opener.focus && opener.isConnected ? opener : pageControl(); // opened at startup there is no opener (the body): the keyboard goes to the page's first control, not nowhere (#10067)
+        if (back) back.focus();
         document.dispatchEvent(new CustomEvent('coral:password-prompt-closed'));
     };
     const notNow = () => { if (local) _notNowSet(); close(); };
