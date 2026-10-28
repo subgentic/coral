@@ -22,6 +22,13 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
             await ev(`fetch('/api/board/${BOARD}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator' }) }).then(r => r.status)`);
+            // a team with no live agent: nothing to put to sleep, reset or kill, and the menu says so
+            await ev(`T.state.liveSessions = []; T.render.renderLiveSessions([]); window.openTeamPage(${JSON.stringify(BOARD)}).then(() => true)`);
+            await waitFor(`!!document.getElementById('team-page-view') && document.getElementById('team-page-view').getClientRects().length > 0 && document.getElementById('team-page-title').textContent.includes('stop-menu')`, `${w}: the team page, no agents`, 15000);
+            await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu opens
+            const none = await ev(`[...document.querySelectorAll('${mobile ? '#team-page-more-menu' : '#team-page-stop-menu'} [data-stop]:not([data-stop="sep"])')].map(b => ({ disabled: b.disabled, title: b.title }))`);
+            check(none.length === 3 && none.every(x => x.disabled && /No agent of this team is running/.test(x.title)), `with no live agent the three are off, with the reason: ${JSON.stringify(none)}`);
+            await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu closes
             await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', false), mk('s2', 'Worker', false)])}; T.render.renderLiveSessions(T.state.liveSessions); window.openTeamPage(${JSON.stringify(BOARD)}).then(() => true)`);
             await waitFor(`!!document.getElementById('team-page-view') && document.getElementById('team-page-view').getClientRects().length > 0 && document.getElementById('team-page-title').textContent.includes('stop-menu')`, `${w}: the team page`, 15000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the header fills

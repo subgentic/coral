@@ -30,6 +30,11 @@ const BOARD = 'return-team-' + Date.now().toString(36);
             await waitFor(`${shown('team-page-view')}`, `${w}: the team page again`, 10000).catch(() => check(false, 'the Agents tab from the Inbox is the team page that was on screen, not Home'));
             check(await ev(`document.getElementById('team-page-title') && document.getElementById('team-page-title').textContent.includes('return-team')`), 'and it is that team');
             check(await ev(`(document.querySelector('#team-page-view [role=tab][aria-selected=true]') || {}).id === 'team-tab-tasks'`), 'on the tab it was on (Tasks)');
+            // already on a team page, choosing Agents keeps the tab it is on (not the one it was last left on, Tasks)
+            await ev(`document.getElementById('team-tab-artifacts').click(); true`);
+            await waitFor(`(document.querySelector('#team-page-view [role=tab][aria-selected=true]') || {}).id === 'team-tab-artifacts'`, `${w}: the Artifacts tab`, 8000);
+            await ev(`window.switchNavTab('agents'); true`); await new Promise(r => setTimeout(r, 700)); // sleep-ok: the tab would redraw
+            check(await ev(`(document.querySelector('#team-page-view [role=tab][aria-selected=true]') || {}).id === 'team-tab-artifacts'`), 'choosing Agents while on the team page keeps the tab it is on');
             // a session opened from the list is not the team: after it, Agents is that session, not the team
             await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); window.switchNavTab('agents'); true`); await new Promise(r => setTimeout(r, 500)); // sleep-ok: the tab draws
             check(!(await ev(shown('team-page-view'))), 'after leaving the team for good the Agents tab is Home');
