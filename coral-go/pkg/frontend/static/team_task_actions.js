@@ -240,7 +240,7 @@ export function completeForm(task, ctx) {
             showToast(e.message || 'Failed to complete task', true);
         }
     }
-    return { node: section, focus: () => message.focus(), submit };
+    return { node: section, focus: () => { message.focus({ preventScroll: true }); message.scrollIntoView({ block: 'center' }); }, submit }; // the box is brought into view above the pinned bar, not left under it on a phone (#10064)
 }
 
 /** Reviews keep their lifecycle; only task text changes in this form. */

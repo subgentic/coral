@@ -192,12 +192,12 @@
 .team-artifacts-error { color: var(--error-text); } /* a failed load is red, not the grey of the other lines (UX #4469) */
 
 /* a task's page as a form (#7644): Edit and Complete on the page, the fields the dialog had, one column */
-.team-task-form, #team-panel-item .task-completion-form { max-width: 760px; margin-top: 12px; }
-.team-task-form label, #team-panel-item .task-completion-form label { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.team-task-form, .task-completion-form { max-width: 760px; margin-top: 12px; }
+.team-task-form label, .task-completion-form label { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
 .team-task-form input[type="text"], .team-task-form select, .team-task-form textarea,
-#team-panel-item .task-completion-form input:not([type="file"]), #team-panel-item .task-completion-form select, #team-panel-item .task-completion-form textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; font-weight: var(--fw-regular); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border, var(--border)); border-radius: var(--radius-md); }
-.team-task-form ::placeholder, #team-panel-item .task-completion-form ::placeholder { color: var(--text-secondary); opacity: 1; }
-.team-task-form textarea, #team-panel-item .task-completion-form textarea { resize: vertical; min-height: 72px; }
+.task-completion-form input:not([type="file"]), .task-completion-form select, .task-completion-form textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; font-weight: var(--fw-regular); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border, var(--border)); border-radius: var(--radius-md); }
+.team-task-form ::placeholder, .task-completion-form ::placeholder { color: var(--text-secondary); opacity: 1; }
+.team-task-form textarea, .task-completion-form textarea { resize: vertical; min-height: 104px; } /* a real message box, wherever the form is shown: the team page, the Inbox, the task dialog (#10064) */
 .team-task-form-label { margin: 0 0 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .team-task-form .task-edit-revision { margin: 0 0 12px; }
 .team-task-extra { max-width: 760px; margin-top: 16px; }
