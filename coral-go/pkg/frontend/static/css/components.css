@@ -4018,6 +4018,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
     .team-menu { position: static; margin-top: 4px; min-width: 0; max-width: none; } /* on a phone the menu opens in the flow under its button, as the Inbox's More menu does: an absolutely placed one was wider than the dialog's scroll box at 200% text and lost its left edge (#8678) */
     .team-orchestrator-line { flex-direction: column; align-items: stretch; }
     .team-template-row .btn, .team-template-pick select, .team-allworkers select { min-height: var(--control-touch-height, 44px); }
+    .team-template-row { flex-wrap: wrap; align-items: stretch; } /* the select is a row of its own, so "Default team (3 members)" reads whole; Describe your team and More share the row under it (#10532) */
+    .team-template-pick { flex: 1 1 100%; }
 }
 #launch-step-team .settings-pane label:has(> input[type="checkbox"]) { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin: 4px 0; }
 #launch-step-team .settings-pane .settings-hint { margin: 2px 0 12px; }
