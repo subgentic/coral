@@ -67,6 +67,10 @@ const BASE = require('./test_base').BASE;
             // the agent stops waiting: the row goes
             await ev(`window.__waiting = false; window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 0`, `${w}: the row leaves`, 8000);
+            // the row is gone and the page says nothing needs the person: it still says what was answered (#10720, Mobile pass 37 moment 5: "the row just vanishes ... I could not tell it went through"), in a toast that is on screen and in the empty list
+            const said = await ev(`(() => { const t = [...document.querySelectorAll('#toast-host .toast, #notices .toast')].find(x => /Answered: Red/.test(x.textContent)); const r = t && t.getBoundingClientRect(); const list = document.getElementById('group-table-view'); return { toast: !!t && r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, toastText: t ? t.textContent.replace(/\\s+/g, ' ').trim() : null, list: /Answered: Red/.test(list ? list.textContent : '') }; })()`);
+            assert.ok(said.toast, `${w}: the toast says Answered: Red and is on screen ${JSON.stringify(said)}`);
+            assert.ok(said.list, `${w}: the empty list says what was answered, not only that nothing needs the person ${JSON.stringify(said)}`);
         }
         // a multi-select has no one-press answer: no buttons
         await ev(`window.__multi = true; window.__waiting = true; window.__answers = []; true`);
