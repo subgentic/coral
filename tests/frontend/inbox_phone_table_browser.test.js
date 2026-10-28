@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
+const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -26,6 +27,8 @@ const BASE = require('./test_base').BASE;
         // the one task row's two-line form (#7737): the id and title, then the state, and the priority only when it is High; the team is the table's column and is not in the phone's line
         for (const [i, word] of [[0, /Queued/], [1, /In progress/], [2, /In review/]]) assert.match(m.rows[i], word, `row ${i + 1} still says its ${word} ${JSON.stringify(m.rows)}`);
         assert.ok(m.rows.every(r => !/Nobody yet/.test(r)), 'the Inbox says nothing of who: every task is the operator\'s ' + JSON.stringify(m.rows));
+        await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary').forEach((b, i) => b.setAttribute('data-axp', String(i))); true`);
+        for (const [i, state] of [[0, 'Queued'], [1, 'In progress'], [2, 'In review']]) { const ax = await axName(client, `[data-axp="${i}"]`); assert.match(ax && ax.name, new RegExp(`^#${i + 1} .+, ${state}, .+$`), `row ${i + 1}'s button is "<task>, <state>, <time>" as Chrome computes it (the state is on the row as an icon and a word: #9747): ${ax && ax.name}`); }
         console.log('PASS the Inbox Tasks table fits a phone');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
