@@ -39,9 +39,9 @@ const BASE = require('./test_base').BASE;
         const total = await optCount();
         assert.ok(total >= 10, 'blank, the built-ins and the saved ones: ' + total);
         await ev(`{ const s = document.getElementById('team-template-search'); s.value = 'saved crew 3'; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#team-template-select option')].map(o => o.textContent)`), ['Blank team', 'Saved crew 3 (1 member, saved)']);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#team-template-select option')].map(o => o.textContent)`), ['Blank team', 'Default team (3 members)', 'Saved crew 3 (1 member, saved)']); // Blank team and Default team (#9906) are always in the list, the search only narrows the templates
         await ev(`{ const s = document.getElementById('team-template-search'); s.value = 'zzzz'; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        assert.equal(await optCount(), 1, 'no match: only Blank team is left');
+        assert.equal(await optCount(), 2, 'no match: only Blank team and Default team are left');
         await ev(`{ const s = document.getElementById('team-template-search'); s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
         assert.equal(await optCount(), total, 'an empty search lists every template again');
 
