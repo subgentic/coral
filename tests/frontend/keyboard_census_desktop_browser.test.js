@@ -209,7 +209,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
             await waitFor(`!!document.querySelector('#command-input')`, 'composer', 20000);
             await ev(`import(${S} + 'state.js').then(m => { m.state.selectedTeam = 'census-board'; return true; })`); // the artifact's comments are of a board (Send to agent needs one)
             await ev(STUB({ filename: 'release-notes.md', content: '# Release notes\n\nThe build is green.\n', mediaType: 'text/markdown', comments: [{ id: 1, parent_id: null, anchor: { whole: true }, body: 'Please check.', author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: '2026-10-22T00:00:00Z' }] }));
-            await ev(`import(${S} + 'changed_files.js').then(m => m.openFilePreview('coral://artifacts/${HEX}')).then(() => true)`); await waitFor(`!!document.querySelector('#preview-toolbar .ac-toggle')`, 'artifact', 10000);
+            await ev(`Promise.resolve(window.openFilePreview('coral://artifacts/${HEX}')).then(() => true)`); await waitFor(`!!document.querySelector('#preview-toolbar .ac-toggle')`, 'artifact', 10000);
         }, { expect: `/Release notes/.test(document.getElementById('preview-body').textContent)` });
         await sc('artifact viewer: comments', async () => { await tap('#preview-toolbar .ac-toggle'); }, { expect: `!!document.querySelector('.ac-panel') && /Please check/.test(document.querySelector('.ac-panel').textContent)` });
         // Send to agent (#6475): the picker inside the comment's card, with the agents of a board that cannot be asked (aria-disabled, still focusable, their reason as the description)

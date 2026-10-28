@@ -40,7 +40,7 @@ const S = `(window.__coralStatic || '/static/')`;
             // an artifact with the side panel open
             await ev(`(async () => { window.PP = await import(${S} + 'preview_pane.js'); return true; })()`);
             await ev(STUB({ filename: 'release-notes.md', content: '# Release notes\n\nThe build is green.\n', mediaType: 'text/markdown', comments: [] }));
-            await ev(`import(${S} + 'changed_files.js').then(m => m.openFilePreview('coral://artifacts/${HEX}')).then(() => true)`); // the way a person opens one: a link or the Artifacts tab
+            await ev(`Promise.resolve(window.openFilePreview('coral://artifacts/${HEX}')).then(() => true)`); // the way a person opens one: a link or the Artifacts tab
             await waitFor(`!!document.querySelector('#preview-pane #preview-toolbar')`, `${name}: the artifact`, 10000);
             const pane = await ev(`(() => { const p = document.getElementById('preview-pane'), b = p.getBoundingClientRect(); return { full: p.classList.contains('preview-phone-full'), w: Math.round(b.width), h: Math.round(b.height), vw: innerWidth, vh: innerHeight, back: !!document.getElementById('preview-full-back') && document.getElementById('preview-full-back').getClientRects().length > 0 }; })()`);
             if (phone) {
