@@ -180,7 +180,7 @@ func itoa(n int) string {
 }
 
 // HomeInText writes every place text names the user's home folder as "~": an error sentence that carries a full executable path ("/home/name/.local/bin/claude is not installed") is stored in a run and
-// read by whoever may see the run, Coral Hub's viewers included (#10021). A folder under the home keeps its path after the "~"; a longer name that only starts like it ("/home/name2") is left.
+// read by whoever may see the run, Coral Hub's viewers included (#10021). A folder under the home keeps its path after the "~"; a longer name that only starts like it ("/home/someoneelse" next to "/home/someone") is left.
 func HomeInText(text string) string { return homeInText(text, homeFolders()) }
 
 func homeInText(text string, homes []string) string {
