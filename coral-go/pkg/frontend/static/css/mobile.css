@@ -90,10 +90,10 @@
 }
 
 /* Send with a team reminder (#3152: was a cryptic "+T"). */
-.mobile-send-more { display: none; position: relative; align-self: stretch; align-items: flex-end; flex-shrink: 0; margin-right: -5px; } /* as tall as the composer's row, its caret at the bottom beside Send: the menu opens above the whole row (bottom: 100%), not over the text box; -5px takes the row's 6 px gap down to a 1 px seam, so the caret and Send are one split button (#9570) */
+.mobile-send-more { display: none; position: relative; align-self: stretch; align-items: flex-end; flex-shrink: 0; margin-right: 4px; } /* as tall as the composer's row, its caret at the bottom beside Send: the menu opens above the whole row (bottom: 100%), not over the text box; -5px takes the row's 6 px gap down to a 1 px seam, so the caret and Send are one split button (#9570) */
 .mobile-send-options-btn { -webkit-tap-highlight-color: transparent; } /* the family's primary icon button */
-.mobile-send-more > button { border-radius: var(--radius-md) 0 0 var(--radius-md); } /* the left half of the split Send (the caret) */
-.mobile-send-btn:not(.is-stop) { border-top-left-radius: 0; border-bottom-left-radius: 0; } /* the right half; a Stop button is its own square */
+.mobile-send-more > button { border-radius: var(--radius-md); } /* the left half of the split Send (the caret) */
+/* (the caret and Send are two buttons 4 px apart, no longer one split control whose halves touched, #10281) */ /* the right half; a Stop button is its own square */
 .mobile-send-more:has(+ .mobile-send-btn.is-stop) { margin-right: 0; } /* a Stop button is its own square, not the right half of the split Send: the caret does not run under it (8 px between them at least, #9643) */
 .mobile-send-menu { right: 0; left: auto; width: max-content; min-width: 0; max-width: calc(100vw - 72px); } /* anchored to the caret's right edge; at 200% text it wraps instead of running off the left of the screen (UI Accessibility, #7063) */
 .mobile-send-menu .send-menu-item { white-space: normal; text-align: left; }
