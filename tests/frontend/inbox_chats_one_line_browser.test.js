@@ -39,7 +39,7 @@ const BASE = require('./test_base').BASE;
                 for (const r of rows) {
                     assert.ok(r.title && r.when, at + 'title and when are on the row: ' + JSON.stringify(r));
                     assert.ok(Math.abs(r.title.mid - r.when.mid) < 8, at + 'they share one line: ' + JSON.stringify(r));
-                    assert.ok(r.h <= 56, at + 'one line: ' + r.h + ' px'); assert.equal(r.snippet, false, at + 'no first message on the row'); assert.equal(r.ran, false, at + 'no Ran on the row'); assert.equal(r.folded, false, at + 'the table does not fold'); assert.ok(r.scrolls <= 1, at + 'no sideways scroll');
+                    assert.ok(r.h <= 56, at + 'one line: ' + r.h + ' px'); if (!mobile) assert.ok(r.h <= 37, at + 'a row is 36 px at a mouse (the shared table density, #9734), not the 44 of a touch target: ' + r.h + ' px'); assert.equal(r.snippet, false, at + 'no first message on the row'); assert.equal(r.ran, false, at + 'no Ran on the row'); assert.equal(r.folded, false, at + 'the table does not fold'); assert.ok(r.scrolls <= 1, at + 'no sideways scroll');
                     if (folder === 'chats') assert.equal(r.agentShown, width === 1280, at + (width === 1280 ? 'the agent is a column' : 'the phone drops the agent column'));
                 }
                 // #9458: nothing in a row is cut by its cell (the star and archive buttons were 99 px in an 80 px cell: a stray mark at the table's edge), and the When header is over its cell's right edge
