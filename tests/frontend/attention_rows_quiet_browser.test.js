@@ -62,7 +62,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                     assert.ok(p.shadow.includes(s.borderVar), `${v.name}: and only the neutral hairline, no amber or red ring (${p.shadow})`);
                     assert.equal(p.ring, 'none', `${v.name}: no expanding ring around the pill (${p.ring})`);
                 }
-                assert.deepEqual(['r2', 'r3', 'r4', 'r5'].map(id => s.pills[id].text), ['Needs input · Permission', 'Needs input · Question', 'Check terminal', 'Stuck'], 'the words say which state it is');
+                assert.deepEqual(['r2', 'r3', 'r4', 'r5'].map(id => s.pills[id].text), ['Needs input', 'Needs input', 'Check terminal', 'Stuck'], 'the words say which state it is (one chip, one word: the reason is in its hover, #9784)');
             }
             // The row's dot flashes by itself, with no ring around it (#5140): it animates with no preference, and stops with reduced motion.
             assert.equal(s.dots.r2.name, 'pulse-waiting', `${v.name}: the waiting dot flashes (${s.dots.r2.name})`);

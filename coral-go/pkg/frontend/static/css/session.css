@@ -637,6 +637,7 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 /* Sentence-case labels ("Needs input" / "Check terminal" / "Stuck"), quiet (#5123): the shape and weight of the neutral pill below, with only the text in the
    warm colour (>= 4.5:1), no amber fill and no amber ring; the words, not the colour, say which state it is. The higher-specificity selector outranks `.chip.waiting-badge`. */
 .session-group-item .chip.session-state-pill {
+    white-space: nowrap; /* one chip, one word, one line (#9784) */
     text-transform: none;
     letter-spacing: 0;
     font-weight: var(--fw-medium);

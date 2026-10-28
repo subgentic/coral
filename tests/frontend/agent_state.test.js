@@ -85,7 +85,7 @@ const EXPECT = {
     [ID.working]: { state: 'working', label: 'Working', dot: 'working', pill: null, attention: false },
     [ID.idle]: { state: 'idle', label: 'Idle', dot: 'stale', pill: null, attention: false },
     [ID.needs]: { state: 'needs_input', label: 'Needs input', dot: 'waiting', pill: 'Needs input', attention: true },
-    [ID.asks]: { state: 'needs_input', label: 'Needs input · Question', dot: 'waiting', pill: 'Needs input · Question', attention: true },
+    [ID.asks]: { state: 'needs_input', label: 'Needs input · Question', dot: 'waiting', pill: 'Needs input', attention: true },
     [ID.screenPrompt]: { state: 'needs_input', label: 'Needs input', dot: 'waiting', pill: 'Needs input', attention: true },
     [ID.oddKind]: { state: 'needs_input', label: 'Needs input', dot: 'waiting', pill: 'Needs input', attention: true },
     [ID.check]: { state: 'check_terminal', label: 'Check terminal', dot: 'waiting', pill: 'Check terminal', attention: true },
