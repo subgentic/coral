@@ -11,16 +11,20 @@ const (
 	KindRateLimit = "rate_limit" // GitHub's limit on anonymous requests (#9704): the wait is the time it says it is over, not a doubling
 )
 
-// rateLimitWait is how long to wait after a rate-limit answer that is over at retryAt: until then (and a few seconds more), at least a minute and at most a day; an answer that did not say when
-// waits an hour. Never a loop that asks again while the limit is still on.
-func rateLimitWait(now, retryAt time.Time) time.Duration {
-	const slack, least, most, unknown = 10 * time.Second, time.Minute, 24 * time.Hour, time.Hour
+// rateLimitWait is how long to wait after a rate-limit answer that is over at retryAt: until then (and a few seconds more), at least a floor and at most a day; an answer that did not say when waits an hour.
+// The floor is a minute for the first rate limit in a row and doubles with each one after it (capped at a day), so a clock that is ahead of GitHub's, which sees every reset as already past, asks 1, 2, 4, 8
+// minutes and so on and not every minute for good. Never a loop that asks again while the limit is still on.
+func rateLimitWait(now, retryAt time.Time, inARow int) time.Duration {
+	const slack, base, most, unknown = 10 * time.Second, time.Minute, 24 * time.Hour, time.Hour
 	if retryAt.IsZero() {
 		return unknown
 	}
-	return min(max(retryAt.Sub(now)+slack, least), most)
+	floor := base
+	for i := 1; i < inARow && floor < most; i++ {
+		floor *= 2
+	}
+	return min(max(retryAt.Sub(now)+slack, floor), most)
 }
-
 func backoff(kind string, attempts int) time.Duration {
 	if attempts < 1 {
 		attempts = 1

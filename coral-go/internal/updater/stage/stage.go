@@ -166,21 +166,25 @@ func (c *checker) save() {
 
 // fail records a failure for version and its back-off.
 func (c *checker) fail(version, kind, stageName string) Result {
-	return c.failAfter(version, kind, stageName, 0)
+	return c.failAfter(version, kind, stageName, nil)
 }
 
-// failAfter is fail with the wait given (the rate limit's), or the kind's back-off when wait is 0.
-func (c *checker) failAfter(version, kind, stageName string, wait time.Duration) Result {
+// failAfter is fail with the wait given by wait (the rate limit's, from how many of them in a row this is), or the kind's back-off when wait is nil.
+func (c *checker) failAfter(version, kind, stageName string, wait func(attempts int) time.Duration) Result {
 	s := c.st.Stage
 	if s == nil || s.Version != version {
 		s = &verify.StageState{Version: version, Staged: stageField(c.st), StagedAt: stagedAtField(c.st)}
 	}
+	if (kind == KindRateLimit) != (s.ErrorKind == KindRateLimit) {
+		s.Attempts = 0 // rate limits are counted in a row: one after another kind of failure, or another kind after one, starts its own count
+	}
 	s.Attempts++
 	s.ErrorKind = kind
-	if wait <= 0 {
-		wait = backoff(kind, s.Attempts)
+	d := backoff(kind, s.Attempts)
+	if wait != nil {
+		d = wait(s.Attempts)
 	}
-	s.NextAttempt = c.now.Add(wait).UTC().Format(time.RFC3339)
+	s.NextAttempt = c.now.Add(d).UTC().Format(time.RFC3339)
 	c.st.Stage = s
 	c.save()
 	c.res.Result, c.res.Version, c.res.FailedStage, c.res.NextAttempt = ResultFailed, version, stageName, s.NextAttempt
@@ -232,7 +236,7 @@ func (c *checker) run(ctx context.Context) Result {
 		var se *verify.StatusError
 		if errors.As(err, &se) && se.RateLimited {
 			log.Printf("[update] GitHub's limit on anonymous requests is on; the next check is after it")
-			return c.failAfter("", KindRateLimit, "manifest", rateLimitWait(c.now, se.RetryAt))
+			return c.failAfter("", KindRateLimit, "manifest", func(inARow int) time.Duration { return rateLimitWait(c.now, se.RetryAt, inARow) })
 		}
 		return c.fail("", KindNetwork, "manifest")
 	}
