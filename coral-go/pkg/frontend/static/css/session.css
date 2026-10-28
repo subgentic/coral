@@ -1665,7 +1665,7 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 .group-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .group-chevron svg { transition: transform .12s; }
 .group-chevron[aria-expanded="false"] svg { transform: rotate(-90deg); }
-@media (pointer: coarse) { .group-chevron { width: 44px; height: 44px; margin-left: -12px; } }
+@media (pointer: coarse), (max-width: 600px) { .group-chevron { width: 44px; height: 44px; margin-left: -12px; } } /* a narrow window and the Hub's tunnelled page report no coarse pointer (#10792) */
 @media (prefers-reduced-motion: reduce) { .group-chevron svg { transition: none; } }
 #team-goal { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; }
 .group-chevron-deco { pointer-events: none; margin-left: -8px; height: 16px; } /* decorative: the whole header is the control, so it does not set the header's height */
