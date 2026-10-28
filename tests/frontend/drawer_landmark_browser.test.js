@@ -34,6 +34,20 @@ const { axNodes } = require('./helpers/ax_tree');
                 }
             }
         }
+        // every top tab gives the sidebar a name (#10489, from #10452's review): a tab not in the fixed list takes its own title, never the name the last tab left
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        const tabs = await ev(`[...document.querySelectorAll('.top-nav-tab[data-arg]')].map(b => ({ tab: b.dataset.arg, title: b.dataset.label || b.textContent.trim() }))`);
+        check(tabs.length >= 5, `the census sees the top tabs: ${JSON.stringify(tabs)}`);
+        const extra = [{ tab: 'zz-new-tab', title: 'A New Tab' }]; // a tab added later, not in the fixed list: the button is made here, the way the next one will be
+        await ev(`(() => { const b = document.createElement('button'); b.className = 'tab top-nav-tab'; b.id = 'nav-tab-zz-new-tab'; b.dataset.arg = 'zz-new-tab'; b.textContent = 'A New Tab'; b.hidden = true; document.querySelector('.top-nav-tab').after(b); return true; })()`);
+        for (const { tab, title } of [...tabs, ...extra]) {
+            await ev(`document.body.setAttribute('data-nav-tab', ${JSON.stringify(tab)}); true`); await new Promise(r => setTimeout(r, 150)); // sleep-ok: the observer runs
+            const got = await ev(`document.querySelector('.sidebar').getAttribute('aria-label') || ''`);
+            const want = NAMES[tab] || title;
+            check(got === want, `${tab}: the sidebar's name is ${JSON.stringify(want)} (it is ${JSON.stringify(got)})`);
+        }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the sidebar landmark:\n  ' + problems.join('\n  '));
     console.log('PASS the sidebar is a named landmark and a shut drawer is out of the tree');
