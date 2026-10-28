@@ -4,6 +4,7 @@
 // SHOT_DIR=<dir> saves screenshots.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { SIZING } = require('./helpers/table_sizing');
 const { connect } = require('./agent_view_harness');
 const { oneLinePerRow } = require('./helpers/row_lines');
 const { setTheme } = require('./helpers/contrast');
@@ -44,6 +45,14 @@ const SERVERS = [
             const t = await ev(`(() => { const tb = document.querySelector('table.dt-table'); return { heads: [...tb.querySelectorAll('thead th')].map(h => (h.querySelector('.dt-sort span') || h.querySelector('.dt-head-text')).textContent.trim()), scopes: [...tb.querySelectorAll('thead th')].map(h => h.getAttribute('scope')), rows: tb.querySelectorAll('tbody tr').length,
                 links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => (b.querySelector('.dt-name-text') || b).textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open').length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
             assert.deepEqual(t.heads, ['Server', 'Tags', 'Status', 'Agents', 'Needs you', 'Last seen', 'Version'], at + 'the columns, UI/UX\'s order (Goal #79, #9679): Tags stays by the name, its warning on the row');
+            if (!mobile) { // the table's default sizes (#9856): the server's name is at least 24 characters, nothing scrolls sideways, at 1280 and at 1024
+                for (const bw of [1280, 1024]) {
+                    await Emulation.setDeviceMetricsOverride({ width: bw, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
+                    const z = await ev(SIZING('table.dt-table', 'server').replace("document.querySelector('table.dt-table')", "document.querySelector('table.dt-table').closest('.dt-box')"));
+                    assert.ok(z && !z.scroll && z.name >= z.ch24 - 1, `${bw}: the server name is at least 24 characters and the table does not scroll sideways: ` + JSON.stringify(z));
+                }
+                await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: back to the suite's width
+            }
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), true, at + 'the table keeps the Servers title');
             assert.deepEqual(t.scopes, ['col', 'col', 'col', 'col', 'col', 'col', 'col']);
             const cols = await ev(`(() => { const cell = (id, k) => { const td = document.querySelector('#server-row-' + id + ' td[data-key="' + k + '"]'); return td ? td.textContent.trim() : null; }; return { needs: ['local', 'epoch', 'lan'].map(id => cell(id, 'needs')), seen: ['local', 'epoch', 'lan'].map(id => cell(id, 'seen')), sortable: [...document.querySelectorAll('table.dt-table thead th')].map(th => !!th.querySelector('.dt-sort')) }; })()`);
