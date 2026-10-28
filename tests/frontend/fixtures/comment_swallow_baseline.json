@@ -1,0 +1,5 @@
+{
+  "search_filters.js": [
+    "sourceTypes: [],         // array of string; empty = all"
+  ]
+}
