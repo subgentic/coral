@@ -6,7 +6,7 @@ import { importOnce } from './import_once.js';
 import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { mountSettingsView } from './settings_view.js'; // the pane's rows (a startup module: the Settings rows draw from it)
-const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, serverHas } = await importOnce('./update_api.js');
+const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, serverHas } = await importOnce('./update_api.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
@@ -179,6 +179,7 @@ export async function showUpdatesPane() {
     }
     const fact = (key, label, value) => fields.push({ key, type: 'custom', label, render: slot => { slot.classList.add('update-fact'); slot.textContent = value; } });
     if (s.checkedAt) fact('checked', 'Last checked', stamp(s.checkedAt));
+    if (s.checkedAt && foundText(s)) fact('found', 'What it found', foundText(s));
     fact('version', 'Version', s.installed || 'unknown');
     if (s.last && s.last.result === 'relaunched' && /^hub:/.test(s.last.by) && stamp(s.last.at)) fact('last', 'Last update', `Relaunched from Coral Hub at ${stamp(s.last.at)}`); // the time, never the hub user's name
     fields.push({ key: 'privacy', type: 'notice', render: slot => slot.append(mk('p', 'update-calm update-privacy', 'Coral contacts GitHub only, to read the release list and download the package.')) });

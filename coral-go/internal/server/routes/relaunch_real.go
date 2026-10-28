@@ -18,6 +18,7 @@ import (
 
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/internal/updatecheck"
 	"github.com/subgentic/coral/internal/updater/runrecord"
 	"github.com/subgentic/coral/internal/updater/status"
 )
@@ -153,6 +154,12 @@ func recordFrom(out status.Out, st relaunchState, now time.Time) UpdaterRecord {
 		rec.Trust.ManifestSequence = out.Accepted.Sequence
 	}
 	rec.CheckedAt = parseTime(out.LastCheck)
+	if r := out.LastResult; r != nil && checkedResults[r.Result] {
+		rec.CheckResult = r.Result
+		if updateVersionRe.MatchString(r.Newest) {
+			rec.Newest = r.Newest
+		}
+	}
 	if i := out.Install; i != nil {
 		rec.InstallKind = i.Kind
 		rec.Supported = i.Unsupported == "" && i.Writable
@@ -192,6 +199,11 @@ func recordFrom(out status.Out, st relaunchState, now time.Time) UpdaterRecord {
 			}
 		}
 	}
+	if rec.Latest == "" && rec.Newest != "" {
+		if updatecheck.Newer(rec.Newest, out.Installed) {
+			rec.Latest = rec.Newest // a release newer than this one that the last check saw (not promoted yet, or staged: then Latest is already it)
+		}
+	}
 	rec.NotReady = notReady(out, rec, now)
 	return rec
 }
@@ -213,6 +225,8 @@ func notReady(out status.Out, rec UpdaterRecord, now time.Time) string {
 		return "rate_limited" // GitHub's limit on anonymous requests: the wait is until it is over (#9704)
 	case out.Backoff != nil && out.Backoff.Waiting:
 		return "backoff"
+	case rec.CheckResult == "not_promoted" && rec.Latest != "":
+		return "not_promoted" // the last check saw a release newer than this one and there is no promotion of it yet
 	case out.LastFailure != nil:
 		return "check_failed"
 	}

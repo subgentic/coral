@@ -304,3 +304,21 @@ func TestStatusSaysTheApplyIsOnWhenTheSwitchIs(t *testing.T) {
 	applyEnabled = false
 	assert.Equal(t, false, statusJSON(t, nil)["apply_enabled"])
 }
+
+// What the last check found (#9726) is in the status as its closed words and a version, and a damaged record shows nothing raw.
+func TestStatusSaysWhatTheLastCheckFound(t *testing.T) {
+	dir := withVersion(t, "1.4.130")
+	writeState(t, dir, verify.State{LastCheck: "2026-10-20T11:00:00Z", LastResult: &verify.CheckResult{Result: "not_promoted", Newest: "1.4.140", Stage: "manifest", At: "2026-10-20T11:00:00Z"}})
+	m := statusJSON(t, nil)
+	assert.Equal(t, map[string]any{"result": "not_promoted", "newest": "1.4.140", "stage": "manifest", "at": "2026-10-20T11:00:00Z"}, m["last_result"])
+	_, out := statusRun(t, nil, "status")
+	assert.Contains(t, out, "Last result: not_promoted (newest release seen 1.4.140), at manifest")
+
+	// a record the file made by hand: nothing raw reaches the status
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "updates", verify.StateFile), []byte(`{"version":"","sequence":0,"revoked":[],"last_result":{"result":"<script>","newest":"9.9.9; rm -rf /","stage":"A B","at":"soon"}}`), 0o600))
+	m = statusJSON(t, nil)
+	assert.Equal(t, map[string]any{"result": "unknown"}, m["last_result"])
+	_, out = statusRun(t, nil, "status")
+	assert.NotContains(t, out, "script")
+	assert.NotContains(t, out, "rm -rf")
+}

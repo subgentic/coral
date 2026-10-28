@@ -13,6 +13,7 @@ type Out struct {
 	Revoked      int       `json:"revoked"`
 	Staged       *Stage    `json:"staged,omitempty"`
 	LastCheck    string    `json:"last_check,omitempty"`
+	LastResult   *Result   `json:"last_result,omitempty"` // what the last check found (#9726)
 	LastFailure  *Fail     `json:"last_failure,omitempty"`
 	Backoff      *Back     `json:"backoff,omitempty"`
 	LastApply    *Apply    `json:"last_apply,omitempty"`
@@ -35,6 +36,15 @@ type Stage struct {
 	Source string `json:"source,omitempty"`
 }
 
+// Result is what the last check found: a result word (up_to_date, staged, already_staged, not_promoted, failed, rate_limited or unknown), the newest release it saw (X.Y.Z or empty), the stage of a failure
+// (a word) and when.
+type Result struct {
+	Result string `json:"result"`
+	Newest string `json:"newest,omitempty"`
+	Stage  string `json:"stage,omitempty"`
+	At     string `json:"at,omitempty"`
+}
+
 // Fail is the last refusal.
 type Fail struct {
 	Version string `json:"version,omitempty"`
@@ -49,7 +59,7 @@ type Back struct {
 	Until    string `json:"until"`
 	Waiting  bool   `json:"waiting"` // until is still in the future
 	Attempts int    `json:"attempts,omitempty"`
-	Kind     string `json:"kind,omitempty"` // network or verify
+	Kind     string `json:"kind,omitempty"` // network, verify or rate_limit
 }
 
 // Apply is one install attempt.

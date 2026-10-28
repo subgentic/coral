@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"time"
 
@@ -143,7 +144,35 @@ func LoadState(dir string) (State, error) {
 			return State{}, fmt.Errorf("%w: invalid revoked version", ErrCorrupt)
 		}
 	}
+	st.LastResult = st.LastResult.Clean() // a record that is not in shape is no record: it never makes the state corrupt
 	return st, nil
+}
+
+var checkWordRe = regexp.MustCompile(`^[a-z][a-z_]{0,31}$`)
+
+// CheckResults are the results a record may hold (the stage package's result words, and rate_limited); anything else reads as "unknown".
+var CheckResults = map[string]bool{"up_to_date": true, "staged": true, "already_staged": true, "not_promoted": true, "failed": true, "rate_limited": true}
+
+// Clean is the record as far as it has the shape the writer gives it, and nothing the file says is trusted beyond that: a result outside CheckResults reads as "unknown", a stage that is not a lower-case word, a
+// newest that is not an X.Y.Z version and an at that is not an RFC 3339 time are dropped (the field, not the record). nil for no record.
+func (c *CheckResult) Clean() *CheckResult {
+	if c == nil || c.Result == "" {
+		return nil
+	}
+	out := CheckResult{Result: c.Result}
+	if !CheckResults[c.Result] {
+		out.Result = "unknown"
+	}
+	if checkWordRe.MatchString(c.Stage) {
+		out.Stage = c.Stage
+	}
+	if _, err := ParseVersion(c.Newest); err == nil {
+		out.Newest = c.Newest
+	}
+	if _, err := time.Parse(time.RFC3339, c.At); err == nil {
+		out.At = c.At
+	}
+	return &out
 }
 
 // ParseVersionOrEmpty accepts "" (nothing accepted yet) as well as a version.

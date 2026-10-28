@@ -85,6 +85,7 @@ func (c *checker) findPromotion(ctx context.Context, onlyTag string) (p *promoti
 	if err != nil {
 		return nil, 0, err
 	}
+	c.noteNewest(list)
 	looked := 0
 	var rehearsal *promotion
 	var first *noneVerified
@@ -206,6 +207,7 @@ func (c *checker) releaseList(ctx context.Context, onlyTag string) ([]listedRele
 		case err != nil:
 			log.Printf("[update] the releases feed could not be used (%v): asking the API's list", err)
 		default:
+			c.noteNewest(list)
 			if onlyTag == "" && feedNothingNewer(list, c.cfg.Installed) {
 				return nil, errFeedNothingNewer // most checks end here: no API request at all
 			}
@@ -229,4 +231,17 @@ func (c *checker) releaseList(ctx context.Context, onlyTag string) ([]listedRele
 		list = list[:100] // a page is 30: anything more is not read
 	}
 	return list, nil
+}
+
+// noteNewest remembers the highest product release (X.Y.Z, a vX.Y.Z tag that is not a prerelease) among the listed ones: the check records it (recordOutcome).
+func (c *checker) noteNewest(list []listedRelease) {
+	for _, r := range list {
+		if r.Draft || !productTagRe.MatchString(r.TagName) {
+			continue
+		}
+		v := strings.TrimPrefix(r.TagName, "v")
+		if cmp, err := verify.CompareVersions(v, c.newest); c.newest == "" || (err == nil && cmp > 0) {
+			c.newest = v
+		}
+	}
 }
