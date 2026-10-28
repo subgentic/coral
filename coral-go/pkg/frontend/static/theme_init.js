@@ -9,9 +9,14 @@
     if (t === 'system') t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', t);
     // The browser's own bar follows the page's light or dark (#10095): the colour is the theme's page colour, set again whenever the theme changes.
+    function barColour() { return document.documentElement.getAttribute('data-theme') === 'light' ? '#f4f5f7' : '#0a0e14'; }
+    // This script runs before the page's own theme-color meta is parsed, so the right one goes in first (the browser reads the first): a light theme's first paint does not flash the dark bar.
+    var first = document.createElement('meta');
+    first.setAttribute('name', 'theme-color'); first.setAttribute('content', barColour());
+    if (document.head) document.head.insertBefore(first, document.head.firstChild);
     function paintBar() {
-        var m = document.querySelector('meta[name="theme-color"]');
-        if (m) m.setAttribute('content', document.documentElement.getAttribute('data-theme') === 'light' ? '#f4f5f7' : '#0a0e14');
+        var m = document.querySelector('meta[name="theme-color"]'); // the first one: the one above
+        if (m) m.setAttribute('content', barColour());
     }
     document.addEventListener('DOMContentLoaded', paintBar);
     new MutationObserver(paintBar).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
