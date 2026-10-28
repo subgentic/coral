@@ -21,6 +21,9 @@ function _setTeamWizardError(message = '') {
     errorEl.style.display = 'none';
 }
 
+/** "1 member" / "3 members": a team's agents are its members everywhere else in the New team flow (#10314). */
+const _membersWords = n => `${n} member${n === 1 ? '' : 's'}`;
+
 /** What went wrong in words that end with what to do next (#10314): a draft with no members says what to ask for; any other failure says to try again or use a template. */
 function _plainGenerateError(message) {
     const m = String(message || '');
@@ -246,7 +249,7 @@ function _handleGenerateResult(payload) {
                     <div class="team-wizard-success">
                         <span class="material-icons team-wizard-success-icon" aria-hidden="true">check_circle</span>
                         <strong>Team generated!</strong>
-                        <p>${team.agents.length} agents created for "${escapeHtml(team.name)}"</p>
+                        <p>${_membersWords(team.agents.length)} drafted for "${escapeHtml(team.name)}"</p>
                         <button class="btn btn-primary" data-on-click="team-generated-review">Review Team</button>
                     </div>
                 `;
@@ -315,7 +318,7 @@ async function testTeamWizard() {
             <div class="team-wizard-success">
                 <span class="material-icons team-wizard-success-icon" aria-hidden="true">check_circle</span>
                 <strong>Team generated!</strong>
-                <p>${sampleTeam.agents.length} agents created for "${escapeHtml(sampleTeam.name)}"</p>
+                <p>${_membersWords(sampleTeam.agents.length)} drafted for "${escapeHtml(sampleTeam.name)}"</p>
                 <button class="btn btn-primary" data-on-click="team-generated-review">Review Team</button>
             </div>
         `;

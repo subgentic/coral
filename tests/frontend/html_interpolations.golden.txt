@@ -461,6 +461,8 @@
 1	team_cross_team_fields.js	buttonFor(st)
 1	team_cross_team_fields.js	links.map(l => `<li><span><b>${escapeHtml(l.team)}</b></span><span class="xt-sub">${[l.machine && escapeHtml(l
 1	team_cross_team_fields.js	turnOn
+1	team_wizard.js	_membersWords(sampleTeam.agents.length)
+1	team_wizard.js	_membersWords(team.agents.length)
 1	team_working_mode.js	applicability
 1	team_working_mode.js	body
 1	team_working_mode.js	cards
