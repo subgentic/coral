@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -52,10 +53,94 @@ type inputBox struct {
 	question   bool          // the open prompt is a question (AskUserQuestion), not a permission menu (#10168)
 	noSubmit   bool          // MOCK_STUCK_ENTER: an Enter does not submit, so typed text stays in the box (#10168)
 	busyFor    time.Duration // MOCK_BUSY <seconds>: the turn the line began ends (its Stop) only after this long (#10602); set by applyControl, taken by the submit that read it
+	busy       busyTurn      // the turn MOCK_BUSY keeps open: lines typed during it are held, Escape ends it (#10672)
 	deaf       bool          // MOCK_GO_DEAF: the box takes no more input and draws nothing (a CLI that has stopped reading), so a send is typed and never shows
 	// notify, when set, hears the menu open ("permission_request") and close ("permission_answered", "permission_dismissed"): the run loop turns them into the hook events Claude Code runs for a tool's
 	// permission prompt, so Coral sees an agent waiting for a person (#8245), not only a menu on its screen.
 	notify func(kind string)
+}
+
+// busyTurn is a turn MOCK_BUSY keeps open, the way Claude Code is while it works (#10672): a line typed meanwhile is queued and goes in when the turn ends (it does not end it), and an Escape, the dashboard's Stop,
+// ends the turn at once with the CLI's interrupt line and puts the queued lines back in the box.
+type busyTurn struct {
+	mu       sync.Mutex
+	active   bool
+	gen      int // which turn: a timer from an interrupted turn must not end the next one
+	timer    *time.Timer
+	queue    []string
+	endTurn  func()       // the turn is over: the Stop hook
+	resubmit func(string) // a held line is sent
+}
+
+// beginBusy opens a turn that ends after d (endTurn, then each held line through resubmit) unless an Escape ends it first.
+func (b *inputBox) beginBusy(d time.Duration, endTurn func(), resubmit func(string)) {
+	t := &b.busy
+	t.mu.Lock()
+	t.active, t.queue, t.endTurn, t.resubmit = true, nil, endTurn, resubmit
+	t.gen++
+	gen := t.gen
+	t.timer = time.AfterFunc(d, func() {
+		t.mu.Lock()
+		if !t.active || t.gen != gen {
+			t.mu.Unlock()
+			return
+		}
+		t.active = false
+		queue := t.queue
+		t.queue = nil
+		t.mu.Unlock()
+		endTurn()
+		for _, line := range queue {
+			resubmit(line) // each goes through the box's own submit again, so a held MOCK_BUSY line holds the lines after it
+		}
+	})
+	t.mu.Unlock()
+}
+
+func (b *inputBox) isBusy() bool {
+	b.busy.mu.Lock()
+	defer b.busy.mu.Unlock()
+	return b.busy.active
+}
+
+// holdIfBusy queues line when a turn is open and says so on the screen.
+func (b *inputBox) holdIfBusy(line string) bool {
+	t := &b.busy
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.active {
+		return false
+	}
+	t.queue = append(t.queue, line)
+	fmt.Printf("[mock-agent] queued (sends when the turn ends): %q\r\n", line)
+	return true
+}
+
+// interrupt ends an open turn at once, as Escape does in Claude Code: the interrupt line, the queued lines back in the box, and the turn's end (its Stop) now.
+func (b *inputBox) interrupt() bool {
+	t := &b.busy
+	t.mu.Lock()
+	if !t.active {
+		t.mu.Unlock()
+		return false
+	}
+	t.active = false
+	if t.timer != nil {
+		t.timer.Stop()
+	}
+	queue, endTurn := t.queue, t.endTurn
+	t.queue = nil
+	t.mu.Unlock()
+	fmt.Print("\r\n[Request interrupted by user]\r\n")
+	if len(queue) > 0 {
+		if b.text.Len() > 0 {
+			queue = append(queue, b.text.String())
+		}
+		b.text.Reset()
+		b.text.WriteString(strings.Join(queue, "\n"))
+	}
+	endTurn()
+	return true
 }
 
 func (b *inputBox) tell(kind string) {
@@ -117,7 +202,8 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 			b.inPaste = false
 			i += len(pasteEnd)
 			continue
-		case rest[0] == 0x1b && len(rest) < len(pasteStart) && (bytes.HasPrefix(pasteStart, rest) || bytes.HasPrefix(pasteEnd, rest)):
+		case rest[0] == 0x1b && len(rest) >= 2 && len(rest) < len(pasteStart) && // a lone Esc at the end of a read is the Escape key (Stop), not half a marker (#10672)
+			(bytes.HasPrefix(pasteStart, rest) || bytes.HasPrefix(pasteEnd, rest)):
 			b.pending = append([]byte(nil), rest...) // a marker cut by the read: finish it next time
 			return
 		}
@@ -153,6 +239,9 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 			b.text.Reset()
 			b.pasted = false
 			fmt.Printf("\r\x1b[K[mock-agent] raw: %q\r\n", s)
+			if b.holdIfBusy(s) { // the agent is working: the line waits for the turn's end (#10672)
+				continue
+			}
 			submit(s)
 		case c == '\r' && b.inPaste:
 			b.text.WriteByte('\n')
@@ -175,6 +264,8 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 					}
 				}
 				i = min(j+1, len(data))
+			} else {
+				b.interrupt() // a lone Escape: Stop (#10672)
 			}
 		default:
 			b.text.WriteByte(c)
@@ -200,7 +291,8 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		}
 	}()
 	var box *inputBox // made below, before the first byte is read
-	submit := func(s string) {
+	var submit func(string)
+	submit = func(s string) {
 		// Test controls: a submitted line that is exactly one of these switches the program's cursor-key
 		// mode (DECCKM), as a TUI does, so a test can check arrows are encoded for it (audit F13).
 		switch s {
@@ -218,12 +310,13 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		if !control {
 			turn(s)
 		}
-		if busy := box.busyFor; busy > 0 { // MOCK_BUSY: the agent keeps working, its Stop comes later
+		if busy := box.busyFor; busy > 0 { // MOCK_BUSY: the agent keeps working, its Stop comes later (or at an Escape); lines typed meanwhile wait
 			box.busyFor = 0
-			go func() {
-				time.Sleep(busy)
-				events <- func() { hooks.fire("Stop", map[string]any{"stop_hook_active": false}) }
-			}()
+			box.beginBusy(busy, func() { events <- func() { hooks.fire("Stop", map[string]any{"stop_hook_active": false}) } }, func(line string) {
+				if !box.holdIfBusy(line) { // a held MOCK_BUSY line opens a turn that holds the lines after it
+					submit(line)
+				}
+			})
 		}
 		if !waiting { // a menu that is open is the agent waiting: no Stop until it is answered
 			events <- func() { hooks.fire("Stop", map[string]any{"stop_hook_active": false}) }
