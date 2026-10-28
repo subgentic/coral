@@ -70,7 +70,7 @@ var routeQueries = map[string]string{
 	"GET /api/token-usage":                        "board_name,session_id,since",
 	"GET /api/token-usage/by-branch":              "branch,since",
 	"GET /api/token-usage/by-team":                "since",
-	"GET /api/token-usage/summary":                "since",
+	"GET /api/token-usage/summary":                "by_agent_limit,include=totals,since",
 	"GET /api/token-usage/timeseries":             "board,group_by,interval,since,until",
 	"GET /api/token-usage/turns":                  "agent,limit,order,session_id,since,until",
 	"GET /api/workflows/runs/recent":              "limit,offset,status",

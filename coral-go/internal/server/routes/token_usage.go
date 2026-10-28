@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -95,10 +96,27 @@ func formatOptionalTime(t time.Time) string {
 	return t.UTC().Format(time.RFC3339Nano)
 }
 
+// maxUsageByAgentLimit bounds by_agent_limit: more sessions than a machine has ever had (#9820).
+const maxUsageByAgentLimit = 100000
+
 // UsageSummary returns high-level aggregated usage.
 // GET /api/token-usage/summary
+//
+// by_agent is one row per session (about 0.9 MiB for 3,000 sessions, #9820). include=totals leaves it out (and its query is not run); by_agent_limit=N keeps the N sessions with the most tokens
+// and adds by_agent_total, how many there were. Neither given, the answer is what it always was (the sessions by cost); the totals are always of every session.
 func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request) {
-	since := r.URL.Query().Get("since")
+	q := r.URL.Query()
+	since := q.Get("since")
+	if inc := q.Get("include"); inc != "" && inc != "totals" {
+		errBadRequest(w, "include is totals, or leave it out")
+		return
+	}
+	totalsOnly := q.Get("include") == "totals"
+	agentLimit, ok := parseBoundedInt(q.Get("by_agent_limit"), 0, 1, maxUsageByAgentLimit)
+	if !ok {
+		errBadRequest(w, fmt.Sprintf("by_agent_limit must be an integer between 1 and %d", maxUsageByAgentLimit))
+		return
+	}
 
 	summaries, err := h.ts.GetUsageSummary(r.Context(), since)
 	if err != nil {
@@ -106,10 +124,19 @@ func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	byAgent, err := h.ts.GetUsageSummaryByAgent(r.Context(), since)
-	if err != nil {
-		errInternalServer(w, err.Error())
-		return
+	var byAgent []store.AgentUsageSummary
+	if !totalsOnly {
+		if byAgent, err = h.ts.GetUsageSummaryByAgent(r.Context(), since); err != nil {
+			errInternalServer(w, err.Error())
+			return
+		}
+	}
+	byAgentTotal := len(byAgent)
+	if agentLimit > 0 && len(byAgent) > 0 {
+		sort.SliceStable(byAgent, func(i, j int) bool { return byAgent[i].TotalTokens > byAgent[j].TotalTokens }) // the most tokens first; ties keep the cost order
+		if len(byAgent) > agentLimit {
+			byAgent = byAgent[:agentLimit]
+		}
 	}
 
 	byModel, err := h.ts.GetUsageSummaryByModel(r.Context(), since)
@@ -143,7 +170,6 @@ func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request)
 
 	out := map[string]any{
 		"by_agent_type": summaries,
-		"by_agent":      byAgent,
 		"by_model":      byModel,
 		"by_thinking":   byThinking,
 		"totals": map[string]any{
@@ -158,8 +184,11 @@ func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request)
 		},
 	}
 	// by_agent is one row per session of every board (id, name, board, working directory): an agent's token gets the totals, not that list (#5041).
-	if _, isAgent := VerifiedSession(r.Context()); isAgent {
-		delete(out, "by_agent")
+	if _, isAgent := VerifiedSession(r.Context()); !isAgent && !totalsOnly {
+		out["by_agent"] = byAgent
+		if agentLimit > 0 {
+			out["by_agent_total"] = byAgentTotal
+		}
 	}
 	writeJSON(w, http.StatusOK, out)
 }
