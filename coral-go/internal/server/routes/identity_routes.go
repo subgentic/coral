@@ -179,6 +179,8 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/sessions/live/{name}/display-name": "rename an agent",
 	"PUT /api/sessions/live/{name}/icon":         "change an agent's icon",
 	"PUT /api/sessions/live/{name}/name-color":   "change an agent's name colour",
+	// #10133: what an agent is told when it starts again is the Operator's to write: an agent could otherwise change another agent's standing instructions. Never through Coral Hub (not in the tunnel table).
+	"PUT /api/sessions/live/{name}/instructions": "change what an agent is told when it restarts",
 	// #3513 (Security's #3509 finding 3): the API key is the Operator's credential (with it an
 	// agent drops its token and is the Operator, settings included), and deleting a board
 	// deletes the team's whole history.

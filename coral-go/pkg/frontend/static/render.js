@@ -402,6 +402,7 @@ registerActions({
     'agent-kill': withAgent('killSessionDirect'),
     'agent-restart': withAgent('restartDirect'),
     'agent-rename': withAgent('renameAgent'),
+    'agent-instructions': withAgent('editInstructions'),
     'agent-icon': withAgent('setAgentIcon'),
     'agent-attach': withAgent('attachDirect'),
     'agent-sleep': withAgent('toggleAgentSleep', ['sleep', 'wake']),

@@ -37,6 +37,38 @@ func (h *SessionsHandler) SetDisplayName(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "display_name": body.DisplayName})
 }
 
+// maxInstructionsBytes caps a member's saved instructions (a prompt is text a person writes; the Behavior prompt box has no larger use).
+const maxInstructionsBytes = 20000
+
+// SetInstructions saves the instructions an agent is given the next time it starts: its Behavior prompt, which a restart reads. The running agent is not touched (#10133). Empty clears them.
+// PUT /api/sessions/live/{name}/instructions  {"session_id": "...", "instructions": "..."}
+func (h *SessionsHandler) SetInstructions(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		SessionID    string `json:"session_id"`
+		Instructions string `json:"instructions"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		errBadRequest(w, "invalid JSON")
+		return
+	}
+	if body.SessionID == "" {
+		errBadRequest(w, "session_id is required")
+		return
+	}
+	if refuseTextTooLarge(w, "instructions_too_large", "the instructions", len(body.Instructions), maxInstructionsBytes) {
+		return
+	}
+	var prompt *string
+	if trimmed := strings.TrimSpace(body.Instructions); trimmed != "" {
+		prompt = &trimmed
+	}
+	if err := h.ss.SetPrompt(r.Context(), body.SessionID, prompt); err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "applies": "at the next restart"})
+}
+
 // SetIcon sets or clears the emoji icon for a live session.
 // PUT /api/sessions/live/{name}/icon
 func (h *SessionsHandler) SetIcon(w http.ResponseWriter, r *http.Request) {

@@ -607,6 +607,30 @@ export function renameAgent(name, agentType, sessionId) {
     }, { color: { value: currentColor, auto: autoColor } });
 }
 
+/** Edit instructions (#10133): the agent's Behavior prompt, saved for its next restart (PUT .../instructions); the running agent is not touched. */
+export async function editInstructions(name, agentType, sessionId, opener) {
+    const server = serverForSession(name, sessionId);
+    const current = state.liveSessions.find(s => s.session_id === sessionId && sessionServer(s) === server);
+    const label = (current && current.display_name) || name;
+    const { openInstructionsDialog } = await importOnce('./agent_instructions_dialog.js');
+    openInstructionsDialog(label, {
+        current: (current && current.prompt) || '',
+        opener,
+        onSave: async text => {
+            const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(name)}/instructions`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, instructions: text }),
+            });
+            const result = await resp.json().catch(() => ({}));
+            if (!resp.ok || result.error) return { ok: false, error: result.error || result.message || `Could not save the instructions (${resp.status}).` };
+            if (current) current.prompt = text;
+            showToast(text ? `Saved. ${label} uses these instructions the next time it restarts.` : `Cleared. ${label} starts without its own instructions the next time it restarts.`);
+            return { ok: true };
+        },
+    });
+}
+
 export async function setAgentIcon(name, agentType, sessionId) {
     const server = serverForSession(name, sessionId);
     showEmojiPicker(async (emoji) => {
