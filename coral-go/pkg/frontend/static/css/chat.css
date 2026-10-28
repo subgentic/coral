@@ -1340,9 +1340,35 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     background: var(--bg-tertiary);
     color: var(--text-secondary);
     cursor: pointer;
-    opacity: 0;
+    opacity: 0.75; /* drawn at rest: a keyboard or touch screen never hovers (#10533) */
     transition: opacity 0.12s;
 }
+.code-block .code-wrap-btn {
+    position: absolute;
+    top: 6px;
+    right: 40px;
+    height: 26px;
+    padding: 0 8px;
+    border: 1px solid var(--control-border);
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font: var(--fw-regular) var(--fs-sm)/1 var(--font-sans);
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.12s;
+}
+.code-block:hover .code-wrap-btn, .code-block .code-wrap-btn:focus-visible, .code-block .code-wrap-btn[aria-pressed="true"] { opacity: 1; }
+.code-block .code-wrap-btn[aria-pressed="true"] { color: var(--text-primary); background: var(--bg-hover); }
+.code-block .code-scroll-hint {
+    position: absolute;
+    top: 9px;
+    right: 96px;
+    font-size: var(--fs-sm);
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+.code-block.code-wrapped > pre, .code-block.code-wrapped > pre code { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
 .code-block .code-copy-btn .material-icons {
     font-size: var(--icon-inline-size);
 }
