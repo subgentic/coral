@@ -356,7 +356,7 @@ function _renderSleepingSummary(sleepingAgents, groupName, isCompact, teamDefaul
     return html;
 }
 
-// A folder with many agents shows its first FOLDER_SHOWN and a "Show 19 more" row (#10319, Mobile pass 23): the long list does not push the others out of a phone's screen. The open agent stays in view; Show fewer folds it again.
+// A folder with many agents shows its first FOLDER_SHOWN and a "Show 19 more" row (#10319, Mobile pass 23), at every width (a phone's list is the one that needed it, and one rule is easier to know): the long list does not push the others out of the screen. The open agent stays in view (and is not counted among the hidden); Show fewer folds it again.
 const FOLDER_SHOWN = 5;
 const isMoreOpen = groupName => { try { return browserLocal.get(`coral-more-expanded:${groupName}`) === 'true'; } catch { return false; } };
 
@@ -375,7 +375,7 @@ export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact,
     const shown = folds && !open ? awake.filter((s, i) => i < FOLDER_SHOWN || s.session_id === openId) : awake;
     let html = shown.map(s => _renderSessionItem(s, groupName, isCompact, false, teamDefaultDir)).join('');
     if (folds) {
-        const more = awake.length - FOLDER_SHOWN, label = open ? 'Show fewer' : `Show ${more} more`; const moreName = `${label} in ${keyLabel(groupName)}`;
+        const more = awake.length - shown.length, label = open ? 'Show fewer' : `Show ${more} more`; const moreName = `${label} in ${keyLabel(groupName)}`;
         html += `<li class="sleeping-summary-row folder-more-row" data-on-click="group-more-expand" data-group="${escapeAttr(groupName)}"><button type="button" class="row-btn" aria-expanded="${escapeAttr(String(open))}" aria-label="${escapeAttr(moreName)}"><span class="sleeping-summary-label">${label}</span></button></li>`;
     }
 
