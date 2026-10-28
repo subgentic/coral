@@ -33,7 +33,7 @@ these official pages (and show the one-line command where the vendor has one).
 
 The Antigravity installer puts `agy` in `~/.local/bin`. Coral looks there itself, so it finds `agy`
 even when that folder is not on your `PATH`. To run `agy` in your own terminal, add
-`export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` or `~/.bashrc` and open a new terminal. A custom executable can be set per agent type with the `cli_path_<type>`
+`export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` or `~/.bashrc` and open a new terminal. A custom executable can be set per agent type in **Settings > Agents > CLI paths** (a closed section; empty uses your `PATH`), which is the `cli_path_<type>`
 setting. The launch API rejects an unsupported `agent_type` (`ValidateAgentType` in
 `internal/agent/agent.go`); adding a new agent requires a source change and a rebuild.
 
@@ -245,11 +245,11 @@ URL alone does not trigger the offer. `--cloud-connect off` suppresses it;
 
 ## 4. Launch your first agent
 
-On Home choose **New agent** (elsewhere, **+ New agent**). Enter an existing
+Home asks **What do you want to work on?** with **New agent**, **New team** and **Open folder** (elsewhere, **+ New agent**). Choose **New agent**, enter an existing
 project folder on the computer running Coral and choose **Next**. Step 2 is the
 persona (optional); step 3 has the **Agent** tab, where you choose your installed
 CLI, then choose **Launch** (it is available from every step once a folder is set). In **Chat**, type a task and press Enter
-to send it; check **Terminal** first for any sign-in or trust prompt. The equivalent API call (with [strict local auth](auth.md#strict-local-auth-the-default), the default, add
+to send it; check **Terminal** first for any sign-in or trust prompt. An agent that is waiting for you (a prompt, a question) is listed under **Inbox > Needs you**. The equivalent API call (with [strict local auth](auth.md#strict-local-auth-the-default), the default, add
 `-H "Authorization: Bearer $(coral api-key)"` to every `curl` in this guide; the key is for a script you run yourself, never an agent):
 
 ```console
@@ -266,6 +266,10 @@ $ curl -H "Authorization: Bearer $(coral api-key)" -s -X POST http://127.0.0.1:8
 > names the launch path ("through the terminal backend") and reads `pty` even for tmux
 > sessions, so use `terminal` (or `tmux_session` in `/api/sessions/live`). Other fields
 > are omitted above.
+
+### Or start a team
+
+Choose **New team** on Home. The dialog opens on the **Default team (3 members)**: an Orchestrator, a Lead Developer and a QA Engineer, already in **Members** and each removable; **Blank team** in the same list starts with none. Name the team, choose the folder it works in, and launch it. The agents share a message board and split the work; see [Teams](teams.md).
 
 ### If your first agent is waiting for input
 
