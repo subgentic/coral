@@ -105,6 +105,7 @@ func Save(dir, name, contentB64 string) (string, error) {
 			}
 			return "", cerr
 		}
+		markDownloaded(path) // the download mark a browser leaves: Gatekeeper and SmartScreen ask before a downloaded app or script runs
 		return path, nil
 	}
 	return "", errors.New("could not find a free file name in Downloads")
