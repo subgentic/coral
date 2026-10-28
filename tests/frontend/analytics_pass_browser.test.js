@@ -12,7 +12,7 @@ const BASE = require('./test_base').BASE;
         window.fetch = (u, o) => { const url = String(u && u.url || u);
             if (url.includes('/api/token-usage/summary')) { window.__summaryAsks.push(url); const since = new Date(new URL(url, location.origin).searchParams.get('since')), n = new Date(), isDay = since.getTime() === new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime(), isMonth = since.getTime() === new Date(n.getFullYear(), n.getMonth(), 1).getTime();
                 return json({ totals: isDay ? { ...${JSON.stringify(totals)}, cost_usd: 1.5 } : isMonth ? { ...${JSON.stringify(totals)}, cost_usd: 7 } : ${JSON.stringify(totals)}, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [] }); }
-            if (url.includes('/api/call-metrics/summary')) return json({ rows: [] });
+            if (url.includes('/api/call-metrics/summary')) return json({ rows: [], hours: 336 }); // the server keeps calls 14 days
             if (url.includes('/api/token-usage/by-team')) return json({ teams: [] });
             if (url.includes('/api/token-usage/by-branch')) return json({ branches: [] });
             if (url.includes('/api/token-usage/')) return json({});
@@ -45,6 +45,17 @@ const BASE = require('./test_base').BASE;
         await ev(`(() => { const sel = document.getElementById('cost-time-range'); sel.value = 'month'; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await waitFor(`!/try a longer range/.test(document.getElementById('cost-dashboard-view').textContent)`, 'the longest range without the hint', 10000);
         assert.match(await empty(), /It appears once an agent has used tokens\./, 'but still says what makes data appear');
+        // 4. Tool and API calls (Coral's own routes) is under Advanced, and its 14-day keep is said in the range's words
+        const names = () => ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].map(b => b.textContent.trim())`);
+        assert.deepEqual(await names(), ['Overview', 'Tokens per commit', 'Task time', 'Advanced'], 'the list has three views and Advanced');
+        assert.equal(await ev(`document.querySelector('#cost-nav-list [data-on-click="analytics-advanced"]').getAttribute('aria-expanded')`), 'false');
+        await ev(`(() => { const b = document.querySelector('#cost-nav-list [data-on-click="analytics-advanced"]'); b.focus(); b.click(); return true; })()`);
+        await waitFor(`[...document.querySelectorAll('#cost-nav-list .row-btn')].some(b => b.textContent.trim() === 'Tool and API calls')`, 'the advanced view', 8000);
+        assert.deepEqual(await names(), ['Overview', 'Tokens per commit', 'Task time', 'Advanced', 'Tool and API calls']);
+        assert.equal(await ev(`document.activeElement && document.activeElement.textContent.trim()`), 'Advanced', 'the keyboard stays on Advanced');
+        await ev(`document.querySelector('#cost-nav-list [data-view="calls"]').click(); true`);
+        await waitFor(`/last 14 days/.test(document.getElementById('call-metrics-summary').textContent)`, 'the calls say what they keep', 10000);
+        assert.match(await ev(`document.getElementById('call-metrics-summary').textContent`), /Calls are kept for 14 days, so this shows the last 14 days, not the last 30 days\./);
         console.log('PASS analytics_pass');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

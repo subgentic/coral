@@ -34,6 +34,7 @@ const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking 
             await ev(`[...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(b => b.textContent === ${JSON.stringify(g)}).click(); true`);
             await waitFor(`document.getElementById('cost-view-title').textContent === 'Overview' && document.querySelector('#cost-group-bar .eff-seg-btn[aria-pressed="true"]').textContent === ${JSON.stringify(g)}`, 'Overview grouped by ' + g, 6000);
         } else {
+            if (label === 'Tool and API calls') await ev(`(() => { const rows = [...document.querySelectorAll('.sidebar-pane[data-pane="tokens"] li .row-btn')]; if (!rows.some(b => b.textContent.trim() === label)) rows.find(b => b.textContent.trim() === 'Advanced').click(); return true; })()`.replace('label', JSON.stringify(label))); // under Advanced (#10521)
             await ev(`[...document.querySelectorAll('.sidebar-pane[data-pane="tokens"] li .row-btn')].find(b => b.textContent.trim() === ${JSON.stringify(label)}).click(); true`);
             await waitFor(`document.getElementById('cost-view-title').textContent === ${JSON.stringify(label)}`, 'the ' + label + ' page', 6000);
         }

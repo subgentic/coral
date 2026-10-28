@@ -57,7 +57,7 @@ const CALLS = [{ operation: '/api/board/{project}/messages', call_type: 'api', a
         assert.equal(await asked(), 168, 'Last 7 days asks for 168 hours');
         await range('hour'); await waitFor(`+new URL(window.__calls[window.__calls.length - 1], location.origin).searchParams.get('hours') === 1`, 'the hour ask');
         await range('month'); await waitFor(`+new URL(window.__calls[window.__calls.length - 1], location.origin).searchParams.get('hours') === 720 && /kept for 14 days/.test(document.getElementById('call-metrics-summary').textContent)`, 'the 30 days ask and the note');
-        assert.match(await ev(`document.getElementById('call-metrics-summary').textContent`), /Calls are kept for 14 days, so this shows the last 14 days\./, 'a range longer than the server keeps says what is shown');
+        assert.match(await ev(`document.getElementById('call-metrics-summary').textContent`), /Calls are kept for 14 days, so this shows the last 14 days, not the last 30 days\./, 'a range longer than the server keeps says what is shown');
         await ev(`window.__rows = []; true`); await range('week');
         await waitFor(`/No tool calls in the last 7 days yet/.test(document.getElementById('call-metrics-summary').textContent)`, 'the empty state names the range');
         await ev(`delete window.__rows; true`); await range('day');

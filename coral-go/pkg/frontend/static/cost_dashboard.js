@@ -252,8 +252,9 @@ async function _refreshCallMetrics(period, hours) {
         // Metrics past the raw-row cap are not stored (#5359): say so, so a gap after a burst is not read as quiet (#5368).
         const dropped = data.cap_dropped > 0 ? `<p class="empty-state">${Number(data.cap_dropped)} calls were not recorded since Coral started: the call metrics table was full.</p>` : '';
         // The server keeps calls for a limited time (#3261) and answers with the window it used: a longer range says so.
-        const kept = data.hours > 0 && data.hours < hours ? `<p class="empty-state">Calls are kept for ${Math.round(data.hours / 24)} days, so this shows the last ${Math.round(data.hours / 24)} days.</p>` : '';
-        if (!rows.length) { emptyState(el, `No tool calls in the ${label} yet. They appear once an agent has used a tool.`, 'empty-state'); if (kept + dropped) el.insertAdjacentHTML('beforeend', kept + dropped); return; }
+        const keptDays = data.hours > 0 && data.hours < hours ? Math.round(data.hours / 24) : 0;
+        const kept = keptDays ? `<p class="empty-state">Calls are kept for ${Number(keptDays)} days, so this shows the last ${Number(keptDays)} days, not the ${escapeHtml(label)}.</p>` : '';
+        if (!rows.length) { emptyState(el, `No tool calls in the ${keptDays ? `last ${keptDays} days` : label} yet. They appear once an agent has used a tool.`, 'empty-state'); if (kept + dropped) el.insertAdjacentHTML('beforeend', kept + dropped); return; }
         el.innerHTML = kept + dropped;
         const st = _tables.calls || (_tables.calls = tableState());
         if (!st.sort) st.sort = { key: 'calls', dir: 'desc' };

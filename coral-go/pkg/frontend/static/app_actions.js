@@ -215,6 +215,7 @@ registerActions({
 
 registerActions({
     'analytics-search-filter': el => { const v = el.value; importOnce('./analytics_views.js').then(m => m.filterViews(v)).catch(() => {}); }, // the Analytics sidebar's search box is in the page from the start; the views module loads with the tab
+    'analytics-advanced': () => { importOnce('./analytics_views.js').then(m => m.toggleAdvanced()).catch(() => {}); },
     'analytics-view': el => { const key = el.dataset.view; importOnce('./analytics_views.js').then(m => m.selectView(key, { focus: true })).catch(() => {}); },
     'analytics-phone-back': () => { importOnce('./analytics_views.js').then(m => m.phoneBack()).catch(() => {}); },
     'automations-search-filter': el => { const v = el.value; importOnce('./automations.js').then(m => m.filterAutomations(v)).catch(() => {}); }, // the Automations sidebar's search box is in the page from the start; automations.js loads with the tab

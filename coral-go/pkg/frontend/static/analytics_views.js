@@ -13,7 +13,7 @@ export const VIEWS = [
     { key: 'overview', label: 'Overview', question: 'What am I spending?' }, // each page is subtitled by the question it answers (#10482)
     { key: 'per-commit', label: 'Tokens per commit', question: 'What did each commit cost?' },
     { key: 'task-time', label: 'Task time', question: 'How long do tasks take?' },
-    { key: 'calls', label: 'Tool and API calls', question: 'Which calls does the work make?' },
+    { key: 'calls', label: 'Tool and API calls', question: 'Which calls does the work make?', advanced: true }, // Coral's own routes and tools, not what a person asks of spend: under Advanced (#10521)
     { key: 'provider', label: 'By provider', under: 'overview', hidden: true },
     { key: 'model', label: 'By model', under: 'overview', hidden: true },
     { key: 'thinking', label: 'By thinking level', under: 'overview', hidden: true },
@@ -27,14 +27,18 @@ export const GROUPS = [['all', 'All'], ['provider', 'Provider'], ['model', 'Mode
 
 let current = 'overview';
 let query = '';
+let advancedOpen = false; // the Advanced entry of the list is open: the views that are not a person's first questions
 
 const page = () => document.getElementById('cost-dashboard-view');
 
 function shown() {
     const q = query.trim().toLowerCase();
-    const listed = VIEWS.filter(v => !v.hidden);
+    const listed = VIEWS.filter(v => !v.hidden && (q || !v.advanced || advancedOpen || current === v.key)); // a search finds an advanced view too; the open one stays listed
     return q ? listed.filter(v => v.label.toLowerCase().includes(q)) : listed;
 }
+
+/** The Advanced entry of the list opens and closes the views under it. */
+export function toggleAdvanced() { advancedOpen = !advancedOpen; drawViews(); }
 
 /** The sidebar's list: one button per view, the open one marked. */
 function drawViews() {
@@ -42,8 +46,10 @@ function drawViews() {
     if (!list) return;
     const held = list.contains(document.activeElement) ? document.activeElement.dataset.view : null; // the list is drawn again: the keyboard stays on its row
     const rows = shown(), on = (VIEWS.find(v => v.key === current) || {}).under || current; // a grouping and an agent's page are under Overview
-    list.innerHTML = rows.map(v => `<li class="session-list-item list-row${escapeAttr(v.key === on ? ' active list-row-current' : '')}"><button type="button" class="row-btn"${v.key === on ? ' aria-current="true"' : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`).join('')
-        || '<li class="empty-state empty-state-tight">No view matches the search.</li>';
+    const row = v => `<li class="session-list-item list-row${escapeAttr(v.key === on ? ' active list-row-current' : '')}"><button type="button" class="row-btn"${v.key === on ? ' aria-current="true"' : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`;
+    const open = advancedOpen || query.trim() || current === 'calls';
+    const toggle = query.trim() || !VIEWS.some(v => v.advanced) ? '' : `<li class="session-list-item list-row"><button type="button" class="row-btn" data-view="advanced-toggle" aria-expanded="${escapeAttr(open ? 'true' : 'false')}" data-on-click="analytics-advanced">Advanced</button></li>`;
+    list.innerHTML = rows.length ? rows.filter(v => !v.advanced).map(row).join('') + toggle + rows.filter(v => v.advanced).map(row).join('') : '<li class="empty-state empty-state-tight">No view matches the search.</li>';
     if (held) list.querySelector(`.row-btn[data-view="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
 }
 

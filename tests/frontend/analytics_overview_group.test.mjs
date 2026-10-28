@@ -19,7 +19,7 @@ try {
     const visible = () => [...doc.querySelectorAll('#cost-dashboard-view [data-cview]')].filter(e => !e.hidden).map(e => e.dataset.cview);
 
     V.selectView('overview', { fromHistory: true });
-    assert.deepEqual(listed(), ['Overview', 'Tokens per commit', 'Task time', 'Tool and API calls'], 'one entry per metric: no By provider, By model, By thinking level, By team, By agent, By branch or By task');
+    assert.deepEqual(listed(), ['Overview', 'Tokens per commit', 'Task time', 'Advanced'], 'one entry per metric: no By provider, By model, By thinking level, By team, By agent, By branch or By task; Tool and API calls is under Advanced (#10521)');
     assert.equal(active(), 'Overview');
     assert.deepEqual([...bar().querySelectorAll('.eff-seg-btn')].map(b => b.textContent), ['All', 'Provider', 'Model', 'Thinking level', 'Team', 'Agent', 'Branch', 'Task'], 'Overview has the Group by selector');
     assert.equal(pressed(), 'All'); assert.deepEqual(visible(), ['overview']);
