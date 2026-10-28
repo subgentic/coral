@@ -96,12 +96,12 @@ export function progressCell(done, total) {
 
 // ── the table ─────────────────────────────────────────────────────────────
 const INTERACTIVE = 'a, input, select, textarea, summary, button:not(.dt-primary)';
-const compareBy = (col) => {
+export const compareBy = (col) => { // exported for its unit test (data_table_compare.test.mjs)
     if (typeof col.sort === 'function') return col.sort;
     const val = col.sortValue || ((r) => (col.field != null ? r[col.field] : ''));
     return (a, b) => {
         const x = val(a), y = val(b);
-        if (col.sort === 'number' || col.sort === 'date' || (typeof x === 'number' && typeof y === 'number')) { const nx = col.sort === 'date' ? Date.parse(x) || 0 : Number(x) || 0, ny = col.sort === 'date' ? Date.parse(y) || 0 : Number(y) || 0; return nx - ny; }
+        if (col.sort === 'number' || col.sort === 'date' || (typeof x === 'number' && typeof y === 'number')) { const at = v => (col.sort === 'date' ? (typeof v === 'number' ? v : Date.parse(v) || 0) : Number(v) || 0); /* a 'date' value is a time in ms or a string Date.parse reads: Date.parse of a number is NaN, which tied every row (#9680) */ return at(x) - at(y); }
         return String(x ?? '').localeCompare(String(y ?? ''), undefined, { numeric: true, sensitivity: 'base' });
     };
 };
