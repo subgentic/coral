@@ -898,6 +898,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
     #mobile-inbox-list { display: block; width: 100%; min-width: 0; } /* a flex item of the view: its own width was its widest row (271 of 390 px) */
     #inbox-view:not([data-phone-item]) .inbox-local { display: none; }
     #inbox-view[data-phone-item] #mobile-inbox-list { display: none; }
+    #inbox-view:has(> #inbox-frame) #mobile-inbox-list { display: none; } /* the Hub's own Inbox page is the whole screen: its frame is not squeezed beside the Agents list's narrow copy (about 90 px, #9882) */
     #inbox-view .inbox-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
     #inbox-page > .back-link:not(.inbox-phone-back) { display: none; } /* a phone has its own back, to the list */
     #mobile-inbox-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
