@@ -12,7 +12,7 @@ import { signInUrl } from './cloud.js';
 import { feedRetryDelay, isStalenessDrift, DRIFT_RENDER_MAX_AGE_MS } from './feed_pacing.js';
 import { scheduleLiveSessionsRender, updateSessionStatus, updateSessionSummary, updateSessionBranch, updateSessionFolder, updateSessionModel, updateWaitingIndicator, resolveSessionIdentity, commandPlaceholder, startingPlaceholder, applyTerminalDot } from './render.js';
 import { renderLiveJobs } from './live_jobs.js';
-import { updateChangedFileCount } from './changed_files.js';
+import { updateChangedFileCount, followChangedFiles } from './changed_files.js';
 import { showNotificationToast, showWorkflowNotification, showAlertNotification, escapeHtml, dbg } from './utils.js';
 import { serverWsBase, identityKey, sessionServer, isCloud } from './server_base.js';
 import { updateHeaderContext } from './header_context.js';
@@ -407,6 +407,7 @@ function _syncViewedSession(data) {
             updateWaitingIndicator(s);
             refreshNeedsInputCard();
             updateChangedFileCount(s.changed_file_count || 0);
+            followChangedFiles(s); // the Files list follows a reply that ends and a count that moves (#10268)
             // Update terminal header status dot
             const termDot = document.getElementById('terminal-status-dot');
             applyTerminalDot(termDot, s);
