@@ -176,12 +176,14 @@ function toastHost() {
     return document.getElementById("toast-host");
 }
 
-// On a phone the notices and the short toasts start below the top bar (the Agents picker, home, bookmarks, panel, settings), never over it: css reads --notice-top, set here from the bar's own bottom edge on the column
+// On a phone the notices and the short toasts start below the top bar (the Agents picker, home, bookmarks, panel, settings) and below an open agent's header, never over them: css reads --notice-top, set here from the bar's own bottom edge on the column
 // itself (not on <html>, where the theme code treats every inline custom property as a theme colour) and kept current when the window changes.
 function placeNotices() {
     const bar = document.querySelector("header.top-bar");
     const banner = document.getElementById("local-auth-banner");
-    const top = `${Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, 0) + 8}px`;
+    const head = document.querySelector("#live-session-view .terminal-header"); // an open agent's header (state, name, the Chat and Terminal toggle, Find, the panel) is not covered either (Mobile tester, #9985)
+    const headBottom = head && head.getClientRects().length ? Math.round(head.getBoundingClientRect().bottom) : 0;
+    const top = `${Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, headBottom, 0) + 8}px`;
     document.getElementById("notices")?.style.setProperty("--notice-top", top);
     // A page's pinned bar (its actions: Run, Edit, Done) is never under a toast: the column sits above the bar on the screen (UI/UX #7588 item 3; a phone's is at the top, where the bar is not).
     const pinned = [...document.querySelectorAll(".item-bar")].map(b => b.getBoundingClientRect()).find(r => r.height > 0 && r.bottom > window.innerHeight - 90 && r.top < window.innerHeight);
