@@ -67,11 +67,13 @@ const { connect } = require('./agent_view_harness');
         assert.ok(/chipshot\.png$/.test(name), 'the test upload: ' + name);
         await render([{ type: 'user', content: 'look', attachments: [{ name: '[Image #1]', file: name }, { name: '[Image #2]', file: 'not-an-upload.png' }] }]);
         const thumbs = () => ev(`[...document.querySelectorAll('#chip-box .chat-attachment-thumb')].map(b => { const r = b.getBoundingClientRect(); const i = b.querySelector('img');
-            return { hidden: b.hidden, w: Math.round(r.width), h: Math.round(r.height), alt: i.alt, src: i.getAttribute('src') || '', loaded: i.complete && i.naturalWidth > 0 }; })`);
+            return { hidden: b.hidden, w: Math.round(r.width), h: Math.round(r.height), alt: i.alt, fit: getComputedStyle(i).objectFit, src: i.getAttribute('src') || '', loaded: i.complete && i.naturalWidth > 0 }; })`);
         for (let k = 0; k < 100 && !(await thumbs())[0].loaded; k++) await ev(`new Promise(r => setTimeout(r, 50))`); // sleep-ok: the lazy fetch has no completion event of its own
         const [shown, absent] = await thumbs();
         assert.ok(!shown.hidden && shown.loaded, 'an upload shows its thumbnail: ' + JSON.stringify(shown));
-        assert.deepEqual([shown.w, shown.h], [48, 48], 'fixed size');
+        assert.deepEqual([shown.w, shown.h], [160, 120], 'fixed size, big enough to show the whole picture (#10311)');
+        if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/sent-image-thumb.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+        assert.equal(shown.fit, 'contain', 'the whole picture is shown, not cropped to a strip (#10311)');
         assert.equal(shown.alt, name, 'alt text is the file name');
         assert.ok(shown.src.startsWith('blob:') || shown.src.startsWith('/api/upload/'), 'from the upload route: ' + shown.src);
         assert.ok(absent.hidden && !absent.src, 'a file that is not an upload stays a name: ' + JSON.stringify(absent));
@@ -95,7 +97,7 @@ const { connect } = require('./agent_view_harness');
         for (let k = 0; k < 100 && !(await thumbs())[0].loaded; k++) await ev(`new Promise(r => setTimeout(r, 50))`); // sleep-ok: the lazy fetch has no completion event of its own
         const [fromRef, unknownRef] = await thumbs();
         assert.ok(!fromRef.hidden && fromRef.loaded, 'a reference shows its thumbnail: ' + JSON.stringify(fromRef));
-        assert.deepEqual([fromRef.w, fromRef.h], [48, 48], 'fixed size');
+        assert.deepEqual([fromRef.w, fromRef.h], [160, 120], 'fixed size');
         assert.ok(unknownRef.hidden, 'a reference the server does not know stays a name');
         const asked = await ev(`window.__attAsked`);
         assert.ok(asked.some(u => u.includes('/api/sessions/live/pasted-agent/attachment/' + REF) && u.includes('session_id=00000000-0000-4000-8000-0000000005a1') && u.includes('agent_type=claude')), 'the session\'s attachment route was asked: ' + asked.join(' '));

@@ -75,7 +75,11 @@ export function initImageDrop() {
         const dropped = [...(e.dataTransfer?.files || [])];
         const files = dropped.filter(f => f.type.startsWith("image/"));
         // A file that is not an image is not attached: say what to do instead of nothing (#10147).
-        if (files.length < dropped.length || dropped.length === 0) showToast(NOT_IMAGES, files.length === 0);
+        if (files.length < dropped.length || dropped.length === 0) {
+            // said once for one drop, however many elements the event reaches, and naming the file: "Mention it with @data.csv" (#10311)
+            const other = dropped.find(f => !f.type.startsWith("image/"));
+            if (Date.now() - lastDropNotice > 1500) { lastDropNotice = Date.now(); showToast(other && other.name && !/\s/.test(other.name) ? `${NOT_IMAGES} Mention it with @${other.name}.` : NOT_IMAGES, files.length === 0); }
+        }
         if (files.length === 0) return;
 
         for (const file of files) {
@@ -248,7 +252,8 @@ export async function uploadAndInsertImage(file, session = state.currentSession)
     }
 }
 
-const NOT_IMAGES = "Only images can be attached here; mention a project file with @";
+const NOT_IMAGES = "Only images can be attached here.";
+let lastDropNotice = 0;
 
 // An attachment is named by its place in the strip ("Image 2"), not by its file's name: the name is a generated id that says nothing; it stays in the tooltip.
 const imageName = (i, n) => (n > 1 ? `Image ${i + 1}` : 'Image');
