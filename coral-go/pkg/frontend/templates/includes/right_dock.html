@@ -44,7 +44,6 @@
                         <button class="tab agentic-tab agentic-tab-more" id="agentic-tab-more" type="button" data-on-click="dock-more-toggle" data-on-keydown="dock-more-open-key" aria-haspopup="menu" aria-expanded="false" aria-controls="agentic-more-menu" title="More tabs" aria-label="More tabs" hidden>
                             <span class="material-icons" aria-hidden="true">expand_more</span><span class="agentic-tab-word">More</span>
                         </button>
-                        <div class="menu agentic-more-menu" id="agentic-more-menu" role="menu" aria-label="More tabs" hidden></div>
                     </div>
                     <!-- Custom view tabs (disabled for now) -->
                     <span id="custom-view-tabs" style="display:none"></span>
@@ -55,6 +54,8 @@
                         <span class="material-icons" aria-hidden="true">close</span>
                     </button>
                 </div>
+                <!-- The More menu is a sibling of the tab row, not inside it: on a phone the row scrolls sideways and its edge fade is a mask, and a masked row is the containing block of a fixed menu inside it, which then sat clipped in the row instead of at the screen, under More (#10214) -->
+                <div class="menu agentic-more-menu" id="agentic-more-menu" role="menu" aria-label="More tabs" hidden></div>
                 <!-- Files tab -->
                 <div id="agentic-panel-files" class="agentic-panel active">
                     <div class="changed-files-header" id="changed-files-header">
