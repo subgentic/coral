@@ -3,7 +3,7 @@ import { appendContent, appendTurnFinal, appendWork, htmlToElement } from './cha
 import { makeBubble } from './chat_bubbles.js';
 import { unwrapPastedContent } from './pasted_content.js';
 import { isCoralNudge, INTERRUPT_RE, appendCoralNotice, isCoralHealthNudge, normalizeNudgeText } from './pending_messages.js';
-import { escapeHtml, renderMarkdown } from './utils.js';
+import { escapeHtml, escapeAttr, renderMarkdown } from './utils.js';
 import { thumbHtml, wireThumbs, sharedImageChips } from './chat_thumbs.js';
 import { splitSharedImages } from './shared_images.js';
 import { chatAgentAdapter } from './chat_agents.js';
@@ -14,7 +14,8 @@ import { getToolIcon, renderToolCard, renderQuestionCard } from './chat_tool_car
 // Agent replies carry a copy button that copies the reply's markdown as the
 // agent wrote it (not the rendered text).
 // The button of a message the person sent: its menu (message_menu.js) loads when it is first opened, not at start (page weight).
-const MESSAGE_MENU_BUTTON = '<button type="button" class="btn btn-quiet btn-icon btn-xs chat-msg-menu-btn" title="Message actions" aria-label="Message actions" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-msg-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></button>';
+// Each button names its message, so a list of them is not a list of the same name (#10451): "Message actions: first words of the message".
+const messageMenuButton = text => { const words = String(text || '').trim().split(/\s+/).filter(Boolean).slice(0, 6).join(' '); const label = words ? `Message actions: ${words}` : 'Message actions'; return `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-msg-menu-btn" title="Message actions" aria-label="${escapeAttr(label)}" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-msg-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></button>`; };
 const COPY_BUTTON = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
 
 export const bubbleSource = new WeakMap();
@@ -63,7 +64,7 @@ function renderOneMessage(msg, container, agentType) {
         // Images pasted in the dashboard lead the turn as "<path> coral://artifacts/<hex>" pairs (#5284): shown as artifact thumbnails, not as the text of a path and a link.
         const lead = splitSharedImages(unwrapPastedContent(msg.content));
         const bubble = makeBubble("chat-bubble human",
-            `<div class="role-label">You</div><div class="message-text prose">${renderMarkdown(lead.rest, undefined, 'chat')}</div>${attachmentChips(msg.attachments)}${sharedImageChips(lead.images)}${MESSAGE_MENU_BUTTON}${msg.key ? SAVE_BUTTON : ""}${messageTimeHtml(msg.timestamp)}`);
+            `<div class="role-label">You</div><div class="message-text prose">${renderMarkdown(lead.rest, undefined, 'chat')}</div>${attachmentChips(msg.attachments)}${sharedImageChips(lead.images)}${messageMenuButton(lead.rest)}${msg.key ? SAVE_BUTTON : ""}${messageTimeHtml(msg.timestamp)}`);
         if (msg.key) { bubble.dataset.msgKey = msg.key; bubble.dataset.said = msg.timestamp || ""; } // Save for Later finds the message again by this (#4510)
         wireThumbs(bubble);
         appendContent(container, bubble);
