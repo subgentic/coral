@@ -5,7 +5,9 @@ import { mountSettingsView } from './settings_view.js';
 import { showToast } from './utils.js';
 import { registerActions, withId } from './actions.js';
 import { apiFetch } from './api.js';
+import { importOnce } from './import_once.js';
 import { limitSeconds, limitParts } from './time_limit.js';
+const { WORKFLOW_TEMPLATES, templateById } = await importOnce('./workflow_templates.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 let view = null;
 let editingWorkflowId = null; // non-null when editing
@@ -140,6 +142,7 @@ function limitField() {
 // The first step a new workflow starts with: a named one to fill in, so the form shows what a step is for (#9297). Its command is empty with an example as the placeholder, so nothing runnable is saved by accident.
 const EXAMPLE_STEP = { name: 'Run tests', type: 'shell', command: '' };
 const EXAMPLE_COMMAND = 'e.g. npm test';
+const TEMPLATE_NONE = '';
 
 function workflowFields() {
     return [
@@ -150,6 +153,11 @@ function workflowFields() {
                 const b = el('button', 'btn btn-small', 'Build with Agent'); b.type = 'button'; b.setAttribute('data-on-click', 'wf-build-agent-from-form');
                 slot.append(el('span', '', 'Not sure what the steps are? An agent can write them with you.'), ' ', b);
             },
+        },
+        {
+            key: 'template', type: 'select', id: 'wf-input-template', label: 'Start from a template', help: 'Fills the name and steps of an example for you to change; nothing is saved until Create workflow.',
+            options: [{ value: TEMPLATE_NONE, label: 'A blank workflow' }, ...WORKFLOW_TEMPLATES.map(t => ({ value: t.id, label: t.label }))],
+            setup: sel => sel.addEventListener('change', () => applyTemplate(sel.value)),
         },
         { key: 'name', type: 'text', id: 'wf-input-name', label: 'Name', required: true, requiredMessage: 'Give the workflow a name.', placeholder: 'lint-and-fix', help: 'Letters, numbers, hyphens and underscores.', attrs: { pattern: '[a-zA-Z0-9_-]+' } },
         stepsField(),
@@ -210,6 +218,20 @@ function openModal(title, submit) {
     document.getElementById('wf-create-modal').style.display = 'flex'; // display-ok: a dialog is shown as the flex container the .modal rule centres (modal_chrome and the close census read it)
 }
 
+/** Fill the form from a template (the name only when the person has not typed one); the blank choice puts the example step back. */
+function applyTemplate(id) {
+    const v = workflowView(), t = templateById(id);
+    if (!t) { v.set('steps', [EXAMPLE_STEP]); document.querySelector('#wf-steps-editor .wf-step-content').placeholder = EXAMPLE_COMMAND; return; }
+    v.set('name', t.name); v.set('description', t.description); v.set('steps', t.steps.map(s => ({ ...s })));
+    v.fold(true); // the description it filled is shown
+}
+
+/** The template row is for a new workflow: not for Edit, and not for a duplicate (it already is a copy of one). */
+function showTemplateRow(on) {
+    const row = document.getElementById('wf-input-template')?.closest('.sv-row');
+    if (row) row.hidden = !on;
+}
+
 export function showWorkflowCreateModal(onClose) {
     const v = workflowView();
     editingWorkflowId = null;
@@ -218,6 +240,7 @@ export function showWorkflowCreateModal(onClose) {
     v.set('steps', [EXAMPLE_STEP]); // the example step, to fill in
     document.querySelector('#wf-steps-editor .wf-step-content').placeholder = EXAMPLE_COMMAND;
     document.getElementById('wf-build-hint').hidden = false;
+    showTemplateRow(true); v.set('template', TEMPLATE_NONE);
     v.fold(false);
     openModal('New workflow', 'Create workflow');
     document.getElementById('wf-input-name').focus();
@@ -229,11 +252,27 @@ export async function editWorkflow(id) {
     const v = workflowView();
     editingWorkflowId = id; returnTo = null;
     document.getElementById('wf-build-hint').hidden = true; // a workflow that exists is changed with Edit with Agent on its page
+    showTemplateRow(false);
     v.reset();
     for (const [k, val] of Object.entries({ name: wf.name || '', steps: wf.steps || [], description: wf.description || '', repo_path: wf.repo_path || '', max_duration_s: wf.max_duration_s || DEFAULT_LIMIT_S })) v.set(k, val);
     // Nothing a workflow already has is hidden: More options opens when it holds something other than the defaults.
     v.fold(!!(wf.description || wf.repo_path || (wf.max_duration_s && wf.max_duration_s !== DEFAULT_LIMIT_S)));
     openModal('Edit workflow', 'Save changes');
+}
+
+/** Duplicate (#10277): the New workflow dialog filled from a workflow that exists, with a name of its own to choose (its name and "-copy"); nothing is saved until Create workflow. */
+export async function duplicateWorkflow(id) {
+    const wf = await hooks.fetchDetail(id);
+    if (!wf) return;
+    const v = workflowView();
+    editingWorkflowId = null; returnTo = null;
+    document.getElementById('wf-build-hint').hidden = true;
+    showTemplateRow(false);
+    v.reset();
+    for (const [k, val] of Object.entries({ name: `${wf.name || 'workflow'}-copy`, steps: (wf.steps || []).map(s => ({ ...s })), description: wf.description || '', repo_path: wf.repo_path || '', max_duration_s: wf.max_duration_s || DEFAULT_LIMIT_S })) v.set(k, val);
+    v.fold(!!(wf.description || wf.repo_path || (wf.max_duration_s && wf.max_duration_s !== DEFAULT_LIMIT_S)));
+    openModal('New workflow', 'Create workflow');
+    document.getElementById('wf-input-name').focus();
 }
 
 export function hideWorkflowCreateModal(skipReturn) {
@@ -247,4 +286,5 @@ export function saveWorkflow() { return workflowView().submit(); }
 
 registerActions({
     'wf-edit': el => withId(el.dataset.workflowId, editWorkflow),
+    'wf-duplicate': el => withId(el.dataset.workflowId, duplicateWorkflow),
 });
