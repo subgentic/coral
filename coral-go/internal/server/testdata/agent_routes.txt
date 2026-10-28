@@ -7,6 +7,7 @@ b CONNECT /api/remote/{server}/*
 a DELETE /api/agent/ui/{id}
 b DELETE /api/artifacts/series/{series_id}
 b DELETE /api/artifacts/{id}
+b DELETE /api/board/{project}/cross-team-links
 b DELETE /api/shared-images/{id}
 b DELETE /api/artifacts/{id}/comments/lock
 b DELETE /api/artifacts/{id}/comments/{cid}
@@ -74,6 +75,7 @@ b GET /api/board/tasks
 c GET /api/board/{project}
 a GET /api/board/{project}/artifacts
 b GET /api/board/{project}/cross-team-candidates
+b GET /api/board/{project}/cross-team-links
 b GET /api/board/{project}/cross-team-state
 b GET /api/board/{project}/cross-team/settings
 a GET /api/board/{project}/goal-requests
@@ -276,6 +278,7 @@ b POST /api/auth/password/set
 b POST /api/auth/sessions/sign-out-others
 b POST /api/auto-accept/disable-all
 b POST /api/board/remotes
+b POST /api/board/{project}/cross-team-links
 b POST /api/board/{project}/cross-team/disable
 b POST /api/board/{project}/cross-team/enable
 b POST /api/board/{project}/cross-team/files/disable

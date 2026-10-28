@@ -440,7 +440,7 @@ func (h *BoardHandler) PostExternalMessage(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	attached, refused := h.crossTeamAttachments(ctx, r, &body, target, senderSession)
+	attached, refused := h.crossTeamAttachments(ctx, r, &body, target, senderSession, role)
 	if refused != nil {
 		refused(w)
 		return
@@ -589,7 +589,7 @@ func (h *BoardHandler) crossTeamRecipients(ctx context.Context, from, target, to
 
 // crossTeamAttachments (#4379): both boards must accept artifacts, and every one is checked and read through before
 // anything is posted; their links are appended to the message.
-func (h *BoardHandler) crossTeamAttachments(ctx context.Context, r *http.Request, m *externalMessage, target, senderSession string) ([]attachedArtifact, answer) {
+func (h *BoardHandler) crossTeamAttachments(ctx context.Context, r *http.Request, m *externalMessage, target, senderSession, role string) ([]attachedArtifact, answer) {
 	if len(m.Attach) == 0 {
 		return nil, nil
 	}
@@ -606,6 +606,16 @@ func (h *BoardHandler) crossTeamAttachments(ctx context.Context, r *http.Request
 	if len(off) > 0 {
 		return nil, func(w http.ResponseWriter) {
 			writeError(w, http.StatusForbidden, "artifacts_off", textFilesOff(off))
+		}
+	}
+	// With the list in force, a link may turn files off for one sender (#9893): the sender is already admitted, so saying so reveals nothing.
+	if h.allowlistOn(ctx) && role != crossTeamOperatorID {
+		if settings, err := h.bs.GetBoardSettings(ctx, target); err == nil {
+			if senderID, ok := h.senderIDOf(ctx, m.FromBoard); ok && !settings.AllowsFilesFrom(board.LocalServer, senderID) {
+				return nil, func(w http.ResponseWriter) {
+					writeError(w, http.StatusForbidden, "link_files_off", "the link between these teams does not share files: ask the Operator to turn files on for it (coral-board link <team> <other> --files)")
+				}
+			}
 		}
 	}
 	sender := h.attachSenderFor(ctx, r, m.FromBoard, m.SubscriberID, senderSession)

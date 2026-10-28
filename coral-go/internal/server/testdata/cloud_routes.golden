@@ -7,6 +7,7 @@ DELETE /api/artifacts/{id}/keep never
 DELETE /api/auth/sessions/{id} never
 DELETE /api/board/remotes never
 DELETE /api/board/{project} launch
+DELETE /api/board/{project}/cross-team-links never
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} never
 DELETE /api/board/{project}/messages/{messageID} launch
 DELETE /api/board/{project}/reminder interact
@@ -67,6 +68,7 @@ GET /api/board/tasks view
 GET /api/board/{project} view
 GET /api/board/{project}/artifacts view
 GET /api/board/{project}/cross-team-candidates never
+GET /api/board/{project}/cross-team-links never
 GET /api/board/{project}/cross-team-state never
 GET /api/board/{project}/cross-team/settings view
 GET /api/board/{project}/goal-requests never
@@ -266,6 +268,7 @@ POST /api/auth/password/set never
 POST /api/auth/sessions/sign-out-others never
 POST /api/auto-accept/disable-all interact
 POST /api/board/remotes never
+POST /api/board/{project}/cross-team-links never
 POST /api/board/{project}/cross-team/disable launch
 POST /api/board/{project}/cross-team/enable launch
 POST /api/board/{project}/cross-team/files/disable launch
