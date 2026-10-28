@@ -1,4 +1,4 @@
-// New agent step 2 says what a persona is first (#9998 point 3, the phone triage): the sentence "A persona is a saved role: a name and a prompt. Pick one, or leave it blank and press Next." is above the select, and
+// New agent step 2 says what a persona is first (#9998 point 3, the phone triage): the sentence "A persona is a saved name and prompt. Pick one, or skip." is above the select, and
 // Save as persona, Export personas and Import personas are one More menu on the select's row (closed at first). At 1280 and 390, with shots. Isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
                 return { lead: lead && lead.textContent.trim(), leadAbove: !!lead && !!sel && !!(lead.compareDocumentPosition(sel) & Node.DOCUMENT_POSITION_FOLLOWING), more: d && d.querySelector('summary').textContent.trim(), open: d && d.open,
                     inMenu: d ? [...d.querySelectorAll('button')].map(b => b.textContent.trim()) : [], shownClosed: ['#agent-save-persona-btn', '[data-on-click="m-export-personas"]'].map(q => vis(top.querySelector(q))), sameRow: !!d && d.closest('.launch-persona-row') === sel.closest('.launch-persona-row'),
                     wide: document.documentElement.scrollWidth <= innerWidth + 1 }; })()`);
-            assert.equal(r.lead, 'A persona is a saved role: a name and a prompt. Pick one, or leave it blank and press Next.', `${label}: the sentence`);
+            assert.equal(r.lead, 'A persona is a saved name and prompt. Pick one, or skip.', `${label}: the sentence`);
             assert.equal(r.leadAbove, true, `${label}: it is above the select`);
             assert.equal(r.more, 'More', `${label}: one More menu`); assert.equal(r.open, false, `${label}: closed at first`);
             assert.deepEqual(r.inMenu, ['Save as persona', 'Export personas', 'Import personas'], `${label}: its three actions`);
