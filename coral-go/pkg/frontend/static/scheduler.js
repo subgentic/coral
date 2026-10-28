@@ -9,7 +9,7 @@ import { registerActions, withId, uuidOf } from './actions.js';
 import { pollEvery } from './overload.js';
 import { compactDuration } from './format.js';
 import { runFailure } from './run_failure.js';
-import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords } from './job_words.js';
+import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords, isExample } from './job_words.js';
 import { foldWayBack } from './sidebar_groups.js';
 import { note } from './nav.js';
 import { importOnce } from './import_once.js';
@@ -208,7 +208,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         <button type="button" class="back-link sched-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
         ${failBanner}
         <div class="sched-header">
-            <h2>${escapeHtml(job.name)}</h2>
+            <h2>${escapeHtml(job.name)}${isExample(job.description) ? ' <span class="chip chip-tag dt-tag">Example</span>' : ''}</h2>
         </div>
         <p class="item-meta sched-status-line">${escapeHtml(status)}</p>
         ${savedLine}

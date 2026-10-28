@@ -487,3 +487,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .inbox-review-actions-star > .dt-star { width: 16px; margin-inline-end: -4px; } /* on a phone the starred glyph is not a button: 16 px, and it leans 4 px into the gap (#9922) */
     .dt-box.dt-fold-column.dt-folded tr:has(.inbox-review-actions-star > .dt-star-on) td.dt-line-1.dt-grow { flex-basis: 3.5rem; } /* a starred row name has 3.5 rem of its own, not 5, so the actions stay on its line at 360 px (#9922) */
 }
+
+/* A job or workflow Coral added as an example: its name and an Example tag on one line (#10001). */
+.dt-name-example { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dt-name-example .dt-primary { min-width: 0; flex: 0 1 auto; width: auto; }
