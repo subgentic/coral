@@ -314,6 +314,12 @@ async function submitJob() {
         view.focus('base_branch');
         throw new Error(data.error);
     }
+    const repoWhy = data.error && /^repo_path is not (an existing directory|a git repository): (.*)$/s.exec(data.error);
+    if (repoWhy) { // the server refused the repository path: said under that field, which takes the focus, in words (a refusal at the dialog's foot was far from the field, #9965)
+        view.error('repo_path', repoWhy[1] === 'a git repository' ? `That folder is not a git repository: ${repoWhy[2]}` : `That folder does not exist: ${repoWhy[2]}`);
+        view.focus('repo_path');
+        throw new Error(data.error);
+    }
     if (data.error) throw new Error(data.error);
     // no toast: the job's page says it, in words, under the title (scheduler.js, "Created. Next run today 06:00 your time."), where a toast would cover the title on a phone or the page's own actions (#9298)
     hideJobModal();
