@@ -85,6 +85,7 @@
 .sv-bar-buttons { display: flex; align-items: center; gap: 8px; flex: none; }
 .sv-fold { margin: 4px 0 0; }
 .sv-fold > summary { color: var(--text-primary); font-weight: var(--fw-strong); display: flex; align-items: center; gap: 6px; min-height: 32px; list-style: none; font-size: var(--fs-md); } /* a form's optional part: closed, its rows inside */
+.sv-fold > summary .sv-fold-note { color: var(--text-secondary); font-weight: var(--fw-regular); font-size: var(--fs-base); } /* what the closed row says beside its name (the CLI paths: whether the default CLI was found, #9955) */
 /* the line reads as a control, not a caption: one "▸" marker (a flex summary draws no native one), 32 px high (44 on a coarse pointer, touch.css), the CLI paths' fold (#7041, #8460) */
 .sv-fold > summary::-webkit-details-marker { display: none; }
 .sv-fold > summary::before { content: '▸'; font-size: var(--fs-base); flex: none; }

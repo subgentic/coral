@@ -212,7 +212,14 @@ export function _fillApiKey() {
 function openCliPathsWhenMissing(type) {
     const details = document.querySelector('#settings-modal #settings-cli-paths');
     if (!details || details.open) return;
-    fetch(`/api/system/cli-check?type=${encodeURIComponent(type)}`).then(r => r.ok ? r.json() : null).then(d => { if (d && d.found === false) details.open = true; }).catch(() => {});
+    fetch(`/api/system/cli-check?type=${encodeURIComponent(type)}`).then(r => r.ok ? r.json() : null).then(d => {
+        if (!d || typeof d.found !== 'boolean') return;
+        if (!d.found) details.open = true;
+        const sum = details.querySelector(':scope > summary'); if (!sum) return;
+        const name = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', gemini: 'Antigravity', pi: 'Pi' }[type] || type;
+        let note = sum.querySelector('.sv-fold-note'); if (!note) { note = document.createElement('span'); note.className = 'sv-fold-note'; sum.append(note); }
+        note.textContent = ` · ${name} ${d.found ? 'found' : 'not found'}`; // the closed row says it, so nobody has to open it to know (#9955)
+    }).catch(() => {});
 }
 
 // The CLI paths and the default models (and their datalists, from the model catalog; not on the hub).
