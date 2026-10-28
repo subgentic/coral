@@ -163,7 +163,7 @@ body.panel-dragging .preview-pane {
 
 .preview-tab {
     display: flex;
-    flex-shrink: 0; /* the strip scrolls instead of losing the name beside Keep open (#8905) */
+    flex-shrink: 0; /* the strip scrolls instead of losing the name beside Pin tab (#8905) */
     align-items: center;
     gap: 5px;
     padding: 0 10px;
