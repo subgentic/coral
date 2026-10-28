@@ -32,7 +32,8 @@ const BASE = require('./test_base').BASE;
     assert.equal(await saved(), '');
     await openDialog();
     assert.deepEqual(await state(), { value: '', notSet: true, first: 'Not set (Auto)', mode: 'Nothing is saved: new agents use Auto.', warn: false }, 'unset: "Not set (Auto)" is chosen, with its line and no warning');
-    assert.equal(await ev(`(document.getElementById('settings-permission-mode').closest('.settings-row, .sv-row').querySelector('.perm-mode-compare') || {}).textContent`), 'Default asks before acting; Auto acts on its own; Not set uses Auto.', 'one line says what Default, Auto and Not set are, whichever is chosen (#10000); what Auto is on each CLI is behind Learn more (#10191)');
+    assert.equal(await ev(`!!document.getElementById('settings-permission-mode').closest('.settings-row, .sv-row').querySelector('.perm-mode-compare')`), false, 'the three modes are not a second line under the select: the contrast is in the row\'s More (#10266, was #10000\'s line)');
+    assert.match(await ev(`document.getElementById('settings-permission-mode').closest('.settings-row, .sv-row').textContent`), /Default asks before acting; Auto acts on its own; Not set uses Auto\./, 'and it says what Default, Auto and Not set are, whichever is chosen');
     await save();
     assert.equal(await saved(), '', 'a Save that never touched the select leaves it unset');
 
