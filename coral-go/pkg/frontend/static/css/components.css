@@ -3651,6 +3651,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-cli-slot .acf-cli-warning code { color: var(--text-primary); overflow-wrap: anywhere; }
 .launch-cli-slot .acf-cli-warning .cli-install-link a { color: var(--link-text); }
 .launch-cli-slot .acf-cli-warning .btn { margin: 0 0 0 auto; }
+.launch-cli-slot .acf-cli-warning .cli-actions { order: 1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 8px; margin-left: auto; } /* Check again and Set path (#10013): one group at the right end of the line, wrapping together */
+.launch-cli-slot .acf-cli-warning .cli-actions .btn { margin: 0; }
 /* The dialog says it once: the app-wide banner steps aside while the dialog has the line (#6046). */
 body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[data-blocks-launch]) #tmux-missing-banner { display: none; }
 #launch-tmux-slot code, #team-tmux-slot code { color: var(--text-primary); overflow-wrap: anywhere; }
