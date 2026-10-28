@@ -15,6 +15,7 @@ let view = null;
 let editingJobId = null;  // non-null when editing an existing job
 let openedJob = null;     // what the editor showed for the job it opened (#4423): Save sends only what the person changed since
 let noOwnWorkflows = false; // none of the workflows is the person's own: the list is empty or holds only the seeded example (its description starts with Example, #9965)
+let repoOffer = '';      // the server refused the folder for a missing repository or first commit (#10276): the form offers to make it one
 let noWorkflows = false;  // the workflow list came back empty: the form says so and offers to make one
 
 const DEFAULT_CRON = '0 9 * * *'; // a new job runs every day at 09:00 until the person says otherwise (#10276): the time a first job is most often wanted, not every hour
@@ -240,6 +241,15 @@ function jobFields(host) {
         { key: 'repo_path', type: 'path', id: 'job-modal-repo', label: 'Folder', required: true, requiredMessage: 'Choose a folder: type a path, or use Browse.', messageAsIs: true, placeholder: 'Choose a folder', help: 'The folder the agent works in: a git folder with at least one commit.', default: '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' }, visibleWhen: prompt,
             live: [{ id: 'btn-browse-job', wide: true, describes: false }, { id: 'dir-browser-job', wide: true, describes: false }] }, // Browse and its folder list, as New agent has them (#10276)
         {
+            key: 'repo_offer', type: 'notice', visibleWhen: v => prompt(v) && !!repoOffer,
+            render: slot => {
+                slot.id = 'job-repo-offer'; slot.classList.add('job-no-workflows');
+                const b = el('button', 'btn btn-small', 'Make this folder a git repo'); b.type = 'button'; b.id = 'job-make-repo'; b.addEventListener('click', makeRepo);
+                const n = el('button', 'btn btn-small', 'Run without a worktree'); n.type = 'button'; n.id = 'job-run-here'; n.addEventListener('click', runHere);
+                slot.append(el('span', '', 'A job works in its own worktree of this folder, which needs a git repository with one commit.'), ' ', b, ' ', n);
+            },
+        },
+        {
             key: 'agent_type', type: 'select', id: 'job-modal-agent', label: 'Agent', default: 'claude', visibleWhen: prompt,
             options: [{ value: 'claude', label: 'Claude' }, { value: 'agy', label: 'Antigravity (agy)' }, { value: 'codex', label: 'Codex' }, { value: 'pi', label: 'Pi' }],
             setup: e => e.setAttribute('data-on-change', 'flag-agent-change'),
@@ -264,7 +274,8 @@ function jobFields(host) {
                 box.append(b); slot.append(box);
             },
         },
-        { key: 'cleanup_worktree', type: 'toggle', id: 'job-modal-cleanup', label: 'Remove the worktree when the run ends', default: true, visibleWhen: prompt },
+        { key: 'no_worktree', type: 'toggle', id: 'job-modal-no-worktree', label: 'Run in the folder itself, without a worktree', default: false, help: 'Each run works straight in the folder, which can be any folder, not a git repository. Runs that overlap share it.', visibleWhen: prompt },
+        { key: 'cleanup_worktree', type: 'toggle', id: 'job-modal-cleanup', label: 'Remove the worktree when the run ends', default: true, visibleWhen: v => prompt(v) && !v.no_worktree },
     ];
 }
 
@@ -281,6 +292,7 @@ function jobFormValues() {
         timezone: String(v.timezone || '').trim() || LOCAL_ZONE,
         max_duration_s: (limit && limit.seconds) || 3600,
         cleanup_worktree: v.cleanup_worktree ? 1 : 0,
+        no_worktree: v.job_type !== 'workflow' && v.no_worktree ? 1 : 0,
         job_type: v.job_type,
     };
     if (v.job_type === 'workflow') {
@@ -293,6 +305,28 @@ function jobFormValues() {
         values.flags = String(v.flags || '').trim();
     }
     return values;
+}
+
+/** Run in the folder itself (#10276): the worktree is switched off for this job, the refusal goes, and the person creates the job again. */
+function runHere() {
+    view.set('no_worktree', true); view.fold(true); // the switch is under More options: opened, so the person sees what was set
+    repoOffer = ''; view.error('repo_path', ''); view.refresh();
+    showToast('This job will work in the folder itself. Create it again.');
+}
+
+/** Make the folder a repository with one first commit, once the person has agreed (#10276); then the form is submitted again by the person, with nothing else changed. */
+function makeRepo() {
+    const dir = String(view.values().repo_path || '').trim();
+    if (!dir) return;
+    window.showConfirmModal('Make this folder a git repo', `Coral will run git init in ${dir} if it is not a repository yet, and make one empty first commit, so each run of the job has a branch to start from. Nothing in the folder is changed.`, async () => {
+        try {
+            const resp = await fetch('/api/scheduled/jobs/init-repo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo_path: dir }) });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || data.error) { showToast(data.error || 'Could not make the folder a git repo.', true); return; }
+            repoOffer = ''; view.error('repo_path', ''); view.refresh();
+            showToast('The folder is a git repo with a first commit. Create the job again.');
+        } catch { showToast('Could not make the folder a git repo.', true); }
+    }, undefined, { label: 'Make it a git repo', danger: false });
 }
 
 async function submitJob() {
@@ -317,9 +351,12 @@ async function submitJob() {
         view.focus('base_branch');
         throw new Error(data.error);
     }
-    const repoWhy = data.error && /^repo_path is not (an existing directory|a git repository): (.*)$/s.exec(data.error);
+    const repoWhy = data.error && /^repo_path (?:is not (an existing directory|a git repository)|has no (commit yet)): (.*)$/s.exec(data.error);
     if (repoWhy) { // the server refused the repository path: said under that field, which takes the focus, in words (a refusal at the dialog's foot was far from the field, #9965)
-        view.error('repo_path', repoWhy[1] === 'a git repository' ? `That folder is not a git repository: ${repoWhy[2]}` : `That folder does not exist: ${repoWhy[2]}`);
+        const why = repoWhy[1] || repoWhy[2], dir = repoWhy[3];
+        view.error('repo_path', why === 'a git repository' ? `That folder is not a git repository: ${dir}` : why === 'commit yet' ? `That repository has no commit yet: ${dir}` : `That folder does not exist: ${dir}`);
+        repoOffer = why === 'an existing directory' ? '' : why; // a folder that is not there cannot be made a repository; the other two can
+        view.refresh();
         view.focus('repo_path');
         throw new Error(data.error);
     }
@@ -373,6 +410,7 @@ export function showJobModal() {
     const v = jobView();
     editingJobId = null;
     openedJob = null;
+    repoOffer = '';
     v.reset(); // every field at its default, no errors, an empty status line
     // No folder is chosen for the person: the Settings default if they set one, else empty and required, never the home folder (as New Agent has it, #5989; #9958).
     if (state.settings?.default_working_dir) v.set('repo_path', state.settings.default_working_dir);
@@ -395,16 +433,17 @@ export async function editScheduledJob(jobId) {
 
     const v = jobView();
     editingJobId = jobId;
+    repoOffer = '';
     v.reset();
     openModal('Edit job', 'Save changes');
     const type = job.job_type || (job.workflow_id ? 'workflow' : 'prompt');
     for (const [k, val] of Object.entries({
         job_type: type, name: job.name, description: job.description || '', cron_expr: job.cron_expr, timezone: job.timezone || 'UTC', repo_path: job.repo_path || '',
-        base_branch: job.base_branch || '', agent_type: job.agent_type || 'claude', prompt: job.prompt || '', max_duration_s: job.max_duration_s || 3600, cleanup_worktree: !!job.cleanup_worktree, flags: job.flags || '',
+        base_branch: job.base_branch || '', agent_type: job.agent_type || 'claude', prompt: job.prompt || '', max_duration_s: job.max_duration_s || 3600, cleanup_worktree: !!job.cleanup_worktree, no_worktree: job.no_worktree === 1, flags: job.flags || '',
     })) v.set(k, val);
     document.getElementById('cron-preview').textContent = '';
     // Nothing a job already has is hidden: More options opens when it holds something other than the defaults.
-    v.fold(!!(job.description || (job.timezone && job.timezone !== LOCAL_ZONE) || (job.max_duration_s && job.max_duration_s !== 3600) || job.flags || (job.base_branch && job.base_branch !== 'main')));
+    v.fold(!!(job.description || (job.timezone && job.timezone !== LOCAL_ZONE) || (job.max_duration_s && job.max_duration_s !== 3600) || job.flags || (job.base_branch && job.base_branch !== 'main') || job.no_worktree === 1));
     document.getElementById('job-modal-flags').dispatchEvent(new Event('input')); // the flag shortcuts show which flags are on
     if (type === 'workflow') {
         await loadWorkflowOptions();

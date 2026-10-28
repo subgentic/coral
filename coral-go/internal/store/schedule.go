@@ -23,6 +23,7 @@ type ScheduledJob struct {
 	Enabled         int    `db:"enabled" json:"enabled"`
 	MaxDurationS    int    `db:"max_duration_s" json:"max_duration_s"`
 	CleanupWorktree int    `db:"cleanup_worktree" json:"cleanup_worktree"`
+	NoWorktree      int    `db:"no_worktree" json:"no_worktree"`
 	Flags           string `db:"flags" json:"flags"`
 	JobType         string `db:"job_type" json:"job_type"`
 	WorkflowID      *int64 `db:"workflow_id" json:"workflow_id,omitempty"`
@@ -118,12 +119,12 @@ func (s *ScheduleStore) CreateScheduledJob(ctx context.Context, job *ScheduledJo
 	result, err := s.db.ExecContext(ctx,
 		`INSERT INTO scheduled_jobs
 		 (name, description, cron_expr, timezone, agent_type, repo_path,
-		  base_branch, prompt, enabled, max_duration_s, cleanup_worktree,
+		  base_branch, prompt, enabled, max_duration_s, cleanup_worktree, no_worktree,
 		  flags, job_type, workflow_id, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		job.Name, job.Description, job.CronExpr, job.Timezone, job.AgentType,
 		job.RepoPath, job.BaseBranch, job.Prompt, job.Enabled, job.MaxDurationS,
-		job.CleanupWorktree, job.Flags, job.JobType, job.WorkflowID, now, now)
+		job.CleanupWorktree, job.NoWorktree, job.Flags, job.JobType, job.WorkflowID, now, now)
 	if err != nil {
 		return nil, err
 	}
@@ -144,10 +145,10 @@ func (s *ScheduleStore) UpdateScheduledJob(ctx context.Context, jobID int64, fie
 	err := dynamicUpdate(ctx, s.db, "scheduled_jobs", jobID, fields, map[string]bool{
 		"name": true, "description": true, "cron_expr": true, "timezone": true,
 		"agent_type": true, "repo_path": true, "base_branch": true, "prompt": true,
-		"enabled": true, "max_duration_s": true, "cleanup_worktree": true, "flags": true,
+		"enabled": true, "max_duration_s": true, "cleanup_worktree": true, "no_worktree": true, "flags": true,
 		"job_type": true, "workflow_id": true, "paused_reason": true, "resumed_at": true,
 	}, map[string]bool{
-		"enabled": true, "cleanup_worktree": true,
+		"enabled": true, "cleanup_worktree": true, "no_worktree": true,
 	}, true)
 	if err != nil {
 		return nil, err

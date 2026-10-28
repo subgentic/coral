@@ -185,7 +185,8 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
     const settingsRows = [
         !isWorkflow ? ['Base branch', escapeHtml(job.base_branch || "The repo's current branch")] : null,
         ['Time limit', escapeHtml(limitWords(job.max_duration_s) || `${job.max_duration_s} seconds`)],
-        !isWorkflow ? ['Cleanup worktree', job.cleanup_worktree ? 'Yes' : 'No'] : null,
+        !isWorkflow && job.no_worktree === 1 ? ['Works in', 'The folder itself, no worktree'] : null,
+        !isWorkflow && job.no_worktree !== 1 ? ['Cleanup worktree', job.cleanup_worktree ? 'Yes' : 'No'] : null,
         job.flags ? ['Flags', `<code>${escapeHtml(job.flags)}</code>`] : null,
     ].filter(Boolean);
 

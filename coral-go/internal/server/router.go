@@ -579,6 +579,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/scheduled/jobs", schedHandler.ListJobs)
 	r.Get("/api/scheduled/jobs/{jobID}", schedHandler.GetJob)
 	r.Post("/api/scheduled/jobs", schedHandler.CreateJob)
+	r.Post("/api/scheduled/jobs/init-repo", schedHandler.InitJobRepo)
 	r.Put("/api/scheduled/jobs/{jobID}", schedHandler.UpdateJob)
 	r.Delete("/api/scheduled/jobs/{jobID}", schedHandler.DeleteJob)
 	r.Post("/api/scheduled/jobs/{jobID}/toggle", schedHandler.ToggleJob)

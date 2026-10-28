@@ -118,6 +118,7 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		Enabled         *int   `json:"enabled"`
 		MaxDurationS    *int   `json:"max_duration_s"`
 		CleanupWorktree *int   `json:"cleanup_worktree"`
+		NoWorktree      *int   `json:"no_worktree"` // 1: the runs work in the folder itself, which need not be a git repository (#10276)
 		Flags           string `json:"flags"`
 		JobType         string `json:"job_type"`
 		WorkflowID      *int64 `json:"workflow_id"`
@@ -175,7 +176,7 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.RepoPath != "" {
-		if msg := jobRepoError(r.Context(), body.RepoPath); msg != "" {
+		if msg := jobFolderErrorFor(r.Context(), body.RepoPath, intPtrOr(body.NoWorktree, 0) == 1); msg != "" {
 			errBadRequest(w, msg)
 			return
 		}
@@ -197,6 +198,7 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		Enabled:         intPtrOr(body.Enabled, 1),
 		MaxDurationS:    intPtrOr(body.MaxDurationS, 3600),
 		CleanupWorktree: intPtrOr(body.CleanupWorktree, 1),
+		NoWorktree:      intPtrOr(body.NoWorktree, 0),
 	}
 	if job.Timezone == "" {
 		job.Timezone = "UTC"
@@ -283,10 +285,38 @@ func (h *ScheduleHandler) UpdateJob(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if repo, ok := fields["repo_path"].(string); ok && repo != "" {
-		if msg := jobRepoError(r.Context(), repo); msg != "" {
-			errBadRequest(w, msg)
+	if v, ok := fields["no_worktree"]; ok { // a flag, as enabled is: 0 or 1 (or a boolean)
+		switch n := v.(type) {
+		case bool:
+			fields["no_worktree"] = map[bool]int{false: 0, true: 1}[n]
+		case float64:
+			if n != 0 && n != 1 {
+				errBadRequest(w, "'no_worktree' must be 0 or 1")
+				return
+			}
+		default:
+			errBadRequest(w, "'no_worktree' must be 0 or 1")
 			return
+		}
+	}
+	_, folderChanged := fields["repo_path"]
+	_, modeChanged := fields["no_worktree"]
+	if folderChanged || modeChanged { // the folder and the way it is used are checked together, each as the job will have it
+		repo, _ := fields["repo_path"].(string)
+		noWT := fields["no_worktree"] == 1 || fields["no_worktree"] == float64(1)
+		if existing, _ := h.sched.GetScheduledJob(r.Context(), jobID); existing != nil {
+			if !folderChanged {
+				repo = existing.RepoPath
+			}
+			if !modeChanged {
+				noWT = existing.NoWorktree == 1
+			}
+		}
+		if repo != "" {
+			if msg := jobFolderErrorFor(r.Context(), repo, noWT); msg != "" {
+				errBadRequest(w, msg)
+				return
+			}
 		}
 	}
 	if v, ok := fields["base_branch"]; ok {
