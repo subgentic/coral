@@ -216,6 +216,7 @@ POST /api/sessions/live/{name}/resize | unbound | operator-only
 POST /api/sessions/live/{name}/restart | unbound | operator-only
 POST /api/sessions/live/{name}/resume | unbound | operator-only
 POST /api/sessions/live/{name}/send | unbound | operator-only
+POST /api/sessions/live/{name}/share-file | unbound | operator-only
 POST /api/sessions/live/{name}/tasks | token-bound
 POST /api/sessions/live/{name}/tasks/reorder | token-bound
 POST /api/sessions/live/{name}/token-usage | token-bound

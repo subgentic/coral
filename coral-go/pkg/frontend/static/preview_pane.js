@@ -179,6 +179,7 @@ function _renderToolbar(tab) {
         _modeBtn('preview', 'visibility', 'Preview', tab),
         binary ? '' : _modeBtn('edit', 'edit', 'Edit', tab),
         !binary && tab.mode === 'edit' ? `<button class="inline-preview-save" data-action="save">Save</button>` : '',
+        `<button class="btn btn-quiet btn-icon btn-xs inline-preview-mode-btn" data-action="share-file" title="Share as artifact" aria-label="${escapeAttr(`Share ${_fileName(tab.filepath)} as an artifact`)}"><span class="material-icons" aria-hidden="true">link</span></button>`, // #10269
     ].join('');
     bar.innerHTML = `<span class="preview-toolbar-path" title="${escapeAttr(tab.filepath)}">${escapeHtml(tab.filepath)}</span>
         <div class="inline-preview-actions">${buttons}</div>`;
@@ -194,6 +195,7 @@ function _onToolbarClick(e) {
         _renderToolbar(tab);
     } else if (btn.dataset.action === 'unshare') tab.unshare?.(() => closeTab(tab.id));
     else if (btn.dataset.action === 'save') saveTab(tab, btn);
+    else if (btn.dataset.action === 'share-file') importOnce('./share_file.js').then(m => m.shareFileAsArtifact(tab.filepath));
 }
 
 /* ── Open / switch / close ─────────────────────────────────── */

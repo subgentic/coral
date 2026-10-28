@@ -98,6 +98,7 @@
 1	changed_files.js	moreButton(filepath, name)
 1	changed_files.js	options
 2	changed_files.js	previewBtn
+2	changed_files.js	shareBtn
 2	changed_files.js	starBtn
 2	changed_files.js	stats
 1	changed_files.js	statusCls

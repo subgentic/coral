@@ -363,6 +363,7 @@ POST /api/sessions/live/{name}/resize interact
 POST /api/sessions/live/{name}/restart launch
 POST /api/sessions/live/{name}/resume launch
 POST /api/sessions/live/{name}/send interact
+POST /api/sessions/live/{name}/share-file launch
 POST /api/sessions/live/{name}/tasks interact
 POST /api/sessions/live/{name}/tasks/reorder never
 POST /api/sessions/live/{name}/token-usage never
