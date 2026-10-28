@@ -377,6 +377,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     if (task.version > 1) { const edited = el('span', 'text-muted-sm', ` edited, v${task.version}`); h.append(edited); }
  const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
+    if (task.status === 'pending' && task.assigned_to) line.append(el('span', 'text-muted-sm', ` Waiting for ${task.assigned_to} to pick it up.`)); // what a queued task waits on, until it is claimed (#10200)
     if (ctx.teamLink) {
         const links = el('div', 'goal-back-row'), teamLink = el('a', 'goal-team-link inbox-team-link', 'Open on team page');
         teamLink.href = ctx.teamLink; teamLink.setAttribute('data-route', '');

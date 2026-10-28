@@ -34,9 +34,10 @@ const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type 
 const statusWord = (a) => WORD[a.availability] || 'No signal yet';
 const providerOf = (a) => PROVIDER[a.agent_type] || (a.agent_type ? a.agent_type.charAt(0).toUpperCase() + a.agent_type.slice(1) : 'Claude');
 const canRemind = (a) => a.availability !== 'offline' && (a.agent_type !== 'terminal' || a.reminder); // a reminder to an ended agent does nothing (#8271) // a terminal is not an agent: a reminder to it does nothing (UI audit #5589)
-const taskLine = (t) => `#${Number(t.id)} ${String(t.status || '').replaceAll('_', ' ')}: ${t.title}`;
+// A task nobody has picked up says what it waits on (#10200): the agent it is for, not just "pending".
+const taskLine = (t, a) => `#${Number(t.id)} ${t.status === 'pending' && a && a.name ? `waiting for ${a.name} to pick it up` : String(t.status || '').replaceAll('_', ' ')}: ${t.title}`;
 /** What the agent is doing: its first task as one line, else the reason its status gives. */
-const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0]) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : (a.reason || ''));
+const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0], a) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : (a.reason || ''));
 
 /** The statuses with at least one agent, in the order of the chips, with their counts. */
 function chipCounts(agents) {
@@ -224,7 +225,7 @@ export function renderAgentPage(host, agent, ctx) {
     fact(dl, 'Provider', providerOf(agent));
     fact(dl, 'Role', agent.role);
     fact(dl, 'Status', agent.reason);
-    if (agent.tasks && agent.tasks.length) { const ul = el('ul', 'team-agent-tasks'); for (const t of agent.tasks) ul.append(el('li', null, taskLine(t))); fact(dl, 'Working on', ul); }
+    if (agent.tasks && agent.tasks.length) { const ul = el('ul', 'team-agent-tasks'); for (const t of agent.tasks) ul.append(el('li', null, taskLine(t, agent))); fact(dl, 'Working on', ul); }
     if (agent.reminder) fact(dl, 'Repeating reminder', agent.reminder_interval_seconds ? `every ${Math.round(agent.reminder_interval_seconds / 60)} min` : 'on');
     itemStatus = status;
     page.append(status, back, h, line, dl);
