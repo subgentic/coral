@@ -203,3 +203,8 @@ svg[width="48"][height="48"] { width: 3rem; height: 3rem; }
 @media (pointer: coarse) {
     .command-pane .mobile-send-btn.is-stop { margin-left: 16px; }
 }
+
+/* A phone turned sideways with the message box focused: the agent's header folds away too (the top bar already does with the keyboard up), so three lines of the chat stay visible; it returns when the box loses focus (#10388) */
+@media (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    body:has(#command-input:focus) #live-session-view .terminal-header, body:has(#command-input:focus) .agent-phone-details { display: none; }
+}
