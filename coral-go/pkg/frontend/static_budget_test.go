@@ -18,7 +18,8 @@ const (
 	// and every other file as it is, with the agent docs `make` syncs into static/agent_docs. It is 5.04 MB today (the source tree is 6.44 MB: comments and indentation are not shipped), so a comment
 	// never moves it and a real asset does. Raise it deliberately, with the reason in the commit, when a real asset needs the room.
 	// 5.25 MiB since Goal #61's artifact roll-up (the file count, the goal section, Group by, tags: ~35 KB of JS, CSS and one new JS module each); about 200 KB of room over what ships
-	staticBudget = 5<<20 + 256<<10
+	// 5.27 MiB since #10291 and #10487 (Resume's folder and mode lines and warning, the dialog opening the resumed agent, All chats' reading words, Session Info's attach note: about 12 KB of JS, CSS and markup), on top of a tree that was within 8 KB of the ceiling
+	staticBudget = 5<<20 + 272<<10
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 )

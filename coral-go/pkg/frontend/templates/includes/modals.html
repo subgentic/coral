@@ -534,7 +534,8 @@
                             <input type="text" id="resume-dir" placeholder="/path/to/project" data-coral-root="{{ .CoralRoot }}" value="{{ .CoralRoot }}">
                             <button class="btn" data-on-click="m-toggle-browser" data-browser="resume-dir resume-dir-browser resume-browser-list resume-browser-current-path">Browse</button>
                         </div>
-                        <p id="resume-dir-note" class="settings-hint" hidden></p><!-- where the session ran, and a warning when the folder is changed or gone (resume_dialog.js, #10291) -->
+                        <p id="resume-dir-note" class="settings-hint" hidden></p>
+                        <p id="resume-mode-note" class="settings-hint" hidden></p><!-- the mode the chat ran in, which it resumes in (resume_dialog.js, #10487) --><!-- where the session ran, and a warning when the folder is changed or gone (resume_dialog.js, #10291) -->
                     </div>
                     <div id="resume-dir-browser" class="dir-browser" style="display:none">
                         <div class="dir-browser-header">

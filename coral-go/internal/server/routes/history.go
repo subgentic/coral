@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/jsonl"
@@ -662,17 +663,24 @@ func (h *HistoryHandler) GetResumeInfo(w http.ResponseWriter, r *http.Request) {
 			if nativeID := nativeResumeID(idx.SourceType, idx.SourceFile, sid); nativeID != "" {
 				result["resume_session_id"] = nativeID
 			}
-			// where the session ran: its transcript says, for a chat Coral has no live row for (#10291)
-			if dir := transcriptCwd(idx.SourceFile); dir != "" {
+			// where the session ran, and the mode it ran in where its transcript keeps one: for a chat Coral has no live row for (#10291, #10487)
+			dir, mode := transcriptStart(idx.SourceFile)
+			if dir != "" {
 				result["working_dir"] = dir
 				result["working_dir_from"] = "session"
 				_, statErr := os.Stat(dir)
 				result["working_dir_exists"] = statErr == nil
 			}
+			if mode != "" {
+				result["permission_mode"] = agent.PermissionModeForCLI(idx.SourceType, mode)
+			}
 		}
 	}
 
 	if ls, err := h.ss.GetLiveSession(r.Context(), sid); err == nil && ls != nil {
+		if ls.PermissionMode != nil && agent.ValidPermissionMode(*ls.PermissionMode) { // the mode its session recorded: the resume keeps it (#10487)
+			result["permission_mode"] = agent.PermissionModeForCLI(ls.AgentType, *ls.PermissionMode)
+		}
 		result["working_dir"] = ls.WorkingDir
 		result["working_dir_from"] = "session"
 		_, statErr := os.Stat(ls.WorkingDir)

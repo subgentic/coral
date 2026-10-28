@@ -46,7 +46,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
         // ── (1) Resume: the folder the session ran in ──
         await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => { const url = new URL(String(u), location.href);
             const m = url.pathname.match(/\\/api\\/sessions\\/history\\/([^/]+)\\/resume-info$/);
-            if (m) { const info = { 'ran-here': { working_dir: '/work/project', working_dir_from: 'session', working_dir_exists: true, agent_type: 'claude' }, 'ran-gone': { working_dir: '/work/removed', working_dir_from: 'session', working_dir_exists: false, agent_type: 'claude' }, 'ran-nowhere': { agent_type: 'claude' } }[m[1]] || {};
+            if (m) { const info = { 'ran-here': { working_dir: '/work/project', working_dir_from: 'session', working_dir_exists: true, agent_type: 'claude', permission_mode: 'plan' }, 'ran-default': { working_dir: '/work/project', working_dir_from: 'session', working_dir_exists: true, agent_type: 'claude', permission_mode: 'default' }, 'ran-gone': { working_dir: '/work/removed', working_dir_from: 'session', working_dir_exists: false, agent_type: 'claude' }, 'ran-nowhere': { agent_type: 'claude' } }[m[1]] || {};
                 return Promise.resolve(new Response(JSON.stringify(info), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
             return R(u, o); }; return true; })()`);
         const resume = async id => { await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); st.state.currentSession = { type: 'history', name: '${id}', agent_type: 'claude' }; st.state.historySessionsList = [{ session_id: '${id}', source_type: 'claude' }]; const m = await import((window.__coralStatic || '/static/') + 'resume_dialog.js'); await m.showResumeModal(); })(); true`); await quiet(400); return ev(`(() => ({ dir: document.getElementById('resume-dir').value, note: document.getElementById('resume-dir-note').hidden ? '' : document.getElementById('resume-dir-note').textContent, warn: document.getElementById('resume-dir-note').classList.contains('is-warning') }))()`); };
@@ -65,13 +65,23 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
         await ev(`window.__selected = []; window.selectLiveSession = (name, type, sid, server) => { window.__selected.push([name, type, sid, server]); return Promise.resolve(); }; window.showChatView = () => { window.__chatShown = true; }; true`);
         await ev(`(() => { const R = window.fetch; window.__liveReads = 0; window.fetch = (u, o) => { const url = new URL(String(u), location.href);
             if (url.pathname === '/api/sessions/live') return Promise.resolve(new Response(JSON.stringify(window.__resumedListed ? [{ session_id: 'resumed-id', name: 'resumed', agent_type: 'claude', server: 'local', working_directory: '/work/project', status: 'idle' }] : []), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-            if (url.pathname === '/api/sessions/launch') return Promise.resolve(new Response(JSON.stringify({ session_id: 'resumed-id', name: 'resumed' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+            if (url.pathname === '/api/sessions/launch') { window.__launchBody = JSON.parse(o.body); } if (url.pathname === '/api/sessions/launch') return Promise.resolve(new Response(JSON.stringify({ session_id: 'resumed-id', name: 'resumed' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
             return R(u, o); }; return true; })()`);
         await resume('ran-here');
+        assert.equal(await ev(`document.getElementById('resume-mode-note').textContent`), 'Resumes in Plan mode, the mode this chat ran in.', 'the dialog says the mode it resumes in');
         await ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); window.__resumedListed = false; await window.resumeLaunchNew(); setTimeout(() => { window.__resumedListed = true; }, 1500); })(); true`);
         await waitFor(`window.__selected.length === 1`, 'the resumed agent opened', 12000);
         assert.deepEqual(await ev(`window.__selected[0]`), ['resumed', 'claude', 'resumed-id', 'local']);
         assert.equal(await ev(`!!window.__chatShown`), true, 'in its chat');
+        assert.deepEqual(await ev(`[window.__launchBody.flags, window.__launchBody.permission_mode, window.__launchBody.resume_session_id]`), [['--permission-mode', 'plan'], null, 'ran-here'], 'a Plan chat is resumed with Plan\'s own flags, never the saved default: ' + JSON.stringify(await ev('window.__launchBody')));
+        await resume('ran-default');
+        assert.equal(await ev(`document.getElementById('resume-mode-note').textContent`), 'Resumes in Default mode, the mode this chat ran in.');
+        await ev(`window.__launchBody = null; window.resumeLaunchNew(); true`); await waitFor(`!!window.__launchBody`, 'the launch', 4000);
+        assert.deepEqual(await ev(`[window.__launchBody.permission_mode, window.__launchBody.flags || null]`), ['default', null], 'a Default chat is resumed in Default, named explicitly');
+        await resume('ran-nowhere');
+        assert.match(await ev(`document.getElementById('resume-mode-note').textContent`), /mode was not recorded: it resumes in your saved default/, 'none recorded says so');
+        await ev(`window.__launchBody = null; window.resumeLaunchNew(); true`); await waitFor(`!!window.__launchBody`, 'the launch', 4000);
+        assert.deepEqual(await ev(`[window.__launchBody.permission_mode || null, window.__launchBody.flags || null]`), [null, null], 'nothing is sent: the saved default applies');
         console.log('PASS resume and index: the folder it ran in, opens when listed, Reading your past sessions, how to attach');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -17,7 +17,7 @@ import (
 // safefs or is reviewed and listed here; a listed site that no longer exists fails too, so the
 // list stays true. Keyed file:function:call, never by line.
 var reviewedFileOpens = map[string]string{
-	"history_resume_cwd.go:transcriptCwd:OpenNoFollow":                    "a session's history file (session_index.source_file, written by the indexer from the CLIs' own history folders, not a request path): read-only, never through a link, the first 256 KiB only, to find the folder it ran in (#10291)",
+	"history_resume_cwd.go:transcriptStart:OpenNoFollow":                  "a session's history file (session_index.source_file, written by the indexer from the CLIs' own history folders, not a request path): read-only, never through a link, the first 256 KiB only, to find the folder it ran in (#10291)",
 	"telemetry_install_id.go:telemetryInstallID:OpenNoFollow":             "fixed .install_id in the server instance data folder, not a request path; read-only, no-follow, regular file, 128-byte cap and 36-character UUID validation (#6047)",
 	"relaunch_fixture.go:readFixture:OpenNoFollow":                        "relaunchfixture builds only: the one fixture file in the owner-only folder named by CORAL_RELAUNCH_FIXTURE_DIR, Lstat-checked regular 0600 own file, 16 KiB cap (#5452)",
 	"updates_dir.go:updatesDir.read:OpenNoFollow":                         "<data dir>/updates/ack.key and ack_used.json: fixed names, Lstat-checked plain files only this user can read (#5280)",
