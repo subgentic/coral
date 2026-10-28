@@ -146,6 +146,9 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 			if m := agent.PermissionModeFromFlags(spec.Flags); m != "" {
 				return m
 			}
+			if agentType == at.Codex && agent.CodexFlagsAreAuto(spec.Flags) {
+				return "auto" // the form's Auto for Codex: its own pair, recorded as the mode it is, so the chat does not say Default for an agent that never asks (#10381)
+			}
 			if carried, _ := agent.SplitPermissionFlags(spec.Flags); len(carried) > 0 {
 				return "default" // permission flags nobody here can read as a mode: never widened to a saved default or Auto (#6423)
 			}

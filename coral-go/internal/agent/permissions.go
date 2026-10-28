@@ -287,6 +287,22 @@ func codexModeFromSandboxFlags(flags []string) string {
 	return "" // a wider pair is no mode here: the flags themselves are carried as they are (SplitPermissionFlags), never widened or narrowed on the way
 }
 
+// CodexFlagsAreAuto reports whether Codex's own flags are exactly the pair Auto launches with (--sandbox workspace-write -a never, appendCodexFullAuto): a form's Auto pick for Codex arrives as these flags and
+// records as Auto, so the chat says what the agent does (#10381). PermissionModeFromFlags still does not read the pair as a mode (it never widens one type's flags into a mode: a launch of another CLI
+// from the same flags must not carry Auto); this is asked only of a Codex launch, whose own mode it is.
+func CodexFlagsAreAuto(flags []string) bool {
+	var sandbox, approval string
+	for i := 0; i+1 < len(flags); i++ {
+		switch flags[i] {
+		case "--sandbox", "-s":
+			sandbox = flags[i+1]
+		case "-a", "--ask-for-approval":
+			approval = flags[i+1]
+		}
+	}
+	return sandbox == "workspace-write" && approval == "never"
+}
+
 func permissionModeFromEntries(flags []string) string {
 	for i := 0; i < len(flags); i++ {
 		f := flags[i]
