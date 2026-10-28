@@ -35,7 +35,7 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 const page = await ev(`window.__na.text(window.__tp.page())`);
                 assert.equal(/ in \//.test(page) || /\b\d+ agents? (in|on) /.test(page), false, 'no "2 agents in /folder" line');
                 assert.equal(await ev(`!!window.__tp.find('button', /^Refresh$/i)`), false, 'no Refresh button');
-                const rows = await ev(`window.__tp.rows()`); assert.ok(await ev(`window.__tp.table().querySelector('.dt-primary').getAttribute('aria-label') === 'Orchestrator'`), `the Orchestrator is first (${JSON.stringify(rows.map(r => r.slice(0, 20)))})`);
+                const rows = await ev(`window.__tp.rows()`); assert.ok(await ev(`/^Orchestrator(, |$)/.test(window.__na.name(window.__tp.table().querySelector('.dt-primary')))`), `the Orchestrator is first (${JSON.stringify(rows.map(r => r.slice(0, 20)))})`);
                 await goTab(ev, settle, 'Knowledge'); await settle(500);
                 assert.equal(await ev(`(() => { const t = window.__tp.allTabs().find(x => window.__tp.tabLabel(x) === 'Knowledge'); return t ? window.__na.name(t) : null; })()`), 'Knowledge', 'the tab carries no 0');
                 await goTab(ev, settle, 'Agents'); await settle(300);
@@ -64,7 +64,7 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 await ev(`delete window.__LIVE[1].server; true`);
             });
             // Remind is on the agent's own page: these helpers open it and come back to the table.
-            const openPage = async n => { await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button, a')].find(x => window.__na.name(x) === ${JSON.stringify(n)}); if (b) b.click(); return true; })()`); await settle(400); };
+            const openPage = async n => { await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button, a')].find(x => { const nm = window.__na.name(x); return nm === ${JSON.stringify(n)} || nm.startsWith(${JSON.stringify(n)} + ', '); }); if (b) b.click(); return true; })()`); await settle(400); };
             const backToTable = async () => { await ev(`(() => { const b = window.__tp.find('button, a', /^(\u2190\s*)?Agents$/); if (b) b.click(); return true; })()`); await settle(300); };
             const clickRemind = n => ev(`(() => { const e = [...window.__tp.page().querySelectorAll('button')].find(x => window.__na.name(x) === ${JSON.stringify('Remind ' + n)}); if (e) e.click(); return true; })()`);
             const dlg = n => `(() => { const d = [...document.querySelectorAll('[role=dialog]')].filter(window.__na.vis).find(x => window.__na.name(x).startsWith(${JSON.stringify('Remind ' + n)})); return d; })()`;
@@ -107,7 +107,7 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 await backToTable();
             });
             await S.run(`${label}: an agent's row opens its page: back link Agents, h2 with the name, buttons Remind and Open chat; Back puts the focus on the row`, async () => {
-                await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button, a')].find(x => window.__na.name(x) === 'Backend Dev'); if (b) b.click(); return true; })()`); await settle(400);
+                await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button, a')].find(x => /^Backend Dev(, |$)/.test(window.__na.name(x))); if (b) b.click(); return true; })()`); await settle(400);
                 assert.ok(await ev(`(() => { const e = [...window.__tp.page().querySelectorAll('h2')].find(window.__na.vis); return !!e && /Backend Dev/.test(window.__na.text(e)); })()`), 'the agent page h2 names the agent');
                 for (const rx of ['/^(\\u2190\\s*)?Agents$/', '/^Remind/', '/^Open chat$/']) assert.ok(await ev(`!!window.__tp.find('button, a', ${rx})`), `a control named ${rx}`);
                 assert.equal(await ev(`window.__tp.pane() === null`), true, 'no Details pane for an agent');
