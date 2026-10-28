@@ -2,7 +2,7 @@
 //  - the title of the Inbox and Automations folders, Analytics and Docs start at the same x (the content edge, 24 px in the main stage); the bar above a folder's table starts there too
 //  - an empty state's words start at that edge on the folders and the artifacts page, and an empty Artifacts, Tasks and Runs page says what fills it (a hint under the line)
 //  - two toasts of different lengths are one width
-//  - at 390 a toast covers no control (it sits under the app bar, over the list's heading: left as it was)
+//  - at 390 a toast covers no control (it sits under the app bar, the list's title and its filter box, #10052 and #10458)
 // PAGE_EDGES_SHOTS=<dir> writes a picture of each screen there (the before/after of the review). Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
 // PAGE_EDGES_NO_ASSERT=1 only reports what would fail (to take the pictures of a tree that does not pass yet)
