@@ -28,6 +28,23 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`import(${S} + 'sessions.js').then(m => m.selectLiveSession('focus-a', 'claude', 'focus-a-id')).then(() => true)`);
             await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: a late focus move would have landed by now
             assert.equal(await ev(`document.activeElement.id`), 'row-stand-in', label + ': selecting from the sidebar leaves focus on the row');
+            if (!mobile) { // the sidebar's row (the old behaviour, #9794): a click puts the cursor in the composer, Enter on the row does not move focus
+                const rowSel = `[data-on-click="session-open"][data-session-id="focus-a-id"] .row-btn`;
+                await ev(`(() => { const ul = document.getElementById('live-sessions-list'); ul.innerHTML = '<li class="session-group-item" data-session-id="focus-a-id" data-server="local" data-on-click="session-open" data-name="focus-a" data-agent-type="claude"><button type="button" class="row-btn">focus-a</button></li>'; return true; })()`);
+                await waitFor(`!!document.querySelector('${rowSel}') && document.querySelector('${rowSel}').getClientRects().length > 0`, label + ': the agent has a sidebar row', 8000);
+                // what the row's handler passes: a mouse click says pointer, Enter (a click with no pointer) does not
+                await ev(`(() => { const o = window.selectLiveSession; window.__opts = []; window.selectLiveSession = (...a) => { window.__opts.push(!!(a[4] && a[4].pointer)); return o(...a); }; return true; })()`);
+                const pt = await ev(`(() => { const r = document.querySelector('${rowSel}').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+                await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: pt.x, y: pt.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
+                await waitFor(`window.__opts.length === 1`, label + ': the click reached the handler', 4000);
+                await ev(`document.querySelector('${rowSel}').focus(); true`);
+                await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+                await waitFor(`window.__opts.length === 2`, label + ': Enter reached the handler', 4000);
+                assert.deepEqual(await ev(`window.__opts`), [true, false], label + ': a click is a pointer open, Enter is not');
+                // and a pointer open puts the cursor in the composer from wherever focus was (here a stand-in outside the list)
+                await ev(`document.getElementById('row-stand-in').focus(); import(${S} + 'sessions.js').then(m => m.selectLiveSession('focus-a', 'claude', 'focus-a-id', undefined, { pointer: true })).then(() => true)`);
+                await waitFor(`document.activeElement && document.activeElement.id === 'command-input'`, label + ': a pointer open puts the cursor in the composer', 4000);
+            }
             console.log('PASS ' + label + ': focus is on ' + want);
         }
     } finally { await client.close(); }
