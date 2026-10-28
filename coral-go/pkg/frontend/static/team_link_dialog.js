@@ -122,7 +122,7 @@ function giveFocusBack(from) {
     if (!t || !t.isConnected || !t.getClientRects().length) t = from && from.closest ? (from.closest('.sidebar-kebab-wrapper') || from.closest('.overflow-menu'))?.querySelector('.sidebar-kebab-btn, [aria-haspopup]') : null;
     if (t && t.isConnected) t.focus({ preventScroll: true });
 }
-const announce = (text) => { if (liveEl) liveEl.textContent = text; };
+const announce = (text) => { const el = liveEl; if (!el) return; el.textContent = ''; setTimeout(() => { if (el === liveEl && el.isConnected) el.textContent = text; }, 50); }; // emptied first: a live region says what changes, so the same sentence twice (a second link of the same team) is still said (QA Reviewer 2)
 
 /** Open the dialog for the team `teamKey` (an identity key: a name, or @server/name). opts: { cloud } (the mode; the dashboard's own by default), opener (the control to give the focus back to). */
 export async function showTeamLinkDialog(teamKey, opts = {}) {
