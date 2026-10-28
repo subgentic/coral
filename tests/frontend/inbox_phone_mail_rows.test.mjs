@@ -41,8 +41,8 @@ try {
     assert.equal(row.querySelector('.dt-mail-avatar').textContent, 'flag');
     // the other two folders carry their rows' spec
     const sidebar = read('static/inbox_sidebar.js'), arts = read('static/team_artifacts_page.js');
-    assert.match(sidebar, /mail: f => \(\{ lead: \{ text: f\.title \|\| f\.which, name: f\.title \|\| f\.which \}, title: f\.title \|\| f\.which, medium: true, snippet: f\.snip, time: f\.saved \}\)/, 'Saved: who it is from (a name, so medium), the message as its name cuts it, when it was saved');
-    assert.match(sidebar, /\.\.\.\(dock \? \{\} : \{ mail: f =>/, "the agent dock's Saved tab keeps its table: only the Inbox page has the mail row");
+    assert.match(sidebar, /mail: f => \(\{ lead: \{ text: f\.title \|\| f\.which, name: f\.title \|\| f\.which \}, title: f\.title \|\| f\.which, medium: true, snippet: f\.snip, time: f\.saved, tip: multi && f\.serverName \? `\$\{f\.which\} \\u00b7 \$\{f\.serverName\}` : '' \}\)/, 'Saved: who it is from (a name, so medium), the message as its name cuts it, when it was saved, and the computer on the hover');
+    assert.doesNotMatch(sidebar, /dock \? \{\} : \{ mail:/, "the agent dock's Saved tab has the mail row too, the same one as the Inbox page (#9786: it was a table on a phone with a Done button on every row)");
     assert.match(arts, /\.\.\.\(inbox \? \{ mail: item => \(\{ lead: \{ icon: 'description'/, 'Artifacts of the Inbox: a file glyph, the name, its team and task');
     assert.ok(!/mail:/.test(arts.slice(0, arts.indexOf('...(inbox ? { mail:'))), 'only the Inbox list, not the team page, agent or goal lists');
     // a board of the group opens that board's messages in the Inbox (its address), not the Board history folder
