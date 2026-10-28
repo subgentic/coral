@@ -58,6 +58,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
         await dlg(`${tag}: hub: dialog settings`, { opener: ACCOUNT, open: () => ev(`(async () => { await window.showSettingsModal(); return true; })()`) });
         // no computer connected (#6351): the home is one "Connect your first computer" panel with its link
         const noComputers = await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__noComputers = true;' });
+        await ev(`try { localStorage.removeItem('coral-last-place'); } catch {} true`); // the dashboard reopens the place the person left (#10057): this scene is the Home of a Hub with no computer
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await ev(`window.__coralReady.startup('liveList','settings')`);
         await sc(`${tag}: hub: home, no computer connected`, async () => { await waitFor(`/Connect your first computer/.test(document.body.textContent) && !!document.querySelector('a[href="/machines/add"]')`, 'the connect panel', 10000); }, { expect: `[...document.querySelectorAll('a[href="/machines/add"]')].some(a => a.getClientRects().length > 0)` });
