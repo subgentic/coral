@@ -1,9 +1,9 @@
 // How a dialog or a toast names an agent and says what stays (#10139): its role and team, never the folder it happens to work in.
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { agentWords, WHAT_STAYS_KILL, WHAT_STAYS_ARCHIVE, deleteTeamWords, unpinWords } = await import(path.resolve(here, '../../coral-go/pkg/frontend/static/agent_words.js'));
+const { agentWords, WHAT_STAYS_KILL, WHAT_STAYS_ARCHIVE, deleteTeamWords, unpinWords } = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/agent_words.js')).href);
 
 // role and team
 let w = agentWords({ board_job_title: 'QA Engineer', board_project: 'alpha', name: 'work-claude-1', working_directory: '/x/work' }, 'work');

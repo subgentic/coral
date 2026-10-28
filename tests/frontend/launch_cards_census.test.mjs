@@ -3,11 +3,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'coral-go', 'pkg', 'frontend');
 const read = p => fs.readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g, '\n');
-const { LAUNCH_CARDS } = await import(path.join(root, 'static', 'launch_cards.js'));
+const { LAUNCH_CARDS } = await import(pathToFileURL(path.join(root, 'static', 'launch_cards.js')).href);
 const want = LAUNCH_CARDS.map(c => [c.icon, c.label, c.desc]);
 
 const welcome = [...read('templates/index.html').matchAll(/<button class="welcome-launch"[\s\S]*?welcome-launch-icon material-icons" aria-hidden="true">([^<]*)<\/span>\s*<span class="welcome-launch-copy"><strong>([^<]*)<\/strong><span>([^<]*)<\/span>/g)].map(m => [m[1], m[2], m[3]]);

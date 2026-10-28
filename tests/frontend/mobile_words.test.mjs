@@ -1,9 +1,9 @@
 // The words of the "Use on your phone" dialog (#10149, Desktop tester #10148): what Enable does, where the phone types the setup code, and the same-network line. Plain text for textContent.
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const W = await import(path.resolve(here, '../../coral-go/pkg/frontend/static/mobile_words.js'));
+const W = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/mobile_words.js')).href);
 
 // what Enable does, before it is pressed, and the Hub way as a named choice
 assert.match(W.DISABLED_WORDS, /Turning it on lets devices on your network reach Coral/);
