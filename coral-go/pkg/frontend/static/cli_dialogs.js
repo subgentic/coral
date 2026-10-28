@@ -18,7 +18,7 @@ async function _checkOneCLI(inputId, resultId) {
     if (!input || !resultEl) return;
 
     const binary = input.value.trim() || input.placeholder;
-    resultEl.textContent = '...';
+    resultEl.textContent = 'Checking…'; // a word: this line is a live region, and a screen reader would say "dot dot dot" (#10693)
     resultEl.className = 'cli-verify-result';
     resultEl.title = '';
     const why = _whyLine(resultEl);
@@ -58,14 +58,15 @@ function _whyLine(resultEl) {
 
 window._verifyAllCLIs = async function() {
     const btn = document.getElementById('verify-all-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Checking...'; }
+    if (btn && btn.getAttribute('aria-disabled') === 'true') return; // checking already
+    if (btn) { btn.setAttribute('aria-disabled', 'true'); btn.textContent = 'Checking…'; } // not disabled: a disabled button that has the keyboard drops it to the page (#10693)
     await Promise.all([
         _checkOneCLI('settings-cli-path-claude', 'cli-result-claude'),
         _checkOneCLI('settings-cli-path-codex', 'cli-result-codex'),
         _checkOneCLI('settings-cli-path-agy', 'cli-result-agy'),
         _checkOneCLI('settings-cli-path-pi', 'cli-result-pi'),
     ]);
-    if (btn) { btn.disabled = false; btn.textContent = 'Verify All'; }
+    if (btn) { btn.removeAttribute('aria-disabled'); btn.textContent = 'Verify All'; }
 };
 
 function _showCLINotFoundModal(agentType, server = LOCAL_SERVER, { retry = null } = {}) {

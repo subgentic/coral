@@ -596,7 +596,7 @@
                         <!-- the live parts of this group (filled by settings_dialog.js, shown or hidden by it) sit here until the rows are drawn, then settings_fields.js moves each into place -->
                         <div id="settings-agents-live" hidden>
                         <!-- the CLI paths' live parts (#8460): each field's verify result and the Verify All button, filled by cli_dialogs.js; settings_fields.js moves them under their fields -->
-                        <span id="cli-result-claude" class="cli-verify-result"></span><span id="cli-result-codex" class="cli-verify-result"></span><span id="cli-result-agy" class="cli-verify-result"></span><span id="cli-result-pi" class="cli-verify-result"></span>
+                        <span id="cli-result-claude" class="cli-verify-result" role="status" aria-live="polite"></span><span id="cli-result-codex" class="cli-verify-result" role="status" aria-live="polite"></span><span id="cli-result-agy" class="cli-verify-result" role="status" aria-live="polite"></span><span id="cli-result-pi" class="cli-verify-result" role="status" aria-live="polite"></span>
                         <button class="btn btn-small" data-on-click="m-verify-all-c-l-is" id="verify-all-btn">Verify All</button>
                         <div id="settings-prompts-live">
                         <button class="btn settings-prompts-btn" data-on-click="m-hide-settings-modal-then-show-default-prompts-modal">
