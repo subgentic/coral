@@ -428,7 +428,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         timer = pollEvery(visibleRefresh, 30000);
         window.addEventListener('focus', visibleRefresh);
     }
-    return { update, refreshTasks: () => loadTasks(id), dispose: () => {
+    return { update, openClose: (g, preset) => openClose(g, preset), refreshTasks: () => loadTasks(id), dispose: () => {
         disposed = true; narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
     }, focus: focusDetail };
 }

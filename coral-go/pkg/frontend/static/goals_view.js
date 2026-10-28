@@ -158,7 +158,7 @@ function drawTableRaw(col) {
         selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null) },
         onSort: () => drawList(), // keep the no-goal navigation row last in either direction
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
-        columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']), oneLine: true, sortBar: false,
+        columns: GC.goalColumns({ progressLabel: 'Tasks', closeReady: g => { model.closeWhenOpen = g.id; openGoal(g.id, true); } }, ['goal', 'state', 'progress', 'updated']), oneLine: true, sortBar: false,
     });
     col.append(table.el); Toolbar.mountSelection(toolbar, goalsTableState.selected.size ? table.bar : null);
     if (PHONE.matches) toolbar.querySelector('.goals-new')?.before(table.selectButton);
@@ -170,6 +170,7 @@ function drawGoalPageRaw(col) {
     clearDetail();
     detailHost = col; detailId = goal.id;
     detail = mountGoal(col, { team: model.project, id: goal.id, goal, back: closeGoal, refresh: loadGoals, status: say });
+    if (model.closeWhenOpen === goal.id) { model.closeWhenOpen = null; detail.openClose?.(goal, 'done'); } // the row's Close: its page opens on the close dialog, Done chosen (#10604)
 }
 
 function draw() {
