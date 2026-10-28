@@ -292,3 +292,38 @@ func TestLaunchEveryInstanceCarriesAUniqueLaunchTag(t *testing.T) {
 		t.Fatalf("tags repeat: %v", tags)
 	}
 }
+
+// laggingProvider lists nothing the first time and the launch's machine the second time, as a provider whose list lags the create does.
+type laggingProvider struct {
+	*stubProvider
+	lists int
+}
+
+func (l *laggingProvider) List(context.Context) ([]Instance, error) {
+	l.lists++
+	if l.lists == 1 {
+		return nil, nil
+	}
+	return []Instance{{ID: "late", Name: "coral-1", Tags: []string{Tag, l.spec.Tags[1]}}}, nil
+}
+
+func TestLaunchTimedOutCreateLooksOnceMoreAndDeletesTheLateMachine(t *testing.T) {
+	base := &stubProvider{createErr: context.DeadlineExceeded}
+	l := &laggingProvider{stubProvider: base}
+	o, d, _ := setup(base, &stubHub{})
+	d.Provider, o.RetryListAfter = l, time.Millisecond
+	_, err := Launch(context.Background(), o, d)
+	if err == nil || l.lists != 2 || !strings.Contains(strings.Join(base.calls, ","), "delete:late") {
+		t.Fatalf("lists %d, err %v, calls %v", l.lists, err, base.calls)
+	}
+}
+
+func TestLaunchCreateFailureThatIsNotATimeoutListsOnlyOnce(t *testing.T) {
+	base := &stubProvider{createErr: errors.New("422 unprocessable")}
+	l := &laggingProvider{stubProvider: base}
+	o, d, _ := setup(base, &stubHub{})
+	d.Provider, o.RetryListAfter = l, time.Millisecond
+	if _, err := Launch(context.Background(), o, d); err == nil || l.lists != 1 {
+		t.Fatalf("lists %d, err %v", l.lists, err)
+	}
+}
