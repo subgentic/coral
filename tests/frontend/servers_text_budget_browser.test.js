@@ -130,7 +130,7 @@ const contrast = (a, b) => {
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: CLOUD_PRELOAD });
         await cloudMode(true);
-        for (const [w, h, mobile, budget] of [[1280, 900, false, 67], [390, 844, true, 66]]) {
+        for (const [w, h, mobile, budget] of [[1280, 900, false, 71], [390, 844, true, 66]]) { // 1280: 67 to 71 for the Needs you and Last seen columns (#9680: four header words and the Last seen words of four rows); the phone's is unchanged
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await open();
             await ev(mobile ? `(document.querySelector('#nav-more-menu [data-arg="servers"]') || document.getElementById('nav-tab-servers')).click(); true` : `document.getElementById('nav-tab-servers').click(); true`);
