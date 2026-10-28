@@ -40,7 +40,7 @@ const BASE = require('./test_base').BASE;
         await open(390, 844, true);
         const phone = await ev(`(() => { const vis = e => !!e && e.checkVisibility({ checkVisibilityCSS: true }); const w = document.querySelector('.session-list li.empty-welcome'), p = document.querySelector('.session-list li.empty-plain');
             return { welcome: vis(w), plain: vis(p), title: w && w.querySelector('h2').textContent, buttons: w ? [...w.querySelectorAll('button')].map(b => b.querySelector('strong').textContent) : [], target: w ? [...w.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().height)) : [] }; })()`);
-        assert.equal(phone.welcome, true); assert.equal(phone.plain, false); assert.equal(phone.title, 'What do you want to work on?'); assert.deepEqual(phone.buttons, ['New agent', 'New team', 'Open folder']);
+        assert.equal(phone.welcome, true); assert.equal(phone.plain, false); assert.equal(phone.title, 'What do you want to work on?'); assert.deepEqual(phone.buttons, ['New agent', 'New project', 'Open folder']);
         assert.ok(phone.target.every(h => h >= 44), 'the cards are touch targets: ' + phone.target);
         await ev(`document.querySelector('.session-list li.empty-welcome button').click(); true`);
         await waitFor(`!!document.getElementById('launch-step-agent') && getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, 'the same New Agent dialog the desktop opens'); // (the dialog is a lazy template: it is not in the page until the click has built it)

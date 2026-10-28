@@ -47,7 +47,7 @@ const MD = '# Report title\n\nSome **bold** text.\n\n## A second heading\n\n- on
             const a3 = await row('launch-dir', 'btn-browse');
             assert.ok(a3 && a3.sameRow && a3.right, at + 'New agent: after closing and reopening the dialog, the same: ' + JSON.stringify(a3));
             await ev(`document.querySelector('#launch-modal .launch-back-btn, #launch-agent-back, [data-on-click="m-select-launch-type"][data-arg="back"]').click(); true`);
-            await ev(`(() => { const c = [...document.querySelectorAll('#launch-modal button')].find(b => /new team/i.test(b.textContent)); if (c) c.click(); return true; })()`);
+            await ev(`(() => { const c = [...document.querySelectorAll('#launch-modal button')].find(b => /new project/i.test(b.textContent)); if (c) c.click(); return true; })()`);
             await waitFor(`!!document.getElementById('launch-team-dir') && document.getElementById('launch-team-dir').getClientRects().length > 0`, at + 'New team step 1', 8000);
             const t = await row('launch-team-dir', 'btn-browse-team');
             assert.ok(t && t.sameRow && t.right && t.text === 'Browse', at + 'New team: the same: ' + JSON.stringify(t));
