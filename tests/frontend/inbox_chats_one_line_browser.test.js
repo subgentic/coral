@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const fs = require('node:fs'), path = require('node:path');
 const { setTheme } = require('./helpers/contrast');
+const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -51,6 +52,7 @@ const BASE = require('./test_base').BASE;
                 const wt = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; const f = e => e ? { fw: getComputedStyle(e).fontWeight, fs: getComputedStyle(e).fontSize } : null; return { unread: r.map(x => !!x.querySelector('.dt-mail-unread')), name: r.map(x => f(x.querySelector('span.dt-mail-title, button.dt-primary.dt-chat-name'))), snippet: r.map(x => f(x.querySelector('.dt-mail-snippet'))), live: r.map(x => { const d = x.querySelector('.dt-mail-live'); return d && d.getClientRects().length ? d.getAttribute('aria-label') : ''; }) }; })()`);
                 assert.ok(wt.name.every((n, i) => n && n.fw === (wt.unread[i] ? '600' : '500') && n.fs === '13px'), at + 'the name is 13/500, and 13/600 only on an unread row (#9687): ' + JSON.stringify([wt.name, wt.unread]));
                 if (mobile && folder === 'chats') { assert.ok(wt.snippet.every(n => n && n.fw === '400'), at + 'the chat title after it stays 400: ' + JSON.stringify(wt.snippet)); assert.deepEqual(wt.live.filter(Boolean), ['Active now'], at + 'only the live chat has the dot, named Active now'); const names = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) button.dt-mail-open')].map(b => b.getAttribute('aria-label'))`); assert.deepEqual(names.map(n => /, active now/.test(n)), wt.live.map(Boolean), at + 'the row\'s own name says active now for the live chat only (the dot is not read inside a labelled button): ' + JSON.stringify(names)); }
+                if (folder === 'chats' && !mobile) { await ev(`(() => { const t = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')].find(r => /Active now/.test((r.querySelector('.dt-tag') || {}).textContent || '')); t.querySelector('button.dt-primary').setAttribute('data-axp', 'live'); return true; })()`); const ax = await axName(client, '[data-axp="live"]'); assert.match(ax && ax.name, /^Open the chat .+ of Backend Dev, active now$/, at + 'a live chat\'s button ends with its chip\'s word, as Chrome computes it (#9747): ' + (ax && ax.name)); }
                 if (folder === 'chats' && !mobile) assert.ok(chips.every(c => / \u00b7 Backend Dev$/.test(c.tip)), at + 'the row\'s hover names the agent: ' + JSON.stringify(chips));
                 if (!mobile) assert.deepEqual(cut.cut, [], at + 'no cell but the title (its ellipsis is the design) is cut by its box: ' + JSON.stringify(cut));
                 if (!mobile) assert.ok(cut.whenOff !== null && cut.whenOff <= 2, at + 'the When header is over its cell: ' + JSON.stringify(cut));
