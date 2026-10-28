@@ -106,7 +106,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250);
             await ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team}))[0]; b.click(); return true; })()`); await waitFor(`!!window.__nt.dlg(${N.member})`, 'Edit member', 5000);
             await t.click('button', /^Back$/i, N.member); await settle(200); // an existing member opens on its settings (the agent step of the Launch dialog, #7861); its role and prompt are the step before
-            await t.type('textarea', /^Behavior prompt$/i, 'Plan the work.', N.member);
+            await t.type('textarea', /^Instructions for this agent$/i, 'Plan the work.', N.member);
             await t.click('button', /^Next$/i, N.member); await settle(200);
             await ev(`(() => { const d = window.__nt.dlg(${N.member}); const tab = [...d.querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === 'Agent'); if (tab) tab.click(); return true; })()`); await settle(250);
             assert.ok(await ev(`(() => { const d = window.__nt.dlg(${N.member}); const g = [...d.querySelectorAll('[role=radiogroup]')].find(e => /^Provider$/i.test(window.__na.name(e))); const s = window.__nt.find(d, 'select', /^Provider$/i); if (s) { const o = [...s.options].find(o => /Codex/.test(o.textContent)); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; } if (!g) return false; window.__na.radios(g).find(x => /Codex/.test(window.__na.radioName(x))).click(); return true; })()`), 'a Provider control with Codex'); await settle(500);
