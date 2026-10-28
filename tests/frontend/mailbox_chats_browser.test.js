@@ -24,6 +24,7 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
     const open = async (w, h, mobile, failBig = false) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
         await Emulation.setTimezoneOverride({ timezoneId: 'Asia/Kolkata' }); // a clock whose morning is before the seeded 12:59 chats: the case a runner in UTC is in (#9864)
+        await ev(`try { localStorage.removeItem('coral-last-place'); } catch (e) {} true`).catch(() => {}); // the dashboard reopens the chat the person left (#10057): a chat opened by an earlier step would be reopened, and read, on this load
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(`window.__failBig = ${failBig}; true`); await stub();
         // the seeded chats are stamped at fixed hours of today: on a runner whose clock is before them they are in the future of a marker that began now and would count as unread. A first load with no marker gets one that began tomorrow, so nothing is unread whatever the hour (parts 6 and after set their own).
