@@ -11,7 +11,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
-        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'pinned_folders.js'); m.showOpenFolderModal(); return true; })()`);
+        await ev(`window.showOpenFolderModal(); true`); // the entry point a click reaches
         await waitFor(`getComputedStyle(document.getElementById('open-folder-modal')).display !== 'none'`, 'the dialog', 4000);
         const err = () => ev(`(() => { const e = document.getElementById('open-folder-error'); return e.hidden ? '' : e.textContent; })()`);
         // empty: the line says what to do; typing clears it

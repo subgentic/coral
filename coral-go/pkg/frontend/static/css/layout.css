@@ -661,6 +661,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .welcome-launch-list > .welcome-launch:first-child .welcome-launch-arrow { color: var(--accent); }
 .welcome-launch-list > .welcome-launch:first-child .welcome-launch-copy span { color: var(--text-secondary); } /* 4.5:1 on the tint in the light theme */
 .welcome-links { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 28px; }
+.welcome-links [hidden] { display: none; }
+.welcome-link-out { font-size: var(--fs-sm); opacity: 0.7; margin-left: -2px; } /* a link that leaves Coral says so (#10572) */
 .welcome-links a,
 .welcome-links button { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: var(--fs-md); text-decoration: none; background: none; border: none; padding: 0; font-family: inherit; cursor: pointer; }
 .welcome-links a:hover,
