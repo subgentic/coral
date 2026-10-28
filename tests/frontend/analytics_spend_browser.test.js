@@ -56,10 +56,10 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             assert.match(how, /counts, not proof of who did the work/); assert.match(how, /shared by several teams, Unattributed can include other teams/);
         });
         await run('commits that could not be read are said with their reason, not as zero', async () => {
-            await ev(`window.__spend = { ...window.__spend, commits: { available: false, reason: 'no repository found for this team', window: null, usual: null, unattributed: 0 } }; true`);
+            await ev(`window.__spend = { ...window.__spend, commits: { available: false, reason: "the repository's history could not be read", window: null, usual: null, unattributed: 0 } }; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/Commits could not be read/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'the reason', 6000);
-            assert.equal(await text('#cost-spend .spend-headline'), 'Commits could not be read: no repository found for this team. 3.1M tokens were spent.');
+            assert.equal(await text('#cost-spend .spend-headline'), 'Commits could not be read: the repository\'s history could not be read. 3.1M tokens were spent.');
             await ev(`window.__spend = ${JSON.stringify(FIX)}; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/516.7K tokens per commit/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'back to normal', 6000);
@@ -130,6 +130,13 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/No commit landed/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'the no-commit headline', 6000);
             assert.equal(await text('#cost-spend .spend-headline'), 'No commit landed in 24 h. 3.1M tokens were spent.');
+        });
+        await run('Tokens per commit says it needs a git folder when none of the team is in one (#10482)', async () => {
+            await ev(`window.__spend = { ...window.__spend, commits: { available: false, reason: "no repository found for this board's agents", window: 0, usual: 0, unattributed: 0 } }; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
+            await waitFor(`/git folder/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'the git folder line', 6000);
+            assert.equal(await text('#cost-spend .spend-headline'), 'Tokens per commit needs a git folder, and none of this team\'s agents is in one. 3.1M tokens were spent.');
+            await ev(`window.__spend = ${JSON.stringify(FIX)}; true`);
         });
         await run('the 7 day range asks range=7d; a 404 says there is no data', async () => {
             await ev(`document.getElementById('cost-time-range').value = 'week'; document.getElementById('cost-time-range').dispatchEvent(new Event('change', { bubbles: true })); true`);
