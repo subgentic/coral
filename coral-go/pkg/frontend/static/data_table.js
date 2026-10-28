@@ -197,11 +197,19 @@ export function dataTable(cfg) {
         if (cfg.layout !== 'fixed' && !cfg.oneLine) table.style.tableLayout = any ? 'fixed' : '';
         if (!any) { table.style.width = ''; return; }
         if (sel) { const k = el('col'); k.style.width = 'var(--table-check-w)'; colgroup.append(k); }
-        for (const c of columns) { const k = el('col'); if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; else if (fixedW(c)) k.style.width = fixedW(c); if (emptyKeys.has(c.key)) k.classList.add('dt-col-unused'); colgroup.append(k); }
-        // Every column has a width (the flexible name column's own separator was used): the table is as wide as its columns, not 100%. A fixed table at 100% spreads what is left over
-        // across ALL its columns, so shrinking one column grew the others (#9228); this way a column's separator changes that column alone, and the table scrolls or ends short of the box.
         const shown = columns.filter(c => !emptyKeys.has(c.key)), all = shown.every(c => st.widths[c.key] || fixedW(c));
-        table.style.width = all ? `calc(${sel ? 'var(--table-check-w) + ' : ''}${shown.map(c => st.widths[c.key] ? `${st.widths[c.key]}px` : fixedW(c)).join(' + ')})` : '';
+        const part = c => (st.widths[c.key] ? `${st.widths[c.key]}px` : fixedW(c)), checkW = sel ? ['var(--table-check-w)'] : [];
+        // Every column has a width (the flexible name column's own separator was used): the table is as wide as its columns, never narrower than its box. A fixed table at 100% spreads what is left over
+        // across ALL its columns, so shrinking one column grew the others (#9228); so the last column that can be resized takes what the others leave, up to the box's edge (#10443: dragging the last
+        // column's right edge left ended the table short of the card, cut its words and left a scrollbar over empty space), and a column's separator changes that column alone. Wider than the box, the table scrolls.
+        const fill = all ? [...shown].reverse().find(c => !c.fixed) : null;
+        for (const c of columns) {
+            const k = el('col');
+            if (c === fill) k.style.width = `max(${part(c)}, calc(100% - (${[...checkW, ...shown.filter(x => x !== c).map(part)].join(' + ') || '0px'})))`;
+            else if (st.widths[c.key]) k.style.width = `${st.widths[c.key]}px`; else if (fixedW(c)) k.style.width = fixedW(c);
+            if (emptyKeys.has(c.key)) k.classList.add('dt-col-unused'); colgroup.append(k);
+        }
+        table.style.width = all ? `max(calc(${[...checkW, ...shown.map(part)].join(' + ')}), 100%)` : '';
     }
     /** The first resize freezes the other columns at the widths they have (the title column, 'grow', takes whatever is left) so nothing jumps. */
     function freezeWidths() {
