@@ -387,6 +387,12 @@ function _applyMember() {
     _syncLaunchBlock();
     _launchStage(m.row ? 'agent' : 'persona'); // an existing member opens on its settings, a new one on its role
     if (!m.row) name?.focus(); // the role is the first thing a new member needs
+    // A member that has its own role and prompt is not "Blank: no persona": the persona choice says Custom (#10314); a new member keeps Blank
+    const pick = document.getElementById('launch-persona-select');
+    if (pick && m.row && (m.value.name || m.value.prompt)) {
+        if (!pick.querySelector('option[value="__custom__"]')) { const o = document.createElement('option'); o.value = '__custom__'; o.textContent = "Custom: this member's own role and prompt"; pick.options[0].after(o); }
+        pick.value = '__custom__';
+    }
 }
 
 /** The parts of Add agent that the dialog shows: the title, the folder, and where it starts. */
