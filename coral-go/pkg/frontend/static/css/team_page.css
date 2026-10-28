@@ -354,6 +354,7 @@
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {
     .inbox-review-actions button { min-height: 44px; }
+    .inbox-review-actions-star { column-gap: 4px; } /* the starred glyph is a fourth cell: 8 px gaps put the actions 3 px over the line, under the name (#9904) */
     .inbox-review-team { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); line-height: var(--lh-label); color: var(--table-tertiary-color); }
 }
 /* A team no board has (#8848): its name and the way back, none of a team's tabs, panels or actions */
