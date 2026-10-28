@@ -72,6 +72,10 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 		}
 		result, err := h.ss.ListSessionsPaged(r.Context(), agentParams)
 		if err != nil {
+			if agentParams.Search != "" { // a search that failed is said so, in words the page shows (#10137): the page used to wait for ever on the 500
+				writeError(w, http.StatusBadRequest, "search_failed", "Search failed: try other words")
+				return
+			}
 			errInternalServer(w, err.Error())
 			return
 		}
@@ -226,7 +230,7 @@ func historyFiltered(params store.SessionListParams) bool {
 func agentHistoryRows(sessions []store.SessionListItem) []map[string]any {
 	rows := make([]map[string]any, 0, len(sessions))
 	for _, s := range sessions {
-		rows = append(rows, map[string]any{
+		row := map[string]any{
 			"session_id":         s.SessionID,
 			"starred":            s.Starred,
 			"archived":           s.Archived,
@@ -246,7 +250,11 @@ func agentHistoryRows(sessions []store.SessionListItem) []map[string]any {
 			"agent_name":         s.AgentName,
 			"display_name":       s.DisplayName,
 			"type":               "agent",
-		})
+		}
+		if s.Snippet != "" { // a search's hit: one line of the chat's text around the matched words (#10137)
+			row["snippet"] = s.Snippet
+		}
+		rows = append(rows, row)
 	}
 	return rows
 }

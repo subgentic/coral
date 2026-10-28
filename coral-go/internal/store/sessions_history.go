@@ -6,6 +6,7 @@ import (
 	"github.com/subgentic/coral/internal/clitext"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/jmoiron/sqlx"
 
@@ -61,6 +62,8 @@ type SessionListItem struct {
 	DurationSec      *int    `json:"duration_sec"`
 	AgentName        string  `json:"agent_name,omitempty"`
 	DisplayName      string  `json:"display_name,omitempty"`
+	// Snippet is, for a search, one line of the chat's text around the matched words (#10137); empty without a search.
+	Snippet string `json:"snippet,omitempty"`
 }
 
 // ListSessionsPaged returns a paginated, filtered list of sessions.
@@ -107,6 +110,7 @@ func (s *SessionStore) ListSessionsPaged(ctx context.Context, params SessionList
 type sessionListSQL struct {
 	from, where, order string
 	args               []interface{}
+	searching          bool // a full-text search is joined in: the rows can carry a snippet
 }
 
 // sessionListQuery turns the list's filters into SQL: a full-text search (ordered by rank), the dates, the
@@ -133,6 +137,7 @@ func sessionListQuery(params SessionListParams) sessionListSQL {
 			q.from += " JOIN session_fts fts ON fts.session_id = si.session_id"
 			where("session_fts MATCH ?", safeQ)
 			q.order = "rank"
+			q.searching = true
 		}
 	}
 	if params.DateFrom != "" {
@@ -183,6 +188,7 @@ type sessionPageRow struct {
 	FirstUserMessage string  `db:"first_user_message"`
 	AgentName        *string `db:"agent_name"`
 	DisplayName      *string `db:"display_name"`
+	Snippet          string  `db:"snippet"`
 }
 
 // pageSessions counts the sessions the query matches and reads the requested page of them.
@@ -199,6 +205,12 @@ func (s *SessionStore) pageSessions(ctx context.Context, q sessionListSQL, param
 	selectFields := `si.session_id, si.source_type, si.source_file,
 		si.first_timestamp, si.last_timestamp, si.message_count, si.display_summary, si.first_user_message,
 		si.agent_name, si.display_name, COALESCE(cf.starred,0) AS starred, ` + archivedChatSQL("si.session_id") + ` AS archived, ` + activeChatSQL("si.session_id", "si.source_type") + ` AS active`
+	if q.searching {
+		// one line of the chat's own text around the matched words: FTS5's snippet() over the body column, 12 tokens, no markers
+		selectFields += `, snippet(session_fts, 1, '', '', ' … ', 12) AS snippet`
+	} else {
+		selectFields += `, '' AS snippet`
+	}
 	query, pageArgs, err := sqlx.In(fmt.Sprintf("SELECT %s FROM %s%s ORDER BY %s LIMIT ? OFFSET ?", selectFields, q.from, q.where, q.order),
 		append(q.args, params.PageSize, offset)...)
 	if err != nil {
@@ -378,6 +390,7 @@ func (x sessionListExtras) item(r sessionPageRow) SessionListItem {
 		DurationSec:      computeDuration(r.FirstTimestamp, r.LastTimestamp),
 		AgentName:        agentName,
 		DisplayName:      displayName,
+		Snippet:          oneLine(r.Snippet, 200),
 	}
 }
 
@@ -573,4 +586,29 @@ func (s *SessionStore) GetSessionAncestry(ctx context.Context, sessionID string)
 	}
 
 	return lineage, nil
+}
+
+// oneLine is s as a single line of at most max runes: line breaks and runs of white space become one space, control and format characters (a transcript's own text) are dropped.
+func oneLine(s string, max int) string {
+	var b strings.Builder
+	space, n := false, 0
+	for _, r := range s {
+		switch {
+		case unicode.IsSpace(r):
+			space = b.Len() > 0
+			continue
+		case unicode.IsControl(r) || unicode.Is(unicode.Cf, r):
+			continue
+		}
+		if space {
+			b.WriteRune(' ')
+			n++
+			space = false
+		}
+		if n++; n > max {
+			break
+		}
+		b.WriteRune(r)
+	}
+	return strings.TrimSpace(b.String())
 }
