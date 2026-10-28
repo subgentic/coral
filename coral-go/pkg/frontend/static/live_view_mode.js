@@ -57,7 +57,7 @@ export function applyLiveViewMode(override) {
     const pane = document.getElementById("command-pane");
     if (pane) pane.classList.toggle("chat-mode", mode === "chat");
     // The two inputs look alike: in the Terminal view the box under it is a message, not the terminal (#6676).
-    document.getElementById('command-input')?.setAttribute('aria-label', mode === 'chat' ? 'Enter command or paste image' : 'Message to the agent, not typed into the terminal');
+    document.getElementById('command-input')?.setAttribute('aria-label', mode === 'chat' ? 'Message' : 'Message to the agent, not typed into the terminal');
     autosizeCommandInput();
     for (const m of ["terminal", "chat"]) {
         const btn = document.getElementById(`live-view-btn-${m}`);
