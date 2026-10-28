@@ -66,5 +66,11 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelector('#team-panel-goals #goal-tab-artifacts').getAttribute('aria-selected')`), 'true', 'still on the Artifacts tab');
         console.log('   ✓');
         console.log('PASS goal artifacts list: 20 then Load more, 5 on a phone, only the goal\'s files, the count and the open list follow the rollup');
+        console.log('N. A goal with no artifacts says how a file gets there (#10157)');
+        const empty = await goal('Nothing yet');
+        await mount(empty);
+        await waitFor(`/No artifacts yet/.test(document.getElementById('ga-host').textContent)`, 'the empty line', 10000);
+        assert.equal(await ev(`document.querySelector('#ga-host .goals-note').textContent`), 'No artifacts yet. An agent shares a file when it finishes a task with one.');
+        console.log('   ✓');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

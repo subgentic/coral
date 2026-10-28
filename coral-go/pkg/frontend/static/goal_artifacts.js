@@ -50,7 +50,7 @@ export function mountGoalArtifactsList(host, { team, goalId, onOpen = () => {}, 
     function draw() {
         host.replaceChildren();
         if (!st.loadedOnce) { host.append(el('p', 'goals-note', st.failed ? 'The artifacts could not be read.' : 'Loading…')); return; }
-        if (!st.items.length) { host.append(el('p', 'goals-note', 'No artifacts yet')); return; }
+        if (!st.items.length) { host.append(el('p', 'goals-note', 'No artifacts yet. An agent shares a file when it finishes a task with one.')); return; }
         const rows = orderByGroup(st.items, 'task'); // a task's files together; the newest task first, as the server sorts
         const table = artifactTable({
             label: `Artifacts of this goal, ${rows.length}`, bare: true, compact: true, fold: 'none', rows, rowKey: itemKey, rowName: readableName, state: st.tableState, sortBar: false,

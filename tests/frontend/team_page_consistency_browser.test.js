@@ -52,7 +52,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             await ev(`window.__avail = 'unknown'; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`); await settle(700);
             const st = await status();
-            assert.match(st, /waiting for first signal/i, `got ${JSON.stringify(st)}`);
+            assert.match(st, /waiting for first signal\. Agents report in when they start\./i, `got ${JSON.stringify(st)}`);
             assert.doesNotMatch(st, /All well/);
             const dot = await ev(`(() => { const s = document.getElementById('team-page-status'); return { cls: s.className, dot: getComputedStyle(s.querySelector('.team-status-dot')).backgroundColor, success: (() => { const p = document.createElement('i'); p.style.color = 'var(--success)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })() }; })()`);
             assert.ok(!/well/.test(dot.cls) && dot.dot !== dot.success, `not the green of All well: ${JSON.stringify(dot)}`);

@@ -3256,6 +3256,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .pw-toggle { flex: none; background: none; border: 0; color: var(--accent);
     font-size: var(--fs-md); cursor: pointer; padding: 6px 8px; }
 .pw-form > .btn { margin: 8px 0 0; max-width: 100%; } /* the Change password button starts at the fields' left edge (.btn-small's 20 px side margin put it 20 px in) and may take two lines in a narrow dialog */
+.pw-note.pw-not-now { margin: 0 0 14px; } /* the line under the lead has room before the Password label */
 .pw-meter { height: 6px; border-radius: var(--radius-xs); background: var(--bg-tertiary); overflow: hidden; margin: 2px 0 4px; }
 .pw-meter > i { display: block; height: 100%; width: 0; border-radius: var(--radius-xs); background: #d4a72c; transition: width .15s; }
 .pw-strength[data-level="strong"] .pw-meter > i { background: var(--fx-green); }
