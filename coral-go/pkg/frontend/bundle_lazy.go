@@ -41,7 +41,7 @@ type LazyGroup struct {
 // and Analytics (the dashboard, its views, charts, an agent's page and the two team views). Each was 4 to 6 files plus their stubs. The shared pieces the Inbox loads too
 // (the folder list, the toolbar) stay files of their own, so the Inbox's first visit does not load Automations.
 var LazyGroups = []LazyGroup{
-	{Main: "automations.js", Members: []string{"workflow_run_html.js", "workflow_agent.js", "workflow_editor.js", "workflows.js", "automation_filters.js"}},
+	{Main: "automations.js", Members: []string{"workflow_run_html.js", "workflow_agent.js", "time_limit.js", "workflow_editor.js", "workflows.js", "automation_filters.js"}},
 	{Main: "cost_dashboard.js", Members: []string{"cost_data.js", "analytics_views.js", "analytics_series.js", "analytics_agent.js", "analytics_spend.js", "analytics_efficiency.js"}},
 }
 
