@@ -62,7 +62,7 @@ const fixture = [
         assert.deepEqual(g[1].inside, ['notice', 'tool'], 'unread notice, read: the steps of the turn');
         assert.equal(g[1].count, '2 steps'); assert.equal(g[1].label, 'Read new board messages');
         assert.deepEqual(g[2].inside, ['notice', 'tool']); assert.equal(g[2].count, '2 steps'); assert.equal(g[2].label, 'Read health check and list open tasks');
-        assert.deepEqual(g[3].inside, ['notice']); assert.equal(g[3].count, '1 step'); assert.ok(/^You have 2 unread messages/.test(g[3].label), 'a notice alone labels its group with its text');
+        assert.deepEqual(g[3].inside, ['notice']); assert.equal(g[3].count, 'Coral reminder'); assert.ok(/^You have 2 unread messages/.test(g[3].label), 'a notice alone labels its group with its text');
         assert.deepEqual(g[4].inside, ['notice', 'tool']); assert.equal(g[4].label, 'Read the board'); // stop-hook feedback folds as a notice
         assert.deepEqual(g[5].inside, ['tool', 'notice', 'tool']); assert.equal(g[5].count, '3 steps'); // a notice inside the user's own turn is one of its steps
         assert.ok(g.every(x => !x.open), 'groups are collapsed');
