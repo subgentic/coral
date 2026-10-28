@@ -4,7 +4,7 @@ import { syncQueuedFromRow, paint as paintQueued } from './held_sends.js';
 import { _gitStateSummary, _repoBranch, presentationSessionState } from './session_state.js';
 import { startupSignedOut } from './signin_line.js';
 import { syncAgentKeys } from './agent_keys.js';
-import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill } from './dom_write.js';
+import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill, setAttr } from './dom_write.js';
 import { modelName, sessionLevel } from './model_labels.js';
 import { sessionServer } from './server_base.js';
 
@@ -24,7 +24,7 @@ let _headerHasBranch = false;
 function _syncHeaderFolder() {
     // The header has no folder of its own (the operator, #9837): the full path is the hover and keyboard-focus tip on the agent's name (data-folder on the header, drawn by the stylesheet), and the Details disclosure has it.
     const el = document.querySelector("#live-session-view .terminal-header");
-    if (el) { if (_headerDir) el.dataset.folder = _headerDir; else el.removeAttribute('data-folder'); }
+    if (el) { if (_headerDir) setAttr(el, 'data-folder', _headerDir); else if (el.hasAttribute('data-folder')) el.removeAttribute('data-folder'); } // written only when it changes: a message that changes nothing writes nothing (perf_budgets, #9919)
 }
 
 /** The model, thinking level and context of the open agent, in the Details disclosure (#9686: the agent row is one line and no longer says them; #9837: neither does the header; the composer's chips still change them). */
