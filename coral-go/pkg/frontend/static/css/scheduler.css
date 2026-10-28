@@ -215,6 +215,14 @@
 
 /* The Jobs fixes of #7121: a run's When is the link into the run; the checkbox of an agent job sits beside its label (a phone rule had made the label a block); a phone's job has a back row to the list. */
 #job-modal .flag-shortcut-btn { margin: 0; }
+/* The New job form is taller than a short window: a soft edge at the foot (and the head, once scrolled) says there is more below, where the Prompt is (#10276). The covers scroll with the content (local), the shades stay (scroll). */
+#job-modal .modal-body {
+    background:
+        linear-gradient(var(--bg-secondary) 30%, transparent) top / 100% 28px no-repeat local,
+        linear-gradient(transparent, var(--bg-secondary) 70%) bottom / 100% 28px no-repeat local,
+        linear-gradient(var(--border), transparent) top / 100% 10px no-repeat scroll,
+        linear-gradient(transparent, var(--border)) bottom / 100% 10px no-repeat scroll;
+}
 .sched-back { display: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .sched-back { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); margin: 0 0 4px; }

@@ -870,6 +870,19 @@
                 <h3 id="job-modal-title">New job</h3>
             </div>
             <div class="modal-body" id="job-form" data-coral-root="{{ .CoralRoot }}"></div>
+            <div id="job-form-parts" hidden>
+                <button class="btn" id="btn-browse-job" type="button" data-on-click="m-toggle-browser" data-browser="job-modal-repo dir-browser-job browser-list-job browser-current-path-job">Browse</button>
+                <div id="dir-browser-job" class="dir-browser" style="display:none">
+                    <div class="dir-browser-header">
+                        <button class="btn btn-small dir-browser-up" type="button" data-on-click="m-browser-navigate-up" title="Go up">..</button>
+                        <span class="dir-browser-path" id="browser-current-path-job">~</span>
+                        <button class="btn btn-small btn-primary dir-browser-use" type="button" data-on-click="m-browser-use" title="Use this folder and close the list">Use this folder</button>
+                    </div>
+                    <ul class="dir-browser-list" id="browser-list-job">
+                        <li class="empty-state">Loading...</li>
+                    </ul>
+                </div>
+            </div>
             <div class="modal-actions modal-footer" id="job-footer"></div>
         </div>
     </div>
