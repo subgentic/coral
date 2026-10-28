@@ -111,6 +111,12 @@ func TestListSessionsPagedAgreesWithBefore4756(t *testing.T) {
 		}
 		want, werr := s.listSessionsPagedBefore4756(ctx, p)
 		got, gerr := s.ListSessionsPaged(ctx, p)
+		if got != nil {
+			// the hit line (#10137) is new since the oracle's code: the rows are compared without it
+			for i := range got.Sessions {
+				got.Sessions[i].Snippet = ""
+			}
+		}
 		require.Equal(t, werr, gerr, "seed %d %+v", seed, p)
 		require.Equal(t, want, got, "seed %d %+v", seed, p)
 		if got == nil {

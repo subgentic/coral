@@ -365,10 +365,10 @@ func TestSanitizeFTSQuery(t *testing.T) {
 	}{
 		{"empty", "", "phrase", ""},
 		{"phrase mode", "hello world", "phrase", `"hello world"`},
-		{"and mode", "hello world", "and", "hello AND world"},
-		{"or mode", "hello world", "or", "hello OR world"},
-		{"strips operators", "hello AND world OR NOT foo", "and", "hello AND world AND foo"},
-		{"quoted phrases", `"exact phrase" other`, "and", `"exact phrase" AND other`},
+		{"and mode", "hello world", "and", `"hello" AND "world"`},
+		{"or mode", "hello world", "or", `"hello" OR "world"`},
+		{"strips operators", "hello AND world OR NOT foo", "and", `"hello" AND "world" AND "foo"`},
+		{"quoted phrases", `"exact phrase" other`, "and", `"exact phrase" AND "other"`},
 		{"invalid mode defaults", "hello", "invalid", `"hello"`},
 	}
 

@@ -68,7 +68,9 @@ func (s *SessionStore) UpsertFTSBatch(ctx context.Context, items []FTSItem) erro
 	return nil
 }
 
-// sanitizeFTSQuery translates a user query into a safe FTS5 expression.
+// sanitizeFTSQuery translates a user query into a safe FTS5 expression. Every term is made a quoted FTS5 string, so what a person types is a word and never FTS5 syntax: a code like PLUM-4471,
+// a version v2.0.3, an address a@b.example, "-", "(", "a:b" and the rest are searched for, not parsed (#10137: a bare hyphen was an FTS5 syntax error and the page waited for ever). Quoted
+// phrases stay phrases; a trailing * on a word is a prefix search; AND, OR and NOT typed as words are left out, as before.
 func sanitizeFTSQuery(raw, mode string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -90,19 +92,26 @@ func sanitizeFTSQuery(raw, mode string) string {
 		return `"` + cleaned + `"`
 	}
 
-	// Tokenize: keep "quoted phrases" together, split bare words
+	// Tokenize: keep "quoted phrases" together (a quote never closed runs to the end), split bare words
 	var tokens []string
+	quote := func(s string) string {
+		s = strings.TrimSpace(strings.ReplaceAll(s, `"`, " "))
+		if s == "" {
+			return ""
+		}
+		return `"` + s + `"`
+	}
 	i := 0
 	for i < len(raw) {
 		if raw[i] == '"' {
 			j := strings.IndexByte(raw[i+1:], '"')
-			var end int
-			if j == -1 {
-				end = len(raw) - 1
-			} else {
+			end := len(raw)
+			if j != -1 {
 				end = i + 1 + j
 			}
-			tokens = append(tokens, raw[i:end+1])
+			if q := quote(raw[i+1 : end]); q != "" {
+				tokens = append(tokens, q)
+			}
 			i = end + 1
 		} else if raw[i] == ' ' || raw[i] == '\t' {
 			i++
@@ -114,7 +123,13 @@ func sanitizeFTSQuery(raw, mode string) string {
 			word := raw[i:j]
 			upper := strings.ToUpper(word)
 			if upper != "AND" && upper != "OR" && upper != "NOT" {
-				tokens = append(tokens, word)
+				prefix := strings.HasSuffix(word, "*")
+				if q := quote(strings.TrimRight(word, "*")); q != "" {
+					if prefix {
+						q += "*"
+					}
+					tokens = append(tokens, q)
+				}
 			}
 			i = j
 		}
