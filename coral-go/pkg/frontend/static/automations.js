@@ -316,7 +316,8 @@ function mount() {
     mounted = true;
     onJobsChanged(() => renderNav());
     W.onWorkflowsChanged(() => renderNav());
-    onLiveRuns(() => { renderNav(); AR.refreshRuns(); });
+    let going = new Set(liveRuns().map(r => r.id)); // a run that was going and is not now has ended: the finished list is read at once, so Recent runs and Failed follow it as the job page does (#10734), not at the next 30 s read
+    onLiveRuns(() => { const now = new Set(liveRuns().map(r => r.id)); const ended = [...going].some(id => !now.has(id)); going = now; renderNav(); AR.refreshRuns(ended); });
     AR.onRunsChanged(() => renderNav());
     AR.startRuns();
     W.refreshWorkflows();
