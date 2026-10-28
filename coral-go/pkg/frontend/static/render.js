@@ -10,7 +10,7 @@ import './hub_access.js';
 import { sessionServer, noteBoardLabels, sessionTeamKey } from './server_base.js';
 import './sleeping_view.js';
 import './knowledge_distill.js';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, showToast } from './utils.js';
 import { registerActions, idOf, tokenOf, textOf } from './actions.js';
 import './live_chat.js';
 import './tags.js';
@@ -280,6 +280,16 @@ function emptyListHtml(unfilteredCount) {
     return 'No agents match these filters. <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-filters-clear">Clear filters</button>';
 }
 
+// One Tab stop for the whole agent list (#10579, like the Inbox's list): the row the keyboard was last on, else the open agent, else the first row that is shown; Up, Down, Home and End move between the rows.
+// It is written into the markup (the same string is drawn and parsed again), so a redraw never has two stops.
+let rowStop = ''; // the session id of the row the keyboard moved to
+function oneRowStop(html) {
+    const rows = [...html.matchAll(/<li class="session-group-item([^"]*)"[^>]*?data-session-id="([^"]*)"/g)].map(m => ({ cls: m[1], sid: m[2] }));
+    if (!rows.length) return html;
+    const stop = (rows.find(r => r.sid === rowStop) || rows.find(r => / active /.test(`${r.cls} `)) || rows.find(r => !/ collapsed/.test(r.cls)) || rows[0]).sid;
+    return html.replace(/(<li class="session-group-item[^"]*"[^>]*?)tabindex="0"([^>]*?data-session-id="([^"]*)")/g, (all, a, b, sid) => `${a}tabindex="${sid === stop ? 0 : -1}"${b}`);
+}
+
 function _renderLiveSessions(sessions) {
     // Single-agent popout: the sidebar is chrome. Never render rows there —
     // they would carry session ids and destructive kebab actions into the DOM.
@@ -346,6 +356,7 @@ function _renderLiveSessions(sessions) {
     }
 
     html += _renderArchivedSection(archived);
+    html = oneRowStop(html);
     _applyListHtml(list, html, focusedSid, focusedInMenu);
     syncGroupToggle(); // the header's Collapse / Expand toggle reads the headers just drawn (#4947)
     _refreshTeamBadges(sessions);
@@ -390,6 +401,16 @@ function _wireListKeyboard(container) {
         }
         const row = e.target.closest ? e.target.closest('.session-group-item') : null;
         if (!row || e.target !== row) return; // only the row itself, never its inner controls
+        if (!e.altKey && !e.ctrlKey && !e.metaKey && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) { // Up and Down move between the rows, Home and End to the ends: the list is one Tab stop (#10579)
+            const rows = [...container.querySelectorAll('.session-group-item[data-session-id]')].filter(r => r.getClientRects().length), i = rows.indexOf(row);
+            const to = e.key === 'ArrowDown' ? Math.min(rows.length - 1, i + 1) : e.key === 'ArrowUp' ? Math.max(0, i - 1) : e.key === 'Home' ? 0 : rows.length - 1;
+            e.preventDefault();
+            if (to < 0 || !rows[to]) return;
+            rowStop = rows[to].dataset.sessionId || '';
+            for (const r of container.querySelectorAll('.session-group-item')) r.tabIndex = r === rows[to] ? 0 : -1;
+            rows[to].focus();
+            return;
+        }
         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
             e.preventDefault(); // Space must not scroll the pane or start a drag
             row.click();
@@ -409,6 +430,7 @@ function _wireListKeyboard(container) {
 
 
 registerActions({
+    'skip-to-message': (el, event) => { event.preventDefault(); const box = document.getElementById('command-input'); if (box && box.getClientRects().length) box.focus(); else showToast('Open an agent first: its message box is there.'); }, // the sidebar's skip link (#10579)
     'agent-search-clear': () => { const i = document.getElementById('agent-search-input'); if (i) { i.value = ''; i.focus(); } filterLiveAgents(''); },
     'agent-filters-clear': () => { setListFilters(_NO_LIST_FILTERS); redrawLiveList(); },
     'kebab-close': (el, event) => { event.stopPropagation(); window.closeSidebarKebabs(); },

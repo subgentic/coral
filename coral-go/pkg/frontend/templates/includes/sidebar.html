@@ -17,6 +17,7 @@
 
             <!-- One pane per tab (#7443): each holds the shared header, its list and its pinned action, so a phone's page can take the whole pane. The header's parts keep one place on every tab. -->
             <div class="sidebar-pane" data-pane="agents">
+                <a href="#command-input" class="skip-link" data-on-click="skip-to-message">Skip to message box</a>
                 {{ template "includes/sidebar_header" "agents" }}
                 <button type="button" class="btn btn-quiet btn-small sidebar-search-all" id="agent-search-all-chats" data-on-click="search-all-chats" hidden></button><!-- the search words as a search of every chat (#10050) -->
                 <section class="sidebar-section" data-section="live-sessions">
