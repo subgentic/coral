@@ -150,6 +150,6 @@ body.native-inbox [data-native-inbox-hides] { display: none !important; }
 .cs-page-name { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .cs-page-name .machine-health-dot { flex: none; }
 .cs-page:focus { outline: none; } /* the page takes the keyboard when it opens: the heading says where it is, no ring round the whole page */
-.cs-facts .cs-launch select { width: auto; min-width: 10rem; max-width: 100%; }
+.cs-facts .cs-launch select { width: auto; min-width: min(10rem, 100%); max-width: 100%; } /* the min is of the value's own width: at 200% on a phone 10 rem is wider than the column and its min beat the max, so the select ran off the screen (#9804) */
 .cs-access-details > .cs-access-info { padding-inline-start: 0; margin-inline-start: 0; } /* its icon starts where the text above does (the .btn-small padding comes later in the cascade) */
 .cs-facts { align-items: baseline; } /* a label sits on its value's text line: the Hub access select is taller than a word and its label was 6 px above its text (#9798) */
