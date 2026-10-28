@@ -39,7 +39,7 @@ const { connect } = require('./agent_view_harness');
                 };
                 feed(); return true;
             })()`);
-            await waitFor(`!!document.querySelector('[data-session-id="hint-codex-id"]')`, 'hint row rendered', { timeout: 5000 });
+            await waitFor(`!!document.querySelector('[data-session-id="hint-codex-id"]')`, 'hint row rendered', 10000, 'snapshot()');
             const quiet = await ev('snapshot()');
             assert.equal(quiet.authoritative, 'needs_input'); assert.equal(quiet.display, 'working');
             assert.equal(quiet.count, 0); assert.equal(quiet.attention, false); assert.equal(quiet.card, false);
@@ -55,7 +55,7 @@ const { connect } = require('./agent_view_harness');
             assert.equal(await ev(`C.promptOptionsBySession.set(a.session_id, { question: 'Approve?', options: [{ n: 1, label: 'Yes', action: '1' }] }); feed(); !!card.querySelector('.chat-needs-input')`), true);
             await ev(`C.promptOptionsBySession.delete(a.session_id); document.querySelectorAll('.notification-toast').forEach(e => e.remove()); feed({}, 9000); true`);
             // No feed arrives: the product lease timer must repaint row/count itself.
-            await waitFor(`I.waitingCount() === 1 && document.querySelector('[data-session-id="hint-codex-id"].needs-attention')`, 'socket stall restores attention', { timeout: 4000 });
+            await waitFor(`I.waitingCount() === 1 && document.querySelector('[data-session-id="hint-codex-id"].needs-attention')`, 'socket stall restores attention', 10000, 'snapshot()'); // a number of ms, with the row's state printed when it fails: the options object that was here made the wait endless (a hung suite the runner killed at 120 s)
             assert.equal(await ev(`T.state.liveSessions[0].waiting_for_input && T.state.liveSessions[0].held_messages[0].id === 'held-1'`), true);
             assert.equal(await ev(`__m.requests.filter(r => ['send', 'keys', 'held'].includes(r.kind)).length`), 0, 'presentation sent no input');
             console.log(`PASS #7974 ${width}px: authoritative wait held, UI quiet, ambiguous states and stale lease restore attention`);
