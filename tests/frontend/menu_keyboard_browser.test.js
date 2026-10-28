@@ -35,9 +35,9 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'ArrowDown on the button opens the menu', 4000);
             const first = await active(); const items = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].filter(i => i.getClientRects().length).map(i => i.lastElementChild.textContent.trim())`);
             assert.equal(first, items[0], 'the focus is on the first entry: ' + first + ' of ' + JSON.stringify(items));
-            // Saved for later is the bookmark here as everywhere else (#9160): the top bar's drawing, not the font's star
-            const savedIcon = await ev(`(() => { const e = [...document.querySelectorAll('#nav-more-menu .nav-more-item')].find(i => /^Saved for later/.test(i.lastElementChild.textContent.trim())); return e ? { svg: !!e.querySelector('.nav-more-drawn svg path'), star: [...e.querySelectorAll('.material-icons')].some(x => x.textContent.trim() === 'star'), w: Math.round(e.querySelector('.nav-more-drawn') ? e.querySelector('.nav-more-drawn').getBoundingClientRect().width : 0) } : null; })()`);
-            assert.deepEqual(savedIcon, { svg: true, star: false, w: 20 }, 'the Saved entry shows the bookmark drawing at the font size, not a star: ' + JSON.stringify(savedIcon));
+            // Saved for later is the Inbox's folder, not an entry of the top bar (#9929, the Operator): the hamburger has no entry for it, and so no bookmark or star drawing for one
+            const savedEntries = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].filter(i => /^Saved/.test(i.lastElementChild.textContent.trim())).length`);
+            assert.equal(savedEntries, 0, 'the hamburger has no Saved entry: ' + JSON.stringify(items));
             await press('ArrowDown', KEYS.ArrowDown); assert.equal(await active(), items[1], 'ArrowDown goes to the next entry');
             await press('End', KEYS.End); assert.equal(await active(), items.at(-1), 'End goes to the last');
             await press('ArrowDown', KEYS.ArrowDown); assert.equal(await active(), items[0], 'ArrowDown wraps to the first');
