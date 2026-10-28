@@ -800,6 +800,7 @@ async function addFirstTask(key, lead, goal, saveGoal = false) {
             });
             if (!g.ok) throw new Error(String(g.status));
             goalId = Number((await g.json()).id) || null;
+            if (goalId) showToast("Your first task is saved as the team's goal: it is on the Goals tab."); // the Goals 1 that appears says where it came from (#10532)
         } catch { showToast('The team started, but its goal was not saved. Add it on the Goals tab.', true); }
     }
     try {
